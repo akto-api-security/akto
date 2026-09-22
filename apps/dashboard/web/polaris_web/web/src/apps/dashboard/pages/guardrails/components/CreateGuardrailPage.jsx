@@ -263,6 +263,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Host + path suggestions are sourced from the browser extension configs.
     const [blockedHosts, setBlockedHosts] = useState([]);
     const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
+    const [blockPublicShare, setBlockPublicShare] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
 
     // Step 13: Exceptions — phrases excluded from evaluation before this policy's detectors run
@@ -496,6 +497,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        blockPublicShare,
         // Step 13
         ignorePhrases,
         // Step 10
@@ -589,7 +591,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 number: EnterpriseLicenseComplianceConfig.number,
                 title: EnterpriseLicenseComplianceConfig.title,
                 summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
-                beta: true,
                 ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
@@ -820,6 +821,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
         setBlockPersonalAccounts(false);
+        setBlockPublicShare(false);
         setIgnorePhrases([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
@@ -986,6 +988,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             pattern: entry.pattern || ""
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
+        setBlockPublicShare(policy.blockPublicShare || false);
 
         setIgnorePhrases((policy.ignorePhrases || []).map(entry => ({
             phrase: entry.phrase || "",
@@ -1146,6 +1149,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedLlmServersV2: transformedLlmServers,
                 blockedHosts: cleanedBlockedHosts,
                 blockPersonalAccounts,
+                blockPublicShare,
                 ignorePhrases: cleanedIgnorePhrases,
                 applyOnResponse,
                 applyOnRequest,
@@ -1344,6 +1348,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setBlockedHosts={setBlockedHosts}
                         blockPersonalAccounts={blockPersonalAccounts}
                         setBlockPersonalAccounts={setBlockPersonalAccounts}
+                        blockPublicShare={blockPublicShare}
+                        setBlockPublicShare={setBlockPublicShare}
                         hostSuggestions={hostSuggestions}
                     />
                 );
@@ -1505,6 +1511,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
             blockPersonalAccounts,
+            blockPublicShare,
             ignorePhrases: (ignorePhrases || [])
                 .filter(entry => entry && (entry.phrase || "").trim())
                 .map(entry => ({

@@ -152,6 +152,9 @@ public class GuardrailPolicies {
     // Block personal / consumer accounts (non-enterprise email-type users).
     private boolean blockPersonalAccounts;
 
+    // Block public sharing of chats/artifacts
+    private boolean blockPublicShare;
+
     // Anomaly detection configuration (tool-call rate limiting, error storm detection).
     private AnomalyDetection anomalyDetection;
 

@@ -48,7 +48,7 @@ func Load() *Config {
 		AuthEnabled:             envBool("AKTO_OTLP_AUTHENTICATE", true),
 		RSAPublicKey:            os.Getenv("RSA_PUBLIC_KEY"),
 		MongoConn:               os.Getenv("AKTO_MONGO_CONN"),
-		MongoDB:                 envStr("AKTO_MONGO_DB", "common"),
+		MongoDB:                 envStr("AKTO_DB_NAME_COMMON", envStr("AKTO_MONGO_DB", "common")),
 		KeyRefreshMinutes:       envInt("OTLP_KEY_REFRESH_MIN", 5),
 		RevokedTokens:           revoked,
 		QueueSize:               envInt("OTLP_QUEUE_SIZE", 50000),
