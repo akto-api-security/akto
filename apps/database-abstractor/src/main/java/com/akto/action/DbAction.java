@@ -6172,7 +6172,7 @@ public class DbAction extends ActionSupport {
 
     public String updateStartTsTestRunResultSummary() {
         try {
-            DbLayer.updateStartTsTestRunResultSummary(testingRunResultSummaryId);
+            DbLayer.updateStartTsTestRunResultSummary(testingRunResultSummaryId, leaseToken);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in updateStartTsTestRunResultSummary: " + e, LogDb.DB_ABS);
             return ERROR.toUpperCase();
