@@ -154,6 +154,10 @@ public abstract class DataActor {
     public abstract void deleteTestRunResultSummary(String summaryId);
     public abstract void deleteTestingRunResults(String testingRunResultId);
     public abstract void updateStartTsTestRunResultSummary(String summaryId);
+    // Also stamps leaseToken onto summaryId - needed for the rerun case, where summaryId is the
+    // ORIGINAL (already-COMPLETED) summary being reopened, not the throwaway one the caller's own
+    // claim was minted against. See DbLayer's 2-arg overload for the full explanation.
+    public abstract void updateStartTsTestRunResultSummary(String summaryId, String leaseToken);
 
     public abstract List<TestingRunResult> fetchLatestTestingRunResult(String testingRunResultSummaryId);
     public abstract List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId);

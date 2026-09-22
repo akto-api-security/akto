@@ -6,6 +6,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -1968,9 +1970,17 @@ public class ClientActor extends DataActor {
 
     @Override
     public void updateStartTsTestRunResultSummary(String summaryId) {
+        updateStartTsTestRunResultSummary(summaryId, null);
+    }
+
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId, String leaseToken) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultSummaryId", summaryId);
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            obj.put("leaseToken", leaseToken);
+        }
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateStartTsTestRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);

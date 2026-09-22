@@ -401,8 +401,17 @@ public class Main {
             return true;
         }
 
-        //Updating start time stamp as current time stamp in case of rerun
-        dataActor.updateStartTsTestRunResultSummary(summaryIdHexId);
+        /*
+         * Also stamps this pod's already-adopted lease token onto the ORIGINAL summary - it was
+         * only ever stamped on the throwaway rerun-attempt summary by the claim above, not on the
+         * (already-COMPLETED) original summary that actually gets drained. Without this, every
+         * write during the drain - renewal, the single result recording - CAS-fails against
+         * whatever leaseToken the original summary still carries (its OWN, from however long ago
+         * it originally ran), and the pod self-fences almost immediately with LEASE_LOST. Confirmed
+         * live: "another module's claim was accepted - this pod's token was rejected", 22s in,
+         * with the original summary's leaseToken still 18+ hours stale from its original run.
+         */
+        dataActor.updateStartTsTestRunResultSummary(summaryIdHexId, TestingLease.getInstance().getToken());
         config.setRerunTestingRunResultSummary(originalSummary);
         config.setTestingRunResultList(testingRunResultList);
         return false;

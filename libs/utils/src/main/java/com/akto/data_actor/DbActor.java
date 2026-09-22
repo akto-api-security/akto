@@ -594,6 +594,15 @@ public class DbActor extends DataActor {
         DbLayer.updateStartTsTestRunResultSummary(summaryId);
     }
 
+    // Standalone/embedded DbLayer has none of the lease schema (LEASE_TOKEN/LEASE_EXPIRY_TS) - the
+    // whole lease/reclaim redesign only ever targeted hybrid mode via database-abstractor. Ignoring
+    // the token here rather than a half-implemented stamp; the rerun-lease gap this exists to fix
+    // is therefore hybrid-mode-only for now.
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId, String leaseToken) {
+        DbLayer.updateStartTsTestRunResultSummary(summaryId);
+    }
+
     public void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
         DbLayer.updateTestRunResultSummaryNoUpsert(testingRunResultSummaryId);
     }
