@@ -3,6 +3,7 @@ package com.akto.service.posture;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -12,6 +13,7 @@ import org.bson.conversions.Bson;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -45,8 +47,6 @@ public class ArgusPostureService {
     private static final double TONE_SUCCESS_AT = 95d;
     private static final double TONE_WARNING_AT = 60d;
 
-    private static final double HIGH_RISK_SCORE_AT = 4d;
-
     private static final String CONTROL_RATE_LIMIT        = "rateLimit";
     private static final String CONTROL_PROMPT_INJECTION  = "promptInjectionFiltering";
     private static final String CONTROL_PII               = "piiDetection";
@@ -59,20 +59,23 @@ public class ArgusPostureService {
         return DEFAULT_REQUIRED_CONTROLS;
     }
 
-    public BasicDBObject buildSummary(List<ApiCollection> scoped, List<GuardrailPolicies> policies,
-                                      Map<Integer, List<String>> sensitiveByCollection,
-                                      Map<Integer, Double> riskScores,
-                                      Map<String, Integer> environmentCounts, String environment) {
+    public BasicDBObject buildSummary(InsightDataBundle bundle, String environment) {
+        List<ApiCollection> assets = new ArrayList<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c != null && !c.isDeactivated()) assets.add(c);
+        }
+        List<ApiCollection> scoped = assetsIn(assets, environment);
+
         List<BasicDBObject> kpis = new ArrayList<>();
         kpis.add(assetsKpi(scoped, environment));
-        kpis.add(highRiskAgentsKpi(scoped, riskScores));
+        kpis.add(highRiskAgentsKpi());
         kpis.add(identityAccessKpi());
         kpis.add(privilegedToolsKpi());
-        kpis.add(sensitiveDataKpi(scoped, sensitiveByCollection));
-        kpis.add(protectionCoverageKpi(scoped, policies));
+        kpis.add(sensitiveDataKpi(scoped, bundle.sensitiveByCollection));
+        kpis.add(protectionCoverageKpi(scoped, bundle.policies));
 
         BasicDBObject response = new BasicDBObject();
-        response.put(KEY_ENVIRONMENTS, environments(environmentCounts));
+        response.put(KEY_ENVIRONMENTS, environments(countByEnvironment(assets)));
         response.put(KEY_KPIS, kpis);
         return response;
     }
@@ -94,14 +97,8 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private BasicDBObject highRiskAgentsKpi(List<ApiCollection> assets, Map<Integer, Double> riskScores) {
-        long highRisk = 0;
-        for (ApiCollection asset : assets) {
-            Double score = riskScores.get(asset.getId());
-            if (score != null && score >= HIGH_RISK_SCORE_AT) highRisk++;
-        }
-
-        BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", highRisk);
+    private BasicDBObject highRiskAgentsKpi() {
+        BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", 0L);
         long newlyHighRisk = 0;
         kpi.put("secondaryFootnote", newlyHighRisk + " newly high risk this week");
         kpi.put("secondaryTone", riskTone(newlyHighRisk, "critical"));
@@ -231,6 +228,42 @@ public class ArgusPostureService {
             if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
         }
         return null;
+    }
+
+    private static List<ApiCollection> assetsIn(List<ApiCollection> assets, String environment) {
+        if (isAllEnvironments(environment)) return assets;
+
+        String bucket = bucketForId(environment);
+        if (bucket == null) return assets;
+
+        List<ApiCollection> out = new ArrayList<>();
+        for (ApiCollection asset : assets) {
+            if (bucket.equals(envBucket(envTagValue(asset)))) out.add(asset);
+        }
+        return out;
+    }
+
+    private static Map<String, Integer> countByEnvironment(List<ApiCollection> assets) {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (ApiCollection asset : assets) {
+            String bucket = envBucket(envTagValue(asset));
+            counts.put(bucket, counts.getOrDefault(bucket, 0) + 1);
+        }
+        return counts;
+    }
+
+    private static String bucketForId(String environment) {
+        if (isBlank(environment)) return null;
+        switch (environment.trim().toLowerCase(Locale.ROOT)) {
+            case ENV_ID_PRODUCTION:
+                return ENV_PRODUCTION;
+            case ENV_ID_STAGING:
+                return ENV_STAGING;
+            case ENV_ID_DEVELOPMENT:
+                return ENV_DEVELOPMENT;
+            default:
+                return null;
+        }
     }
 
     public static String envBucket(String envTagValue) {
