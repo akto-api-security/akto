@@ -43,7 +43,6 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Sorts;
 import org.bson.Document;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -874,6 +873,11 @@ public class MaliciousEventService {
   // contextSource_1_filterId_1_detectedAt_-1 index) followed by an in-memory _id sort over the
   // matched page is an acceptable cost; add an {contextSource, filterId, _id} index if this needs
   // to scale further.
+  /** Cursor encoding for listGuardrailViolationPayloads: "<detectedAt>|<_id>". Not an ObjectId —
+   *  see that method's own comment on why. "|" is safe as a separator: detectedAt is numeric and
+   *  _id is a UUID string (neither can contain it). */
+  private static final String GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR = "|";
+
   public ListGuardrailViolationPayloadsResponse listGuardrailViolationPayloads(
       String accountId, ListGuardrailViolationPayloadsRequest request, String contextSource) {
 
@@ -901,28 +905,50 @@ public class MaliciousEventService {
     }
 
     // Oldest-first by default (what an exhaustive paging scan needs, so no row is skipped as new
-    // ones arrive between pages) — flip to newest-first on request. Same sort/cursor-operator
-    // pairing ThreatActorService#listThreatActorsFromActorInfo uses for its own _id cursor.
+    // ones arrive between pages) — flip to newest-first on request.
+    //
+    // Cursor is on (detectedAt, _id), NOT _id alone: MaliciousEventDto#id is a
+    // UUID.randomUUID().toString() that the POJO codec auto-maps to _id (no @BsonId ObjectId
+    // override), so _id in this collection is a random string with no chronological meaning —
+    // sorting/range-filtering on it alone would produce an arbitrary, unstable page order, not the
+    // "walk forward without skipping a row" guarantee this endpoint exists for. detectedAt gives
+    // the real ordering; _id is only a tiebreaker for the (common) case of several events sharing a
+    // timestamp, using the standard keyset-pagination "$gt this OR ($eq this AND $gt that)" shape.
     boolean newestFirst = request.hasNewestFirst() && request.getNewestFirst();
-    String cursorOperator = newestFirst ? "$lt" : "$gt";
+    String cmp = newestFirst ? "$lt" : "$gt";
 
     String cursorParam = request.hasCursor() ? request.getCursor() : null;
     if (cursorParam != null && !cursorParam.isEmpty()) {
+      int sep = cursorParam.indexOf(GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR);
+      if (sep < 0) {
+        logger.error("Malformed cursor for listGuardrailViolationPayloads: " + cursorParam);
+        return ListGuardrailViolationPayloadsResponse.newBuilder().build();
+      }
       try {
-        query.append("_id", new Document(cursorOperator, new ObjectId(cursorParam)));
-      } catch (IllegalArgumentException e) {
-        logger.error("Invalid cursor ObjectId for listGuardrailViolationPayloads: " + cursorParam);
+        long cursorDetectedAt = Long.parseLong(cursorParam.substring(0, sep));
+        String cursorId = cursorParam.substring(sep + 1);
+        query.append("$or", Arrays.asList(
+            new Document("detectedAt", new Document(cmp, cursorDetectedAt)),
+            new Document("detectedAt", cursorDetectedAt)
+                .append("_id", new Document(cmp, cursorId))
+        ));
+      } catch (NumberFormatException e) {
+        logger.error("Malformed cursor for listGuardrailViolationPayloads: " + cursorParam);
         return ListGuardrailViolationPayloadsResponse.newBuilder().build();
       }
     }
+
+    Bson sort = newestFirst
+        ? Sorts.orderBy(Sorts.descending("detectedAt"), Sorts.descending("_id"))
+        : Sorts.orderBy(Sorts.ascending("detectedAt"), Sorts.ascending("_id"));
 
     List<ListGuardrailViolationPayloadsResponse.ViolationPayload> payloads = new ArrayList<>();
     MongoCursor<Document> cursor = null;
     try {
       cursor = maliciousEventDao.getDocumentCollection(accountId)
           .find(query)
-          .projection(Projections.include("refId", "filterId", "detectedAt", "latestApiOrig"))
-          .sort(newestFirst ? Sorts.descending("_id") : Sorts.ascending("_id"))
+          .projection(Projections.include("_id", "refId", "filterId", "detectedAt", "latestApiOrig"))
+          .sort(sort)
           .limit(limit)
           .cursor();
 
@@ -931,12 +957,17 @@ public class MaliciousEventService {
         String orig = HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"));
         Object detectedAtRaw = doc.get("detectedAt");
         long detectedAt = detectedAtRaw instanceof Number ? ((Number) detectedAtRaw).longValue() : 0L;
+        // _id may be legitimately typed as ObjectId or String depending on how a given row was
+        // inserted — read it generically rather than assuming one BSON type (see this method's own
+        // comment above on why it's a String in practice for this DTO).
+        Object idRaw = doc.get("_id");
+        String id = idRaw != null ? idRaw.toString() : "";
         payloads.add(ListGuardrailViolationPayloadsResponse.ViolationPayload.newBuilder()
             .setRefId(doc.getString("refId") != null ? doc.getString("refId") : "")
             .setFilterId(doc.getString("filterId") != null ? doc.getString("filterId") : "")
             .setDetectedAt(detectedAt)
             .setOrig(orig != null ? orig : "")
-            .setCursor(doc.getObjectId("_id").toHexString())
+            .setCursor(detectedAt + GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR + id)
             .build());
       }
     } finally {
