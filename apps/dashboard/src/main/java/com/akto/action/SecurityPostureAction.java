@@ -27,7 +27,6 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -98,15 +97,25 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             int windowLength = endTimestamp - startTimestamp;
             int priorStart = hasPriorWindow ? Math.max(0, startTimestamp - windowLength) : 0;
 
-            // "Attack attempts" trend — always a fixed 8-week window ending now, independent of
-            // the page's selected date range (same convention shadowAiTrend already uses).
-            int attackTrendEndTs = endTimestamp;
-            List<Integer> attackTrendBoundaries = PostureService.attackTrendWeekBoundaries(attackTrendEndTs);
-            int attackTrendStartTs = attackTrendBoundaries.get(0) - (attackTrendBoundaries.get(1) - attackTrendBoundaries.get(0));
+            // Trend/sparkline panels ("Attack attempts", the Critical alerts / Sensitive data
+            // incidents KPI sparklines) bucket the page's own SELECTED range, same as the KPI
+            // values themselves — not a fixed rolling window. An unbounded "all time" start (0)
+            // has no natural lower edge to bucket against, so it falls back to a fixed
+            // TREND_BUCKET_COUNT-week lookback, same convention priorStart above already uses for
+            // an unbounded range.
+            int trendEndTs = endTimestamp;
+            int trendStartTs = startTimestamp > 0 ? startTimestamp
+                    : trendEndTs - (PostureService.TREND_BUCKET_COUNT * 7 * 86400);
+            List<Integer> trendBoundaries = PostureService.trendBucketBoundaries(
+                    trendStartTs, trendEndTs, PostureService.TREND_BUCKET_COUNT);
 
-            // "Biggest movers" — same fixed-lookback convention as the attack trend above, not
-            // the page's selected range (see PostureService#biggestMovers).
-            int biggestMoversStartTs = attackTrendEndTs - (PostureService.BIGGEST_MOVERS_WINDOW_DAYS * 86400);
+            // "Biggest movers" deliberately does NOT follow the selected range (see
+            // PostureService#buildSummary's own comment on BIGGEST_MOVERS_WINDOW_DAYS) — a fixed
+            // 30-day lookback regardless of filter. When the selected range is narrower than that
+            // (e.g. "last 1 hour"), trendStartTs alone wouldn't reach back far enough to cover it,
+            // so the raw-event fetch below spans whichever of the two windows is wider.
+            int biggestMoversStartTs = trendEndTs - (PostureService.BIGGEST_MOVERS_WINDOW_DAYS * 86400);
+            int rawEventFetchStartTs = Math.min(trendStartTs, biggestMoversStartTs);
 
             // Shared with the Insights feature rather than loaded again: the same page renders
             // "Act now" from insights, so one bundle serves both.
@@ -123,11 +132,17 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             Future<Long> totalInspectedActionsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> fetchTotalInspectedActions(accountId, startTimestamp, endTimestamp)));
             Future<List<Integer>> weeklyAttackCountsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                    () -> fetchViolationsMonthlyTotals(attackTrendStartTs, attackTrendEndTs, attackTrendBoundaries, null)));
+                    () -> fetchViolationsMonthlyTotals(trendStartTs, trendEndTs, trendBoundaries, null)));
             Future<List<GuardrailPolicies>> allPoliciesFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                     () -> GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 5000)));
-            Future<List<DashboardMaliciousEvent>> recentAttackEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
-                    () -> fetchAllMaliciousEvents(biggestMoversStartTs, attackTrendEndTs, MAX_THREAT_FETCH_LIMIT, null, null, true)));
+            // Raw events over [rawEventFetchStartTs, trendEndTs] — the wider of the trend window
+            // and biggestMoversStartTs (see above), so one fetch serves both "Biggest movers"
+            // (which filters back down to its own narrower window itself — see biggestMovers) and
+            // the Critical alerts / Sensitive data incidents KPI sparklines (which need per-event
+            // severity/category to bucket by the selected range; the bucketed aggregation
+            // fetchViolationsMonthlyTotals uses has no severity/category filter).
+            Future<List<DashboardMaliciousEvent>> trendWindowEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    () -> fetchAllMaliciousEvents(rawEventFetchStartTs, trendEndTs, MAX_THREAT_FETCH_LIMIT, null, null, true)));
 
             // Each .get() below only blocks on ITS OWN future (all were submitted above and are
             // already running), so its timing is that call's real duration, not a sum of the
@@ -140,8 +155,8 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                     ? timedGet("priorSubCategoryFuture", priorSubCategoryFuture) : null;
             Long totalInspectedActions = timedGet("totalInspectedActionsFuture (SearchClient)", totalInspectedActionsFuture);
             List<Integer> weeklyAttackCounts = timedGet("weeklyAttackCountsFuture", weeklyAttackCountsFuture);
-            List<DashboardMaliciousEvent> recentAttackEvents =
-                    timedGet("recentAttackEventsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", recentAttackEventsFuture);
+            List<DashboardMaliciousEvent> trendWindowEvents =
+                    timedGet("trendWindowEventsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", trendWindowEventsFuture);
             List<GuardrailPolicies> allPoliciesIncludingInactive = timedGet("allPoliciesFuture", allPoliciesFuture);
 
             // bundle.collections, not bundle.activeCollections: the latter is loaded via a
@@ -155,7 +170,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
             response = postureService.buildSummary(bundle, priorHostSeverity, priorSubCategory,
                     endpointCollections, totalInspectedActions,
-                    weeklyAttackCounts, recentAttackEvents, allPoliciesIncludingInactive);
+                    weeklyAttackCounts, trendWindowEvents, allPoliciesIncludingInactive);
 
             // "Act now" — reuses the Insights feature wholesale rather than a parallel action
             // list: same bundle (already cached above under this exact ctx), same worst-first/

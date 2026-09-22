@@ -534,6 +534,14 @@ final class RiskScoreCalculator {
     private static final double VENDOR_UNAPPROVED_SHARE_WEIGHT = 0.75;
     private static final double VENDOR_RISKY_APPROVED_SHARE_WEIGHT = 0.25;
 
+    public  static final Map<String,String> DEFAULT_DATA_LEAVING_POLICIES = new HashMap<>();
+    static {
+        DEFAULT_DATA_LEAVING_POLICIES.put("Default-Source code detection", "Source Code");
+        DEFAULT_DATA_LEAVING_POLICIES.put("Default-Financial Advice", "Financials");
+        DEFAULT_DATA_LEAVING_POLICIES.put("Default-Customer PII", "Customer PII");
+        DEFAULT_DATA_LEAVING_POLICIES.put("Default-Credentials Alert", "Credentials");
+    }
+
     private static final class VendorRiskAnalysis {
         final List<BasicDBObject> rows;
         final Double subScore;
