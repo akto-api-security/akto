@@ -246,33 +246,46 @@ function ComingSoonTile({ label }) {
     )
 }
 
-// "Framework readiness" — no backend for this yet at all, so it's always the blurred dummy
-// content (see DUMMY_FRAMEWORK_READINESS). Each row's tick mark is this quarter's target,
-// positioned absolutely over the same CustomProgressBar every other bar on this page uses.
-function FrameworkReadinessCard() {
+// Same red/yellow/green triad already used elsewhere on this page (see SEGMENT_COLORS /
+// warningOverridden above) — reused rather than inventing a fourth palette for one panel.
+function colorForReadiness(value) {
+    if (value >= 75) return '#23C48C'
+    if (value >= 40) return '#F2B322'
+    return '#F24122'
+}
+
+// "Framework readiness" — clausesCovered/totalClauses per framework, from a compliance-clause
+// scan of real guardrail-violation traffic (see ComplianceClauseScanService /
+// PostureService#frameworkReadiness). Replaces the earlier enforcingPolicies/totalPolicies metric,
+// which answered "are my policies switched on" rather than "how ready am I for this framework".
+// No target/quarter-goal exists server-side, so — unlike the earlier dummy content — there is no
+// tick mark to draw; inventing one would just be fake data again.
+function FrameworkReadinessCard({ panel }) {
+    const rows = panel?.frameworks || []
+    const hasData = rows.length > 0
+    const effectiveRows = hasData ? rows : DUMMY_FRAMEWORK_READINESS
+
     const body = (
         <VerticalStack gap="3">
-            {DUMMY_FRAMEWORK_READINESS.map((row) => (
-                <VerticalStack key={row.id} gap="1">
+            {effectiveRows.map((row) => (
+                <VerticalStack key={row.framework || row.id} gap="1">
                     <HorizontalStack align="space-between">
-                        <Text variant="bodyMd">{row.label}</Text>
+                        <Text variant="bodyMd">{row.framework || row.label}</Text>
                         <Text variant="bodyMd" fontWeight="semibold">{row.value}%</Text>
                     </HorizontalStack>
-                    <div style={{ position: 'relative' }}>
-                        <CustomProgressBar progress={row.value} topColor={row.color} height={"10px"}/>
-                        <div style={{
-                            position: 'absolute', top: 0, bottom: 0, left: `${row.target}%`,
-                            width: '2px', background: '#1f2937',
-                        }} />
-                    </div>
+                    <CustomProgressBar progress={row.value} topColor={colorForReadiness(row.value)} height={"10px"}/>
                 </VerticalStack>
             ))}
-            <Text variant="bodySm" color="subdued">Markers show the target for this quarter</Text>
         </VerticalStack>
     )
     return (
-        <CardWithHeader title="Framework readiness" hasData={true} minHeight="220px">
-            <DummyDataOverlay panelId="frameworkReadiness">{body}</DummyDataOverlay>
+        <CardWithHeader
+            title="Framework readiness"
+            tooltipContent={panel?.dataGaps?.[0]?.impact}
+            hasData={true}
+            minHeight="220px"
+        >
+            {hasData ? body : <DummyDataOverlay panelId="frameworkReadiness">{body}</DummyDataOverlay>}
         </CardWithHeader>
     )
 }
@@ -1051,7 +1064,7 @@ function SecurityPosture() {
 
     const frameworkAndAdoptionRow = (
         <HorizontalGrid columns={2} gap="4">
-            <FrameworkReadinessCard />
+            <FrameworkReadinessCard panel={pageData.frameworkReadiness} />
             <AdoptionGapCard />
         </HorizontalGrid>
     )

@@ -3,13 +3,17 @@ package com.akto.service.posture;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dao.threat_detection.ComplianceClauseCoverageDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.threat_detection.ComplianceClauseCoverage;
+import com.akto.dto.threat_detection.ComplianceClauseCoverage.ClauseHit;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightUtil.GovernanceBucket;
+import com.akto.util.compliance.ComplianceSubClauseCatalog;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
@@ -95,6 +99,9 @@ public class PostureService {
     private static final String GAP_DEVICE_IDENTITY = "DEVICE_IDENTITY";
     static final String GAP_THREAT_BACKEND  = "THREAT_BACKEND";
     static final String GAP_GUARDRAIL_POLICIES = "GUARDRAIL_POLICIES";
+    /** No compliance-clause scan has been run yet, or the scan found nothing for this window —
+     *  distinct from GAP_GUARDRAIL_POLICIES (no framework even mapped), see frameworkReadiness. */
+    static final String GAP_COMPLIANCE_SCAN = "COMPLIANCE_SCAN";
     /** The selected range has no comparable preceding window (an unbounded "all time" start). */
     private static final String GAP_NO_PRIOR_WINDOW = "PRIOR_WINDOW";
 
@@ -150,12 +157,6 @@ public class PostureService {
      *                             alerts / Sensitive data incidents KPI sparklines, which bucket it
      *                             client-side rather than firing a separate backend call per bucket
      *                             per KPI (see bucketedSparkline's own javadoc for why).
-     * @param allPoliciesIncludingInactive every GuardrailPolicies row regardless of active status
-     *                             — needed only for Framework readiness, which measures what
-     *                             fraction of a framework's mapped policies are actually turned
-     *                             on. bundle.policies won't do: InsightDataLoader#loadPolicies
-     *                             already filters to active-only for every other feature that
-     *                             reads it.
      */
     public BasicDBObject buildSummary(InsightDataBundle bundle,
                                        List<HostSeverityCount> priorHostSeverity,
@@ -163,8 +164,7 @@ public class PostureService {
                                        List<ApiCollection> endpointCollections,
                                        Long totalInspectedActions,
                                        List<Integer> weeklyAttackCounts,
-                                       List<DashboardMaliciousEvent> trendWindowEvents,
-                                       List<GuardrailPolicies> allPoliciesIncludingInactive) {
+                                       List<DashboardMaliciousEvent> trendWindowEvents) {
         BasicDBObject response = new BasicDBObject();
 
         // Shared boundary source for every trend/sparkline panel — the page's own SELECTED range,
@@ -196,7 +196,7 @@ public class PostureService {
         response.put(KEY_BIGGEST_MOVERS, biggestMovers(endpointCollections, bundle.collectionLastTrafficSeen,
                 trendWindowEvents, biggestMoversWindowStartTs));
 
-        response.put(KEY_FRAMEWORK_READINESS, frameworkReadiness(allPoliciesIncludingInactive));
+        response.put(KEY_FRAMEWORK_READINESS, frameworkReadiness(trendStartTs, trendEndTs));
 
         return response;
     }
@@ -813,20 +813,20 @@ public class PostureService {
 
     // ── Framework readiness ──────────────────────────────────────────────────────
     //
-    // Real, not illustrative: a policy maps itself to a compliance framework via its own
-    // llmRule.compliance (a Map<framework name, clause ids> the policy author fills in — see
-    // GuardrailPolicies.LLMRule), not a fixed list this code invents. Readiness for a framework is
-    // the share of ITS OWN mapped policies that are actually enforcing right now (policy active
-    // AND its llmRule turned on) — "how much of what you've configured for this framework is
-    // actually live", not a claim about total regulatory coverage, since there's no source for
-    // "how many controls this framework requires" to divide by instead. Needs every policy
-    // (active and inactive) to have a real denominator — see buildSummary's own param doc.
+    // Real, not illustrative: readiness for a framework is the share of ITS OWN
+    // ComplianceSubClauseCatalog sub-clauses that have actually been hit by real guardrail-violation
+    // traffic in the selected window — "how much of this framework have we actually seen exercised",
+    // not "are my policies switched on" (the earlier, replaced definition — see git history / the
+    // package CLAUDE.md for why). The numerator comes from ComplianceClauseCoverageDao, written by
+    // ComplianceClauseScanService's LLM clause-attribution scan (triggered from the Threat Detection
+    // page); this method only reads that result and buckets it into [trendStartTs, trendEndTs] so
+    // the panel moves with the page's date filter, per this file's design principle 1.
 
     /** A policy is "enforcing" only while it's active AND its LLM rule (which carries the
      *  compliance mapping) is enabled — a disabled/inactive policy's compliance mapping is
      *  configuration, not live coverage. Package-private (not private): RiskScoreCalculator's
-     *  Compliance gaps sub-score uses the same definition of "covered by a compliance
-     *  framework" so the two panels can't disagree with each other. */
+     *  Compliance gaps sub-score AND ComplianceClauseScanService use the same definition of
+     *  "covered by a compliance framework" so all three can't disagree with each other. */
     static boolean policyEnforcing(GuardrailPolicies p) {
         return p != null && p.isActive() && p.getLlmRule() != null && p.getLlmRule().isEnabled();
     }
@@ -838,42 +838,52 @@ public class PostureService {
                 && !p.getLlmRule().getCompliance().isEmpty();
     }
 
-    private BasicDBObject frameworkReadiness(List<GuardrailPolicies> allPoliciesIncludingInactive) {
-        Map<String, Integer> totalByFramework = new LinkedHashMap<>();
-        Map<String, Integer> enforcingByFramework = new LinkedHashMap<>();
-        for (GuardrailPolicies p : safe(allPoliciesIncludingInactive)) {
-            if (p == null || p.getLlmRule() == null || p.getLlmRule().getCompliance() == null) continue;
-            boolean enforcing = policyEnforcing(p);
-            for (String framework : p.getLlmRule().getCompliance().keySet()) {
-                if (framework == null || framework.trim().isEmpty()) continue;
-                totalByFramework.merge(framework, 1, Integer::sum);
-                if (enforcing) enforcingByFramework.merge(framework, 1, Integer::sum);
-            }
-        }
+    private BasicDBObject frameworkReadiness(int trendStartTs, int trendEndTs) {
+        List<ComplianceClauseCoverage> coverageDocs = ComplianceClauseCoverageDao.instance.findAllCoverage();
 
         List<BasicDBObject> rows = new ArrayList<>();
-        for (Map.Entry<String, Integer> e : totalByFramework.entrySet()) {
-            String framework = e.getKey();
-            int total = e.getValue();
-            int enforcing = enforcingByFramework.getOrDefault(framework, 0);
+        int lastScannedAt = 0;
+        for (ComplianceClauseCoverage doc : safe(coverageDocs)) {
+            if (doc == null || doc.getId() == null) continue;
+            int total = doc.getTotalClauses() > 0
+                    ? doc.getTotalClauses()
+                    : ComplianceSubClauseCatalog.totalClauses(doc.getId());
+            if (total <= 0) continue;
+
+            // Only clauses with at least one hit whose timestamp falls in the page's selected
+            // window count — a clause hit once, months ago, outside the current range isn't "live".
+            int covered = 0;
+            Map<String, List<ClauseHit>> clauseHits = doc.getClauseHits();
+            if (clauseHits != null) {
+                for (List<ClauseHit> hits : clauseHits.values()) {
+                    if (hits == null) continue;
+                    boolean inWindow = hits.stream().anyMatch(h ->
+                            h != null && h.getTimestamp() >= trendStartTs && h.getTimestamp() <= trendEndTs);
+                    if (inWindow) covered++;
+                }
+            }
+
             BasicDBObject row = new BasicDBObject();
-            row.put("framework", framework);
-            row.put("value", (int) Math.round((enforcing * 100.0) / total));
-            row.put("enforcingPolicies", enforcing);
-            row.put("totalPolicies", total);
+            row.put("framework", doc.getId());
+            row.put("value", (int) Math.round((covered * 100.0) / total));
+            row.put("clausesCovered", covered);
+            row.put("totalClauses", total);
+            row.put("lastScannedAt", doc.getLastScannedAt());
             rows.add(row);
+            lastScannedAt = Math.max(lastScannedAt, doc.getLastScannedAt());
         }
-        // Frameworks with more mapped policies first — a framework only one policy happens to
-        // mention is too noisy a sample to lead with.
-        rows.sort((a, b) -> Integer.compare(b.getInt("totalPolicies"), a.getInt("totalPolicies")));
+        // Most-covered framework first, same "lead with the strongest signal" ordering the earlier
+        // policy-count metric used.
+        rows.sort((a, b) -> Integer.compare(b.getInt("clausesCovered"), a.getInt("clausesCovered")));
         List<BasicDBObject> top = rows.subList(0, Math.min(6, rows.size()));
 
         BasicDBObject panel = new BasicDBObject();
         panel.put("frameworks", top);
+        panel.put("lastScannedAt", lastScannedAt);
         List<Map<String, Object>> gaps = new ArrayList<>();
         if (rows.isEmpty()) {
-            gaps.add(gapRow(GAP_GUARDRAIL_POLICIES, REASON_NOT_CONFIGURED,
-                    "No policy has a compliance framework mapped in its LLM rule yet, so framework readiness can't be scored."));
+            gaps.add(gapRow(GAP_COMPLIANCE_SCAN, REASON_NOT_CONFIGURED,
+                    "No compliance clause scan has been run yet — trigger one from the Threat Detection page to score framework readiness."));
         }
         panel.put("dataGaps", gaps);
         return panel;

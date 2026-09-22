@@ -28,6 +28,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.SourceCodeVulnerabilitiesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.threat_detection.ComplianceClauseCoverageDao;
 import com.akto.dao.threat_detection.IpReputationScoreDao;
 import com.akto.dao.tracing.TraceDao;
 import com.akto.dao.tracing.SpanDao;
@@ -585,5 +586,6 @@ public class DaoInit {
         CopilotStudioIntegrationDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusQueueDao.instance.createIndicesIfAbsent();
+        ComplianceClauseCoverageDao.instance.createIndicesIfAbsent();
     }
 }
