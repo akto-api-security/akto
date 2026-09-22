@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.MCollection;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
@@ -21,6 +22,7 @@ import org.bson.conversions.Bson;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,11 +52,16 @@ public class ArgusPostureAction extends UserAction {
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME,
                             ApiCollection.NAME, ApiCollection.TAGS_STRING));
 
+            List<Integer> scopedIds = new ArrayList<>(scoped.size());
+            for (ApiCollection asset : scoped) scopedIds.add(asset.getId());
+
             List<GuardrailPolicies> policies = insightDataLoader.loadPolicies();
             Map<Integer, List<String>> sensitiveByCollection =
                     insightDataLoader.loadSensitiveByCollection(scoped);
+            Map<Integer, Double> riskScores = ApiInfoDao.instance.getRiskScoreForCollections(scopedIds);
 
-            this.response = argusPostureService.buildSummary(scoped, policies, sensitiveByCollection, environmentCounts, environment);
+            this.response = argusPostureService.buildSummary(scoped, policies, sensitiveByCollection,
+                    riskScores, environmentCounts, environment);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture summary: " + e.getMessage());

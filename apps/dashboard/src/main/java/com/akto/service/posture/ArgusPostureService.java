@@ -45,6 +45,8 @@ public class ArgusPostureService {
     private static final double TONE_SUCCESS_AT = 95d;
     private static final double TONE_WARNING_AT = 60d;
 
+    private static final double HIGH_RISK_SCORE_AT = 4d;
+
     private static final String CONTROL_RATE_LIMIT        = "rateLimit";
     private static final String CONTROL_PROMPT_INJECTION  = "promptInjectionFiltering";
     private static final String CONTROL_PII               = "piiDetection";
@@ -59,10 +61,11 @@ public class ArgusPostureService {
 
     public BasicDBObject buildSummary(List<ApiCollection> scoped, List<GuardrailPolicies> policies,
                                       Map<Integer, List<String>> sensitiveByCollection,
+                                      Map<Integer, Double> riskScores,
                                       Map<String, Integer> environmentCounts, String environment) {
         List<BasicDBObject> kpis = new ArrayList<>();
         kpis.add(assetsKpi(scoped, environment));
-        kpis.add(highRiskAgentsKpi());
+        kpis.add(highRiskAgentsKpi(scoped, riskScores));
         kpis.add(identityAccessKpi());
         kpis.add(privilegedToolsKpi());
         kpis.add(sensitiveDataKpi(scoped, sensitiveByCollection));
@@ -91,8 +94,14 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private BasicDBObject highRiskAgentsKpi() {
-        BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", 0L);
+    private BasicDBObject highRiskAgentsKpi(List<ApiCollection> assets, Map<Integer, Double> riskScores) {
+        long highRisk = 0;
+        for (ApiCollection asset : assets) {
+            Double score = riskScores.get(asset.getId());
+            if (score != null && score >= HIGH_RISK_SCORE_AT) highRisk++;
+        }
+
+        BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", highRisk);
         long newlyHighRisk = 0;
         kpi.put("secondaryFootnote", newlyHighRisk + " newly high risk this week");
         kpi.put("secondaryTone", riskTone(newlyHighRisk, "critical"));
@@ -101,7 +110,7 @@ public class ArgusPostureService {
 
     private BasicDBObject identityAccessKpi() {
         BasicDBObject kpi = kpi(KPI_IDENTITY_ACCESS, "Identity & Access", 0L);
-        kpi.put("footnote", "overprivileged identities");
+        kpi.put("footnote", "overprivileged identity(s)");
         kpi.put("secondaryFootnote", "0 shared · 0 orphaned");
         kpi.put("secondaryTone", "subdued");
         return kpi;
@@ -125,7 +134,7 @@ public class ArgusPostureService {
         }
 
         BasicDBObject kpi = kpi(KPI_SENSITIVE_DATA, "Sensitive Data", withSensitive);
-        kpi.put("footnote", "assets access sensitive data");
+        kpi.put("footnote", "asset(s) access sensitive data");
         long canSendExternally = 0;
         kpi.put("secondaryFootnote", canSendExternally + " can send it externally");
         kpi.put("secondaryTone", riskTone(canSendExternally, "critical"));
@@ -139,7 +148,7 @@ public class ArgusPostureService {
 
         if (assets.isEmpty()) {
             kpi.put("value", 0d);
-            kpi.put("secondaryFootnote", "0 assets missing required controls");
+            kpi.put("secondaryFootnote", "0 asset(s) missing required controls");
             kpi.put("secondaryTone", riskTone(0, "critical"));
             return kpi;
         }
@@ -157,7 +166,7 @@ public class ArgusPostureService {
 
         kpi.put("value", percent);
         kpi.put("tone", toneForPercent(percent));
-        kpi.put("secondaryFootnote", missing + " assets missing required controls");
+        kpi.put("secondaryFootnote", missing + " asset(s) missing required controls");
         kpi.put("secondaryTone", riskTone(missing, toneForPercent(percent)));
         return kpi;
     }
