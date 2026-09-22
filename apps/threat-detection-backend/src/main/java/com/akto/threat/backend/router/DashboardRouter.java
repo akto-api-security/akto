@@ -5,6 +5,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Da
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
@@ -166,6 +167,29 @@ public class DashboardRouter implements ARouter {
 
                 ProtoMessageUtils.toString(
                     dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode, humanResponseFilter)
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/list_guardrail_violation_payloads")
+            .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
+                RequestBody reqBody = ctx.body();
+                ListGuardrailViolationPayloadsRequest req = ProtoMessageUtils.<
+                    ListGuardrailViolationPayloadsRequest
+                >toProtoMessage(
+                    ListGuardrailViolationPayloadsRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    dsService.listGuardrailViolationPayloads(ctx.get("accountId"), req, contextSource)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 

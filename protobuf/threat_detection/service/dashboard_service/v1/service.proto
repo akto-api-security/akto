@@ -90,6 +90,38 @@ message ListMaliciousRequestsRequest {
     optional bool minimal_fields = 5;
 }
 
+// Batched, cursor-paginated fetch of the raw request/response payload (latestApiOrig) behind a set
+// of guardrail-policy violations — used to feed real traffic to an LLM for compliance sub-clause
+// attribution (see PostureService#frameworkReadiness / ComplianceClauseScanService on the dashboard
+// side). ListMaliciousRequestsRequest cannot serve this: its response hard-codes payload to "" for
+// every row (MaliciousEventService#listMaliciousRequests), and a filterId/payload field could not be
+// safely added to that existing request — JsonFormat.parser() throws on an unrecognized field, so an
+// un-redeployed dashboard talking to an already-redeployed backend (or vice versa) would silently
+// flatline every caller of that endpoint, not just this one. A new message pair confines that risk:
+// a stale caller simply gets a 404 on this path, surfaced as a data gap instead of empty results.
+message ListGuardrailViolationPayloadsRequest {
+  repeated string filter_ids = 1;                         // guardrail policy names (== event filterId)
+  optional TimeRangeFilter detected_at_time_range = 2;
+  optional string cursor = 3;                              // last-seen _id (hex ObjectId); empty = first page
+  uint32 limit = 4;                                        // 0/unset -> server default; server also caps the max
+  // false/unset (default): walk oldest-first (_id ascending) — what an exhaustive scan that must
+  // not miss a row wants, and what ComplianceClauseScanService uses. true: walk newest-first
+  // (_id descending), for a caller that only wants the most recent violations quickly. Flips both
+  // the sort AND the cursor comparison operator — see MaliciousEventService#listGuardrailViolationPayloads.
+  optional bool newest_first = 5;
+}
+
+message ListGuardrailViolationPayloadsResponse {
+  message ViolationPayload {
+    string ref_id = 1;
+    string filter_id = 2;
+    uint64 detected_at = 3;
+    string orig = 4;      // decoded request/response sample (HttpResponseParams.getSampleStringFromProtoString)
+    string cursor = 5;    // this row's _id (hex ObjectId) — pass back as the next page's cursor
+  }
+  repeated ViolationPayload payloads = 1;
+}
+
 message FetchAlertFiltersRequest {
   optional TimeRangeFilter detected_at_time_range = 1;
 }
