@@ -24,7 +24,7 @@ import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import {
     PANEL_EMPTY_STATE_COPY, DUMMY_SHADOW_AI_TREND, DUMMY_DATA_LEAVING, DUMMY_ENFORCEMENT_FUNNEL,
     DUMMY_ATTACK_ATTEMPTS, DUMMY_FRAMEWORK_READINESS, DUMMY_ADOPTION_GAP, DUMMY_VENDOR_RISK_BUBBLE,
-    DUMMY_RISK_SCORE_TREND,
+    DUMMY_RISK_SCORE_TREND
 } from './securityPostureDummyData'
 
 // KPI ids — must match PostureService.KPI_* on the backend.
@@ -39,10 +39,23 @@ const DELTA_TONE_TO_COLOR = {
     neutral: 'subdued',
 }
 
+// Sparkline color per KPI — both are "higher is worse" counts, so both read red, matching
+// deltaTone's own critical-is-red convention elsewhere on this page.
+const KPI_SPARKLINE_COLOR = {
+    [KPI_CRITICAL_ALERTS]: '#dc2626',
+    [KPI_SENSITIVE_INCIDENTS]: '#dc2626',
+}
+
 // Donut/segment colors — matches the palette other posture cards (ComplianceAtRisksCard,
 // GuardrailCoverageCard) already use, so a "data type" or "policy mode" reads the same tone
 // wherever it shows up on the page.
-const SEGMENT_COLORS = ['#dc2626', '#ea580c', '#ca8a04', '#3b82f6', '#7c3aed', '#9ca3af']
+const SEGMENT_COLORS = {
+    'Source Code':  '#F24122',
+    'Customer PII': '#F2B322',
+    'Financials':   '#3BC3D3',
+    'Credentials':  '#7958F3',
+    'Others':        '#CACED3',
+}
 
 // Mirrors InsightService.severityRank on the backend (CRITICAL first, missing/unrecognized
 // last) — needed here because "Act now" merges two already-sorted lists (discovery, guardrail)
@@ -155,6 +168,14 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
     // (counts/percentages) have no ring to show.
     const showRing = kpi.id === KPI_RISK_SCORE && hasValue
 
+    // Critical alerts / Sensitive data incidents: real weekly counts, bucketed server-side from
+    // the same fixed ATTACK_TREND_WEEKS window "Attack attempts" uses (see
+    // PostureService#weeklySparkline). Monitoring coverage has no history to trend against yet
+    // (a point-in-time ratio, not an event count — see buildSummary's own gap conventions), so it
+    // gets the page's usual blurred-illustrative-data treatment instead of a real chart.
+    const sparklineColor = KPI_SPARKLINE_COLOR[kpi.id]
+    const hasRealSparkline = !!sparklineColor && Array.isArray(kpi.sparkline) && kpi.sparkline.length > 0
+
     const valueColumn = (
         <VerticalStack gap="1">
             {hasValue ? (
@@ -193,6 +214,12 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
 
                     {kpi.footnote && (
                         <Text variant="bodySm" color="subdued">{kpi.footnote}</Text>
+                    )}
+
+                    {hasRealSparkline && (
+                        <div style={{ width: '100%' }}>
+                            <SmoothAreaChart tickPositions={kpi.sparkline} color={sparklineColor} height="40" width={null} />
+                        </div>
                     )}
                 </VerticalStack>
             </Box>
@@ -411,11 +438,18 @@ function ShadowAiTrendCard({ panel, onOpen }) {
 function ChartLegend({ items }) {
     return (
         <VerticalStack gap="2">
-            {items.map(({ label, color, count }) => (
-                <HorizontalStack key={label} gap="2" blockAlign="center">
-                    <Box style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                    <Text variant="bodyMd" color="subdued">{label}</Text>
-                    <Text variant="bodyMd" fontWeight="semibold">{count.toLocaleString()}</Text>
+            {items.map(({ label, color, count, percent }) => (
+                <HorizontalStack key={label} align="space-between" blockAlign="center">
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Box style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        <Text variant="bodyMd" color="subdued">{label}</Text>
+                    </HorizontalStack>
+                    <HorizontalStack gap="1" blockAlign="center">
+                        <Text variant="bodyMd" fontWeight="semibold">{count.toLocaleString()}</Text>
+                        {(percent !== undefined && percent !== null) && (
+                            <Text variant="bodySm" color="subdued">({percent}%)</Text>
+                        )}
+                    </HorizontalStack>
                 </HorizontalStack>
             ))}
         </VerticalStack>
@@ -426,15 +460,28 @@ function DataLeavingCard({ panel, onOpen }) {
     if (!panel) return null
     const hasData = panel.total > 0
     const effective = hasData ? panel : DUMMY_DATA_LEAVING
+
+    // Fixed taxonomy order (SEGMENT_COLORS' own key order), not whatever order the backend's
+    // segments array happens to arrive in — any label outside that taxonomy (a real, unmapped
+    // policy name; the backend's own "Other" overflow bucket) is appended after, in its existing
+    // order, rather than dropped.
+    const labelOrder = Object.keys(SEGMENT_COLORS)
+    const orderedSegments = [...(effective.segments || [])].sort((a, b) => {
+        const ai = labelOrder.indexOf(a.label)
+        const bi = labelOrder.indexOf(b.label)
+        return (ai === -1 ? labelOrder.length : ai) - (bi === -1 ? labelOrder.length : bi)
+    })
+
     const graphData = {}
-    ;(effective.segments || []).forEach((seg, i) => {
+    orderedSegments.forEach((seg) => {
         graphData[seg.label] = {
             text: seg.count,
-            color: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
+            color: SEGMENT_COLORS[seg.label] || SEGMENT_COLORS.Others,
             filterValue: seg.filterId || seg.label,
+            percent: seg.percent,
         }
     })
-    const legendItems = Object.entries(graphData).map(([label, { text, color }]) => ({ label, color, count: text }))
+    const legendItems = Object.entries(graphData).map(([label, { text, color, percent }]) => ({ label, color, count: text, percent }))
 
     const body = (
         <HorizontalStack gap="4" blockAlign="center" wrap={false}>
@@ -613,7 +660,7 @@ function BiggestMoversCard({ biggestMovers }) {
     if (movers.length === 0) {
         return (
             <CardWithHeader title="Biggest movers" hasData={false}
-                emptyMessage="No vendor crossed a threshold in the last 1 month." minHeight="160px" />
+                emptyMessage="No vendor crossed a threshold in the time period" minHeight="160px" />
         )
     }
     return (
