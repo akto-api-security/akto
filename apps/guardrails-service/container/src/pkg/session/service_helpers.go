@@ -49,12 +49,15 @@ func CheckAndHandleMaliciousSession(sessionMgr *SessionManager, logger *zap.Logg
 // via IsMalicious. "human_approval" is a pending review, not a confirmed-malicious call —
 // marking the session here would permanently lock it out via CheckAndHandleMaliciousSession
 // even after an admin approves, since nothing ever resets IsMalicious back to false.
-func shouldMarkSessionMalicious(behaviour string) bool {
+func shouldMarkSessionMalicious(behaviour string, sessionDrivenBlock bool) bool {
+	if !sessionDrivenBlock {
+		return false
+	}
 	return !strings.EqualFold(behaviour, "human_approval")
 }
 
 // TrackBlockedResponse tracks blocked response in session manager
-func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID string, processResult *mcp.ProcessResult) {
+func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID string, processResult *mcp.ProcessResult, sessionDrivenBlock bool) {
 	if sessionMgr == nil || sessionID == "" || !processResult.IsBlocked {
 		return
 	}
@@ -85,7 +88,7 @@ func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessio
 		}
 	}
 
-	sessionMgr.TrackResponse(sessionID, requestID, blockedResponseMsg, shouldMarkSessionMalicious(processResult.Behaviour))
+	sessionMgr.TrackResponse(sessionID, requestID, blockedResponseMsg, shouldMarkSessionMalicious(processResult.Behaviour, sessionDrivenBlock))
 	if blockReason != "" {
 		sessionMgr.UpdateBlockedReason(sessionID, blockReason)
 	}
@@ -96,50 +99,48 @@ func TrackBlockedResponse(sessionMgr *SessionManager, logger *zap.Logger, sessio
 		zap.String("blockReason", blockReason))
 }
 
-// TrackRequestAndGenerateSummary tracks request and generates summary asynchronously
-func TrackRequestAndGenerateSummary(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID, payload string) {
-	if sessionMgr == nil || sessionID == "" || payload == "" {
+func TrackRequestOnly(sessionMgr *SessionManager, sessionID, requestID, payload string) {
+	if sessionMgr == nil || sessionID == "" || requestID == "" || payload == "" {
 		return
 	}
-
 	sessionMgr.TrackRequest(sessionID, requestID, payload)
+}
 
+func GenerateSummaryAsync(sessionMgr *SessionManager, logger *zap.Logger, sessionID, summaryText string, isRequest bool) {
+	if sessionMgr == nil || sessionID == "" || strings.TrimSpace(summaryText) == "" {
+		return
+	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-
-		// Extract just the prompt for summarization
-		prompt := ExtractPromptFromRequestPayload(payload)
-		if err := sessionMgr.GenerateAndUpdateSummary(ctx, sessionID, prompt, true); err != nil {
-			logger.Warn("Failed to generate session summary for request",
+		if err := sessionMgr.GenerateAndUpdateSummary(ctx, sessionID, summaryText, isRequest); err != nil {
+			logger.Warn("Failed to generate session summary",
 				zap.String("sessionID", sessionID),
+				zap.Bool("isRequest", isRequest),
 				zap.Error(err))
 		}
 	}()
 }
 
-// TrackResponseAndGenerateSummary tracks response and generates summary asynchronously
-func TrackResponseAndGenerateSummary(sessionMgr *SessionManager, logger *zap.Logger, sessionID, requestID, payload string, isMalicious bool) {
-	if sessionMgr == nil || sessionID == "" || payload == "" {
+func TrackResponseAndGenerateSummary(
+	sessionMgr *SessionManager,
+	logger *zap.Logger,
+	sessionID, requestID, rawResponseBody string,
+	sessionDrivenBlock bool,
+	processResult *mcp.ProcessResult,
+	finalResponse string,
+	allowed, modified bool,
+) {
+	if sessionMgr == nil || sessionID == "" || rawResponseBody == "" {
 		return
 	}
-
-	sessionMgr.TrackResponse(sessionID, requestID, payload, isMalicious)
-
-	// Only generate summary for non-blocked responses
-	if !isMalicious {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-
-			// Extract just the response for summarization
-			response := ExtractResponseFromResponsePayload(payload)
-			if err := sessionMgr.GenerateAndUpdateSummary(ctx, sessionID, response, false); err != nil {
-				logger.Warn("Failed to generate session summary for response",
-					zap.String("sessionID", sessionID),
-					zap.Error(err))
-			}
-		}()
+	markMalicious := false
+	if processResult != nil && processResult.IsBlocked {
+		markMalicious = shouldMarkSessionMalicious(processResult.Behaviour, sessionDrivenBlock)
+	}
+	sessionMgr.TrackResponse(sessionID, requestID, rawResponseBody, markMalicious)
+	if text := ResponseSummaryInput(rawResponseBody, finalResponse, allowed, modified); text != "" {
+		GenerateSummaryAsync(sessionMgr, logger, sessionID, text, false)
 	}
 }
 
