@@ -856,16 +856,24 @@ public class MaliciousEventService {
     }
   }
 
+  /** Fallback when the caller sends no limit (0/unset). */
+  private static final int GUARDRAIL_VIOLATION_PAYLOADS_DEFAULT_LIMIT = 50;
+  /** Hard cap regardless of what the caller asks for — an internal LLM scan job paging through
+   *  this endpoint should never be able to pull an unbounded page (and, by extension, an
+   *  unbounded amount of payload text) into memory in one call. */
+  private static final int GUARDRAIL_VIOLATION_PAYLOADS_MAX_LIMIT = 500;
+
   // Batched, cursor-paginated fetch of the raw request/response payload (latestApiOrig) behind a
   // set of guardrail-policy violations. listMaliciousRequests cannot serve this: its response
   // hard-codes payload to "" for every row (see .setPayload("") below), and adding a payload field
   // to that request risks an unrecognized-field parse failure on an un-redeployed caller (see the
-  // proto comment on ListGuardrailViolationPayloadsRequest). Sorted/paginated on the raw _id
-  // ascending — filterId does not appear in an existing _id-ordered index, but this endpoint is
-  // used by an internal LLM scan job, not an interactive list view, so a collection scan bounded by
-  // contextSource + filterId + detectedAt (existing contextSource_1_filterId_1_detectedAt_-1 index)
-  // followed by an in-memory _id sort over the matched page is an acceptable cost; add an
-  // {contextSource, filterId, _id} index if this needs to scale further.
+  // proto comment on ListGuardrailViolationPayloadsRequest). Sorted/paginated on the raw _id in
+  // either direction (request.newestFirst) — filterId does not appear in an existing _id-ordered
+  // index, but this endpoint is used by an internal LLM scan job, not an interactive list view, so
+  // a collection scan bounded by contextSource + filterId + detectedAt (existing
+  // contextSource_1_filterId_1_detectedAt_-1 index) followed by an in-memory _id sort over the
+  // matched page is an acceptable cost; add an {contextSource, filterId, _id} index if this needs
+  // to scale further.
   public ListGuardrailViolationPayloadsResponse listGuardrailViolationPayloads(
       String accountId, ListGuardrailViolationPayloadsRequest request, String contextSource) {
 
@@ -873,7 +881,9 @@ public class MaliciousEventService {
       createIndexIfAbsent(accountId);
     }
 
-    int limit = request.getLimit() > 0 ? request.getLimit() : 50;
+    int requestedLimit = request.getLimit() > 0
+        ? request.getLimit() : GUARDRAIL_VIOLATION_PAYLOADS_DEFAULT_LIMIT;
+    int limit = Math.min(requestedLimit, GUARDRAIL_VIOLATION_PAYLOADS_MAX_LIMIT);
     List<String> filterIds = request.getFilterIdsList();
 
     Document query = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
@@ -890,10 +900,16 @@ public class MaliciousEventService {
       query.append("detectedAt", new Document("$gte", start).append("$lte", end));
     }
 
+    // Oldest-first by default (what an exhaustive paging scan needs, so no row is skipped as new
+    // ones arrive between pages) — flip to newest-first on request. Same sort/cursor-operator
+    // pairing ThreatActorService#listThreatActorsFromActorInfo uses for its own _id cursor.
+    boolean newestFirst = request.hasNewestFirst() && request.getNewestFirst();
+    String cursorOperator = newestFirst ? "$lt" : "$gt";
+
     String cursorParam = request.hasCursor() ? request.getCursor() : null;
     if (cursorParam != null && !cursorParam.isEmpty()) {
       try {
-        query.append("_id", new Document("$gt", new ObjectId(cursorParam)));
+        query.append("_id", new Document(cursorOperator, new ObjectId(cursorParam)));
       } catch (IllegalArgumentException e) {
         logger.error("Invalid cursor ObjectId for listGuardrailViolationPayloads: " + cursorParam);
         return ListGuardrailViolationPayloadsResponse.newBuilder().build();
@@ -906,7 +922,7 @@ public class MaliciousEventService {
       cursor = maliciousEventDao.getDocumentCollection(accountId)
           .find(query)
           .projection(Projections.include("refId", "filterId", "detectedAt", "latestApiOrig"))
-          .sort(Sorts.ascending("_id"))
+          .sort(newestFirst ? Sorts.descending("_id") : Sorts.ascending("_id"))
           .limit(limit)
           .cursor();
 

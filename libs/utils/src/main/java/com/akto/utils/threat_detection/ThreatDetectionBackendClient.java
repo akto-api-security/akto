@@ -187,8 +187,17 @@ public final class ThreatDetectionBackendClient {
      * handler; {@link #listMaliciousRequests} cannot serve this since its response hard-codes
      * payload to {@code ""} for every row.
      *
+     * <p>{@code limit} is a request only — the server (see
+     * {@code MaliciousEventService#listGuardrailViolationPayloads}) applies its own default when
+     * this is {@code <= 0} and its own hard cap regardless of what is asked for, so a caller here
+     * cannot force an unbounded page.
+     *
      * @param filterIds guardrail policy names (== event {@code filterId}) to restrict to
      * @param cursor previous page's last {@code ViolationPayload.cursor}, or null/empty for page 1
+     * @param newestFirst false (default): walk oldest-first (_id ascending) — what an exhaustive
+     *     paging scan needs, so a row already returned page 1 doesn't shift onto page 2 and get
+     *     skipped as newer rows arrive between calls. true: walk newest-first (_id descending),
+     *     for a caller that only wants the most recent violations.
      */
     public static ListGuardrailViolationPayloadsResponse listGuardrailViolationPayloads(
             int accountId,
@@ -197,6 +206,7 @@ public final class ThreatDetectionBackendClient {
             java.util.List<String> filterIds,
             String cursor,
             int limit,
+            boolean newestFirst,
             String contextSourceValue) throws Exception {
         String url = backendUrl() + LIST_GUARDRAIL_VIOLATION_PAYLOADS_PATH;
 
@@ -214,6 +224,9 @@ public final class ThreatDetectionBackendClient {
         body.put("limit", limit);
         if (cursor != null && !cursor.isEmpty()) {
             body.put("cursor", cursor);
+        }
+        if (newestFirst) {
+            body.put("newestFirst", true);
         }
 
         String msg = objectMapper.valueToTree(body).toString();

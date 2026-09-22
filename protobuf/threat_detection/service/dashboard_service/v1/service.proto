@@ -103,7 +103,12 @@ message ListGuardrailViolationPayloadsRequest {
   repeated string filter_ids = 1;                         // guardrail policy names (== event filterId)
   optional TimeRangeFilter detected_at_time_range = 2;
   optional string cursor = 3;                              // last-seen _id (hex ObjectId); empty = first page
-  uint32 limit = 4;
+  uint32 limit = 4;                                        // 0/unset -> server default; server also caps the max
+  // false/unset (default): walk oldest-first (_id ascending) — what an exhaustive scan that must
+  // not miss a row wants, and what ComplianceClauseScanService uses. true: walk newest-first
+  // (_id descending), for a caller that only wants the most recent violations quickly. Flips both
+  // the sort AND the cursor comparison operator — see MaliciousEventService#listGuardrailViolationPayloads.
+  optional bool newest_first = 5;
 }
 
 message ListGuardrailViolationPayloadsResponse {
