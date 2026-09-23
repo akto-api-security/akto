@@ -1,8 +1,11 @@
 package com.akto.service.posture;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.Constants;
@@ -70,7 +73,7 @@ public class ArgusPostureService {
         kpis.add(assetsKpi(scoped, environment));
         kpis.add(highRiskAgentsKpi());
         kpis.add(identityAccessKpi());
-        kpis.add(privilegedToolsKpi());
+        kpis.add(privilegedToolsKpi(scoped, environment));
         kpis.add(sensitiveDataKpi(scoped, bundle.sensitiveByCollection));
         kpis.add(protectionCoverageKpi(scoped, bundle.policies));
 
@@ -113,13 +116,41 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private BasicDBObject privilegedToolsKpi() {
-        BasicDBObject kpi = kpi(KPI_PRIVILEGED_TOOLS, "Privileged Tools", 0L);
+    private BasicDBObject privilegedToolsKpi(List<ApiCollection> assets, String environment) {
+        long privileged = 0;
+        long destructive = 0;
+
+        if (!assets.isEmpty()) {
+            Bson inScope = scopeFilter(assets, environment);
+
+            privileged = ApiInfoDao.instance.count(Filters.and(inScope,
+                    Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY),
+                    Filters.ne(ApiInfo.TOOL_INFO_CAPABILITY, ToolCapabilityClassifier.SAFE)));
+
+            destructive = ApiInfoDao.instance.count(Filters.and(inScope,
+                    Filters.in(ApiInfo.TOOL_INFO_CAPABILITY,
+                            ToolCapabilityClassifier.RESOURCE_DELETE,
+                            ToolCapabilityClassifier.CRITICAL_RESOURCE_WRITE)));
+        }
+
+        BasicDBObject kpi = kpi(KPI_PRIVILEGED_TOOLS, "Privileged Tools", privileged);
         kpi.put("footnote", "privileged");
-        long destructiveNoApproval = 0;
-        kpi.put("secondaryFootnote", destructiveNoApproval + " destructive, no approval");
-        kpi.put("secondaryTone", riskTone(destructiveNoApproval, "critical"));
+        kpi.put("secondaryFootnote", destructive + " destructive");
+        kpi.put("secondaryTone", riskTone(destructive, "critical"));
         return kpi;
+    }
+
+    /**
+     * On "all environments" the DAO's own RBAC/context filter already restricts to Argus
+     * collections, so an id list would only repeat it — at fleet scale that is a $in carrying
+     * every asset id, on top of the one the RBAC filter already adds.
+     */
+    private static Bson scopeFilter(List<ApiCollection> assets, String environment) {
+        if (isAllEnvironments(environment)) return Filters.empty();
+
+        List<Integer> ids = new ArrayList<>(assets.size());
+        for (ApiCollection asset : assets) ids.add(asset.getId());
+        return Filters.in(ApiInfo.ID_API_COLLECTION_ID, ids);
     }
 
     private BasicDBObject sensitiveDataKpi(List<ApiCollection> assets,
@@ -150,6 +181,14 @@ public class ArgusPostureService {
             return kpi;
         }
 
+        if (fleetWideControls(policies).containsAll(requiredControls(null))) {
+            kpi.put("value", 100d);
+            kpi.put("tone", toneForPercent(100d));
+            kpi.put("secondaryFootnote", "0 asset(s) missing required controls");
+            kpi.put("secondaryTone", riskTone(0, "critical"));
+            return kpi;
+        }
+
         List<Set<String>> providedByPolicy = new ArrayList<>(policies.size());
         for (GuardrailPolicies p : policies) providedByPolicy.add(providedControls(p));
 
@@ -166,6 +205,21 @@ public class ArgusPostureService {
         kpi.put("secondaryFootnote", missing + " asset(s) missing required controls");
         kpi.put("secondaryTone", riskTone(missing, toneForPercent(percent)));
         return kpi;
+    }
+
+    /**
+     * Controls provided to every asset, from the apply-to-all policies alone. When these already
+     * satisfy the required set, every asset is protected regardless of the scoped policies, and
+     * coverage is 100% without matching a single asset — the per-asset path is assets x policies
+     * host matching, so this is the difference between one pass over the policies and 500k string
+     * comparisons at fleet scale.
+     */
+    private static Set<String> fleetWideControls(List<GuardrailPolicies> policies) {
+        Set<String> provided = new HashSet<>();
+        for (GuardrailPolicies p : policies) {
+            if (p != null && p.isApplyToAllServers()) provided.addAll(providedControls(p));
+        }
+        return provided;
     }
 
     private static Set<String> providedControls(GuardrailPolicies p) {

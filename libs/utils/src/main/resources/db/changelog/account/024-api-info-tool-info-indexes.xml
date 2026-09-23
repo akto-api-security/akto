@@ -13,12 +13,13 @@
         ToolClassificationCron.
 
         capability serves the Argus Posture "Privileged Tools" tile, which counts tool rows by
-        capability rather than loading them. calculatedAt serves the cron's own candidate
-        selection, which picks rows whose classification is missing or older than the recalc
-        threshold — without it that gate scans every tool row on every run.
+        capability rather than loading them. It is partial on toolInfo.capability existing, so the
+        index holds only classified tools instead of every api_info document. calculatedAt serves
+        the cron's own candidate selection, which picks rows whose classification is missing or
+        older than the recalc threshold.
 
-        Index names match MCollection.generateIndexName so these are no-ops if DaoInit already
-        built them.
+        Index names match what ApiInfoDao creates, so these are no-ops if DaoInit already built
+        them.
     -->
 
     <changeSet id="024-account-api-info-tool-info-capability-index" author="akto">
@@ -27,7 +28,7 @@
         </preConditions>
         <mongodb:createIndex collectionName="api_info">
             <mongodb:keys>{ "toolInfo.capability": 1 }</mongodb:keys>
-            <mongodb:options>{ "name": "capability_1" }</mongodb:options>
+            <mongodb:options>{ "name": "capability_1_partial_exists", "partialFilterExpression": { "toolInfo.capability": { "$exists": true } } }</mongodb:options>
         </mongodb:createIndex>
         <rollback>
             <mongodb:dropIndex collectionName="api_info">
