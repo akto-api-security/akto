@@ -249,7 +249,7 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                     onChange={setBlockPublicShare}
                 />
                 <Box paddingBlockStart="2">
-                    <Banner tone="info">Currently supported only for the Claude desktop app with Endpoint Shield v1.1.229 or later.</Banner>
+                    <Banner tone="info">Currently supported only for the Claude desktop app with Endpoint Shield v1.1.229 or later (System Proxy must be enabled).</Banner>
                 </Box>
             </SectionCard>
         </VerticalStack>
