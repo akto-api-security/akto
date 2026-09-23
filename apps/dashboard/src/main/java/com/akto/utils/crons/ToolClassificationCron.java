@@ -56,7 +56,7 @@ public class ToolClassificationCron {
         try {
             Context.accountId.set(1_000_000);
             if (!callDibs(Cluster.TOOL_CLASSIFICATION_CRON_INFO, 3300, 60)) {
-                loggerMaker.debugAndAddToDb("Tool classification cron dibs not acquired, thus skipping cron");
+                loggerMaker.infoAndAddToDb("Tool classification cron dibs not acquired, thus skipping cron");
                 return;
             }
             AccountTask.instance.executeTask(this::processAccount, "tool-classification-cron");
@@ -70,14 +70,14 @@ public class ToolClassificationCron {
         try {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess == null || !featureAccess.getIsGranted()) {
-                loggerMaker.debugAndAddToDb("Tool classification cron: skipping accountId=" + accountId
+                loggerMaker.infoAndAddToDb("Tool classification cron: skipping accountId=" + accountId
                         + " (feature access not granted)");
                 return;
             }
 
             List<ApiInfo> candidates = findCandidates();
             if (candidates.isEmpty()) {
-                loggerMaker.debugAndAddToDb("Tool classification cron: no candidates for accountId=" + accountId);
+                loggerMaker.infoAndAddToDb("Tool classification cron: no candidates for accountId=" + accountId);
                 return;
             }
 
@@ -127,7 +127,7 @@ public class ToolClassificationCron {
     private void classify(int accountId, ApiInfo tool, List<WriteModel<ApiInfo>> updates) {
         ApiInfo.ApiInfoKey key = tool.getId();
         if (key == null || key.getUrl() == null || key.getMethod() == null) {
-            loggerMaker.debugAndAddToDb("Tool classification cron: skipping row with incomplete key, accountId="
+            loggerMaker.infoAndAddToDb("Tool classification cron: skipping row with incomplete key, accountId="
                     + accountId);
             return;
         }
@@ -136,14 +136,14 @@ public class ToolClassificationCron {
             String rawSample = SampleDataDao.getLatestSampleData(key.getApiCollectionId(), key.getUrl(),
                     key.getMethod().name());
             if (rawSample == null) {
-                loggerMaker.debugAndAddToDb("Tool classification cron: no sample data, accountId=" + accountId
+                loggerMaker.infoAndAddToDb("Tool classification cron: no sample data, accountId=" + accountId
                         + ", url=" + key.getUrl() + ", will retry next tick");
                 return;
             }
 
             String sample = stripHeaders(rawSample);
             if (sample.isEmpty()) {
-                loggerMaker.debugAndAddToDb("Tool classification cron: sample unparseable, accountId=" + accountId
+                loggerMaker.infoAndAddToDb("Tool classification cron: sample unparseable, accountId=" + accountId
                         + ", url=" + key.getUrl() + ", will retry next tick");
                 return;
             }
