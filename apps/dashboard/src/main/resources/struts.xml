@@ -13835,6 +13835,28 @@
             </result>
         </action>
 
+        <action name="api/fetchArgusPostureSummary" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureSummary">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchRiskScoreBreakdown" class="com.akto.action.SecurityPostureAction" method="fetchRiskScoreBreakdown">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

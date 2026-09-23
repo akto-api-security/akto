@@ -1,0 +1,200 @@
+{
+    "environments": [
+        { "id": "all", "label": "All environments", "count": null },
+        { "id": "production", "label": "Production", "count": 42 },
+        { "id": "staging", "label": "Staging", "count": 61 },
+        { "id": "development", "label": "Development", "count": 81 }
+    ],
+    "postureScore": {
+        "value": 68,
+        "bandLabel": "Elevated risk",
+        "bandTone": "critical",
+        "delta": -4,
+        "deltaTone": "critical",
+        "deltaDrivenBy": "Tools & MCP",
+        "trend": [58, 60, 62, 61, 65, 67, 66, 72, 68]
+    },
+    "kpis": [
+        {
+            "id": "assets",
+            "label": "Assets",
+            "value": 184,
+            "footnote": "42 production",
+            "secondaryFootnote": "11 externally exposed",
+            "secondaryTone": "warning"
+        },
+        {
+            "id": "highRiskAgents",
+            "label": "High-Risk Agents",
+            "value": 17,
+            "secondaryFootnote": "+6 newly high risk this week",
+            "secondaryTone": "critical",
+            "linkLabel": "Top risk: refund-agent-prod",
+            "linkGroupKey": "refund-agent-prod"
+        },
+        {
+            "id": "identityAccess",
+            "label": "Identity & Access",
+            "status": "COMING_SOON",
+            "illustrative": { "value": 19, "footnote": "overprivileged identities", "secondaryFootnote": "8 shared · 6 orphaned", "secondaryTone": "subdued" }
+        },
+        {
+            "id": "privilegedTools",
+            "label": "Privileged Tools",
+            "value": 73,
+            "footnote": "privileged",
+            "secondaryFootnote": "14 destructive, no approval",
+            "secondaryTone": "critical"
+        },
+        {
+            "id": "sensitiveData",
+            "label": "Sensitive Data",
+            "value": 31,
+            "footnote": "agents access sensitive data",
+            "secondaryFootnote": "8 can send it externally",
+            "secondaryTone": "critical"
+        },
+        {
+            "id": "protectionCoverage",
+            "label": "Protection Coverage",
+            "value": 72,
+            "unit": "percent",
+            "footnote": "18 prod agents missing required controls",
+            "tone": "warning"
+        }
+    ],
+    "dangerousPaths": {
+        "status": "COMING_SOON",
+        "illustrative": [
+            {
+                "id": "path-1",
+                "severity": "CRITICAL",
+                "title": "Open internet input can drive shell access to production Kubernetes",
+                "chain": [
+                    { "label": "Internet", "type": "source" },
+                    { "label": "ResearchAgent", "type": "agent" },
+                    { "label": "Shell Tool", "type": "tool" },
+                    { "label": "Production Kubernetes", "type": "resource" }
+                ],
+                "tags": ["Untrusted input", "Privileged action", "Sensitive resource", "Excessive privilege"],
+                "explanation": "A prompt-injected result from the open internet can drive a shell tool with standing access to production Kubernetes — nothing separates research input from execution privilege."
+            },
+            {
+                "id": "path-2",
+                "severity": "CRITICAL",
+                "title": "An uploaded document can reach the customer database, unapproved",
+                "chain": [
+                    { "label": "Uploaded Document", "type": "source" },
+                    { "label": "SupportAgent", "type": "agent" },
+                    { "label": "SQL MCP", "type": "tool" },
+                    { "label": "Customer DB", "type": "resource" }
+                ],
+                "tags": ["Untrusted input", "Privileged action", "Sensitive resource", "Missing approval"],
+                "explanation": "A document an outside party can upload can inject instructions that reach a SQL MCP tool with write access to the customer database — no approval step sits in front of the query."
+            },
+            {
+                "id": "path-3",
+                "severity": "CRITICAL",
+                "title": "A single employee prompt can trigger an unbounded Stripe refund",
+                "chain": [
+                    { "label": "Employee Prompt", "type": "source" },
+                    { "label": "FinanceAgent", "type": "agent" },
+                    { "label": "Refund Tool", "type": "tool" },
+                    { "label": "Stripe", "type": "resource" }
+                ],
+                "tags": ["Privileged action", "Sensitive resource", "Missing approval", "Missing guardrail"],
+                "explanation": "A single employee prompt can trigger an unbounded refund against live Stripe funds — there is no approval step and no per-transaction cap.",
+                "groupKey": "refund-agent-prod",
+                "linkLabel": "View refund-agent-prod"
+            }
+        ]
+    },
+    "highestRiskAgents": [
+        { "rank": 1, "groupKey": "refund-agent-prod", "name": "refund-agent-prod", "environment": "production", "score": 92, "issue": "Issues refunds without approval", "severity": "CRITICAL" },
+        { "rank": 2, "groupKey": "research-agent", "name": "research-agent", "environment": "production", "score": 88, "issue": "Can send sensitive data to arbitrary URLs", "severity": "CRITICAL" },
+        { "rank": 3, "groupKey": "support-agent", "name": "support-agent", "environment": "production", "score": 74, "issue": "Uses a shared Salesforce credential", "severity": "HIGH" },
+        { "rank": 4, "groupKey": "customer-agent", "name": "customer-agent", "environment": "staging", "score": 69, "issue": "Can invoke an unauthenticated MCP server", "severity": "HIGH" },
+        { "rank": 5, "groupKey": "analytics-agent", "name": "analytics-agent", "environment": "production", "score": 51, "issue": "184 AWS permissions granted, 9 used", "severity": "MEDIUM" }
+    ],
+    "riskByDomain": [
+        { "id": "identity", "label": "Identity", "count": 33, "agentCount": 28, "delta": 3, "deltaTone": "critical" },
+        { "id": "permissions", "label": "Permissions", "count": 26, "agentCount": 18, "delta": 4, "deltaTone": "critical" },
+        { "id": "toolsMcp", "label": "Tools & MCP", "count": 41, "agentCount": 35, "delta": 7, "deltaTone": "critical" },
+        { "id": "dataExposure", "label": "Data Exposure", "count": 22, "agentCount": 19, "delta": 2, "deltaTone": "warning" },
+        { "id": "protectionControls", "label": "Protection Controls", "count": 18, "agentCount": 18, "delta": -5, "deltaTone": "success" }
+    ],
+    "topFindings": [
+        {
+            "id": "finding-1",
+            "severity": "CRITICAL",
+            "title": "refund-agent-prod can issue refunds without approval",
+            "groupKey": "refund-agent-prod",
+            "environment": "production",
+            "owner": "Finance Engineering",
+            "resource": "Stripe — Refund API",
+            "whyItMatters": "Unbounded financial impact from a single prompt: no cap, no approver, and no distinction between routine and unusual refunds.",
+            "remediation": "Require human approval above a set threshold and add a per-transaction cap on the Refund Tool."
+        },
+        {
+            "id": "finding-2",
+            "severity": "HIGH",
+            "title": "support-agent uses a shared Salesforce credential",
+            "groupKey": "support-agent",
+            "environment": "production",
+            "owner": "Support Engineering",
+            "resource": "Salesforce — shared service account",
+            "whyItMatters": "Actions can't be attributed to a single agent or session, which blocks incident response and hides misuse.",
+            "remediation": "Issue a scoped, per-agent credential and rotate the shared one."
+        },
+        {
+            "id": "finding-3",
+            "severity": "CRITICAL",
+            "title": "research-agent can send sensitive data to arbitrary URLs",
+            "groupKey": "research-agent",
+            "environment": "production",
+            "owner": "Data Platform",
+            "resource": "Outbound HTTP — no egress allowlist",
+            "whyItMatters": "This is an exfiltration path for anything the agent can read, triggerable by a single crafted instruction.",
+            "remediation": "Enforce a destination allowlist on the agent's outbound HTTP tool."
+        },
+        {
+            "id": "finding-4",
+            "severity": "MEDIUM",
+            "title": "analytics-agent has 184 AWS permissions but uses 9",
+            "groupKey": "analytics-agent",
+            "environment": "production",
+            "owner": "Data Platform",
+            "resource": "AWS IAM role — analytics-agent-role",
+            "whyItMatters": "175 unused permissions is a large blast radius if this agent's credentials are ever compromised.",
+            "remediation": "Right-size the IAM policy to observed 30-day usage."
+        },
+        {
+            "id": "finding-5",
+            "severity": "HIGH",
+            "title": "customer-agent can invoke an unauthenticated MCP server",
+            "groupKey": "customer-agent",
+            "environment": "staging",
+            "owner": "Platform Engineering",
+            "resource": "internal-tools MCP server",
+            "whyItMatters": "Any caller on the network can trigger tool actions with no identity check on the other end.",
+            "remediation": "Put the MCP server behind authenticated transport before promoting it."
+        }
+    ],
+    "coverageGovernance": [
+        { "id": "agentDiscovery", "label": "Agent discovery", "value": 94 },
+        { "id": "ownershipMapped", "label": "Ownership mapped", "value": 81 },
+        { "id": "identityMapped", "label": "Identity mapped", "value": 88 },
+        { "id": "permissionVisibility", "label": "Permission visibility", "status": "COMING_SOON", "illustrative": { "value": 76 } },
+        { "id": "runtimeActivityObserved", "label": "Runtime activity observed", "value": 69 },
+        { "id": "guardrailEnforcement", "label": "Guardrail enforcement", "value": 72 }
+    ],
+    "changesThisWeek": [
+        { "id": "newAgents", "icon": "plus", "count": 12, "label": "new agents discovered" },
+        { "id": "newTools", "icon": "plus", "count": 37, "label": "new tools added", "tone": "warning" },
+        { "id": "newProdIdentities", "label": "new production identities", "status": "COMING_SOON", "illustrative": { "count": 4 } },
+        { "id": "agentsGainedWriteAccess", "label": "agents gained write access", "status": "COMING_SOON", "illustrative": { "count": 3 } },
+        { "id": "newExternalDestinations", "label": "new external destinations", "status": "COMING_SOON", "illustrative": { "count": 2 } },
+        { "id": "issuesResolved", "icon": "tick", "count": 5, "label": "posture issues resolved", "tone": "success" }
+    ],
+    "generatedAt": "2026-09-19T00:00:00Z"
+}

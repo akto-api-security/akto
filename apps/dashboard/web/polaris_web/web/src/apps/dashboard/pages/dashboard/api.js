@@ -296,6 +296,18 @@ const api = {
         })
     },
 
+    fetchArgusPostureSummary: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                environment
+            }
+        })
+    },
+
     fetchPostureSummary: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchPostureSummary',
@@ -312,6 +324,19 @@ const api = {
     fetchRiskScoreBreakdown: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchRiskScoreBreakdown',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    // Argus (Agentic Security) posture page — today just the Posture Score hero. See
+    // ArgusPostureAction's javadoc and agenticPosture/postureDataSource.js's merge-over-mock seam.
+    fetchArgusPostureScore: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureScore',
             method: 'post',
             data: {
                 startTimestamp,
