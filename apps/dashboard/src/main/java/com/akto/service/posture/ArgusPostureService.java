@@ -16,12 +16,10 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 public class ArgusPostureService {
@@ -48,20 +46,8 @@ public class ArgusPostureService {
     private static final List<String> DEV_ENVS     = Arrays.asList("DEV");
     private static final List<String> STAGING_ENVS = Arrays.asList("STAGING", "PREPROD", "UAT", "QA", "INTEG");
 
-    private static final double TONE_SUCCESS_AT = 95d;
-    private static final double TONE_WARNING_AT = 60d;
-
-    private static final String CONTROL_RATE_LIMIT        = "rateLimit";
-    private static final String CONTROL_PROMPT_INJECTION  = "promptInjectionFiltering";
-    private static final String CONTROL_PII               = "piiDetection";
-    private static final String CONTROL_OUTPUT_VALIDATION = "outputValidation";
-
-    private static final List<String> DEFAULT_REQUIRED_CONTROLS = Arrays.asList(
-            CONTROL_RATE_LIMIT, CONTROL_PROMPT_INJECTION, CONTROL_PII, CONTROL_OUTPUT_VALIDATION);
-
-    private static List<String> requiredControls(ApiCollection asset) {
-        return DEFAULT_REQUIRED_CONTROLS;
-    }
+    private static final double TONE_SUCCESS_AT = 100d;
+    private static final double TONE_WARNING_AT = 70d;
 
     public BasicDBObject buildSummary(InsightDataBundle bundle, String environment) {
         List<ApiCollection> assets = new ArrayList<>();
@@ -181,7 +167,7 @@ public class ArgusPostureService {
         if (assets.isEmpty()) {
             kpi.put("value", 0d);
             kpi.put("secondaryFootnote", "No asset(s) discovered");
-            kpi.put("secondaryTone", riskTone(0, "critical"));
+            kpi.put("secondaryTone", toneForPercent(0d));
             return kpi;
         }
 
@@ -189,7 +175,7 @@ public class ArgusPostureService {
             kpi.put("value", 100d);
             kpi.put("tone", toneForPercent(100d));
             kpi.put("secondaryFootnote", "All asset(s) covered");
-            kpi.put("secondaryTone", riskTone(0, "critical"));
+            kpi.put("secondaryTone", toneForPercent(100d));
             return kpi;
         }
 
@@ -204,7 +190,7 @@ public class ArgusPostureService {
         kpi.put("value", percent);
         kpi.put("tone", toneForPercent(percent));
         kpi.put("secondaryFootnote", countLine(notCovered, "asset(s) not covered", "All asset(s) covered"));
-        kpi.put("secondaryTone", riskTone(notCovered, "critical"));
+        kpi.put("secondaryTone", toneForPercent(percent));
         return kpi;
     }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Badge, Box, Card, HorizontalStack, Icon, Popover, ProgressBar, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Card, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import { CircleInformationMajor } from '@shopify/polaris-icons'
 
 // Generic idioms shared by both posture pages, adapted from the same pattern
@@ -15,12 +15,17 @@ export const TONE_TEXT_COLOR = {
     subdued: 'subdued',
 }
 
-// Polaris's ProgressBar `color` prop uses a different vocabulary (no "warning") than Badge's
-// `status`/our own TONE_TEXT_COLOR — this bridges a KPI's own tone to it.
-const TONE_PROGRESS_COLOR = {
-    critical: 'critical',
-    warning: 'highlight',
-    success: 'success',
+const TONE_TEXT_TOKEN = {
+    critical: 'text-critical',
+    warning: 'text-caution',
+    success: 'text-success-strong',
+    subdued: 'text-subdued',
+}
+
+const TONE_BAR_BG = {
+    critical: 'bg-critical-strong',
+    warning: 'bg-caution-strong',
+    success: 'bg-success-strong',
 }
 
 export function formatValue(value, unit) {
@@ -120,11 +125,15 @@ export function KpiTile({ kpi, icon, onOpenLink }) {
                         )}
                     </VerticalStack>
                     {hasValue && kpi.unit === 'percent' && (
-                        <ProgressBar progress={kpi.value} size="small" color={TONE_PROGRESS_COLOR[kpi.tone] || 'primary'} />
+                        <Box background="bg-strong" borderRadius="full" minHeight="0.5rem" width="100%">
+                            <Box background={TONE_BAR_BG[kpi.tone] || 'bg-strong'} borderRadius="full" minHeight="0.5rem" width={`${kpi.value}%`} />
+                        </Box>
                     )}
                     {kpi.footnote && <Text variant="bodySm" color="subdued">{kpi.footnote}</Text>}
                     {kpi.secondaryFootnote && (
-                        <Text variant="bodySm" color={TONE_TEXT_COLOR[kpi.secondaryTone] || 'subdued'}>{kpi.secondaryFootnote}</Text>
+                        <Box color={TONE_TEXT_TOKEN[kpi.secondaryTone] || 'text-subdued'}>
+                            <Text variant="bodySm">{kpi.secondaryFootnote}</Text>
+                        </Box>
                     )}
                     {kpi.linkLabel && (
                         <Box onClick={() => onOpenLink && onOpenLink(kpi)} style={{ cursor: 'pointer' }}>
