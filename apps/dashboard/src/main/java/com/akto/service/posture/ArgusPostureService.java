@@ -94,11 +94,11 @@ public class ArgusPostureService {
             for (ApiCollection asset : assets) {
                 if (ENV_PRODUCTION.equals(envBucket(envTagValue(asset)))) production++;
             }
-            kpi.put("footnote", production + " production");
+            kpi.put("footnote", countLine(production, "production", "None in production"));
         }
 
         long externallyExposed = 0;
-        kpi.put("secondaryFootnote", externallyExposed + " externally exposed");
+        kpi.put("secondaryFootnote", countLine(externallyExposed, "externally exposed", "None externally exposed"));
         kpi.put("secondaryTone", riskTone(externallyExposed, "warning"));
         return kpi;
     }
@@ -106,7 +106,7 @@ public class ArgusPostureService {
     private BasicDBObject highRiskAgentsKpi() {
         BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", 0L);
         long newlyHighRisk = 0;
-        kpi.put("secondaryFootnote", newlyHighRisk + " newly high risk this week");
+        kpi.put("secondaryFootnote", countLine(newlyHighRisk, "newly high risk this week", "No change since last week"));
         kpi.put("secondaryTone", riskTone(newlyHighRisk, "critical"));
         return kpi;
     }
@@ -114,7 +114,7 @@ public class ArgusPostureService {
     private BasicDBObject identityAccessKpi() {
         BasicDBObject kpi = kpi(KPI_IDENTITY_ACCESS, "Identity & Access", 0L);
         kpi.put("footnote", "overprivileged identity(s)");
-        kpi.put("secondaryFootnote", "0 shared · 0 orphaned");
+        kpi.put("secondaryFootnote", sharedOrphanedLine(0, 0));
         kpi.put("secondaryTone", "subdued");
         return kpi;
     }
@@ -139,7 +139,7 @@ public class ArgusPostureService {
 
         BasicDBObject kpi = kpi(KPI_PRIVILEGED_TOOLS, "Privileged Tools", privileged);
         kpi.put("footnote", "privileged");
-        kpi.put("secondaryFootnote", destructive + " destructive");
+        kpi.put("secondaryFootnote", countLine(destructive, "destructive", "None destructive"));
         kpi.put("secondaryTone", riskTone(destructive, "critical"));
         return kpi;
     }
@@ -167,7 +167,7 @@ public class ArgusPostureService {
         BasicDBObject kpi = kpi(KPI_SENSITIVE_DATA, "Sensitive Data", withSensitive);
         kpi.put("footnote", "asset(s) access sensitive data");
         long canSendExternally = 0;
-        kpi.put("secondaryFootnote", canSendExternally + " can send it externally");
+        kpi.put("secondaryFootnote", countLine(canSendExternally, "can send it externally", "None can send it externally"));
         kpi.put("secondaryTone", riskTone(canSendExternally, "critical"));
         return kpi;
     }
@@ -179,7 +179,7 @@ public class ArgusPostureService {
 
         if (assets.isEmpty()) {
             kpi.put("value", 0d);
-            kpi.put("secondaryFootnote", "0 asset(s) not covered");
+            kpi.put("secondaryFootnote", "No asset(s) discovered");
             kpi.put("secondaryTone", riskTone(0, "critical"));
             return kpi;
         }
@@ -187,7 +187,7 @@ public class ArgusPostureService {
         if (hasFleetWidePolicy(policies)) {
             kpi.put("value", 100d);
             kpi.put("tone", toneForPercent(100d));
-            kpi.put("secondaryFootnote", "0 asset(s) not covered");
+            kpi.put("secondaryFootnote", "All asset(s) covered");
             kpi.put("secondaryTone", riskTone(0, "critical"));
             return kpi;
         }
@@ -202,9 +202,20 @@ public class ArgusPostureService {
 
         kpi.put("value", percent);
         kpi.put("tone", toneForPercent(percent));
-        kpi.put("secondaryFootnote", notCovered + " asset(s) not covered");
+        kpi.put("secondaryFootnote", countLine(notCovered, "asset(s) not covered", "All asset(s) covered"));
         kpi.put("secondaryTone", riskTone(notCovered, "critical"));
         return kpi;
+    }
+
+    private static String countLine(long count, String whenSome, String whenNone) {
+        return count > 0 ? count + " " + whenSome : whenNone;
+    }
+
+    private static String sharedOrphanedLine(long shared, long orphaned) {
+        if (shared == 0 && orphaned == 0) return "No shared or orphaned identity(s)";
+        if (orphaned == 0) return shared + " shared";
+        if (shared == 0) return orphaned + " orphaned";
+        return shared + " shared · " + orphaned + " orphaned";
     }
 
     private static boolean hasFleetWidePolicy(List<GuardrailPolicies> policies) {
