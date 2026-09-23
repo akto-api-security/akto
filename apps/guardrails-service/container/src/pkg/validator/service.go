@@ -2041,23 +2041,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// 	return result, "", nil
 	// }
 
-	// Track request and generate summary asynchronously
-	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
-
-	// Inject session summary into payload if available
-	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
-	if payloadToValidate != payload {
-		s.logger.Info("ValidateRequest - payload modified by session summary injection",
-			zap.String("sessionID", sessionID))
-	}
+	session.TrackRequestOnly(s.sessionMgr, sessionID, requestID, payload)
 
 	s.schemaFetcher.RefreshIfNeeded()
 
-	payloadToValidate = s.extractPayloadForValidation(payloadToValidate, params.Method, params.Path, true)
+	payloadBare := s.extractPayloadForValidation(payload, params.Method, params.Path, true)
 	s.logger.Info("ValidateRequest - payload prepared for validation",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
-		zap.String("payloadToValidate", payloadToValidate))
+		zap.String("payloadBare", payloadBare))
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
@@ -2093,7 +2085,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
-	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
+	valCtx := s.validationContextFromParams(params, sessionID, payloadBare, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
 	// Narrow to the policies that apply to this server/device/user so all subsequent
 	// checks only fire for rules that belong to them.
@@ -2110,8 +2102,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// selection is respected (a personal-account policy scoped to server A should
 	// not block requests arriving on server B).
 	if policyName, blocked := s.resolvePersonalAccountBlock(policies, valCtx.Tag, valCtx.RequestHeaders, params.Path, sessionID); blocked {
-		result := s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName))
-		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+		result := s.reportAndBlockPersonalAccount(ctx, params, payloadBare, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName))
+		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadBare, sessionID)
 		return result, activityID, nil
 	}
 
@@ -2124,8 +2116,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
 	// policies scoped to this server are considered.
-	if blockResult := s.checkBlockedHost(params, valCtx, payloadToValidate, sessionID, requestID, policies); blockResult != nil {
-		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadToValidate, sessionID)
+	if blockResult := s.checkBlockedHost(params, valCtx, payloadBare, sessionID, requestID, policies); blockResult != nil {
+		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadBare, sessionID)
 		return blockResult, activityID, nil
 	}
 
@@ -2150,30 +2142,50 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Redact any configured ignore-phrases before the enforcement library ever sees the
-	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
-	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
-	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(payloadToValidate, policies, "ValidateRequest", sessionID)
-	payloadToValidate = payloadForEvaluation
-
-	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
 	procCtx, cancelProc := s.withValidationDeadline(ctx)
 	defer cancelProc()
-	processResult, err := s.processor.ProcessRequestParallel(procCtx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+
+	validate := func(extractedPayload string) (*mcp.ProcessResult, string, string, error) {
+		eval, pre := s.redactIgnorePhrasesForEvaluation(extractedPayload, policies, "ValidateRequest", sessionID)
+		valCtx.RequestPayload = eval
+		result, err := s.processor.ProcessRequestParallel(procCtx, eval, valCtx, policies, auditPolicies, hasAuditRules)
+		return result, eval, pre, err
+	}
+
+	valCtx.SessionID = ""
+	processResult, evalPayload, preRedactionPayload, err := validate(payloadBare)
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
-			zap.String("path", params.Path),
-			zap.String("method", params.Method),
-			zap.String("account", params.AktoAccountID),
 			zap.String("sessionID", sessionID),
 			zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
 			zap.Error(err))
 		return nil, "", fmt.Errorf("failed to process request: %w", err)
 	}
 
-	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, "ValidateRequest", sessionID)
+	sessionDrivenBlock := false
+	if !processResult.IsBlocked && s.config != nil && s.config.SessionEnabled {
+		if rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID); rawWithSummary != payload {
+			s.logger.Info("Session summary changed payload, running summary validation pass",
+				zap.String("sessionID", sessionID))
+			valCtx.SessionID = sessionID
+			payloadWithSummary := s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, true)
+			processResult, evalPayload, preRedactionPayload, err = validate(payloadWithSummary)
+			if err != nil {
+				s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
+					zap.String("sessionID", sessionID),
+					zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
+					zap.Error(err))
+				return nil, "", fmt.Errorf("failed to process request: %w", err)
+			}
+			s.logger.Info("ValidateRequest - session summary payload validated",
+				zap.String("sessionID", sessionID),
+				zap.String("payloadWithSummary", payloadWithSummary),
+				zap.String("evalPayload", evalPayload))
+			sessionDrivenBlock = processResult.IsBlocked
+		}
+	}
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, evalPayload, preRedactionPayload, "ValidateRequest", sessionID)
 
 	s.logger.Info("ValidateRequest - ProcessRequestParallel result",
 		zap.String("path", params.Path),
@@ -2195,7 +2207,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	// Track blocked response if request was blocked
-	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
+	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult, sessionDrivenBlock)
 
 	// Convert ProcessResult to ValidationResult. finalPayload is processResult.ModifiedPayload
 	// with any ignore-phrase placeholders reconciled back to real text (or discarded in
@@ -2244,12 +2256,17 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.Bool("allowed", result.Allowed))
 	}
 
-	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadBare, sessionID)
 	// Browser-extension traffic that inlined file-attachment content can only be enforced by
 	// blocking — a mask or alert verdict is unenforceable on that payload shape. Skipped for a
 	// pending approval, which owns its own response. See upgradeBrowserAttachmentVerdict.
 	if activityID == "" {
 		s.upgradeBrowserAttachmentVerdict(result, params, sessionID)
+	}
+	if activityID == "" && session.ShouldGenerateRequestSummary(result) {
+		if text := session.RequestSummaryInput(payload, finalPayload, result); text != "" {
+			session.GenerateSummaryAsync(s.sessionMgr, s.logger, sessionID, text, true)
+		}
 	}
 	return result, activityID, nil
 }
@@ -2337,22 +2354,24 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	responseBodyForValidation := s.extractPayloadForValidation(responseBody, params.Method, params.Path, false)
+	responseBodyBare := s.extractPayloadForValidation(responseBody, params.Method, params.Path, false)
 	s.logger.Info("ValidateResponse - payload prepared for validation",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
-		zap.String("payloadToValidate", responseBodyForValidation))
+		zap.String("payloadToValidate", responseBodyBare))
 
-	// Redact any configured ignore-phrases before the enforcement library ever sees the
-	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
-	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
-	responseBodyForValidation = payloadForEvaluation
-
-	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
 	procCtx, cancelProc := s.withValidationDeadline(ctx)
 	defer cancelProc()
-	processResult, err := s.processor.ProcessResponseParallel(procCtx, responseBodyForValidation, valCtx, policies)
+
+	validate := func(extractedPayload string) (*mcp.ProcessResult, string, string, error) {
+		eval, pre := s.redactIgnorePhrasesForEvaluation(extractedPayload, policies, "ValidateResponse", sessionID)
+		result, err := s.processor.ProcessResponseParallel(procCtx, eval, valCtx, policies)
+		return result, eval, pre, err
+	}
+
+	valCtx.SessionID = ""
+	processResult, evalPayload, preRedactionPayload, err := validate(responseBodyBare)
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
@@ -2364,8 +2383,33 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		return nil, "", fmt.Errorf("failed to process response: %w", err)
 	}
 
-	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, responseBodyForValidation, preRedactionPayload, "ValidateResponse", sessionID)
+	sessionContextBlock := false
+	if !processResult.IsBlocked && s.config != nil && s.config.SessionEnabled {
+		if rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, responseBody, sessionID); rawWithSummary != responseBody {
+			s.logger.Info("Session summary changed payload, running summary validation pass",
+				zap.String("sessionID", sessionID))
+			valCtx.SessionID = sessionID
+			withSummary := s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, false)
+			processResult, evalPayload, preRedactionPayload, err = validate(withSummary)
+			if err != nil {
+				s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
+					zap.String("path", params.Path),
+					zap.String("method", params.Method),
+					zap.String("account", params.AktoAccountID),
+					zap.String("sessionID", sessionID),
+					zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
+					zap.Error(err))
+				return nil, "", fmt.Errorf("failed to process response: %w", err)
+			}
+			s.logger.Info("ValidateResponse - session summary payload validated",
+				zap.String("sessionID", sessionID),
+				zap.String("withSummary", withSummary),
+				zap.String("evalPayload", evalPayload))
+			sessionContextBlock = processResult.IsBlocked
+		}
+	}
+
+	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, evalPayload, preRedactionPayload, "ValidateResponse", sessionID)
 
 	s.logger.Info("ValidateResponse - ProcessResponseParallel result",
 		zap.String("path", params.Path),
@@ -2374,9 +2418,13 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.Bool("isBlocked", processResult.IsBlocked),
 		zap.Int64("latencyMs", time.Since(processStart).Milliseconds()))
 
-	// Track response and generate summary
-	isMalicious := processResult.IsBlocked
-	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, responseBody, isMalicious)
+	responseAllowed := !processResult.IsBlocked
+	responseModified := finalResponsePayload != "" && finalResponsePayload != responseBody
+	session.TrackResponseAndGenerateSummary(
+		s.sessionMgr, s.logger, sessionID, requestID, responseBody,
+		sessionContextBlock, processResult,
+		finalResponsePayload, responseAllowed, responseModified,
+	)
 
 	// Anomaly detection: record error if tool call returned error status (4xx/5xx).
 	// Uses the same filtered policies from the request path.
@@ -2386,8 +2434,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
-		Allowed:         !processResult.IsBlocked,
-		Modified:        finalResponsePayload != "" && finalResponsePayload != responseBody,
+		Allowed:         responseAllowed,
+		Modified:        responseModified,
 		ModifiedPayload: finalResponsePayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        processResult.Metadata,
@@ -2406,7 +2454,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("reason", result.Reason),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
-	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, responseBodyForValidation, sessionID)
+	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, responseBodyBare, sessionID)
 	return result, activityID, nil
 }
 
@@ -2433,11 +2481,7 @@ func (s *Service) ValidateRequestWithPolicy(
 	// 	return result, nil
 	// }
 
-	// Track request and generate summary asynchronously
-	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
-
-	// Inject session summary into payload if available
-	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+	session.TrackRequestOnly(s.sessionMgr, sessionID, requestID, payload)
 
 	// Log the provided policy structure before conversion
 	policyJSON, _ := json.Marshal(providedPolicy)
@@ -2510,23 +2554,39 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Bool("hasAuditRules", hasAuditRules),
 		zap.Bool("skipThreat", skipThreat),
-		zap.String("payload", payloadToValidate),
 		zap.Int("requestFiltersCount", len(providedPolicyConverted.Filters.RequestPayload)),
 		zap.Int("responseFiltersCount", len(providedPolicyConverted.Filters.ResponsePayload)))
 
-	// Redact any configured ignore-phrases before the enforcement library ever sees the
-	// text — same rationale as ValidateRequest, but the playground evaluates a single
-	// one-off provided policy that never goes through the policy cache, so matchers are
-	// compiled fresh for just this one policy rather than looked up from it.
 	matchersByPolicy := compileIgnorePhraseMatchersByPolicy(policies)
-	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluationWithMatchers(payloadToValidate, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
-	payloadToValidate = payloadForEvaluation
 
-	// Use the default processor - skipThreat is passed via ValidationContext
-	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	validate := func(candidatePayload string) (*mcp.ProcessResult, string, string, error) {
+		eval, pre := s.redactIgnorePhrasesForEvaluationWithMatchers(candidatePayload, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
+		result, err := s.processor.ProcessRequest(ctx, eval, valCtx, policies, auditPolicies, hasAuditRules)
+		return result, eval, pre, err
+	}
+
+	valCtx.SessionID = ""
+	processResult, payloadToValidate, preRedactionPayload, err := validate(payload)
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
+	}
+
+	sessionDrivenBlock := false
+	if !processResult.IsBlocked && s.config != nil && s.config.SessionEnabled {
+		if rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID); rawWithSummary != payload {
+			valCtx.SessionID = sessionID
+			processResult, payloadToValidate, preRedactionPayload, err = validate(rawWithSummary)
+			if err != nil {
+				s.logger.Error("ProcessRequest failed", zap.Error(err))
+				return nil, fmt.Errorf("failed to process request: %w", err)
+			}
+			s.logger.Info("ValidateRequestWithPolicy - session summary payload validated",
+				zap.String("sessionID", sessionID),
+				zap.String("rawWithSummary", rawWithSummary),
+				zap.String("payloadToValidate", payloadToValidate))
+			sessionDrivenBlock = processResult.IsBlocked
+		}
 	}
 
 	// Log detailed ProcessRequest result
@@ -2547,16 +2607,24 @@ func (s *Service) ValidateRequestWithPolicy(
 		Allowed:         !processResult.IsBlocked,
 		Modified:        finalPayload != "" && finalPayload != preRedactionPayload,
 		ModifiedPayload: finalPayload,
-		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
-		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
+		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
 	}
+
+	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult, sessionDrivenBlock)
 
 	s.logger.Info("Request validation completed with provided policy",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
 		zap.String("sessionID", sessionID))
+
+	if session.ShouldGenerateRequestSummary(result) {
+		if text := session.RequestSummaryInput(payload, finalPayload, result); text != "" {
+			session.GenerateSummaryAsync(s.sessionMgr, s.logger, sessionID, text, true)
+		}
+	}
 
 	return result, nil
 }
