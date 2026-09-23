@@ -6,11 +6,13 @@ import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.ActivitiesDao;
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -374,6 +376,17 @@ public class TestExecutor {
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
+        // Pre-fetch collection metadata for asset-type based test filtering (one batch DB call)
+        Set<Integer> collectionIds = new HashSet<>();
+        for (ApiInfoKey key : apiInfoKeyList) {
+            collectionIds.add(key.getApiCollectionId());
+        }
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, new ArrayList<>(collectionIds)));
+        Map<Integer, ApiCollection> collectionMap = new HashMap<>();
+        for (ApiCollection col : apiCollections) {
+            collectionMap.put(col.getId(), col);
+        }
+
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getMaxAgentTokens());
         TestingUtilsSingleton.init();
 
@@ -498,14 +511,14 @@ public class TestExecutor {
                             insertRecordInKafka(accountId, testSubCategory,
                                     apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap,
                                     testConfigMap, testLogs, testingRun, new AtomicBoolean(false),
-                                    totalRecordsInsertedInKafka, skippedRecordsForKafka, throttleNumber);
+                                    totalRecordsInsertedInKafka, skippedRecordsForKafka, throttleNumber, collectionMap);
                         }
                     }
                 }
                 else{
                     Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId,
                             apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap,
-                            testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
+                            testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap, collectionMap));
                     testingRecords.add(future);
                 }
             }
@@ -556,7 +569,8 @@ public class TestExecutor {
     private Void startWithLatch(List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
         List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
         ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
-        List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap){
+        List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap,
+        Map<Integer, ApiCollection> collectionMap){
 
             Context.accountId.set(accountId);
             AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
@@ -567,7 +581,7 @@ public class TestExecutor {
                             && !TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit,
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
-                                isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
+                                isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger(), collectionMap);
                     }else{
                         if(TestingConfigurations.getInstance().isAgentTokenLimitExceeded()){
                             loggerMaker.infoAndAddToDb("Agent token limit reached, stopping further tests for run: " + testingRun.getHexId(), LogDb.TESTING);
@@ -590,17 +604,37 @@ public class TestExecutor {
     private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
             List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
             ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
-            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, 
-            AtomicInteger totalRecords,  AtomicInteger skippedRecords, AtomicInteger throttleNumber) {
+            List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested,
+            AtomicInteger totalRecords,  AtomicInteger skippedRecords, AtomicInteger throttleNumber,
+            Map<Integer, ApiCollection> collectionMap) {
         Context.accountId.set(accountId);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
-                    
+
         if (testConfig == null) {
             skippedRecords.incrementAndGet();
             if(Constants.KAFKA_DEBUG_MODE){
                 loggerMaker.debugAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
             }
             return null;
+        }
+
+        // Filter tests based on asset type (pure in-memory map lookup, no DB/API calls):
+        // MCP server collections skip agentic tests; AI agent (gen-ai) collections skip MCP tests.
+        // If collection is not found in the map, the test always runs.
+        ApiCollection collection = collectionMap.get(apiInfoKey.getApiCollectionId());
+        if (collection != null) {
+            boolean isMcpTest = testSubCategory.startsWith("MCP");
+            boolean isAgenticTest = testSubCategory.startsWith("AGENTIC") || testSubCategory.endsWith("_AGENTIC");
+            if (collection.isMcpCollection() && isAgenticTest) {
+                skippedRecords.incrementAndGet();
+                loggerMaker.debugAndAddToDb("Skipping agentic test " + testSubCategory + " for MCP server collection " + apiInfoKey.getApiCollectionId(), LogDb.TESTING);
+                return null;
+            }
+            if (collection.isGenAICollection() && isMcpTest) {
+                skippedRecords.incrementAndGet();
+                loggerMaker.debugAndAddToDb("Skipping MCP test " + testSubCategory + " for AI agent collection " + apiInfoKey.getApiCollectionId(), LogDb.TESTING);
+                return null;
+            }
         }
 
         if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
