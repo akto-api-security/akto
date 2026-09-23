@@ -33,7 +33,7 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
     }
 
     @Override
-    protected int getMaxTokens() { return 60; }
+    protected int getMaxTokens() { return 2000; }
 
     @Override
     protected double getTemperature() { return 0.0; }
