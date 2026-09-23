@@ -11,6 +11,7 @@ import com.akto.service.insights.InsightUtil;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -233,68 +234,6 @@ public class ArgusPostureService {
         return false;
     }
 
-    private static Set<String> fleetWideControls(List<GuardrailPolicies> policies) {
-        Set<String> provided = new HashSet<>();
-        for (GuardrailPolicies p : policies) {
-            if (p != null && p.isApplyToAllServers()) provided.addAll(providedControls(p));
-        }
-        return provided;
-    }
-
-    private static Set<String> providedControls(GuardrailPolicies p) {
-        Set<String> provided = new HashSet<>();
-        for (String control : DEFAULT_REQUIRED_CONTROLS) {
-            if (policyProvides(p, control)) provided.add(control);
-        }
-        return provided;
-    }
-
-    private static List<String> missingControls(ApiCollection asset, List<String> required,
-                                                List<GuardrailPolicies> policies, List<Set<String>> providedByPolicy) {
-        Set<String> have = new HashSet<>();
-        for (int i = 0; i < policies.size(); i++) {
-            GuardrailPolicies p = policies.get(i);
-            if (!InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) continue;
-            have.addAll(providedByPolicy.get(i));
-            if (have.containsAll(required)) return new ArrayList<>();
-        }
-
-        List<String> missing = new ArrayList<>();
-        for (String control : required) {
-            if (!have.contains(control)) missing.add(control);
-        }
-        return missing;
-    }
-
-    private static boolean policyProvides(GuardrailPolicies p, String control) {
-        if (p == null || control == null) return false;
-
-        switch (control) {
-            case CONTROL_RATE_LIMIT: {
-                GuardrailPolicies.AnomalyDetection anomaly = p.getAnomalyDetection();
-                if (anomaly != null && anomaly.isEnabled()
-                        && (anomaly.getToolCallLimit() > 0 || anomaly.getErrorLimit() > 0)) {
-                    return true;
-                }
-                GuardrailPolicies.TokenLimitDetection tokens = p.getTokenLimitDetection();
-                return tokens != null && tokens.isEnabled() && tokens.getThreshold() > 0;
-            }
-
-            case CONTROL_PROMPT_INJECTION: {
-                Map<String, Object> filtering = p.getContentFiltering();
-                return filtering != null && filtering.get("promptAttacks") != null;
-            }
-
-            case CONTROL_PII:
-                return notEmpty(p.getPiiTypes());
-
-            case CONTROL_OUTPUT_VALIDATION:
-                return p.isApplyOnResponse();
-            default:
-                return false;
-        }
-    }
-
     private static String envTagValue(ApiCollection c) {
         if (c == null || c.getEnvType() == null) return null;
         for (CollectionTags tag : c.getEnvType()) {
@@ -326,7 +265,7 @@ public class ArgusPostureService {
     }
 
     private static String bucketForId(String environment) {
-        if (isBlank(environment)) return null;
+        if (StringUtils.isBlank(environment)) return null;
         switch (environment.trim().toLowerCase(Locale.ROOT)) {
             case ENV_ID_PRODUCTION:
                 return ENV_PRODUCTION;
@@ -340,7 +279,7 @@ public class ArgusPostureService {
     }
 
     public static String envBucket(String envTagValue) {
-        if (isBlank(envTagValue)) return ENV_PRODUCTION;
+        if (StringUtils.isBlank(envTagValue)) return ENV_PRODUCTION;
         String value = envTagValue.trim().toUpperCase(Locale.ROOT);
         if (DEV_ENVS.contains(value)) return ENV_DEVELOPMENT;
         if (STAGING_ENVS.contains(value)) return ENV_STAGING;
@@ -348,11 +287,11 @@ public class ArgusPostureService {
     }
 
     private static boolean isAllEnvironments(String environment) {
-        return isBlank(environment) || ENV_ID_ALL.equalsIgnoreCase(environment.trim());
+        return StringUtils.isBlank(environment) || ENV_ID_ALL.equalsIgnoreCase(environment.trim());
     }
 
     public static Bson filterForEnvironment(String environment) {
-        if (isBlank(environment)) return Filters.empty();
+        if (StringUtils.isBlank(environment)) return Filters.empty();
         switch (environment.trim().toLowerCase(Locale.ROOT)) {
             case ENV_ID_DEVELOPMENT:
                 return envTagIn(DEV_ENVS);
@@ -416,13 +355,5 @@ public class ArgusPostureService {
         if (percent >= TONE_SUCCESS_AT) return "success";
         if (percent >= TONE_WARNING_AT) return "warning";
         return "critical";
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
-    }
-
-    private static boolean notEmpty(List<?> list) {
-        return list != null && !list.isEmpty();
     }
 }
