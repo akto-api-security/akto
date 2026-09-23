@@ -88,27 +88,36 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
 
     @Override
     protected BasicDBObject processResponse(String rawResponse) {
-        BasicDBObject result = new BasicDBObject();
-        String capability = SAFE;
-        boolean dangerous = false;
-        if (rawResponse != null && !rawResponse.isEmpty() && !"NOT_FOUND".equalsIgnoreCase(rawResponse)) {
-            try {
-                JSONObject parsed = new JSONObject(rawResponse);
-                String c = parsed.optString(CAPABILITY, SAFE).trim().toUpperCase();
-                if (c.equals(RESOURCE_DELETE) || c.equals(FILE_WRITE) || c.equals(CREDENTIAL_OR_PII_READ)
-                        || c.equals(CRITICAL_RESOURCE_WRITE)) {
-                    capability = c;
-                    dangerous = true;
-                } else {
-                    dangerous = parsed.optBoolean(DANGEROUS, false);
-                }
-            } catch (Exception e) {
-                logger.error("ToolCapabilityClassifier: failed to parse response: " + e.getMessage());
-            }
+        if (rawResponse == null || rawResponse.isEmpty() || "NOT_FOUND".equalsIgnoreCase(rawResponse)) {
+            return error("empty response");
         }
+        String capability;
+        boolean dangerous;
+        try {
+            JSONObject parsed = new JSONObject(rawResponse);
+            String c = parsed.optString(CAPABILITY, SAFE).trim().toUpperCase();
+            if (c.equals(RESOURCE_DELETE) || c.equals(FILE_WRITE) || c.equals(CREDENTIAL_OR_PII_READ)
+                    || c.equals(CRITICAL_RESOURCE_WRITE)) {
+                capability = c;
+                dangerous = true;
+            } else {
+                capability = SAFE;
+                dangerous = parsed.optBoolean(DANGEROUS, false);
+            }
+        } catch (Exception e) {
+            logger.error("ToolCapabilityClassifier: failed to parse response: " + e.getMessage());
+            return error("unparseable response");
+        }
+        BasicDBObject result = new BasicDBObject();
         result.put(CAPABILITY, capability);
         result.put(DANGEROUS, dangerous);
         return result;
+    }
+
+    private static BasicDBObject error(String reason) {
+        BasicDBObject resp = new BasicDBObject();
+        resp.put("error", reason);
+        return resp;
     }
 
     private static String truncate(String s, int max) {

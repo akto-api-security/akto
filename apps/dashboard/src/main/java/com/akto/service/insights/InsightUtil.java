@@ -82,19 +82,6 @@ public final class InsightUtil {
         return "between " + startStr + " and " + endStr;
     }
 
-    // ── Agent purpose (on-domain reference for insights 6/7) ───────────────────────────
-
-    /**
-     * ApiCollection.description for one agent/service, or null when unset. Callers must
-     * treat null as PARTIAL, never as "off-domain" — see the plan on CollectionDescriptionCron.
-     */
-    public static String agentDescription(InsightDataBundle bundle, String serviceOrAgentName) {
-        for (ApiCollection c : bundle.collectionsForServiceName(serviceOrAgentName)) {
-            if (StringUtils.isNotBlank(c.getDescription())) return c.getDescription();
-        }
-        return null;
-    }
-
     // ── Tool capability classification (insight 8) ──────────────────────────────────────
     // Classification itself is delegated to InsightClassificationHelper.classifyToolDanger
     // (sample-data-driven, no static name/slug table) — see DangerousCapabilityExposureProvider.

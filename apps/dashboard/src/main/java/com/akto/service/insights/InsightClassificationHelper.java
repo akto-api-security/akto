@@ -3,6 +3,8 @@ package com.akto.service.insights;
 import com.akto.dao.insights.InsightClassificationCacheDao;
 import com.akto.dto.insights.InsightClassificationCache;
 import com.akto.gpt.handlers.gpt_prompts.AgentDomainClassifier;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.gpt.handlers.gpt_prompts.GuardrailSuggestionClassifier;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.mongodb.BasicDBObject;
@@ -24,6 +26,8 @@ import java.util.concurrent.TimeUnit;
  */
 public final class InsightClassificationHelper {
     private InsightClassificationHelper() {}
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(InsightClassificationHelper.class, LogDb.DASHBOARD);
 
     private static final long CLASSIFICATION_TTL_DAYS = 30;
 
@@ -47,7 +51,7 @@ public final class InsightClassificationHelper {
         return parseStringMap(result.toJson());
     }
 
-    /** toolName + a request/response sample -> dangerous verdict (never null; SAFE on failure). */
+    /** toolName + a request/response sample -> dangerous verdict, or null when classification failed. */
     public static ToolDangerVerdict classifyToolDanger(String toolName, String sampleData) {
         String sample = sampleData != null ? sampleData : "";
         String id = "tool:" + InsightUtil.md5(toolName.toLowerCase() + "|" + sample);
@@ -57,7 +61,7 @@ public final class InsightClassificationHelper {
         BasicDBObject input = new BasicDBObject(ToolCapabilityClassifier.TOOL_NAME, toolName)
                 .append(ToolCapabilityClassifier.SAMPLE_DATA, sample);
         BasicDBObject result = new ToolCapabilityClassifier().handle(input);
-        if (result.containsField("error")) return new ToolDangerVerdict(false, ToolCapabilityClassifier.SAFE);
+        if (result.containsField("error")) return null;
 
         put(id, "ToolCapabilityClassifier", result);
         return new ToolDangerVerdict(result.getBoolean(ToolCapabilityClassifier.DANGEROUS, false),
@@ -70,7 +74,9 @@ public final class InsightClassificationHelper {
             return new ToolDangerVerdict(obj.optBoolean(ToolCapabilityClassifier.DANGEROUS, false),
                     obj.optString(ToolCapabilityClassifier.CAPABILITY, ToolCapabilityClassifier.SAFE));
         } catch (Exception e) {
-            return new ToolDangerVerdict(false, ToolCapabilityClassifier.SAFE);
+            loggerMaker.errorAndAddToDb("InsightClassificationHelper: unreadable cached tool verdict, "
+                    + "treating as unclassified: " + e.getMessage());
+            return null;
         }
     }
 

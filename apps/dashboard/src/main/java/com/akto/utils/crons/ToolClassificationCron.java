@@ -66,7 +66,7 @@ public class ToolClassificationCron {
         }
     }
 
-    private void processAccount(Account account) {
+    void processAccount(Account account) {
         int accountId = account.getId();
         try {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
@@ -110,7 +110,7 @@ public class ToolClassificationCron {
      * that filter only engages when a userId or contextSource is set on the thread, and neither
      * is inside a cron, so an unscoped query would pick up Atlas collections too.
      */
-    private List<ApiInfo> findCandidates() {
+    List<ApiInfo> findCandidates() {
         Set<Integer> argusCollectionIds = UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.AGENTIC);
         if (argusCollectionIds == null || argusCollectionIds.isEmpty()) return new ArrayList<>();
 
@@ -125,7 +125,7 @@ public class ToolClassificationCron {
                 Sorts.descending(ApiInfo.LAST_SEEN), Projections.include(Constants.ID));
     }
 
-    private void classify(int accountId, ApiInfo tool, List<WriteModel<ApiInfo>> updates) {
+    void classify(int accountId, ApiInfo tool, List<WriteModel<ApiInfo>> updates) {
         ApiInfo.ApiInfoKey key = tool.getId();
         if (key == null || key.getUrl() == null || key.getMethod() == null) {
             loggerMaker.infoAndAddToDb("Tool classification cron: skipping row with incomplete key, accountId="
@@ -152,6 +152,11 @@ public class ToolClassificationCron {
             String toolName = toolNameFromUrl(key.getUrl());
             InsightClassificationHelper.ToolDangerVerdict verdict =
                     InsightClassificationHelper.classifyToolDanger(toolName, sample);
+            if (verdict == null) {
+                loggerMaker.errorAndAddToDb("Tool classification cron: classification failed, accountId=" + accountId
+                        + ", tool=" + toolName + ", will retry next tick");
+                return;
+            }
 
             loggerMaker.infoAndAddToDb("Tool classification cron: accountId=" + accountId
                     + ", collectionId=" + key.getApiCollectionId() + ", tool=" + toolName
