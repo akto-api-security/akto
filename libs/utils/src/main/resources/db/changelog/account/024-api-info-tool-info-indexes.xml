@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors ApiInfoDao.createIndicesIfAbsent, for the tool classification written by
+        ToolClassificationCron.
+
+        capability serves the Argus Posture "Privileged Tools" tile, which counts tool rows by
+        capability rather than loading them. calculatedAt serves the cron's own candidate
+        selection, which picks rows whose classification is missing or older than the recalc
+        threshold — without it that gate scans every tool row on every run.
+
+        Index names match MCollection.generateIndexName so these are no-ops if DaoInit already
+        built them.
+    -->
+
+    <changeSet id="024-account-api-info-tool-info-capability-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_info"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ "toolInfo.capability": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "capability_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_info">
+                <mongodb:keys>{ "toolInfo.capability": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="024-account-api-info-tool-info-calculated-at-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_info"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ "toolInfo.calculatedAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "calculatedAt_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_info">
+                <mongodb:keys>{ "toolInfo.calculatedAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
