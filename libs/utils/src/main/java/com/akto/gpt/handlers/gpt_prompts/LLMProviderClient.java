@@ -43,7 +43,7 @@ public class LLMProviderClient {
             case AZURE_OPENAI:
                 return callAzureOpenAI(model, prompt, client, maxTokens, temperature, responseFormat);
             case DATABRICKS:
-                return callDatabricks(model, prompt, client, maxTokens, temperature);
+                return callDatabricks(model, prompt, client, maxTokens);
 
                 // TODO: Implement other providers
             case OPENAI:
@@ -100,15 +100,14 @@ public class LLMProviderClient {
     }
 
     static JSONObject buildDatabricksPayload(String prompt, String modelName) throws org.json.JSONException {
-        return buildDatabricksPayload(prompt, modelName, PromptHandler.max_tokens, PromptHandler.temperature);
+        return buildDatabricksPayload(prompt, modelName, PromptHandler.max_tokens);
     }
 
-    static JSONObject buildDatabricksPayload(String prompt, String modelName, int maxTokens, double temperature)
+    static JSONObject buildDatabricksPayload(String prompt, String modelName, int maxTokens)
             throws org.json.JSONException {
         JSONObject payload = new JSONObject();
         payload.put("model", modelName);
         payload.put("max_tokens", maxTokens);
-        payload.put("temperature", temperature);
         payload.put("stream", false);
 
         JSONArray messages = new JSONArray();
@@ -187,8 +186,7 @@ public class LLMProviderClient {
         return content;
     }
 
-    private static String callDatabricks(Model model, String prompt, OkHttpClient client,
-                                         int maxTokens, double temperature)
+    private static String callDatabricks(Model model, String prompt, OkHttpClient client, int maxTokens)
             throws IOException, org.json.JSONException {
         String databricksEndpoint = model.getDatabricksEndpoint();
         String apiKey = model.getApiKey();
@@ -213,7 +211,7 @@ public class LLMProviderClient {
 
         logger.info("Calling Databricks, model: " + modelName + ", endpoint: " + databricksEndpoint);
 
-        JSONObject payload = buildDatabricksPayload(prompt, modelName, maxTokens, temperature);
+        JSONObject payload = buildDatabricksPayload(prompt, modelName, maxTokens);
         logger.info("Databricks request payload keys: " + payload.names() + ", prompt length: " + (prompt != null ? prompt.length() : 0));
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()

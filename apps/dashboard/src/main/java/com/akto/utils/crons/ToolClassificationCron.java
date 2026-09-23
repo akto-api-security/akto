@@ -33,6 +33,7 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
@@ -120,8 +121,8 @@ public class ToolClassificationCron {
                         Filters.exists(ApiInfo.TOOL_INFO_CALCULATED_AT, false),
                         Filters.lte(ApiInfo.TOOL_INFO_CALCULATED_AT, Context.now() - RECLASSIFY_THRESHOLD_SECONDS)));
 
-        return ApiInfoDao.instance.findAll(filter, 0, PER_ACCOUNT_LIMIT, null,
-                Projections.include(Constants.ID));
+        return ApiInfoDao.instance.findAll(filter, 0, PER_ACCOUNT_LIMIT,
+                Sorts.descending(ApiInfo.LAST_SEEN), Projections.include(Constants.ID));
     }
 
     private void classify(int accountId, ApiInfo tool, List<WriteModel<ApiInfo>> updates) {
