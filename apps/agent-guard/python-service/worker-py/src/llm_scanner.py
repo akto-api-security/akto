@@ -184,7 +184,9 @@ class LLMScanner:
 
         start = time.time()
         if isinstance(self.provider, Qwen3GuardOutput):
+            logger.debug(f"[LLMScanner] {scanner_name} qwen3guard input: {text!r}")
             raw, logprobs = await self.provider.complete_with_logprobs(text)
+            logger.debug(f"[LLMScanner] {scanner_name} qwen3guard raw response: {raw!r}")
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
         else:
             prompt = build_scan_prompt(
@@ -197,7 +199,9 @@ class LLMScanner:
             )
             if prompt is None:
                 raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
+            logger.debug(f"[LLMScanner] {scanner_name} prompt: {prompt!r}")
             raw = await self.provider.complete(prompt)
+            logger.debug(f"[LLMScanner] {scanner_name} raw response: {raw!r}")
             effective = resolve_response_format(scanner_name, scanner_type, self.response_format)
             result = _FORMAT_PARSERS.get(effective, parse_llm_result)(scanner_name, raw)
 
