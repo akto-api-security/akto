@@ -130,6 +130,32 @@ public class ApiInfo {
     public static final String GUARDRAIL_SCHEMA = "guardrailSchema";
     private GuardrailSchema guardrailSchema;
 
+    public static class ToolInfo {
+        public static final String CAPABILITY = "capability";
+        public static final String CALCULATED_AT = "calculatedAt";
+
+        private String capability;
+        private int calculatedAt;
+
+        public ToolInfo() {}
+
+        public ToolInfo(String capability, int calculatedAt) {
+            this.capability = capability;
+            this.calculatedAt = calculatedAt;
+        }
+
+        public String getCapability() { return capability; }
+        public void setCapability(String capability) { this.capability = capability; }
+
+        public int getCalculatedAt() { return calculatedAt; }
+        public void setCalculatedAt(int calculatedAt) { this.calculatedAt = calculatedAt; }
+    }
+
+    public static final String TOOL_INFO = "toolInfo";
+    public static final String TOOL_INFO_CAPABILITY = TOOL_INFO + "." + ToolInfo.CAPABILITY;
+    public static final String TOOL_INFO_CALCULATED_AT = TOOL_INFO + "." + ToolInfo.CALCULATED_AT;
+    private ToolInfo toolInfo;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -716,4 +742,7 @@ public class ApiInfo {
 
     public GuardrailSchema getGuardrailSchema() { return guardrailSchema; }
     public void setGuardrailSchema(GuardrailSchema guardrailSchema) { this.guardrailSchema = guardrailSchema; }
+
+    public ToolInfo getToolInfo() { return toolInfo; }
+    public void setToolInfo(ToolInfo toolInfo) { this.toolInfo = toolInfo; }
 }
