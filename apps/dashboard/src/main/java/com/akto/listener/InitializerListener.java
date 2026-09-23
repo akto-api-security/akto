@@ -2682,12 +2682,6 @@ public class InitializerListener implements ServletContextListener {
                     logger.warn("Started Okta user sync scheduler", LogDb.DASHBOARD);
                     oktaUserSyncCron.setUpOktaUserSyncScheduler();
 
-                    AccountTask.instance.executeTask(new Consumer<Account>() {
-                        @Override
-                        public void accept(Account account) {
-                            runInitializerFunctions();
-                        }
-                    }, "context-initializer-secondary");
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
                     logger.warn("Started threat detection rolling reboot scheduler", LogDb.DASHBOARD);
@@ -2700,6 +2694,12 @@ public class InitializerListener implements ServletContextListener {
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     logger.warn("Started test template scheduler", LogDb.DASHBOARD);
                     setUpTestEditorTemplatesScheduler();
+                    AccountTask.instance.executeTask(new Consumer<Account>() {
+                        @Override
+                        public void accept(Account account) {
+                            runInitializerFunctions();
+                        }
+                    }, "context-initializer-secondary");
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
