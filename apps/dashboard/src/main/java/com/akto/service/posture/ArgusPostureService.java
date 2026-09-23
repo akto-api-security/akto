@@ -64,8 +64,11 @@ public class ArgusPostureService {
 
     public BasicDBObject buildSummary(InsightDataBundle bundle, String environment) {
         List<ApiCollection> assets = new ArrayList<>();
+        List<Integer> deactivatedIds = new ArrayList<>();
         for (ApiCollection c : bundle.collections) {
-            if (c != null && !c.isDeactivated()) assets.add(c);
+            if (c == null) continue;
+            if (c.isDeactivated()) deactivatedIds.add(c.getId());
+            else assets.add(c);
         }
         List<ApiCollection> scoped = assetsIn(assets, environment);
 
@@ -73,7 +76,7 @@ public class ArgusPostureService {
         kpis.add(assetsKpi(scoped, environment));
         kpis.add(highRiskAgentsKpi());
         kpis.add(identityAccessKpi());
-        kpis.add(privilegedToolsKpi(scoped, environment));
+        kpis.add(privilegedToolsKpi(scoped, environment, deactivatedIds));
         kpis.add(sensitiveDataKpi(scoped, bundle.sensitiveByCollection));
         kpis.add(protectionCoverageKpi(scoped, bundle.policies));
 
@@ -116,12 +119,13 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private BasicDBObject privilegedToolsKpi(List<ApiCollection> assets, String environment) {
+    private BasicDBObject privilegedToolsKpi(List<ApiCollection> assets, String environment,
+                                             List<Integer> deactivatedIds) {
         long privileged = 0;
         long destructive = 0;
 
         if (!assets.isEmpty()) {
-            Bson inScope = scopeFilter(assets, environment);
+            Bson inScope = scopeFilter(assets, environment, deactivatedIds);
 
             privileged = ApiInfoDao.instance.count(Filters.and(inScope,
                     Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY),
@@ -140,8 +144,12 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private static Bson scopeFilter(List<ApiCollection> assets, String environment) {
-        if (isAllEnvironments(environment)) return Filters.empty();
+    private static Bson scopeFilter(List<ApiCollection> assets, String environment,
+                                    List<Integer> deactivatedIds) {
+        if (isAllEnvironments(environment)) {
+            if (deactivatedIds.isEmpty()) return Filters.empty();
+            return Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedIds);
+        }
 
         List<Integer> ids = new ArrayList<>(assets.size());
         for (ApiCollection asset : assets) ids.add(asset.getId());
@@ -386,7 +394,7 @@ public class ArgusPostureService {
 
     private static double percentOf(long part, long total) {
         if (total <= 0) return 0d;
-        return Math.round((part * 1000d) / total) / 10d;
+        return Math.floor((part * 1000d) / total) / 10d;
     }
 
     private static String riskTone(long count, String toneWhenPresent) {
