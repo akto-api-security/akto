@@ -27,16 +27,23 @@ public class LLMProviderClient {
      * If model is null, falls back to Azure OpenAI env vars.
      */
     public static String callLLM(Model model, String prompt, OkHttpClient client) throws Exception {
+        return callLLM(model, prompt, client, PromptHandler.max_tokens, PromptHandler.temperature, null);
+    }
+
+    /** Same, with the caller's own token cap, sampling temperature and response_format.
+     *  response_format is applied to chat-completions providers only. */
+    public static String callLLM(Model model, String prompt, OkHttpClient client,
+                                 int maxTokens, double temperature, JSONObject responseFormat) throws Exception {
         if (model == null) {
             logger.info("No model configured, falling back to Azure OpenAI env vars");
-            return callAzureOpenAIFromEnv(prompt, client);
+            return callAzureOpenAIFromEnv(prompt, client, maxTokens, temperature, responseFormat);
         }
         logger.info("Routing LLM call to provider: " + model.getType() + ", model: " + model.getName());
         switch (model.getType()) {
             case AZURE_OPENAI:
-                return callAzureOpenAI(model, prompt, client);
+                return callAzureOpenAI(model, prompt, client, maxTokens, temperature, responseFormat);
             case DATABRICKS:
-                return callDatabricks(model, prompt, client);
+                return callDatabricks(model, prompt, client, maxTokens);
 
                 // TODO: Implement other providers
             case OPENAI:
@@ -55,17 +62,26 @@ public class LLMProviderClient {
     }
 
     static JSONObject buildChatCompletionsPayload(String prompt, String modelName) throws org.json.JSONException {
+        return buildChatCompletionsPayload(prompt, modelName, PromptHandler.max_tokens, PromptHandler.temperature, null);
+    }
+
+    static JSONObject buildChatCompletionsPayload(String prompt, String modelName, int maxTokens,
+                                                  double temperature, JSONObject responseFormat)
+            throws org.json.JSONException {
         JSONObject payload = new JSONObject();
 
         if (isReasoningModel(modelName)) {
-            payload.put("max_completion_tokens", PromptHandler.max_tokens);
+            payload.put("max_completion_tokens", maxTokens);
             payload.put("reasoning_effort", "minimal");
         } else {
-            payload.put("temperature", PromptHandler.temperature);
+            payload.put("temperature", temperature);
             payload.put("top_p", 0.9);
-            payload.put("max_tokens", PromptHandler.max_tokens);
+            payload.put("max_tokens", maxTokens);
             payload.put("frequency_penalty", 0);
             payload.put("presence_penalty", 0.6);
+        }
+        if (responseFormat != null) {
+            payload.put("response_format", responseFormat);
         }
         payload.put("stream", false);
 
@@ -84,9 +100,14 @@ public class LLMProviderClient {
     }
 
     static JSONObject buildDatabricksPayload(String prompt, String modelName) throws org.json.JSONException {
+        return buildDatabricksPayload(prompt, modelName, PromptHandler.max_tokens);
+    }
+
+    static JSONObject buildDatabricksPayload(String prompt, String modelName, int maxTokens)
+            throws org.json.JSONException {
         JSONObject payload = new JSONObject();
         payload.put("model", modelName);
-        payload.put("max_tokens", PromptHandler.max_tokens);
+        payload.put("max_tokens", maxTokens);
         payload.put("stream", false);
 
         JSONArray messages = new JSONArray();
@@ -127,7 +148,9 @@ public class LLMProviderClient {
 
     // --- Provider implementations ---
 
-    private static String callAzureOpenAI(Model model, String prompt, OkHttpClient client) throws IOException, org.json.JSONException {
+    private static String callAzureOpenAI(Model model, String prompt, OkHttpClient client,
+                                          int maxTokens, double temperature, JSONObject responseFormat)
+            throws IOException, org.json.JSONException {
         String endpoint = model.getAzureEndpoint();
         String apiKey = model.getApiKey();
         String modelName = model.getModelName();
@@ -148,7 +171,7 @@ public class LLMProviderClient {
 
         logger.info("Calling Azure OpenAI, deployment: " + modelName + ", endpoint: " + endpoint);
 
-        JSONObject payload = buildChatCompletionsPayload(prompt, null);
+        JSONObject payload = buildChatCompletionsPayload(prompt, null, maxTokens, temperature, responseFormat);
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()
                 .url(url)
@@ -163,7 +186,8 @@ public class LLMProviderClient {
         return content;
     }
 
-    private static String callDatabricks(Model model, String prompt, OkHttpClient client) throws IOException, org.json.JSONException {
+    private static String callDatabricks(Model model, String prompt, OkHttpClient client, int maxTokens)
+            throws IOException, org.json.JSONException {
         String databricksEndpoint = model.getDatabricksEndpoint();
         String apiKey = model.getApiKey();
         String modelName = model.getModelName();
@@ -187,7 +211,7 @@ public class LLMProviderClient {
 
         logger.info("Calling Databricks, model: " + modelName + ", endpoint: " + databricksEndpoint);
 
-        JSONObject payload = buildDatabricksPayload(prompt, modelName);
+        JSONObject payload = buildDatabricksPayload(prompt, modelName, maxTokens);
         logger.info("Databricks request payload keys: " + payload.names() + ", prompt length: " + (prompt != null ? prompt.length() : 0));
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()
@@ -206,6 +230,12 @@ public class LLMProviderClient {
     // --- Env var fallback (preserves older AzureOpenAIPromptHandler behavior) ---
 
     static String callAzureOpenAIFromEnv(String prompt, OkHttpClient client) throws IOException, org.json.JSONException {
+        return callAzureOpenAIFromEnv(prompt, client, PromptHandler.max_tokens, PromptHandler.temperature, null);
+    }
+
+    static String callAzureOpenAIFromEnv(String prompt, OkHttpClient client,
+                                         int maxTokens, double temperature, JSONObject responseFormat)
+            throws IOException, org.json.JSONException {
         String host = System.getenv("AZURE_OPENAI_HOST");
         String deployment = System.getenv("AZURE_OPENAI_DEPLOYMENT");
         String apiKey = System.getenv("AZURE_OPENAI_API_KEY");
@@ -230,7 +260,7 @@ public class LLMProviderClient {
 
         logger.info("Calling Azure OpenAI (env fallback), deployment: " + deployment + ", host: " + host);
 
-        JSONObject payload = buildChatCompletionsPayload(prompt, deployment);
+        JSONObject payload = buildChatCompletionsPayload(prompt, deployment, maxTokens, temperature, responseFormat);
         RequestBody body = RequestBody.create(payload.toString(), JSON_MEDIA_TYPE);
         Request request = new Request.Builder()
                 .url(url)
