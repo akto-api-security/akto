@@ -239,7 +239,7 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
             </SectionCard>
 
             <SectionCard
-                title="Block public sharing"
+                title="Block public sharing of chats/artifacts"
                 description="Block a chat or artifact share request that would make it visible to anyone with the link, instead of just the org or invited users."
                 beta
             >
@@ -249,7 +249,10 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                     onChange={setBlockPublicShare}
                 />
                 <Box paddingBlockStart="2">
-                    <Banner tone="info">Currently supported only for the Claude desktop app with Endpoint Shield v1.1.229 or later (System Proxy must be enabled).</Banner>
+                    <Banner tone="info">
+                        Currently supported for the Claude desktop app with{" "}
+                        <Text as="span" fontWeight="semibold">System Proxy enabled</Text> (Endpoint Shield v1.1.229 or later).
+                    </Banner>
                 </Box>
             </SectionCard>
         </VerticalStack>
