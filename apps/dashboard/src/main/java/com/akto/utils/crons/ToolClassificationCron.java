@@ -76,11 +76,15 @@ public class ToolClassificationCron {
             }
 
             List<ApiInfo> candidates = findCandidates();
-            if (candidates.isEmpty()) return;
+            if (candidates.isEmpty()) {
+                loggerMaker.debugAndAddToDb("Tool classification cron: no candidates for accountId=" + accountId);
+                return;
+            }
 
             loggerMaker.infoAndAddToDb("Tool classification cron processing accountId=" + accountId
                     + ", candidates=" + candidates.size());
 
+            long startMs = System.currentTimeMillis();
             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
             for (ApiInfo tool : candidates) {
                 classify(accountId, tool, updates);
@@ -88,9 +92,10 @@ public class ToolClassificationCron {
 
             if (!updates.isEmpty()) {
                 ApiInfoDao.instance.bulkWrite(updates, new BulkWriteOptions().ordered(false));
-                loggerMaker.infoAndAddToDb("Tool classification cron classified " + updates.size()
-                        + "/" + candidates.size() + " tools for accountId=" + accountId);
             }
+            loggerMaker.infoAndAddToDb("Tool classification cron finished accountId=" + accountId
+                    + ", classified=" + updates.size() + "/" + candidates.size()
+                    + ", took=" + (System.currentTimeMillis() - startMs) + "ms");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in tool classification cron for accountId=" + accountId
                     + ": " + e.getMessage());
@@ -121,18 +126,35 @@ public class ToolClassificationCron {
 
     private void classify(int accountId, ApiInfo tool, List<WriteModel<ApiInfo>> updates) {
         ApiInfo.ApiInfoKey key = tool.getId();
-        if (key == null || key.getUrl() == null || key.getMethod() == null) return;
+        if (key == null || key.getUrl() == null || key.getMethod() == null) {
+            loggerMaker.debugAndAddToDb("Tool classification cron: skipping row with incomplete key, accountId="
+                    + accountId);
+            return;
+        }
 
         try {
             String rawSample = SampleDataDao.getLatestSampleData(key.getApiCollectionId(), key.getUrl(),
                     key.getMethod().name());
-            if (rawSample == null) return;
+            if (rawSample == null) {
+                loggerMaker.debugAndAddToDb("Tool classification cron: no sample data, accountId=" + accountId
+                        + ", url=" + key.getUrl() + ", will retry next tick");
+                return;
+            }
 
             String sample = stripHeaders(rawSample);
-            if (sample.isEmpty()) return;
+            if (sample.isEmpty()) {
+                loggerMaker.debugAndAddToDb("Tool classification cron: sample unparseable, accountId=" + accountId
+                        + ", url=" + key.getUrl() + ", will retry next tick");
+                return;
+            }
 
+            String toolName = toolNameFromUrl(key.getUrl());
             InsightClassificationHelper.ToolDangerVerdict verdict =
-                    InsightClassificationHelper.classifyToolDanger(toolNameFromUrl(key.getUrl()), sample);
+                    InsightClassificationHelper.classifyToolDanger(toolName, sample);
+
+            loggerMaker.infoAndAddToDb("Tool classification cron: accountId=" + accountId
+                    + ", collectionId=" + key.getApiCollectionId() + ", tool=" + toolName
+                    + ", capability=" + verdict.capability + ", dangerous=" + verdict.dangerous);
 
             updates.add(new UpdateOneModel<>(
                     ApiInfoDao.getFilter(key),
