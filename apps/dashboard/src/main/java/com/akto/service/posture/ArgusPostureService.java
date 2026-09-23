@@ -1,23 +1,25 @@
 package com.akto.service.posture;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 public class ArgusPostureService {
@@ -44,25 +46,16 @@ public class ArgusPostureService {
     private static final List<String> DEV_ENVS     = Arrays.asList("DEV");
     private static final List<String> STAGING_ENVS = Arrays.asList("STAGING", "PREPROD", "UAT", "QA", "INTEG");
 
-    private static final double TONE_SUCCESS_AT = 95d;
-    private static final double TONE_WARNING_AT = 60d;
-
-    private static final String CONTROL_RATE_LIMIT        = "rateLimit";
-    private static final String CONTROL_PROMPT_INJECTION  = "promptInjectionFiltering";
-    private static final String CONTROL_PII               = "piiDetection";
-    private static final String CONTROL_OUTPUT_VALIDATION = "outputValidation";
-
-    private static final List<String> DEFAULT_REQUIRED_CONTROLS = Arrays.asList(
-            CONTROL_RATE_LIMIT, CONTROL_PROMPT_INJECTION, CONTROL_PII, CONTROL_OUTPUT_VALIDATION);
-
-    private static List<String> requiredControls(ApiCollection asset) {
-        return DEFAULT_REQUIRED_CONTROLS;
-    }
+    private static final double TONE_SUCCESS_AT = 100d;
+    private static final double TONE_WARNING_AT = 70d;
 
     public BasicDBObject buildSummary(InsightDataBundle bundle, String environment) {
         List<ApiCollection> assets = new ArrayList<>();
+        List<Integer> deactivatedIds = new ArrayList<>();
         for (ApiCollection c : bundle.collections) {
-            if (c != null && !c.isDeactivated()) assets.add(c);
+            if (c == null) continue;
+            if (c.isDeactivated()) deactivatedIds.add(c.getId());
+            else assets.add(c);
         }
         List<ApiCollection> scoped = assetsIn(assets, environment);
 
@@ -70,7 +63,7 @@ public class ArgusPostureService {
         kpis.add(assetsKpi(scoped, environment));
         kpis.add(highRiskAgentsKpi());
         kpis.add(identityAccessKpi());
-        kpis.add(privilegedToolsKpi());
+        kpis.add(privilegedToolsKpi(scoped, environment, deactivatedIds));
         kpis.add(sensitiveDataKpi(scoped, bundle.sensitiveByCollection));
         kpis.add(protectionCoverageKpi(scoped, bundle.policies));
 
@@ -88,11 +81,11 @@ public class ArgusPostureService {
             for (ApiCollection asset : assets) {
                 if (ENV_PRODUCTION.equals(envBucket(envTagValue(asset)))) production++;
             }
-            kpi.put("footnote", production + " production");
+            kpi.put("footnote", countLine(production, "production", "None in production"));
         }
 
         long externallyExposed = 0;
-        kpi.put("secondaryFootnote", externallyExposed + " externally exposed");
+        kpi.put("secondaryFootnote", countLine(externallyExposed, "externally exposed", "None externally exposed"));
         kpi.put("secondaryTone", riskTone(externallyExposed, "warning"));
         return kpi;
     }
@@ -100,7 +93,7 @@ public class ArgusPostureService {
     private BasicDBObject highRiskAgentsKpi() {
         BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", 0L);
         long newlyHighRisk = 0;
-        kpi.put("secondaryFootnote", newlyHighRisk + " newly high risk this week");
+        kpi.put("secondaryFootnote", countLine(newlyHighRisk, "newly high risk this week", "No change since last week"));
         kpi.put("secondaryTone", riskTone(newlyHighRisk, "critical"));
         return kpi;
     }
@@ -108,18 +101,46 @@ public class ArgusPostureService {
     private BasicDBObject identityAccessKpi() {
         BasicDBObject kpi = kpi(KPI_IDENTITY_ACCESS, "Identity & Access", 0L);
         kpi.put("footnote", "overprivileged identity(s)");
-        kpi.put("secondaryFootnote", "0 shared · 0 orphaned");
+        kpi.put("secondaryFootnote", sharedOrphanedLine(0, 0));
         kpi.put("secondaryTone", "subdued");
         return kpi;
     }
 
-    private BasicDBObject privilegedToolsKpi() {
-        BasicDBObject kpi = kpi(KPI_PRIVILEGED_TOOLS, "Privileged Tools", 0L);
+    private BasicDBObject privilegedToolsKpi(List<ApiCollection> assets, String environment,
+                                             List<Integer> deactivatedIds) {
+        long privileged = 0;
+        long destructive = 0;
+
+        if (!assets.isEmpty()) {
+            Bson inScope = scopeFilter(assets, environment, deactivatedIds);
+
+            privileged = ApiInfoDao.instance.count(Filters.and(inScope,
+                    Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY),
+                    Filters.ne(ApiInfo.TOOL_INFO_CAPABILITY, ToolCapabilityClassifier.SAFE)));
+
+            destructive = ApiInfoDao.instance.count(Filters.and(inScope,
+                    Filters.in(ApiInfo.TOOL_INFO_CAPABILITY,
+                            ToolCapabilityClassifier.RESOURCE_DELETE,
+                            ToolCapabilityClassifier.CRITICAL_RESOURCE_WRITE)));
+        }
+
+        BasicDBObject kpi = kpi(KPI_PRIVILEGED_TOOLS, "Privileged Tools", privileged);
         kpi.put("footnote", "privileged");
-        long destructiveNoApproval = 0;
-        kpi.put("secondaryFootnote", destructiveNoApproval + " destructive, no approval");
-        kpi.put("secondaryTone", riskTone(destructiveNoApproval, "critical"));
+        kpi.put("secondaryFootnote", countLine(destructive, "destructive", "None destructive"));
+        kpi.put("secondaryTone", riskTone(destructive, "critical"));
         return kpi;
+    }
+
+    private static Bson scopeFilter(List<ApiCollection> assets, String environment,
+                                    List<Integer> deactivatedIds) {
+        if (isAllEnvironments(environment)) {
+            if (deactivatedIds.isEmpty()) return Filters.empty();
+            return Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedIds);
+        }
+
+        List<Integer> ids = new ArrayList<>(assets.size());
+        for (ApiCollection asset : assets) ids.add(asset.getId());
+        return Filters.in(ApiInfo.ID_API_COLLECTION_ID, ids);
     }
 
     private BasicDBObject sensitiveDataKpi(List<ApiCollection> assets,
@@ -133,7 +154,7 @@ public class ArgusPostureService {
         BasicDBObject kpi = kpi(KPI_SENSITIVE_DATA, "Sensitive Data", withSensitive);
         kpi.put("footnote", "asset(s) access sensitive data");
         long canSendExternally = 0;
-        kpi.put("secondaryFootnote", canSendExternally + " can send it externally");
+        kpi.put("secondaryFootnote", countLine(canSendExternally, "can send it externally", "None can send it externally"));
         kpi.put("secondaryTone", riskTone(canSendExternally, "critical"));
         return kpi;
     }
@@ -145,81 +166,58 @@ public class ArgusPostureService {
 
         if (assets.isEmpty()) {
             kpi.put("value", 0d);
-            kpi.put("secondaryFootnote", "0 asset(s) missing required controls");
-            kpi.put("secondaryTone", riskTone(0, "critical"));
+            kpi.put("secondaryFootnote", "No asset(s) discovered");
+            kpi.put("secondaryTone", toneForPercent(0d));
             return kpi;
         }
 
-        List<Set<String>> providedByPolicy = new ArrayList<>(policies.size());
-        for (GuardrailPolicies p : policies) providedByPolicy.add(providedControls(p));
-
-        long fullyProtected = 0;
-        for (ApiCollection asset : assets) {
-            if (missingControls(asset, requiredControls(asset), policies, providedByPolicy).isEmpty()) fullyProtected++;
+        if (hasFleetWidePolicy(policies)) {
+            kpi.put("value", 100d);
+            kpi.put("tone", toneForPercent(100d));
+            kpi.put("secondaryFootnote", "All asset(s) covered");
+            kpi.put("secondaryTone", toneForPercent(100d));
+            return kpi;
         }
 
-        long missing = assets.size() - fullyProtected;
-        double percent = percentOf(fullyProtected, assets.size());
+        long covered = 0;
+        for (ApiCollection asset : assets) {
+            if (isCovered(asset, policies)) covered++;
+        }
+
+        long notCovered = assets.size() - covered;
+        double percent = percentOf(covered, assets.size());
 
         kpi.put("value", percent);
         kpi.put("tone", toneForPercent(percent));
-        kpi.put("secondaryFootnote", missing + " asset(s) missing required controls");
-        kpi.put("secondaryTone", riskTone(missing, toneForPercent(percent)));
+        kpi.put("secondaryFootnote", countLine(notCovered, "asset(s) not covered", "All asset(s) covered"));
+        kpi.put("secondaryTone", toneForPercent(percent));
         return kpi;
     }
 
-    private static Set<String> providedControls(GuardrailPolicies p) {
-        Set<String> provided = new HashSet<>();
-        for (String control : DEFAULT_REQUIRED_CONTROLS) {
-            if (policyProvides(p, control)) provided.add(control);
-        }
-        return provided;
+    private static String countLine(long count, String whenSome, String whenNone) {
+        return count > 0 ? count + " " + whenSome : whenNone;
     }
 
-    private static List<String> missingControls(ApiCollection asset, List<String> required,
-                                                List<GuardrailPolicies> policies, List<Set<String>> providedByPolicy) {
-        Set<String> have = new HashSet<>();
-        for (int i = 0; i < policies.size(); i++) {
-            GuardrailPolicies p = policies.get(i);
-            if (!InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) continue;
-            have.addAll(providedByPolicy.get(i));
-            if (have.containsAll(required)) return new ArrayList<>();
-        }
-
-        List<String> missing = new ArrayList<>();
-        for (String control : required) {
-            if (!have.contains(control)) missing.add(control);
-        }
-        return missing;
+    private static String sharedOrphanedLine(long shared, long orphaned) {
+        if (shared == 0 && orphaned == 0) return "No shared or orphaned identity(s)";
+        if (orphaned == 0) return shared + " shared";
+        if (shared == 0) return orphaned + " orphaned";
+        return shared + " shared · " + orphaned + " orphaned";
     }
 
-    private static boolean policyProvides(GuardrailPolicies p, String control) {
-        if (p == null || control == null) return false;
-
-        switch (control) {
-            case CONTROL_RATE_LIMIT: {
-                GuardrailPolicies.AnomalyDetection anomaly = p.getAnomalyDetection();
-                if (anomaly != null && anomaly.isEnabled()
-                        && (anomaly.getToolCallLimit() > 0 || anomaly.getErrorLimit() > 0)) {
-                    return true;
-                }
-                GuardrailPolicies.TokenLimitDetection tokens = p.getTokenLimitDetection();
-                return tokens != null && tokens.isEnabled() && tokens.getThreshold() > 0;
-            }
-
-            case CONTROL_PROMPT_INJECTION: {
-                Map<String, Object> filtering = p.getContentFiltering();
-                return filtering != null && filtering.get("promptAttacks") != null;
-            }
-
-            case CONTROL_PII:
-                return notEmpty(p.getPiiTypes());
-
-            case CONTROL_OUTPUT_VALIDATION:
-                return p.isApplyOnResponse();
-            default:
-                return false;
+    private static boolean hasFleetWidePolicy(List<GuardrailPolicies> policies) {
+        for (GuardrailPolicies p : policies) {
+            if (p != null && p.isApplyToAllServers()) return true;
         }
+        return false;
+    }
+
+    private static boolean isCovered(ApiCollection asset, List<GuardrailPolicies> policies) {
+        for (GuardrailPolicies p : policies) {
+            if (p == null) continue;
+            if (InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) return true;
+        }
+        return false;
     }
 
     private static String envTagValue(ApiCollection c) {
@@ -253,7 +251,7 @@ public class ArgusPostureService {
     }
 
     private static String bucketForId(String environment) {
-        if (isBlank(environment)) return null;
+        if (StringUtils.isBlank(environment)) return null;
         switch (environment.trim().toLowerCase(Locale.ROOT)) {
             case ENV_ID_PRODUCTION:
                 return ENV_PRODUCTION;
@@ -267,7 +265,7 @@ public class ArgusPostureService {
     }
 
     public static String envBucket(String envTagValue) {
-        if (isBlank(envTagValue)) return ENV_PRODUCTION;
+        if (StringUtils.isBlank(envTagValue)) return ENV_PRODUCTION;
         String value = envTagValue.trim().toUpperCase(Locale.ROOT);
         if (DEV_ENVS.contains(value)) return ENV_DEVELOPMENT;
         if (STAGING_ENVS.contains(value)) return ENV_STAGING;
@@ -275,11 +273,11 @@ public class ArgusPostureService {
     }
 
     private static boolean isAllEnvironments(String environment) {
-        return isBlank(environment) || ENV_ID_ALL.equalsIgnoreCase(environment.trim());
+        return StringUtils.isBlank(environment) || ENV_ID_ALL.equalsIgnoreCase(environment.trim());
     }
 
     public static Bson filterForEnvironment(String environment) {
-        if (isBlank(environment)) return Filters.empty();
+        if (StringUtils.isBlank(environment)) return Filters.empty();
         switch (environment.trim().toLowerCase(Locale.ROOT)) {
             case ENV_ID_DEVELOPMENT:
                 return envTagIn(DEV_ENVS);
@@ -332,7 +330,7 @@ public class ArgusPostureService {
 
     private static double percentOf(long part, long total) {
         if (total <= 0) return 0d;
-        return Math.round((part * 1000d) / total) / 10d;
+        return Math.floor((part * 1000d) / total) / 10d;
     }
 
     private static String riskTone(long count, String toneWhenPresent) {
@@ -343,13 +341,5 @@ public class ArgusPostureService {
         if (percent >= TONE_SUCCESS_AT) return "success";
         if (percent >= TONE_WARNING_AT) return "warning";
         return "critical";
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
-    }
-
-    private static boolean notEmpty(List<?> list) {
-        return list != null && !list.isEmpty();
     }
 }
