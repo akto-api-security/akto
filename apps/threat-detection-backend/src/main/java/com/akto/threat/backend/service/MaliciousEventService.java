@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dao.AgenticSessionContextDao;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.utils.ThreatUtils;
@@ -13,6 +14,8 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.OwaspCategory;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
@@ -37,6 +40,7 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Sorts;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -849,6 +853,132 @@ public class MaliciousEventService {
         cursor.close();
       }
     }
+  }
+
+  /** Fallback when the caller sends no limit (0/unset). */
+  private static final int GUARDRAIL_VIOLATION_PAYLOADS_DEFAULT_LIMIT = 50;
+  /** Hard cap regardless of what the caller asks for — an internal LLM scan job paging through
+   *  this endpoint should never be able to pull an unbounded page (and, by extension, an
+   *  unbounded amount of payload text) into memory in one call. */
+  private static final int GUARDRAIL_VIOLATION_PAYLOADS_MAX_LIMIT = 500;
+
+  // Batched, cursor-paginated fetch of the raw request/response payload (latestApiOrig) behind a
+  // set of guardrail-policy violations. listMaliciousRequests cannot serve this: its response
+  // hard-codes payload to "" for every row (see .setPayload("") below), and adding a payload field
+  // to that request risks an unrecognized-field parse failure on an un-redeployed caller (see the
+  // proto comment on ListGuardrailViolationPayloadsRequest). Sorted/paginated on the raw _id in
+  // either direction (request.newestFirst) — filterId does not appear in an existing _id-ordered
+  // index, but this endpoint is used by an internal LLM scan job, not an interactive list view, so
+  // a collection scan bounded by contextSource + filterId + detectedAt (existing
+  // contextSource_1_filterId_1_detectedAt_-1 index) followed by an in-memory _id sort over the
+  // matched page is an acceptable cost; add an {contextSource, filterId, _id} index if this needs
+  // to scale further.
+  /** Cursor encoding for listGuardrailViolationPayloads: "<detectedAt>|<_id>". Not an ObjectId —
+   *  see that method's own comment on why. "|" is safe as a separator: detectedAt is numeric and
+   *  _id is a UUID string (neither can contain it). */
+  private static final String GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR = "|";
+
+  public ListGuardrailViolationPayloadsResponse listGuardrailViolationPayloads(
+      String accountId, ListGuardrailViolationPayloadsRequest request, String contextSource) {
+
+    if (!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
+      createIndexIfAbsent(accountId);
+    }
+
+    int requestedLimit = request.getLimit() > 0
+        ? request.getLimit() : GUARDRAIL_VIOLATION_PAYLOADS_DEFAULT_LIMIT;
+    int limit = Math.min(requestedLimit, GUARDRAIL_VIOLATION_PAYLOADS_MAX_LIMIT);
+    List<String> filterIds = request.getFilterIdsList();
+
+    Document query = ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId);
+    if (!filterIds.isEmpty()) {
+      query.append("filterId", new Document("$in", filterIds));
+    }
+    // Only rows that actually carry a payload are useful to the LLM attribution step.
+    query.append("latestApiOrig", new Document("$exists", true).append("$ne", ""));
+
+    if (request.hasDetectedAtTimeRange()) {
+      TimeRangeFilter timeRange = request.getDetectedAtTimeRange();
+      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
+      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
+      query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    // Oldest-first by default (what an exhaustive paging scan needs, so no row is skipped as new
+    // ones arrive between pages) — flip to newest-first on request.
+    //
+    // Cursor is on (detectedAt, _id), NOT _id alone: MaliciousEventDto#id is a
+    // UUID.randomUUID().toString() that the POJO codec auto-maps to _id (no @BsonId ObjectId
+    // override), so _id in this collection is a random string with no chronological meaning —
+    // sorting/range-filtering on it alone would produce an arbitrary, unstable page order, not the
+    // "walk forward without skipping a row" guarantee this endpoint exists for. detectedAt gives
+    // the real ordering; _id is only a tiebreaker for the (common) case of several events sharing a
+    // timestamp, using the standard keyset-pagination "$gt this OR ($eq this AND $gt that)" shape.
+    boolean newestFirst = request.hasNewestFirst() && request.getNewestFirst();
+    String cmp = newestFirst ? "$lt" : "$gt";
+
+    String cursorParam = request.hasCursor() ? request.getCursor() : null;
+    if (cursorParam != null && !cursorParam.isEmpty()) {
+      int sep = cursorParam.indexOf(GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR);
+      if (sep < 0) {
+        logger.error("Malformed cursor for listGuardrailViolationPayloads: " + cursorParam);
+        return ListGuardrailViolationPayloadsResponse.newBuilder().build();
+      }
+      try {
+        long cursorDetectedAt = Long.parseLong(cursorParam.substring(0, sep));
+        String cursorId = cursorParam.substring(sep + 1);
+        query.append("$or", Arrays.asList(
+            new Document("detectedAt", new Document(cmp, cursorDetectedAt)),
+            new Document("detectedAt", cursorDetectedAt)
+                .append("_id", new Document(cmp, cursorId))
+        ));
+      } catch (NumberFormatException e) {
+        logger.error("Malformed cursor for listGuardrailViolationPayloads: " + cursorParam);
+        return ListGuardrailViolationPayloadsResponse.newBuilder().build();
+      }
+    }
+
+    Bson sort = newestFirst
+        ? Sorts.orderBy(Sorts.descending("detectedAt"), Sorts.descending("_id"))
+        : Sorts.orderBy(Sorts.ascending("detectedAt"), Sorts.ascending("_id"));
+
+    List<ListGuardrailViolationPayloadsResponse.ViolationPayload> payloads = new ArrayList<>();
+    MongoCursor<Document> cursor = null;
+    try {
+      cursor = maliciousEventDao.getDocumentCollection(accountId)
+          .find(query)
+          .projection(Projections.include("_id", "refId", "filterId", "detectedAt", "latestApiOrig"))
+          .sort(sort)
+          .limit(limit)
+          .cursor();
+
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        String orig = HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"));
+        Object detectedAtRaw = doc.get("detectedAt");
+        long detectedAt = detectedAtRaw instanceof Number ? ((Number) detectedAtRaw).longValue() : 0L;
+        // _id may be legitimately typed as ObjectId or String depending on how a given row was
+        // inserted — read it generically rather than assuming one BSON type (see this method's own
+        // comment above on why it's a String in practice for this DTO).
+        Object idRaw = doc.get("_id");
+        String id = idRaw != null ? idRaw.toString() : "";
+        payloads.add(ListGuardrailViolationPayloadsResponse.ViolationPayload.newBuilder()
+            .setRefId(doc.getString("refId") != null ? doc.getString("refId") : "")
+            .setFilterId(doc.getString("filterId") != null ? doc.getString("filterId") : "")
+            .setDetectedAt(detectedAt)
+            .setOrig(orig != null ? orig : "")
+            .setCursor(detectedAt + GUARDRAIL_VIOLATION_PAYLOADS_CURSOR_SEPARATOR + id)
+            .build());
+      }
+    } finally {
+      if (cursor != null) {
+        cursor.close();
+      }
+    }
+
+    return ListGuardrailViolationPayloadsResponse.newBuilder()
+        .addAllPayloads(payloads)
+        .build();
   }
 
   // metadata is stored as proto-text (`risk_score: "0.95"`) or JSON (`"riskScore": "0.95"`).

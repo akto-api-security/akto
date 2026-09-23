@@ -58,7 +58,7 @@ export const BlockedHostsConfig = {
 
     validate: () => ({ isValid: true, errorMessage: null }),
 
-    getSummary: ({ blockedHosts, blockPersonalAccounts }) => {
+    getSummary: ({ blockedHosts, blockPersonalAccounts, blockPublicShare }) => {
         const rows = (blockedHosts || []).filter((r) => (r.pattern || "").trim());
         const parts = [];
         if (rows.length > 0) {
@@ -69,11 +69,14 @@ export const BlockedHostsConfig = {
         if (blockPersonalAccounts) {
             parts.push("personal accounts blocked");
         }
+        if (blockPublicShare) {
+            parts.push("Public sharing of chats/artifacts blocked");
+        }
         return parts.length > 0 ? parts.join(" · ") : "";
     }
 };
 
-const SectionCard = ({ title, description, children }) => (
+const SectionCard = ({ title, description, beta, children }) => (
     <Box
         padding="5"
         borderColor="border"
@@ -83,7 +86,10 @@ const SectionCard = ({ title, description, children }) => (
     >
         <VerticalStack gap="4">
             <VerticalStack gap="1">
-                <Text variant="headingSm" as="h3">{title}</Text>
+                <HorizontalStack gap="2" blockAlign="center">
+                    <Text variant="headingSm" as="h3">{title}</Text>
+                    {beta && <Badge status="info">Beta</Badge>}
+                </HorizontalStack>
                 <Text variant="bodySm" tone="subdued">{description}</Text>
             </VerticalStack>
             {children}
@@ -91,7 +97,7 @@ const SectionCard = ({ title, description, children }) => (
     </Box>
 );
 
-const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts, setBlockPersonalAccounts, hostSuggestions = [] }) => {
+const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts, setBlockPersonalAccounts, blockPublicShare, setBlockPublicShare, hostSuggestions = [] }) => {
     const entries = blockedHosts || [];
     const [inputValue, setInputValue] = useState("");
     const [error, setError] = useState("");
@@ -229,6 +235,24 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                 />
                 <Box paddingBlockStart="2">
                     <Banner tone="info">Currently supported for the following browser LLMs: chatgpt.com, claude.ai, gemini.google.com, copilot.microsoft.com and grok.com.</Banner>
+                </Box>
+            </SectionCard>
+
+            <SectionCard
+                title="Block public sharing of chats/artifacts"
+                description="Block a chat or artifact share request that would make it visible to anyone with the link, instead of just the org or invited users."
+                beta
+            >
+                <Checkbox
+                    label="Block public sharing of chats and artifacts"
+                    checked={!!blockPublicShare}
+                    onChange={setBlockPublicShare}
+                />
+                <Box paddingBlockStart="2">
+                    <Banner tone="info">
+                        Currently supported for the Claude desktop app with{" "}
+                        <Text as="span" fontWeight="semibold">System Proxy enabled</Text> (Endpoint Shield v1.1.229 or later).
+                    </Banner>
                 </Box>
             </SectionCard>
         </VerticalStack>

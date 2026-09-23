@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.utils.HttpTrafficPublisher;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.OperationalAlerts;
 import com.akto.utils.McpCollectionResolver;
 import com.akto.utils.TopicPublisher;
 import com.akto.utils.TrafficPublisher;
@@ -25,6 +26,7 @@ public class InitializerListener implements ServletContextListener {
 
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
+        OperationalAlerts.logConfiguration();
         initMongoConnection();
 
         GuardrailsConfig guardrailsConfig = GuardrailsConfig.getInstance();

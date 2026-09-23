@@ -264,6 +264,13 @@ const threatDetectionRequests = {
             data: {}
         })
     },
+    startComplianceClauseScan(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/startComplianceClauseScan',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+    },
     fetchThreatActivityWebhookIntegration() {
         return request({
             url: '/api/fetchThreatActivityWebhookIntegration',

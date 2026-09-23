@@ -7,6 +7,8 @@ export AKTO_DATA_INGESTION_URL="{{AKTO_DATA_INGESTION_URL}}"
 export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export CONTEXT_SOURCE="ENDPOINT"
+# Device registration with the abstractor — off unless explicitly enabled.
+export AKTO_HEARTBEAT_ENABLED="${AKTO_HEARTBEAT_ENABLED:-false}"
 export AKTO_API_TOKEN="{{AKTO_API_TOKEN}}"
 
 # Execute Python hook script

@@ -24,7 +24,7 @@ import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import {
     PANEL_EMPTY_STATE_COPY, DUMMY_SHADOW_AI_TREND, DUMMY_DATA_LEAVING, DUMMY_ENFORCEMENT_FUNNEL,
     DUMMY_ATTACK_ATTEMPTS, DUMMY_FRAMEWORK_READINESS, DUMMY_ADOPTION_GAP, DUMMY_VENDOR_RISK_BUBBLE,
-    DUMMY_RISK_SCORE_TREND,
+    DUMMY_RISK_SCORE_TREND
 } from './securityPostureDummyData'
 
 // KPI ids — must match PostureService.KPI_* on the backend.
@@ -39,10 +39,23 @@ const DELTA_TONE_TO_COLOR = {
     neutral: 'subdued',
 }
 
+// Sparkline color per KPI — both are "higher is worse" counts, so both read red, matching
+// deltaTone's own critical-is-red convention elsewhere on this page.
+const KPI_SPARKLINE_COLOR = {
+    [KPI_CRITICAL_ALERTS]: '#dc2626',
+    [KPI_SENSITIVE_INCIDENTS]: '#dc2626',
+}
+
 // Donut/segment colors — matches the palette other posture cards (ComplianceAtRisksCard,
 // GuardrailCoverageCard) already use, so a "data type" or "policy mode" reads the same tone
 // wherever it shows up on the page.
-const SEGMENT_COLORS = ['#dc2626', '#ea580c', '#ca8a04', '#3b82f6', '#7c3aed', '#9ca3af']
+const SEGMENT_COLORS = {
+    'Source Code':  '#F24122',
+    'Customer PII': '#F2B322',
+    'Financials':   '#3BC3D3',
+    'Credentials':  '#7958F3',
+    'Others':        '#CACED3',
+}
 
 // Mirrors InsightService.severityRank on the backend (CRITICAL first, missing/unrecognized
 // last) — needed here because "Act now" merges two already-sorted lists (discovery, guardrail)
@@ -155,6 +168,14 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
     // (counts/percentages) have no ring to show.
     const showRing = kpi.id === KPI_RISK_SCORE && hasValue
 
+    // Critical alerts / Sensitive data incidents: real weekly counts, bucketed server-side from
+    // the same fixed ATTACK_TREND_WEEKS window "Attack attempts" uses (see
+    // PostureService#weeklySparkline). Monitoring coverage has no history to trend against yet
+    // (a point-in-time ratio, not an event count — see buildSummary's own gap conventions), so it
+    // gets the page's usual blurred-illustrative-data treatment instead of a real chart.
+    const sparklineColor = KPI_SPARKLINE_COLOR[kpi.id]
+    const hasRealSparkline = !!sparklineColor && Array.isArray(kpi.sparkline) && kpi.sparkline.length > 0
+
     const valueColumn = (
         <VerticalStack gap="1">
             {hasValue ? (
@@ -194,6 +215,12 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
                     {kpi.footnote && (
                         <Text variant="bodySm" color="subdued">{kpi.footnote}</Text>
                     )}
+
+                    {hasRealSparkline && (
+                        <div style={{ width: '100%' }}>
+                            <SmoothAreaChart tickPositions={kpi.sparkline} color={sparklineColor} height="40" width={null} />
+                        </div>
+                    )}
                 </VerticalStack>
             </Box>
         </Card>
@@ -219,33 +246,46 @@ function ComingSoonTile({ label }) {
     )
 }
 
-// "Framework readiness" — no backend for this yet at all, so it's always the blurred dummy
-// content (see DUMMY_FRAMEWORK_READINESS). Each row's tick mark is this quarter's target,
-// positioned absolutely over the same CustomProgressBar every other bar on this page uses.
-function FrameworkReadinessCard() {
+// Same red/yellow/green triad already used elsewhere on this page (see SEGMENT_COLORS /
+// warningOverridden above) — reused rather than inventing a fourth palette for one panel.
+function colorForReadiness(value) {
+    if (value >= 75) return '#23C48C'
+    if (value >= 40) return '#F2B322'
+    return '#F24122'
+}
+
+// "Framework readiness" — clausesCovered/totalClauses per framework, from a compliance-clause
+// scan of real guardrail-violation traffic (see ComplianceClauseScanService /
+// PostureService#frameworkReadiness). Replaces the earlier enforcingPolicies/totalPolicies metric,
+// which answered "are my policies switched on" rather than "how ready am I for this framework".
+// No target/quarter-goal exists server-side, so — unlike the earlier dummy content — there is no
+// tick mark to draw; inventing one would just be fake data again.
+function FrameworkReadinessCard({ panel }) {
+    const rows = panel?.frameworks || []
+    const hasData = rows.length > 0
+    const effectiveRows = hasData ? rows : DUMMY_FRAMEWORK_READINESS
+
     const body = (
         <VerticalStack gap="3">
-            {DUMMY_FRAMEWORK_READINESS.map((row) => (
-                <VerticalStack key={row.id} gap="1">
+            {effectiveRows.map((row) => (
+                <VerticalStack key={row.framework || row.id} gap="1">
                     <HorizontalStack align="space-between">
-                        <Text variant="bodyMd">{row.label}</Text>
+                        <Text variant="bodyMd">{row.framework || row.label}</Text>
                         <Text variant="bodyMd" fontWeight="semibold">{row.value}%</Text>
                     </HorizontalStack>
-                    <div style={{ position: 'relative' }}>
-                        <CustomProgressBar progress={row.value} topColor={row.color} height={"10px"}/>
-                        <div style={{
-                            position: 'absolute', top: 0, bottom: 0, left: `${row.target}%`,
-                            width: '2px', background: '#1f2937',
-                        }} />
-                    </div>
+                    <CustomProgressBar progress={row.value} topColor={colorForReadiness(row.value)} height={"10px"}/>
                 </VerticalStack>
             ))}
-            <Text variant="bodySm" color="subdued">Markers show the target for this quarter</Text>
         </VerticalStack>
     )
     return (
-        <CardWithHeader title="Framework readiness" hasData={true} minHeight="220px">
-            <DummyDataOverlay panelId="frameworkReadiness">{body}</DummyDataOverlay>
+        <CardWithHeader
+            title="Framework readiness"
+            tooltipContent={panel?.dataGaps?.[0]?.impact}
+            hasData={true}
+            minHeight="220px"
+        >
+            {hasData ? body : <DummyDataOverlay panelId="frameworkReadiness">{body}</DummyDataOverlay>}
         </CardWithHeader>
     )
 }
@@ -411,11 +451,18 @@ function ShadowAiTrendCard({ panel, onOpen }) {
 function ChartLegend({ items }) {
     return (
         <VerticalStack gap="2">
-            {items.map(({ label, color, count }) => (
-                <HorizontalStack key={label} gap="2" blockAlign="center">
-                    <Box style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                    <Text variant="bodyMd" color="subdued">{label}</Text>
-                    <Text variant="bodyMd" fontWeight="semibold">{count.toLocaleString()}</Text>
+            {items.map(({ label, color, count, percent }) => (
+                <HorizontalStack key={label} align="space-between" blockAlign="center">
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Box style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        <Text variant="bodyMd" color="subdued">{label}</Text>
+                    </HorizontalStack>
+                    <HorizontalStack gap="1" blockAlign="center">
+                        <Text variant="bodyMd" fontWeight="semibold">{count.toLocaleString()}</Text>
+                        {(percent !== undefined && percent !== null) && (
+                            <Text variant="bodySm" color="subdued">({percent}%)</Text>
+                        )}
+                    </HorizontalStack>
                 </HorizontalStack>
             ))}
         </VerticalStack>
@@ -426,15 +473,28 @@ function DataLeavingCard({ panel, onOpen }) {
     if (!panel) return null
     const hasData = panel.total > 0
     const effective = hasData ? panel : DUMMY_DATA_LEAVING
+
+    // Fixed taxonomy order (SEGMENT_COLORS' own key order), not whatever order the backend's
+    // segments array happens to arrive in — any label outside that taxonomy (a real, unmapped
+    // policy name; the backend's own "Other" overflow bucket) is appended after, in its existing
+    // order, rather than dropped.
+    const labelOrder = Object.keys(SEGMENT_COLORS)
+    const orderedSegments = [...(effective.segments || [])].sort((a, b) => {
+        const ai = labelOrder.indexOf(a.label)
+        const bi = labelOrder.indexOf(b.label)
+        return (ai === -1 ? labelOrder.length : ai) - (bi === -1 ? labelOrder.length : bi)
+    })
+
     const graphData = {}
-    ;(effective.segments || []).forEach((seg, i) => {
+    orderedSegments.forEach((seg) => {
         graphData[seg.label] = {
             text: seg.count,
-            color: SEGMENT_COLORS[i % SEGMENT_COLORS.length],
+            color: SEGMENT_COLORS[seg.label] || SEGMENT_COLORS.Others,
             filterValue: seg.filterId || seg.label,
+            percent: seg.percent,
         }
     })
-    const legendItems = Object.entries(graphData).map(([label, { text, color }]) => ({ label, color, count: text }))
+    const legendItems = Object.entries(graphData).map(([label, { text, color, percent }]) => ({ label, color, count: text, percent }))
 
     const body = (
         <HorizontalStack gap="4" blockAlign="center" wrap={false}>
@@ -613,7 +673,7 @@ function BiggestMoversCard({ biggestMovers }) {
     if (movers.length === 0) {
         return (
             <CardWithHeader title="Biggest movers" hasData={false}
-                emptyMessage="No vendor crossed a threshold in the last 1 month." minHeight="160px" />
+                emptyMessage="No vendor crossed a threshold in the time period" minHeight="160px" />
         )
     }
     return (
@@ -1004,7 +1064,7 @@ function SecurityPosture() {
 
     const frameworkAndAdoptionRow = (
         <HorizontalGrid columns={2} gap="4">
-            <FrameworkReadinessCard />
+            <FrameworkReadinessCard panel={pageData.frameworkReadiness} />
             <AdoptionGapCard />
         </HorizontalGrid>
     )

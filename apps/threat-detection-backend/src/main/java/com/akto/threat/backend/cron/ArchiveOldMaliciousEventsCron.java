@@ -3,6 +3,7 @@ package com.akto.threat.backend.cron;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dao.context.Context;
+import com.akto.util.DbNames;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatConfigurationDao;
 import com.mongodb.client.MongoClient;
@@ -91,6 +92,8 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                 || "admin".equals(dbName)
                 || "local".equals(dbName)
                 || "config".equals(dbName)
+                || DbNames.COMMON.equals(dbName)
+                || DbNames.BILLING.equals(dbName)
                 || "1669322524".equals(dbName);
     }
 

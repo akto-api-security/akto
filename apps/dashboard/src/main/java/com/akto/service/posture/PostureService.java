@@ -3,17 +3,22 @@ package com.akto.service.posture;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dao.threat_detection.ComplianceClauseCoverageDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.threat_detection.ComplianceClauseCoverage;
+import com.akto.dto.threat_detection.ComplianceClauseCoverage.ClauseHit;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightUtil.GovernanceBucket;
+import com.akto.util.compliance.ComplianceSubClauseCatalog;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -21,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Builds the AI Security Posture page payload. One method per panel, each writing a single key
@@ -60,16 +66,21 @@ public class PostureService {
     // Enforcement funnel stages ("what happened after a policy matched"), and the top N data
     // types kept before rolling the rest into "Other" on the data-leaving donut.
     private static final int TOP_DATA_TYPES = 5;
-    private static final int SHADOW_TREND_WEEKS = 12;
+    private static final int SHADOW_TREND_BUCKET_COUNT = 12;
+    /** Also the fallback lookback for an unbounded "all time" range (start=0), which has no
+     *  natural lower edge to bucket the trend/sparkline panels against — see trendBucketBoundaries'
+     *  callers. Not a rolling window otherwise: every trend/sparkline panel below buckets the
+     *  page's own SELECTED [startTs, endTs] range, not a fixed lookback ending "now". */
     private static final long WEEK_SECONDS = 7L * 24 * 3600;
     /** Also the number of boundaries SecurityPostureAction must request via
-     *  {@link #attackTrendWeekBoundaries}. */
-    static final int ATTACK_TREND_WEEKS = 8;
+     *  {@link #trendBucketBoundaries}, and the point count "Attack attempts" and the Critical
+     *  alerts / Sensitive data incidents KPI sparklines all share. */
+    public static final int TREND_BUCKET_COUNT = 8;
 
-    // "Biggest movers" — a fixed lookback window (independent of the page's own date-range
-    // filter, same convention ATTACK_TREND_WEEKS already uses), not the page's selected range:
-    // a mover is about "did this cross a threshold recently", which should read the same
-    // regardless of what range someone happens to have the page filtered to.
+    // "Biggest movers" — a fixed lookback window, deliberately NOT the page's own selected range
+    // like the trend/sparkline panels above: a mover is about "did this cross a threshold
+    // recently", which should read the same regardless of what range someone happens to have the
+    // page filtered to.
     public static final int BIGGEST_MOVERS_WINDOW_DAYS = 30;
     private static final int BIGGEST_MOVERS_DEVICE_THRESHOLD = 20;
     private static final int BIGGEST_MOVERS_ATTACK_THRESHOLD = 1000;
@@ -88,6 +99,9 @@ public class PostureService {
     private static final String GAP_DEVICE_IDENTITY = "DEVICE_IDENTITY";
     static final String GAP_THREAT_BACKEND  = "THREAT_BACKEND";
     static final String GAP_GUARDRAIL_POLICIES = "GUARDRAIL_POLICIES";
+    /** No compliance-clause scan has been run yet, or the scan found nothing for this window —
+     *  distinct from GAP_GUARDRAIL_POLICIES (no framework even mapped), see frameworkReadiness. */
+    static final String GAP_COMPLIANCE_SCAN = "COMPLIANCE_SCAN";
     /** The selected range has no comparable preceding window (an unbounded "all time" start). */
     private static final String GAP_NO_PRIOR_WINDOW = "PRIOR_WINDOW";
 
@@ -128,19 +142,21 @@ public class PostureService {
      * @param totalInspectedActions the funnel's denominator — total gateway-inspected
      *                             (isAtlasTraffic) traffic in the window. Null when the trace
      *                             search backend isn't configured or didn't respond.
-     * @param weeklyAttackCounts   {@link #ATTACK_TREND_WEEKS} malicious-event counts, one per
-     *                             boundary from {@link #attackTrendWeekBoundaries}, ascending
-     *                             (oldest week first). Null/short when the threat backend didn't
-     *                             return a full set — see attackAttemptsTrend's own gap handling.
-     * @param recentAttackEvents   malicious events over BIGGEST_MOVERS_WINDOW_DAYS ending at
-     *                             bundle.ctx's end — needed only for "Biggest movers"' attack-count
-     *                             condition, a fixed lookback independent of the page's own range.
-     * @param allPoliciesIncludingInactive every GuardrailPolicies row regardless of active status
-     *                             — needed only for Framework readiness, which measures what
-     *                             fraction of a framework's mapped policies are actually turned
-     *                             on. bundle.policies won't do: InsightDataLoader#loadPolicies
-     *                             already filters to active-only for every other feature that
-     *                             reads it.
+     * @param weeklyAttackCounts   {@link #TREND_BUCKET_COUNT} malicious-event counts, one per
+     *                             boundary from {@link #trendBucketBoundaries} over the page's own
+     *                             selected range, ascending (oldest bucket first). Null/short when
+     *                             the threat backend didn't return a full set — see
+     *                             attackAttemptsTrend's own gap handling.
+     * @param trendWindowEvents    malicious events over the page's selected range (unfiltered by
+     *                             label; unbounded "all time" falls back to a fixed lookback — see
+     *                             buildSummary's own trendStartTs computation), widened to also
+     *                             cover BIGGEST_MOVERS_WINDOW_DAYS when the selected range is
+     *                             narrower than that, so one raw-event fetch serves both "Biggest
+     *                             movers"' attack-count condition (which filters back down to its
+     *                             own fixed window itself — see biggestMovers) and the Critical
+     *                             alerts / Sensitive data incidents KPI sparklines, which bucket it
+     *                             client-side rather than firing a separate backend call per bucket
+     *                             per KPI (see bucketedSparkline's own javadoc for why).
      */
     public BasicDBObject buildSummary(InsightDataBundle bundle,
                                        List<HostSeverityCount> priorHostSeverity,
@@ -148,29 +164,39 @@ public class PostureService {
                                        List<ApiCollection> endpointCollections,
                                        Long totalInspectedActions,
                                        List<Integer> weeklyAttackCounts,
-                                       List<DashboardMaliciousEvent> recentAttackEvents,
-                                       List<GuardrailPolicies> allPoliciesIncludingInactive) {
+                                       List<DashboardMaliciousEvent> trendWindowEvents) {
         BasicDBObject response = new BasicDBObject();
+
+        // Shared boundary source for every trend/sparkline panel — the page's own SELECTED range,
+        // not a fixed rolling window (see trendBucketBoundaries' own javadoc). Unbounded "all
+        // time" start (0) falls back to a fixed lookback, same convention every other delta on
+        // this page already uses for an unbounded range.
+        int trendEndTs = bundle.ctx.getEndTs() > 0 ? bundle.ctx.getEndTs() : (int) (System.currentTimeMillis() / 1000);
+        int trendStartTs = bundle.ctx.getStartTs() > 0 ? bundle.ctx.getStartTs()
+                : trendEndTs - (int) (TREND_BUCKET_COUNT * WEEK_SECONDS);
+        List<Integer> trendBoundaries = trendBucketBoundaries(trendStartTs, trendEndTs, TREND_BUCKET_COUNT);
 
         List<BasicDBObject> kpis = new ArrayList<>();
         kpis.add(RiskScoreCalculator.compute(bundle, endpointCollections, priorHostSeverity, priorSubCategory));
-        kpis.add(criticalAlertsKpi(bundle, priorHostSeverity));
+        kpis.add(criticalAlertsKpi(bundle, priorHostSeverity, trendWindowEvents, trendStartTs, trendBoundaries));
         kpis.add(monitoringCoverageKpi(bundle));
-        kpis.add(sensitiveDataIncidentsKpi(bundle, priorSubCategory));
+        kpis.add(sensitiveDataIncidentsKpi(bundle, priorSubCategory, trendWindowEvents, trendStartTs, trendBoundaries));
         response.put(KEY_KPIS, kpis);
 
         response.put(KEY_SHADOW_AI_TREND, shadowAiTrend(bundle));
         response.put(KEY_DATA_LEAVING, dataLeavingBreakdown(bundle));
         response.put(KEY_ENFORCEMENT_FUNNEL, enforcementFunnel(bundle, totalInspectedActions));
 
-        int attackTrendEndTs = bundle.ctx.getEndTs() > 0 ? bundle.ctx.getEndTs() : (int) (System.currentTimeMillis() / 1000);
-        response.put(KEY_ATTACK_ATTEMPTS, attackAttemptsTrend(weeklyAttackCounts, attackTrendEndTs));
+        response.put(KEY_ATTACK_ATTEMPTS, attackAttemptsTrend(weeklyAttackCounts, trendBoundaries));
 
-        int biggestMoversWindowStartTs = attackTrendEndTs - (BIGGEST_MOVERS_WINDOW_DAYS * 86400);
+        // Biggest movers deliberately does NOT follow the selected range — see its own comment on
+        // BIGGEST_MOVERS_WINDOW_DAYS: "did this cross a threshold recently" should read the same
+        // regardless of the page's date filter, unlike the trend panels above.
+        int biggestMoversWindowStartTs = trendEndTs - (BIGGEST_MOVERS_WINDOW_DAYS * 86400);
         response.put(KEY_BIGGEST_MOVERS, biggestMovers(endpointCollections, bundle.collectionLastTrafficSeen,
-                recentAttackEvents, biggestMoversWindowStartTs));
+                trendWindowEvents, biggestMoversWindowStartTs));
 
-        response.put(KEY_FRAMEWORK_READINESS, frameworkReadiness(allPoliciesIncludingInactive));
+        response.put(KEY_FRAMEWORK_READINESS, frameworkReadiness(trendStartTs, trendEndTs));
 
         return response;
     }
@@ -180,7 +206,9 @@ public class PostureService {
     // this needs no raw-event fetch. The delta is a real prior-window comparison, hence absolute
     // ("+3") rather than a percentage — at these magnitudes a percentage swings wildly.
 
-    private BasicDBObject criticalAlertsKpi(InsightDataBundle bundle, List<HostSeverityCount> priorHostSeverity) {
+    private BasicDBObject criticalAlertsKpi(InsightDataBundle bundle, List<HostSeverityCount> priorHostSeverity,
+                                             List<DashboardMaliciousEvent> trendWindowEvents,
+                                             int trendStartTs, List<Integer> trendBoundaries) {
         long current = sumCritical(bundle.hostSeverityCounts);
         BasicDBObject kpi = kpi(KPI_CRITICAL_ALERTS, "Critical alerts", current, null, InsightRoutes.GUARDRAIL_VIOLATIONS);
         kpi.put("unit", "count");
@@ -196,6 +224,11 @@ public class PostureService {
             kpi.put("value", null);
             return kpi;
         }
+
+        // Bucketed over the page's own selected range — same convention attackAttemptsTrend/
+        // shadowAiTrend now use for their own trends.
+        kpi.put("sparkline", bucketedSparkline(trendWindowEvents, trendStartTs, trendBoundaries,
+                e -> "CRITICAL".equalsIgnoreCase(e.getSeverity())));
 
         if (priorHostSeverity == null) {
             addGap(kpi, GAP_NO_PRIOR_WINDOW, REASON_NOT_CONFIGURED, NO_PRIOR_WINDOW_IMPACT);
@@ -298,7 +331,9 @@ public class PostureService {
      * a subcategory counts as sensitive-data when it matches the name of a policy that actually
      * has PII detection configured.
      */
-    private BasicDBObject sensitiveDataIncidentsKpi(InsightDataBundle bundle, List<ThreatCategoryCount> priorSubCategory) {
+    private BasicDBObject sensitiveDataIncidentsKpi(InsightDataBundle bundle, List<ThreatCategoryCount> priorSubCategory,
+                                                      List<DashboardMaliciousEvent> trendWindowEvents,
+                                                      int trendStartTs, List<Integer> trendBoundaries) {
         Set<String> piiPolicyNamesLower = piiPolicyNamesLower(bundle);
 
         long current = sumMatching(bundle.subCategoryCounts, piiPolicyNamesLower);
@@ -319,6 +354,11 @@ public class PostureService {
             kpi.put("value", null);
             return kpi;
         }
+
+        // Same category (not subCategory) join sumMatching uses for the headline count — see
+        // bucketedSparkline's own javadoc for why this can't come from a single bucketed backend call.
+        kpi.put("sparkline", bucketedSparkline(trendWindowEvents, trendStartTs, trendBoundaries,
+                e -> e.getCategory() != null && piiPolicyNamesLower.contains(e.getCategory().toLowerCase(Locale.ROOT))));
 
         if (priorSubCategory == null) {
             addGap(kpi, GAP_NO_PRIOR_WINDOW, REASON_NOT_CONFIGURED, NO_PRIOR_WINDOW_IMPACT);
@@ -372,21 +412,29 @@ public class PostureService {
     // ── Shadow AI trend ──────────────────────────────────────────────────────────
 
     /**
-     * 12 weekly buckets of cumulative sanctioned vs. unsanctioned tool counts, by first-seen date
-     * ({@code ApiCollection.startTs}).
+     * SHADOW_TREND_BUCKET_COUNT buckets of cumulative sanctioned vs. unsanctioned tool counts, by
+     * first-seen date ({@code ApiCollection.startTs}), spanning the page's own selected
+     * [startTs, endTs] — not a fixed rolling window — so the trend's shape always matches whatever
+     * period is currently filtered.
      *
      * This is an approximation worth naming explicitly: a tool's sanction status is applied at
      * TODAY's classification across its *entire* history, because — same as the risk-score
      * history the PRD flags as a gap — nothing stores how a tool's audit status changed over
-     * time. A tool sanctioned yesterday reads as sanctioned for all 12 weeks, not just the last
+     * time. A tool sanctioned yesterday reads as sanctioned for every bucket, not just the last
      * one. Real (not fabricated) counts, wrong-shaped history; the gap says so.
      */
     private BasicDBObject shadowAiTrend(InsightDataBundle bundle) {
         int endTs = bundle.ctx.getEndTs() > 0 ? bundle.ctx.getEndTs() : (int) (System.currentTimeMillis() / 1000);
+        // Unbounded "all time" start (0) has no natural lower edge to bucket against — falls back
+        // to a fixed lookback for that one case only, same convention every other delta on this
+        // page already uses for an unbounded range.
+        int startTs = bundle.ctx.getStartTs() > 0 ? bundle.ctx.getStartTs()
+                : endTs - (int) (SHADOW_TREND_BUCKET_COUNT * WEEK_SECONDS);
+        List<Integer> boundaries = trendBucketBoundaries(startTs, endTs, SHADOW_TREND_BUCKET_COUNT);
         Map<String, String> remarksByService = InsightUtil.remarksByServiceName(bundle.auditRows);
 
-        long[] sanctioned = new long[SHADOW_TREND_WEEKS];
-        long[] unsanctioned = new long[SHADOW_TREND_WEEKS];
+        long[] sanctioned = new long[SHADOW_TREND_BUCKET_COUNT];
+        long[] unsanctioned = new long[SHADOW_TREND_BUCKET_COUNT];
 
         for (ApiCollection c : safe(bundle.collections)) {
             if (c == null || c.isDeactivated() || c.getHostName() == null) continue;
@@ -395,20 +443,19 @@ public class PostureService {
 
             boolean isSanctioned = InsightUtil.governanceBucket(c, bundle.allowlistNamesLower, remarksByService)
                     == GovernanceBucket.SANCTIONED;
-            for (int week = 0; week < SHADOW_TREND_WEEKS; week++) {
-                long weekEnd = endTs - (long) (SHADOW_TREND_WEEKS - 1 - week) * WEEK_SECONDS;
-                if (firstSeen <= weekEnd) {
-                    if (isSanctioned) sanctioned[week]++; else unsanctioned[week]++;
+            for (int i = 0; i < SHADOW_TREND_BUCKET_COUNT; i++) {
+                if (firstSeen <= boundaries.get(i)) {
+                    if (isSanctioned) sanctioned[i]++; else unsanctioned[i]++;
                 }
             }
         }
 
         List<List<Object>> sanctionedSeries = new ArrayList<>();
         List<List<Object>> unsanctionedSeries = new ArrayList<>();
-        for (int week = 0; week < SHADOW_TREND_WEEKS; week++) {
-            long weekEndMs = (endTs - (long) (SHADOW_TREND_WEEKS - 1 - week) * WEEK_SECONDS) * 1000L;
-            sanctionedSeries.add(Arrays.asList((Object) weekEndMs, (Object) sanctioned[week]));
-            unsanctionedSeries.add(Arrays.asList((Object) weekEndMs, (Object) unsanctioned[week]));
+        for (int i = 0; i < SHADOW_TREND_BUCKET_COUNT; i++) {
+            long bucketEndMs = boundaries.get(i) * 1000L;
+            sanctionedSeries.add(Arrays.asList((Object) bucketEndMs, (Object) sanctioned[i]));
+            unsanctionedSeries.add(Arrays.asList((Object) bucketEndMs, (Object) unsanctioned[i]));
         }
 
         BasicDBObject panel = new BasicDBObject();
@@ -416,8 +463,8 @@ public class PostureService {
         series.add(namedSeries("Sanctioned", sanctionedSeries));
         series.add(namedSeries("Unsanctioned", unsanctionedSeries));
         panel.put("series", series);
-        panel.put("currentSanctioned", sanctioned[SHADOW_TREND_WEEKS - 1]);
-        panel.put("currentUnsanctioned", unsanctioned[SHADOW_TREND_WEEKS - 1]);
+        panel.put("currentSanctioned", sanctioned[SHADOW_TREND_BUCKET_COUNT - 1]);
+        panel.put("currentUnsanctioned", unsanctioned[SHADOW_TREND_BUCKET_COUNT - 1]);
         panel.put("route", InsightRoutes.AGENTIC_ASSETS);
 
         List<Map<String, Object>> gaps = new ArrayList<>();
@@ -451,10 +498,17 @@ public class PostureService {
         Map<String, Long> countByPolicyName = new LinkedHashMap<>();
         Map<String, String> hexIdByPolicyName = new HashMap<>();
         for (PolicyMatch m : matchedPolicyCounts(bundle)) {
-            if (!InsightUtil.policyHasPiiDetection(m.policy)) continue;
             String name = m.policy.getName();
-            countByPolicyName.merge(name, m.count, Long::sum);
-            hexIdByPolicyName.putIfAbsent(name, m.policy.getHexId());
+            if (InsightUtil.policyHasPiiDetection(m.policy)){
+                hexIdByPolicyName.putIfAbsent(name, m.policy.getHexId());
+            }
+            if(RiskScoreCalculator.DEFAULT_DATA_LEAVING_POLICIES.containsKey(name)){
+                String userForName = RiskScoreCalculator.DEFAULT_DATA_LEAVING_POLICIES.get(name);
+                countByPolicyName.merge(userForName, m.count, Long::sum);
+            }else{
+                countByPolicyName.merge("Others", m.count, Long::sum);
+            }
+            
         }
 
         long total = 0;
@@ -574,45 +628,76 @@ public class PostureService {
     // ── Attack attempts ──────────────────────────────────────────────────────────
 
     /**
-     * ATTACK_TREND_WEEKS ascending epoch-second boundaries ending at endTs, one per weekly
-     * bucket — SecurityPostureAction passes these straight into
-     * AbstractThreatDetectionAction#fetchViolationsMonthlyTotals (the same cheap $bucket
-     * aggregation AgenticObserveAction's own violations sparkline uses; despite the name it
-     * buckets by whatever ascending boundaries it's given, not literally calendar months) to get
-     * one malicious-event count per week back.
+     * bucketCount ascending epoch-second boundaries evenly dividing [startTs, endTs] — the shared
+     * boundary source for every trend/sparkline panel on this page. SecurityPostureAction passes
+     * these straight into AbstractThreatDetectionAction#fetchViolationsMonthlyTotals (the same
+     * cheap $bucket aggregation AgenticObserveAction's own violations sparkline uses; despite the
+     * name it buckets by whatever ascending boundaries it's given, not literally calendar months)
+     * to get one malicious-event count per bucket back. Deliberately the page's own SELECTED
+     * range, not a fixed rolling window ending "now" — a trend's shape should match whatever
+     * period the filter is currently showing, same as its KPI's own headline value does.
      */
-    public static List<Integer> attackTrendWeekBoundaries(int endTs) {
+    public static List<Integer> trendBucketBoundaries(int startTs, int endTs, int bucketCount) {
         List<Integer> boundaries = new ArrayList<>();
-        for (int week = 0; week < ATTACK_TREND_WEEKS; week++) {
-            boundaries.add((int) (endTs - (long) (ATTACK_TREND_WEEKS - 1 - week) * WEEK_SECONDS));
+        long rangeLength = Math.max(1, (long) endTs - startTs);
+        for (int i = 1; i <= bucketCount; i++) {
+            boundaries.add(i == bucketCount ? endTs : (int) (startTs + rangeLength * i / bucketCount));
         }
         return boundaries;
     }
 
     /**
-     * "Attack attempts" — weekly malicious-event counts as a Blocked/Got-through stacked series,
-     * plus this week's headline numbers.
+     * One count per entry in boundaries — the number of events matching `matches` whose timestamp
+     * falls in that bucket (the half-open "(previous boundary, this boundary]" range; the first
+     * bucket's lower edge is rangeStartTs itself). Backs the Critical alerts / Sensitive data
+     * incidents KPI sparklines: the threat backend's own bucketed aggregation
+     * (AbstractThreatDetectionAction#fetchViolationsMonthlyTotals) has no severity or category
+     * filter, so there's no single backend call that returns "critical-only" or "PII-policy-only"
+     * counts per bucket. Bucketing one raw-event fetch client-side is cheaper than firing one
+     * backend call per bucket per KPI.
+     */
+    static List<Long> bucketedSparkline(List<DashboardMaliciousEvent> events, int rangeStartTs,
+                                         List<Integer> boundaries, Predicate<DashboardMaliciousEvent> matches) {
+        List<Long> counts = new ArrayList<>(Collections.nCopies(boundaries.size(), 0L));
+        for (DashboardMaliciousEvent event : safe(events)) {
+            if (event == null || !matches.test(event)) continue;
+            long ts = event.getTimestamp();
+            for (int i = 0; i < boundaries.size(); i++) {
+                int lowerExclusive = i == 0 ? rangeStartTs : boundaries.get(i - 1);
+                int upperInclusive = boundaries.get(i);
+                if (ts > lowerExclusive && ts <= upperInclusive) {
+                    counts.set(i, counts.get(i) + 1);
+                    break;
+                }
+            }
+        }
+        return counts;
+    }
+
+    /**
+     * "Attack attempts" — bucketed malicious-event counts as a Blocked/Got-through stacked series
+     * over the page's selected range, plus the latest bucket's headline numbers.
      *
      * "Got through" (a malicious event that reached its target rather than being stopped) has no
      * data source yet — every malicious event is counted as Blocked here. Kept as its own
      * always-present series/field (zeroed, not omitted) so the chart and legend are already
      * shaped for the day a per-event outcome filter exists: wiring it in is then "fetch this same
-     * weekly bucket query again with that filter", not a redesign. Same gap this funnel already
-     * has for the gateway's unread per-event guardrailAction field.
+     * bucketed query again with that filter", not a redesign. Same gap this funnel already has
+     * for the gateway's unread per-event guardrailAction field.
      */
-    private BasicDBObject attackAttemptsTrend(List<Integer> weeklyMaliciousCounts, int endTs) {
-        boolean fetchFailed = weeklyMaliciousCounts == null || weeklyMaliciousCounts.size() < ATTACK_TREND_WEEKS;
+    private BasicDBObject attackAttemptsTrend(List<Integer> weeklyMaliciousCounts, List<Integer> boundaries) {
+        boolean fetchFailed = weeklyMaliciousCounts == null || weeklyMaliciousCounts.size() < boundaries.size();
 
         List<BasicDBObject> series = new ArrayList<>();
         List<List<Object>> blockedPoints = new ArrayList<>();
         List<List<Object>> gotThroughPoints = new ArrayList<>();
         long currentTotal = 0;
-        for (int week = 0; week < ATTACK_TREND_WEEKS; week++) {
-            long weekEndMs = (endTs - (long) (ATTACK_TREND_WEEKS - 1 - week) * WEEK_SECONDS) * 1000L;
-            long count = (!fetchFailed) ? weeklyMaliciousCounts.get(week) : 0;
-            blockedPoints.add(Arrays.asList((Object) weekEndMs, (Object) count));
-            gotThroughPoints.add(Arrays.asList((Object) weekEndMs, (Object) 0L));
-            if (week == ATTACK_TREND_WEEKS - 1) currentTotal = count;
+        for (int i = 0; i < boundaries.size(); i++) {
+            long bucketEndMs = boundaries.get(i) * 1000L;
+            long count = (!fetchFailed) ? weeklyMaliciousCounts.get(i) : 0;
+            blockedPoints.add(Arrays.asList((Object) bucketEndMs, (Object) count));
+            gotThroughPoints.add(Arrays.asList((Object) bucketEndMs, (Object) 0L));
+            if (i == boundaries.size() - 1) currentTotal = count;
         }
         series.add(namedSeries("Blocked", blockedPoints));
         series.add(namedSeries("Got through", gotThroughPoints));
@@ -647,7 +732,7 @@ public class PostureService {
     // numbers don't always crowd out the device condition's.
 
     private BasicDBObject biggestMovers(List<ApiCollection> endpointCollections, Map<Integer, Integer> collectionLastTrafficSeen,
-                                         List<DashboardMaliciousEvent> recentAttackEvents, int windowStartTs) {
+                                         List<DashboardMaliciousEvent> trendWindowEvents, int windowStartTs) {
         Map<String, Set<String>> devicesByVendor = new HashMap<>();
         Map<Integer, String> vendorByCollectionId = new HashMap<>();
         for (ApiCollection c : safe(endpointCollections)) {
@@ -673,8 +758,12 @@ public class PostureService {
         List<BasicDBObject> topDeviceMovers = topByRatio(deviceMovers, BIGGEST_MOVERS_MAX_PER_CONDITION);
 
         Map<String, Long> attacksByVendor = new HashMap<>();
-        for (DashboardMaliciousEvent event : safe(recentAttackEvents)) {
-            if (event == null) continue;
+        // trendWindowEvents spans the wider attack-trend window (its own caller reuses one raw
+        // fetch for both purposes rather than fetching this narrower range twice — see
+        // SecurityPostureAction's own comment on trendWindowEventsFuture), so this condition must
+        // filter down to windowStartTs itself instead of trusting the list's own bounds.
+        for (DashboardMaliciousEvent event : safe(trendWindowEvents)) {
+            if (event == null || event.getTimestamp() < windowStartTs) continue;
             String vendor = vendorByCollectionId.get(event.getApiCollectionId());
             if (vendor == null) continue;
             attacksByVendor.merge(vendor, 1L, Long::sum);
@@ -724,20 +813,20 @@ public class PostureService {
 
     // ── Framework readiness ──────────────────────────────────────────────────────
     //
-    // Real, not illustrative: a policy maps itself to a compliance framework via its own
-    // llmRule.compliance (a Map<framework name, clause ids> the policy author fills in — see
-    // GuardrailPolicies.LLMRule), not a fixed list this code invents. Readiness for a framework is
-    // the share of ITS OWN mapped policies that are actually enforcing right now (policy active
-    // AND its llmRule turned on) — "how much of what you've configured for this framework is
-    // actually live", not a claim about total regulatory coverage, since there's no source for
-    // "how many controls this framework requires" to divide by instead. Needs every policy
-    // (active and inactive) to have a real denominator — see buildSummary's own param doc.
+    // Real, not illustrative: readiness for a framework is the share of ITS OWN
+    // ComplianceSubClauseCatalog sub-clauses that have actually been hit by real guardrail-violation
+    // traffic in the selected window — "how much of this framework have we actually seen exercised",
+    // not "are my policies switched on" (the earlier, replaced definition — see git history / the
+    // package CLAUDE.md for why). The numerator comes from ComplianceClauseCoverageDao, written by
+    // ComplianceClauseScanService's LLM clause-attribution scan (triggered from the Threat Detection
+    // page); this method only reads that result and buckets it into [trendStartTs, trendEndTs] so
+    // the panel moves with the page's date filter, per this file's design principle 1.
 
     /** A policy is "enforcing" only while it's active AND its LLM rule (which carries the
      *  compliance mapping) is enabled — a disabled/inactive policy's compliance mapping is
      *  configuration, not live coverage. Package-private (not private): RiskScoreCalculator's
-     *  Compliance gaps sub-score uses the same definition of "covered by a compliance
-     *  framework" so the two panels can't disagree with each other. */
+     *  Compliance gaps sub-score AND ComplianceClauseScanService use the same definition of
+     *  "covered by a compliance framework" so all three can't disagree with each other. */
     static boolean policyEnforcing(GuardrailPolicies p) {
         return p != null && p.isActive() && p.getLlmRule() != null && p.getLlmRule().isEnabled();
     }
@@ -749,42 +838,52 @@ public class PostureService {
                 && !p.getLlmRule().getCompliance().isEmpty();
     }
 
-    private BasicDBObject frameworkReadiness(List<GuardrailPolicies> allPoliciesIncludingInactive) {
-        Map<String, Integer> totalByFramework = new LinkedHashMap<>();
-        Map<String, Integer> enforcingByFramework = new LinkedHashMap<>();
-        for (GuardrailPolicies p : safe(allPoliciesIncludingInactive)) {
-            if (p == null || p.getLlmRule() == null || p.getLlmRule().getCompliance() == null) continue;
-            boolean enforcing = policyEnforcing(p);
-            for (String framework : p.getLlmRule().getCompliance().keySet()) {
-                if (framework == null || framework.trim().isEmpty()) continue;
-                totalByFramework.merge(framework, 1, Integer::sum);
-                if (enforcing) enforcingByFramework.merge(framework, 1, Integer::sum);
-            }
-        }
+    private BasicDBObject frameworkReadiness(int trendStartTs, int trendEndTs) {
+        List<ComplianceClauseCoverage> coverageDocs = ComplianceClauseCoverageDao.instance.findAllCoverage();
 
         List<BasicDBObject> rows = new ArrayList<>();
-        for (Map.Entry<String, Integer> e : totalByFramework.entrySet()) {
-            String framework = e.getKey();
-            int total = e.getValue();
-            int enforcing = enforcingByFramework.getOrDefault(framework, 0);
+        int lastScannedAt = 0;
+        for (ComplianceClauseCoverage doc : safe(coverageDocs)) {
+            if (doc == null || doc.getId() == null) continue;
+            int total = doc.getTotalClauses() > 0
+                    ? doc.getTotalClauses()
+                    : ComplianceSubClauseCatalog.totalClauses(doc.getId());
+            if (total <= 0) continue;
+
+            // Only clauses with at least one hit whose timestamp falls in the page's selected
+            // window count — a clause hit once, months ago, outside the current range isn't "live".
+            int covered = 0;
+            Map<String, List<ClauseHit>> clauseHits = doc.getClauseHits();
+            if (clauseHits != null) {
+                for (List<ClauseHit> hits : clauseHits.values()) {
+                    if (hits == null) continue;
+                    boolean inWindow = hits.stream().anyMatch(h ->
+                            h != null && h.getTimestamp() >= trendStartTs && h.getTimestamp() <= trendEndTs);
+                    if (inWindow) covered++;
+                }
+            }
+
             BasicDBObject row = new BasicDBObject();
-            row.put("framework", framework);
-            row.put("value", (int) Math.round((enforcing * 100.0) / total));
-            row.put("enforcingPolicies", enforcing);
-            row.put("totalPolicies", total);
+            row.put("framework", doc.getId());
+            row.put("value", (int) Math.round((covered * 100.0) / total));
+            row.put("clausesCovered", covered);
+            row.put("totalClauses", total);
+            row.put("lastScannedAt", doc.getLastScannedAt());
             rows.add(row);
+            lastScannedAt = Math.max(lastScannedAt, doc.getLastScannedAt());
         }
-        // Frameworks with more mapped policies first — a framework only one policy happens to
-        // mention is too noisy a sample to lead with.
-        rows.sort((a, b) -> Integer.compare(b.getInt("totalPolicies"), a.getInt("totalPolicies")));
+        // Most-covered framework first, same "lead with the strongest signal" ordering the earlier
+        // policy-count metric used.
+        rows.sort((a, b) -> Integer.compare(b.getInt("clausesCovered"), a.getInt("clausesCovered")));
         List<BasicDBObject> top = rows.subList(0, Math.min(6, rows.size()));
 
         BasicDBObject panel = new BasicDBObject();
         panel.put("frameworks", top);
+        panel.put("lastScannedAt", lastScannedAt);
         List<Map<String, Object>> gaps = new ArrayList<>();
         if (rows.isEmpty()) {
-            gaps.add(gapRow(GAP_GUARDRAIL_POLICIES, REASON_NOT_CONFIGURED,
-                    "No policy has a compliance framework mapped in its LLM rule yet, so framework readiness can't be scored."));
+            gaps.add(gapRow(GAP_COMPLIANCE_SCAN, REASON_NOT_CONFIGURED,
+                    "No compliance clause scan has been run yet — trigger one from the Threat Detection page to score framework readiness."));
         }
         panel.put("dataGaps", gaps);
         return panel;

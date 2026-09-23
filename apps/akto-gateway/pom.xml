@@ -25,7 +25,7 @@
             <version>${project.version}</version>
         </dependency>
 
-        <!-- Utils module for SlackUtils -->
+        <!-- Utils module for OperationalAlerts -->
         <dependency>
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
