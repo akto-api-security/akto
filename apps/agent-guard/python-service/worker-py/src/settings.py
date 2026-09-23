@@ -57,6 +57,7 @@ _FIELDS = (
     "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
+    "SCANNER_RESPONSE_FORMAT",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",
     # --- Per-scanner semantic cache (Redis vector store + embedder service) ---
@@ -131,6 +132,7 @@ class Settings:
     SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
+    SCANNER_RESPONSE_FORMAT: str
     ANONYMIZER_URL: str
     DATABASE_ABSTRACTOR_SERVICE_TOKEN: str
     METRICS_PUSH_INTERVAL_SEC: str
