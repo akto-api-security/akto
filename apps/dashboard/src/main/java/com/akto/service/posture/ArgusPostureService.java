@@ -140,11 +140,6 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    /**
-     * On "all environments" the DAO's own RBAC/context filter already restricts to Argus
-     * collections, so an id list would only repeat it — at fleet scale that is a $in carrying
-     * every asset id, on top of the one the RBAC filter already adds.
-     */
     private static Bson scopeFilter(List<ApiCollection> assets, String environment) {
         if (isAllEnvironments(environment)) return Filters.empty();
 
@@ -176,44 +171,49 @@ public class ArgusPostureService {
 
         if (assets.isEmpty()) {
             kpi.put("value", 0d);
-            kpi.put("secondaryFootnote", "0 asset(s) missing required controls");
+            kpi.put("secondaryFootnote", "0 asset(s) not covered");
             kpi.put("secondaryTone", riskTone(0, "critical"));
             return kpi;
         }
 
-        if (fleetWideControls(policies).containsAll(requiredControls(null))) {
+        if (hasFleetWidePolicy(policies)) {
             kpi.put("value", 100d);
             kpi.put("tone", toneForPercent(100d));
-            kpi.put("secondaryFootnote", "0 asset(s) missing required controls");
+            kpi.put("secondaryFootnote", "0 asset(s) not covered");
             kpi.put("secondaryTone", riskTone(0, "critical"));
             return kpi;
         }
 
-        List<Set<String>> providedByPolicy = new ArrayList<>(policies.size());
-        for (GuardrailPolicies p : policies) providedByPolicy.add(providedControls(p));
-
-        long fullyProtected = 0;
+        long covered = 0;
         for (ApiCollection asset : assets) {
-            if (missingControls(asset, requiredControls(asset), policies, providedByPolicy).isEmpty()) fullyProtected++;
+            if (isCovered(asset, policies)) covered++;
         }
 
-        long missing = assets.size() - fullyProtected;
-        double percent = percentOf(fullyProtected, assets.size());
+        long notCovered = assets.size() - covered;
+        double percent = percentOf(covered, assets.size());
 
         kpi.put("value", percent);
         kpi.put("tone", toneForPercent(percent));
-        kpi.put("secondaryFootnote", missing + " asset(s) missing required controls");
-        kpi.put("secondaryTone", riskTone(missing, toneForPercent(percent)));
+        kpi.put("secondaryFootnote", notCovered + " asset(s) not covered");
+        kpi.put("secondaryTone", riskTone(notCovered, "critical"));
         return kpi;
     }
 
-    /**
-     * Controls provided to every asset, from the apply-to-all policies alone. When these already
-     * satisfy the required set, every asset is protected regardless of the scoped policies, and
-     * coverage is 100% without matching a single asset — the per-asset path is assets x policies
-     * host matching, so this is the difference between one pass over the policies and 500k string
-     * comparisons at fleet scale.
-     */
+    private static boolean hasFleetWidePolicy(List<GuardrailPolicies> policies) {
+        for (GuardrailPolicies p : policies) {
+            if (p != null && p.isApplyToAllServers()) return true;
+        }
+        return false;
+    }
+
+    private static boolean isCovered(ApiCollection asset, List<GuardrailPolicies> policies) {
+        for (GuardrailPolicies p : policies) {
+            if (p == null) continue;
+            if (InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) return true;
+        }
+        return false;
+    }
+
     private static Set<String> fleetWideControls(List<GuardrailPolicies> policies) {
         Set<String> provided = new HashSet<>();
         for (GuardrailPolicies p : policies) {
