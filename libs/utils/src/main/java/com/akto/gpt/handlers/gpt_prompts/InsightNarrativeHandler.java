@@ -236,8 +236,35 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         while (m.find()) {
             String literal = m.group();
             out.add(literal);
-            out.add(literal.replace(",", "")); // also allow the same number without a thousands separator
+            String stripped = literal.replace(",", "");
+            out.add(stripped); // also allow the same number without a thousands separator
+            out.add(withThousandsSeparators(stripped)); // ...and WITH one, even if the source had none —
+            // a raw evidence-row count (e.g. a plain "10495" int, not a pre-formatted "formatted"
+            // string) has no comma to begin with, but the model naturally writes large numbers with
+            // one in prose. Without this, a real, correctly-copied number gets rejected every single
+            // retry (the source number never changes), which is what actually caused an infinite
+            // regenerate loop for PostureDrillNarrativeService's evidence-only (no "formatted" field)
+            // input shape.
         }
+    }
+
+    private String withThousandsSeparators(String numeric) {
+        String suffix = "";
+        String body = numeric;
+        if (body.endsWith("%")) { suffix = "%"; body = body.substring(0, body.length() - 1); }
+        String intPart = body;
+        String fracPart = "";
+        int dot = body.indexOf('.');
+        if (dot >= 0) { intPart = body.substring(0, dot); fracPart = body.substring(dot); }
+        if (intPart.isEmpty() || intPart.length() <= 3) return numeric;
+        StringBuilder grouped = new StringBuilder();
+        int digitsSinceComma = 0;
+        for (int i = intPart.length() - 1; i >= 0; i--) {
+            grouped.append(intPart.charAt(i));
+            digitsSinceComma++;
+            if (digitsSinceComma % 3 == 0 && i != 0) grouped.append(',');
+        }
+        return grouped.reverse().toString() + fracPart + suffix;
     }
 
     @Override

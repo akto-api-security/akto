@@ -1,5 +1,5 @@
-import { useEffect, useReducer, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
     Badge, Box, Card, DataTable, HorizontalGrid, HorizontalStack, Icon, Popover, Text, Tooltip, VerticalStack,
 } from '@shopify/polaris'
@@ -17,6 +17,7 @@ import StackedChart from '../../components/charts/StackedChart'
 import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
 import InsightsFlyout from '../observe/agentic/insights/InsightsFlyout'
 import { INSIGHT_GROUP } from '../observe/agentic/insights/insightsHelpers'
+import PostureDrillFlyout from './PostureDrillFlyout'
 import dashboardApi from './api'
 import func from '@/util/func'
 import values from '@/util/values'
@@ -32,6 +33,13 @@ const KPI_RISK_SCORE = 'riskScore'
 const KPI_CRITICAL_ALERTS = 'criticalAlerts'
 const KPI_MONITORING_COVERAGE = 'monitoringCoverage'
 const KPI_SENSITIVE_INCIDENTS = 'sensitiveDataIncidents'
+
+// Drill ids — must match PostureService.DRILL_* on the backend.
+const DRILL_SHADOW_AI = 'shadowAiTools'
+const DRILL_DATA_LEAVING = 'dataLeaving'
+const DRILL_ENFORCEMENT_FUNNEL = 'enforcementFunnel'
+const DRILL_VENDOR_RISK = 'vendorRisk'
+const DRILL_FRAMEWORK_READINESS = 'frameworkReadiness'
 
 const DELTA_TONE_TO_COLOR = {
     critical: 'critical',
@@ -194,35 +202,36 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
 
     return (
         <Card>
-            <Box
-                padding="4"
+            <div
                 onClick={clickable ? () => onOpen(kpi) : undefined}
                 style={clickable ? { cursor: 'pointer' } : undefined}
             >
-                <VerticalStack gap="2">
-                    <HorizontalStack align="space-between" blockAlign="center">
-                        <Text variant="bodySm" fontWeight="semibold" color="subdued">{kpi.label}</Text>
-                        <GapHint gaps={kpi.dataGaps} />
-                    </HorizontalStack>
-
-                    {showRing ? (
-                        <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                            <RiskScoreRing value={kpi.value} size={48} />
-                            {valueColumn}
+                <Box padding="4">
+                    <VerticalStack gap="2">
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Text variant="bodySm" fontWeight="semibold" color="subdued">{kpi.label}</Text>
+                            <GapHint gaps={kpi.dataGaps} />
                         </HorizontalStack>
-                    ) : valueColumn}
 
-                    {kpi.footnote && (
-                        <Text variant="bodySm" color="subdued">{kpi.footnote}</Text>
-                    )}
+                        {showRing ? (
+                            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                                <RiskScoreRing value={kpi.value} size={48} />
+                                {valueColumn}
+                            </HorizontalStack>
+                        ) : valueColumn}
 
-                    {hasRealSparkline && (
-                        <div style={{ width: '100%' }}>
-                            <SmoothAreaChart tickPositions={kpi.sparkline} color={sparklineColor} height="40" width={null} />
-                        </div>
-                    )}
-                </VerticalStack>
-            </Box>
+                        {kpi.footnote && (
+                            <Text variant="bodySm" color="subdued">{kpi.footnote}</Text>
+                        )}
+
+                        {hasRealSparkline && (
+                            <div style={{ width: '100%' }}>
+                                <SmoothAreaChart tickPositions={kpi.sparkline} color={sparklineColor} height="40" width={null} />
+                            </div>
+                        )}
+                    </VerticalStack>
+                </Box>
+            </div>
         </Card>
     )
 }
@@ -260,7 +269,7 @@ function colorForReadiness(value) {
 // which answered "are my policies switched on" rather than "how ready am I for this framework".
 // No target/quarter-goal exists server-side, so — unlike the earlier dummy content — there is no
 // tick mark to draw; inventing one would just be fake data again.
-function FrameworkReadinessCard({ panel }) {
+function FrameworkReadinessCard({ panel, onOpen }) {
     const rows = panel?.frameworks || []
     const hasData = rows.length > 0
     const effectiveRows = hasData ? rows : DUMMY_FRAMEWORK_READINESS
@@ -268,13 +277,21 @@ function FrameworkReadinessCard({ panel }) {
     const body = (
         <VerticalStack gap="3">
             {effectiveRows.map((row) => (
-                <VerticalStack key={row.framework || row.id} gap="1">
-                    <HorizontalStack align="space-between">
-                        <Text variant="bodyMd">{row.framework || row.label}</Text>
-                        <Text variant="bodyMd" fontWeight="semibold">{row.value}%</Text>
-                    </HorizontalStack>
-                    <CustomProgressBar progress={row.value} topColor={colorForReadiness(row.value)} height={"10px"}/>
-                </VerticalStack>
+                // Any framework click opens the same group-level (all-frameworks) drilldown table —
+                // drilling into one specific framework's clause hits happens from a row inside it.
+                <div
+                    key={row.framework || row.id}
+                    onClick={hasData ? () => onOpen() : undefined}
+                    style={{ cursor: hasData ? 'pointer' : 'default' }}
+                >
+                    <VerticalStack gap="1">
+                        <HorizontalStack align="space-between">
+                            <Text variant="bodyMd">{row.framework || row.label}</Text>
+                            <Text variant="bodyMd" fontWeight="semibold">{row.value}%</Text>
+                        </HorizontalStack>
+                        <CustomProgressBar progress={row.value} topColor={colorForReadiness(row.value)} height={"10px"}/>
+                    </VerticalStack>
+                </div>
             ))}
         </VerticalStack>
     )
@@ -339,7 +356,7 @@ function AdoptionGapCard() {
 // (KNOWN_RISKY_VENDORS/UNAPPROVED_VENDOR_WEIGHT — unapproved is a flat 3, a known-risky-but-approved
 // vendor is 5, everything else is 0). A plain absolutely-positioned scatter, not a chart library —
 // static-shaped data (a handful of vendors), so there's nothing a real chart engine buys here.
-function VendorRiskBubbleCard({ vendorTable }) {
+function VendorRiskBubbleCard({ vendorTable, onOpen }) {
     const navigate = useNavigate()
     const rows = vendorTable || []
     const hasData = rows.length > 0
@@ -356,7 +373,10 @@ function VendorRiskBubbleCard({ vendorTable }) {
 
     const body = (
         <VerticalStack gap="2">
-            <div style={{ position: 'relative', height: '180px', border: '1px solid #e5e7eb', borderRadius: '4px' }}>
+            <div
+                onClick={hasData ? () => onOpen() : undefined}
+                style={{ position: 'relative', height: '180px', border: '1px solid #e5e7eb', borderRadius: '4px', cursor: hasData ? 'pointer' : 'default' }}
+            >
                 <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '35%', background: 'rgba(220,38,38,0.08)' }} />
                 {points.map((p) => (
                     // Plain title, not Polaris <Tooltip>: Tooltip wraps its child in its own
@@ -388,9 +408,9 @@ function VendorRiskBubbleCard({ vendorTable }) {
                 <VerticalStack gap="4">
                     <HorizontalStack align="space-between" blockAlign="center">
                         <Text variant="headingSm">Vendor risk vs. exposure</Text>
-                        <Box onClick={() => navigate('/dashboard/observe/audit')} style={{ cursor: 'pointer' }}>
+                        <div onClick={() => navigate('/dashboard/observe/audit')} style={{ cursor: 'pointer' }}>
                             <Text variant="bodySm" color="interactive">Registry</Text>
-                        </Box>
+                        </div>
                     </HorizontalStack>
                     {hasData ? body : <DummyDataOverlay panelId="vendorRiskExposure">{body}</DummyDataOverlay>}
                 </VerticalStack>
@@ -496,6 +516,8 @@ function DataLeavingCard({ panel, onOpen }) {
     })
     const legendItems = Object.entries(graphData).map(([label, { text, color, percent }]) => ({ label, color, count: text, percent }))
 
+    // Any segment click opens the SAME group-level drilldown table (every data type, not just the
+    // one clicked) — drilling into one specific type happens from a row inside that table.
     const body = (
         <HorizontalStack gap="4" blockAlign="center" wrap={false}>
             <DonutChart
@@ -503,7 +525,7 @@ function DataLeavingCard({ panel, onOpen }) {
                 title=""
                 size={150}
                 pieInnerSize="55%"
-                onSegmentClick={hasData ? () => onOpen(panel) : undefined}
+                onSegmentClick={hasData ? () => onOpen() : undefined}
             />
             <ChartLegend items={legendItems} />
         </HorizontalStack>
@@ -555,7 +577,9 @@ function EnforcementFunnelCard({ panel, onOpen }) {
     const body = (
         <VerticalStack gap="3">
             {effectiveStages.map((stage) => (
-                <Box key={stage.id} onClick={hasData ? () => onOpen(panel) : undefined} style={{ cursor: hasData && panel.route ? 'pointer' : 'default' }}>
+                // Any stage click opens the same group-level (all-stages) drilldown table — drilling
+                // into one specific stage happens from a row inside that table.
+                <div key={stage.id} onClick={hasData ? () => onOpen() : undefined} style={{ cursor: hasData && panel.route ? 'pointer' : 'default' }}>
                     <VerticalStack gap="1">
                         <HorizontalStack align="space-between">
                             <Text variant="bodyMd">{stage.label}</Text>
@@ -572,7 +596,7 @@ function EnforcementFunnelCard({ panel, onOpen }) {
                             </Text>
                         )}
                     </VerticalStack>
-                </Box>
+                </div>
             ))}
             {hasData && panel.dataGaps && panel.dataGaps.length > 0 && (
                 <Text variant="bodySm" color="subdued">
@@ -649,7 +673,7 @@ function AttackAttemptsCard({ panel, onOpen }) {
 function ActNowRow({ insight, onOpen }) {
     return (
         <Box borderBlockEndWidth="1" borderColor="border">
-            <Box
+            <div
                 onClick={() => onOpen(insight)}
                 style={{ cursor: 'pointer', borderRadius: '4px', padding: '8px' }}
             >
@@ -660,7 +684,7 @@ function ActNowRow({ insight, onOpen }) {
                     </HorizontalStack>
                     <Text variant="bodySm" color="subdued">{insight.headline}</Text>
                 </VerticalStack>
-            </Box>
+            </div>
         </Box>
     )
 }
@@ -949,11 +973,29 @@ function RiskScoreFlyoutBody({ kpi, breakdownLoading }) {
     ]
 }
 
+// "Last 30 days" — same default EndpointPosture uses.
+const DEFAULT_DATE_RANGE = values.ranges[3]
+
+// A shared drilldown link is only reproducible if the page's date filter comes back with it —
+// this page's range was pure local state until now. `since`/`until` (raw epoch seconds) mirror the
+// same convention ThreatDetectionPage/CompliancePage already use for a shareable date filter.
+function dateRangeFromSearchParams(searchParams) {
+    const sinceParam = searchParams.get('since')
+    const untilParam = searchParams.get('until')
+    if (sinceParam == null || untilParam == null) return null
+    const sinceTs = parseInt(sinceParam, 10)
+    const untilTs = parseInt(untilParam, 10)
+    if (Number.isNaN(sinceTs) || Number.isNaN(untilTs)) return null
+    return { title: 'Custom', alias: 'custom', period: { since: new Date(sinceTs * 1000), until: new Date(untilTs * 1000) } }
+}
+
 function SecurityPosture() {
     const navigate = useNavigate()
+    const [searchParams, setSearchParams] = useSearchParams()
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[3] // "Last 30 days" — same default EndpointPosture uses
+        searchParams,
+        (sp) => dateRangeFromSearchParams(sp) || DEFAULT_DATE_RANGE
     )
     const [pageData, setPageData] = useState({})
     const [loading, setLoading] = useState(true)
@@ -961,8 +1003,29 @@ function SecurityPosture() {
     const [riskScoreFlyoutOpen, setRiskScoreFlyoutOpen] = useState(false)
     const [riskScoreBreakdown, setRiskScoreBreakdown] = useState(null)
     const [riskScoreBreakdownLoading, setRiskScoreBreakdownLoading] = useState(false)
+    // { drillId, path } | null — the paginated drilldown flyout (Shadow AI tools, What data is
+    // leaving, Enforcement funnel, Vendor risk, Framework readiness), fully derived from the URL's
+    // own `drill`/`path` params so a drilldown link is shareable and reload-safe.
+    const drillState = useMemo(() => {
+        const drillId = searchParams.get('drill')
+        if (!drillId) return null
+        return { drillId, path: searchParams.get('path') || '' }
+    }, [searchParams])
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+
+    // Mirrors the page's own selected range into the URL on every change ({replace: true} — this
+    // reflects internal state, it isn't a user-initiated navigation) so a link copied at any time
+    // reproduces the same range, not just whatever a drilldown's own `drill`/`path` params capture.
+    useEffect(() => {
+        const since = String(getTimeEpoch('since'))
+        const until = String(getTimeEpoch('until'))
+        if (searchParams.get('since') === since && searchParams.get('until') === until) return
+        const next = new URLSearchParams(searchParams)
+        next.set('since', since)
+        next.set('until', until)
+        setSearchParams(next, { replace: true })
+    }, [currDateRange]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         let cancelled = false
@@ -1030,6 +1093,25 @@ function SecurityPosture() {
 
     const openInsight = (insightId, group) => setFlyout({ insightId, group })
 
+    // Opens (or jumps to a specific level of) a panel's paginated drilldown flyout — replaces the
+    // old openPanel/navigate-away behavior for the 3 panels that had it, and is the first
+    // drilldown at all for Vendor risk / Framework readiness, which had none. {replace: true}: this
+    // mirrors flyout state into the URL, it isn't itself a navigation the user should be able to
+    // back-button through level by level.
+    const openDrill = (drillId, path = '') => {
+        const next = new URLSearchParams(searchParams)
+        next.set('drill', drillId)
+        if (path) next.set('path', path); else next.delete('path')
+        setSearchParams(next, { replace: true })
+    }
+    const navigateDrill = (state) => openDrill(state.drillId, state.path)
+    const closeDrill = () => {
+        const next = new URLSearchParams(searchParams)
+        next.delete('drill')
+        next.delete('path')
+        setSearchParams(next, { replace: true })
+    }
+
     const kpiRow = (
         <HorizontalGrid columns={4} gap="2">
             {[KPI_RISK_SCORE, KPI_CRITICAL_ALERTS, KPI_MONITORING_COVERAGE, KPI_SENSITIVE_INCIDENTS].map((id) => {
@@ -1049,22 +1131,26 @@ function SecurityPosture() {
     // ratio, so plain flex rather than Polaris's equal-width HorizontalGrid.
     const shadowAndDataLeavingRow = (
         <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
-            <div style={{ flex: 3, minWidth: 0 }}><ShadowAiTrendCard panel={pageData.shadowAiTrend} onOpen={openPanel} /></div>
-            <div style={{ flex: 2, minWidth: 0 }}><DataLeavingCard panel={pageData.dataLeaving} onOpen={openPanel} /></div>
+            <div style={{ flex: 3, minWidth: 0 }}><ShadowAiTrendCard panel={pageData.shadowAiTrend} onOpen={() => openDrill(DRILL_SHADOW_AI)} /></div>
+            {/* Every card opens the SAME group-level (L1) table regardless of which segment/row/
+                stage within it was clicked — drilling into a specific member (a data type, a
+                stage, a framework) happens by clicking a row inside that L1 table, not by
+                pre-guessing which one from the card. */}
+            <div style={{ flex: 2, minWidth: 0 }}><DataLeavingCard panel={pageData.dataLeaving} onOpen={() => openDrill(DRILL_DATA_LEAVING)} /></div>
         </div>
     )
 
     const funnelAttackVendorRow = (
         <HorizontalGrid columns={3} gap="3">
-            <EnforcementFunnelCard panel={pageData.enforcementFunnel} onOpen={openPanel} />
+            <EnforcementFunnelCard panel={pageData.enforcementFunnel} onOpen={() => openDrill(DRILL_ENFORCEMENT_FUNNEL)} />
             <AttackAttemptsCard panel={pageData.attackAttempts} onOpen={openPanel} />
-            <VendorRiskBubbleCard vendorTable={kpiById(KPI_RISK_SCORE)?.vendorTable} />
+            <VendorRiskBubbleCard vendorTable={kpiById(KPI_RISK_SCORE)?.vendorTable} onOpen={() => openDrill(DRILL_VENDOR_RISK)} />
         </HorizontalGrid>
     )
 
     const frameworkAndAdoptionRow = (
         <HorizontalGrid columns={2} gap="4">
-            <FrameworkReadinessCard panel={pageData.frameworkReadiness} />
+            <FrameworkReadinessCard panel={pageData.frameworkReadiness} onOpen={() => openDrill(DRILL_FRAMEWORK_READINESS)} />
             <AdoptionGapCard />
         </HorizontalGrid>
     )
@@ -1136,6 +1222,13 @@ function SecurityPosture() {
                             breakdownLoading: riskScoreBreakdownLoading,
                         }) || []}
                         showDivider
+                    />
+                    <PostureDrillFlyout
+                        drillState={drillState}
+                        onNavigate={navigateDrill}
+                        onClose={closeDrill}
+                        startTimestamp={getTimeEpoch('since')}
+                        endTimestamp={getTimeEpoch('until')}
                     />
                 </>
             )}

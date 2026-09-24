@@ -1,0 +1,296 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Banner, Box, Button, Divider, HorizontalStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
+import AgenticFlyoutShell from '../observe/agentic/AgenticFlyoutShell'
+import FlyoutBreadcrumb from '../observe/agentic/FlyoutBreadcrumb'
+import AgGridTable from '../../components/tables/AgGridTable'
+import SpinnerCentered from '../../components/progress/SpinnerCentered'
+import MarkdownViewer from '@/apps/dashboard/components/shared/MarkdownViewer'
+import dashboardApi from './api'
+import func from '@/util/func'
+
+// How many times to re-poll a PENDING narrative before giving up silently (no more network
+// calls, but the "Generating summary…" line stays as-is rather than flipping to an error state —
+// a slow LLM call isn't a failure). 5 tries * 3s = 15s, generous for the one-shot renderer call
+// InsightNarrativeHandler makes.
+const MAX_NARRATIVE_POLLS = 5
+const NARRATIVE_POLL_INTERVAL_MS = 3000
+
+// Same relative-time rendering LLMCellRenderers.jsx's TimeCell uses, minus its /1000 — every
+// drill's "detectedAt" column (see PostureService#fetchDrill's row builders) is already epoch
+// seconds, not epoch millis.
+function DetectedAtCell({ value }) {
+    return <Text variant="bodySm">{func.prettifyEpoch(value || 0)}</Text>
+}
+
+// ─── Stats row ────────────────────────────────────────────────────────────────
+// Same "big number over a subdued label" stat-tile language OverviewContent (SessionFlyout) uses
+// — a row total is always shown (real, not from the backend's own optional summary[]), plus
+// whatever InsightResult.Metric rows the drill sends.
+
+function DrillStats({ drill }) {
+    const stats = [
+        { key: '__total', label: 'Rows', value: (drill.total ?? 0).toLocaleString() },
+        ...(drill.summary || []).map((m) => ({ key: m.key, label: m.label, value: m.formatted })),
+    ]
+    return (
+        <HorizontalStack gap="6">
+            {stats.map((s) => (
+                <VerticalStack gap="1" key={s.key}>
+                    <Text variant="headingLg" as="p">{s.value}</Text>
+                    <Text variant="bodySm" color="subdued">{s.label}</Text>
+                </VerticalStack>
+            ))}
+        </HorizontalStack>
+    )
+}
+
+// ─── AI summary ───────────────────────────────────────────────────────────────
+// Same box/label language InsightDetailView.jsx's own "Analysis" section already uses for the
+// identical OK/PENDING/UNAVAILABLE + markdown/concern/impact/remediation contract
+// PostureDrillNarrativeService now sends for every drill level, not just insights.
+function DrillNarrative({ drill }) {
+    const status = drill.narrativeStatus
+    if (status === 'UNAVAILABLE') return null
+    const hasSummary = drill.narrativeConcern || drill.narrativeImpact || drill.narrativeRemediation
+    return (
+        <Box background="bg-surface-secondary" padding="4" borderRadius="2">
+            <VerticalStack gap="4">
+                <VerticalStack gap="1">
+                    <Text variant="bodySm" fontWeight="semibold" color="subdued">AI summary</Text>
+                    {status === 'PENDING' ? (
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Spinner size="small" accessibilityLabel="Generating AI summary" />
+                            <Text variant="bodyMd" color="subdued">Generating summary…</Text>
+                        </HorizontalStack>
+                    ) : (
+                        <MarkdownViewer markdown={drill.narrativeMarkdown} noPadding />
+                    )}
+                </VerticalStack>
+                {status === 'OK' && hasSummary && (
+                    <VerticalStack gap="3">
+                        {drill.narrativeConcern && (
+                            <VerticalStack gap="1">
+                                <Text variant="bodySm" fontWeight="semibold" color="subdued">Concern</Text>
+                                <Text variant="bodyMd">{drill.narrativeConcern}</Text>
+                            </VerticalStack>
+                        )}
+                        {drill.narrativeImpact && (
+                            <VerticalStack gap="1">
+                                <Text variant="bodySm" fontWeight="semibold" color="subdued">Impact</Text>
+                                <Text variant="bodyMd">{drill.narrativeImpact}</Text>
+                            </VerticalStack>
+                        )}
+                        {drill.narrativeRemediation && (
+                            <VerticalStack gap="1">
+                                <Text variant="bodySm" fontWeight="semibold" color="subdued">Remediation</Text>
+                                <Text variant="bodyMd">{drill.narrativeRemediation}</Text>
+                            </VerticalStack>
+                        )}
+                    </VerticalStack>
+                )}
+            </VerticalStack>
+        </Box>
+    )
+}
+
+// ─── PostureDrillFlyout ───────────────────────────────────────────────────────
+// One flyout every posture panel opens (Shadow AI tools, What data is leaving, Enforcement
+// funnel, Vendor risk, Framework readiness) — see PostureService#fetchDrill's own javadoc for the
+// drillId/path/level contract this mirrors 1:1. Same shell/breadcrumb language as SessionFlyout /
+// AgenticAssetFlyout (AgenticFlyoutShell + FlyoutBreadcrumb), rather than this page's own
+// FlyLayout, for visual consistency with the rest of the app's drilldown flyouts.
+//
+// `drillState` ({ drillId, path } | null) and its URL sync are owned by the parent page, not this
+// component — SecurityPosture.jsx mirrors it to `?drill=&path=` so a drilldown link is shareable
+// and reloadable. This component only renders whatever level `drillState` currently points to and
+// asks the parent (via onNavigate) to move to a different level — a breadcrumb click or a row
+// click when the current level is drillable.
+function PostureDrillFlyout({ drillState, onNavigate, onClose, startTimestamp, endTimestamp }) {
+    const navigate = useNavigate()
+    const show = !!drillState
+    const [drill, setDrill] = useState(null)
+    const [loading, setLoading] = useState(false)
+
+    // The initial fetch (below) already returns page 1's rows alongside the title/columns/
+    // breadcrumb/ctas/gaps. AgGridTable's own SSRM datasource fires its own getRows() the moment
+    // it mounts, which would otherwise re-fetch that exact same page over the network a second
+    // time — this cache lets its first call (skip===0, same drillId/path) reuse what's already in
+    // hand instead. Consumed once; every other fetch (pagination, a later remount) goes to the
+    // network as normal.
+    const firstPageCache = useRef(null)
+    // Reset whenever the level changes (new drillId/path) — see the polling effect below.
+    const narrativePollCount = useRef(0)
+
+    useEffect(() => {
+        setDrill(null)
+        firstPageCache.current = null
+        narrativePollCount.current = 0
+        if (!drillState) return
+        let cancelled = false
+
+        async function load() {
+            setLoading(true)
+            try {
+                const resp = await dashboardApi.fetchPostureDrill(
+                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
+                if (cancelled) return
+                setDrill(resp || null)
+                firstPageCache.current = resp
+                    ? { drillId: drillState.drillId, path: drillState.path, rows: resp.rows || [], total: resp.total || 0 }
+                    : null
+            } catch (error) {
+                console.error('Error fetching posture drill:', error)
+                if (!cancelled) setDrill(null)
+            } finally {
+                if (!cancelled) setLoading(false)
+            }
+        }
+
+        load()
+        return () => { cancelled = true }
+    }, [drillState, startTimestamp, endTimestamp])
+
+    // Every ancestor's own {path, label} comes back from the backend on every fetch (see
+    // PostureDrillResult.breadcrumb's own javadoc) — a reload from a deep-linked URL renders the
+    // full trail with no extra round trips to reconstruct it.
+    const breadcrumbItems = useMemo(() => (drill?.breadcrumb || []).map((b, i, arr) => ({
+        label: b.label,
+        onClick: i === arr.length - 1 ? undefined
+            : () => onNavigate({ drillId: drillState.drillId, path: b.path }),
+    })), [drill?.breadcrumb, drillState, onNavigate])
+
+    const columnDefs = useMemo(() => (drill?.columns || []).map((c) => ({
+        field: c.field,
+        headerName: c.headerName,
+        flex: 1,
+        minWidth: 130,
+        cellStyle: { display: 'flex', alignItems: 'center' },
+        ...(c.field === 'detectedAt' ? { cellRenderer: DetectedAtCell } : {}),
+    })), [drill?.columns])
+
+    const onServerFetch = useCallback(({ skip, limit }) => {
+        const cached = firstPageCache.current
+        if (skip === 0 && cached && cached.drillId === drillState.drillId && cached.path === drillState.path) {
+            firstPageCache.current = null
+            return Promise.resolve({ value: cached.rows, total: cached.total })
+        }
+        return dashboardApi.fetchPostureDrill(
+            drillState.drillId, drillState.path, startTimestamp, endTimestamp, skip, limit || 20
+        ).then((resp) => ({ value: resp?.rows || [], total: resp?.total || 0 }))
+    }, [drillState?.drillId, drillState?.path, startTimestamp, endTimestamp])
+
+    const handleRowClicked = useCallback((e) => {
+        if (!drill?.drillable || e?.data?.id === undefined || e?.data?.id === null) return
+        const nextPath = drillState.path ? `${drillState.path}/${e.data.id}` : String(e.data.id)
+        onNavigate({ drillId: drillState.drillId, path: nextPath })
+    }, [drill?.drillable, drillState, onNavigate])
+
+    // AI summary is generated in the background (PostureDrillNarrativeService) — a PENDING status
+    // means the initial fetch above hit a cache miss and the backend kicked off generation without
+    // waiting on it. Re-fetching the same drillId/path a few seconds later picks up the finished
+    // prose once it's cached; only the narrative fields are merged in, so this never disturbs the
+    // table's own SSRM-managed rows/pagination.
+    useEffect(() => {
+        if (!drill || drill.narrativeStatus !== 'PENDING' || !drillState) return
+        if (narrativePollCount.current >= MAX_NARRATIVE_POLLS) return
+        let cancelled = false
+        const timer = setTimeout(async () => {
+            narrativePollCount.current += 1
+            try {
+                const resp = await dashboardApi.fetchPostureDrill(
+                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
+                if (cancelled || !resp) return
+                setDrill((prev) => (prev ? {
+                    ...prev,
+                    narrativeStatus: resp.narrativeStatus,
+                    narrativeMarkdown: resp.narrativeMarkdown,
+                    narrativeConcern: resp.narrativeConcern,
+                    narrativeImpact: resp.narrativeImpact,
+                    narrativeRemediation: resp.narrativeRemediation,
+                } : prev))
+            } catch (error) {
+                console.error('Error polling posture drill narrative:', error)
+            }
+        }, NARRATIVE_POLL_INTERVAL_MS)
+        return () => { cancelled = true; clearTimeout(timer) }
+    }, [drill, drillState, startTimestamp, endTimestamp])
+
+    return (
+        <AgenticFlyoutShell
+            show={show}
+            width={760}
+            header={
+                <FlyoutBreadcrumb
+                    items={breadcrumbItems}
+                    onClose={onClose}
+                    subtitle={drillState?.path ? drill?.title : null}
+                />
+            }
+        >
+            {/* Plain flex divs all the way down to the grid, deliberately not Polaris VerticalStack
+                — AgGridTable's domLayout="normal" needs an unbroken pixel-height chain to size
+                itself against, and VerticalStack doesn't forward flex-grow the way Box/a div does
+                (see AgenticFlyoutShell's own reliance on Box forwarding raw style for the same
+                reason). Same structure DevicesTab/SessionTracesContent already use. */}
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                {/* AgenticFlyoutShell keeps rendering children through its own close transition, so
+                    `drillState` can already be null here for a render or two after the close button
+                    is clicked, before the effect above catches up and resets `drill` to null too —
+                    guard on both, not just `drill`, or drillState.drillId below throws. */}
+                {!drill || !drillState || loading ? (
+                    <SpinnerCentered height="200px" />
+                ) : (
+                    <>
+                        <Box padding="4" paddingBlockEnd="0">
+                            <HorizontalStack align="space-between" blockAlign="start">
+                                <DrillStats drill={drill} />
+                                {(drill.ctas || []).length > 0 && (
+                                    <HorizontalStack gap="2">
+                                        {drill.ctas.map((cta) => (
+                                            <Button key={cta.id} size="slim" onClick={() => navigate(cta.route)}>{cta.label}</Button>
+                                        ))}
+                                    </HorizontalStack>
+                                )}
+                            </HorizontalStack>
+                            {(drill.dataGaps || []).length > 0 && (
+                                <Box paddingBlockStart="3">
+                                    <VerticalStack gap="2">
+                                        {drill.dataGaps.map((g, i) => (
+                                            <Banner key={i} status="info">{g.impact}</Banner>
+                                        ))}
+                                    </VerticalStack>
+                                </Box>
+                            )}
+                            {drill.narrativeStatus !== 'UNAVAILABLE' && (
+                                <Box paddingBlockStart="3">
+                                    <DrillNarrative drill={drill} />
+                                </Box>
+                            )}
+                        </Box>
+                        <Box paddingBlockStart="4"><Divider /></Box>
+                        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                            <AgGridTable
+                                key={`${drillState.drillId}:${drillState.path || ''}`}
+                                columnDefs={columnDefs}
+                                defaultColDef={{ sortable: false, resizable: true, filter: false }}
+                                onServerFetch={onServerFetch}
+                                serverSideRowModel
+                                onRowClicked={drill.drillable ? handleRowClicked : undefined}
+                                getRowStyle={drill.drillable ? () => ({ cursor: 'pointer' }) : undefined}
+                                noOuterBorder
+                                domLayout="normal"
+                                paginationPageSize={20}
+                                hidePageSizeSelector
+                                filterStateUrl={`security-posture-drill/${drillState?.drillId || ''}/${drillState?.path || ''}`}
+                                sideBar={false}
+                            />
+                        </div>
+                    </>
+                )}
+            </div>
+        </AgenticFlyoutShell>
+    )
+}
+
+export default PostureDrillFlyout

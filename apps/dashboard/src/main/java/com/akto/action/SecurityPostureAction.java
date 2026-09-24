@@ -13,6 +13,8 @@ import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightService;
+import com.akto.service.posture.PostureDrillNarrativeService;
+import com.akto.service.posture.PostureDrillResult;
 import com.akto.service.posture.PostureService;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.search.SearchClient;
@@ -67,6 +69,21 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
     @Getter
     private BasicDBObject riskScoreBreakdown = new BasicDBObject();
+
+    // ── fetchPostureDrill's own request/response fields ──
+    @Setter
+    private String drillId;
+    /** Slash-joined segments, e.g. "chatgpt.com" — empty/null for the drilldown's root (group)
+     *  level. Mirrors the frontend's own `?drill=&path=` URL query params 1:1, so the flyout's
+     *  current location is always reconstructible from the URL alone. */
+    @Setter
+    private String path;
+    @Setter
+    private int skip;
+    @Setter
+    private int limit;
+    @Getter
+    private PostureDrillResult postureDrill;
 
     private final InsightService insightService = new InsightService();
     private final PostureService postureService = new PostureService();
@@ -255,6 +272,66 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching risk score breakdown: " + e.getMessage());
             addActionError("Error fetching risk score breakdown: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * One panel's paginated drilldown flyout — see PostureService#fetchDrill's own javadoc for the
+     * drillId/path/level contract. A second on-demand call, same shape as
+     * {@link #fetchRiskScoreBreakdown}: reuses the same 60s-cached bundle
+     * fetchPostureSummary already populated for this ctx, and does its own raw-event fetch scoped
+     * to the same trend window fetchPostureSummary computes, rather than threading that list
+     * through from the page's own load — this is a separate HTTP round trip, fired only once
+     * someone actually opens a flyout.
+     */
+    public String fetchPostureDrill() {
+        long callStart = System.currentTimeMillis();
+        try {
+            if (endTimestamp == 0) {
+                endTimestamp = Context.now();
+            }
+
+            final int accountId = Context.accountId.get();
+            final Integer userId = Context.userId.get();
+            final CONTEXT_SOURCE contextSource = Context.contextSource.get();
+
+            InsightContext ctx = new InsightContext(accountId, userId, contextSource, startTimestamp, endTimestamp);
+
+            // Same trend-window convention buildSummary/shadowAiTrend use — the page's own
+            // selected range, falling back to a fixed lookback only for an unbounded "all time"
+            // start. See PostureService.TREND_BUCKET_COUNT's own javadoc.
+            int trendEndTs = endTimestamp;
+            int trendStartTs = startTimestamp > 0 ? startTimestamp
+                    : trendEndTs - (PostureService.TREND_BUCKET_COUNT * 7 * 86400);
+
+            Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    () -> insightService.getOrLoadBundle(ctx)));
+            Future<List<DashboardMaliciousEvent>> trendWindowEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    () -> fetchAllMaliciousEvents(trendStartTs, trendEndTs, MAX_THREAT_FETCH_LIMIT, null, null, true)));
+
+            InsightDataBundle bundle = timedGet("fetchPostureDrill: bundleFuture", bundleFuture);
+            List<DashboardMaliciousEvent> trendWindowEvents =
+                    timedGet("fetchPostureDrill: trendWindowEventsFuture", trendWindowEventsFuture);
+
+            List<ApiCollection> endpointCollections = bundle.collections.stream()
+                    .filter(c -> c != null && !c.isDeactivated() && c.isEndpointCollection())
+                    .collect(Collectors.toList());
+
+            postureDrill = postureService.fetchDrill(bundle, endpointCollections, trendWindowEvents,
+                    trendStartTs, trendEndTs, drillId, path, skip, limit);
+
+            // AI summary for this exact level — cache hit attaches it synchronously; a miss marks
+            // it PENDING and generates in the background, so a slow LLM call never adds latency
+            // here (see PostureDrillNarrativeService's own javadoc).
+            PostureDrillNarrativeService.attachNarrative(postureDrill, accountId, drillId, path);
+
+            loggerMaker.infoAndAddToDb("SecurityPostureAction: fetchPostureDrill (" + drillId + ") total "
+                    + (System.currentTimeMillis() - callStart) + "ms");
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching posture drill: " + e.getMessage());
+            addActionError("Error fetching posture drill: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }

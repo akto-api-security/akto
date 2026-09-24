@@ -318,6 +318,24 @@ const api = {
                 endTimestamp
             }
         })
+    },
+
+    // One page of one panel's drilldown flyout — see PostureService#fetchDrill's own javadoc.
+    // `path` is empty/undefined for the root (group) level, or one prior level's row id to drill
+    // into its members.
+    fetchPostureDrill: async (drillId, path, startTimestamp, endTimestamp, skip, limit) => {
+        return await request({
+            url: '/api/fetchPostureDrill',
+            method: 'post',
+            data: {
+                drillId,
+                path: path || '',
+                startTimestamp,
+                endTimestamp,
+                skip: skip || 0,
+                limit: limit || 20
+            }
+        })
     }
 }
 

@@ -6,6 +6,7 @@ import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightUtil.GovernanceBucket;
 import com.akto.util.AgenticObserveUtil;
@@ -624,6 +625,85 @@ final class RiskScoreCalculator {
         }
         rows.sort((a, b) -> Integer.compare(b.getInt("deviceCount"), a.getInt("deviceCount")));
         return rows.subList(0, Math.min(2, rows.size()));
+    }
+
+    // ── Vendor risk drill ────────────────────────────────────────────────────────
+    //
+    // Lives here rather than in PostureService, next to vendorRiskAnalysis, which does the same
+    // endpointCollections grouping this reuses rather than duplicating. See PostureService#fetchDrill
+    // for the dispatch and PostureService.paginate/PostureDrillResult for the shared shape.
+
+    static PostureDrillResult vendorRiskDrill(List<ApiCollection> endpointCollections, Set<String> allowlistNamesLower,
+                                               Map<String, String> deviceIdToUsername, List<String> path,
+                                               int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+
+        if (path.isEmpty()) {
+            result.setTitle("Vendor risk");
+            result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Vendor risk"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("vendor", "Vendor"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("approved", "Approved"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("devices", "Devices"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("weight", "Risk weight"));
+            result.setDrillable(true);
+
+            VendorRiskAnalysis analysis = vendorRiskAnalysis(endpointCollections, allowlistNamesLower);
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (BasicDBObject r : analysis.rows) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", r.getString("vendor"));
+                row.put("vendor", r.getString("vendor"));
+                row.put("approved", r.getBoolean("approved"));
+                row.put("devices", r.getLong("count"));
+                row.put("weight", r.getInt("weight"));
+                rows.add(row);
+            }
+            PostureService.paginate(result, rows, skip, limit);
+            if (rows.isEmpty()) {
+                result.addDataGap(new InsightResult.Gap("VENDOR_RISK", PostureService.REASON_NO_ROWS,
+                        "No endpoint traffic resolves to a known vendor yet."));
+            }
+            return result;
+        }
+
+        String vendor = path.get(0);
+        result.setTitle(vendor + " — devices");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Vendor risk"));
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem(vendor, vendor));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("device", "Device / user"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("tool", "Tool / host"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("firstSeen", "First seen"));
+        result.setDrillable(false);
+
+        Map<String, Object[]> byDevice = new LinkedHashMap<>(); // [hostName, firstSeen]
+        for (ApiCollection c : PostureService.safe(endpointCollections)) {
+            if (c == null || c.isDeactivated()) continue;
+            String v = InsightUtil.endpointVendorName(c);
+            if (v == null || !v.equals(vendor)) continue;
+            String deviceId = InsightUtil.deviceIdOf(c);
+            if (deviceId == null) deviceId = "unknown";
+            Object[] seen = byDevice.computeIfAbsent(deviceId, k -> new Object[]{c.getHostName(), 0});
+            int firstSeen = (int) seen[1];
+            if (c.getStartTs() > 0 && (firstSeen == 0 || c.getStartTs() < firstSeen)) seen[1] = c.getStartTs();
+        }
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map.Entry<String, Object[]> e : byDevice.entrySet()) {
+            String deviceId = e.getKey();
+            String display = deviceIdToUsername != null ? deviceIdToUsername.getOrDefault(deviceId, deviceId) : deviceId;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("device", display);
+            row.put("tool", e.getValue()[0]);
+            row.put("firstSeen", e.getValue()[1]);
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Integer.compare((int) b.get("firstSeen"), (int) a.get("firstSeen")));
+        PostureService.paginate(result, rows, skip, limit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap("VENDOR_RISK", PostureService.REASON_NO_ROWS,
+                    "No devices found for vendor \"" + vendor + "\"."));
+        }
+        return result;
     }
 
     // ── Compliance gaps ──────────────────────────────────────────────────────────
