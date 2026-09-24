@@ -642,15 +642,24 @@ def _build_qwen3guard() -> LLMProvider | None:
 
 
 # ── Faster per-role alternates — old provider is the fallback on failure ──────
-# Each is a plain OpenAI-compatible endpoint (own model/baseUrl, from the
-# modelConfigs entry, same as "openai_compatible"); on any error it calls the
-# existing builder for the role's original provider and delegates to it.
+# Own model/baseUrl per modelConfigs entry, same as "openai_compatible"; on any
+# error, each calls the existing builder for its role's original provider.
 
 
 class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
-    """Faster Qwen3Guard-compatible endpoint; falls back to qwen3guard (Vertex AI) on failure."""
+    """Faster Qwen3Guard-hosting endpoint; falls back to qwen3guard (Vertex AI) on failure.
+
+    Same contract as the real qwen3guard (raw text in, Safety:/Categories: out) —
+    the model always answers that way regardless of prompt, on Vertex or here, so
+    this can't take the ABCD path gemma_fast/gemma_fast_arbiter use.
+    """
 
     name = "qwen3guard_fast"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        # OpenAIProvider.__init__ overwrites self.name — reassert it.
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "qwen3guard_fast"
 
     async def complete_with_logprobs(
         self, text: str, top_logprobs: int = 5, temperature: float = 0.0
@@ -681,6 +690,10 @@ class GemmaFastProvider(OpenAIProvider):
 
     name = "gemma_fast"
 
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast"
+
     async def complete(self, prompt: str) -> str:
         try:
             return await super().complete(prompt)
@@ -696,6 +709,10 @@ class GemmaFastArbiterProvider(OpenAIProvider):
     """Faster (Gemma) arbiter endpoint; falls back to the direct anthropic provider on failure."""
 
     name = "gemma_fast_arbiter"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast_arbiter"
 
     async def complete(self, prompt: str) -> str:
         try:
@@ -771,17 +788,17 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
         "anthropic_foundry", model, base_url, deployment
     ),
     "qwen3guard_fast": lambda model, base_url, _d: (
-        Qwen3GuardFastProvider(settings.GEMMA_VLLM_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        Qwen3GuardFastProvider(settings.QWEN_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
         if base_url
         else None
     ),
     "gemma_fast": lambda model, base_url, _d: (
-        GemmaFastProvider(settings.GEMMA_VLLM_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        GemmaFastProvider(settings.GEMMA_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
         if base_url
         else None
     ),
     "gemma_fast_arbiter": lambda model, base_url, _d: (
-        GemmaFastArbiterProvider(settings.GEMMA_VLLM_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        GemmaFastArbiterProvider(settings.GEMMA_26B_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
         if base_url
         else None
     ),

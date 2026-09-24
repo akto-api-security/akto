@@ -93,8 +93,11 @@ _FIELDS = (
     "QWEN3GUARD_VLLM_BASE_URL",
     "GEMMA_VLLM_BASE_URL",
     "GEMMA_VLLM_ARBITER_BASE_URL",
-    # Shared auth for all three "_fast" providers above (sent as Authorization: Bearer).
-    "GEMMA_VLLM_API_KEY",
+    # Per-"_fast"-provider auth (sent as Authorization: Bearer) — one key per
+    # container, matching the base URLs above.
+    "QWEN_VLLM_KEY",
+    "GEMMA_VLLM_KEY",
+    "GEMMA_26B_VLLM_KEY",
 )
 
 
@@ -146,7 +149,9 @@ class Settings:
     QWEN3GUARD_VLLM_BASE_URL: str
     GEMMA_VLLM_BASE_URL: str
     GEMMA_VLLM_ARBITER_BASE_URL: str
-    GEMMA_VLLM_API_KEY: str
+    QWEN_VLLM_KEY: str
+    GEMMA_VLLM_KEY: str
+    GEMMA_26B_VLLM_KEY: str
 
     def __init__(self):
         for f in _FIELDS:

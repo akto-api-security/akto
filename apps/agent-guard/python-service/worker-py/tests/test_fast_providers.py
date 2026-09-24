@@ -9,7 +9,7 @@ by "provider" like any other, reading "model"/"baseUrl" the same way
 import pytest
 
 import providers
-from providers import GemmaFastProvider, Qwen3GuardOutput, build_provider_from_config
+from providers import GemmaFastProvider, Qwen3GuardFastProvider, Qwen3GuardOutput, build_provider_from_config
 
 _HOST = "https://fast-host:8000/v1"
 
@@ -70,6 +70,31 @@ def test_fast_provider_without_base_url_is_unconfigured():
     assert p is None
 
 
+def test_fast_provider_name_is_not_overwritten_by_openai_init():
+    # OpenAIProvider.__init__ would otherwise clobber .name to "openai"/"openai_compatible" —
+    # ban_topics.py's provider_name.startswith("gemma") prompt-template choice, and the
+    # llm_provider field in scan results, both depend on the real name surviving construction.
+    gemma = build_provider_from_config({"provider": "gemma_fast", "model": "m", "baseUrl": _HOST})
+    arbiter = build_provider_from_config({"provider": "gemma_fast_arbiter", "model": "m", "baseUrl": _HOST})
+    qwen = build_provider_from_config({"provider": "qwen3guard_fast", "model": "m", "baseUrl": _HOST})
+    assert gemma.name == "gemma_fast"
+    assert arbiter.name == "gemma_fast_arbiter"
+    assert qwen.name == "qwen3guard_fast"
+
+
+def test_gemma_fast_providers_get_the_gemma_tuned_ban_topics_prompt():
+    # End-to-end proof of the name fix: ban_topics.py selects its benchmarked
+    # Gemma-tuned template only when provider_name.startswith("gemma").
+    from prompts import ban_topics
+
+    config = {"topics": ["violence"]}
+    vertex_prompt = ban_topics.build(config, "gemma_vertexai", "some text")
+    other_prompt = ban_topics.build(config, "azure_foundry", "some text")
+    assert ban_topics.build(config, "gemma_fast", "some text") == vertex_prompt
+    assert ban_topics.build(config, "gemma_fast_arbiter", "some text") == vertex_prompt
+    assert other_prompt != vertex_prompt
+
+
 def test_fast_provider_falls_back_to_its_own_env_var_when_entry_omits_base_url(monkeypatch):
     monkeypatch.setattr(providers.settings, "GEMMA_VLLM_BASE_URL", _HOST)
     p = build_provider_from_config({"provider": "gemma_fast", "model": "gemma-fast"})
@@ -91,13 +116,20 @@ def test_each_fast_provider_reads_its_own_distinct_env_var(monkeypatch):
     assert build_provider_from_config({"provider": "gemma_fast_arbiter", "model": "m"}) is None
 
 
-async def test_fast_provider_sends_gemma_vllm_api_key_as_bearer_auth(monkeypatch):
-    # GEMMA_VLLM_API_KEY is shared across all three fast providers' Authorization header.
-    monkeypatch.setattr(providers.settings, "GEMMA_VLLM_API_KEY", "shared-key-123")
+@pytest.mark.parametrize(
+    ("provider_name", "setting_name"),
+    [
+        ("qwen3guard_fast", "QWEN_VLLM_KEY"),
+        ("gemma_fast", "GEMMA_VLLM_KEY"),
+        ("gemma_fast_arbiter", "GEMMA_26B_VLLM_KEY"),
+    ],
+)
+async def test_each_fast_provider_sends_its_own_api_key_as_bearer_auth(monkeypatch, provider_name, setting_name):
+    monkeypatch.setattr(providers.settings, setting_name, f"{setting_name}-value")
     _FakeClient.responses = {_HOST: {"choices": [{"message": {"content": "ok"}}]}}
-    p = build_provider_from_config({"provider": "gemma_fast", "model": "gemma-fast", "baseUrl": _HOST})
+    p = build_provider_from_config({"provider": provider_name, "model": "m", "baseUrl": _HOST})
     await p.complete("hi")
-    assert _FakeClient.posts[0]["headers"]["Authorization"] == "Bearer shared-key-123"
+    assert _FakeClient.posts[0]["headers"]["Authorization"] == f"Bearer {setting_name}-value"
 
 
 # ── gemma_fast falls back to gemma_foundry ──────────────────────────────────
@@ -138,19 +170,13 @@ async def test_gemma_fast_arbiter_falls_back_to_anthropic_on_failure(monkeypatch
 
 
 # ── qwen3guard_fast falls back to qwen3guard, preserving the logprobs interface ─
+# (the real model only ever answers Safety:/Categories:, so this can't use ABCD)
 
 
 def test_qwen3guard_fast_is_a_qwen3guard_output():
     p = build_provider_from_config({"provider": "qwen3guard_fast", "model": "qwen3-fast", "baseUrl": _HOST})
+    assert isinstance(p, Qwen3GuardFastProvider)
     assert isinstance(p, Qwen3GuardOutput)
-
-
-async def test_qwen3guard_fast_falls_back_to_qwen3guard_on_failure(monkeypatch):
-    monkeypatch.setattr(providers.settings, "QWEN3GUARD_SA_KEY_JSON", "")  # left unset -> qwen3guard build fails
-    p = build_provider_from_config({"provider": "qwen3guard_fast", "model": "qwen3-fast", "baseUrl": _HOST})
-    _FakeClient.responses = {_HOST: ConnectionError("fast host unreachable")}
-    with pytest.raises(ConnectionError):
-        await p.complete_with_logprobs("bad text")
 
 
 async def test_qwen3guard_fast_uses_its_own_endpoint_when_it_succeeds():
@@ -160,3 +186,11 @@ async def test_qwen3guard_fast_uses_its_own_endpoint_when_it_succeeds():
     p = build_provider_from_config({"provider": "qwen3guard_fast", "model": "qwen3-fast", "baseUrl": _HOST})
     content, _lp = await p.complete_with_logprobs("fine text")
     assert content == "Safety: safe"
+
+
+async def test_qwen3guard_fast_falls_back_to_qwen3guard_on_failure(monkeypatch):
+    monkeypatch.setattr(providers.settings, "QWEN3GUARD_SA_KEY_JSON", "")  # left unset -> qwen3guard build fails too
+    p = build_provider_from_config({"provider": "qwen3guard_fast", "model": "qwen3-fast", "baseUrl": _HOST})
+    _FakeClient.responses = {_HOST: ConnectionError("fast host unreachable")}
+    with pytest.raises(ConnectionError):
+        await p.complete_with_logprobs("bad text")
