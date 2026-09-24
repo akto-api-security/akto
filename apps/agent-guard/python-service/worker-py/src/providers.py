@@ -710,6 +710,16 @@ class GemmaFastArbiterProvider(OpenAIProvider):
 
 _FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
 
+# Fast provider name → settings attr holding its default endpoint. An entry's
+# own "baseUrl" always overrides this; when the entry omits it, this is how
+# the code knows which host to hit — add one more pair here for a new "_fast"
+# provider, no other wiring needed.
+_FAST_PROVIDER_BASE_URL_SETTING: dict[str, str] = {
+    "qwen3guard_fast": "QWEN3GUARD_VLLM_BASE_URL",
+    "gemma_fast": "GEMMA_VLLM_BASE_URL",
+    "gemma_fast_arbiter": "GEMMA_VLLM_ARBITER_BASE_URL",
+}
+
 
 # Foundry provider name → (class, settings-var prefix). BASE_URL/API_KEY are
 # required (entry baseUrl overrides the env); DEPLOYMENT/MODEL are optional.
@@ -761,17 +771,17 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
         "anthropic_foundry", model, base_url, deployment
     ),
     "qwen3guard_fast": lambda model, base_url, _d: (
-        Qwen3GuardFastProvider(settings.OPENAI_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        Qwen3GuardFastProvider(settings.GEMMA_VLLM_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
         if base_url
         else None
     ),
     "gemma_fast": lambda model, base_url, _d: (
-        GemmaFastProvider(settings.OPENAI_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        GemmaFastProvider(settings.GEMMA_VLLM_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
         if base_url
         else None
     ),
     "gemma_fast_arbiter": lambda model, base_url, _d: (
-        GemmaFastArbiterProvider(settings.OPENAI_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        GemmaFastArbiterProvider(settings.GEMMA_VLLM_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
         if base_url
         else None
     ),
@@ -802,7 +812,7 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
     if name in _FAST_PROVIDERS:
-        base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
+        base_url = (entry.get("baseUrl") or "").strip() or getattr(settings, _FAST_PROVIDER_BASE_URL_SETTING[name], "")
         return _dispatch(name, model, base_url)
     if name in _FOUNDRY_PROVIDERS:
         # deployment (azureml-model-deployment header) is a routing label, not a

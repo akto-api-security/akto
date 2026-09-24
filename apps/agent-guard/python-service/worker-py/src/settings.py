@@ -88,6 +88,13 @@ _FIELDS = (
     "DATABASE_ABSTRACTOR_SERVICE_TOKEN",
     # Seconds between metric pushes to database-abstractor. Default 60s.
     "METRICS_PUSH_INTERVAL_SEC",
+    # Default endpoint for each "_fast" provider (providers.py); a modelConfigs
+    # entry's own "baseUrl" overrides this per-request.
+    "QWEN3GUARD_VLLM_BASE_URL",
+    "GEMMA_VLLM_BASE_URL",
+    "GEMMA_VLLM_ARBITER_BASE_URL",
+    # Shared auth for all three "_fast" providers above (sent as Authorization: Bearer).
+    "GEMMA_VLLM_API_KEY",
 )
 
 
@@ -136,6 +143,10 @@ class Settings:
     ANONYMIZER_URL: str
     DATABASE_ABSTRACTOR_SERVICE_TOKEN: str
     METRICS_PUSH_INTERVAL_SEC: str
+    QWEN3GUARD_VLLM_BASE_URL: str
+    GEMMA_VLLM_BASE_URL: str
+    GEMMA_VLLM_ARBITER_BASE_URL: str
+    GEMMA_VLLM_API_KEY: str
 
     def __init__(self):
         for f in _FIELDS:

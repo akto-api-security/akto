@@ -70,6 +70,36 @@ def test_fast_provider_without_base_url_is_unconfigured():
     assert p is None
 
 
+def test_fast_provider_falls_back_to_its_own_env_var_when_entry_omits_base_url(monkeypatch):
+    monkeypatch.setattr(providers.settings, "GEMMA_VLLM_BASE_URL", _HOST)
+    p = build_provider_from_config({"provider": "gemma_fast", "model": "gemma-fast"})
+    assert isinstance(p, GemmaFastProvider)
+    assert p.base_url == _HOST
+
+
+def test_fast_provider_entry_base_url_overrides_its_env_var(monkeypatch):
+    monkeypatch.setattr(providers.settings, "GEMMA_VLLM_BASE_URL", "https://env-default-host/v1")
+    p = build_provider_from_config({"provider": "gemma_fast", "model": "gemma-fast", "baseUrl": _HOST})
+    assert isinstance(p, GemmaFastProvider)
+    assert p.base_url == _HOST
+
+
+def test_each_fast_provider_reads_its_own_distinct_env_var(monkeypatch):
+    # qwen3guard_fast and gemma_fast_arbiter must NOT fall back to GEMMA_VLLM_BASE_URL.
+    monkeypatch.setattr(providers.settings, "GEMMA_VLLM_BASE_URL", "https://gemma-fast-host/v1")
+    assert build_provider_from_config({"provider": "qwen3guard_fast", "model": "m"}) is None
+    assert build_provider_from_config({"provider": "gemma_fast_arbiter", "model": "m"}) is None
+
+
+async def test_fast_provider_sends_gemma_vllm_api_key_as_bearer_auth(monkeypatch):
+    # GEMMA_VLLM_API_KEY is shared across all three fast providers' Authorization header.
+    monkeypatch.setattr(providers.settings, "GEMMA_VLLM_API_KEY", "shared-key-123")
+    _FakeClient.responses = {_HOST: {"choices": [{"message": {"content": "ok"}}]}}
+    p = build_provider_from_config({"provider": "gemma_fast", "model": "gemma-fast", "baseUrl": _HOST})
+    await p.complete("hi")
+    assert _FakeClient.posts[0]["headers"]["Authorization"] == "Bearer shared-key-123"
+
+
 # ── gemma_fast falls back to gemma_foundry ──────────────────────────────────
 
 
