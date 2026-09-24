@@ -5,6 +5,7 @@ import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.MetricLabelBuilder;
+import com.akto.utils.OperationalAlerts;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
@@ -46,31 +47,35 @@ public class InfraMetricsFilter implements Filter {
             String uri = MetricLabelBuilder.templatize(httpServletRequest.getRequestURI());
             String method = httpServletRequest.getMethod();
 
-            // Context.accountId is populated by AuthFilter only when AKTO_DI_AUTHENTICATE=true
-            // and the JWT validates. Auth is skipped by default in this service, so most
-            // requests legitimately fall back to "unknown"; the label stays present and bounded
-            // rather than being dropped. This is expected, not a bug.
+            // Prefer the per-request tenant (Context.accountId, set by AuthFilter when
+            // AKTO_DI_AUTHENTICATE=true). Auth is skipped by default, so fall back to the
+            // deployment account parsed from DATABASE_ABSTRACTOR_SERVICE_TOKEN - the same source
+            // the outbound-client metric uses - instead of "unknown", so both metrics agree.
             Integer accountIdValue = Context.accountId.get();
-            String accountId = accountIdValue == null ? "unknown" : accountIdValue.toString();
+            String accountId = accountIdValue != null
+                    ? accountIdValue.toString()
+                    : OperationalAlerts.deploymentAccountId();
 
-            // OpenTelemetry HTTP server semantic-convention label names. The Prometheus
-            // registry renders the dotted keys as underscores (http_route, etc.).
+            // Same tag convention as the outbound-client metric (method/uri/status/account_id)
+            // so server and client metrics read the same way.
             ArrayList<Tag> tags = new ArrayList<>(Arrays.asList(
-                    Tag.of("http.route", uri),
-                    Tag.of("http.request.method", method),
-                    Tag.of("http.response.status_code", Integer.toString(statusCode)),
+                    Tag.of("method", method),
+                    Tag.of("uri", uri),
+                    Tag.of("status", Integer.toString(statusCode)),
                     Tag.of("account.id", accountId)
             ));
 
             // Single histogram, Micrometer appends the base unit -> publishes
-            // http_server_request_duration_seconds with _count/_sum/_bucket{le=...}.
-            Timer.builder("http.server.request.duration")
+            // akto_http_server_requests_seconds with _count/_sum/_bucket{le=...}. Named
+            // symmetrically with akto.http.client.requests; buckets match the client layout.
+            Timer.builder("akto.http.server.requests")
                     .description("HTTP server request duration")
                     .tags(tags)
-                    // Bucket boundaries: 100ms, 600ms, 1s, 3s, 6s, 10s (plus +Inf).
+                    // Bucket boundaries: 50ms, 200ms, 500ms, 1s, 3s, 5s, 10s (plus +Inf).
                     .serviceLevelObjectives(
-                            Duration.ofMillis(100), Duration.ofMillis(600), Duration.ofMillis(1000),
-                            Duration.ofMillis(3000), Duration.ofMillis(6000), Duration.ofMillis(10000))
+                            Duration.ofMillis(50), Duration.ofMillis(200), Duration.ofMillis(500),
+                            Duration.ofMillis(1000), Duration.ofMillis(3000), Duration.ofMillis(5000),
+                            Duration.ofMillis(10000))
                     .register(InfraMetricsListener.registry)
                     .record(duration, TimeUnit.MILLISECONDS);
         } catch (Exception e) {
