@@ -1345,8 +1345,12 @@ public class ThreatActorService {
     return FetchThreatsForActorResponse.newBuilder().addAllActivities(activities).build();
   }
 
+  // status / skillEvalMode / configEvalMode narrow the top hosts to exactly what the Guardrails
+  // Activity table shows for the same tab, so a click-through on a host always finds its rows.
+  // All three are optional; without them this counts every event (the Guardrails Dashboard view).
   public FetchTopNDataResponse fetchTopNData(
-      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource) {
+      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource,
+      String status, String skillEvalMode, String configEvalMode) {
 
     List<Document> pipeline = new ArrayList<>();
 
@@ -1426,9 +1430,20 @@ public class ThreatActorService {
     if (!match.isEmpty()) {
       hostPipeline.add(new Document("$match", match));
     }
+    if (status != null && !status.isEmpty()) {
+      hostPipeline.add(new Document("$match", new Document("status", status)));
+    }
+    List<Document> evaluationModeConditions = ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+    if (!evaluationModeConditions.isEmpty()) {
+      hostPipeline.add(new Document("$match", new Document("$and", evaluationModeConditions)));
+    }
     // Only consider documents where host exists and is not empty
     hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", null))));
     hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", ""))));
+    // Misconfigured Settings lists each misconfiguration once, so count it once here too.
+    if ("only".equalsIgnoreCase(configEvalMode)) {
+      hostPipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+    }
 
     hostPipeline.add(new Document("$group",
         new Document("_id", "$host")

@@ -5,7 +5,8 @@ import LineChart from "../../../components/charts/LineChart";
 import api from "../api";
 import observeFunc from "../../observe/transform";
 import dayjs from "dayjs";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { fetchEndpointViolationCounts } from "../utils/threatDashboardUtils";
 
 const SERIES_COLORS = {
     totalThreats: "#E45858",
@@ -29,16 +30,18 @@ function ThreatDetectionOverTimeChart({ startTimestamp, endTimestamp }) {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [dailyResp, timelineResp, apisResp, actorsResp] = await Promise.all([
+                const [dailyResp, timelineResp, apisResp, actorsResp, endpointCounts] = await Promise.all([
                     api.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
                     api.getThreatActivityTimeline(startTimestamp, endTimestamp),
                     api.fetchThreatApis(0, {}, []),
                     api.fetchThreatActors(0, {}, [], [], startTimestamp, endTimestamp, [], []),
+                    // Atlas: the Guardrails Activity page's own counts, so this total matches it.
+                    isEndpointSecurityCategory() ? fetchEndpointViolationCounts(startTimestamp, endTimestamp) : null,
                 ]);
 
                 if (!mounted) return;
 
-                const totalThreats = dailyResp?.totalAnalysed || 0;
+                const totalThreats = endpointCounts ? endpointCounts.total : (dailyResp?.totalAnalysed || 0);
                 const actorsCounts = dailyResp?.actorsCounts || [];
                 const totalActors = actorsResp?.total || (actorsResp?.actors || []).length;
                 const apisTotal = apisResp?.total || 0;
