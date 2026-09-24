@@ -97,6 +97,34 @@ public class ThreatUtils {
         return new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN));
     }
 
+    public static final Pattern CONFIG_ENDPOINT_PATTERN = Pattern.compile("/config/");
+
+    // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
+    // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
+    // Misconfigured Settings iff latestApiEndpoint contains "/config/" (e.g.
+    // "/codex/config/mcp_servers.computer-use.command" — the agent name prefix varies, so this
+    // isn't anchored to the start like the skills pattern). Each mode independently narrows to
+    // just its own partition ("only") or excludes it ("exclude") — Active sets both to "exclude"
+    // so neither shows up there. Returns the conditions to AND onto a match; empty for other
+    // contexts or when no mode is set.
+    public static List<Document> evaluationModeConditions(String contextSource, String skillEvalMode, String configEvalMode) {
+        List<Document> conditions = new ArrayList<>();
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return conditions;
+        }
+        if ("only".equalsIgnoreCase(skillEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", SKILLS_ENDPOINT_PATTERN));
+        } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", new Document("$not", SKILLS_ENDPOINT_PATTERN)));
+        }
+        if ("only".equalsIgnoreCase(configEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", CONFIG_ENDPOINT_PATTERN));
+        } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
+            conditions.add(new Document("latestApiEndpoint", new Document("$not", CONFIG_ENDPOINT_PATTERN)));
+        }
+        return conditions;
+    }
+
     // Collapse repeated config-scan re-detections into one.
     public static List<Document> configScanDedupeStages(String contextSource) {
         if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
@@ -116,6 +144,7 @@ public class ThreatUtils {
             new Document("$sort", new Document("detectedAt", -1)),
             new Document("$group",
                 new Document("_id", dedupeKey)
+                    .append("host", new Document("$first", "$host"))
                     .append("category", new Document("$first", "$category"))
                     .append("subCategory", new Document("$first", "$subCategory"))
                     .append("status", new Document("$first", "$status"))

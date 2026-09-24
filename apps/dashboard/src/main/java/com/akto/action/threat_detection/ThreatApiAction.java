@@ -126,6 +126,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+    addEvaluationModeHeaders(post);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -315,6 +316,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+    addEvaluationModeHeaders(post);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -322,6 +324,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
         put("limit", 8);
+        if (severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
+          put("status", severityStatusFilter);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();

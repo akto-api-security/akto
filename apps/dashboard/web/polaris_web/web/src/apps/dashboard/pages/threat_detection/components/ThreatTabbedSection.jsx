@@ -7,8 +7,8 @@ import observeFunc from "../../observe/transform";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import DonutChart from "../../../components/shared/DonutChart";
 import ThreatWorldMap from "./ThreatWorldMap";
-import { formatCategoryName, getFlagSrc, openThreatActivityPage } from "../utils/threatDashboardUtils";
-import { getDashboardCategory, mapLabel, categoryToShortName } from "../../../../main/labelHelper";
+import { formatCategoryName, getFlagSrc, openThreatActivityPage, fetchEndpointViolationCounts } from "../utils/threatDashboardUtils";
+import { getDashboardCategory, mapLabel, categoryToShortName, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 
 const TAB_KEYS = {
     TOTAL_THREATS: 0,
@@ -20,6 +20,8 @@ const STATUS_COLORS = {
     Active: "#E45858",
     "Under Review": "#F5A623",
     Ignored: "#95A5A6",
+    "Skills Evaluations": "#8B5CF6",
+    "Misconfigured Settings": "#F59E0B",
 };
 
 function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
@@ -39,11 +41,13 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
         const fetchAll = async () => {
             setLoading(true);
             try {
-                const [summaryResp, categoryResp, apisResp, actorsResp] = await Promise.all([
+                const [summaryResp, categoryResp, apisResp, actorsResp, endpointCounts] = await Promise.all([
                     api.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
                     api.fetchThreatCategoryCount(startTimestamp, endTimestamp),
                     api.fetchThreatApis(0, {}, []),
                     api.fetchThreatActors(0, {}, [], [], startTimestamp, endTimestamp, [], []),
+                    // Atlas: the Guardrails Activity page's own counts, so this total matches it.
+                    isEndpointSecurityCategory() ? fetchEndpointViolationCounts(startTimestamp, endTimestamp) : null,
                 ]);
 
                 let dashboardTopResp = null;
@@ -53,10 +57,10 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                     // Fallback: new API not yet available
                 }
 
-                const totalActive = summaryResp?.totalActiveStatus || 0;
-                const totalIgnored = summaryResp?.totalIgnoredStatus || 0;
-                const totalUnderReview = summaryResp?.totalUnderReviewStatus || 0;
-                setTotalThreatsCount(summaryResp?.totalAnalysed || 0);
+                const totalActive = endpointCounts?.active ?? (summaryResp?.totalActiveStatus || 0);
+                const totalIgnored = endpointCounts?.ignored ?? (summaryResp?.totalIgnoredStatus || 0);
+                const totalUnderReview = endpointCounts?.underReview ?? (summaryResp?.totalUnderReviewStatus || 0);
+                setTotalThreatsCount(endpointCounts ? endpointCounts.total : (summaryResp?.totalAnalysed || 0));
 
                 setThreatStatusData({
                     Active: {
@@ -74,6 +78,19 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
                         color: STATUS_COLORS.Ignored,
                         filterKey: "Ignored",
                     },
+                    // Atlas partitions of ACTIVE that the Activity page counts under Other Violations.
+                    ...(endpointCounts ? {
+                        "Skills Evaluations": {
+                            text: endpointCounts.skillsEvaluations || 0,
+                            color: STATUS_COLORS["Skills Evaluations"],
+                            filterKey: "Skills Evaluations",
+                        },
+                        "Misconfigured Settings": {
+                            text: endpointCounts.misconfiguredSettings || 0,
+                            color: STATUS_COLORS["Misconfigured Settings"],
+                            filterKey: "Misconfigured Settings",
+                        },
+                    } : {}),
                 });
 
                 if (categoryResp?.categoryCounts) {
@@ -144,6 +161,8 @@ function ThreatTabbedSection({ startTimestamp, endTimestamp }) {
         "Active": "ACTIVE",
         "Under Review": "UNDER_REVIEW",
         "Ignored": "IGNORED",
+        "Skills Evaluations": "skills_evaluations",
+        "Misconfigured Settings": "misconfigured_settings",
     };
 
     const handleDonutSegmentClick = (segmentName) => {
