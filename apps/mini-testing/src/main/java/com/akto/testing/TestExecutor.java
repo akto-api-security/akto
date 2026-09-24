@@ -311,6 +311,19 @@ public class TestExecutor {
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size());
+
+        // This pod owns the TRRS (TestingRunResultSummary) via a lease token stamped on it, good
+        // until an expiry a few minutes out; if the token isn't refreshed before expiry, another
+        // pod is allowed to claim the TRRS instead. The refresh normally rides along with results
+        // being saved, but the setup work below (StatusCodeAnalyser etc.) saves nothing and can
+        // itself run for several minutes, so refresh the lease on a timer here or it can expire
+        // before this pod even starts testing.
+        ScheduledExecutorService leaseHeartbeat = Executors.newSingleThreadScheduledExecutor();
+        leaseHeartbeat.scheduleAtFixedRate(
+                () -> TestingLease.getInstance().renewIfDue(summaryId.toHexString()),
+                30, 30, TimeUnit.SECONDS);
+        try {
+
         boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
@@ -607,6 +620,9 @@ public class TestExecutor {
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
+        }
+        } finally {
+            leaseHeartbeat.shutdownNow();
         }
     }
 

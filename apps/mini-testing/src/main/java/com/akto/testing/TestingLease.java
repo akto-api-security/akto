@@ -39,8 +39,12 @@ public class TestingLease {
      * TTL that tight. 360s clears that 300s floor with margin and comfortably covers every stall
      * actually observed (up to ~74s) without giving up fast reclaim of a truly dead pod relative
      * to typical run durations (30-3600s).
+     *
+     * Overridable via MINI_TESTING_LEASE_SECONDS - accounts large enough that apiWiseInit's own
+     * pre-fan-out work (sample/status-code/auth-prefetch calls, none of which renew) exceeds this
+     * on its own need a higher floor than what fits every account by default.
      */
-    public static final int LEASE_SECONDS = 360;
+    public static final int LEASE_SECONDS = Integer.parseInt(System.getenv().getOrDefault("MINI_TESTING_LEASE_SECONDS", "360"));
     private static final int RENEW_INTERVAL_SECONDS = LEASE_SECONDS / 3;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestingLease.class, LogDb.TESTING);
