@@ -76,19 +76,30 @@ public class GuardrailsClient {
                 .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 // Client-level metrics: Micrometer times/counts every call automatically, so no
-                // instrumentation leaks into callValidate. Emits akto.guardrails.validate.* with
-                // method/uri/status/outcome tags -> latency (p50/p95/p99), throughput, and
-                // transport failures (status=IO_ERROR = the fail-open-on-timeout case) all visible.
-                // uri is the bounded endpoint path; recorded on the global registry, which the
-                // data-ingestion-service Prometheus registry is bound to for /metrics scraping.
+                // instrumentation leaks into callValidate. Tags method/uri/status/outcome give
+                // latency (p50/p95/p99), throughput, and transport failures (status=IO_ERROR = the
+                // fail-open-on-timeout case). uri is the bounded endpoint path; recorded on the
+                // global registry, which the data-ingestion-service Prometheus registry is bound to.
+                // One shared metric name for every outbound HTTP client (akto.http.client.requests),
+                // distinguished by the "client" tag - so all external calls share dashboards/alerts
+                // instead of each client minting its own metric name.
+                //   client     - names the dependency (here "guardrails"); other clients reuse the
+                //                 same name with client="abstractor", client="http_ingest", ...
+                //   account.id - deployment account parsed once from the JWT in
+                //                DATABASE_ABSTRACTOR_SERVICE_TOKEN (OperationalAlerts.deploymentAccountId,
+                //                "unknown" if absent); a per-process constant, so cardinality 1.
                 .eventListener(OkHttpMetricsEventListener
-                        .builder(Metrics.globalRegistry, "akto.guardrails.validate")
-                        .tags(Tags.of("client", "guardrails"))
+                        .builder(Metrics.globalRegistry, EXTERNAL_HTTP_CLIENT_METRIC)
+                        .tags(Tags.of("client", "guardrails",
+                                "account.id", OperationalAlerts.deploymentAccountId()))
                         .uriMapper(req -> req.url().encodedPath())
                         .includeHostTag(false)
                         .build())
                 .build();
     }
+
+    /** Shared metric name for all outbound HTTP clients; the "client" tag names the dependency. */
+    public static final String EXTERNAL_HTTP_CLIENT_METRIC = "akto.http.client.requests";
 
     private static Dispatcher buildDispatcher() {
         Dispatcher dispatcher = new Dispatcher();

@@ -12,6 +12,7 @@ import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import com.akto.gateway.GuardrailsClient;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
@@ -32,28 +33,7 @@ public class InfraMetricsListener implements ServletContextListener {
     public void contextInitialized(ServletContextEvent sce) {
         try {
             logger.debug("Infra metrics initializing.......");
-            // The OkHttp event listener that times guardrails calls creates a plain Timer, which
-            // by itself emits only _count and _sum (no _bucket), so histogram_quantile() would not
-            // work. Attach SLO buckets via a MeterFilter (the listener builder has no SLO option),
-            // tuned to the guardrails 3s call timeout rather than the generic web buckets. Must be
-            // registered before the first guardrails call creates the meter (startup is well before
-            // any request), so the config is applied when the meter is instantiated.
-            registry.config().meterFilter(new MeterFilter() {
-                @Override
-                public DistributionStatisticConfig configure(Meter.Id id, DistributionStatisticConfig config) {
-                    if ("akto.guardrails.validate".equals(id.getName())) {
-                        return DistributionStatisticConfig.builder()
-                                .serviceLevelObjectives(
-                                        Duration.ofMillis(25).toNanos(), Duration.ofMillis(50).toNanos(),
-                                        Duration.ofMillis(100).toNanos(), Duration.ofMillis(250).toNanos(),
-                                        Duration.ofMillis(500).toNanos(), Duration.ofMillis(1000).toNanos(),
-                                        Duration.ofMillis(2000).toNanos(), Duration.ofMillis(3000).toNanos())
-                                .build()
-                                .merge(config);
-                    }
-                    return config;
-                }
-            });
+            configureExternalHttpClientMetric(registry);
 
             // Bind to the global registry so meters emitted from bundled libraries (e.g.
             // akto-gateway's GuardrailsClient) via Metrics.* land in this scraped registry.
@@ -68,6 +48,62 @@ public class InfraMetricsListener implements ServletContextListener {
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "ERROR while setting up InfraMetricsListener", LogDb.DATA_INGESTION);
         }
+    }
+
+    // One common histogram-bucket layout for every outbound HTTP client, in seconds. Covers a
+    // fast internal call (10ms) through a slow dependency (10s). Prometheus renders these as the
+    // le="..." bucket boundaries on akto_http_client_requests_seconds.
+    private static final Duration[] HTTP_CLIENT_BUCKETS = {
+            Duration.ofMillis(10), Duration.ofMillis(25), Duration.ofMillis(50), Duration.ofMillis(100),
+            Duration.ofMillis(250), Duration.ofMillis(500), Duration.ofMillis(1000), Duration.ofMillis(2500),
+            Duration.ofMillis(5000), Duration.ofMillis(10000)
+    };
+
+    /**
+     * Shapes the shared outbound-HTTP-client metric (akto.http.client.requests) into a clean,
+     * production-ready form. The OkHttp binder emits a plain Timer (no buckets) plus some noisy
+     * default tags, so via MeterFilters we:
+     *   - attach the common histogram buckets (the builder has no SLO option),
+     *   - drop the per-connection target.* tags and the redundant "outcome" tag (success vs error
+     *     is derivable from status at query time: 2xx ok, 4xx/5xx error, 0 no response),
+     *   - keep status as the real HTTP response code (200/404/500...); only the no-response case
+     *     (timeout/connection failure, where the binder emits "IO_ERROR") maps to "0".
+     * Registered at startup, before the first call creates the meter, so it applies at instantiation.
+     */
+    private static void configureExternalHttpClientMetric(PrometheusMeterRegistry registry) {
+        double[] bucketsNanos = new double[HTTP_CLIENT_BUCKETS.length];
+        for (int i = 0; i < HTTP_CLIENT_BUCKETS.length; i++) {
+            bucketsNanos[i] = HTTP_CLIENT_BUCKETS[i].toNanos();
+        }
+
+        registry.config()
+                .meterFilter(MeterFilter.ignoreTags("target.scheme", "target.host", "target.port", "outcome"))
+                .meterFilter(MeterFilter.replaceTagValues("status",
+                        value -> isNumeric(value) ? value : "0"))
+                .meterFilter(new MeterFilter() {
+                    @Override
+                    public DistributionStatisticConfig configure(Meter.Id id, DistributionStatisticConfig config) {
+                        if (GuardrailsClient.EXTERNAL_HTTP_CLIENT_METRIC.equals(id.getName())) {
+                            return DistributionStatisticConfig.builder()
+                                    .serviceLevelObjectives(bucketsNanos)
+                                    .build()
+                                    .merge(config);
+                        }
+                        return config;
+                    }
+                });
+    }
+
+    private static boolean isNumeric(String value) {
+        if (value == null || value.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
