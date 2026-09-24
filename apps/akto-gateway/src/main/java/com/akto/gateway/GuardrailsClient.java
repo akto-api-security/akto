@@ -4,6 +4,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.utils.OperationalAlerts;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.MediaType;
@@ -72,6 +75,18 @@ public class GuardrailsClient {
                 .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                // Client-level metrics: Micrometer times/counts every call automatically, so no
+                // instrumentation leaks into callValidate. Emits akto.guardrails.validate.* with
+                // method/uri/status/outcome tags -> latency (p50/p95/p99), throughput, and
+                // transport failures (status=IO_ERROR = the fail-open-on-timeout case) all visible.
+                // uri is the bounded endpoint path; recorded on the global registry, which the
+                // data-ingestion-service Prometheus registry is bound to for /metrics scraping.
+                .eventListener(OkHttpMetricsEventListener
+                        .builder(Metrics.globalRegistry, "akto.guardrails.validate")
+                        .tags(Tags.of("client", "guardrails"))
+                        .uriMapper(req -> req.url().encodedPath())
+                        .includeHostTag(false)
+                        .build())
                 .build();
     }
 

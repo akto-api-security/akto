@@ -93,6 +93,15 @@
             <artifactId>utils</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Prometheus scrape registry + JVM/system binders for the /metrics endpoint.
+             Latest stable line. WARs here compile to Java 8 bytecode but run on JDK 21
+             (see Dockerfile), so the Java 11 baseline of 1.13+ is fine. This line uses the
+             Prometheus Java client 1.x, so the API lives in io.micrometer.prometheusmetrics.* -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <version>1.17.1</version>
+        </dependency>
         <dependency>
             <groupId>com.akto.apps.gateway</groupId>
             <artifactId>akto-gateway</artifactId>

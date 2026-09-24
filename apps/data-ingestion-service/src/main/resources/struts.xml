@@ -16,6 +16,12 @@
         <!-- Default action for root path (/) - redirects to healthCheck -->
         <default-action-ref name="healthCheck" />
 
+        <!-- Prometheus scrape endpoint. Deliberately in the root namespace (not api/*) so the
+             JWT AuthFilter does not intercept it; InfraMetricsAction does its own Bearer-token
+             auth (METRICS_AUTH_TOKEN) and exposure gating (PROMETHEUS_METRICS_ENABLED). -->
+        <action name="metrics" class="com.akto.action.InfraMetricsAction">
+        </action>
+
         <action name="api/ingestData" class="com.akto.action.IngestionAction" method="ingestData">
             <interceptor-ref name="json">
                 <param name="maxStringLength">5242880</param>
