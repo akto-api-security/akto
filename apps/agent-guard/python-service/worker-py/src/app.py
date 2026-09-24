@@ -32,6 +32,7 @@ class ScanRequest(BaseModel):
     text: str = ""
     config: dict[str, Any] = Field(default_factory=dict)
     agent_host: str = ""
+    context_source: str = ""  # gateway ContextSource: AGENTIC (Argus) or ENDPOINT (Atlas)
     # Optional separate system prompt. When given, the intent prefilter uses it
     # only to build/retrieve a cached per-agent capability profile — it is
     # never part of the instruction/data split run over `text` (the user

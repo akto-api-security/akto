@@ -95,3 +95,27 @@ async def test_cascade_exception_still_schedules_slack_alert(monkeypatch):
     assert "cascade failed" in result["details"]["error"]
     assert len(scheduled) == 1
     await scheduled[0]  # SLACK_WEBHOOK_URL unset in tests -> no-op, just avoids "never awaited"
+
+
+@pytest.mark.parametrize(
+    ("payload_extra", "expected"),
+    [({"context_source": "ENDPOINT"}, "ENDPOINT"), ({}, None), ({"context_source": ""}, None)],
+)
+async def test_context_source_reaches_cascade_config(monkeypatch, payload_extra, expected):
+    # The top-level context_source rides in config so prompt builders can pick
+    # the Atlas/Argus variant; absent or empty leaves config untouched.
+    seen = {}
+
+    async def _cascade(scanner, stype, text, config, store_fn=None):
+        seen["config"] = config
+        return {"is_valid": True, "risk_score": 0.0, "details": {}, "execution_time_ms": 5}
+
+    monkeypatch.setattr(scan_handler, "scan_with_model_map", _cascade)
+
+    await scan_handler.scan_payload(
+        {"scanner_name": "PromptInjection", "scanner_type": "prompt", "text": "hi", "config": HOSTILE_CONFIG}
+        | payload_extra,
+        schedule_fn=lambda c: c.close(),
+    )
+
+    assert seen["config"].get("contextSource") == expected
