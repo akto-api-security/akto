@@ -641,6 +641,76 @@ def _build_qwen3guard() -> LLMProvider | None:
     )
 
 
+# ── Faster per-role alternates — old provider is the fallback on failure ──────
+# Each is a plain OpenAI-compatible endpoint (own model/baseUrl, from the
+# modelConfigs entry, same as "openai_compatible"); on any error it calls the
+# existing builder for the role's original provider and delegates to it.
+
+
+class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
+    """Faster Qwen3Guard-compatible endpoint; falls back to qwen3guard (Vertex AI) on failure."""
+
+    name = "qwen3guard_fast"
+
+    async def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> tuple[str, list | None]:
+        try:
+            headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            client = http_client.get_client()
+            body = await _post_json_logged(
+                client,
+                f"{self.base_url}/chat/completions",
+                headers,
+                {"model": self.model, **_qwen3guard_params(text, top_logprobs, temperature)},
+                "[Qwen3GuardFast]",
+            )
+            return _choice_content_and_logprobs(body)
+        except Exception as exc:
+            logger.warning(f"[Qwen3GuardFast] fast endpoint failed ({exc!r}), falling back to qwen3guard")
+            fallback = _build_qwen3guard()
+            if not isinstance(fallback, Qwen3GuardOutput):
+                raise
+            return await fallback.complete_with_logprobs(text, top_logprobs, temperature)
+
+
+class GemmaFastProvider(OpenAIProvider):
+    """Faster Gemma endpoint; falls back to gemma_foundry on failure."""
+
+    name = "gemma_fast"
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await super().complete(prompt)
+        except Exception as exc:
+            logger.warning(f"[GemmaFast] fast endpoint failed ({exc!r}), falling back to gemma_foundry")
+            fallback = _build_foundry("gemma_foundry", "", "", "")
+            if fallback is None:
+                raise
+            return await fallback.complete(prompt)
+
+
+class GemmaFastArbiterProvider(OpenAIProvider):
+    """Faster (Gemma) arbiter endpoint; falls back to the direct anthropic provider on failure."""
+
+    name = "gemma_fast_arbiter"
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await super().complete(prompt)
+        except Exception as exc:
+            logger.warning(f"[GemmaFastArbiter] fast endpoint failed ({exc!r}), falling back to anthropic")
+            fallback = _build_anthropic("")
+            if fallback is None:
+                raise
+            return await fallback.complete(prompt)
+
+
+_FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
+
+
 # Foundry provider name → (class, settings-var prefix). BASE_URL/API_KEY are
 # required (entry baseUrl overrides the env); DEPLOYMENT/MODEL are optional.
 # All classes take the same (base_url, api_key, deployment, model) constructor:
@@ -690,6 +760,21 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "anthropic_foundry": lambda model, base_url, deployment: _build_foundry(
         "anthropic_foundry", model, base_url, deployment
     ),
+    "qwen3guard_fast": lambda model, base_url, _d: (
+        Qwen3GuardFastProvider(settings.OPENAI_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast": lambda model, base_url, _d: (
+        GemmaFastProvider(settings.OPENAI_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast_arbiter": lambda model, base_url, _d: (
+        GemmaFastArbiterProvider(settings.OPENAI_API_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
 }
 
 
@@ -716,6 +801,9 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
     if name in ("openai", "ollama", "openai_compatible"):
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
+    if name in _FAST_PROVIDERS:
+        base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
+        return _dispatch(name, model, base_url)
     if name in _FOUNDRY_PROVIDERS:
         # deployment (azureml-model-deployment header) is a routing label, not a
         # secret — safe to allow per-entry, unlike apiKey. This lets two
