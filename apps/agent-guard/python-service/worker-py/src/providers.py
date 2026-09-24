@@ -645,6 +645,11 @@ def _build_qwen3guard() -> LLMProvider | None:
 # Own model/baseUrl per modelConfigs entry, same as "openai_compatible"; on any
 # error, each calls the existing builder for its role's original provider.
 
+# Fast leg's own budget — bounds how long an unreachable/hung host can delay
+# the fallback (asyncio.CancelledError from the caller's own timeout isn't an
+# Exception, so an unreachable host must fail from inside our own except).
+_FAST_LEG_TIMEOUT_S = 1.5
+
 
 class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
     """Faster Qwen3Guard-hosting endpoint; falls back to qwen3guard (Vertex AI) on failure.
@@ -669,12 +674,15 @@ class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
             if self.api_key:
                 headers["Authorization"] = f"Bearer {self.api_key}"
             client = http_client.get_client()
-            body = await _post_json_logged(
-                client,
-                f"{self.base_url}/chat/completions",
-                headers,
-                {"model": self.model, **_qwen3guard_params(text, top_logprobs, temperature)},
-                "[Qwen3GuardFast]",
+            body = await asyncio.wait_for(
+                _post_json_logged(
+                    client,
+                    f"{self.base_url}/chat/completions",
+                    headers,
+                    {"model": self.model, **_qwen3guard_params(text, top_logprobs, temperature)},
+                    "[Qwen3GuardFast]",
+                ),
+                timeout=_FAST_LEG_TIMEOUT_S,
             )
             return _choice_content_and_logprobs(body)
         except Exception as exc:
@@ -696,7 +704,7 @@ class GemmaFastProvider(OpenAIProvider):
 
     async def complete(self, prompt: str) -> str:
         try:
-            return await super().complete(prompt)
+            return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
         except Exception as exc:
             logger.warning(f"[GemmaFast] fast endpoint failed ({exc!r}), falling back to gemma_foundry")
             fallback = _build_foundry("gemma_foundry", "", "", "")
@@ -716,7 +724,7 @@ class GemmaFastArbiterProvider(OpenAIProvider):
 
     async def complete(self, prompt: str) -> str:
         try:
-            return await super().complete(prompt)
+            return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
         except Exception as exc:
             logger.warning(f"[GemmaFastArbiter] fast endpoint failed ({exc!r}), falling back to anthropic")
             fallback = _build_anthropic("")

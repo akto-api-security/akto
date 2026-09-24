@@ -6,6 +6,8 @@ by "provider" like any other, reading "model"/"baseUrl" the same way
 "openai_compatible" already does.
 """
 
+import asyncio
+
 import pytest
 
 import providers
@@ -25,6 +27,14 @@ class _FakeResponse:
         return self._payload
 
 
+class _Hang:
+    """Sentinel response: post() sleeps (near-)forever instead of answering —
+    simulates a black-holed/firewalled host, not a fast connection refusal."""
+
+    def __init__(self, seconds: float = 3600.0):
+        self.seconds = seconds
+
+
 class _FakeClient:
     """Stand-in for the shared http_client.get_client() AsyncClient.
 
@@ -33,12 +43,15 @@ class _FakeClient:
     """
 
     posts = []
-    responses = {}  # url substring -> payload dict, or an Exception to raise
+    responses = {}  # url substring -> payload dict, an Exception to raise, or _Hang()
 
     async def post(self, url, headers=None, json=None):
         _FakeClient.posts.append({"url": url, "headers": headers, "json": json})
         for substr, resp in _FakeClient.responses.items():
             if substr in url:
+                if isinstance(resp, _Hang):
+                    await asyncio.sleep(resp.seconds)
+                    raise AssertionError("_Hang should have been cancelled by the caller's own timeout first")
                 if isinstance(resp, Exception):
                     raise resp
                 return _FakeResponse(resp)
@@ -155,6 +168,25 @@ async def test_gemma_fast_falls_back_to_gemma_foundry_on_failure(monkeypatch):
     assert any("foundry-host" in c["url"] for c in _FakeClient.posts)
 
 
+async def test_gemma_fast_falls_back_when_fast_leg_hangs_not_just_errors(monkeypatch):
+    # Regression test: a fast leg that HANGS (black-holed connection, never
+    # responds) must still trigger the fallback. Relying on the caller's own
+    # outer per-scanner timeout doesn't work — asyncio.CancelledError isn't an
+    # Exception subclass, so a cancel delivered from outside would skip the
+    # `except Exception` fallback entirely. _FAST_LEG_TIMEOUT_S is what
+    # guarantees this fires from inside our own code instead.
+    monkeypatch.setattr(providers, "_FAST_LEG_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(providers.settings, "GEMMA_FOUNDRY_BASE_URL", "https://foundry-host/v1")
+    monkeypatch.setattr(providers.settings, "GEMMA_FOUNDRY_API_KEY", "key-123")
+    _FakeClient.responses = {
+        _HOST: _Hang(),
+        "foundry-host": {"choices": [{"message": {"content": "from foundry"}}]},
+    }
+    p = build_provider_from_config({"provider": "gemma_fast", "model": "gemma-fast", "baseUrl": _HOST})
+    out = await asyncio.wait_for(p.complete("hi"), timeout=2.0)
+    assert out == "from foundry"
+
+
 # ── gemma_fast_arbiter falls back to anthropic (the real FINAL_ARBITER) ─────
 
 
@@ -166,6 +198,20 @@ async def test_gemma_fast_arbiter_falls_back_to_anthropic_on_failure(monkeypatch
     }
     p = build_provider_from_config({"provider": "gemma_fast_arbiter", "model": "gemma-fast-arbiter", "baseUrl": _HOST})
     out = await p.complete("hi")
+    assert out == "from anthropic"
+
+
+async def test_gemma_fast_arbiter_falls_back_when_fast_leg_hangs_not_just_errors(monkeypatch):
+    # Same regression as gemma_fast: a hung fast leg (not a fast error) must
+    # still reach the anthropic fallback.
+    monkeypatch.setattr(providers, "_FAST_LEG_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(providers.settings, "ANTHROPIC_API_KEY", "key-123")
+    _FakeClient.responses = {
+        _HOST: _Hang(),
+        "api.anthropic.com": {"content": [{"text": "from anthropic"}]},
+    }
+    p = build_provider_from_config({"provider": "gemma_fast_arbiter", "model": "gemma-fast-arbiter", "baseUrl": _HOST})
+    out = await asyncio.wait_for(p.complete("hi"), timeout=2.0)
     assert out == "from anthropic"
 
 
@@ -194,3 +240,16 @@ async def test_qwen3guard_fast_falls_back_to_qwen3guard_on_failure(monkeypatch):
     _FakeClient.responses = {_HOST: ConnectionError("fast host unreachable")}
     with pytest.raises(ConnectionError):
         await p.complete_with_logprobs("bad text")
+
+
+async def test_qwen3guard_fast_attempts_fallback_when_fast_leg_hangs_not_just_errors(monkeypatch):
+    # Same regression as the other two: a hung fast leg must still reach the
+    # except block and attempt the fallback (which fails here for an unrelated
+    # reason — no SA key — but the point is it gets attempted at all, promptly,
+    # instead of hanging for the full _Hang() duration).
+    monkeypatch.setattr(providers, "_FAST_LEG_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(providers.settings, "QWEN3GUARD_SA_KEY_JSON", "")
+    p = build_provider_from_config({"provider": "qwen3guard_fast", "model": "qwen3-fast", "baseUrl": _HOST})
+    _FakeClient.responses = {_HOST: _Hang()}
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(p.complete_with_logprobs("bad text"), timeout=2.0)
