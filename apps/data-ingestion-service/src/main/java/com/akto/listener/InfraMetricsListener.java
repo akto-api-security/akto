@@ -50,13 +50,11 @@ public class InfraMetricsListener implements ServletContextListener {
         }
     }
 
-    // One common histogram-bucket layout for every outbound HTTP client, in seconds. Covers a
-    // fast internal call (10ms) through a slow dependency (10s). Prometheus renders these as the
-    // le="..." bucket boundaries on akto_http_client_requests_seconds.
+    // One common histogram-bucket layout for every outbound HTTP client. Prometheus renders these
+    // as the le="..." bucket boundaries on akto_http_client_requests_seconds.
     private static final Duration[] HTTP_CLIENT_BUCKETS = {
-            Duration.ofMillis(10), Duration.ofMillis(25), Duration.ofMillis(50), Duration.ofMillis(100),
-            Duration.ofMillis(250), Duration.ofMillis(500), Duration.ofMillis(1000), Duration.ofMillis(2500),
-            Duration.ofMillis(5000), Duration.ofMillis(10000)
+            Duration.ofMillis(50), Duration.ofMillis(200), Duration.ofMillis(500), Duration.ofMillis(1000),
+            Duration.ofMillis(3000), Duration.ofMillis(5000), Duration.ofMillis(10000)
     };
 
     /**

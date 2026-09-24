@@ -2,11 +2,15 @@ package com.akto.action;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.gateway.GuardrailsClient;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
+import com.akto.utils.OperationalAlerts;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.apache.struts2.interceptor.ServletRequestAware;
 
 import javax.servlet.http.HttpServletRequest;
@@ -17,6 +21,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Reverse proxy from data-ingestion-service to the database-abstractor service.
@@ -69,6 +74,9 @@ public class AbstractorProxyAction extends ActionSupport implements ServletReque
             return Action.ERROR.toUpperCase();
         }
 
+        // status stays 0 (= no response) unless the abstractor actually answers; recorded in finally.
+        long startNanos = System.nanoTime();
+        int statusForMetric = 0;
         try {
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Content-Type", Collections.singletonList("application/json"));
@@ -87,6 +95,7 @@ public class AbstractorProxyAction extends ActionSupport implements ServletReque
                     : new HashMap<>();
 
             int statusCode = response.getStatusCode();
+            statusForMetric = statusCode;
             success = statusCode >= 200 && statusCode < 300;
             if (success) {
                 loggerMaker.info("Proxied {} to abstractor - status: {}", normalizedPath, statusCode);
@@ -101,6 +110,29 @@ public class AbstractorProxyAction extends ActionSupport implements ServletReque
             success = false;
             message = "Unexpected error: " + e.getMessage();
             return Action.ERROR.toUpperCase();
+        } finally {
+            recordAbstractorCall(normalizedPath, statusForMetric, startNanos);
+        }
+    }
+
+    /**
+     * Records the abstractor proxy call on the shared akto.http.client.requests metric with
+     * client="ultron" (the logical name for the database-abstractor backend). Goes through
+     * ApiExecutor (shared util), so it is timed here rather than via an OkHttp listener.
+     * Self-contained try/catch so metrics can never break the proxy.
+     */
+    private static void recordAbstractorCall(String subpath, int statusCode, long startNanos) {
+        try {
+            Timer.builder(GuardrailsClient.EXTERNAL_HTTP_CLIENT_METRIC)
+                    .tag("client", "ultron")
+                    .tag("account.id", OperationalAlerts.deploymentAccountId())
+                    .tag("method", "POST")
+                    .tag("uri", (subpath == null || subpath.isEmpty()) ? "unknown" : "/api/" + subpath)
+                    .tag("status", Integer.toString(statusCode))
+                    .register(Metrics.globalRegistry)
+                    .record(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
+        } catch (Exception ignore) {
+            // never let metrics recording break the proxy path
         }
     }
 
