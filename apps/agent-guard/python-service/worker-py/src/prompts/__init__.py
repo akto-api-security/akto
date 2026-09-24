@@ -84,6 +84,7 @@ TEXT THAT WAS FLAGGED:
 %s
 
 In one or two sentences, explain specifically what in the text matches this attack type. Describe the actual trigger, don't just restate the attack type name.
+Refer to any PII, secret or personal data by kind and count only (e.g. "an email address", "2 API keys"); never quote the values themselves.
 
 Respond ONLY with valid JSON in exactly this shape, nothing else:
 {"reason": "your explanation here"}"""

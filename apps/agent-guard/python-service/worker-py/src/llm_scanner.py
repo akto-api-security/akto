@@ -83,7 +83,6 @@ def parse_abcd_result(scanner_name: str, raw: str) -> dict[str, Any]:
     raise ValueError(f"expected one of A/B/C/D for {scanner_name}, got {(raw or '').strip()[:60]!r}")
 
 
-
 def parse_values_result(scanner_name: str, raw: str) -> dict[str, Any]:
     """Read the values-only contract: the secret substrings and nothing else.
 
