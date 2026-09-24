@@ -2,15 +2,19 @@ package com.akto.dao.test_editor;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.Account;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -69,20 +73,22 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         int localLimit = Math.min(100, limit);
 
         Map<String, List<String>> commonWordListMap = fetchCommonWordListMap();
+        Map<String, YamlTemplate> overrideMap = fetchSystemTemplateOverrideMap();
 
         while (localCounter < limit) {
             yamlTemplates = YamlTemplateDao.instance.findAll(Filters.and(filters), localSkip, localLimit, Sorts.ascending("_id"), proj);
             for (YamlTemplate yamlTemplate: yamlTemplates) {
+                YamlTemplate effectiveTemplate = overrideMap.getOrDefault(yamlTemplate.getId(), yamlTemplate);
                 try {
-                    TestConfig testConfig = TestConfigYamlParser.parseTemplate(yamlTemplate.getContent());
+                    TestConfig testConfig = TestConfigYamlParser.parseTemplate(effectiveTemplate.getContent());
                     if (includeYamlContent) {
-                        testConfig.setContent(yamlTemplate.getContent());
-                        testConfig.setTemplateSource(yamlTemplate.getSource());
-                        testConfig.setUpdateTs(yamlTemplate.getUpdatedAt());
+                        testConfig.setContent(effectiveTemplate.getContent());
+                        testConfig.setTemplateSource(effectiveTemplate.getSource());
+                        testConfig.setUpdateTs(effectiveTemplate.getUpdatedAt());
                     }
-                    testConfig.setInactive(yamlTemplate.getInactive());
-                    testConfig.setAuthor(yamlTemplate.getAuthor());
-                    testConfig.setEstimatedTokens(yamlTemplate.getEstimatedTokens());
+                    testConfig.setInactive(effectiveTemplate.getInactive());
+                    testConfig.setAuthor(effectiveTemplate.getAuthor());
+                    testConfig.setEstimatedTokens(effectiveTemplate.getEstimatedTokens());
                     if (testConfig.getWordlists() != null) {
                         testConfig.getWordlists().putAll(commonWordListMap);
                     } else {
@@ -90,8 +96,8 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     }
                     testConfigMap.put(testConfig.getId(), testConfig);
 
-                    if (testConfig.getInfo() != null && yamlTemplate.getInfo() != null && yamlTemplate.getInfo().getCompliance() != null) {
-                        testConfig.getInfo().setCompliance(yamlTemplate.getInfo().getCompliance());
+                    if (testConfig.getInfo() != null && effectiveTemplate.getInfo() != null && effectiveTemplate.getInfo().getCompliance() != null) {
+                        testConfig.getInfo().setCompliance(effectiveTemplate.getInfo().getCompliance());
                     }
                     
                 } catch (Exception e) {
@@ -115,11 +121,66 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
     public Map<String, Info> fetchTestInfoMap(Bson filter) {
         Map<String, Info> ret = new HashMap<>();
         List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(filter, Projections.include("info"));
+        applySystemTemplateOverrides(yamlTemplates);
         for (YamlTemplate yamlTemplate : yamlTemplates) {
             ret.put(yamlTemplate.getId(), yamlTemplate.getInfo());
         }
 
         return ret;
+    }
+
+    public static boolean accountAllowsSystemTemplateOverrides() {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null) {
+            return false;
+        }
+        if (AccountTask.inactiveAccountsSet.contains(accountId)) {
+            return false;
+        }
+        Account account = Context.getAccount();
+        return account != null && !account.isInactive();
+    }
+
+    public YamlTemplate findEffectiveOne(String id, Bson projection) {
+        Bson idFilter = Filters.eq(Constants.ID, id);
+        if (accountAllowsSystemTemplateOverrides()) {
+            YamlTemplate override = YamlTemplateOverrideDao.instance.findOne(idFilter, projection);
+            if (override != null) {
+                return override;
+            }
+        }
+        return findOne(idFilter, projection);
+    }
+
+    public void applySystemTemplateOverrides(List<YamlTemplate> yamlTemplates) {
+        if (yamlTemplates == null || yamlTemplates.isEmpty()) {
+            return;
+        }
+        Map<String, YamlTemplate> overrideMap = fetchSystemTemplateOverrideMap();
+        if (overrideMap.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < yamlTemplates.size(); i++) {
+            YamlTemplate override = overrideMap.get(yamlTemplates.get(i).getId());
+            if (override != null) {
+                yamlTemplates.set(i, override);
+            }
+        }
+    }
+
+    private Map<String, YamlTemplate> fetchSystemTemplateOverrideMap() {
+        if (!accountAllowsSystemTemplateOverrides()) {
+            return Collections.emptyMap();
+        }
+        List<YamlTemplate> overrides = YamlTemplateOverrideDao.instance.findAll(Filters.empty());
+        if (overrides == null || overrides.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, YamlTemplate> overrideMap = new HashMap<>();
+        for (YamlTemplate override : overrides) {
+            overrideMap.put(override.getId(), override);
+        }
+        return overrideMap;
     }
 
     public int getNewCustomTemplates(int timestamp){

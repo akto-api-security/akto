@@ -803,9 +803,13 @@ public class IssuesAction extends UserAction {
                 testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         }
 
+        subCategories = new ArrayList<>();
+        if (filters.isEmpty()) {
+            return SUCCESS.toUpperCase();
+        }
+
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
                 fetchOnlyActive, skip, limit, Filters.or(filters));
-        subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {
                 BasicDBObject infoObj = createSubcategoriesInfoObj(entry.getValue());
