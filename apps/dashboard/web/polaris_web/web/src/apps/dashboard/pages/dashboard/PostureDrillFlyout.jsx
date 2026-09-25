@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-    Badge, Banner, Box, Button, Card, DataTable, Divider, HorizontalStack, Spinner, Text, VerticalStack,
+    Badge, Banner, Box, Button, Card, DataTable, Divider, HorizontalGrid, HorizontalStack, Icon, Scrollable, Spinner, Text, VerticalStack,
 } from '@shopify/polaris'
+import { ChevronRightMinor } from '@shopify/polaris-icons'
 import AgenticFlyoutShell from '../observe/agentic/AgenticFlyoutShell'
 import FlyoutBreadcrumb from '../observe/agentic/FlyoutBreadcrumb'
 import AgGridTable from '../../components/tables/AgGridTable'
@@ -56,19 +57,30 @@ function EpochCell({ value }) {
 // whatever InsightResult.Metric rows the drill sends.
 
 function DrillStats({ drill }) {
-    const stats = [
-        { key: '__total', label: 'Rows', value: (drill.total ?? 0).toLocaleString() },
-        ...(drill.summary || []).map((m) => ({ key: m.key, label: m.label, value: m.formatted })),
-    ]
+    const stats = (drill.summary || []).map((m) => ({ key: m.key, label: m.label, value: m.formatted }))
+    // The table's first column names what each row is, so the list gets a real title ("Tools")
+    // with the count beside it, rather than a generic "Rows" total.
+    const entity = drill.columns?.[0]?.headerName
+    const title = !entity ? 'Results'
+        : entity.endsWith('s') ? entity
+        : /[^aeiou]y$/i.test(entity) ? `${entity.slice(0, -1)}ies` : `${entity}s`
     return (
-        <HorizontalStack gap="6">
-            {stats.map((s) => (
-                <VerticalStack gap="1" key={s.key}>
-                    <Text variant="headingLg" as="p">{s.value}</Text>
-                    <Text variant="bodySm" color="subdued">{s.label}</Text>
-                </VerticalStack>
-            ))}
-        </HorizontalStack>
+        <VerticalStack gap="3">
+            <HorizontalStack gap="2" blockAlign="center">
+                <Text variant="headingMd" as="h3">{title}</Text>
+                <Badge>{(drill.total ?? 0).toLocaleString()}</Badge>
+            </HorizontalStack>
+            {stats.length > 0 && (
+                <HorizontalStack gap="6">
+                    {stats.map((s) => (
+                        <VerticalStack gap="1" key={s.key}>
+                            <Text variant="headingLg" as="p">{s.value}</Text>
+                            <Text variant="bodySm" color="subdued">{s.label}</Text>
+                        </VerticalStack>
+                    ))}
+                </HorizontalStack>
+            )}
+        </VerticalStack>
     )
 }
 
@@ -84,7 +96,7 @@ function DrillNarrative({ drill }) {
         <Box background="bg-surface-secondary" padding="4" borderRadius="2">
             <VerticalStack gap="4">
                 <VerticalStack gap="1">
-                    <Text variant="bodySm" fontWeight="semibold" color="subdued">AI summary</Text>
+                    <Text variant="headingSm">AI summary</Text>
                     {status === 'PENDING' ? (
                         <HorizontalStack gap="2" blockAlign="center">
                             <Spinner size="small" accessibilityLabel="Generating AI summary" />
@@ -98,19 +110,19 @@ function DrillNarrative({ drill }) {
                     <VerticalStack gap="3">
                         {drill.narrativeConcern && (
                             <VerticalStack gap="1">
-                                <Text variant="bodySm" fontWeight="semibold" color="subdued">Concern</Text>
+                                <Text variant="headingXs">Concern</Text>
                                 <Text variant="bodyMd">{drill.narrativeConcern}</Text>
                             </VerticalStack>
                         )}
                         {drill.narrativeImpact && (
                             <VerticalStack gap="1">
-                                <Text variant="bodySm" fontWeight="semibold" color="subdued">Impact</Text>
+                                <Text variant="headingXs">Impact</Text>
                                 <Text variant="bodyMd">{drill.narrativeImpact}</Text>
                             </VerticalStack>
                         )}
                         {drill.narrativeRemediation && (
                             <VerticalStack gap="1">
-                                <Text variant="bodySm" fontWeight="semibold" color="subdued">Remediation</Text>
+                                <Text variant="headingXs">Remediation</Text>
                                 <Text variant="bodyMd">{drill.narrativeRemediation}</Text>
                             </VerticalStack>
                         )}
@@ -346,31 +358,34 @@ function RiskScoreSubScoreRow({ subScore, kpi, onClick }) {
     const band = riskBand(subScore.value)
     const detail = subScoreDetailLines(subScore, kpi)
     const detailLines = Array.isArray(detail) ? detail : (detail ? [detail] : [])
+    // This sub-score's share of the composite's change (same row "What moved the score" lists).
+    const moved = (kpi.whatMoved || []).find((m) => m.category === subScore.label)
     return (
-        <div onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+        <Box className="agentic-clickable-row" onClick={onClick}>
             <VerticalStack gap="2">
-                <HorizontalStack align="space-between" blockAlign="center" gap={"2"}>
-                    <Box width='200px' maxWidth='200px'>
-                        <VerticalStack gap="05">
-                            <HorizontalStack gap="1" blockAlign="center" align="start">
-                                <Text variant="bodyMd" fontWeight="semibold">{subScore.label}</Text>
-                                <GapHint gaps={subScore.dataGaps} />
-                            </HorizontalStack>
-                            <Text variant="bodySm" color="subdued">{subScore.weight}% of composite</Text>
-                        </VerticalStack>
-                    </Box>
-                    <Box width='540px'>
-                        <CustomProgressBar progress={hasValue ? subScore.value : 0} topColor={band ? band.color : '#9ca3af'} height={"8px"}/>
-                    </Box>
-                    <Box width='120px' maxWidth='120px'>
-                        <HorizontalStack align="end">
-                            <Text variant="bodyMd" fontWeight="semibold">
-                                {hasValue ? `${subScore.value} / 100` : 'Not computed'}
-                            </Text>
+                <HorizontalGrid columns="180px minmax(0, 1fr) 96px 20px" gap="4" alignItems="center">
+                    <VerticalStack gap="05">
+                        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                            <Text variant="bodyMd" fontWeight="medium">{subScore.label}</Text>
+                            <GapHint gaps={subScore.dataGaps} />
                         </HorizontalStack>
-                    </Box>
-                </HorizontalStack>
-
+                        <Text variant="bodySm" color="subdued">{subScore.weight}% of composite</Text>
+                    </VerticalStack>
+                    <CustomProgressBar progress={hasValue ? subScore.value : 0} topColor={band ? band.color : '#9ca3af'} height={"8px"}/>
+                    <VerticalStack gap="05" inlineAlign="end">
+                        {hasValue ? (
+                            <Text variant="bodyMd" fontWeight="semibold">{subScore.value} / 100</Text>
+                        ) : (
+                            <Text variant="bodySm" color="subdued">Not computed</Text>
+                        )}
+                        {moved && (
+                            <Text variant="bodySm" color={moved.impactPoints > 0 ? 'critical' : 'success'}>
+                                {moved.impactPoints > 0 ? '+' : ''}{moved.impactPoints} pts
+                            </Text>
+                        )}
+                    </VerticalStack>
+                    <Icon source={ChevronRightMinor} color="subdued" />
+                </HorizontalGrid>
                 {detailLines.length > 0 && (
                     <Box paddingBlockStart="1">
                         <VerticalStack gap="05">
@@ -381,7 +396,7 @@ function RiskScoreSubScoreRow({ subScore, kpi, onClick }) {
                     </Box>
                 )}
             </VerticalStack>
-        </div>
+        </Box>
     )
 }
 
@@ -389,16 +404,12 @@ function RiskScoreSubScoreRow({ subScore, kpi, onClick }) {
 // PostureService.GAP_POSTURE_HISTORY), so illustrative-only and blurred, same convention as every
 // other backend-less panel on this page.
 function RiskScoreTrendSection() {
-    const latest = DUMMY_RISK_SCORE_TREND[DUMMY_RISK_SCORE_TREND.length - 1]
     const body = (
         <VerticalStack gap="4">
-            <HorizontalStack gap="4" blockAlign="center" wrap={false}>
-                <RiskScoreRing value={latest} size={90} showValue />
-                <VerticalStack gap="2">
-                    <Text variant="bodySm" color="subdued">Composite trend · last 12 weeks</Text>
-                    <SmoothAreaChart tickPositions={DUMMY_RISK_SCORE_TREND} color="#7C5CFC" height="60" width="260" />
-                </VerticalStack>
-            </HorizontalStack>
+            <VerticalStack gap="2">
+                <Text variant="bodySm" color="subdued">Composite trend · last 12 weeks</Text>
+                <SmoothAreaChart tickPositions={DUMMY_RISK_SCORE_TREND} color="#7C5CFC" height="60" width={null} />
+            </VerticalStack>
             <HorizontalStack gap="2">
                 {['30 days', '90 days', '365 days'].map((label, i) => (
                     <Badge key={label} status={i === 0 ? 'info' : undefined}>{label}</Badge>
@@ -500,51 +511,55 @@ function RiskScoreRootBody({ kpi, onSubScoreClick }) {
     const deltaText = formatDelta(kpi)
 
     return (
-        <Box overflowY="scroll" padding="4">
+        <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
+        <Box padding="4">
             <VerticalStack gap="5">
-                <VerticalStack gap="2">
-                    <HorizontalStack gap="3" blockAlign="center">
-                        <RiskScoreRing value={kpi.value} size={56} />
+                {/* Grid, not HorizontalStack: settings.css forces `.Polaris-HorizontalStack { align-items: center !important }`
+                    globally, which would override blockAlign="start". The fixed track also keeps the donut from clipping. */}
+                <HorizontalGrid columns="96px minmax(0, 1fr)" gap="5" alignItems="start">
+                    <RiskScoreRing value={kpi.value} size={96} showValue />
+                    <VerticalStack gap="3">
                         <VerticalStack gap="1">
-                            <HorizontalStack gap="3" blockAlign="center">
-                                <Text variant="heading2xl">
-                                    {kpi.value !== null && kpi.value !== undefined ? `${kpi.value} / 100` : 'Not computed yet'}
-                                </Text>
+                            <HorizontalStack gap="2" blockAlign="center">
                                 {band && (
                                     <Badge status={band.tone === 'critical' ? 'critical' : band.tone === 'warning' ? 'warning' : 'success'}>
                                         {band.label}
                                     </Badge>
                                 )}
+                                {deltaText && (
+                                    <HorizontalStack gap="1">
+                                        <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
+                                            {deltaText}
+                                        </Text>
+                                        <Text variant="bodySm" color="subdued">vs previous period</Text>
+                                    </HorizontalStack>
+                                )}
                             </HorizontalStack>
-                            {deltaText && (
-                                <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
-                                    {deltaText}
-                                </Text>
-                            )}
+                            <Text variant="bodySm" color="subdued">
+                                Composite of five weighted sub-scores. Lower is better.
+                                {kpi.footnote ? ` ${kpi.footnote}.` : ''}
+                            </Text>
                         </VerticalStack>
-                    </HorizontalStack>
-                    <Text variant="bodySm" color="subdued">
-                        Composite of five weighted sub-scores. Lower is better.
-                        {kpi.footnote ? ` ${kpi.footnote}.` : ''}
-                    </Text>
-                </VerticalStack>
-
-                <RiskScoreTrendSection />
-
-                <VerticalStack gap="4">
-                    <VerticalStack gap="3">
-                        {(kpi.subScores || []).map((s) => (
-                            <RiskScoreSubScoreRow key={s.id} subScore={s} kpi={kpi} onClick={() => onSubScoreClick(s.id)} />
-                        ))}
+                        <RiskScoreTrendSection />
+                        {historyGap && <Text variant="bodySm" color="subdued">{historyGap.impact}</Text>}
                     </VerticalStack>
-                    {historyGap && (
-                        <Text variant="bodySm" color="subdued">{historyGap.impact}</Text>
-                    )}
+                </HorizontalGrid>
+
+                {/* Rows carry their own padding + hover (agentic-clickable-row), so no stack gap here. */}
+                <VerticalStack gap="0">
+                    {(kpi.subScores || []).map((s) => (
+                        <VerticalStack key={s.id} gap="0">
+                            <Divider />
+                            <RiskScoreSubScoreRow subScore={s} kpi={kpi} onClick={() => onSubScoreClick(s.id)} />
+                        </VerticalStack>
+                    ))}
+                    <Divider />
                 </VerticalStack>
 
                 <RiskScoreAnnotationsSection kpi={kpi} onSubScoreClick={onSubScoreClick} />
             </VerticalStack>
         </Box>
+        </Scrollable>
     )
 }
 
@@ -693,6 +708,21 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         return () => { cancelled = true; clearTimeout(timer) }
     }, [drill, drillState, startTimestamp, endTimestamp])
 
+    const ctas = drill?.ctas || []
+    const dataGaps = drill?.dataGaps || []
+    // The risk score root has no stats row, so without CTAs/gaps the top strip would render as an
+    // empty padded band with a stray divider under the header.
+    const hasTopContent = !isRiskScoreRoot || ctas.length > 0 || dataGaps.length > 0
+    const narrativeSection = drill && drill.narrativeStatus !== 'UNAVAILABLE' ? (
+        <>
+            <Divider />
+            {/* Same pane as the breakdown above, so the two halves split the flyout evenly and each scrolls on its own. */}
+            <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
+                <DrillNarrative drill={drill} />
+            </Scrollable>
+        </>
+    ) : null
+
     return (
         <AgenticFlyoutShell
             show={show}
@@ -701,7 +731,8 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                 <FlyoutBreadcrumb
                     items={breadcrumbItems}
                     onClose={onClose}
-                    subtitle={drillState?.path ? drill?.title : null}
+                    // Only when it adds something — on sub-score levels the title is the last crumb already.
+                    subtitle={drillState?.path && drill?.title !== breadcrumbItems[breadcrumbItems.length - 1]?.label ? drill.title : null}
                 />
             }
         >
@@ -719,23 +750,23 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                     <SpinnerCentered height="200px" />
                 ) : (
                     <>
-                        {!isProfileLayout && (
+                        {!isProfileLayout && hasTopContent && (
                             <>
                                 <Box padding="4" paddingBlockEnd="0">
                                     <HorizontalStack align="space-between" blockAlign="start">
                                         {!isRiskScoreRoot && <DrillStats drill={drill} />}
-                                        {(drill.ctas || []).length > 0 && (
+                                        {ctas.length > 0 && (
                                             <HorizontalStack gap="2">
-                                                {drill.ctas.map((cta) => (
+                                                {ctas.map((cta) => (
                                                     <Button key={cta.id} size="slim" onClick={() => navigate(ctaHref(cta))}>{cta.label}</Button>
                                                 ))}
                                             </HorizontalStack>
                                         )}
                                     </HorizontalStack>
-                                    {(drill.dataGaps || []).length > 0 && (
+                                    {dataGaps.length > 0 && (
                                         <Box paddingBlockStart="3">
                                             <VerticalStack gap="2">
-                                                {drill.dataGaps.map((g, i) => (
+                                                {dataGaps.map((g, i) => (
                                                     <Banner key={i} status="info">{g.impact}</Banner>
                                                 ))}
                                             </VerticalStack>
@@ -768,11 +799,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                                 />
                             )}
                         </div>
-                        {drill.narrativeStatus !== 'UNAVAILABLE' && (
-                            <Box paddingBlockStart="3">
-                                <DrillNarrative drill={drill} />
-                            </Box>
-                        )}
+                        {narrativeSection}
                     </>
                 )}
             </div>

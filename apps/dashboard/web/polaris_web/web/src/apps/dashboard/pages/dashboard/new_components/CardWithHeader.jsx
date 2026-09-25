@@ -10,6 +10,7 @@ function CardWithHeader({
     emptyMessage,
     minHeight = "250px",
     useFlexContent = false,
+    headerAction,
     children
 }) {
     return (
@@ -23,6 +24,7 @@ function CardWithHeader({
                     itemId={itemId}
                     onRemove={onRemove}
                     tooltipContent={tooltipContent}
+                    action={headerAction}
                 />
                 {hasData ? (
                     useFlexContent ? (

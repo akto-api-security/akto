@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
-    Badge, Box, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack,
+    Badge, Box, Button, Card, HorizontalGrid, HorizontalStack, Text, VerticalStack,
 } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter'
 import CardWithHeader from './new_components/CardWithHeader'
+import ComponentHeader from './new_components/ComponentHeader'
 import CustomProgressBar from './new_components/CustomProgressBar'
 import DonutChart from '../../components/shared/DonutChart'
 import SmoothAreaChart from './new_components/SmoothChart'
@@ -16,7 +17,7 @@ import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
 import InsightsFlyout from '../observe/agentic/insights/InsightsFlyout'
 import { INSIGHT_GROUP } from '../observe/agentic/insights/insightsHelpers'
 import PostureDrillFlyout from './PostureDrillFlyout'
-import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, GapHint, RiskScoreRing } from './new_components/PostureShared'
+import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, RiskScoreRing } from './new_components/PostureShared'
 import dashboardApi from './api'
 import func from '@/util/func'
 import values from '@/util/values'
@@ -24,6 +25,7 @@ import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import {
     DUMMY_SHADOW_AI_TREND, DUMMY_DATA_LEAVING, DUMMY_ENFORCEMENT_FUNNEL,
     DUMMY_ATTACK_ATTEMPTS, DUMMY_FRAMEWORK_READINESS, DUMMY_ADOPTION_GAP, DUMMY_VENDOR_RISK_BUBBLE,
+    POSTURE_CARD_INFO,
 } from './securityPostureDummyData'
 
 // KPI ids — must match PostureService.KPI_* on the backend.
@@ -70,6 +72,11 @@ function severityRank(severity) {
     return SEVERITY_RANK[String(severity || '').toUpperCase()] || 5
 }
 
+// Title tooltip for any posture card: what it measures, then any data-gap notes the backend sent.
+function cardInfo(id, gaps, ...extra) {
+    return [POSTURE_CARD_INFO[id], ...extra, ...(gaps || []).map((g) => g.impact)].filter(Boolean).join(' ')
+}
+
 function formatValue(kpi) {
     if (kpi.value === null || kpi.value === undefined) return '—'
     if (kpi.unit === 'percent') return `${kpi.value}%`
@@ -97,54 +104,55 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
     const sparklineColor = KPI_SPARKLINE_COLOR[kpi.id]
     const hasRealSparkline = !!sparklineColor && Array.isArray(kpi.sparkline) && kpi.sparkline.length > 0
 
-    const valueColumn = (
-        <VerticalStack gap="1">
-            {hasValue ? (
-                <Text variant="heading2xl">{formatValue(kpi)}</Text>
-            ) : (
-                <Text variant="heading2xl" color="subdued">Not computed yet</Text>
-            )}
+    // Footnotes live in the title's tooltip (with any data gaps) rather than as body text, so every
+    // tile hugs to title → value → sparkline and the row stays one compact height.
+    const hintText = cardInfo(kpi.id, kpi.dataGaps, kpi.footnote)
 
+    // Same header as every other card on the page, so the KPI titles read as proper card titles.
+    const header = <ComponentHeader title={kpi.label} tooltipContent={hintText || null} />
+
+    const valueRow = hasValue ? (
+        <HorizontalStack gap="2" blockAlign="baseline" wrap={false}>
+            <Text variant="heading2xl" as="p">{formatValue(kpi)}</Text>
             {deltaText && (
-                <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
+                <Text variant="bodyMd" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
                     {deltaText}
                 </Text>
+            )}
+        </HorizontalStack>
+    ) : (
+        <Text variant="headingLg" as="p" color="subdued">Not computed yet</Text>
+    )
+
+    // Same title row on every tile so the four labels line up; the ring sits beside the value below it.
+    const content = showRing ? (
+        <VerticalStack gap="2">
+            {header}
+            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                {/* minWidth stops flex-shrink from clipping the donut's chart container. */}
+                <Box minWidth="56px">
+                    <RiskScoreRing value={kpi.value} size={56} />
+                </Box>
+                {valueRow}
+            </HorizontalStack>
+        </VerticalStack>
+    ) : (
+        <VerticalStack gap="1">
+            {header}
+            {valueRow}
+            {hasRealSparkline && (
+                <Box paddingBlockStart="2" width="100%">
+                    <SmoothAreaChart tickPositions={kpi.sparkline} color={sparklineColor} height="40" width={null} />
+                </Box>
             )}
         </VerticalStack>
     )
 
     return (
-        <Card>
-            <div
-                onClick={clickable ? () => onOpen(kpi) : undefined}
-                style={clickable ? { cursor: 'pointer' } : undefined}
-            >
-                <Box padding="4">
-                    <VerticalStack gap="2">
-                        <HorizontalStack align="space-between" blockAlign="center">
-                            <Text variant="bodySm" fontWeight="semibold" color="subdued">{kpi.label}</Text>
-                            <GapHint gaps={kpi.dataGaps} />
-                        </HorizontalStack>
-
-                        {showRing ? (
-                            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                                <RiskScoreRing value={kpi.value} size={48} />
-                                {valueColumn}
-                            </HorizontalStack>
-                        ) : valueColumn}
-
-                        {kpi.footnote && (
-                            <Text variant="bodySm" color="subdued">{kpi.footnote}</Text>
-                        )}
-
-                        {hasRealSparkline && (
-                            <div style={{ width: '100%' }}>
-                                <SmoothAreaChart tickPositions={kpi.sparkline} color={sparklineColor} height="40" width={null} />
-                            </div>
-                        )}
-                    </VerticalStack>
-                </Box>
-            </div>
+        <Card padding="4">
+            {clickable ? (
+                <Box className="cursor-pointer" onClick={() => onOpen(kpi)}>{content}</Box>
+            ) : content}
         </Card>
     )
 }
@@ -154,16 +162,14 @@ function KpiTile({ kpi, onOpen, forceClickable }) {
 // silently omits a card the design expects to see.
 function ComingSoonTile({ label }) {
     return (
-        <Card>
-            <Box padding="4">
-                <VerticalStack gap="2">
-                    <HorizontalStack align="space-between" blockAlign="center">
-                        <Text variant="bodySm" fontWeight="semibold" color="subdued">{label}</Text>
-                        <Badge status="new">Coming soon</Badge>
-                    </HorizontalStack>
-                    <Text variant="heading2xl" color="subdued">—</Text>
-                </VerticalStack>
-            </Box>
+        <Card padding="4">
+            <VerticalStack gap="1">
+                <ComponentHeader title={label} />
+                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                    <Text variant="heading2xl" as="p" color="subdued">—</Text>
+                    <Badge status="new">Coming soon</Badge>
+                </HorizontalStack>
+            </VerticalStack>
         </Card>
     )
 }
@@ -211,7 +217,7 @@ function FrameworkReadinessCard({ panel, onOpen }) {
     return (
         <CardWithHeader
             title="Framework readiness"
-            tooltipContent={panel?.dataGaps?.[0]?.impact}
+            tooltipContent={cardInfo('frameworkReadiness', panel?.dataGaps)}
             hasData={true}
             minHeight="220px"
         >
@@ -257,7 +263,7 @@ function AdoptionGapCard() {
         </VerticalStack>
     )
     return (
-        <CardWithHeader title="Adoption gap by department" hasData={true} minHeight="220px">
+        <CardWithHeader title="Adoption gap by department" tooltipContent={cardInfo('adoptionGap')} hasData={true} minHeight="220px">
             <DummyDataOverlay panelId="adoptionGap">{body}</DummyDataOverlay>
         </CardWithHeader>
     )
@@ -316,19 +322,14 @@ function VendorRiskBubbleCard({ vendorTable, onOpen }) {
     )
 
     return (
-        <Card>
-            <Box padding="4">
-                <VerticalStack gap="4">
-                    <HorizontalStack align="space-between" blockAlign="center">
-                        <Text variant="headingSm">Vendor risk vs. exposure</Text>
-                        <div onClick={() => navigate('/dashboard/observe/audit')} style={{ cursor: 'pointer' }}>
-                            <Text variant="bodySm" color="interactive">Registry</Text>
-                        </div>
-                    </HorizontalStack>
-                    {hasData ? body : <DummyDataOverlay panelId="vendorRiskExposure">{body}</DummyDataOverlay>}
-                </VerticalStack>
-            </Box>
-        </Card>
+        <CardWithHeader
+            title="Vendor risk vs. exposure"
+            tooltipContent={cardInfo('vendorRiskExposure')}
+            hasData={true}
+            headerAction={<Button plain onClick={() => navigate('/dashboard/observe/audit')}>Registry</Button>}
+        >
+            {hasData ? body : <DummyDataOverlay panelId="vendorRiskExposure">{body}</DummyDataOverlay>}
+        </CardWithHeader>
     )
 }
 
@@ -369,7 +370,7 @@ function ShadowAiTrendCard({ panel, onOpen }) {
     return (
         <CardWithHeader
             title="Shadow AI is outgrowing what you've approved"
-            tooltipContent={panel.dataGaps?.[0]?.impact}
+            tooltipContent={cardInfo('shadowAiTrend', panel.dataGaps)}
             hasData={true}
             minHeight="220px"
         >
@@ -447,7 +448,7 @@ function DataLeavingCard({ panel, onOpen }) {
     return (
         <CardWithHeader
             title="What data is leaving"
-            tooltipContent={panel.dataGaps?.[0]?.impact}
+            tooltipContent={cardInfo('dataLeaving', panel.dataGaps)}
             hasData={true}
             minHeight="180px"
         >
@@ -522,7 +523,7 @@ function EnforcementFunnelCard({ panel, onOpen }) {
     return (
         <CardWithHeader
             title="Enforcement funnel"
-            tooltipContent={panel.dataGaps?.map((g) => g.impact).join(' ')}
+            tooltipContent={cardInfo('enforcementFunnel', panel.dataGaps)}
             hasData={true}
             minHeight="220px"
         >
@@ -571,7 +572,7 @@ function AttackAttemptsCard({ panel, onOpen }) {
     return (
         <CardWithHeader
             title="Attack attempts"
-            tooltipContent={panel.dataGaps?.map((g) => g.impact).join(' ')}
+            tooltipContent={cardInfo('attackAttempts', panel.dataGaps)}
             hasData={true}
             minHeight="220px"
         >
@@ -583,21 +584,18 @@ function AttackAttemptsCard({ panel, onOpen }) {
 // "Act now" — top 3 discovery + top 3 guardrail insights, merged into one worst-first list.
 // Reuses the Insights feature's own data and severity styling wholesale rather than a parallel
 // summarization; the source label is what tells the two groups apart once they're merged.
-function ActNowRow({ insight, onOpen }) {
+function ActNowRow({ insight, onOpen, isLast }) {
     return (
-        <Box borderBlockEndWidth="1" borderColor="border">
-            <div
-                onClick={() => onOpen(insight)}
-                style={{ cursor: 'pointer', borderRadius: '4px', padding: '8px' }}
-            >
+        <Box padding="2" borderBlockEndWidth={isLast ? undefined : '1'} borderColor="border" onClick={() => onOpen(insight)}>
+            <Box className="cursor-pointer">
                 <VerticalStack gap="1">
-                    <HorizontalStack gap={"2"}>
+                    <HorizontalStack gap="2">
                         {insight.severity && <SeverityBadge severity={insight.severity} useDot={true}/>}
                         <Text variant="bodyMd" fontWeight="semibold">{insight.title}</Text>
                     </HorizontalStack>
                     <Text variant="bodySm" color="subdued">{insight.headline}</Text>
                 </VerticalStack>
-            </div>
+            </Box>
         </Box>
     )
 }
@@ -609,12 +607,12 @@ function BiggestMoversCard({ biggestMovers }) {
     const movers = (biggestMovers && biggestMovers.movers) || []
     if (movers.length === 0) {
         return (
-            <CardWithHeader title="Biggest movers" hasData={false}
+            <CardWithHeader title="Biggest movers" tooltipContent={cardInfo('biggestMovers')} hasData={false}
                 emptyMessage="No vendor crossed a threshold in the time period" minHeight="160px" />
         )
     }
     return (
-        <CardWithHeader title="Biggest movers" hasData={true} minHeight="160px">
+        <CardWithHeader title="Biggest movers" tooltipContent={cardInfo('biggestMovers')} hasData={true} minHeight="160px">
             <VerticalStack gap="3">
                 {movers.map((m) => (
                     <VerticalStack key={`${m.condition}-${m.vendor}`} gap="05">
@@ -644,15 +642,15 @@ function ActNowCard({ actNow, onOpenInsight }) {
 
     if (merged.length === 0) {
         return (
-            <CardWithHeader title="Act now" hasData={false} emptyMessage="Nothing needs attention right now." minHeight="160px" />
+            <CardWithHeader title="Act now" tooltipContent={cardInfo('actNow')} hasData={false} emptyMessage="Nothing needs attention right now." minHeight="160px" />
         )
     }
 
     return (
-        <CardWithHeader title="Act now" hasData={true} minHeight="160px">
+        <CardWithHeader title="Act now" tooltipContent={cardInfo('actNow')} hasData={true} minHeight="160px">
             <VerticalStack gap="2">
-                {merged.map((i) => (
-                    <ActNowRow key={i.insightId} insight={i} onOpen={() => onOpenInsight(i.insightId, i.group)} />
+                {merged.map((i, idx) => (
+                    <ActNowRow key={i.insightId} insight={i} isLast={idx === merged.length - 1} onOpen={() => onOpenInsight(i.insightId, i.group)} />
                 ))}
             </VerticalStack>
         </CardWithHeader>
@@ -771,7 +769,7 @@ function SecurityPosture() {
     }
 
     const kpiRow = (
-        <HorizontalGrid columns={4} gap="2">
+        <HorizontalGrid columns={4} gap="4">
             {[KPI_RISK_SCORE, KPI_CRITICAL_ALERTS, KPI_MONITORING_COVERAGE, KPI_SENSITIVE_INCIDENTS].map((id) => {
                 const kpi = kpiById(id)
                 if (!kpi) return <ComingSoonTile key={id} label={id} />
@@ -792,17 +790,17 @@ function SecurityPosture() {
         </HorizontalGrid>
     )
 
-    // Shadow AI trend gets more width than the data-leaving donut (3:2), not an even split — a
-    // ratio, so plain flex rather than Polaris's equal-width HorizontalGrid.
+    // Shadow AI trend gets more width than the data-leaving donut (3:2). Cards are direct grid
+    // items, so both stretch to the taller one's height; minmax(0, …) lets the charts shrink.
     const shadowAndDataLeavingRow = (
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'stretch' }}>
-            <div style={{ flex: 3, minWidth: 0 }}><ShadowAiTrendCard panel={pageData.shadowAiTrend} onOpen={() => openDrill(DRILL_SHADOW_AI)} /></div>
+        <HorizontalGrid columns="minmax(0, 3fr) minmax(0, 2fr)" gap="4">
+            <ShadowAiTrendCard panel={pageData.shadowAiTrend} onOpen={() => openDrill(DRILL_SHADOW_AI)} />
             {/* Every card opens the SAME group-level (L1) table regardless of which segment/row/
                 stage within it was clicked — drilling into a specific member (a data type, a
                 stage, a framework) happens by clicking a row inside that L1 table, not by
                 pre-guessing which one from the card. */}
-            <div style={{ flex: 2, minWidth: 0 }}><DataLeavingCard panel={pageData.dataLeaving} onOpen={() => openDrill(DRILL_DATA_LEAVING)} /></div>
-        </div>
+            <DataLeavingCard panel={pageData.dataLeaving} onOpen={() => openDrill(DRILL_DATA_LEAVING)} />
+        </HorizontalGrid>
     )
 
     const funnelAttackVendorRow = (
