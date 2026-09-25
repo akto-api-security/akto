@@ -19,6 +19,7 @@ import { INSIGHT_GROUP } from '../observe/agentic/insights/insightsHelpers'
 import PostureDrillFlyout from './PostureDrillFlyout'
 import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, RiskScoreRing } from './new_components/PostureShared'
 import dashboardApi from './api'
+import settingRequests from '../settings/api'
 import func from '@/util/func'
 import values from '@/util/values'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
@@ -32,6 +33,16 @@ import {
 const KPI_RISK_SCORE = 'riskScore'
 const KPI_CRITICAL_ALERTS = 'criticalAlerts'
 const KPI_MONITORING_COVERAGE = 'monitoringCoverage'
+
+// Monitoring coverage — frontend-only recalculation. PostureService's own KPI_MONITORING_COVERAGE
+// answers a different question (how many live devices an active guardrail policy applies to), not
+// whether a device is actually still heartbeating — this overrides its value/numerator/denominator/
+// footnote with a real answer computed here, off the same Endpoint Shield agents list
+// EndpointShieldMetadata.jsx itself reads (fetchEndpointShieldAgents). Its own `route`/`label` are
+// left as the backend sent them. A live/point-in-time question, so this fetches once on mount, not
+// on every date-range change like the rest of this page's own KPIs.
+const MONITORING_AGENT_PAGE_SIZE = 200
+const MONITORING_STALE_SECONDS = 3 * 24 * 3600
 const KPI_SENSITIVE_INCIDENTS = 'sensitiveDataIncidents'
 
 // Drill ids — must match PostureService.DRILL_* on the backend.
@@ -386,18 +397,16 @@ function ChartLegend({ items }) {
     return (
         <VerticalStack gap="2">
             {items.map(({ label, color, count, percent }) => (
-                <HorizontalStack key={label} align="space-between" blockAlign="center">
+                <HorizontalStack key={label} align="space-between">
                     <HorizontalStack gap="2" blockAlign="center">
                         <Box style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
                         <Text variant="bodyMd" color="subdued">{label}</Text>
+                        <Text variant="bodyMd">{count.toLocaleString()}</Text>
                     </HorizontalStack>
-                    <HorizontalStack gap="1" blockAlign="center">
-                        <Text variant="bodyMd" fontWeight="semibold">{count.toLocaleString()}</Text>
-                        {(percent !== undefined && percent !== null) && (
-                            <Text variant="bodySm" color="subdued">({percent}%)</Text>
-                        )}
+                    {(percent !== undefined && percent !== null) && (
+                        <Text variant="bodySm" color="subdued" fontWeight="semibold">({percent}%)</Text>
+                    )}
                     </HorizontalStack>
-                </HorizontalStack>
             ))}
         </VerticalStack>
     )
@@ -433,7 +442,7 @@ function DataLeavingCard({ panel, onOpen }) {
     // Any segment click opens the SAME group-level drilldown table (every data type, not just the
     // one clicked) — drilling into one specific type happens from a row inside that table.
     const body = (
-        <HorizontalStack gap="4" blockAlign="center" wrap={false}>
+        <HorizontalStack gap="2" blockAlign="center">
             <DonutChart
                 data={graphData}
                 title=""
@@ -441,7 +450,9 @@ function DataLeavingCard({ panel, onOpen }) {
                 pieInnerSize="55%"
                 onSegmentClick={hasData ? () => onOpen() : undefined}
             />
-            <ChartLegend items={legendItems} />
+            <Box width='100%'>
+                <ChartLegend items={legendItems} />
+            </Box>
         </HorizontalStack>
     )
 
@@ -450,7 +461,7 @@ function DataLeavingCard({ panel, onOpen }) {
             title="What data is leaving"
             tooltipContent={cardInfo('dataLeaving', panel.dataGaps)}
             hasData={true}
-            minHeight="180px"
+            minHeight="100px"
         >
             {hasData ? body : <DummyDataOverlay panelId="dataLeaving">{body}</DummyDataOverlay>}
         </CardWithHeader>
@@ -683,6 +694,7 @@ function SecurityPosture() {
     )
     const [pageData, setPageData] = useState({})
     const [loading, setLoading] = useState(true)
+    const [monitoringCoverage, setMonitoringCoverage] = useState(null) // {value,numerator,denominator,footnote,dataGaps} | null
     const [flyout, setFlyout] = useState(null) // { insightId, group } | null
     // { drillId, path } | null — the paginated drilldown flyout (Shadow AI tools, What data is
     // leaving, Enforcement funnel, Vendor risk, Framework readiness, Risk score breakdown), fully
@@ -733,6 +745,56 @@ function SecurityPosture() {
         load()
         return () => { cancelled = true }
     }, [currDateRange])
+
+    // See MONITORING_STALE_SECONDS' own comment above — a live re-derivation of Monitoring
+    // coverage, independent of currDateRange, so this fetches once on mount rather than per-range.
+    useEffect(() => {
+        let cancelled = false
+
+        async function load() {
+            try {
+                const agents = []
+                let skip = 0
+                // fetchEndpointShieldAgents caps its own limit at 200 server-side regardless of
+                // what's asked for (ModuleInfoAction#fetchEndpointShieldAgents), so this pages
+                // through in fixed-size chunks until the server's own `total` says there's nothing
+                // left, rather than trusting one oversized request to return everything.
+                while (true) { // eslint-disable-line no-constant-condition
+                    const resp = await settingRequests.fetchEndpointShieldAgents({ skip, limit: MONITORING_AGENT_PAGE_SIZE })
+                    const page = resp?.moduleInfos || []
+                    agents.push(...page)
+                    const total = resp?.total || 0
+                    skip += page.length
+                    if (page.length === 0 || skip >= total) break
+                }
+                if (cancelled) return
+                if (agents.length === 0) { setMonitoringCoverage(null); return }
+
+                const now = Math.floor(Date.now() / 1000)
+                const total = agents.filter(x => x.lastHeartbeatReceived > 0).length
+                // Only a device that HAS heartbeated before but has gone stale counts as out of
+                // coverage — one that's never heartbeated at all (lastHeartbeatReceived === 0) is a
+                // separate, not-yet-onboarded case, not something this metric should flag.
+                const outOfCoverage = agents.filter((a) => {
+                    const last = a?.lastHeartbeatReceived || 0
+                    return last > 0 && (now - last) > MONITORING_STALE_SECONDS
+                }).length
+                const covered = total - outOfCoverage
+                setMonitoringCoverage({
+                    value: Math.round((covered / total) * 100),
+                    numerator: covered,
+                    denominator: total,
+                    footnote: `${outOfCoverage} device${outOfCoverage === 1 ? '' : 's'} unmonitored`,
+                    dataGaps: [],
+                })
+            } catch (error) {
+                console.error('Error computing monitoring coverage:', error)
+            }
+        }
+
+        load()
+        return () => { cancelled = true }
+    }, [])
 
     const kpis = pageData.kpis || []
     const kpiById = (id) => kpis.find((k) => k.id === id)
@@ -785,7 +847,15 @@ function SecurityPosture() {
                 if (id === KPI_SENSITIVE_INCIDENTS) {
                     return <KpiTile key={id} kpi={kpi} onOpen={() => openDrill(DRILL_SENSITIVE_DATA)} forceClickable />
                 }
-                return <KpiTile key={id} kpi={kpi} onOpen={openKpi} />
+                // See MONITORING_STALE_SECONDS' own comment — overrides the backend's own
+                // value/numerator/denominator/footnote/dataGaps with the frontend-computed ones,
+                // keeping everything else (id/label/route) as the backend sent it. Falls back to
+                // the backend's own (guardrail-policy-based) figure until the client-side fetch
+                // resolves, rather than showing "Not computed yet" for a moment first.
+                const displayKpi = id === KPI_MONITORING_COVERAGE && monitoringCoverage
+                    ? { ...kpi, ...monitoringCoverage }
+                    : kpi
+                return <KpiTile key={id} kpi={displayKpi} onOpen={openKpi} />
             })}
         </HorizontalGrid>
     )
@@ -804,16 +874,16 @@ function SecurityPosture() {
     )
 
     const funnelAttackVendorRow = (
-        <HorizontalGrid columns={3} gap="3">
+        <HorizontalGrid columns={2} gap="3">
             <EnforcementFunnelCard panel={pageData.enforcementFunnel} onOpen={() => openDrill(DRILL_ENFORCEMENT_FUNNEL)} />
-            <AttackAttemptsCard panel={pageData.attackAttempts} onOpen={openPanel} />
-            <VendorRiskBubbleCard vendorTable={kpiById(KPI_RISK_SCORE)?.vendorTable} onOpen={() => openDrill(DRILL_VENDOR_RISK)} />
+            <FrameworkReadinessCard panel={pageData.frameworkReadiness} onOpen={() => openDrill(DRILL_FRAMEWORK_READINESS)} />
         </HorizontalGrid>
     )
 
     const frameworkAndAdoptionRow = (
-        <HorizontalGrid columns={2} gap="4">
-            <FrameworkReadinessCard panel={pageData.frameworkReadiness} onOpen={() => openDrill(DRILL_FRAMEWORK_READINESS)} />
+        <HorizontalGrid columns={3} gap="4">
+            <VendorRiskBubbleCard vendorTable={kpiById(KPI_RISK_SCORE)?.vendorTable} onOpen={() => openDrill(DRILL_VENDOR_RISK)} />
+            <AttackAttemptsCard panel={pageData.attackAttempts} onOpen={openPanel} />
             <AdoptionGapCard />
         </HorizontalGrid>
     )

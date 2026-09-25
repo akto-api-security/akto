@@ -6,12 +6,13 @@ import {
 import { ChevronRightMinor } from '@shopify/polaris-icons'
 import AgenticFlyoutShell from '../observe/agentic/AgenticFlyoutShell'
 import FlyoutBreadcrumb from '../observe/agentic/FlyoutBreadcrumb'
+import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
 import AgGridTable from '../../components/tables/AgGridTable'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import MarkdownViewer from '@/apps/dashboard/components/shared/MarkdownViewer'
 import CustomProgressBar from './new_components/CustomProgressBar'
 import SmoothAreaChart from './new_components/SmoothChart'
-import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, GapHint, riskBand, RiskScoreRing } from './new_components/PostureShared'
+import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, GapHint, NumberCardsRow, riskBand, RiskScoreRing } from './new_components/PostureShared'
 import { DUMMY_RISK_SCORE_TREND } from './securityPostureDummyData'
 import dashboardApi from './api'
 import func from '@/util/func'
@@ -51,6 +52,12 @@ function EpochCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(value || 0)}</Text>
 }
 
+// Same badge every severity anywhere else in the app already renders (guardrail violations, the
+// agentic asset flyouts) — a "severity" column showing plain text was the odd one out.
+function SeverityCell({ value }) {
+    return value ? <SeverityBadge severity={value} /> : <Text variant="bodySm">-</Text>
+}
+
 // ─── Stats row ────────────────────────────────────────────────────────────────
 // Same "big number over a subdued label" stat-tile language OverviewContent (SessionFlyout) uses
 // — a row total is always shown (real, not from the backend's own optional summary[]), plus
@@ -59,9 +66,15 @@ function EpochCell({ value }) {
 function DrillStats({ drill }) {
     const stats = (drill.summary || []).map((m) => ({ key: m.key, label: m.label, value: m.formatted }))
     // The table's first column names what each row is, so the list gets a real title ("Tools")
-    // with the count beside it, rather than a generic "Rows" total.
-    const entity = drill.columns?.[0]?.headerName
-    const title = !entity ? 'Results'
+    // with the count beside it, rather than a generic "Rows" total. That heuristic only holds when
+    // each row is a grouped entity (a tool, a vendor, a user); a table of individual guardrail
+    // events instead — every drill here whose own first column is "detectedAt" (criticalAlerts,
+    // dataLeaving's/enforcementFunnel's own member-level event lists) — has nothing sensible to
+    // pluralize ("Detected at" -> "Detected ats"), so it gets this fixed label instead.
+    const firstColumn = drill.columns?.[0]
+    const entity = firstColumn?.headerName
+    const title = firstColumn?.field === 'detectedAt' ? 'Guardrail violations'
+        : !entity ? 'Results'
         : entity.endsWith('s') ? entity
         : /[^aeiou]y$/i.test(entity) ? `${entity.slice(0, -1)}ies` : `${entity}s`
     return (
@@ -70,16 +83,7 @@ function DrillStats({ drill }) {
                 <Text variant="headingMd" as="h3">{title}</Text>
                 <Badge>{(drill.total ?? 0).toLocaleString()}</Badge>
             </HorizontalStack>
-            {stats.length > 0 && (
-                <HorizontalStack gap="6">
-                    {stats.map((s) => (
-                        <VerticalStack gap="1" key={s.key}>
-                            <Text variant="headingLg" as="p">{s.value}</Text>
-                            <Text variant="bodySm" color="subdued">{s.label}</Text>
-                        </VerticalStack>
-                    ))}
-                </HorizontalStack>
-            )}
+            <NumberCardsRow metrics={stats} />
         </VerticalStack>
     )
 }
@@ -234,6 +238,7 @@ function ProfileTable({ section }) {
     const tableRows = rows.map((r) => columns.map((c) => {
         const value = r[c.field]
         if (EPOCH_FIELDS.has(c.field)) return func.prettifyEpoch(value || 0)
+        if (c.field === 'severity') return value ? <SeverityBadge severity={value} /> : '-'
         if ((c.field === 'status' || c.field === 'result') && STATUS_BADGE_STATUS[value]) {
             return <Badge status={STATUS_BADGE_STATUS[value]}>{value}</Badge>
         }
@@ -270,31 +275,26 @@ function ProfileTable({ section }) {
 }
 
 function DrillProfileBody({ drill, onCtaClick }) {
-    // Summary metrics repeat what the subtitle already says, so they join the facts card (skipping
-    // any the facts already carry) instead of rendering as a third copy of the same numbers.
-    const facts = drill.facts || []
-    const factLabels = new Set(facts.map((f) => f.label))
-    const mergedFacts = [
-        ...(drill.summary || []).filter((m) => !factLabels.has(m.label)).map((m) => ({ label: m.label, value: m.formatted })),
-        ...facts,
-    ]
+    // Summary metrics get their own number-card row; qualitative facts (Status, First seen, an
+    // account mix — not really "numbers") stay in the plain label/value grid below, minus whatever
+    // a summary card already shows, so nothing repeats twice.
+    const summaryMetrics = (drill.summary || []).map((m) => ({ key: m.key, label: m.label, value: m.formatted }))
+    const summaryLabels = new Set(summaryMetrics.map((m) => m.label))
+    const facts = (drill.facts || []).filter((f) => !summaryLabels.has(f.label))
     return (
-        <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
-        <Box padding="4">
-            <VerticalStack gap="4">
-                <ProfileHeader drill={drill} onCtaClick={onCtaClick} />
-                {drill.notice && <Banner status="info">{drill.notice}</Banner>}
-                {(drill.dataGaps || []).map((g, i) => <Banner key={i} status="info">{g.impact}</Banner>)}
-                <ProfileFacts facts={mergedFacts} />
-                {(drill.sections || []).map((s) => (
-                    <VerticalStack key={s.id} gap="4">
-                        <Divider />
-                        {s.kind === 'timeline' ? <ProfileTimeline section={s} /> : <ProfileTable section={s} />}
-                    </VerticalStack>
-                ))}
-            </VerticalStack>
-        </Box>
-        </Scrollable>
+        <VerticalStack gap="4">
+            <ProfileHeader drill={drill} onCtaClick={onCtaClick} />
+            {drill.notice && <Banner status="info">{drill.notice}</Banner>}
+            {(drill.dataGaps || []).map((g, i) => <Banner key={i} status="info">{g.impact}</Banner>)}
+            <NumberCardsRow metrics={summaryMetrics} />
+            <ProfileFacts facts={facts} />
+            {(drill.sections || []).map((s) => (
+                <VerticalStack key={s.id} gap="4">
+                    <Divider />
+                    {s.kind === 'timeline' ? <ProfileTimeline section={s} /> : <ProfileTable section={s} />}
+                </VerticalStack>
+            ))}
+        </VerticalStack>
     )
 }
 
@@ -504,55 +504,51 @@ function RiskScoreRootBody({ kpi, onSubScoreClick }) {
     const deltaText = formatDelta(kpi)
 
     return (
-        <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
-        <Box padding="4">
-            <VerticalStack gap="5">
-                {/* Grid, not HorizontalStack: settings.css forces `.Polaris-HorizontalStack { align-items: center !important }`
-                    globally, which would override blockAlign="start". The fixed track also keeps the donut from clipping. */}
-                <HorizontalGrid columns="96px minmax(0, 1fr)" gap="5" alignItems="start">
-                    <RiskScoreRing value={kpi.value} size={96} showValue />
-                    <VerticalStack gap="3">
-                        <VerticalStack gap="1">
-                            <HorizontalStack gap="2" blockAlign="center">
-                                {band && (
-                                    <Badge status={band.tone === 'critical' ? 'critical' : band.tone === 'warning' ? 'warning' : 'success'}>
-                                        {band.label}
-                                    </Badge>
-                                )}
-                                {deltaText && (
-                                    <HorizontalStack gap="1">
-                                        <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
-                                            {deltaText}
-                                        </Text>
-                                        <Text variant="bodySm" color="subdued">vs previous period</Text>
-                                    </HorizontalStack>
-                                )}
-                            </HorizontalStack>
-                            <Text variant="bodySm" color="subdued">
-                                Composite of five weighted sub-scores. Lower is better.
-                                {kpi.footnote ? ` ${kpi.footnote}.` : ''}
-                            </Text>
-                        </VerticalStack>
-                        <RiskScoreTrendSection />
-                        {historyGap && <Text variant="bodySm" color="subdued">{historyGap.impact}</Text>}
+        <VerticalStack gap="5">
+            {/* Grid, not HorizontalStack: settings.css forces `.Polaris-HorizontalStack { align-items: center !important }`
+                globally, which would override blockAlign="start". The fixed track also keeps the donut from clipping. */}
+            <HorizontalGrid columns="96px minmax(0, 1fr)" gap="5" alignItems="start">
+                <RiskScoreRing value={kpi.value} size={96} showValue />
+                <VerticalStack gap="3">
+                    <VerticalStack gap="1">
+                        <HorizontalStack gap="2" blockAlign="center">
+                            {band && (
+                                <Badge status={band.tone === 'critical' ? 'critical' : band.tone === 'warning' ? 'warning' : 'success'}>
+                                    {band.label}
+                                </Badge>
+                            )}
+                            {deltaText && (
+                                <HorizontalStack gap="1">
+                                    <Text variant="bodySm" fontWeight="semibold" color={DELTA_TONE_TO_COLOR[kpi.deltaTone] || 'subdued'}>
+                                        {deltaText}
+                                    </Text>
+                                    <Text variant="bodySm" color="subdued">vs previous period</Text>
+                                </HorizontalStack>
+                            )}
+                        </HorizontalStack>
+                        <Text variant="bodySm" color="subdued">
+                            Composite of five weighted sub-scores. Lower is better.
+                            {kpi.footnote ? ` ${kpi.footnote}.` : ''}
+                        </Text>
                     </VerticalStack>
-                </HorizontalGrid>
-
-                {/* Rows carry their own padding + hover (agentic-clickable-row), so no stack gap here. */}
-                <VerticalStack gap="0">
-                    {(kpi.subScores || []).map((s) => (
-                        <VerticalStack key={s.id} gap="0">
-                            <Divider />
-                            <RiskScoreSubScoreRow subScore={s} kpi={kpi} onClick={() => onSubScoreClick(s.id)} />
-                        </VerticalStack>
-                    ))}
-                    <Divider />
+                    <RiskScoreTrendSection />
+                    {historyGap && <Text variant="bodySm" color="subdued">{historyGap.impact}</Text>}
                 </VerticalStack>
+            </HorizontalGrid>
 
-                <RiskScoreAnnotationsSection kpi={kpi} onSubScoreClick={onSubScoreClick} />
+            {/* Rows carry their own padding + hover (agentic-clickable-row), so no stack gap here. */}
+            <VerticalStack gap="0">
+                {(kpi.subScores || []).map((s) => (
+                    <VerticalStack key={s.id} gap="0">
+                        <Divider />
+                        <RiskScoreSubScoreRow subScore={s} kpi={kpi} onClick={() => onSubScoreClick(s.id)} />
+                    </VerticalStack>
+                ))}
+                <Divider />
             </VerticalStack>
-        </Box>
-        </Scrollable>
+
+            <RiskScoreAnnotationsSection kpi={kpi} onSubScoreClick={onSubScoreClick} />
+        </VerticalStack>
     )
 }
 
@@ -646,7 +642,8 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         flex: 1,
         minWidth: 130,
         cellStyle: { display: 'flex', alignItems: 'center' },
-        ...(EPOCH_FIELDS.has(c.field) ? { cellRenderer: EpochCell } : {}),
+        ...(EPOCH_FIELDS.has(c.field) ? { cellRenderer: EpochCell }
+            : c.field === 'severity' ? { cellRenderer: SeverityCell } : {}),
     })), [drill?.columns])
 
     const onServerFetch = useCallback(({ skip, limit }) => {
@@ -709,10 +706,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
     const narrativeSection = drill && drill.narrativeStatus !== 'UNAVAILABLE' ? (
         <>
             <Divider />
-            {/* Same pane as the breakdown above, so the two halves split the flyout evenly and each scrolls on its own. */}
-            <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
-                <DrillNarrative drill={drill} />
-            </Scrollable>
+            <DrillNarrative drill={drill} />
         </>
     ) : null
 
@@ -729,12 +723,12 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                 />
             }
         >
-            {/* Plain flex divs all the way down to the grid, deliberately not Polaris VerticalStack
-                — AgGridTable's domLayout="normal" needs an unbroken pixel-height chain to size
-                itself against, and VerticalStack doesn't forward flex-grow the way Box/a div does
-                (see AgenticFlyoutShell's own reliance on Box forwarding raw style for the same
-                reason). Same structure DevicesTab/SessionTracesContent already use. */}
-            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+            {/* AgenticFlyoutShell's own child wrapper is a fixed-height flex column with
+                overflow:hidden, so a single Scrollable here is the ONE scroll region for the whole
+                flyout body — everything below (stats, the table/profile/risk-score body, the pie,
+                the AI summary) is plain document flow inside it, not a chain of independently
+                scrolling panes that fight each other for height. */}
+            <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
                 {/* AgenticFlyoutShell keeps rendering children through its own close transition, so
                     `drillState` can already be null here for a render or two after the close button
                     is clicked, before the effect above catches up and resets `drill` to null too —
@@ -742,34 +736,32 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                 {!drill || !drillState || loading ? (
                     <SpinnerCentered height="200px" />
                 ) : (
-                    <>
-                        {!isProfileLayout && hasTopContent && (
-                            <>
-                                <Box padding="4" paddingBlockEnd="0">
-                                    <HorizontalStack align="space-between" blockAlign="start">
-                                        {!isRiskScoreRoot && <DrillStats drill={drill} />}
-                                        {ctas.length > 0 && (
-                                            <HorizontalStack gap="2">
-                                                {ctas.map((cta) => (
-                                                    <Button key={cta.id} size="slim" onClick={() => navigate(ctaHref(cta))}>{cta.label}</Button>
-                                                ))}
-                                            </HorizontalStack>
-                                        )}
-                                    </HorizontalStack>
-                                    {dataGaps.length > 0 && (
-                                        <Box paddingBlockStart="3">
+                    <Box padding="4">
+                        <VerticalStack gap="4">
+                            {!isProfileLayout && hasTopContent && (
+                                <>
+                                    <VerticalStack gap="3">
+                                        <HorizontalStack align="space-between" blockAlign="start">
+                                            {!isRiskScoreRoot && <DrillStats drill={drill} />}
+                                            {ctas.length > 0 && (
+                                                <HorizontalStack gap="2">
+                                                    {ctas.map((cta) => (
+                                                        <Button key={cta.id} size="slim" onClick={() => navigate(ctaHref(cta))}>{cta.label}</Button>
+                                                    ))}
+                                                </HorizontalStack>
+                                            )}
+                                        </HorizontalStack>
+                                        {dataGaps.length > 0 && (
                                             <VerticalStack gap="2">
                                                 {dataGaps.map((g, i) => (
                                                     <Banner key={i} status="info">{g.impact}</Banner>
                                                 ))}
                                             </VerticalStack>
-                                        </Box>
-                                    )}
-                                </Box>
-                                <Box paddingBlockStart="4"><Divider /></Box>
-                            </>
-                        )}
-                        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                                        )}
+                                    </VerticalStack>
+                                    <Divider />
+                                </>
+                            )}
                             {isRiskScoreRoot ? (
                                 <RiskScoreRootBody kpi={mergedRiskScoreKpi} onSubScoreClick={handleSubScoreClick} />
                             ) : isProfileLayout ? (
@@ -784,18 +776,18 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                                     onRowClicked={drill.drillable ? handleRowClicked : undefined}
                                     getRowStyle={drill.drillable ? () => ({ cursor: 'pointer' }) : undefined}
                                     noOuterBorder
-                                    domLayout="normal"
+                                    domLayout="autoHeight"
                                     paginationPageSize={20}
                                     hidePageSizeSelector
                                     filterStateUrl={`security-posture-drill/${drillState?.drillId || ''}/${drillState?.path || ''}`}
                                     sideBar={false}
                                 />
                             )}
-                        </div>
-                        {narrativeSection}
-                    </>
+                            {narrativeSection}
+                        </VerticalStack>
+                    </Box>
                 )}
-            </div>
+            </Scrollable>
         </AgenticFlyoutShell>
     )
 }

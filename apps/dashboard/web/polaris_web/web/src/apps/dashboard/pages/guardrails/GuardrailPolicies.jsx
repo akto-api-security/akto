@@ -740,7 +740,8 @@ function GuardrailPolicies() {
                     : null,
                 url: guardrailData.url || '',
                 confidenceScore: guardrailData.confidenceScore || 0,
-                active: true
+                active: true,
+                skipEnterpriseAccounts: guardrailData.skipEnterpriseAccounts || false
             };
 
             // Prepare request payload with nested policy object
