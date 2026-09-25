@@ -168,47 +168,25 @@ function ProfileHeader({ drill, onCtaClick }) {
     )
 }
 
-function ProfileStats({ summary }) {
-    if (!summary || summary.length === 0) return null
-    return (
-        <HorizontalStack gap="3">
-            {summary.map((m) => (
-                <Box key={m.key} width="160px" padding="3" background="bg-surface-secondary" borderRadius="2">
-                    <VerticalStack gap="1">
-                        <Text variant="headingLg" as="p">{m.formatted}</Text>
-                        <Text variant="bodySm" color="subdued">{m.label}</Text>
-                    </VerticalStack>
-                </Box>
-            ))}
-        </HorizontalStack>
-    )
-}
-
 function ProfileFacts({ facts }) {
     if (!facts || facts.length === 0) return null
     return (
-        <Card>
-            <Box padding="4">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 24px' }}>
-                    {facts.map((f, i) => (
-                        <VerticalStack gap="1" key={i}>
-                            <Text variant="bodySm" color="subdued">{f.label}</Text>
-                            <Text variant="bodyMd" fontWeight="semibold" color={f.tone === 'critical' ? 'critical' : undefined}>
-                                {f.value}
-                            </Text>
-                        </VerticalStack>
-                    ))}
-                </div>
-            </Box>
-        </Card>
+        <HorizontalGrid columns={3} gap="4">
+                {facts.map((f, i) => (
+                    <VerticalStack gap="1" key={i}>
+                        <Text variant="bodySm" color="subdued">{f.label}</Text>
+                        <Text variant="bodyMd" fontWeight="semibold" color={f.tone === 'critical' ? 'critical' : undefined}>
+                            {f.value}
+                        </Text>
+                    </VerticalStack>
+                ))}
+        </HorizontalGrid>
     )
 }
 
 function ProfileTimeline({ section }) {
     const rows = section.rows || []
     return (
-        <Card>
-            <Box padding="4">
                 <VerticalStack gap="4">
                     <VerticalStack gap="05">
                         <Text variant="headingSm">{section.title}</Text>
@@ -217,21 +195,28 @@ function ProfileTimeline({ section }) {
                     {rows.length === 0 ? (
                         <Text variant="bodySm" color="subdued">Nothing recorded in this window.</Text>
                     ) : (
-                        <VerticalStack gap="4">
+                        // time | rail | content. Grid cells stretch to the row's height, so the rail's
+                        // border runs from under the dot to the next row — rows have no gap, the
+                        // content's bottom padding is the spacing, which keeps the line unbroken.
+                        <VerticalStack gap="0">
                             {rows.map((r, i) => (
-                                <HorizontalStack key={i} gap="3" wrap={false} blockAlign="start">
-                                    <Box paddingBlockStart="1">
-                                        <div style={{
-                                            width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                                            background: SEVERITY_DOT_COLOR[String(r.severity || '').toUpperCase()] || '#8C9196',
-                                        }} />
+                                <HorizontalGrid key={i} columns="96px 8px minmax(0, 1fr)" gap="3">
+                                    <Text variant="bodySm" color="subdued" alignment="end">{func.prettifyEpoch(r.timestamp || 0)}</Text>
+                                    <Box position="relative">
+                                        <Box paddingBlockStart="1">
+                                            <Box className="agentic-dot" style={{ '--dot-color': SEVERITY_DOT_COLOR[String(r.severity || '').toUpperCase()] || '#8C9196' }} />
+                                        </Box>
+                                        {i < rows.length - 1 && (
+                                            <Box position="absolute" insetBlockStart="4" insetBlockEnd="0" width="4px" borderInlineEndWidth="1" borderColor="border-subdued" />
+                                        )}
                                     </Box>
-                                    <VerticalStack gap="05">
-                                        <Text variant="bodySm" color="subdued">{func.prettifyEpoch(r.timestamp || 0)}</Text>
-                                        <Text variant="bodyMd" fontWeight="semibold">{r.title}</Text>
-                                        {r.detail && <Text variant="bodySm" color="subdued">{r.detail}</Text>}
-                                    </VerticalStack>
-                                </HorizontalStack>
+                                    <Box paddingBlockEnd="5">
+                                        <VerticalStack gap="05">
+                                            <Text variant="bodyMd" fontWeight="semibold">{r.title}</Text>
+                                            {r.detail && <Text variant="bodySm" color="subdued">{r.detail}</Text>}
+                                        </VerticalStack>
+                                    </Box>
+                                </HorizontalGrid>
                             ))}
                         </VerticalStack>
                     )}
@@ -239,8 +224,6 @@ function ProfileTimeline({ section }) {
                         <Text variant="bodySm" color="subdued">Showing {rows.length} of {section.total}.</Text>
                     )}
                 </VerticalStack>
-            </Box>
-        </Card>
     )
 }
 
@@ -287,21 +270,31 @@ function ProfileTable({ section }) {
 }
 
 function DrillProfileBody({ drill, onCtaClick }) {
+    // Summary metrics repeat what the subtitle already says, so they join the facts card (skipping
+    // any the facts already carry) instead of rendering as a third copy of the same numbers.
+    const facts = drill.facts || []
+    const factLabels = new Set(facts.map((f) => f.label))
+    const mergedFacts = [
+        ...(drill.summary || []).filter((m) => !factLabels.has(m.label)).map((m) => ({ label: m.label, value: m.formatted })),
+        ...facts,
+    ]
     return (
-        <Box overflowY="scroll" padding="4">
+        <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
+        <Box padding="4">
             <VerticalStack gap="4">
                 <ProfileHeader drill={drill} onCtaClick={onCtaClick} />
                 {drill.notice && <Banner status="info">{drill.notice}</Banner>}
                 {(drill.dataGaps || []).map((g, i) => <Banner key={i} status="info">{g.impact}</Banner>)}
-                <ProfileStats summary={drill.summary} />
-                <ProfileFacts facts={drill.facts} />
+                <ProfileFacts facts={mergedFacts} />
                 {(drill.sections || []).map((s) => (
-                    s.kind === 'timeline'
-                        ? <ProfileTimeline key={s.id} section={s} />
-                        : <ProfileTable key={s.id} section={s} />
+                    <VerticalStack key={s.id} gap="4">
+                        <Divider />
+                        {s.kind === 'timeline' ? <ProfileTimeline section={s} /> : <ProfileTable section={s} />}
+                    </VerticalStack>
                 ))}
             </VerticalStack>
         </Box>
+        </Scrollable>
     )
 }
 
@@ -732,7 +725,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                     items={breadcrumbItems}
                     onClose={onClose}
                     // Only when it adds something — on sub-score levels the title is the last crumb already.
-                    subtitle={drillState?.path && drill?.title !== breadcrumbItems[breadcrumbItems.length - 1]?.label ? drill.title : null}
+                    subtitle={drillState?.path && drill && drill.title !== breadcrumbItems[breadcrumbItems.length - 1]?.label ? drill.title : null}
                 />
             }
         >
