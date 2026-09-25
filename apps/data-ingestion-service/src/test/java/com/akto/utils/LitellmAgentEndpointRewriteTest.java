@@ -28,8 +28,10 @@ public class LitellmAgentEndpointRewriteTest {
         return data;
     }
 
+    /** Headers claude.sh makes Claude Code send, x-akto-contextsource: ENDPOINT included. */
     private static BasicDBObject claudeCodeHeaders() {
         return new BasicDBObject("user-agent", CLAUDE_CLI_UA)
+            .append("x-akto-contextsource", "ENDPOINT")
             .append("x-claude-code-session-id", "4d0e795e")
             .append("host", "localhost:4000")
             .append("content-type", "application/json");
@@ -151,9 +153,9 @@ public class LitellmAgentEndpointRewriteTest {
         BasicDBObject h = claudeCodeHeaders().append("X-OpenWebUI-User-Email", "webui.user@example.com");
         assertEquals("webui.user@example.com", LitellmAgentEndpointRewrite.apply(envelope("litellm", h, verdictTag())));
         assertNull(LitellmAgentEndpointRewrite.apply(envelope("litellm", claudeCodeHeaders(), verdictTag())));
-        BasicDBObject other = claudeCodeHeaders().append("x-akto-installer-user_email", "test.user@example.com");
-        other.put("user-agent", "OpenAI/Python 1.40.0");
-        assertNull(LitellmAgentEndpointRewrite.apply(envelope("litellm", other, verdictTag())));
+        BasicDBObject noHeader = claudeCodeHeaders().append("x-akto-installer-user_email", "test.user@example.com");
+        noHeader.remove("x-akto-contextsource");
+        assertNull(LitellmAgentEndpointRewrite.apply(envelope("litellm", noHeader, verdictTag())));
     }
 
     @Test
@@ -192,7 +194,7 @@ public class LitellmAgentEndpointRewriteTest {
 
     @Test
     public void hostHeaderIsReplacedWhateverItsCasing() {
-        BasicDBObject h = new BasicDBObject("User-Agent", CLAUDE_CLI_UA).append("Host", "LiteLLM.corp:4000");
+        BasicDBObject h = new BasicDBObject("User-Agent", CLAUDE_CLI_UA).append("Host", "LiteLLM.corp:4000").append("x-akto-contextsource", "ENDPOINT");
         Map<String, Object> data = envelope("LiteLLM", h, baseTag());
         LitellmAgentEndpointRewrite.apply(data);
         BasicDBObject out = headers(data);
@@ -218,7 +220,7 @@ public class LitellmAgentEndpointRewriteTest {
 
     @Test
     public void openCodeViaLitellmBecomesAtlasOpenCodeTraffic() {
-        BasicDBObject h = new BasicDBObject("user-agent", OPENCODE_UA).append("host", "localhost:4001");
+        BasicDBObject h = new BasicDBObject("user-agent", OPENCODE_UA).append("host", "localhost:4001").append("x-akto-contextsource", "ENDPOINT");
         Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
         LitellmAgentEndpointRewrite.apply(data);
         assertEquals("ENDPOINT", data.get("contextSource"));
@@ -230,7 +232,7 @@ public class LitellmAgentEndpointRewriteTest {
     @Test
     public void openCodeEmailHeaderNamesTheHost() {
         BasicDBObject h = new BasicDBObject("user-agent", OPENCODE_UA).append("host", "localhost:4001")
-            .append("x-akto-installer-user_email", "test.user@example.com");
+            .append("x-akto-contextsource", "ENDPOINT").append("x-akto-installer-user_email", "test.user@example.com");
         Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
         LitellmAgentEndpointRewrite.apply(data);
         assertEquals("test-user.ai-agent.opencode-litellm", headers(data).getString("host"));
@@ -281,6 +283,17 @@ public class LitellmAgentEndpointRewriteTest {
     }
 
     @Test
+    public void claudeCodeAndOpenCodeStayInArgusWithoutTheHeader() {
+        for (String ua : new String[]{CLAUDE_CLI_UA, OPENCODE_UA}) {
+            BasicDBObject h = new BasicDBObject("user-agent", ua).append("host", "localhost:4000");
+            Map<String, Object> data = envelope("litellm", h, ingestTag());
+            Map<String, Object> before = new HashMap<>(data);
+            assertNull(LitellmAgentEndpointRewrite.apply(data));
+            assertEquals(before, data);
+        }
+    }
+
+    @Test
     public void knownAgentsKeepTheirNameWhenTheHeaderIsSent() {
         BasicDBObject h = new BasicDBObject("user-agent", OPENCODE_UA).append("host", "localhost:4001").append("x-akto-contextsource", "ENDPOINT");
         Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
@@ -313,9 +326,10 @@ public class LitellmAgentEndpointRewriteTest {
     }
 
     @Test
-    public void otherLitellmClientsAreUntouched() {
+    public void clientsWithoutTheHeaderAreUntouched() {
         BasicDBObject h = claudeCodeHeaders();
         h.put("user-agent", "OpenAI/Python 1.40.0");
+        h.remove("x-akto-contextsource");
         Map<String, Object> data = envelope("litellm", h, verdictTag());
         Map<String, Object> before = new HashMap<>(data);
         LitellmAgentEndpointRewrite.apply(data);
