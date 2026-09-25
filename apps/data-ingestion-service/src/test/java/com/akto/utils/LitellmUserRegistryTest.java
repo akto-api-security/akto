@@ -56,7 +56,8 @@ public class LitellmUserRegistryTest {
         AgenticUsers u = upserted.get(0);
         assertEquals("Test.User@example.com", u.getUserId());
         assertEquals("Test.User@example.com", u.getUserEmail());
-        assertEquals("test-user", u.getUserName());
+        // The email's local part as written, like deriveUsernameFromEmail: not the host slug (test-user).
+        assertEquals("Test.User", u.getUserName());
         assertEquals("litellm", u.getLastUpdatedBy());
     }
 
@@ -80,6 +81,13 @@ public class LitellmUserRegistryTest {
         LitellmUserRegistry.fetchAllAgentUsers = () -> { throw new RuntimeException("abstractor down"); };
         LitellmUserRegistry.upsertAgentUsers = users -> { throw new RuntimeException("abstractor down"); };
         LitellmUserRegistry.register("a@example.com");
+    }
+
+    @Test
+    public void emailsWithoutALocalPartAreSkipped() {
+        LitellmUserRegistry.register("@example.com");
+        LitellmUserRegistry.register("not-an-email");
+        assertTrue(upserted.isEmpty());
     }
 
     @Test

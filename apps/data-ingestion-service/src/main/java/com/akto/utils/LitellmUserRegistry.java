@@ -14,9 +14,13 @@ import java.util.function.Supplier;
 /**
  * Makes users seen in Atlas LiteLLM traffic pickable as Users in the guardrail policy UI.
  *
- * The dashboard's user picker lists agent_users. This adds the traffic's email there through the
+ * The dashboard's user picker (ModuleInfoAction#fetchAgenticUsers) lists agent_users deduped by
+ * userName, and a pick is sent as that userName. This adds the traffic's email there through the
  * database-abstractor APIs the Copilot Studio sync already uses (fetchAllAgentUsers and
- * bulkUpsertAgentUserExternalIdentities, via DataActor), so no database access is needed here.
+ * bulkUpsertAgentUserExternalIdentities, via DataActor), so no database access is needed here. The
+ * row is the one AgentUsersDao.upsertFromEmailTag writes: userId and userEmail are the email, and
+ * userName is the email's local part as written (deriveUsernameFromEmail), the canonical username
+ * SSO identities use too, so the person merges with their other identities under one username.
  * Guardrail matching needs nothing from here: it reads the email header of each request.
  *
  * Those APIs set userId / userName / userEmail only, so the row has no devices or device tags:
@@ -46,22 +50,34 @@ public final class LitellmUserRegistry {
             return;
         }
         String trimmed = email.trim();
+        AgenticUsers identity = identityFor(trimmed);
+        if (identity == null) {
+            return;
+        }
         loadKnownEmails();
         if (!knownEmails.add(trimmed.toLowerCase())) {
             return;
         }
         try {
-            upsertAgentUsers.accept(Collections.singletonList(identityFor(trimmed)));
+            upsertAgentUsers.accept(Collections.singletonList(identity));
         } catch (Exception e) {
             loggerMaker.error("LiteLLM user registration failed for " + trimmed + ": " + e.getMessage(), e);
         }
     }
 
-    /** agent_users row for an email: keyed by the email, named by its host identity segment. */
+    /**
+     * agent_users row for an email, as AgentUsersDao.upsertFromEmailTag builds it: keyed by the email,
+     * named by the email's local part as written. Null when the email has no local part.
+     */
     static AgenticUsers identityFor(String email) {
+        int at = email.indexOf('@');
+        String userName = at > 0 ? email.substring(0, at).trim() : "";
+        if (userName.isEmpty()) {
+            return null;
+        }
         AgenticUsers user = new AgenticUsers();
         user.setUserId(email);
-        user.setUserName(AgentHostUtils.identitySlug(AgentHostUtils.emailLocalPart(email)));
+        user.setUserName(userName);
         user.setUserEmail(email);
         user.setLastUpdatedBy(LAST_UPDATED_BY);
         return user;
