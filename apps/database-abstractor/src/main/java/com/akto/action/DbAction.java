@@ -409,7 +409,7 @@ public class DbAction extends ActionSupport {
     Set<MergedUrls> mergedUrls;
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
-    Bson filter;
+    int sinceTimestamp;
 
     String operator;
 
@@ -2858,7 +2858,7 @@ public class DbAction extends ActionSupport {
                 loggerMaker.errorAndAddToDb(ex, "markTestRunResultSummaryFailed: could not load prior test results");
             }
 
-            trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
+            trrs = DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId, leaseToken);
             if (trrs == null) {
                 loggerMaker.errorAndAddToDb("No matching RUNNING summary found for markTestRunResultSummaryFailed, testingRunResultSummaryId=" + testingRunResultSummaryId);
                 return Action.ERROR.toUpperCase();
@@ -2910,7 +2910,7 @@ public class DbAction extends ActionSupport {
             }
             if((operator == null || operator.isEmpty()) && summaryId != null){
                 totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
-                trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+                trrs = DbLayer.updateIssueCountInSummaryFenced(summaryId, totalCountIssues, leaseToken);
             }else{
                 trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
             }
@@ -3707,7 +3707,12 @@ public class DbAction extends ActionSupport {
     }
 
     public String countTestingRunResultSummaries() {
-        count = DbLayer.countTestingRunResultSummaries(filter);
+        try {
+            count = DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, TestingRun.State.valueOf(state));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in countTestingRunResultSummaries " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -5858,8 +5863,12 @@ public class DbAction extends ActionSupport {
         this.removeZeroLevel = removeZeroLevel;
     }
 
-    public void setFilter(Bson filter) {
-        this.filter = filter;
+    public int getSinceTimestamp() {
+        return sinceTimestamp;
+    }
+
+    public void setSinceTimestamp(int sinceTimestamp) {
+        this.sinceTimestamp = sinceTimestamp;
     }
 
     public TestScript getTestScript() {
