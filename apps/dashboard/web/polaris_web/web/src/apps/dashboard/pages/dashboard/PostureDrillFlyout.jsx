@@ -34,6 +34,18 @@ const DRILL_RISK_SCORE = 'riskScoreBreakdown'
 // this was the "AI summary/table shows raw seconds" bug this level's build fixed.
 const EPOCH_FIELDS = new Set(['detectedAt', 'firstSeen', 'lastSeen', 'lastScannedAt', 'timestamp'])
 
+// A CTA's own `params` (e.g. Critical alerts' "View all" -> {severity: "CRITICAL"}) has to land
+// as a URL query param, not router `state` — the destination pages this app already has (e.g.
+// ThreatDetectionPage.jsx's own severity filter) read their own pre-filters off `searchParams`,
+// never off `location.state`. Appending here, once, is what makes a CTA's `params` do anything at
+// all — passing them as `state` would have silently gone nowhere on arrival.
+function ctaHref(cta) {
+    if (!cta.params) return cta.route
+    const qs = new URLSearchParams(cta.params).toString()
+    if (!qs) return cta.route
+    return cta.route + (cta.route.includes('?') ? '&' : '?') + qs
+}
+
 function EpochCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(value || 0)}</Text>
 }
@@ -132,7 +144,7 @@ function ProfileHeader({ drill, onCtaClick }) {
                     <HorizontalStack gap="2">
                         {ctas.map((cta, i) => (
                             <Button key={cta.id} size="slim" primary={i === ctas.length - 1}
-                                onClick={() => onCtaClick(cta.route)}>
+                                onClick={() => onCtaClick(cta)}>
                                 {cta.label}
                             </Button>
                         ))}
@@ -413,22 +425,42 @@ function movedRowDetail(category, kpi) {
     return ''
 }
 
+// Same category strings RiskScoreCalculator#addWhatMovedRow writes -> the sub-score id
+// openDrill/onSubScoreClick already navigates to (see RiskScoreSubScoreRow's own onClick a few
+// rows above this table) — lets a "what moved the score" row jump to that sub-score's own L2
+// breakdown, the closest "similar screen" this table's own aggregate category can resolve to
+// (the detail text names specific people, but not the raw deviceId an L3 profile link needs).
+// Shadow AI exposure / Vendor risk never appear here in the first place (see this file's own
+// comment above), so they're intentionally absent from this map too.
+const WHAT_MOVED_CATEGORY_TO_SUB_SCORE_ID = {
+    'DLP incidents': 'dlpIncidents',
+    'Compliance gaps': 'complianceGaps',
+    'Threat activity': 'threatActivity',
+}
+
 // Real, not illustrative — one row per sub-score that actually moved between this window and the
 // immediately preceding one (RiskScoreCalculator#compute's whatMoved). Each row's points are
 // computed the exact same way the composite's own delta is (this sub-score's weight over the
 // composite's coveredWeight, times its own current-minus-prior) — summing every row here reproduces
 // the composite delta exactly, not approximately, because it's that same weighted-average formula
 // decomposed back into its terms.
-function RiskScoreAnnotationsSection({ kpi }) {
+function RiskScoreAnnotationsSection({ kpi, onSubScoreClick }) {
     const rows = (kpi.whatMoved || []).slice().sort((a, b) => Math.abs(b.impactPoints) - Math.abs(a.impactPoints))
 
-    const tableRows = rows.map((row) => [
-        row.category,
-        movedRowDetail(row.category, kpi),
-        <Text variant="bodyMd" fontWeight="semibold" color={row.impactPoints > 0 ? 'critical' : 'success'}>
-            {row.impactPoints > 0 ? `+${row.impactPoints}` : row.impactPoints} pts
-        </Text>,
-    ])
+    const tableRows = rows.map((row) => {
+        const subScoreId = WHAT_MOVED_CATEGORY_TO_SUB_SCORE_ID[row.category]
+        const onClick = subScoreId ? () => onSubScoreClick(subScoreId) : undefined
+        const cellStyle = onClick ? { cursor: 'pointer' } : undefined
+        return [
+            <div onClick={onClick} style={cellStyle}>{row.category}</div>,
+            <div onClick={onClick} style={cellStyle}>{movedRowDetail(row.category, kpi)}</div>,
+            <div onClick={onClick} style={cellStyle}>
+                <Text variant="bodyMd" fontWeight="semibold" color={row.impactPoints > 0 ? 'critical' : 'success'}>
+                    {row.impactPoints > 0 ? `+${row.impactPoints}` : row.impactPoints} pts
+                </Text>
+            </div>,
+        ]
+    })
 
     return (
         <VerticalStack gap="3">
@@ -510,7 +542,7 @@ function RiskScoreRootBody({ kpi, onSubScoreClick }) {
                     )}
                 </VerticalStack>
 
-                <RiskScoreAnnotationsSection kpi={kpi} />
+                <RiskScoreAnnotationsSection kpi={kpi} onSubScoreClick={onSubScoreClick} />
             </VerticalStack>
         </Box>
     )
@@ -695,7 +727,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                                         {(drill.ctas || []).length > 0 && (
                                             <HorizontalStack gap="2">
                                                 {drill.ctas.map((cta) => (
-                                                    <Button key={cta.id} size="slim" onClick={() => navigate(cta.route)}>{cta.label}</Button>
+                                                    <Button key={cta.id} size="slim" onClick={() => navigate(ctaHref(cta))}>{cta.label}</Button>
                                                 ))}
                                             </HorizontalStack>
                                         )}
@@ -717,7 +749,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                             {isRiskScoreRoot ? (
                                 <RiskScoreRootBody kpi={mergedRiskScoreKpi} onSubScoreClick={handleSubScoreClick} />
                             ) : isProfileLayout ? (
-                                <DrillProfileBody drill={drill} onCtaClick={(route) => navigate(route)} />
+                                <DrillProfileBody drill={drill} onCtaClick={(cta) => navigate(ctaHref(cta))} />
                             ) : (
                                 <AgGridTable
                                     key={`${drillState.drillId}:${drillState.path || ''}`}

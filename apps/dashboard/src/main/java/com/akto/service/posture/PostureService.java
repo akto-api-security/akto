@@ -13,6 +13,7 @@ import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightUtil.GovernanceBucket;
+import com.akto.util.AgenticObserveUtil;
 import com.akto.util.compliance.ComplianceSubClauseCatalog;
 import com.mongodb.BasicDBObject;
 
@@ -71,6 +72,10 @@ public class PostureService {
     public static final String DRILL_ENFORCEMENT_FUNNEL = "enforcementFunnel";
     public static final String DRILL_VENDOR_RISK = "vendorRisk";
     public static final String DRILL_FRAMEWORK_READINESS = "frameworkReadiness";
+    /** Reuse the KPI's own id as its drill id (rather than a separate DRILL_* literal) — these two
+     *  are the KPI tile's own drilldown, not a panel's, so there's no second name to keep in sync. */
+    public static final String DRILL_CRITICAL_ALERTS = KPI_CRITICAL_ALERTS;
+    public static final String DRILL_SENSITIVE_DATA = KPI_SENSITIVE_INCIDENTS;
     /** The former standalone "Risk score breakdown" flyout/action — see
      *  {@link #fetchRiskScoreDrill}'s own javadoc for why it's dispatched separately from
      *  {@link #fetchDrill} rather than added as a 6th case in that switch. */
@@ -943,9 +948,201 @@ public class PostureService {
                         bundle.deviceIdToUsername, segments, skip, effectiveLimit);
             case DRILL_FRAMEWORK_READINESS:
                 return frameworkReadinessDrill(trendStartTs, trendEndTs, segments, skip, effectiveLimit);
+            case DRILL_CRITICAL_ALERTS:
+                return criticalAlertsDrill(bundle.hostSeverityCounts, trendWindowEvents);
+            case DRILL_SENSITIVE_DATA:
+                return sensitiveDataDrill(bundle, trendWindowEvents, segments, skip, effectiveLimit);
             default:
                 return unknownDrill(drillId);
         }
+    }
+
+    // ── Critical alerts drill (the KPI tile's own drilldown, not a panel's) ─────
+
+    private static final int CRITICAL_ALERTS_TOP_N = 5;
+
+    /** Root-only (no member level): the top {@link #CRITICAL_ALERTS_TOP_N} CRITICAL-severity
+     *  events in the window, newest first — always exactly this many regardless of the requested
+     *  skip/limit, since this is a fixed "top 5, then go to the full page" snapshot, not a real
+     *  paginated list (see this drill's own CTA, which is that full page). Each row carries a
+     *  hidden "refId" (not a displayed column) so SecurityPostureAction can enrich the top rows
+     *  with their own real intercepted request/response sample before the AI summary runs — see
+     *  that action's own attachEvidenceSamples javadoc, the "used for both Critical alerts and
+     *  Sensitive data incidents" helper.
+     *
+     *  <p>The "totalCritical" summary metric is deliberately {@code sumCritical(hostSeverityCounts)}
+     *  — the exact same server-side aggregation {@link #criticalAlertsKpi} uses for the tile's own
+     *  headline number — rather than {@code rows.size()} over the raw event list below. The two
+     *  disagree in practice (a single window can carry many more raw threat-backend "malicious
+     *  event" rows per host than hostSeverityCounts' own per-host critical count — the same
+     *  bursty-near-duplicate-events shape {@link RiskScoreProfileDrillService#clusterEvents} exists
+     *  to collapse for a device timeline), and hostSeverityCounts is the number already shown on
+     *  the KPI tile the user clicked to get here, so it is the one this drill must agree with by
+     *  construction, not a second, independently-recomputed count that can silently drift from it. */
+    private static PostureDrillResult criticalAlertsDrill(List<HostSeverityCount> hostSeverityCounts,
+                                                            List<DashboardMaliciousEvent> trendWindowEvents) {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Critical alerts");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Critical alerts"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("detectedAt", "Detected at"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("policy", "Policy"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("host", "Host"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("actor", "Actor / device"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("status", "Status"));
+        result.setDrillable(false);
+        result.getCtas().add(new InsightResult.Cta("openFullView", "View all critical alerts", "NAVIGATE",
+                InsightRoutes.GUARDRAIL_VIOLATIONS, Collections.singletonMap("severity", "CRITICAL"), false));
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (DashboardMaliciousEvent e : safe(trendWindowEvents)) {
+            if (e == null || !"CRITICAL".equalsIgnoreCase(e.getSeverity())) continue;
+            rows.add(row("detectedAt", e.getTimestamp(), "policy", e.getFilterId(), "host", e.getHost(),
+                    "actor", e.getActor(), "status", e.getStatus(), "refId", e.getRefId()));
+        }
+        rows.sort((a, b) -> Long.compare((long) b.get("detectedAt"), (long) a.get("detectedAt")));
+
+        List<Map<String, Object>> top = rows.size() > CRITICAL_ALERTS_TOP_N
+                ? new ArrayList<>(rows.subList(0, CRITICAL_ALERTS_TOP_N)) : rows;
+        result.setRows(top);
+        // total = what's actually shown (top.size()), NOT the real count: AgGridTable's own SSRM
+        // would otherwise see total > rows.length and request a further page, and this handler
+        // ignores skip/limit entirely (always the same fixed top-N) — a second page would come
+        // back as the identical 5 rows again instead of a real next page. The real total still
+        // isn't lost: it's a named summary metric below (and the CTA is the actual "see
+        // everything" escape hatch), just not the field that drives this table's own pagination.
+        result.setTotal(top.size());
+        result.setSkip(0);
+        result.setLimit(CRITICAL_ALERTS_TOP_N);
+        result.setSeverity(top.isEmpty() ? null : "CRITICAL");
+        long totalCritical = sumCritical(hostSeverityCounts);
+        List<InsightResult.Metric> summary = new ArrayList<>();
+        summary.add(new InsightResult.Metric("totalCritical", "Critical events in window",
+                totalCritical, "count", String.valueOf(totalCritical)));
+        result.setSummary(summary);
+
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap(GAP_THREAT_BACKEND, REASON_NO_ROWS,
+                    "No critical-severity activity recorded in this window."));
+        }
+        return result;
+    }
+
+    // ── Sensitive data incidents drill (the KPI tile's own drilldown) ───────────
+
+    /** Root — grouped by agent/tool (see toolForHost) — how systemically each agent is leaking
+     *  sensitive data, matching sensitiveDataIncidentsKpi's own PII-policy definition
+     *  (piiPolicyNamesLower) rather than inventing a second one. One segment in — that tool's own
+     *  users, each row carrying the refId/policy of that user's own most recent PII hit so
+     *  SecurityPostureAction can enrich it with a real intercepted sample (see
+     *  criticalAlertsDrill's own note on this same mechanism). */
+    private PostureDrillResult sensitiveDataDrill(InsightDataBundle bundle, List<DashboardMaliciousEvent> trendWindowEvents,
+                                                   List<String> path, int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+        if (!bundle.threatBackendAvailable) {
+            result.addDataGap(new InsightResult.Gap(GAP_THREAT_BACKEND, REASON_REQUEST_FAILED, THREAT_BACKEND_DOWN_IMPACT));
+        }
+
+        Set<String> piiPolicyNamesLower = piiPolicyNamesLower(bundle);
+        List<DashboardMaliciousEvent> piiEvents = new ArrayList<>();
+        for (DashboardMaliciousEvent e : safe(trendWindowEvents)) {
+            if (e == null || e.getCategory() == null) continue;
+            if (!piiPolicyNamesLower.contains(e.getCategory().toLowerCase(Locale.ROOT))) continue;
+            piiEvents.add(e);
+        }
+
+        if (path.isEmpty()) {
+            result.setTitle("Sensitive data incidents");
+            result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Sensitive data incidents"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("tool", "Agent / tool"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("incidents", "Incidents"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("severity", "Worst severity"));
+            result.setDrillable(true);
+
+            Map<String, Long> countByTool = new LinkedHashMap<>();
+            Map<String, String> worstSeverityByTool = new HashMap<>();
+            for (DashboardMaliciousEvent e : piiEvents) {
+                String tool = toolForHost(e.getHost());
+                countByTool.merge(tool, 1L, Long::sum);
+                if (isWorseSeverity(e.getSeverity(), worstSeverityByTool.get(tool))) worstSeverityByTool.put(tool, e.getSeverity());
+            }
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Map.Entry<String, Long> e : countByTool.entrySet()) {
+                rows.add(row("id", e.getKey(), "tool", e.getKey(), "incidents", e.getValue(),
+                        "severity", worstSeverityByTool.get(e.getKey())));
+            }
+            rows.sort((a, b) -> Long.compare((long) b.get("incidents"), (long) a.get("incidents")));
+            paginate(result, rows, skip, limit);
+            if (rows.isEmpty()) {
+                result.addDataGap(new InsightResult.Gap(GAP_GUARDRAIL_POLICIES, REASON_NO_ROWS,
+                        "No PII-detecting policy matched any traffic in this window."));
+            }
+            return result;
+        }
+
+        String tool = path.get(0);
+        result.setTitle(tool + " — users");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Sensitive data incidents"));
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem(tool, tool));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("user", "User / device"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("incidents", "Incidents"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("severity", "Worst severity"));
+        result.setDrillable(false);
+
+        Map<String, Long> countByUser = new LinkedHashMap<>();
+        Map<String, String> worstSeverityByUser = new HashMap<>();
+        Map<String, Long> latestTsByUser = new HashMap<>();
+        Map<String, String> latestRefIdByUser = new HashMap<>();
+        Map<String, String> latestPolicyByUser = new HashMap<>();
+        for (DashboardMaliciousEvent e : piiEvents) {
+            if (!tool.equals(toolForHost(e.getHost()))) continue;
+            String deviceId = AgenticObserveUtil.extractEndpointId(e.getHost());
+            String username = bundle.deviceIdToUsername != null && deviceId != null
+                    ? bundle.deviceIdToUsername.getOrDefault(deviceId, deviceId) : (deviceId != null ? deviceId : "unknown");
+            countByUser.merge(username, 1L, Long::sum);
+            if (isWorseSeverity(e.getSeverity(), worstSeverityByUser.get(username))) worstSeverityByUser.put(username, e.getSeverity());
+            Long prevTs = latestTsByUser.get(username);
+            if (prevTs == null || e.getTimestamp() > prevTs) {
+                latestTsByUser.put(username, e.getTimestamp());
+                latestRefIdByUser.put(username, e.getRefId());
+                latestPolicyByUser.put(username, e.getFilterId());
+            }
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map.Entry<String, Long> e : countByUser.entrySet()) {
+            String username = e.getKey();
+            rows.add(row("user", username, "incidents", e.getValue(), "severity", worstSeverityByUser.get(username),
+                    "policy", latestPolicyByUser.get(username), "refId", latestRefIdByUser.get(username)));
+        }
+        rows.sort((a, b) -> Long.compare((long) b.get("incidents"), (long) a.get("incidents")));
+        paginate(result, rows, skip, limit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap(GAP_GUARDRAIL_POLICIES, REASON_NO_ROWS,
+                    "No PII-detecting policy matched any traffic for \"" + tool + "\" in this window."));
+        }
+        return result;
+    }
+
+    /** Best-effort tool/agent name for a raw event host string (no ApiCollection object available
+     *  for a threat-backend event, unlike shadowAiDrill's own collection-based governanceGroupingName)
+     *  — endpointVendorNameOfHost first (endpoint-shield host shape), else the MCP/skill service
+     *  name, else the raw host as a last resort. */
+    private static String toolForHost(String host) {
+        if (host == null) return "Unknown";
+        String vendor = InsightUtil.endpointVendorNameOfHost(host);
+        if (vendor != null) return vendor;
+        String service = AgenticObserveUtil.extractServiceName(host);
+        return service != null ? service : host;
+    }
+
+    /** True when `candidate` is a real, worse (or the first real) severity than `current` — null
+     *  input to either side reads as "no signal", never invented. */
+    private static boolean isWorseSeverity(String candidate, String current) {
+        if (candidate == null) return false;
+        Integer candidateRank = SEVERITY_RANK_BY_NAME.get(candidate.toUpperCase(Locale.ROOT));
+        if (candidateRank == null) return false;
+        if (current == null) return true;
+        Integer currentRank = SEVERITY_RANK_BY_NAME.get(current.toUpperCase(Locale.ROOT));
+        return currentRank == null || candidateRank < currentRank;
     }
 
     // ── Risk score breakdown drill ───────────────────────────────────────────────

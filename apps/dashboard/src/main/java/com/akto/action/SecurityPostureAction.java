@@ -13,12 +13,15 @@ import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightId;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightService;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsResponse.ViolationPayload;
 import com.akto.service.posture.PostureDrillNarrativeService;
 import com.akto.service.posture.PostureDrillResult;
 import com.akto.service.posture.PostureService;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
+import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.mongodb.BasicDBObject;
 
 import lombok.Getter;
@@ -27,8 +30,10 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -370,6 +375,12 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
                 postureDrill = postureService.fetchDrill(bundle, endpointCollections, trendWindowEvents,
                         trendStartTs, trendEndTs, drillId, path, skip, limit);
+
+                // Ground the AI summary in real traffic, not just aggregate counts — see
+                // attachEvidenceSamples' own javadoc for why only these two drills get this.
+                if (PostureService.DRILL_CRITICAL_ALERTS.equals(drillId) || PostureService.DRILL_SENSITIVE_DATA.equals(drillId)) {
+                    attachEvidenceSamples(postureDrill, accountId, contextSource != null ? contextSource.name() : "");
+                }
             }
 
             // AI summary for this exact level — cache hit attaches it synchronously; a miss marks
@@ -419,6 +430,69 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
         return bundle.collections.stream()
                 .filter(c -> c != null && !c.isDeactivated() && c.isEndpointCollection())
                 .collect(Collectors.toList());
+    }
+
+    /** Top N rows enriched with their own real intercepted request/response sample; the rest of
+     *  the drill's own AI-summary evidence (metrics, gaps) stays exactly as PostureDrillNarrativeService
+     *  already builds it — this only adds one more field to a handful of rows. */
+    private static final int EVIDENCE_ENRICHMENT_ROW_CAP = 5;
+    /** Long enough to ground a claim, short enough not to balloon the narrative prompt with a raw
+     *  payload dump — this is a sample for the LLM to cite from, not a display value. */
+    private static final int EVIDENCE_SAMPLE_MAX_CHARS = 600;
+
+    /** Critical alerts and Sensitive data incidents both build rows that already carry a hidden
+     *  "refId" (and, where the row is itself an aggregate — Sensitive data incidents' own per-user
+     *  rows — a "policy" naming that user's own most recent hit) rather than a displayed column —
+     *  see PostureService#criticalAlertsDrill/#sensitiveDataDrill's own javadoc. This attaches
+     *  each of the first {@link #EVIDENCE_ENRICHMENT_ROW_CAP} rows' own real intercepted request/
+     *  response sample (the same "latestApiOrig" {@code ThreatDetectionBackendClient
+     *  #listGuardrailViolationPayloads} already serves ComplianceClauseScanService, keyed by
+     *  refId — see that client method's own javadoc) as a new "evidenceSample" field on that same
+     *  row map. PostureDrillNarrativeService's own buildNarrativeInput already serializes a
+     *  drill's rows verbatim into the LLM's EVIDENCE block, so this one attach is the ONLY change
+     *  needed to ground that narrative in real traffic instead of just the aggregate counts
+     *  already in FACTS — no changes to the narrative service itself. Root-cause "the new function
+     *  ... used for both 1 and 3" the request asked for: this method, called identically for both
+     *  drills. A failure here (backend down, no row had a refId) silently no-ops — the narrative
+     *  still gets everything else. */
+    private void attachEvidenceSamples(PostureDrillResult result, int accountId, String contextSourceValue) {
+        if (result == null || result.getRows() == null || result.getRows().isEmpty()) return;
+        List<Map<String, Object>> topRows = result.getRows().size() > EVIDENCE_ENRICHMENT_ROW_CAP
+                ? result.getRows().subList(0, EVIDENCE_ENRICHMENT_ROW_CAP) : result.getRows();
+
+        Set<String> filterIds = new HashSet<>();
+        Set<String> refIds = new HashSet<>();
+        for (Map<String, Object> row : topRows) {
+            Object refId = row.get("refId");
+            Object policy = row.get("policy");
+            if (refId == null || policy == null) continue;
+            refIds.add(String.valueOf(refId));
+            filterIds.add(String.valueOf(policy));
+        }
+        if (refIds.isEmpty()) return;
+
+        try {
+            ListGuardrailViolationPayloadsResponse resp = ThreatDetectionBackendClient.listGuardrailViolationPayloads(
+                    accountId, startTimestamp, endTimestamp, new ArrayList<>(filterIds), null, 50, true, contextSourceValue);
+            if (resp == null) return;
+
+            Map<String, String> origByRefId = new HashMap<>();
+            for (ViolationPayload vp : resp.getPayloadsList()) {
+                if (refIds.contains(vp.getRefId()) && vp.getOrig() != null && !vp.getOrig().isEmpty()) {
+                    origByRefId.put(vp.getRefId(), vp.getOrig());
+                }
+            }
+            for (Map<String, Object> row : topRows) {
+                Object refId = row.get("refId");
+                if (refId == null) continue;
+                String orig = origByRefId.get(String.valueOf(refId));
+                if (orig == null) continue;
+                row.put("evidenceSample", orig.length() > EVIDENCE_SAMPLE_MAX_CHARS
+                        ? orig.substring(0, EVIDENCE_SAMPLE_MAX_CHARS) + "…" : orig);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching evidence samples for \"" + result.getTitle() + "\": " + e.getMessage());
+        }
     }
 
     /** Blocks on one future and logs how long that specific wait took — see the call site's own

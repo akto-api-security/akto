@@ -20,6 +20,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -27,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -75,9 +77,18 @@ final class RiskScoreProfileDrillService {
         return result;
     }
 
+    /** How close two same-category events must be to count as one "burst" instead of two separate
+     *  timeline rows — see {@link #clusterEvents}'s own javadoc for what a burst is. */
+    private static final int TIMELINE_CLUSTER_WINDOW_SECONDS = 3600;
+    /** Top N bursts shown per timeline, most recent first — the same policy firing every few
+     *  minutes for hours used to render as dozens of near-identical rows; capping to the handful
+     *  that actually matter reads as "what happened", not a raw event log. */
+    private static final int TIMELINE_TOP_BURSTS = 5;
+
     /** A profile section rendering `events` (newest first — caller's own sort order is preserved)
-     *  as a vertical activity feed, capped at PROFILE_SECTION_CAP with the real count kept in
-     *  Section#total. */
+     *  as a vertical activity feed, clustered into bursts (see {@link #clusterEvents}) and capped
+     *  at {@link #TIMELINE_TOP_BURSTS} rows. Section#total stays the real, uncapped raw-event
+     *  count regardless of how many bursts they collapse into. */
     static PostureDrillResult.Section timelineSection(String id, String title, String subtitle,
                                                        List<DashboardMaliciousEvent> events) {
         PostureDrillResult.Section section = new PostureDrillResult.Section();
@@ -85,17 +96,41 @@ final class RiskScoreProfileDrillService {
         section.setTitle(title);
         section.setSubtitle(subtitle);
         section.setKind("timeline");
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (DashboardMaliciousEvent e : PostureService.safe(events)) {
-            if (rows.size() >= PROFILE_SECTION_CAP) break;
-            if (e == null) continue;
-            rows.add(PostureService.row("timestamp", e.getTimestamp(),
-                    "title", e.getCategory() != null ? e.getCategory() : "Flagged activity",
-                    "detail", e.getHost(), "severity", e.getSeverity(), "status", e.getStatus()));
-        }
-        section.setRows(rows);
+        section.setRows(clusterEvents(PostureService.safe(events)));
         section.setTotal(events == null ? 0 : events.size());
         return section;
+    }
+
+    /** Groups consecutive same-category events (already sorted newest-first) into "bursts": every
+     *  event whose timestamp falls within {@link #TIMELINE_CLUSTER_WINDOW_SECONDS} of the burst's
+     *  own most-recent event joins that burst rather than starting a new row — a policy that fires
+     *  every few minutes for hours (e.g. "Default-Customer PII" repeated 18 times over 3 hours)
+     *  becomes one row ("Default-Customer PII ×18") instead of 18 near-identical ones. Each row's
+     *  own severity is the worst across its whole burst, not just its first event. Capped at
+     *  {@link #TIMELINE_TOP_BURSTS} bursts. */
+    private static List<Map<String, Object>> clusterEvents(List<DashboardMaliciousEvent> events) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int i = 0;
+        while (i < events.size() && rows.size() < TIMELINE_TOP_BURSTS) {
+            DashboardMaliciousEvent first = events.get(i);
+            if (first == null) { i++; continue; }
+            int j = i + 1;
+            while (j < events.size()) {
+                DashboardMaliciousEvent next = events.get(j);
+                if (next == null || !Objects.equals(first.getCategory(), next.getCategory())
+                        || (first.getTimestamp() - next.getTimestamp()) > TIMELINE_CLUSTER_WINDOW_SECONDS) {
+                    break;
+                }
+                j++;
+            }
+            List<DashboardMaliciousEvent> burst = events.subList(i, j);
+            String title = first.getCategory() != null ? first.getCategory() : "Flagged activity";
+            if (burst.size() > 1) title = title + " ×" + burst.size();
+            rows.add(PostureService.row("timestamp", first.getTimestamp(), "title", title,
+                    "detail", first.getHost(), "severity", worstSeverityOfEvents(burst), "status", first.getStatus()));
+            i = j;
+        }
+        return rows;
     }
 
     /** A profile section rendering `allRows` as a plain table, capped at PROFILE_SECTION_CAP with
@@ -203,18 +238,58 @@ final class RiskScoreProfileDrillService {
         return seenByDevice;
     }
 
+    /** One resolved user's own aggregate across every collection they touched for this tool —
+     *  keyed by the resolved display username, not the raw deviceId, so the same person's several
+     *  accounts/collections club into one row instead of showing up as separate near-duplicate
+     *  ones (see shadowAiToolProfileDrill's own note on why). */
+    private static final class UserActivity {
+        int firstSeen;
+        int lastSeen;
+        final Set<String> assets = new LinkedHashSet<>();
+    }
+
+    /** "<name> (<Type>)" for one collection — Skill/MCP Server/AI Agent/LLM/Plugin/SaaS Agent, via
+     *  the exact same tagsList-based classifier ({@link AgenticObserveUtil#getTypeFromCollection})
+     *  AgenticObserveAction/the App catalog already use, so this reads consistently with that page
+     *  rather than inventing a second classification. A skill collection can carry more than one
+     *  skill tag, so this can return several labels for one collection. */
+    private static List<String> assetLabelsOf(ApiCollection c) {
+        String type = AgenticObserveUtil.getTypeFromCollection(c);
+        if (AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(type)) {
+            Set<String> skills = AgenticObserveUtil.getSkillNames(c);
+            if (!skills.isEmpty()) {
+                List<String> labels = new ArrayList<>();
+                for (String skill : skills) labels.add(skill + " (Skill)");
+                return labels;
+            }
+        }
+        if (AgenticObserveUtil.CLIENT_TYPE_PLUGIN.equals(type)) {
+            String plugin = AgenticObserveUtil.getPluginName(c);
+            if (plugin != null) return Collections.singletonList(plugin + " (Plugin)");
+        }
+        String name = InsightUtil.serviceNameOf(c);
+        if (name == null) name = c.getHostName();
+        return Collections.singletonList(name + " (" + type + ")");
+    }
+
     static PostureDrillResult shadowAiToolProfileDrill(InsightDataBundle bundle,
                                                         List<DashboardMaliciousEvent> windowEvents, String tool) {
         // One pass over this tool's own collections builds both the tool-level facts (bucket/
-        // firstSeen/lastSeen/hostNames) AND the per-device breakdown (devices) together — these
-        // used to be two separate loops over the identical collectionsForTool(bundle, tool) list
-        // (the second one hidden inside a since-removed devicesForTool helper), redoing the same
-        // scan for no reason since both need is a single request, same thread.
+        // firstSeen/lastSeen/hostNames) AND the per-user breakdown (byUser) together — these used
+        // to be two separate loops over the identical collectionsForTool(bundle, tool) list (the
+        // second one hidden inside a since-removed devicesForTool helper), redoing the same scan
+        // for no reason since both need it in a single request, same thread.
+        //
+        // Grouped by the RESOLVED username, not the raw deviceId: two different deviceIds/
+        // collections that both resolve to the same display username (e.g. two accounts for
+        // "oscar.carcamo") used to render as two separate near-duplicate rows for the same real
+        // person — clubbing by username merges them into one, and also collects which distinct
+        // agentic assets (name + type, via assetLabelsOf) that person actually used.
         Map<String, String> remarksByService = InsightUtil.remarksByServiceName(bundle.auditRows);
         GovernanceBucket bucket = null;
         int firstSeen = 0, lastSeen = 0;
         Set<String> hostNames = new HashSet<>();
-        Map<String, int[]> devices = new LinkedHashMap<>(); // deviceId -> [firstSeen, lastSeen]
+        Map<String, UserActivity> byUser = new LinkedHashMap<>();
         for (ApiCollection c : collectionsForTool(bundle, tool)) {
             if (bucket == null) bucket = InsightUtil.governanceBucket(c, bundle.allowlistNamesLower, remarksByService);
             Integer seenTs = bundle.collectionLastTrafficSeen != null ? bundle.collectionLastTrafficSeen.get(c.getId()) : null;
@@ -223,19 +298,24 @@ final class RiskScoreProfileDrillService {
             hostNames.add(c.getHostName());
 
             String deviceId = InsightUtil.deviceIdOf(c);
-            if (deviceId == null) deviceId = "unknown";
-            int[] seen = devices.computeIfAbsent(deviceId, k -> new int[]{0, 0});
-            if (c.getStartTs() > 0 && (seen[0] == 0 || c.getStartTs() < seen[0])) seen[0] = c.getStartTs();
-            if (seenTs != null && seenTs > seen[1]) seen[1] = seenTs;
+            String username = bundle.deviceIdToUsername != null
+                    ? bundle.deviceIdToUsername.getOrDefault(deviceId, deviceId != null ? deviceId : "unknown")
+                    : (deviceId != null ? deviceId : "unknown");
+            UserActivity activity = byUser.computeIfAbsent(username, k -> new UserActivity());
+            if (c.getStartTs() > 0 && (activity.firstSeen == 0 || c.getStartTs() < activity.firstSeen)) activity.firstSeen = c.getStartTs();
+            if (seenTs != null && seenTs > activity.lastSeen) activity.lastSeen = seenTs;
+            activity.assets.addAll(assetLabelsOf(c));
         }
 
         List<DashboardMaliciousEvent> toolEvents = new ArrayList<>();
-        Map<String, Long> flagsByDevice = new HashMap<>();
+        Map<String, Long> flagsByUser = new HashMap<>();
         for (DashboardMaliciousEvent e : PostureService.safe(windowEvents)) {
             if (e == null || e.getHost() == null || !hostNames.contains(e.getHost())) continue;
             toolEvents.add(e);
             String deviceId = AgenticObserveUtil.extractEndpointId(e.getHost());
-            if (deviceId != null) flagsByDevice.merge(deviceId, 1L, Long::sum);
+            String username = bundle.deviceIdToUsername != null && deviceId != null
+                    ? bundle.deviceIdToUsername.getOrDefault(deviceId, deviceId) : deviceId;
+            if (username != null) flagsByUser.merge(username, 1L, Long::sum);
         }
         toolEvents.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
         long criticalCount = 0;
@@ -249,14 +329,14 @@ final class RiskScoreProfileDrillService {
         PostureDrillResult.Badge badge = new PostureDrillResult.Badge(bucketLabel, sanctioned ? "success" : "critical");
 
         PostureDrillResult result = newProfileResult("Shadow AI exposure", "shadowAiExposure", tool, tool,
-                devices.size() + " device" + (devices.size() == 1 ? "" : "s") + " used · " + toolEvents.size()
+                byUser.size() + " user" + (byUser.size() == 1 ? "" : "s") + " · " + toolEvents.size()
                         + " flagged action" + (toolEvents.size() == 1 ? "" : "s") + " in this window", badge);
         result.getCtas().add(new InsightResult.Cta("openFullView", "Open in App catalog", "NAVIGATE",
                 InsightRoutes.AGENTIC_ASSETS, null, false));
         result.setSeverity(worstSeverityOfEvents(toolEvents));
 
         List<InsightResult.Metric> summary = new ArrayList<>();
-        summary.add(new InsightResult.Metric("devices", "Devices", (long) devices.size(), "count", String.valueOf(devices.size())));
+        summary.add(new InsightResult.Metric("users", "Users", (long) byUser.size(), "count", String.valueOf(byUser.size())));
         summary.add(new InsightResult.Metric("incidents", "Incidents", (long) toolEvents.size(), "count", String.valueOf(toolEvents.size())));
         summary.add(new InsightResult.Metric("critical", "Critical incidents", criticalCount, "count", String.valueOf(criticalCount)));
         result.setSummary(summary);
@@ -269,15 +349,17 @@ final class RiskScoreProfileDrillService {
         result.setFacts(facts);
 
         List<Map<String, Object>> deviceRows = new ArrayList<>();
-        for (Map.Entry<String, int[]> e : devices.entrySet()) {
-            String deviceId = e.getKey();
-            String display = bundle.deviceIdToUsername != null ? bundle.deviceIdToUsername.getOrDefault(deviceId, deviceId) : deviceId;
-            deviceRows.add(PostureService.row("device", display, "firstSeen", e.getValue()[0], "lastSeen", e.getValue()[1],
-                    "flags", flagsByDevice.getOrDefault(deviceId, 0L)));
+        for (Map.Entry<String, UserActivity> e : byUser.entrySet()) {
+            String username = e.getKey();
+            UserActivity activity = e.getValue();
+            deviceRows.add(PostureService.row("device", username, "assets", String.join(", ", activity.assets),
+                    "firstSeen", activity.firstSeen, "lastSeen", activity.lastSeen,
+                    "flags", flagsByUser.getOrDefault(username, 0L)));
         }
         deviceRows.sort((a, b) -> Long.compare((long) b.get("flags"), (long) a.get("flags")));
         List<PostureDrillResult.ColumnDef> deviceColumns = Arrays.asList(
                 new PostureDrillResult.ColumnDef("device", "Device / user"),
+                new PostureDrillResult.ColumnDef("assets", "Agentic assets used"),
                 new PostureDrillResult.ColumnDef("firstSeen", "First seen"),
                 new PostureDrillResult.ColumnDef("lastSeen", "Last seen"),
                 new PostureDrillResult.ColumnDef("flags", "Flags"));

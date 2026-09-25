@@ -726,6 +726,82 @@ public class TestPostureService extends MongoBasedTest {
         assertFalse(root.getDataGaps().isEmpty());
     }
 
+    // ── fetchDrill — Critical alerts (the KPI tile's own drilldown) ──────────────
+
+    @Test
+    public void testFetchDrill_criticalAlerts_topRowsNewestFirstWithSeverityCta() {
+        List<HostSeverityCount> hostSeverityCounts = Collections.singletonList(
+                new HostSeverityCount("host", 2, 0, 0, 0));
+        InsightDataBundle b = bundle(new ArrayList<>(), new ArrayList<>(), new HashSet<>(), new HashMap<>(),
+                new HashMap<>(), hostSeverityCounts, new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult result = postureService.fetchDrill(b, new ArrayList<>(), fiveTrendWindowEvents(),
+                TREND_START, TREND_END, PostureService.DRILL_CRITICAL_ALERTS, "", 0, 20);
+
+        assertEquals(2, result.getTotal()); // both CRITICAL events in fiveTrendWindowEvents()
+        assertEquals(2, result.getRows().size());
+        assertFalse(result.isDrillable());
+        assertEquals("CRITICAL", result.getSeverity());
+        assertEquals(1, result.getCtas().size());
+        assertEquals("CRITICAL", result.getCtas().get(0).getParams().get("severity"));
+        assertEquals(1_007_500L, ((Number) result.getRows().get(0).get("detectedAt")).longValue()); // newest first
+        // Sourced from hostSeverityCounts (the same aggregation the KPI tile's own value uses),
+        // not rows.size() over the raw event list — see criticalAlertsDrill's own note on why.
+        assertEquals("2", result.getSummary().get(0).getFormatted());
+    }
+
+    @Test
+    public void testFetchDrill_criticalAlerts_capsAtTopFiveRegardlessOfTotal() {
+        List<DashboardMaliciousEvent> events = new ArrayList<>();
+        for (int i = 0; i < 7; i++) {
+            events.add(event(1, 1_000_000 + i, "Default-Customer PII", "host", "actor", "CRITICAL", "ACTIVE"));
+        }
+        // Deliberately NOT 7 — this is the whole point of the fix: the drill's "totalCritical"
+        // metric must reflect hostSeverityCounts (what the KPI tile itself shows), never a
+        // recount of the raw, independently-fetched event list, since the two are known to
+        // disagree (see criticalAlertsDrill's own note on why).
+        List<HostSeverityCount> hostSeverityCounts = Collections.singletonList(
+                new HostSeverityCount("host", 11, 0, 0, 0));
+        InsightDataBundle b = bundle(new ArrayList<>(), new ArrayList<>(), new HashSet<>(), new HashMap<>(),
+                new HashMap<>(), hostSeverityCounts, new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult result = postureService.fetchDrill(b, new ArrayList<>(), events,
+                TREND_START, TREND_END, PostureService.DRILL_CRITICAL_ALERTS, "", 0, 20);
+
+        // total stays == rows shown (5), NOT the raw event count (7) or hostSeverityCounts (11) —
+        // see criticalAlertsDrill's own note on why: this handler ignores skip/limit and always
+        // returns the same fixed top-N, so AgGridTable's own SSRM must never see a total bigger
+        // than what's actually on this one page, or it would request a "page 2" that comes back
+        // as the same 5 rows again. The real total isn't lost, just moved to its own named
+        // summary metric, sourced from hostSeverityCounts rather than the raw list's own count.
+        assertEquals(5, result.getTotal());
+        assertEquals(5, result.getRows().size());
+        assertEquals("11", result.getSummary().get(0).getFormatted());
+    }
+
+    // ── fetchDrill — Sensitive data incidents (the KPI tile's own drilldown) ─────
+
+    @Test
+    public void testFetchDrill_sensitiveDataIncidents_groupedByToolThenUser() {
+        InsightDataBundle b = bundle(new ArrayList<>(), fourBehaviourPolicies(), new HashSet<>(),
+                deviceIdToUsernameForFourVendors(), new HashMap<>(), new ArrayList<>(), new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l1 = postureService.fetchDrill(b, new ArrayList<>(), fiveTrendWindowEvents(),
+                TREND_START, TREND_END, PostureService.DRILL_SENSITIVE_DATA, "", 0, 20);
+        assertTrue(l1.isDrillable());
+        assertEquals(1, l1.getTotal()); // only the "Default-Customer PII" event matches a configured PII policy
+        assertEquals("OpenAI", l1.getRows().get(0).get("tool")); // deviceA.ai-agent.chatgpt.com -> OpenAI
+
+        PostureDrillResult l2 = postureService.fetchDrill(b, new ArrayList<>(), fiveTrendWindowEvents(),
+                TREND_START, TREND_END, PostureService.DRILL_SENSITIVE_DATA, "OpenAI", 0, 20);
+        assertFalse(l2.isDrillable());
+        assertEquals(1, l2.getRows().size());
+        assertEquals("alice", l2.getRows().get(0).get("user"));
+    }
+
     // ── fetchDrill — unknown drillId ──────────────────────────────────────────────
 
     @Test
@@ -779,6 +855,32 @@ public class TestPostureService extends MongoBasedTest {
         assertEquals("success", l3.getBadge().getTone());
         assertFalse(l3.isDrillable());
         assertEquals(2, l3.getSections().size()); // devices table + recent-activity timeline
+    }
+
+    /** Two different deviceIds/collections that both resolve to the same display username used to
+     *  render as two separate near-duplicate rows in "Who is using it" — shadowAiToolProfileDrill
+     *  now clubs them into one row by username instead, and surfaces the agentic assets each
+     *  person actually used. */
+    @Test
+    public void testFetchRiskScoreDrill_shadowAiExposure_l3ClubsSameUsernameAcrossDevices() {
+        List<ApiCollection> collections = Arrays.asList(
+                endpointCollection(301, "devX.ai-agent.chatgpt.com", 1_000_100),
+                endpointCollection(302, "devY.ai-agent.chatgpt.com", 1_000_300));
+        Map<String, String> deviceIdToUsername = new HashMap<>();
+        deviceIdToUsername.put("devX", "oscar.carcamo");
+        deviceIdToUsername.put("devY", "oscar.carcamo");
+        InsightDataBundle b = bundle(collections, new ArrayList<>(), new HashSet<>(),
+                deviceIdToUsername, new HashMap<>(), new ArrayList<>(), new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l3 = postureService.fetchRiskScoreDrill(b, collections, new ArrayList<>(),
+                null, null, new ArrayList<>(), "shadowAiExposure/OpenAI", 0, 20);
+        List<Map<String, Object>> deviceRows = l3.getSections().get(0).getRows();
+        assertEquals(1, deviceRows.size()); // clubbed into one row, not two
+        assertEquals("oscar.carcamo", deviceRows.get(0).get("device"));
+        assertEquals(1_000_100, deviceRows.get(0).get("firstSeen")); // earliest of the two collections
+        assertNotNull(deviceRows.get(0).get("assets"));
+        assertFalse(((String) deviceRows.get(0).get("assets")).isEmpty());
     }
 
     /** SecurityPostureAction calls this BEFORE firing shadowAiExposure's own entity-level
@@ -956,5 +1058,42 @@ public class TestPostureService extends MongoBasedTest {
         PostureDrillResult unknownSubScore = postureService.fetchRiskScoreDrill(b, fourVendorCollections(),
                 new ArrayList<>(), null, null, new ArrayList<>(), "notARealSubScore/x", 0, 20);
         assertEquals("Unknown drilldown", unknownSubScore.getTitle());
+    }
+
+    // ── RiskScoreProfileDrillService.timelineSection — burst clustering ─────────
+
+    /** Same-category events within TIMELINE_CLUSTER_WINDOW_SECONDS (1h) of the burst's own
+     *  most-recent event club into one row with a "×N" count and the worst severity across the
+     *  whole burst — a policy firing every few minutes for hours used to render as dozens of
+     *  near-identical timeline rows. */
+    @Test
+    public void testTimelineSection_clubsSameCategoryEventsWithinOneHour() {
+        List<DashboardMaliciousEvent> events = Arrays.asList(
+                event(1, 1_010_000, "Default-Customer PII", "host", "actor", "HIGH", "ACTIVE"),
+                event(1, 1_008_000, "Default-Customer PII", "host", "actor", "CRITICAL", "ACTIVE"),
+                event(1, 1_006_800, "Default-Customer PII", "host", "actor", "LOW", "ACTIVE"), // 3200s from first, within 1h
+                event(1, 1_000_000, "Default-Customer PII", "host", "actor", "LOW", "ACTIVE")); // 10000s from first, new burst
+
+        PostureDrillResult.Section section = RiskScoreProfileDrillService.timelineSection("t", "Timeline", null, events);
+
+        assertEquals(2, section.getRows().size());
+        assertEquals("Default-Customer PII ×3", section.getRows().get(0).get("title"));
+        assertEquals("CRITICAL", section.getRows().get(0).get("severity")); // worst across the clubbed burst
+        assertEquals("Default-Customer PII", section.getRows().get(1).get("title")); // single event, no ×N suffix
+        assertEquals(4, section.getTotal()); // real raw-event count, unaffected by clustering
+    }
+
+    @Test
+    public void testTimelineSection_capsAtTopFiveBursts() {
+        List<DashboardMaliciousEvent> events = new ArrayList<>();
+        // 7 distinct categories, each >1h apart -> 7 separate bursts, capped to 5.
+        for (int i = 0; i < 7; i++) {
+            events.add(event(1, 2_000_000 - i * 10_000, "Category" + i, "host", "actor", "LOW", "ACTIVE"));
+        }
+
+        PostureDrillResult.Section section = RiskScoreProfileDrillService.timelineSection("t", "Timeline", null, events);
+
+        assertEquals(5, section.getRows().size());
+        assertEquals(7, section.getTotal());
     }
 }

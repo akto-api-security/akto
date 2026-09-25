@@ -37,7 +37,14 @@ class InsightNarrativeHandlerTest {
 
     @Test
     void testPromptVersion_bumpedForEpochFix() {
-        assertEquals(5, InsightNarrativeHandler.PROMPT_VERSION);
+        assertEquals(6, InsightNarrativeHandler.PROMPT_VERSION);
+    }
+
+    @Test
+    void testBuildPrompt_mentionsEvidenceSampleGrounding() throws org.json.JSONException {
+        String prompt = new InsightNarrativeHandler().buildPrompt(minimalInput(), null);
+        assertTrue(prompt.contains("evidenceSample"));
+        assertTrue(prompt.toLowerCase().contains("paraphrase"));
     }
 
     @Test

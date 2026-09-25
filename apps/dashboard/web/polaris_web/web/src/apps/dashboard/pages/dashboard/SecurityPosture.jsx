@@ -39,6 +39,10 @@ const DRILL_ENFORCEMENT_FUNNEL = 'enforcementFunnel'
 const DRILL_VENDOR_RISK = 'vendorRisk'
 const DRILL_FRAMEWORK_READINESS = 'frameworkReadiness'
 const DRILL_RISK_SCORE = 'riskScoreBreakdown'
+// Reuse the KPI's own id as its drill id, same as the backend does (PostureService.DRILL_CRITICAL_ALERTS/
+// DRILL_SENSITIVE_DATA) — these two are the KPI tile's own drilldown, not a panel's.
+const DRILL_CRITICAL_ALERTS = KPI_CRITICAL_ALERTS
+const DRILL_SENSITIVE_DATA = KPI_SENSITIVE_INCIDENTS
 
 // Sparkline color per KPI — both are "higher is worse" counts, so both read red, matching
 // deltaTone's own critical-is-red convention elsewhere on this page.
@@ -771,10 +775,17 @@ function SecurityPosture() {
             {[KPI_RISK_SCORE, KPI_CRITICAL_ALERTS, KPI_MONITORING_COVERAGE, KPI_SENSITIVE_INCIDENTS].map((id) => {
                 const kpi = kpiById(id)
                 if (!kpi) return <ComingSoonTile key={id} label={id} />
-                // The risk score has no route — it opens its own breakdown drilldown instead of
-                // navigating away, so it needs a different onOpen/clickability than the rest.
+                // Risk score / Critical alerts / Sensitive data incidents each open their own
+                // in-context drilldown instead of navigating away — Monitoring coverage is the
+                // only one left on the old navigate-away behavior (openKpi).
                 if (id === KPI_RISK_SCORE) {
                     return <KpiTile key={id} kpi={kpi} onOpen={() => openDrill(DRILL_RISK_SCORE)} forceClickable />
+                }
+                if (id === KPI_CRITICAL_ALERTS) {
+                    return <KpiTile key={id} kpi={kpi} onOpen={() => openDrill(DRILL_CRITICAL_ALERTS)} forceClickable />
+                }
+                if (id === KPI_SENSITIVE_INCIDENTS) {
+                    return <KpiTile key={id} kpi={kpi} onOpen={() => openDrill(DRILL_SENSITIVE_DATA)} forceClickable />
                 }
                 return <KpiTile key={id} kpi={kpi} onOpen={openKpi} />
             })}

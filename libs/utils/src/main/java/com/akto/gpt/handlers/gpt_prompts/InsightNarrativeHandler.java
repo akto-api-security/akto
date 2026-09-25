@@ -14,21 +14,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Renders one insight's precomputed metric bundle into markdown, plus grounds the
- * provider's own concern/impact/remediation drafts in the real evidence rows (naming
- * actual hosts/users/topics instead of just aggregate counts). This handler NEVER
- * computes a number — every figure in its input is already Java-computed (see
- * InsightService.buildNarrativeInput); its only job is prose. validateAndBuild()
- * mechanically enforces that for every field it returns: any numeric literal in the
- * model's output that isn't copied verbatim from the input is grounds for rejection,
- * with one retry before giving up. Bump PROMPT_VERSION whenever the prompt changes —
- * it is baked into the narrative cache key so old prose can never outlive a changed
- * prompt.
- */
+
 public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
 
-    public static final int PROMPT_VERSION = 5;
     public static final String NARRATIVE_INPUT = "narrativeInput"; // JSON string
 
     private static final Pattern NUMERIC_LITERAL = Pattern.compile("(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?%?");
@@ -205,7 +193,14 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("timing only in relative, qualitative words (\"recently\", \"earlier this month\", \"on its ")
           .append("most recent occurrence\", \"within this window\") using CURRENT_TIME below only to judge ")
           .append("roughly how far in the past it is — never state or compute a specific date, a day count, ")
-          .append("or an age in days/weeks (that would be computing a new number, which rule 1 forbids).\n\n")
+          .append("or an age in days/weeks (that would be computing a new number, which rule 1 forbids).\n")
+          .append("8. When a row in EVIDENCE has an \"evidenceSample\" field, that is the real, verbatim ")
+          .append("intercepted request/response text behind that row — the strongest possible grounding for ")
+          .append("WHY that specific row matters. Prefer it over the row's other fields when explaining a ")
+          .append("row's importance, and pair it with that row's own \"policy\" field (the guardrail policy ")
+          .append("that fired) to say what was detected, not just that something was. Never invent detail ")
+          .append("beyond what evidenceSample actually shows, and never quote it verbatim at length — ")
+          .append("paraphrase what it reveals in your own words.\n\n")
           .append("CURRENT_TIME: ").append(nowForPrompt()).append("\n\n")
           .append("SEVERITY: ").append(severity).append("\n\n")
           .append("FACTS: ").append(input.optJSONArray("metrics")).append("\n\n")
