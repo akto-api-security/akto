@@ -16,9 +16,11 @@ import java.util.Map;
  *   <li>tag source=ENDPOINT, plus ai-agent / mcp-client = claudecli: Atlas collection placement
  *       and agent grouping (the envelope contextSource is not carried past ingestion).</li>
  * </ul>
- * The identity is the user's email local part when the traffic carries an email, else the host the
- * hook sent (the LiteLLM agent name or proxy host), so every call of a conversation, verdict and
- * ingest alike, lands on the same host.
+ * The identity (first host segment) is, in order: the user's email local part when the traffic
+ * carries an email; else Claude Code's own device id (the hook's client_device_id tag, from the
+ * Anthropic metadata.user_id Claude Code sends), shortened; else the host the hook sent (the
+ * LiteLLM agent name or proxy host). The hook tags verdict, ingest and tool-call traffic alike, so
+ * every call of a conversation lands on the same host.
  */
 public final class ClaudeCliEndpointRewrite {
 
@@ -31,6 +33,10 @@ public final class ClaudeCliEndpointRewrite {
     static final String SPEND_LOGS_METADATA_HEADER = "x-litellm-spend-logs-metadata";
     static final String USER_EMAIL_KEY = "user_email";
     static final String MCP_SERVER_NAME_TAG = "mcp_server_name";
+    static final String DEVICE_ID_TAG = "client_device_id";
+    // Claude Code's device id is 64 hex characters, one more than a host label allows; a 16-character
+    // prefix still tells installs apart.
+    static final int DEVICE_ID_LENGTH = 16;
 
     private ClaudeCliEndpointRewrite() {}
 
@@ -53,7 +59,9 @@ public final class ClaudeCliEndpointRewrite {
             header(headers, INSTALLER_USER_EMAIL_HEADER),
             tag.getString(USER_EMAIL_KEY),
             parseObject(header(headers, SPEND_LOGS_METADATA_HEADER)).getString(USER_EMAIL_KEY));
-        String identity = email != null ? AgentHostUtils.emailLocalPart(email) : header(headers, "host");
+        String identity = email != null
+            ? AgentHostUtils.emailLocalPart(email)
+            : firstNonEmpty(shortDeviceId(tag.getString(DEVICE_ID_TAG)), header(headers, "host"));
 
         boolean mcp = tag.containsField(Constants.AKTO_MCP_SERVER_TAG);
         String host = mcp
@@ -70,6 +78,14 @@ public final class ClaudeCliEndpointRewrite {
         requestData.put("requestHeaders", headers.toJson());
         requestData.put("tag", tag.toJson());
         requestData.put("contextSource", Constants.AKTO_ENDPOINT_SOURCE_VALUE);
+    }
+
+    private static String shortDeviceId(String deviceId) {
+        if (deviceId == null) {
+            return null;
+        }
+        String trimmed = deviceId.trim();
+        return trimmed.length() > DEVICE_ID_LENGTH ? trimmed.substring(0, DEVICE_ID_LENGTH) : trimmed;
     }
 
     private static String header(BasicDBObject headers, String name) {

@@ -14,6 +14,9 @@ import static org.junit.Assert.assertTrue;
 public class ClaudeCliEndpointRewriteTest {
 
     private static final String CLAUDE_CLI_UA = "claude-cli/2.1.282 (external, sdk-cli)";
+    // Claude Code's metadata.user_id device_id: 64 hex characters.
+    private static final String DEVICE_ID = "e5682ef8c5847e7f62e4e2bc2124da809f6b8b98591f2ffb56f5c199bac68ebd";
+    private static final String DEVICE_HOST = "e5682ef8c5847e7f.ai-agent.claudecli";
 
     /** Envelope as the LiteLLM hook sends it: headers and tag are JSON strings. */
     private static Map<String, Object> envelope(String connector, BasicDBObject headers, BasicDBObject tag) {
@@ -32,15 +35,20 @@ public class ClaudeCliEndpointRewriteTest {
             .append("content-type", "application/json");
     }
 
-    /** Tag of the pre-call verdict: LiteLLM metadata is not populated yet, so no identity tags. */
-    private static BasicDBObject verdictTag() {
+    /** Tag with no client identity, as sent by clients that carry no metadata.user_id. */
+    private static BasicDBObject baseTag() {
         return new BasicDBObject("gen-ai", "Gen AI").append("litellm", "LiteLLM")
             .append("call_type", "anthropic_messages").append("model", "claude-opus-5-5");
     }
 
-    /** Tag of the post-call ingest of the same turn. */
+    /** Tag of the pre-call verdict: the hook reads Claude Code's metadata.user_id from the request body. */
+    private static BasicDBObject verdictTag() {
+        return baseTag().append("client_device_id", DEVICE_ID).append("client_session_id", "4d0e795e");
+    }
+
+    /** Tag of the post-call ingest of the same turn: also carries LiteLLM's own session ids. */
     private static BasicDBObject ingestTag() {
-        return verdictTag().append("client_device_id", "e568ebd").append("client_session_id", "4d0e795e");
+        return verdictTag().append("session_id", "4d0e795e").append("litellm_call_id", "1ddebc2e");
     }
 
     private static BasicDBObject headers(Map<String, Object> data) {
@@ -57,13 +65,14 @@ public class ClaudeCliEndpointRewriteTest {
         ClaudeCliEndpointRewrite.apply(data);
 
         assertEquals("ENDPOINT", data.get("contextSource"));
-        assertEquals("localhost-4000.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals(DEVICE_HOST, headers(data).getString("host"));
         BasicDBObject tag = tag(data);
         assertEquals("ENDPOINT", tag.getString("source"));
         assertEquals("claudecli", tag.getString("ai-agent"));
         assertEquals("LiteLLM", tag.getString("litellm"));
-        assertEquals("e568ebd", tag.getString("client_device_id"));
+        assertEquals(DEVICE_ID, tag.getString("client_device_id"));
         assertEquals(CLAUDE_CLI_UA, headers(data).getString("user-agent"));
+        assertNull(headers(data).get("x-akto-installer-user_email"));
     }
 
     @Test
@@ -72,7 +81,22 @@ public class ClaudeCliEndpointRewriteTest {
         Map<String, Object> ingest = envelope("litellm", claudeCodeHeaders(), ingestTag());
         ClaudeCliEndpointRewrite.apply(verdict);
         ClaudeCliEndpointRewrite.apply(ingest);
-        assertEquals(headers(verdict).getString("host"), headers(ingest).getString("host"));
+        assertEquals(DEVICE_HOST, headers(verdict).getString("host"));
+        assertEquals(DEVICE_HOST, headers(ingest).getString("host"));
+    }
+
+    @Test
+    public void shortDeviceIdIsKeptWhole() {
+        Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), baseTag().append("client_device_id", "e568ebd"));
+        ClaudeCliEndpointRewrite.apply(data);
+        assertEquals("e568ebd.ai-agent.claudecli", headers(data).getString("host"));
+    }
+
+    @Test
+    public void withoutEmailOrDeviceIdTheProxyHostIsUsed() {
+        Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), baseTag());
+        ClaudeCliEndpointRewrite.apply(data);
+        assertEquals("localhost-4000.ai-agent.claudecli", headers(data).getString("host"));
     }
 
     @Test
@@ -112,10 +136,10 @@ public class ClaudeCliEndpointRewriteTest {
     @Test
     public void toolCallTrafficIsTaggedAsClaudeCliAgent() {
         BasicDBObject toolTag = new BasicDBObject("gen-ai", "Gen AI").append("ai-agent", "litellm")
-            .append("tool_name", "Bash").append("call_type", "tool_call");
+            .append("tool_name", "Bash").append("call_type", "tool_call").append("client_device_id", DEVICE_ID);
         Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), toolTag);
         ClaudeCliEndpointRewrite.apply(data);
-        assertEquals("localhost-4000.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals(DEVICE_HOST, headers(data).getString("host"));
         assertEquals("claudecli", tag(data).getString("ai-agent"));
         assertEquals("ENDPOINT", tag(data).getString("source"));
     }
@@ -123,10 +147,11 @@ public class ClaudeCliEndpointRewriteTest {
     @Test
     public void mcpToolCallsUseTheClaudeCliMcpHostShape() {
         BasicDBObject mcpTag = new BasicDBObject("mcp-server", "MCP Server").append("mcp-client", "litellm")
-            .append("mcp_server_name", "claude_ai_Slack").append("tool_name", "slack_send_message");
+            .append("mcp_server_name", "claude_ai_Slack").append("tool_name", "slack_send_message")
+            .append("client_device_id", DEVICE_ID);
         Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), mcpTag);
         ClaudeCliEndpointRewrite.apply(data);
-        assertEquals("localhost-4000.claudecli.claude-ai-slack", headers(data).getString("host"));
+        assertEquals("e5682ef8c5847e7f.claudecli.claude-ai-slack", headers(data).getString("host"));
         BasicDBObject tag = tag(data);
         assertEquals("claudecli", tag.getString("mcp-client"));
         assertEquals("ENDPOINT", tag.getString("source"));
@@ -137,7 +162,7 @@ public class ClaudeCliEndpointRewriteTest {
     @Test
     public void hostHeaderIsReplacedWhateverItsCasing() {
         BasicDBObject h = new BasicDBObject("User-Agent", CLAUDE_CLI_UA).append("Host", "LiteLLM.corp:4000");
-        Map<String, Object> data = envelope("LiteLLM", h, verdictTag());
+        Map<String, Object> data = envelope("LiteLLM", h, baseTag());
         ClaudeCliEndpointRewrite.apply(data);
         BasicDBObject out = headers(data);
         assertFalse(out.containsField("Host"));
