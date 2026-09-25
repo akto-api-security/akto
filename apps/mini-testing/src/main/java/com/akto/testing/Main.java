@@ -637,14 +637,14 @@ public class Main {
                     logSentMap.put(accountId, start);
                     loggerMaker.infoAndAddToDb(errorMessage + " . Failing test run : " + start, LogDb.TESTING);
                 }
-                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage);
+                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage, leaseToken);
                 continue;
             }
 
             if (isEntirelyOutOfTestingScope(testingRun.getTestingEndpoints())) {
                 String errorMessage = OUT_OF_TESTING_SCOPE_ERROR;
                 loggerMaker.infoAndAddToDb(errorMessage + " for testing run: " + testingRun.getId(), LogDb.TESTING);
-                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage);
+                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage, leaseToken);
                 continue;
             }
 
@@ -697,21 +697,18 @@ public class Main {
                                         + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
                                         + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                                Bson filterQ = Filters.and(
-                                    Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
-                                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                                    Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
-                                );
+                                int sinceTimestamp = Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime);
 
-                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(filterQ);
+                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(
+                                        testingRun.getHexId(), sinceTimestamp, State.FAILED);
                                 TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 TestingRunResultSummary summary;
                                 if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
-                                    summary = dataActor.updateIssueCountInSummary(testingRunResultSummary.getId().toHexString(), runResultSummary.getCountIssues());
+                                    summary = dataActor.updateIssueCountInSummaryFenced(testingRunResultSummary.getId().toHexString(), runResultSummary.getCountIssues(), leaseToken);
                                     loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
                                     maxRetriesReached = true;
                                 }else{
-                                    summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
+                                    summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString(), leaseToken);
                                 }
     
                                 runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
@@ -735,7 +732,7 @@ public class Main {
                                 loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId(), LogDb.TESTING);
                                 continue;
                             }
-                            TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
+                            TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString(), leaseToken);
                             if (summary == null) {
                                 loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 continue;
@@ -750,7 +747,15 @@ public class Main {
                                 trrs.setId(new ObjectId());
                                 trrs.setStartTimestamp(start);
                                 trrs.setState(State.RUNNING);
+                                // Same reasoning as the leased mint in the else branch below and in
+                                // failTestingRun: an un-leased insert here is permanently unreachable
+                                // via the safe TRRS-scoped discovery path from the moment of its
+                                // creation, for the exact same reason - it's the same bug, just on
+                                // the safe-path retry instead of the fallback-path retry.
+                                trrs.setLeaseToken(leaseToken);
+                                trrs.setLeaseExpiryTs(Context.now() + TestingLease.LEASE_SECONDS);
                                 dataActor.insertTestingRunResultSummary(trrs);
+                                TestingLease.getInstance().adopt(leaseToken);
                                 summaryId = trrs.getId();
                             } else {
                                 trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start, leaseToken, TestingLease.LEASE_SECONDS);
@@ -822,10 +827,20 @@ public class Main {
              * it would close out a run that the new owner is still executing. Sits outside the try
              * above, so it is reached even when init threw - which is exactly when the lease is
              * most likely to have been lost.
+             *
+             * isLost() alone is not enough: it returns false whenever token==null (see its own
+             * javadoc - no lease held is not the same as a lease lost), and token is null for the
+             * whole iteration whenever this poll went through the lease-blind findPendingTestingRun
+             * fallback (trrs==null at the top of the loop). That path establishes no summary at
+             * all, so summaryId==null here is the actual signal that there was never anything to
+             * complete on behalf of. Confirmed root cause of a real production incident (23 Sep): a
+             * crash mid-iteration on this exact fallback path fell through to this call with
+             * summaryId==null and isLost()==false, marking a partially-complete TestingRun COMPLETED.
              */
-            if (TestingLease.getInstance().isLost()) {
+            if (summaryId == null || TestingLease.getInstance().isLost()) {
                 loggerMaker.errorAndAddToDb("Not marking run complete for summary "
-                        + (summaryId == null ? "null" : summaryId.toHexString()) + ": lease no longer held.");
+                        + (summaryId == null ? "null" : summaryId.toHexString()) + ": "
+                        + (summaryId == null ? "no summary established (lease-blind fallback path)" : "lease no longer held."));
             } else {
                 testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
             }
@@ -858,10 +873,14 @@ public class Main {
     }
 
     private static void failTestingRun(TestingRun testingRun, ObjectId summaryId, TestingRunResultSummary trrs,
-            boolean isTestingRunResultRerunCase, TestingConfigurations config, int start, String errorMessage) {
+            boolean isTestingRunResultRerunCase, TestingConfigurations config, int start, String errorMessage,
+            String leaseToken) {
         if (summaryId == null) {
-            // Fresh run, first pickup - no TestingRunResultSummary created yet, same fallback used elsewhere in this loop.
-            trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+            // Fresh run, first pickup - no TestingRunResultSummary created yet, same fallback used
+            // elsewhere in this loop. Leased: an unleased mint here would be permanently unreachable
+            // via the safe TRRS-scoped discovery path from the moment of its creation.
+            trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start, leaseToken, TestingLease.LEASE_SECONDS);
+            if (trrs != null) TestingLease.getInstance().adopt(leaseToken);
             summaryId = trrs.getId();
         }
 
@@ -875,7 +894,7 @@ public class Main {
         } else {
             Map<String, String> metadata = new HashMap<>();
             metadata.put("error", errorMessage);
-            dataActor.markTestRunResultSummaryFailed(summaryId.toHexString());
+            dataActor.markTestRunResultSummaryFailed(summaryId.toHexString(), leaseToken);
             dataActor.updateMetadataInSummary(summaryId.toHexString(), metadata);
         }
     }

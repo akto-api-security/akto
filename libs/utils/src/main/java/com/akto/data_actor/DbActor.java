@@ -516,6 +516,10 @@ public class DbActor extends DataActor {
         return DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
     }
 
+    public TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken) {
+        return DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId, leaseToken);
+    }
+
     public void updateAccessMatrixInfo(String taskId, int frequencyInSeconds) {
         DbLayer.updateAccessMatrixInfo(taskId, frequencyInSeconds);
     }
@@ -527,6 +531,11 @@ public class DbActor extends DataActor {
     public TestingRunResultSummary updateIssueCountInSummary(String summaryId,
             Map<String, Integer> totalCountIssues) {
         return DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+    }
+
+    public TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId,
+            Map<String, Integer> totalCountIssues, String leaseToken) {
+        return DbLayer.updateIssueCountInSummaryFenced(summaryId, totalCountIssues, leaseToken);
     }
 
     public TestingRunResultSummary updateIssueCountInSummary(String summaryId,
@@ -711,8 +720,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip);
     }
 
-    public long countTestingRunResultSummaries(Bson filter){
-        return DbLayer.countTestingRunResultSummaries(filter);
+    public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state){
+        return DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, state);
     }
 
     public TestScript fetchTestScript(TestScript.Type type){

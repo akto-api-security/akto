@@ -164,6 +164,8 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId);
 
+    public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken);
+
     public abstract void insertTestingRunResultSummary(TestingRunResultSummary trrs);
 
 
@@ -229,6 +231,8 @@ public abstract class DataActor {
     public abstract void insertActivity(int count);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
+
+    public abstract TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues, String operator);
 
@@ -332,7 +336,7 @@ public abstract class DataActor {
 
     public abstract List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip);
 
-    public abstract long countTestingRunResultSummaries(Bson filter);
+    public abstract long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state);
 
     public abstract TestScript fetchTestScript(TestScript.Type type);
 
