@@ -66,9 +66,15 @@ function SeverityCell({ value }) {
 function DrillStats({ drill }) {
     const stats = (drill.summary || []).map((m) => ({ key: m.key, label: m.label, value: m.formatted }))
     // The table's first column names what each row is, so the list gets a real title ("Tools")
-    // with the count beside it, rather than a generic "Rows" total.
-    const entity = drill.columns?.[0]?.headerName
-    const title = !entity ? 'Results'
+    // with the count beside it, rather than a generic "Rows" total. That heuristic only holds when
+    // each row is a grouped entity (a tool, a vendor, a user); a table of individual guardrail
+    // events instead — every drill here whose own first column is "detectedAt" (criticalAlerts,
+    // dataLeaving's/enforcementFunnel's own member-level event lists) — has nothing sensible to
+    // pluralize ("Detected at" -> "Detected ats"), so it gets this fixed label instead.
+    const firstColumn = drill.columns?.[0]
+    const entity = firstColumn?.headerName
+    const title = firstColumn?.field === 'detectedAt' ? 'Guardrail violations'
+        : !entity ? 'Results'
         : entity.endsWith('s') ? entity
         : /[^aeiou]y$/i.test(entity) ? `${entity.slice(0, -1)}ies` : `${entity}s`
     return (
