@@ -307,15 +307,22 @@ const api = {
         })
     },
 
-    // The risk score flyout's own detail (sub-scores + vendor table) — fetched only when the
-    // flyout opens, not as part of fetchPostureSummary. See SecurityPostureAction's javadoc.
-    fetchRiskScoreBreakdown: async (startTimestamp, endTimestamp) => {
+    // One page of one panel's drilldown flyout — see PostureService#fetchDrill's own javadoc.
+    // The risk score breakdown (formerly its own fetchRiskScoreBreakdown call) is now just
+    // drillId=PostureService.DRILL_RISK_SCORE on this same endpoint.
+    // `path` is empty/undefined for the root (group) level, or one prior level's row id to drill
+    // into its members.
+    fetchPostureDrill: async (drillId, path, startTimestamp, endTimestamp, skip, limit) => {
         return await request({
-            url: '/api/fetchRiskScoreBreakdown',
+            url: '/api/fetchPostureDrill',
             method: 'post',
             data: {
+                drillId,
+                path: path || '',
                 startTimestamp,
-                endTimestamp
+                endTimestamp,
+                skip: skip || 0,
+                limit: limit || 20
             }
         })
     }

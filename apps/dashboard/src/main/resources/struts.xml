@@ -13835,7 +13835,7 @@
             </result>
         </action>
 
-        <action name="api/fetchRiskScoreBreakdown" class="com.akto.action.SecurityPostureAction" method="fetchRiskScoreBreakdown">
+        <action name="api/fetchPostureDrill" class="com.akto.action.SecurityPostureAction" method="fetchPostureDrill">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -13843,7 +13843,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="SUCCESS" type="json">
-                <param name="root">riskScoreBreakdown</param>
+                <param name="root">postureDrill</param>
             </result>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>

@@ -4,6 +4,9 @@ import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
 import javax.validation.ValidationException;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -11,24 +14,12 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Renders one insight's precomputed metric bundle into markdown, plus grounds the
- * provider's own concern/impact/remediation drafts in the real evidence rows (naming
- * actual hosts/users/topics instead of just aggregate counts). This handler NEVER
- * computes a number — every figure in its input is already Java-computed (see
- * InsightService.buildNarrativeInput); its only job is prose. validateAndBuild()
- * mechanically enforces that for every field it returns: any numeric literal in the
- * model's output that isn't copied verbatim from the input is grounds for rejection,
- * with one retry before giving up. Bump PROMPT_VERSION whenever the prompt changes —
- * it is baked into the narrative cache key so old prose can never outlive a changed
- * prompt.
- */
+
 public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
 
-    public static final int PROMPT_VERSION = 3;
     public static final String NARRATIVE_INPUT = "narrativeInput"; // JSON string
 
-    private static final Pattern NUMERIC_LITERAL = Pattern.compile("\\d[\\d,]*(?:\\.\\d+)?%?");
+    private static final Pattern NUMERIC_LITERAL = Pattern.compile("(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?%?");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\([^)]*\\)");
     private static final int MAX_WORDS = 260;
     private static final int MAX_SUMMARY_FIELD_WORDS = 60;
@@ -99,7 +90,9 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         return validateAndBuild(rawResponse, allowedLiterals);
     }
 
-    private BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
+    /** Package-private (not private): InsightNarrativeHandlerTest exercises the literal-rejection
+     *  guard directly against hand-built responses, rather than only through a real `call()`. */
+    BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
         BasicDBObject resp = new BasicDBObject();
         if (rawResponse == null || rawResponse.isEmpty() || "NOT_FOUND".equalsIgnoreCase(rawResponse)) {
             resp.put("error", "empty response");
@@ -160,13 +153,26 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         }
     }
 
-    private String buildPrompt(JSONObject input, String rejectedNote) {
+    /** "<epoch> (<ISO date>)" — orientation for HARD RULE 7's relative-time phrasing, never a
+     *  value the model is meant to copy into its output (it isn't added to allowedLiterals). */
+    static String nowForPrompt() {
+        long nowEpoch = System.currentTimeMillis() / 1000;
+        String iso = Instant.ofEpochSecond(nowEpoch).atZone(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ROOT));
+        return nowEpoch + " (" + iso + ")";
+    }
+
+    /** Package-private (not private): pure string-building, no network call — same
+     *  "test the pure piece directly" convention this repo already uses elsewhere (see
+     *  InsightNarrativeHandlerTest). */
+    String buildPrompt(JSONObject input, String rejectedNote) {
+        String severity = input.optString("severity", "");
         StringBuilder sb = new StringBuilder();
-        sb.append("You are rendering a precomputed security finding into prose for someone new to this ")
-          .append("product who won't know what to do next. You are a RENDERER, not an analyst — every ")
-          .append("number below has already been computed in Java; your job is to make it specific and ")
-          .append("concrete, grounded in the real rows in EVIDENCE (actual hosts/users/topics/examples), ")
-          .append("not just the aggregate counts in FACTS. Return JSON.\n\n")
+        sb.append("You are rendering a precomputed security finding into prose for a reader who needs to ")
+          .append("decide what to do next, not just read what happened. You are a RENDERER, not an analyst ")
+          .append("— every number below has already been computed in Java; your job is to make it specific, ")
+          .append("concrete, and ACTION-DRIVEN, grounded in the real rows in EVIDENCE (actual hosts/users/")
+          .append("topics/examples), not just the aggregate counts in FACTS. Return JSON.\n\n")
           .append("HARD RULES:\n")
           .append("1. Every number in your output (in every field) MUST be copied verbatim from a ")
           .append("\"formatted\" value in FACTS or a cell value in EVIDENCE. Never compute, sum, round, or ")
@@ -176,7 +182,27 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("3. Never write a link, URL, or call to action — those are rendered separately.\n")
           .append("4. Include every sentence in CAVEATS and every \"impact\" in DATA_GAPS, verbatim, ")
           .append("somewhere in narrative.\n")
-          .append("5. If something is not in FACTS or EVIDENCE, say it is unavailable — never estimate it.\n\n")
+          .append("5. If something is not in FACTS or EVIDENCE, say it is unavailable — never estimate it.\n")
+          .append("6. SEVERITY below (if non-empty) is the real, Java-computed worst severity behind this ")
+          .append("finding — let concern/impact read with that urgency (CRITICAL/HIGH: urgent, immediate; ")
+          .append("MEDIUM/LOW: worth doing, not alarming). Never invent a severity or urgency that SEVERITY, ")
+          .append("CAVEATS, and DATA_GAPS don't support — when SEVERITY is empty, stay neutral.\n")
+          .append("7. FACTS/EVIDENCE hold raw Unix epoch seconds under keys like \"detectedAt\", \"firstSeen\", ")
+          .append("\"lastSeen\", \"lastScannedAt\", \"timestamp\", or \"lastHit\" (a plain integer, e.g. ")
+          .append("1758375000) — these are NOT counts. Never print one of these as a bare number. Describe ")
+          .append("timing only in relative, qualitative words (\"recently\", \"earlier this month\", \"on its ")
+          .append("most recent occurrence\", \"within this window\") using CURRENT_TIME below only to judge ")
+          .append("roughly how far in the past it is — never state or compute a specific date, a day count, ")
+          .append("or an age in days/weeks (that would be computing a new number, which rule 1 forbids).\n")
+          .append("8. When a row in EVIDENCE has an \"evidenceSample\" field, that is the real, verbatim ")
+          .append("intercepted request/response text behind that row — the strongest possible grounding for ")
+          .append("WHY that specific row matters. Prefer it over the row's other fields when explaining a ")
+          .append("row's importance, and pair it with that row's own \"policy\" field (the guardrail policy ")
+          .append("that fired) to say what was detected, not just that something was. Never invent detail ")
+          .append("beyond what evidenceSample actually shows, and never quote it verbatim at length — ")
+          .append("paraphrase what it reveals in your own words.\n\n")
+          .append("CURRENT_TIME: ").append(nowForPrompt()).append("\n\n")
+          .append("SEVERITY: ").append(severity).append("\n\n")
           .append("FACTS: ").append(input.optJSONArray("metrics")).append("\n\n")
           .append("EVIDENCE: ").append(input.optJSONArray("evidence")).append("\n\n")
           .append("CAVEATS: ").append(input.optJSONArray("caveats")).append("\n\n")
@@ -198,10 +224,15 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("as a stray dash), no literal section labels like \"What we found\", \"Why it matters\", ")
           .append("\"Summary\", no markdown heading (#, ##). Under 200 words total, no emojis.\n")
           .append("- concern: one sentence, under 40 words, on what was specifically found — name real ")
-          .append("entities from EVIDENCE where possible.\n")
-          .append("- impact: one to two sentences, under 40 words, on what happens if this is left ")
-          .append("unaddressed.\n")
-          .append("- remediation: one to two sentences, under 40 words, the concrete next step to take.\n\n")
+          .append("entities from EVIDENCE where possible. Open with the severity word (e.g. \"A CRITICAL...\") ")
+          .append("only when SEVERITY is non-empty — never state a severity otherwise.\n")
+          .append("- impact: one to two sentences, under 40 words, on the concrete consequence of leaving ")
+          .append("this unaddressed — name what actually breaks or who's exposed (from EVIDENCE/FACTS), not ")
+          .append("generic risk language like \"could pose a risk.\"\n")
+          .append("- remediation: one to two sentences, under 40 words, phrased as a direct instruction, not ")
+          .append("a vague suggestion — start with an imperative verb (Review/Disable/Rotate/Escalate/Notify/")
+          .append("Update/Contact) and name the specific policy, host, or device from EVIDENCE it applies to ")
+          .append("wherever EVIDENCE names one.\n\n")
           .append("Return exactly: {\"narrative\": \"<markdown>\", \"concern\": \"<text>\", ")
           .append("\"impact\": \"<text>\", \"remediation\": \"<text>\"}. This is a json response.\n");
         if (rejectedNote != null) {
@@ -218,7 +249,7 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
      *  and the model can't tell those apart from a "formatted" value — it just sees text with a
      *  number in it. Field-by-field extraction only catches up with each new case one bug report at
      *  a time; scanning everything the prompt actually contains closes the whole class at once. */
-    private Set<String> allowedLiterals(JSONObject input) {
+    Set<String> allowedLiterals(JSONObject input) {
         Set<String> out = new HashSet<>();
         for (String field : new String[] { "metrics", "evidence", "caveats", "dataGaps" }) {
             Object value = input.opt(field);
@@ -236,8 +267,35 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         while (m.find()) {
             String literal = m.group();
             out.add(literal);
-            out.add(literal.replace(",", "")); // also allow the same number without a thousands separator
+            String stripped = literal.replace(",", "");
+            out.add(stripped); // also allow the same number without a thousands separator
+            out.add(withThousandsSeparators(stripped)); // ...and WITH one, even if the source had none —
+            // a raw evidence-row count (e.g. a plain "10495" int, not a pre-formatted "formatted"
+            // string) has no comma to begin with, but the model naturally writes large numbers with
+            // one in prose. Without this, a real, correctly-copied number gets rejected every single
+            // retry (the source number never changes), which is what actually caused an infinite
+            // regenerate loop for PostureDrillNarrativeService's evidence-only (no "formatted" field)
+            // input shape.
         }
+    }
+
+    private String withThousandsSeparators(String numeric) {
+        String suffix = "";
+        String body = numeric;
+        if (body.endsWith("%")) { suffix = "%"; body = body.substring(0, body.length() - 1); }
+        String intPart = body;
+        String fracPart = "";
+        int dot = body.indexOf('.');
+        if (dot >= 0) { intPart = body.substring(0, dot); fracPart = body.substring(dot); }
+        if (intPart.isEmpty() || intPart.length() <= 3) return numeric;
+        StringBuilder grouped = new StringBuilder();
+        int digitsSinceComma = 0;
+        for (int i = intPart.length() - 1; i >= 0; i--) {
+            grouped.append(intPart.charAt(i));
+            digitsSinceComma++;
+            if (digitsSinceComma % 3 == 0 && i != 0) grouped.append(',');
+        }
+        return grouped.reverse().toString() + fracPart + suffix;
     }
 
     @Override
