@@ -7,7 +7,7 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
@@ -38,6 +38,17 @@ class ScanRequest(BaseModel):
     # prompt). Omitted requests fall back to segmenting `text` alone.
     system_prompt: str = ""
     enrichment: str = ""
+
+
+class GuardrailsLLMRequest(BaseModel):
+    prompt: str
+    model: str = ""
+
+
+# gemma_fast_arbiter's actual served model — DEFAULT_OPENAI_MODEL ("gpt-4o-mini", providers.py)
+# is the wrong default here: the gateway never sends a model, and vLLM 404s on any model name
+# it isn't serving. Matches the FINAL_ARBITER entry's "model" in DEFAULT_MODEL_CONFIG_JSON.
+_GUARDRAILS_ARBITER_MODEL = "gemma-4-26b-a4b-it"
 
 
 @asynccontextmanager
@@ -147,3 +158,26 @@ async def scan(body: ScanRequest):
 @app.post("/scan/batch")
 async def scan_batch(body: list[ScanRequest]):
     return [await scan_payload(item.model_dump(), schedule_fn=_schedule_background) for item in body]
+
+
+@app.post("/guardrails/llm")
+async def guardrails_llm(body: GuardrailsLLMRequest):
+    """Single-provider prompt-in/text-out passthrough for the gateway's PII/custom-guardrail
+    block+redact decisions — bypasses ModelMapScanner's cascade entirely, one provider call.
+    Backed by the same gemma_fast_arbiter settings (GEMMA_VLLM_ARBITER_BASE_URL/GEMMA_26B_VLLM_KEY)
+    the cascade's FINAL_ARBITER role already uses.
+    """
+    logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
+    provider = providers.build_provider_from_config(
+        {"provider": "gemma_fast_arbiter", "model": body.model or _GUARDRAILS_ARBITER_MODEL}
+    )
+    if provider is None:
+        logger.warning("[GuardrailsLLM] not configured (GEMMA_VLLM_ARBITER_BASE_URL unset)")
+        raise HTTPException(status_code=503, detail="guardrails LLM not configured (GEMMA_VLLM_ARBITER_BASE_URL unset)")
+    try:
+        content = await provider.complete(body.prompt)
+    except Exception as exc:
+        logger.warning(f"[GuardrailsLLM] call failed: {exc!r}")
+        raise HTTPException(status_code=502, detail=f"guardrails LLM call failed: {exc!r}") from exc
+    logger.debug(f"[GuardrailsLLM] response: {content!r}")
+    return {"content": content}
