@@ -19,6 +19,9 @@ public class Gateway {
     // way _traces already does. Keeping it out of requestHeaders matters: a recorded header becomes
     // part of the API's schema and its stored sample, and would be replayed during tests.
     private static final String GUARDRAIL_FIELD = "_guardrail";
+    // Optional request payload to validate instead of requestPayload, e.g. only the newest user
+    // turn of a long conversation. requestPayload is still what gets ingested.
+    public static final String GUARDRAILS_REQUEST_PAYLOAD = "guardrailsRequestPayload";
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -219,7 +222,8 @@ public class Gateway {
 
     private Map<String, Object> callGuardrails(Map<String, Object> requestData, boolean isResponse) {
         Map<String, Object> validateRequest = new HashMap<>();
-        validateRequest.put("requestPayload", requestData.get("requestPayload"));
+        Object verdictPayload = requestData.get(GUARDRAILS_REQUEST_PAYLOAD);
+        validateRequest.put("requestPayload", verdictPayload != null ? verdictPayload : requestData.get("requestPayload"));
         validateRequest.put("contextSource", requestData.get("contextSource"));
 
         putIfNotNull(validateRequest, requestData, "path");

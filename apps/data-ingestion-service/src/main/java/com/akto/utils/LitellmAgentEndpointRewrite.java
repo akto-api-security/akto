@@ -3,32 +3,37 @@ package com.akto.utils;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Treats Claude Code traffic that reaches Akto through the LiteLLM connector as Atlas (endpoint)
- * traffic, the same as the native Claude CLI hooks send it. Atlas keys on three things, and the
- * LiteLLM hook sets none of them:
+ * Treats coding-agent traffic that reaches Akto through the LiteLLM connector (Akto's custom hook or
+ * LiteLLM's built-in Akto guardrail) as Atlas (endpoint) traffic, the same as that agent's native
+ * Akto connector sends it. The agent is recognised by its User-Agent (see AGENTS). Atlas keys on
+ * three things, and the LiteLLM connector sets none of them:
  * <ul>
  *   <li>contextSource ENDPOINT: which guardrail policies the guardrails service loads;</li>
- *   <li>host {identity}.ai-agent.claudecli (MCP tool calls: {identity}.claudecli.{server}):
+ *   <li>host {identity}.ai-agent.{agent} (MCP tool calls: {identity}.{agent}.{server}):
  *       agent/device-scoped policy matching and the collection name;</li>
- *   <li>tag source=ENDPOINT, plus ai-agent / mcp-client = claudecli: Atlas collection placement
+ *   <li>tag source=ENDPOINT, plus ai-agent / mcp-client = {agent}: Atlas collection placement
  *       and agent grouping (the envelope contextSource is not carried past ingestion).</li>
  * </ul>
  * The identity (first host segment) is, in order: the user's email local part when the traffic
- * carries an email; else Claude Code's own device id (the hook's client_device_id tag, from the
- * Anthropic metadata.user_id Claude Code sends), shortened; else the host the hook sent (the
- * LiteLLM agent name or proxy host). The hook tags verdict, ingest and tool-call traffic alike, so
- * every call of a conversation lands on the same host.
+ * carries an email; else the client's device id (the client_device_id tag, e.g. from the Anthropic
+ * metadata.user_id Claude Code sends), shortened; else the host the connector sent (the LiteLLM
+ * agent name or proxy host). Every call of a conversation carries the same inputs, so it lands on
+ * the same host.
  */
-public final class ClaudeCliEndpointRewrite {
+public final class LitellmAgentEndpointRewrite {
 
     static final String LITELLM_CONNECTOR = "litellm";
-    static final String CLAUDE_CLI_USER_AGENT_PREFIX = "claude-cli/";
-    // Same agent segment the native Claude CLI hooks use (AKTO_CONNECTOR_VALUE), so policies
-    // scoped to the Claude CLI agent match both.
-    static final String CLAUDE_CLI_AGENT = "claudecli";
+    // User-Agent prefix -> agent segment, the same segment that agent's native Akto hooks use
+    // (AKTO_CONNECTOR_VALUE), so policies scoped to the agent match both.
+    static final Map<String, String> AGENTS = new LinkedHashMap<>();
+    static {
+        AGENTS.put("claude-cli/", "claudecli");
+        AGENTS.put("opencode/", "opencode");
+    }
     static final String INSTALLER_USER_EMAIL_HEADER = "x-akto-installer-user_email";
     static final String SPEND_LOGS_METADATA_HEADER = "x-litellm-spend-logs-metadata";
     static final String USER_EMAIL_KEY = "user_email";
@@ -38,19 +43,19 @@ public final class ClaudeCliEndpointRewrite {
     // prefix still tells installs apart.
     static final int DEVICE_ID_LENGTH = 16;
 
-    private ClaudeCliEndpointRewrite() {}
+    private LitellmAgentEndpointRewrite() {}
 
     /**
      * Rewrites contextSource, the host request header and the tag of requestData in place when it
-     * is Claude Code traffic from the LiteLLM connector; anything else is left untouched.
+     * is traffic from a known coding agent (AGENTS) via the LiteLLM connector; anything else is left untouched.
      */
     public static void apply(Map<String, Object> requestData) {
         if (!LITELLM_CONNECTOR.equalsIgnoreCase(asString(requestData.get("akto_connector")))) {
             return;
         }
         BasicDBObject headers = parseObject(asString(requestData.get("requestHeaders")));
-        String userAgent = header(headers, "user-agent");
-        if (userAgent == null || !userAgent.toLowerCase().startsWith(CLAUDE_CLI_USER_AGENT_PREFIX)) {
+        String agent = agentFor(header(headers, "user-agent"));
+        if (agent == null) {
             return;
         }
         BasicDBObject tag = parseObject(asString(requestData.get("tag")));
@@ -65,19 +70,33 @@ public final class ClaudeCliEndpointRewrite {
 
         boolean mcp = tag.containsField(Constants.AKTO_MCP_SERVER_TAG);
         String host = mcp
-            ? AgentHostUtils.identitySlug(identity) + "." + CLAUDE_CLI_AGENT + "." + AgentHostUtils.identitySlug(tag.getString(MCP_SERVER_NAME_TAG))
-            : AgentHostUtils.agentHost(identity, CLAUDE_CLI_AGENT);
+            ? AgentHostUtils.identitySlug(identity) + "." + agent + "." + AgentHostUtils.identitySlug(tag.getString(MCP_SERVER_NAME_TAG))
+            : AgentHostUtils.agentHost(identity, agent);
 
         putHeader(headers, "host", host);
         if (email != null && header(headers, INSTALLER_USER_EMAIL_HEADER) == null) {
             headers.put(INSTALLER_USER_EMAIL_HEADER, email);
         }
         tag.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE);
-        tag.put(mcp ? Constants.AKTO_MCP_CLIENT_TAG : Constants.AKTO_AI_AGENT_TAG, CLAUDE_CLI_AGENT);
+        tag.put(mcp ? Constants.AKTO_MCP_CLIENT_TAG : Constants.AKTO_AI_AGENT_TAG, agent);
 
         requestData.put("requestHeaders", headers.toJson());
         requestData.put("tag", tag.toJson());
         requestData.put("contextSource", Constants.AKTO_ENDPOINT_SOURCE_VALUE);
+    }
+
+    /** Agent segment for a known coding-agent User-Agent (prefix match, any version and casing), else null. */
+    static String agentFor(String userAgent) {
+        if (userAgent == null) {
+            return null;
+        }
+        String ua = userAgent.toLowerCase();
+        for (Map.Entry<String, String> e : AGENTS.entrySet()) {
+            if (ua.startsWith(e.getKey())) {
+                return e.getValue();
+            }
+        }
+        return null;
     }
 
     private static String shortDeviceId(String deviceId) {
