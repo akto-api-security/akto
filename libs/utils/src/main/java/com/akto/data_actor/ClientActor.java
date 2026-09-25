@@ -2605,23 +2605,25 @@ public class ClientActor extends DataActor {
     }
 
     /**
-     * Reads the leaseHeld flag the abstractor carries in the response body. It is deliberately not
-     * an HTTP status: a lost lease is a domain outcome, and treating a non-2xx as one would make a
-     * sick abstractor indistinguishable from a real takeover.
+     * Reads the domain outcome (APPLIED/REJECTED) the abstractor names directly in the response
+     * body. Deliberately not an HTTP status: a lost lease is a domain outcome, and treating a
+     * non-2xx as one would make a sick abstractor indistinguishable from a real takeover.
      *
-     * An old abstractor that does not send the flag yields APPLIED, which keeps a new client
-     * working against it exactly as it works today.
+     * No older-server fallback: this contract and its only client ship together, unreleased, so a
+     * missing/unrecognized leaseStatus means something is actually wrong, not an old-abstractor
+     * compatibility case to paper over - treated as UNKNOWN like any other parse failure.
      */
     private LeaseStatus parseLeaseStatus(String responsePayload, String caller) {
         try {
             BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-            Object leaseHeld = payloadObj.get("leaseHeld");
-            if (leaseHeld == null) {
-                return LeaseStatus.APPLIED;
+            Object leaseStatus = payloadObj.get("leaseStatus");
+            if (leaseStatus == null) {
+                loggerMaker.errorAndAddToDb("no leaseStatus in response for " + caller, LoggerMaker.LogDb.RUNTIME);
+                return LeaseStatus.UNKNOWN;
             }
-            return Boolean.parseBoolean(leaseHeld.toString()) ? LeaseStatus.APPLIED : LeaseStatus.REJECTED;
+            return LeaseStatus.valueOf(leaseStatus.toString());
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error parsing leaseHeld in " + caller + ": " + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb("error parsing leaseStatus in " + caller + ": " + e, LoggerMaker.LogDb.RUNTIME);
             return LeaseStatus.UNKNOWN;
         }
     }

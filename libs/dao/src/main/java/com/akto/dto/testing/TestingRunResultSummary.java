@@ -5,6 +5,9 @@ import java.util.Map;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class TestingRunResultSummary {
     
     public static final String ID = "_id";
@@ -48,12 +51,18 @@ public class TestingRunResultSummary {
      * re-claims fences out its own previous threads. leaseExpiryTs is what lets another module
      * take over an attempt whose owner died.
      */
+    @Getter
+    @Setter
     private int leaseExpiryTs;
+    @Getter
+    @Setter
     private String leaseToken;
     /*
      * originalTestingRunResultSummaryId this will be used to trigger running testingRunResults
      *
      * */
+    @Getter
+    @Setter
     private ObjectId originalTestingRunResultSummaryId;
     @BsonIgnore
     private String originalTestingRunResultSummaryHexId;
@@ -201,14 +210,6 @@ public class TestingRunResultSummary {
             "}";
     }
 
-    public ObjectId getOriginalTestingRunResultSummaryId() {
-        return originalTestingRunResultSummaryId;
-    }
-
-    public void setOriginalTestingRunResultSummaryId(ObjectId originalTestingRunResultSummaryId) {
-        this.originalTestingRunResultSummaryId = originalTestingRunResultSummaryId;
-    }
-
     public String getOriginalTestingRunResultSummaryHexId() {
         if (originalTestingRunResultSummaryHexId == null && this.originalTestingRunResultSummaryId != null) {
             return this.originalTestingRunResultSummaryId.toHexString();
@@ -228,19 +229,4 @@ public class TestingRunResultSummary {
         this.producerDone = producerDone;
     }
 
-    public int getLeaseExpiryTs() {
-        return leaseExpiryTs;
-    }
-
-    public void setLeaseExpiryTs(int leaseExpiryTs) {
-        this.leaseExpiryTs = leaseExpiryTs;
-    }
-
-    public String getLeaseToken() {
-        return leaseToken;
-    }
-
-    public void setLeaseToken(String leaseToken) {
-        this.leaseToken = leaseToken;
-    }
 }

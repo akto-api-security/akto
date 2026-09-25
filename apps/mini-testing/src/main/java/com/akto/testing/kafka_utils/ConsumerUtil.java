@@ -261,6 +261,41 @@ public class ConsumerUtil {
     }
 
     /**
+     * Builds the Kafka consumer for this attempt and wraps it in the parallel-consumer library's
+     * processor. Assigns the static consumer field as a side effect (the consumer itself has to
+     * exist before ParallelConsumerOptions can reference it).
+     */
+    private ParallelStreamProcessor<String, String> createParallelConsumer(String summaryIdForTest, int concurrency) {
+        Properties consumerProperties = properties;
+        if (Constants.CONCURRENT_TESTING) {
+            consumerProperties = new Properties();
+            consumerProperties.putAll(properties);
+            consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, Constants.getKafkaGroupIdConfig(summaryIdForTest));
+        }
+        consumer = new KafkaConsumer<>(consumerProperties);
+        ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
+            .consumer(consumer)
+            .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
+            .maxConcurrency(concurrency)
+            .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
+            // Explicit, generous ceiling rather than the library default (10s) - a commit that
+            // takes longer than that under normal broker load should not be fatal to the whole
+            // pipeline. See statelessrun9's 18:43 incident: a commit slower than the default
+            // killed pc-control while the delay itself was recoverable.
+            //
+            // Must stay above the underlying KafkaConsumer's own default.api.timeout.ms (60s
+            // default), which bounds a single commit attempt - otherwise a slow-but-recoverable
+            // attempt (observed: 60.006s, statelessrun12's 17:08/17:22 incidents) exhausts the
+            // whole budget before even one attempt completes, leaving zero room for the retry
+            // this setting exists to allow. 30s was below that floor; 90s clears it with margin.
+            .offsetCommitTimeout(Duration.ofSeconds(90))
+            .batchSize(1)
+            .maxFailureHistory(3)
+            .build();
+        return ParallelStreamProcessor.createEosStreamProcessor(options);
+    }
+
+    /**
      * @param summaryIdForTest the attempt being drained - supplied by the caller now rather than
      *                         read back from a file, which is what lets a different pod resume it
      * @param pickedUpTimestamp when the attempt started, so a resumed drain inherits the original
@@ -301,33 +336,7 @@ public class ConsumerUtil {
         TestRunMetrics.StopReason stopReason = TestRunMetrics.StopReason.UNKNOWN;
         try {
             closeKafkaConsumerQuietly(consumer, "previous run");
-            Properties consumerProperties = properties;
-            if (Constants.CONCURRENT_TESTING) {
-                consumerProperties = new Properties();
-                consumerProperties.putAll(properties);
-                consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, Constants.getKafkaGroupIdConfig(summaryIdForTest));
-            }
-            consumer = new KafkaConsumer<>(consumerProperties);
-            ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
-                .consumer(consumer)
-                .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
-                .maxConcurrency(concurrency)
-                .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
-                // Explicit, generous ceiling rather than the library default (10s) - a commit that
-                // takes longer than that under normal broker load should not be fatal to the whole
-                // pipeline. See statelessrun9's 18:43 incident: a commit slower than the default
-                // killed pc-control while the delay itself was recoverable.
-                //
-                // Must stay above the underlying KafkaConsumer's own default.api.timeout.ms (60s
-                // default), which bounds a single commit attempt - otherwise a slow-but-recoverable
-                // attempt (observed: 60.006s, statelessrun12's 17:08/17:22 incidents) exhausts the
-                // whole budget before even one attempt completes, leaving zero room for the retry
-                // this setting exists to allow. 30s was below that floor; 90s clears it with margin.
-                .offsetCommitTimeout(Duration.ofSeconds(90))
-                .batchSize(1)
-                .maxFailureHistory(3)
-                .build();
-            parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
+            parallelConsumer = createParallelConsumer(summaryIdForTest, concurrency);
             parallelConsumer.subscribe(Arrays.asList(Constants.getTestResultsTopicName(summaryIdForTest)));
             metrics.logConsumerUp(1);
 
