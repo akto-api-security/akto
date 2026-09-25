@@ -23,7 +23,7 @@ export const ServerSettingsConfig = {
         return { isValid: true, errorMessage: null };
     },
 
-    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames, negatedTargetTags, negatedTargetDeviceIds, negatedTargetUserNames }) => {
+    getSummary: ({ applyToAllServers, applyToAllUsers, selectedMcpServers, selectedAgentServers, selectedBrowserLlms, negatedAgentServers, negatedMcpServers, negatedLlmServers, mcpServers, agentServers, browserLlmServers, applyOnRequest, applyOnResponse, policyBehaviour, targetTags, targetDeviceIds, targetUserNames, negatedTargetTags, negatedTargetDeviceIds, negatedTargetUserNames, skipEnterpriseAccounts }) => {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
@@ -63,6 +63,7 @@ export const ServerSettingsConfig = {
             if (userPart) userParts.push(userPart);
             if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
         }
+        if (skipEnterpriseAccounts) summary += ' | Personal accounts only';
         summary += `${appSettings} ${behaviourSuffix}`;
         return summary;
     }
@@ -215,6 +216,8 @@ const ServerSettingsStep = ({
     deviceList = [],
     showConditionError = false,
     showUserConditionError = false,
+    skipEnterpriseAccounts,
+    setSkipEnterpriseAccounts,
 }) => {
     const isBlockMode = policyBehaviour === 'block';
     const isAtlas = isEndpointSecurityCategory();
@@ -769,6 +772,49 @@ const ServerSettingsStep = ({
                                         </Box>
                                     )}
                                 </VerticalStack>
+                            </VerticalStack>
+                        </Box>
+                    </Box>
+                )}
+                {isAtlas && (
+                    <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
+                        <Box padding="4">
+                            <VerticalStack gap="4">
+                                <VerticalStack gap="1">
+                                    <HorizontalStack gap="2" blockAlign="center">
+                                        <Text variant="headingSm">Work & Personal Accounts</Text>
+                                        <Badge status="info">Beta</Badge>
+                                    </HorizontalStack>
+                                    <Text variant="bodyMd" tone="subdued">
+                                        Apply this policy based on the account used to sign in to AI tools.
+                                    </Text>
+                                </VerticalStack>
+                                <VerticalStack gap="2">
+                                    <RadioButton
+                                        label={
+                                            <HorizontalStack gap="2" blockAlign="center">
+                                                <Text variant="bodyMd">All accounts</Text>
+                                                <Badge tone="success">Recommended</Badge>
+                                            </HorizontalStack>
+                                        }
+                                        helpText="Applies to both work and personal accounts."
+                                        checked={!skipEnterpriseAccounts}
+                                        id="account_scope_all"
+                                        name="accountScope"
+                                        onChange={() => setSkipEnterpriseAccounts(false)}
+                                    />
+                                    <RadioButton
+                                        label="Only personal accounts"
+                                        helpText="Excludes work email accounts. Personal and unidentified accounts remain covered."
+                                        checked={!!skipEnterpriseAccounts}
+                                        id="account_scope_personal"
+                                        name="accountScope"
+                                        onChange={() => setSkipEnterpriseAccounts(true)}
+                                    />
+                                </VerticalStack>
+                                {skipEnterpriseAccounts && (
+                                    <Banner tone="info">Supported for the Akto browser extension and ChatGPT / Codex via Endpoint Shield. All other traffic remains covered.</Banner>
+                                )}
                             </VerticalStack>
                         </Box>
                     </Box>
