@@ -33,7 +33,6 @@ public class InsightNarrativeCache {
     private String id;
     private String insightId;
     private int providerVersion;
-    private int promptVersion;
     private String narrativeMarkdown;
     private String narrativeConcern;    // nullable — empty when the model had nothing grounded to add over the provider's own draft
     private String narrativeImpact;     // nullable
