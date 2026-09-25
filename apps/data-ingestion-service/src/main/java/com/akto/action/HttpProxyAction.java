@@ -5,6 +5,7 @@ import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
+import com.akto.utils.ClaudeCliEndpointRewrite;
 import com.akto.utils.McpCollectionResolver;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
@@ -70,6 +71,7 @@ public class HttpProxyAction extends ActionSupport {
                 path, method, akto_account_id, guardrails, response_guardrails, ingest_data, contextSource);
 
             Map<String, Object> requestData = buildRequestData();
+            ClaudeCliEndpointRewrite.apply(requestData);
             applyMcpHostRewrite(requestData);
             Map<String, Object> result = gateway.processHttpProxy(requestData);
 
