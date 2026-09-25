@@ -19,7 +19,8 @@ import java.util.Map;
  *       and agent grouping (the envelope contextSource is not carried past ingestion).</li>
  * </ul>
  * The identity (first host segment) is, in order: the user's email local part when the traffic
- * carries an email; else the client's device id (the client_device_id tag, e.g. from the Anthropic
+ * carries an email (X-OpenWebUI-User-Email first, then x-akto-installer-user_email, the user_email
+ * tag and x-litellm-spend-logs-metadata); else the client's device id (the client_device_id tag, e.g. from the Anthropic
  * metadata.user_id Claude Code sends), shortened; else the host the connector sent (the LiteLLM
  * agent name or proxy host). Every call of a conversation carries the same inputs, so it lands on
  * the same host.
@@ -39,6 +40,8 @@ public final class LitellmAgentEndpointRewrite {
     // in AGENTS; its agent name is then taken from its User-Agent (see agentFromUserAgent).
     static final String CONTEXT_SOURCE_HEADER = "x-akto-contextsource";
     static final String UNKNOWN_AGENT = "unknown";
+    // Open WebUI's logged-in user, sent when Open WebUI runs with ENABLE_FORWARD_USER_INFO_HEADERS=true.
+    static final String OPENWEBUI_USER_EMAIL_HEADER = "x-openwebui-user-email";
     static final String INSTALLER_USER_EMAIL_HEADER = "x-akto-installer-user_email";
     static final String SPEND_LOGS_METADATA_HEADER = "x-litellm-spend-logs-metadata";
     static final String USER_EMAIL_KEY = "user_email";
@@ -71,6 +74,7 @@ public final class LitellmAgentEndpointRewrite {
         BasicDBObject tag = parseObject(asString(requestData.get("tag")));
 
         String email = firstNonEmpty(
+            header(headers, OPENWEBUI_USER_EMAIL_HEADER),
             header(headers, INSTALLER_USER_EMAIL_HEADER),
             tag.getString(USER_EMAIL_KEY),
             parseObject(header(headers, SPEND_LOGS_METADATA_HEADER)).getString(USER_EMAIL_KEY));

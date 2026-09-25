@@ -126,6 +126,27 @@ public class LitellmAgentEndpointRewriteTest {
     }
 
     @Test
+    public void openWebUiUserEmailComesFirst() {
+        BasicDBObject h = claudeCodeHeaders().append("X-OpenWebUI-User-Email", "webui.user@example.com")
+            .append("x-akto-installer-user_email", "installer@example.com");
+        Map<String, Object> data = envelope("litellm", h, ingestTag().append("user_email", "tag@example.com"));
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("webui-user.ai-agent.claudecli-litellm", headers(data).getString("host"));
+        // An installer email the client already sent is left as it is.
+        assertEquals("installer@example.com", headers(data).getString("x-akto-installer-user_email"));
+    }
+
+    @Test
+    public void openWebUiUserEmailIsForwardedAsInstallerHeader() {
+        BasicDBObject h = genericClientHeaders("Python/3.11 aiohttp/3.9.5").append("x-akto-contextsource", "ENDPOINT")
+            .append("X-OpenWebUI-User-Email", "webui.user@example.com");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("webui-user.ai-agent.python-litellm", headers(data).getString("host"));
+        assertEquals("webui.user@example.com", headers(data).getString("x-akto-installer-user_email"));
+    }
+
+    @Test
     public void installerEmailHeaderWinsOverTag() {
         BasicDBObject h = claudeCodeHeaders().append("x-akto-installer-user_email", "first@example.com");
         Map<String, Object> data = envelope("litellm", h, ingestTag().append("user_email", "second@example.com"));
