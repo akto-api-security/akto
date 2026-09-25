@@ -147,6 +147,16 @@ public class LitellmAgentEndpointRewriteTest {
     }
 
     @Test
+    public void applyReturnsTheEmailItUsed() {
+        BasicDBObject h = claudeCodeHeaders().append("X-OpenWebUI-User-Email", "webui.user@example.com");
+        assertEquals("webui.user@example.com", LitellmAgentEndpointRewrite.apply(envelope("litellm", h, verdictTag())));
+        assertNull(LitellmAgentEndpointRewrite.apply(envelope("litellm", claudeCodeHeaders(), verdictTag())));
+        BasicDBObject other = claudeCodeHeaders().append("x-akto-installer-user_email", "test.user@example.com");
+        other.put("user-agent", "OpenAI/Python 1.40.0");
+        assertNull(LitellmAgentEndpointRewrite.apply(envelope("litellm", other, verdictTag())));
+    }
+
+    @Test
     public void installerEmailHeaderWinsOverTag() {
         BasicDBObject h = claudeCodeHeaders().append("x-akto-installer-user_email", "first@example.com");
         Map<String, Object> data = envelope("litellm", h, ingestTag().append("user_email", "second@example.com"));

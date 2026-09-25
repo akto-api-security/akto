@@ -57,10 +57,12 @@ public final class LitellmAgentEndpointRewrite {
      * Rewrites contextSource, the host request header and the tag of requestData in place when it
      * is LiteLLM connector traffic from a known coding agent (AGENTS), or from any client that sends
      * x-akto-contextsource: ENDPOINT; anything else is left untouched.
+     *
+     * @return the user email the rewritten traffic carries, or null when it carries none or nothing was rewritten
      */
-    public static void apply(Map<String, Object> requestData) {
+    public static String apply(Map<String, Object> requestData) {
         if (!LITELLM_CONNECTOR.equalsIgnoreCase(asString(requestData.get("akto_connector")))) {
-            return;
+            return null;
         }
         BasicDBObject headers = parseObject(asString(requestData.get("requestHeaders")));
         String userAgent = header(headers, "user-agent");
@@ -69,7 +71,7 @@ public final class LitellmAgentEndpointRewrite {
             agent = agentFromUserAgent(userAgent);
         }
         if (agent == null) {
-            return;
+            return null;
         }
         BasicDBObject tag = parseObject(asString(requestData.get("tag")));
 
@@ -97,6 +99,7 @@ public final class LitellmAgentEndpointRewrite {
         requestData.put("requestHeaders", headers.toJson());
         requestData.put("tag", tag.toJson());
         requestData.put("contextSource", Constants.AKTO_ENDPOINT_SOURCE_VALUE);
+        return email;
     }
 
     /** Agent segment for a known coding-agent User-Agent (prefix match, any version and casing), else null. */

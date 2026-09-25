@@ -6,6 +6,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
 import com.akto.utils.LitellmAgentEndpointRewrite;
+import com.akto.utils.LitellmUserRegistry;
 import com.akto.utils.LitellmVerdictView;
 import com.akto.utils.McpCollectionResolver;
 import com.mongodb.BasicDBObject;
@@ -74,7 +75,11 @@ public class HttpProxyAction extends ActionSupport {
                 path, method, akto_account_id, guardrails, response_guardrails, ingest_data, contextSource);
 
             Map<String, Object> requestData = buildRequestData();
-            LitellmAgentEndpointRewrite.apply(requestData);
+            String litellmUserEmail = LitellmAgentEndpointRewrite.apply(requestData);
+            if ("true".equalsIgnoreCase(ingest_data)) {
+                // Once per user per process, and only on ingest calls, so verdicts stay fast.
+                LitellmUserRegistry.register(litellmUserEmail);
+            }
             LitellmVerdictView.apply(requestData);
             applyMcpHostRewrite(requestData);
             Map<String, Object> result = gateway.processHttpProxy(requestData);
