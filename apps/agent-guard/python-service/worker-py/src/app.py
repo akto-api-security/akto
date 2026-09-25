@@ -45,6 +45,12 @@ class GuardrailsLLMRequest(BaseModel):
     model: str = ""
 
 
+# gemma_fast_arbiter's actual served model — DEFAULT_OPENAI_MODEL ("gpt-4o-mini", providers.py)
+# is the wrong default here: the gateway never sends a model, and vLLM 404s on any model name
+# it isn't serving. Matches the FINAL_ARBITER entry's "model" in DEFAULT_MODEL_CONFIG_JSON.
+_GUARDRAILS_ARBITER_MODEL = "gemma-4-26b-a4b-it"
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     scan_diag.configure_process_logging()
@@ -162,7 +168,9 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
     the cascade's FINAL_ARBITER role already uses.
     """
     logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
-    provider = providers.build_provider_from_config({"provider": "gemma_fast_arbiter", "model": body.model})
+    provider = providers.build_provider_from_config(
+        {"provider": "gemma_fast_arbiter", "model": body.model or _GUARDRAILS_ARBITER_MODEL}
+    )
     if provider is None:
         logger.warning("[GuardrailsLLM] not configured (GEMMA_VLLM_ARBITER_BASE_URL unset)")
         raise HTTPException(status_code=503, detail="guardrails LLM not configured (GEMMA_VLLM_ARBITER_BASE_URL unset)")
