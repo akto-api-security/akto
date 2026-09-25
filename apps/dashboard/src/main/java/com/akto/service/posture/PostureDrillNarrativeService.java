@@ -152,7 +152,7 @@ public class PostureDrillNarrativeService {
             long now = System.currentTimeMillis() / 1000;
             String label = "posture-drill:" + drillId + (path == null || path.isEmpty() ? "" : ":" + path);
             InsightNarrativeCache cache = new InsightNarrativeCache(fingerprint, label,
-                    DRILL_NARRATIVE_INPUT_VERSION, InsightNarrativeHandler.PROMPT_VERSION,
+                    DRILL_NARRATIVE_INPUT_VERSION,
                     out.getString("markdown"), out.getString("concern"), out.getString("impact"), out.getString("remediation"),
                     now, new Date((now + TimeUnit.DAYS.toSeconds(NARRATIVE_TTL_DAYS)) * 1000L));
             InsightNarrativeCacheDao.instance.put(cache);
@@ -219,7 +219,7 @@ public class PostureDrillNarrativeService {
      *  directly. */
     static String fingerprint(InsightContext ctx, String drillId, String path) {
         String raw = ctx.bundleCacheKey() + "|posture-drill|" + drillId + "|" + (path == null ? "" : path) + "|"
-                + DRILL_NARRATIVE_INPUT_VERSION + "|" + InsightNarrativeHandler.PROMPT_VERSION;
+                + DRILL_NARRATIVE_INPUT_VERSION;
         return InsightUtil.md5(raw);
     }
 
