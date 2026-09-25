@@ -703,21 +703,6 @@ public class TestExecutor {
         } else {
             updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
         }
-        
-
-        int skip = 0;
-        int limit = 1000;
-        boolean fetchMore = false;
-        do {
-            fetchMore = false;
-            List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResultBySummaryId(summaryId.toHexString(), limit, skip);
-            loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults");
-            if (testingRunResults.size() == limit) {
-                skip += limit;
-                fetchMore = true;
-            }
-
-        } while (fetchMore);
 
         TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), updatedState.toString());
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
