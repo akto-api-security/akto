@@ -301,6 +301,12 @@ public class DbActor extends DataActor {
         return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
     }
 
+    // direct-mongo path is single-process by definition, so there is no lease to lose; the token
+    // is accepted for interface symmetry with ClientActor but not persisted
+    public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds) {
+        return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
+    }
+
     @Override
     public void ingestMetricData(List<MetricData> metricData) {
         DbLayer.ingestMetric(metricData);
@@ -310,7 +316,7 @@ public class DbActor extends DataActor {
         return DbLayer.findPendingTestingRun(delta);
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName, String leaseToken, int leaseSeconds) {
         return DbLayer.findPendingTestingRunResultSummary(now, delta);
     }
 
@@ -498,7 +504,7 @@ public class DbActor extends DataActor {
     }
 
     // mini-testing always talks to DB via cyborg (ClientActor); direct-Mongo path intentionally unimplemented.
-    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+    public LeaseStatus bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds) {
         throw new UnsupportedOperationException("bulkRecordTestingRunResults is not supported via DbActor");
     }
 
@@ -508,6 +514,10 @@ public class DbActor extends DataActor {
 
     public TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId) {
         return DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId);
+    }
+
+    public TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken) {
+        return DbLayer.markTestRunResultSummaryFailed(testingRunResultSummaryId, leaseToken);
     }
 
     public void updateAccessMatrixInfo(String taskId, int frequencyInSeconds) {
@@ -521,6 +531,11 @@ public class DbActor extends DataActor {
     public TestingRunResultSummary updateIssueCountInSummary(String summaryId,
             Map<String, Integer> totalCountIssues) {
         return DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues);
+    }
+
+    public TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId,
+            Map<String, Integer> totalCountIssues, String leaseToken) {
+        return DbLayer.updateIssueCountInSummaryFenced(summaryId, totalCountIssues, leaseToken);
     }
 
     public TestingRunResultSummary updateIssueCountInSummary(String summaryId,
@@ -559,8 +574,14 @@ public class DbActor extends DataActor {
         DbLayer.updateTestInitiatedCountInTestSummary(summaryId, testInitiatedCount);
     }
 
-    public void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
+    public LeaseStatus updateTestResultsCountInTestSummary(String summaryId, int testResultsCount, String leaseToken, int leaseSeconds) {
         DbLayer.updateTestResultsCountInTestSummary(summaryId, testResultsCount);
+        // direct-mongo path is single-process by definition, so there is no lease to lose
+        return LeaseStatus.APPLIED;
+    }
+
+    public LeaseStatus markProducerDone(String summaryId, String leaseToken) {
+        return LeaseStatus.APPLIED;
     }
 
     public void updateTestRunResultSummary(String summaryId) {
@@ -579,6 +600,15 @@ public class DbActor extends DataActor {
 
     @Override
     public void updateStartTsTestRunResultSummary(String summaryId) {
+        DbLayer.updateStartTsTestRunResultSummary(summaryId);
+    }
+
+    // Standalone/embedded DbLayer has none of the lease schema (LEASE_TOKEN/LEASE_EXPIRY_TS) - the
+    // whole lease/reclaim redesign only ever targeted hybrid mode via database-abstractor. Ignoring
+    // the token here rather than a half-implemented stamp; the rerun-lease gap this exists to fix
+    // is therefore hybrid-mode-only for now.
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId, String leaseToken) {
         DbLayer.updateStartTsTestRunResultSummary(summaryId);
     }
 
@@ -690,8 +720,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip);
     }
 
-    public long countTestingRunResultSummaries(Bson filter){
-        return DbLayer.countTestingRunResultSummaries(filter);
+    public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state){
+        return DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, state);
     }
 
     public TestScript fetchTestScript(TestScript.Type type){

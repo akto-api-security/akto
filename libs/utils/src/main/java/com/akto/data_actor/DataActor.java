@@ -135,10 +135,12 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start);
 
+    public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds);
+
     public abstract void ingestMetricData(List<MetricData> metricData);
     public abstract TestingRun findPendingTestingRun(int delta, String miniTestingName);
 
-    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName);
+    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName, String leaseToken, int leaseSeconds);
 
     public abstract TestingRun findTestingRun(String testingRunId);
 
@@ -152,11 +154,17 @@ public abstract class DataActor {
     public abstract void deleteTestRunResultSummary(String summaryId);
     public abstract void deleteTestingRunResults(String testingRunResultId);
     public abstract void updateStartTsTestRunResultSummary(String summaryId);
+    // Also stamps leaseToken onto summaryId - needed for the rerun case, where summaryId is the
+    // ORIGINAL (already-COMPLETED) summary being reopened, not the throwaway one the caller's own
+    // claim was minted against. See DbLayer's 2-arg overload for the full explanation.
+    public abstract void updateStartTsTestRunResultSummary(String summaryId, String leaseToken);
 
     public abstract List<TestingRunResult> fetchLatestTestingRunResult(String testingRunResultSummaryId);
     public abstract List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId);
 
     public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId);
+
+    public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken);
 
     public abstract void insertTestingRunResultSummary(TestingRunResultSummary trrs);
 
@@ -204,7 +212,9 @@ public abstract class DataActor {
 
     public abstract List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive);
 
-    public abstract void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount);
+    public abstract LeaseStatus updateTestResultsCountInTestSummary(String summaryId, int testResultsCount, String leaseToken, int leaseSeconds);
+
+    public abstract LeaseStatus markProducerDone(String summaryId, String leaseToken);
 
     public abstract void updateLastTestedField(int apiCollectionId, String url, String method);
 
@@ -212,7 +222,7 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
-    public abstract void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed);
+    public abstract LeaseStatus bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds);
 
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 
@@ -221,6 +231,8 @@ public abstract class DataActor {
     public abstract void insertActivity(int count);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
+
+    public abstract TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues, String operator);
 
@@ -324,7 +336,7 @@ public abstract class DataActor {
 
     public abstract List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip);
 
-    public abstract long countTestingRunResultSummaries(Bson filter);
+    public abstract long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state);
 
     public abstract TestScript fetchTestScript(TestScript.Type type);
 

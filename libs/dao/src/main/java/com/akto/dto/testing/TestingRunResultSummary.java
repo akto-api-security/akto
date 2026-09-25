@@ -5,6 +5,9 @@ import java.util.Map;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class TestingRunResultSummary {
     
     public static final String ID = "_id";
@@ -17,6 +20,9 @@ public class TestingRunResultSummary {
     public static final String TEST_RESULTS_COUNT = "testResultsCount";
     public static final String METADATA_STRING = "metadata";
     public static final String TESTS_INITIATED_COUNT = "testInitiatedCount";
+    public static final String PRODUCER_DONE = "producerDone";
+    public static final String LEASE_EXPIRY_TS = "leaseExpiryTs";
+    public static final String LEASE_TOKEN = "leaseToken";
 
     private ObjectId id;
     private int startTimestamp;
@@ -32,10 +38,31 @@ public class TestingRunResultSummary {
     private int testInitiatedCount;
 
     private int testIdConfig;
+
+    /*
+     * Set once the producer has written every message for this attempt to kafka. Until then the
+     * message set is partial, so a module picking this summary up must re-produce rather than
+     * resume consuming.
+     */
+    private boolean producerDone;
+
+    /*
+     * Ownership lease. leaseToken is minted per claim, not per pod, so a module that restarts and
+     * re-claims fences out its own previous threads. leaseExpiryTs is what lets another module
+     * take over an attempt whose owner died.
+     */
+    @Getter
+    @Setter
+    private int leaseExpiryTs;
+    @Getter
+    @Setter
+    private String leaseToken;
     /*
      * originalTestingRunResultSummaryId this will be used to trigger running testingRunResults
      *
      * */
+    @Getter
+    @Setter
     private ObjectId originalTestingRunResultSummaryId;
     @BsonIgnore
     private String originalTestingRunResultSummaryHexId;
@@ -183,14 +210,6 @@ public class TestingRunResultSummary {
             "}";
     }
 
-    public ObjectId getOriginalTestingRunResultSummaryId() {
-        return originalTestingRunResultSummaryId;
-    }
-
-    public void setOriginalTestingRunResultSummaryId(ObjectId originalTestingRunResultSummaryId) {
-        this.originalTestingRunResultSummaryId = originalTestingRunResultSummaryId;
-    }
-
     public String getOriginalTestingRunResultSummaryHexId() {
         if (originalTestingRunResultSummaryHexId == null && this.originalTestingRunResultSummaryId != null) {
             return this.originalTestingRunResultSummaryId.toHexString();
@@ -201,4 +220,13 @@ public class TestingRunResultSummary {
     public void setOriginalTestingRunResultSummaryHexId(String originalTestingRunResultSummaryHexId) {
         this.originalTestingRunResultSummaryHexId = originalTestingRunResultSummaryHexId;
     }
+
+    public boolean getProducerDone() {
+        return producerDone;
+    }
+
+    public void setProducerDone(boolean producerDone) {
+        this.producerDone = producerDone;
+    }
+
 }
