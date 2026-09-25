@@ -47,7 +47,7 @@ type ValidationHandler struct {
 }
 
 // policyGate mirrors validator.Service.HasApplicablePolicies.
-type policyGate func(contextSource, requestHeaders string) (bool, error)
+type policyGate func(contextSource, requestHeaders, tag string) (bool, error)
 
 // NewValidationHandler creates a new validation handler
 func NewValidationHandler(validatorService *validator.Service, logger *zap.Logger, cfg *config.Config, fileRegistry *fileprocessor.Registry, acc *metrics.Accumulator) *ValidationHandler {

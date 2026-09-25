@@ -57,6 +57,8 @@ public class HttpProxyAction extends ActionSupport {
     private String contextSource;
     // When set, checks a pending Human Approval activity's status instead of validating.
     private String activityId;
+    // Raw request from endpoint shield, used for account-type detection.
+    private String fullRequest;
 
     private Map<String, Object> data;
     private boolean success;
@@ -203,6 +205,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("contextSource", contextSource);
         requestData.put("client_hook", client_hook);
         requestData.put("activityId", activityId);
+        requestData.put("fullRequest", fullRequest);
 
         return requestData;
     }
