@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Box, Icon, Popover, Text, Tooltip } from '@shopify/polaris'
+import { Box, Card, HorizontalGrid, Icon, Popover, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import { CircleInformationMajor } from '@shopify/polaris-icons'
 import DonutChart from '../../../components/shared/DonutChart'
 import { PANEL_EMPTY_STATE_COPY } from '../securityPostureDummyData'
@@ -94,5 +94,30 @@ export function RiskScoreRing({ value, size, showValue }) {
             title={showValue ? String(filled) : undefined}
             subtitle={showValue ? 'of 100' : undefined}
         />
+    )
+}
+
+// ─── Number cards ───────────────────────────────────────────────────────────
+// A drill's own summary[] (InsightResult.Metric) is real, backend-computed data — worth more
+// visual weight than a plain label/value line. One bordered tile per metric, big number over a
+// subdued label, reused by both the generic drill's own stats row and a profile page's own
+// stat row (previously two copies of the same "big number over a subdued label" language).
+export function NumberCard({ label, value }) {
+    return (
+        <Card padding="4">
+            <VerticalStack gap="1">
+                <Text variant="heading2xl" as="p">{value}</Text>
+                <Text variant="bodySm" color="subdued">{label}</Text>
+            </VerticalStack>
+        </Card>
+    )
+}
+
+export function NumberCardsRow({ metrics }) {
+    if (!metrics || metrics.length === 0) return null
+    return (
+        <HorizontalGrid columns={{ xs: 2, sm: Math.min(metrics.length, 4) }} gap="3">
+            {metrics.map((m) => <NumberCard key={m.key || m.label} label={m.label} value={m.value} />)}
+        </HorizontalGrid>
     )
 }
