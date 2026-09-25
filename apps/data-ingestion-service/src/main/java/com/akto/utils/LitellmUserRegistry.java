@@ -26,8 +26,10 @@ import java.util.function.Supplier;
  * Those APIs set userId / userName / userEmail only, so the row has no devices or device tags:
  * the user is pickable under Users (matched on email), not under Devices.
  *
- * An email already in agent_users (e.g. from the native Atlas agent) is left alone, so the person
- * is not listed twice. agent_users is read once per process; each new email is then upserted once.
+ * An email that already belongs to another identity (e.g. from the native Atlas agent) is left
+ * alone, so the person is not listed twice. A row this registry wrote itself (userId = the email) is
+ * upserted again, once per process, which also corrects a stale userName on it. agent_users is read
+ * once per process.
  */
 public final class LitellmUserRegistry {
 
@@ -38,7 +40,7 @@ public final class LitellmUserRegistry {
     static Supplier<List<AgenticUsers>> fetchAllAgentUsers = () -> DataActorFactory.fetchInstance().fetchAllAgentUsers();
     static Consumer<List<AgenticUsers>> upsertAgentUsers = users -> DataActorFactory.fetchInstance().bulkUpsertAgentUserExternalIdentities(users);
 
-    // Lowercased emails already in agent_users or already upserted by this process.
+    // Lowercased emails owned by another agent_users identity, or already upserted by this process.
     static final Set<String> knownEmails = ConcurrentHashMap.newKeySet();
     private static volatile boolean loaded = false;
 
@@ -97,7 +99,8 @@ public final class LitellmUserRegistry {
                     for (AgenticUsers u : users) {
                         // Rows picked by an email-shaped username carry the address there instead.
                         for (String e : new String[]{u.getUserEmail(), u.getUserName()}) {
-                            if (e != null && e.contains("@")) {
+                            // A row keyed by the email itself is one this registry (or an email tag) wrote.
+                            if (e != null && e.contains("@") && !e.trim().equalsIgnoreCase(u.getUserId())) {
                                 knownEmails.add(e.trim().toLowerCase());
                             }
                         }

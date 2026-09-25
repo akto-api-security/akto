@@ -69,6 +69,16 @@ public class LitellmUserRegistryTest {
     }
 
     @Test
+    public void ownRowsAreUpsertedAgainToCorrectTheirUserName() {
+        AgenticUsers stale = existing("test-user", "test.user@example.com");
+        stale.setUserId("test.user@example.com");
+        LitellmUserRegistry.fetchAllAgentUsers = () -> Collections.singletonList(stale);
+        LitellmUserRegistry.register("test.user@example.com");
+        assertEquals(1, upserted.size());
+        assertEquals("test.user", upserted.get(0).getUserName());
+    }
+
+    @Test
     public void agentUsersIsReadOncePerProcess() {
         LitellmUserRegistry.register("a@example.com");
         LitellmUserRegistry.register("b@example.com");
