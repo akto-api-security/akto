@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from constants import CONTEXT_SOURCE_KEY
+
 from . import ban_topics, code, gibberish, password, prompt_injection, toxicity
 
 
@@ -13,7 +15,7 @@ def build_scan_prompt(
     provider_name: str = "",
 ) -> str | None:
     if scanner_name == "PromptInjection":
-        return prompt_injection.build(scanner_type, text)
+        return prompt_injection.build(scanner_type, text, config.get(CONTEXT_SOURCE_KEY, ""))
     if scanner_name == "BanTopics":
         return ban_topics.build(config, provider_name, text)
     if scanner_name == "Toxicity":
