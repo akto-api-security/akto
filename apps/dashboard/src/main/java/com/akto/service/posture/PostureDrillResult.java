@@ -1,6 +1,7 @@
 package com.akto.service.posture;
 
 import com.akto.service.insights.InsightResult;
+import com.mongodb.BasicDBObject;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,6 +36,11 @@ public class PostureDrillResult {
     private List<ColumnDef> columns = new ArrayList<>();
     private List<Map<String, Object>> rows = new ArrayList<>();
     private boolean drillable;
+    /** Worst real severity ("CRITICAL"/"HIGH"/"MEDIUM"/"LOW") among this level's own rows, when
+     *  any carry one — see PostureService#worstSeverity. Null when no row has a severity field
+     *  (most drills don't; never invented to fill the gap). Structural, not LLM-generated —
+     *  always present immediately, independent of narrativeStatus. */
+    private String severity;
     private long total;
     private int skip;
     private int limit;
@@ -52,6 +58,7 @@ public class PostureDrillResult {
     private String narrativeConcern;
     private String narrativeImpact;
     private String narrativeRemediation;
+    private BasicDBObject riskScoreBreakdown;
 
     public void addDataGap(InsightResult.Gap gap) { dataGaps.add(gap); }
 

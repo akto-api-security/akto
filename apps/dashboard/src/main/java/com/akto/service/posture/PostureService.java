@@ -71,6 +71,10 @@ public class PostureService {
     public static final String DRILL_ENFORCEMENT_FUNNEL = "enforcementFunnel";
     public static final String DRILL_VENDOR_RISK = "vendorRisk";
     public static final String DRILL_FRAMEWORK_READINESS = "frameworkReadiness";
+    /** The former standalone "Risk score breakdown" flyout/action — see
+     *  {@link #fetchRiskScoreDrill}'s own javadoc for why it's dispatched separately from
+     *  {@link #fetchDrill} rather than added as a 6th case in that switch. */
+    public static final String DRILL_RISK_SCORE = "riskScoreBreakdown";
     private static final int DEFAULT_DRILL_LIMIT = 20;
 
     // Enforcement funnel stages ("what happened after a policy matched"), and the top N data
@@ -937,6 +941,174 @@ public class PostureService {
         }
     }
 
+    // ── Risk score breakdown drill ───────────────────────────────────────────────
+    //
+    // The former standalone "Risk score breakdown" flyout — folded into this same generic
+    // drilldown mechanism (breadcrumb/URL/AI-summary) rather than the separate FlyLayout +
+    // fetchRiskScoreBreakdown action it used to be. Dispatched from its own method, not a 6th
+    // case in fetchDrill's switch, because its inputs genuinely differ: the other five drills
+    // share bundle/endpointCollections/trendWindowEvents from fetchPostureSummary's own trend
+    // window, but this one needs the CURRENT window's full raw-event list plus a real
+    // prior-window comparison (allThreats/priorAllThreats/priorHostSeverity) for "what moved the
+    // score" — see SecurityPostureAction#fetchPostureDrill's own DRILL_RISK_SCORE branch.
+    //
+    // Two levels, same as the other five: root (path="") is the composite + 5 sub-scores + "what
+    // moved" (rendered by the frontend's existing rich components, not the generic AgGridTable —
+    // see PostureDrillResult#riskScoreBreakdown's own javadoc); one segment in (path=[subScoreId])
+    // is that sub-score's own full detail table. shadowAiExposure/vendorRisk delegate straight to
+    // the existing Shadow AI / Vendor risk panel drills (root level) — their data and grouping are
+    // exactly the same either way, so this reuses those handlers rather than recomputing the same
+    // grouping a second time. dlpIncidents/complianceGaps/threatActivity have no equivalent
+    // existing drill (their panel-card "top 2" hint arrays are capped, and grouped differently
+    // than a paginated table needs), so they get their own small handlers below, each just
+    // pagination over one of RiskScoreCalculator's own uncapped arrays.
+    public PostureDrillResult fetchRiskScoreDrill(InsightDataBundle bundle, List<ApiCollection> endpointCollections,
+                                                   List<DashboardMaliciousEvent> allThreats,
+                                                   List<DashboardMaliciousEvent> priorAllThreats,
+                                                   List<HostSeverityCount> priorHostSeverity,
+                                                   String path, int skip, int limit) {
+        List<String> segments = splitPath(path);
+        int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;
+
+        if (segments.isEmpty()) {
+            return riskScoreRootDrill(bundle, endpointCollections, allThreats, priorAllThreats, priorHostSeverity);
+        }
+
+        String subScoreId = segments.get(0);
+        switch (subScoreId) {
+            case "shadowAiExposure":
+                return asRiskScoreSubLevel(shadowAiDrill(bundle, new ArrayList<>(), skip, effectiveLimit),
+                        "Shadow AI exposure", subScoreId);
+            case "vendorRisk":
+                return asRiskScoreSubLevel(RiskScoreCalculator.vendorRiskDrill(endpointCollections,
+                        bundle.allowlistNamesLower, bundle.deviceIdToUsername, new ArrayList<>(), skip, effectiveLimit),
+                        "Vendor risk", subScoreId);
+            case "dlpIncidents":
+                return dlpIncidentsDrill(allThreats, bundle.policies, bundle.deviceIdToUsername, skip, effectiveLimit);
+            case "complianceGaps":
+                return complianceGapsDrill(bundle, skip, effectiveLimit);
+            case "threatActivity":
+                return threatActivityDrill(bundle.hostSeverityCounts, bundle.deviceIdToUsername, skip, effectiveLimit);
+            default:
+                return unknownDrill(DRILL_RISK_SCORE);
+        }
+    }
+
+    private PostureDrillResult riskScoreRootDrill(InsightDataBundle bundle, List<ApiCollection> endpointCollections,
+                                                    List<DashboardMaliciousEvent> allThreats,
+                                                    List<DashboardMaliciousEvent> priorAllThreats,
+                                                    List<HostSeverityCount> priorHostSeverity) {
+        BasicDBObject breakdown = RiskScoreCalculator.computeBreakdown(bundle, endpointCollections, allThreats,
+                priorAllThreats, priorHostSeverity);
+
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Risk score breakdown");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Risk score breakdown"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("label", "Sub-score"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("weight", "Weight"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("value", "Value"));
+        result.setDrillable(true);
+
+        @SuppressWarnings("unchecked")
+        List<BasicDBObject> subScores = (List<BasicDBObject>) breakdown.get("subScores");
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (BasicDBObject s : safe(subScores)) {
+            rows.add(row("id", s.getString("id"), "label", s.getString("label"),
+                    "weight", s.getInt("weight"), "value", s.get("value")));
+        }
+        result.setRows(rows);
+        result.setTotal(rows.size());
+        result.setSkip(0);
+        result.setLimit(rows.size());
+
+        // Raw passthrough for the frontend's existing rich rendering (bars/badges/detail lines/
+        // "what moved" table) — see PostureDrillResult#riskScoreBreakdown's own javadoc.
+        result.setRiskScoreBreakdown(breakdown);
+        return result;
+    }
+
+    /** Relabels a delegated panel-drill result (Shadow AI tools / Vendor risk, both fetched at
+     *  their own root level) into this sub-score's own breadcrumb/title, and caps depth at this
+     *  one level — a specific tool's devices / a specific vendor's devices isn't wired from here,
+     *  matching every other sub-score's own single-level detail table. */
+    private static PostureDrillResult asRiskScoreSubLevel(PostureDrillResult delegate, String label, String subScoreId) {
+        delegate.setTitle(label);
+        List<PostureDrillResult.BreadcrumbItem> breadcrumb = new ArrayList<>();
+        breadcrumb.add(new PostureDrillResult.BreadcrumbItem("", "Risk score breakdown"));
+        breadcrumb.add(new PostureDrillResult.BreadcrumbItem(subScoreId, label));
+        delegate.setBreadcrumb(breadcrumb);
+        delegate.setDrillable(false);
+        return delegate;
+    }
+
+    private static PostureDrillResult dlpIncidentsDrill(List<DashboardMaliciousEvent> allThreats,
+                                                          List<GuardrailPolicies> policies,
+                                                          Map<String, String> deviceIdToUsername,
+                                                          int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("DLP incidents");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Risk score breakdown"));
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("dlpIncidents", "DLP incidents"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("username", "Device / user"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("incidents", "Incidents this period"));
+        result.setDrillable(false);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (BasicDBObject r : RiskScoreCalculator.dlpIncidentsAllDevices(allThreats, policies, deviceIdToUsername)) {
+            rows.add(r);
+        }
+        paginate(result, rows, skip, limit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap(GAP_GUARDRAIL_POLICIES, REASON_NOT_CONFIGURED,
+                    "No PII-detecting policy matched any traffic this window."));
+        }
+        return result;
+    }
+
+    private static PostureDrillResult complianceGapsDrill(InsightDataBundle bundle, int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Compliance gaps");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Risk score breakdown"));
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("complianceGaps", "Compliance gaps"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("policy", "Policy"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("count", "Uncovered matches"));
+        result.setDrillable(false);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (BasicDBObject r : RiskScoreCalculator.complianceGapsByPolicyAll(bundle)) {
+            rows.add(r);
+        }
+        paginate(result, rows, skip, limit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap(GAP_GUARDRAIL_POLICIES, REASON_NOT_CONFIGURED,
+                    "No policy has a compliance framework mapped in its LLM rule yet."));
+        }
+        return result;
+    }
+
+    private static PostureDrillResult threatActivityDrill(List<HostSeverityCount> hostSeverityCounts,
+                                                            Map<String, String> deviceIdToUsername,
+                                                            int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Threat activity");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Risk score breakdown"));
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("threatActivity", "Threat activity"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("username", "Device / user"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("violations", "Violations this period"));
+        result.setDrillable(false);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (BasicDBObject r : RiskScoreCalculator.threatActivityAllDevices(hostSeverityCounts, deviceIdToUsername)) {
+            rows.add(r);
+        }
+        paginate(result, rows, skip, limit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap(GAP_THREAT_BACKEND, REASON_REQUEST_FAILED,
+                    THREAT_BACKEND_DOWN_IMPACT));
+        }
+        return result;
+    }
+
     private static List<String> splitPath(String path) {
         List<String> segments = new ArrayList<>();
         if (path == null || path.isEmpty()) return segments;
@@ -974,6 +1146,35 @@ public class PostureService {
             row.put((String) kv[i], kv[i + 1]);
         }
         return row;
+    }
+
+    private static final Map<String, Integer> SEVERITY_RANK_BY_NAME = new HashMap<>();
+    static {
+        SEVERITY_RANK_BY_NAME.put("CRITICAL", 1);
+        SEVERITY_RANK_BY_NAME.put("HIGH", 2);
+        SEVERITY_RANK_BY_NAME.put("MEDIUM", 3);
+        SEVERITY_RANK_BY_NAME.put("LOW", 4);
+    }
+
+    /** Worst (lowest-rank) literal severity among a level's own rows — only meaningful for the
+     *  drills whose rows actually carry a per-row "severity" field (real DashboardMaliciousEvent
+     *  rows; see dataLeavingDrill/enforcementFunnelDrill). Null when no row has one — never
+     *  invented to paper over a drill that has no real severity signal. */
+    static String worstSeverity(List<Map<String, Object>> rows) {
+        String worst = null;
+        int worstRank = Integer.MAX_VALUE;
+        for (Map<String, Object> row : safe(rows)) {
+            Object raw = row.get("severity");
+            if (raw == null) continue;
+            String severity = raw.toString().toUpperCase(Locale.ROOT);
+            Integer rank = SEVERITY_RANK_BY_NAME.get(severity);
+            if (rank == null) continue;
+            if (rank < worstRank) {
+                worstRank = rank;
+                worst = severity;
+            }
+        }
+        return worst;
     }
 
     // ── Shadow AI tools drill ────────────────────────────────────────────────────
@@ -1121,6 +1322,7 @@ public class PostureService {
         }
         rows.sort((a, b) -> Long.compare((long) b.get("detectedAt"), (long) a.get("detectedAt")));
         paginate(result, rows, skip, limit);
+        result.setSeverity(worstSeverity(result.getRows()));
         if (rows.isEmpty() && bundle.threatBackendAvailable) {
             result.addDataGap(new InsightResult.Gap(GAP_GUARDRAIL_POLICIES, REASON_NO_ROWS,
                     "No matching activity for \"" + dataType + "\" in this window."));
@@ -1204,6 +1406,7 @@ public class PostureService {
         result.getColumns().add(new PostureDrillResult.ColumnDef("mode", "Mode"));
         result.getColumns().add(new PostureDrillResult.ColumnDef("host", "Host"));
         result.getColumns().add(new PostureDrillResult.ColumnDef("actor", "Actor / device"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("severity", "Severity"));
 
         Map<String, GuardrailPolicies> policyByNameLower = policyByNameLower(bundle.policies);
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -1214,10 +1417,12 @@ public class PostureService {
             boolean matchesStage = "matched".equals(stageId) || stageId.equals(funnelStageIdFor(p));
             if (!matchesStage) continue;
             rows.add(row("detectedAt", e.getTimestamp(), "policy", p.getName(),
-                    "mode", InsightUtil.humanizePolicyMode(p.getBehaviour()), "host", e.getHost(), "actor", e.getActor()));
+                    "mode", InsightUtil.humanizePolicyMode(p.getBehaviour()), "host", e.getHost(),
+                    "actor", e.getActor(), "severity", e.getSeverity()));
         }
         rows.sort((a, b) -> Long.compare((long) b.get("detectedAt"), (long) a.get("detectedAt")));
         paginate(result, rows, skip, limit);
+        result.setSeverity(worstSeverity(result.getRows()));
         if (rows.isEmpty() && bundle.threatBackendAvailable) {
             result.addDataGap(new InsightResult.Gap(GAP_GUARDRAIL_POLICIES, REASON_NO_ROWS,
                     "No matching activity for \"" + stageLabel + "\" in this window."));
@@ -1321,6 +1526,28 @@ public class PostureService {
             }
         }
         return byName;
+    }
+
+    /**
+     * PII-detecting policy names — used to narrow a raw {@code fetchAllMaliciousEvents} call
+     * server-side (via {@code additionalFilters.put("latestAttack", ...)}, the exact same filter
+     * ViolationsPage.jsx's own policy-name filter chip already sends) instead of pulling every
+     * event in the window and filtering client-side. {@code latestAttack} is the request-side
+     * name for what MaliciousEventService matches against the stored {@code filterId} — and
+     * ViolationsPage.jsx's own rendering (`event.filterId` as its policyName fallback) confirms
+     * filterId already IS the firing guardrail policy's name for these events, same as this
+     * package's per-event `category` field is (see matchedPolicyCounts's own note on why that's a
+     * *different*, aggregate-only field) — no new backend filter field needed, this one already
+     * exists and is already wired. Public: called from SecurityPostureAction, a different package.
+     */
+    public static List<String> piiPolicyNames(List<GuardrailPolicies> policies) {
+        List<String> names = new ArrayList<>();
+        for (GuardrailPolicies p : safe(policies)) {
+            if (p != null && p.getName() != null && InsightUtil.policyHasPiiDetection(p)) {
+                names.add(p.getName());
+            }
+        }
+        return names;
     }
 
     /**

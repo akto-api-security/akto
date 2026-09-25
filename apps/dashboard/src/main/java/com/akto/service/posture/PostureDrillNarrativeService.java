@@ -6,6 +6,7 @@ import com.akto.dto.insights.InsightNarrativeCache;
 import com.akto.gpt.handlers.gpt_prompts.InsightNarrativeHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightUtil;
 import com.mongodb.BasicDBObject;
@@ -71,24 +72,36 @@ public class PostureDrillNarrativeService {
 
     /** Attaches whatever's already cached (OK) or marks PENDING and kicks off generation in the
      *  background — never blocks on the LLM call. No-op (leaves the UNAVAILABLE default) when
-     *  this level has nothing to narrate (no summary, no rows, no gaps). */
-    public static void attachNarrative(PostureDrillResult result, int accountId, String drillId, String path) {
+     *  this level has nothing to narrate (no summary, no rows, no gaps).
+     *
+     *  Cache key is the request's own scope (account/user/contextSource/date-range, via
+     *  InsightContext#bundleCacheKey — the exact same shape InsightService's 60s bundle cache
+     *  already uses) plus drillId/path, NOT a hash of the computed narrativeInput. Keying on the
+     *  computed VALUES was the wrong tradeoff: the underlying counts drift slightly on almost
+     *  every request (a new event, a device count off by one), so a value-keyed fingerprint
+     *  almost never repeats in practice — every request pays a fresh LLM generation regardless of
+     *  how recently the same drill/range was viewed, which defeats the point of caching at all.
+     *  Keying on the input range instead means the SAME drill/range genuinely reuses one cached
+     *  narrative until the TTL backstop expires, same as the bundle/malicious-events caches
+     *  already accept "a little stale is fine" for a dashboard read. Bonus: a cache hit no longer
+     *  needs to build narrativeInput at all — that only happens on a miss now. */
+    public static void attachNarrative(PostureDrillResult result, InsightContext ctx, String drillId, String path) {
         if (result == null) return;
         try {
-            BasicDBObject narrativeInput = buildNarrativeInput(result, drillId, path);
-            if (isEmpty(narrativeInput)) return; // nothing grounded to say — not worth an LLM call
-
-            String fingerprint = fingerprint(accountId, drillId, path, narrativeInput);
+            String fingerprint = fingerprint(ctx, drillId, path);
             InsightNarrativeCache cached = InsightNarrativeCacheDao.instance.get(fingerprint);
             if (cached != null) {
                 applyCached(result, cached);
                 return;
             }
 
+            BasicDBObject narrativeInput = buildNarrativeInput(result, drillId, path);
+            if (isEmpty(narrativeInput)) return; // nothing grounded to say — not worth an LLM call
+
             result.setNarrativeStatus("PENDING");
             if (!IN_FLIGHT.add(fingerprint)) return; // someone else is already generating this exact level
 
-            final int capturedAccountId = accountId;
+            final int capturedAccountId = ctx.getAccountId();
             NARRATIVE_EXECUTOR.submit(withAccountContext(capturedAccountId, () -> {
                 try {
                     generateAndCache(drillId, path, narrativeInput, fingerprint);
@@ -172,16 +185,17 @@ public class PostureDrillNarrativeService {
                 .append("evidence", evidence)
                 .append("caveats", new ArrayList<>())
                 .append("dataGaps", gaps)
+                .append("severity", r.getSeverity() != null ? r.getSeverity() : "")
                 .append("draftConcern", "")
                 .append("draftImpact", "")
                 .append("draftRemediation", "");
     }
 
-    /** Over the exact bytes sent to the LLM, same as InsightService#fingerprint — a changed row,
-     *  metric, or gap changes the key, so stale prose can never outlive the data it describes. */
-    private static String fingerprint(int accountId, String drillId, String path, BasicDBObject narrativeInput) {
-        String raw = accountId + "|posture-drill|" + drillId + "|" + (path == null ? "" : path) + "|"
-                + DRILL_NARRATIVE_INPUT_VERSION + "|" + InsightNarrativeHandler.PROMPT_VERSION + "|" + narrativeInput.toJson();
+    /** Request-scope key (account/user/contextSource/date-range) + drillId/path/versions — see
+     *  #attachNarrative's own javadoc for why this replaced a hash of the computed narrativeInput. */
+    private static String fingerprint(InsightContext ctx, String drillId, String path) {
+        String raw = ctx.bundleCacheKey() + "|posture-drill|" + drillId + "|" + (path == null ? "" : path) + "|"
+                + DRILL_NARRATIVE_INPUT_VERSION + "|" + InsightNarrativeHandler.PROMPT_VERSION;
         return InsightUtil.md5(raw);
     }
 

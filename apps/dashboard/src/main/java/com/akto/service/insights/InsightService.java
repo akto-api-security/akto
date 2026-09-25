@@ -206,6 +206,7 @@ public class InsightService {
                 .append("evidence", evidence)
                 .append("caveats", r.getCaveats())
                 .append("dataGaps", gaps)
+                .append("severity", r.getSeverity() != null ? r.getSeverity() : "")
                 .append("draftConcern", r.getConcern() != null ? r.getConcern() : "")
                 .append("draftImpact", r.getImpact() != null ? r.getImpact() : "")
                 .append("draftRemediation", r.getRemediation() != null ? r.getRemediation() : "");

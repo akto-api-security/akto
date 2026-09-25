@@ -746,6 +746,16 @@ final class RiskScoreCalculator {
      * uncovered count.
      */
     private static List<BasicDBObject> complianceGapsByPolicy(InsightDataBundle bundle) {
+        List<BasicDBObject> rows = complianceGapsByPolicyAll(bundle);
+        return rows.subList(0, Math.min(2, rows.size()));
+    }
+
+    /** Uncapped core of {@link #complianceGapsByPolicy} — every policy with at least one
+     *  compliance-uncovered match this window, not just the top 2. Feeds the risk-score
+     *  breakdown's own "Compliance gaps" drilldown level (see
+     *  PostureService#fetchRiskScoreDrill) — the top-2 version above stays capped for the
+     *  existing inline "what's driving this" hint line. */
+    static List<BasicDBObject> complianceGapsByPolicyAll(InsightDataBundle bundle) {
         Map<String, Long> uncoveredCountByPolicy = new HashMap<>();
         for (PostureService.PolicyMatch m : PostureService.matchedPolicyCounts(bundle)) {
             if (PostureService.policyHasComplianceMapping(m.policy)) continue;
@@ -760,6 +770,56 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Long.compare(b.getLong("count"), a.getLong("count")));
-        return rows.subList(0, Math.min(2, rows.size()));
+        return rows;
+    }
+
+    /**
+     * Full (uncapped) per-device PII-incident count for the current window — the risk-score
+     * breakdown's own "DLP incidents" drilldown level. Deliberately simpler than
+     * {@link #dlpDeviceMovements}: that method needs a prior window to compute a diff (and is
+     * capped to 2 for the inline hint line); fetchPostureDrill's DRILL_RISK_SCORE branch doesn't
+     * thread a "which specific device moved" comparison this deep, so this is just "how many PII
+     * incidents does each device have right now", same {@link #piiEventCountByDevice} join, every
+     * device, sorted worst-first.
+     */
+    static List<BasicDBObject> dlpIncidentsAllDevices(List<DashboardMaliciousEvent> events,
+                                                        List<GuardrailPolicies> policies,
+                                                        Map<String, String> deviceIdToUsername) {
+        Map<String, GuardrailPolicies> policyByNameLower = PostureService.policyByNameLower(policies);
+        Map<String, Long> byDevice = piiEventCountByDevice(events, policyByNameLower);
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Long> e : byDevice.entrySet()) {
+            BasicDBObject row = new BasicDBObject();
+            row.put("deviceId", e.getKey());
+            row.put("username", deviceIdToUsername != null ? deviceIdToUsername.getOrDefault(e.getKey(), e.getKey()) : e.getKey());
+            row.put("incidents", e.getValue());
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Long.compare(b.getLong("incidents"), a.getLong("incidents")));
+        return rows;
+    }
+
+    /**
+     * Full (uncapped) per-device current-window violation count — the risk-score breakdown's own
+     * "Threat activity" drilldown level. Same {@link #totalActivityByDevice} grouping
+     * {@link #threatActivityDeviceMovements} uses, but a current-period snapshot rather than a
+     * window-over-window diff (no prior-window comparison this deep), every device, sorted
+     * worst-first.
+     */
+    static List<BasicDBObject> threatActivityAllDevices(List<HostSeverityCount> current,
+                                                          Map<String, String> deviceIdToUsername) {
+        Map<String, Long> byDevice = totalActivityByDevice(current);
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Long> e : byDevice.entrySet()) {
+            BasicDBObject row = new BasicDBObject();
+            row.put("deviceId", e.getKey());
+            row.put("username", deviceIdToUsername != null ? deviceIdToUsername.getOrDefault(e.getKey(), e.getKey()) : e.getKey());
+            row.put("violations", e.getValue());
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Long.compare(b.getLong("violations"), a.getLong("violations")));
+        return rows;
     }
 }

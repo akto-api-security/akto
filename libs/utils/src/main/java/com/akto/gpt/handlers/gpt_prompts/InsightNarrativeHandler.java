@@ -25,10 +25,10 @@ import java.util.regex.Pattern;
  */
 public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
 
-    public static final int PROMPT_VERSION = 3;
+    public static final int PROMPT_VERSION = 4;
     public static final String NARRATIVE_INPUT = "narrativeInput"; // JSON string
 
-    private static final Pattern NUMERIC_LITERAL = Pattern.compile("\\d[\\d,]*(?:\\.\\d+)?%?");
+    private static final Pattern NUMERIC_LITERAL = Pattern.compile("(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?%?");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\([^)]*\\)");
     private static final int MAX_WORDS = 260;
     private static final int MAX_SUMMARY_FIELD_WORDS = 60;
@@ -161,12 +161,13 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
     }
 
     private String buildPrompt(JSONObject input, String rejectedNote) {
+        String severity = input.optString("severity", "");
         StringBuilder sb = new StringBuilder();
-        sb.append("You are rendering a precomputed security finding into prose for someone new to this ")
-          .append("product who won't know what to do next. You are a RENDERER, not an analyst — every ")
-          .append("number below has already been computed in Java; your job is to make it specific and ")
-          .append("concrete, grounded in the real rows in EVIDENCE (actual hosts/users/topics/examples), ")
-          .append("not just the aggregate counts in FACTS. Return JSON.\n\n")
+        sb.append("You are rendering a precomputed security finding into prose for a reader who needs to ")
+          .append("decide what to do next, not just read what happened. You are a RENDERER, not an analyst ")
+          .append("— every number below has already been computed in Java; your job is to make it specific, ")
+          .append("concrete, and ACTION-DRIVEN, grounded in the real rows in EVIDENCE (actual hosts/users/")
+          .append("topics/examples), not just the aggregate counts in FACTS. Return JSON.\n\n")
           .append("HARD RULES:\n")
           .append("1. Every number in your output (in every field) MUST be copied verbatim from a ")
           .append("\"formatted\" value in FACTS or a cell value in EVIDENCE. Never compute, sum, round, or ")
@@ -176,7 +177,12 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("3. Never write a link, URL, or call to action — those are rendered separately.\n")
           .append("4. Include every sentence in CAVEATS and every \"impact\" in DATA_GAPS, verbatim, ")
           .append("somewhere in narrative.\n")
-          .append("5. If something is not in FACTS or EVIDENCE, say it is unavailable — never estimate it.\n\n")
+          .append("5. If something is not in FACTS or EVIDENCE, say it is unavailable — never estimate it.\n")
+          .append("6. SEVERITY below (if non-empty) is the real, Java-computed worst severity behind this ")
+          .append("finding — let concern/impact read with that urgency (CRITICAL/HIGH: urgent, immediate; ")
+          .append("MEDIUM/LOW: worth doing, not alarming). Never invent a severity or urgency that SEVERITY, ")
+          .append("CAVEATS, and DATA_GAPS don't support — when SEVERITY is empty, stay neutral.\n\n")
+          .append("SEVERITY: ").append(severity).append("\n\n")
           .append("FACTS: ").append(input.optJSONArray("metrics")).append("\n\n")
           .append("EVIDENCE: ").append(input.optJSONArray("evidence")).append("\n\n")
           .append("CAVEATS: ").append(input.optJSONArray("caveats")).append("\n\n")
@@ -198,10 +204,15 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("as a stray dash), no literal section labels like \"What we found\", \"Why it matters\", ")
           .append("\"Summary\", no markdown heading (#, ##). Under 200 words total, no emojis.\n")
           .append("- concern: one sentence, under 40 words, on what was specifically found — name real ")
-          .append("entities from EVIDENCE where possible.\n")
-          .append("- impact: one to two sentences, under 40 words, on what happens if this is left ")
-          .append("unaddressed.\n")
-          .append("- remediation: one to two sentences, under 40 words, the concrete next step to take.\n\n")
+          .append("entities from EVIDENCE where possible. Open with the severity word (e.g. \"A CRITICAL...\") ")
+          .append("only when SEVERITY is non-empty — never state a severity otherwise.\n")
+          .append("- impact: one to two sentences, under 40 words, on the concrete consequence of leaving ")
+          .append("this unaddressed — name what actually breaks or who's exposed (from EVIDENCE/FACTS), not ")
+          .append("generic risk language like \"could pose a risk.\"\n")
+          .append("- remediation: one to two sentences, under 40 words, phrased as a direct instruction, not ")
+          .append("a vague suggestion — start with an imperative verb (Review/Disable/Rotate/Escalate/Notify/")
+          .append("Update/Contact) and name the specific policy, host, or device from EVIDENCE it applies to ")
+          .append("wherever EVIDENCE names one.\n\n")
           .append("Return exactly: {\"narrative\": \"<markdown>\", \"concern\": \"<text>\", ")
           .append("\"impact\": \"<text>\", \"remediation\": \"<text>\"}. This is a json response.\n");
         if (rejectedNote != null) {
