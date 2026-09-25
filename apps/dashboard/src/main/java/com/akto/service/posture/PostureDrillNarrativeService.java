@@ -50,8 +50,10 @@ public class PostureDrillNarrativeService {
     private static final long NARRATIVE_TTL_DAYS = 7;
     // Posture drills have no "provider" the way insights do (InsightProvider#providerVersion) —
     // this is the one knob to bump if buildNarrativeInput's own shape changes meaningfully enough
-    // that old cached prose should stop being served.
-    private static final int DRILL_NARRATIVE_INPUT_VERSION = 1;
+    // that old cached prose should stop being served. Bumped to 2: the "profile" layout (risk-score
+    // breakdown's own 3rd level) has no top-level `rows` at all — its evidence lives in
+    // `facts`/`sections` instead, now folded into this same input.
+    private static final int DRILL_NARRATIVE_INPUT_VERSION = 2;
     private static final int EVIDENCE_ROW_CAP = 20;
 
     // Small, separate from SecurityPostureAction's own request-scoped EXECUTOR: those futures are
@@ -117,7 +119,10 @@ public class PostureDrillNarrativeService {
         }
     }
 
-    private static boolean isEmpty(BasicDBObject narrativeInput) {
+    /** Package-private (not private): TestPostureDrillNarrativeService exercises this directly —
+     *  it's pure (no Mongo/LLM), so it's tested the same way PostureService's own pure builders
+     *  are, rather than only indirectly through attachNarrative's own cache/executor plumbing. */
+    static boolean isEmpty(BasicDBObject narrativeInput) {
         List<?> metrics = (List<?>) narrativeInput.get("metrics");
         List<?> evidence = (List<?>) narrativeInput.get("evidence");
         List<?> gaps = (List<?>) narrativeInput.get("dataGaps");
@@ -159,11 +164,20 @@ public class PostureDrillNarrativeService {
     /** Same shape InsightService#buildNarrativeInput sends the model — metrics/evidence/caveats/
      *  dataGaps — sourced from a PostureDrillResult's own summary/rows/dataGaps instead of an
      *  InsightResult's. No draftConcern/Impact/Remediation: unlike insights, a drill has no
-     *  provider-computed draft to ground — the model writes those fields from EVIDENCE alone. */
-    private static BasicDBObject buildNarrativeInput(PostureDrillResult r, String drillId, String path) {
+     *  provider-computed draft to ground — the model writes those fields from EVIDENCE alone.
+     *
+     *  The "profile" layout (risk-score breakdown's own 3rd level — see
+     *  PostureDrillResult#layout's javadoc) has no top-level `rows`; its own facts/sections carry
+     *  the same real, grounded detail instead, so both are folded in here too — otherwise a
+     *  profile level would reach the LLM with almost nothing to narrate. Package-private (not
+     *  private): see {@link #isEmpty}'s own note on why this is unit-tested directly. */
+    static BasicDBObject buildNarrativeInput(PostureDrillResult r, String drillId, String path) {
         List<BasicDBObject> metrics = new ArrayList<>();
         for (InsightResult.Metric m : r.getSummary()) {
             metrics.add(new BasicDBObject("key", m.getKey()).append("label", m.getLabel()).append("formatted", m.getFormatted()));
+        }
+        for (PostureDrillResult.Fact f : r.getFacts()) {
+            metrics.add(new BasicDBObject("key", f.getLabel()).append("label", f.getLabel()).append("formatted", f.getValue()));
         }
 
         List<BasicDBObject> evidence = new ArrayList<>();
@@ -172,6 +186,14 @@ public class PostureDrillNarrativeService {
             List<Map<String, Object>> capped = rows.size() > EVIDENCE_ROW_CAP ? rows.subList(0, EVIDENCE_ROW_CAP) : rows;
             evidence.add(new BasicDBObject("id", "rows").append("title", r.getTitle())
                     .append("rows", capped).append("totalRowCount", r.getTotal()));
+        }
+        for (PostureDrillResult.Section s : r.getSections()) {
+            List<Map<String, Object>> sectionRows = s.getRows();
+            if (sectionRows == null || sectionRows.isEmpty()) continue;
+            List<Map<String, Object>> capped = sectionRows.size() > EVIDENCE_ROW_CAP
+                    ? sectionRows.subList(0, EVIDENCE_ROW_CAP) : sectionRows;
+            evidence.add(new BasicDBObject("id", s.getId()).append("title", s.getTitle())
+                    .append("rows", capped).append("totalRowCount", s.getTotal()));
         }
 
         List<BasicDBObject> gaps = new ArrayList<>();
@@ -192,8 +214,10 @@ public class PostureDrillNarrativeService {
     }
 
     /** Request-scope key (account/user/contextSource/date-range) + drillId/path/versions — see
-     *  #attachNarrative's own javadoc for why this replaced a hash of the computed narrativeInput. */
-    private static String fingerprint(InsightContext ctx, String drillId, String path) {
+     *  #attachNarrative's own javadoc for why this replaced a hash of the computed narrativeInput.
+     *  Package-private (not private): see {@link #isEmpty}'s own note on why this is unit-tested
+     *  directly. */
+    static String fingerprint(InsightContext ctx, String drillId, String path) {
         String raw = ctx.bundleCacheKey() + "|posture-drill|" + drillId + "|" + (path == null ? "" : path) + "|"
                 + DRILL_NARRATIVE_INPUT_VERSION + "|" + InsightNarrativeHandler.PROMPT_VERSION;
         return InsightUtil.md5(raw);

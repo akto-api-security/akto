@@ -29,9 +29,12 @@ const NARRATIVE_POLL_INTERVAL_MS = 3000
 const DRILL_RISK_SCORE = 'riskScoreBreakdown'
 
 // Same relative-time rendering LLMCellRenderers.jsx's TimeCell uses, minus its /1000 — every
-// drill's "detectedAt" column (see PostureService#fetchDrill's row builders) is already epoch
-// seconds, not epoch millis.
-function DetectedAtCell({ value }) {
+// drill row field named one of these (see PostureService#fetchDrill/ProfileBuilder's own row
+// builders) is already epoch seconds, not epoch millis, and must never render as a bare number —
+// this was the "AI summary/table shows raw seconds" bug this level's build fixed.
+const EPOCH_FIELDS = new Set(['detectedAt', 'firstSeen', 'lastSeen', 'lastScannedAt', 'timestamp'])
+
+function EpochCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(value || 0)}</Text>
 }
 
@@ -101,6 +104,178 @@ function DrillNarrative({ drill }) {
                         )}
                     </VerticalStack>
                 )}
+            </VerticalStack>
+        </Box>
+    )
+}
+
+// ─── Entity profile (risk-score breakdown's own 3rd level) ─────────────────────
+// One page per sub-score's L2 row (a tool/device/vendor/framework) — a header with a risk badge
+// and CTAs, an optional coaching notice, stat tiles, a facts card, and one or more sections (a
+// timeline or a table). See PostureDrillResult#layout's own javadoc; every section's rows are
+// already capped server-side (PostureService.PROFILE_SECTION_CAP), so this renders them plainly
+// rather than through AgGridTable's own SSRM pagination.
+
+const SEVERITY_DOT_COLOR = { CRITICAL: '#D82C0D', HIGH: '#EF8A15', MEDIUM: '#EEC200', LOW: '#8C9196' }
+const STATUS_BADGE_STATUS = { Met: 'success', Partial: 'attention', Gap: 'critical' }
+
+function ProfileHeader({ drill, onCtaClick }) {
+    const ctas = drill.ctas || []
+    return (
+        <VerticalStack gap="2">
+            <HorizontalStack align="space-between" blockAlign="start" wrap={false}>
+                <HorizontalStack gap="3" blockAlign="center">
+                    <Text variant="headingXl" as="h2">{drill.title}</Text>
+                    {drill.badge && <Badge status={drill.badge.tone}>{drill.badge.label}</Badge>}
+                </HorizontalStack>
+                {ctas.length > 0 && (
+                    <HorizontalStack gap="2">
+                        {ctas.map((cta, i) => (
+                            <Button key={cta.id} size="slim" primary={i === ctas.length - 1}
+                                onClick={() => onCtaClick(cta.route)}>
+                                {cta.label}
+                            </Button>
+                        ))}
+                    </HorizontalStack>
+                )}
+            </HorizontalStack>
+            {drill.subtitle && <Text variant="bodyMd" color="subdued">{drill.subtitle}</Text>}
+        </VerticalStack>
+    )
+}
+
+function ProfileStats({ summary }) {
+    if (!summary || summary.length === 0) return null
+    return (
+        <HorizontalStack gap="3">
+            {summary.map((m) => (
+                <Box key={m.key} width="160px" padding="3" background="bg-surface-secondary" borderRadius="2">
+                    <VerticalStack gap="1">
+                        <Text variant="headingLg" as="p">{m.formatted}</Text>
+                        <Text variant="bodySm" color="subdued">{m.label}</Text>
+                    </VerticalStack>
+                </Box>
+            ))}
+        </HorizontalStack>
+    )
+}
+
+function ProfileFacts({ facts }) {
+    if (!facts || facts.length === 0) return null
+    return (
+        <Card>
+            <Box padding="4">
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px 24px' }}>
+                    {facts.map((f, i) => (
+                        <VerticalStack gap="1" key={i}>
+                            <Text variant="bodySm" color="subdued">{f.label}</Text>
+                            <Text variant="bodyMd" fontWeight="semibold" color={f.tone === 'critical' ? 'critical' : undefined}>
+                                {f.value}
+                            </Text>
+                        </VerticalStack>
+                    ))}
+                </div>
+            </Box>
+        </Card>
+    )
+}
+
+function ProfileTimeline({ section }) {
+    const rows = section.rows || []
+    return (
+        <Card>
+            <Box padding="4">
+                <VerticalStack gap="4">
+                    <VerticalStack gap="05">
+                        <Text variant="headingSm">{section.title}</Text>
+                        {section.subtitle && <Text variant="bodySm" color="subdued">{section.subtitle}</Text>}
+                    </VerticalStack>
+                    {rows.length === 0 ? (
+                        <Text variant="bodySm" color="subdued">Nothing recorded in this window.</Text>
+                    ) : (
+                        <VerticalStack gap="4">
+                            {rows.map((r, i) => (
+                                <HorizontalStack key={i} gap="3" wrap={false} blockAlign="start">
+                                    <Box paddingBlockStart="1">
+                                        <div style={{
+                                            width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                                            background: SEVERITY_DOT_COLOR[String(r.severity || '').toUpperCase()] || '#8C9196',
+                                        }} />
+                                    </Box>
+                                    <VerticalStack gap="05">
+                                        <Text variant="bodySm" color="subdued">{func.prettifyEpoch(r.timestamp || 0)}</Text>
+                                        <Text variant="bodyMd" fontWeight="semibold">{r.title}</Text>
+                                        {r.detail && <Text variant="bodySm" color="subdued">{r.detail}</Text>}
+                                    </VerticalStack>
+                                </HorizontalStack>
+                            ))}
+                        </VerticalStack>
+                    )}
+                    {section.total > rows.length && (
+                        <Text variant="bodySm" color="subdued">Showing {rows.length} of {section.total}.</Text>
+                    )}
+                </VerticalStack>
+            </Box>
+        </Card>
+    )
+}
+
+function ProfileTable({ section }) {
+    const columns = section.columns || []
+    const rows = section.rows || []
+    const headings = columns.map((c) => c.headerName)
+    const tableRows = rows.map((r) => columns.map((c) => {
+        const value = r[c.field]
+        if (EPOCH_FIELDS.has(c.field)) return func.prettifyEpoch(value || 0)
+        if ((c.field === 'status' || c.field === 'result') && STATUS_BADGE_STATUS[value]) {
+            return <Badge status={STATUS_BADGE_STATUS[value]}>{value}</Badge>
+        }
+        return value === null || value === undefined || value === '' ? '-' : String(value)
+    }))
+    return (
+        <Card padding="0">
+            <Box padding="4" paddingBlockEnd="2">
+                <VerticalStack gap="05">
+                    <Text variant="headingSm">{section.title}</Text>
+                    {section.subtitle && <Text variant="bodySm" color="subdued">{section.subtitle}</Text>}
+                </VerticalStack>
+            </Box>
+            {rows.length === 0 ? (
+                <Box padding="4" paddingBlockStart="0">
+                    <Text variant="bodySm" color="subdued">Nothing to show in this window.</Text>
+                </Box>
+            ) : (
+                <DataTable
+                    columnContentTypes={columns.map(() => 'text')}
+                    headings={headings}
+                    rows={tableRows}
+                    hideScrollIndicator
+                    increasedTableDensity
+                />
+            )}
+            {section.total > rows.length && (
+                <Box padding="3">
+                    <Text variant="bodySm" color="subdued">Showing {rows.length} of {section.total}.</Text>
+                </Box>
+            )}
+        </Card>
+    )
+}
+
+function DrillProfileBody({ drill, onCtaClick }) {
+    return (
+        <Box overflowY="scroll" padding="4">
+            <VerticalStack gap="4">
+                <ProfileHeader drill={drill} onCtaClick={onCtaClick} />
+                {drill.notice && <Banner status="info">{drill.notice}</Banner>}
+                {(drill.dataGaps || []).map((g, i) => <Banner key={i} status="info">{g.impact}</Banner>)}
+                <ProfileStats summary={drill.summary} />
+                <ProfileFacts facts={drill.facts} />
+                {(drill.sections || []).map((s) => (
+                    s.kind === 'timeline'
+                        ? <ProfileTimeline key={s.id} section={s} />
+                        : <ProfileTable key={s.id} section={s} />
+                ))}
             </VerticalStack>
         </Box>
     )
@@ -362,6 +537,10 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
     // instead of the generic AgGridTable every other drill/level uses — the former standalone
     // "Risk score breakdown" FlyLayout, relocated here wholesale.
     const isRiskScoreRoot = drillState?.drillId === DRILL_RISK_SCORE && !drillState?.path
+    // Risk-score breakdown's own 3rd level (one entity — a tool/device/vendor/framework) — see
+    // PostureDrillResult#layout's own javadoc. Renders DrillProfileBody instead of AgGridTable,
+    // with its own header/stats/facts replacing the generic top-of-flyout DrillStats/ctas row.
+    const isProfileLayout = drill?.layout === 'profile'
     const mergedRiskScoreKpi = useMemo(() => (
         riskScoreKpi ? { ...riskScoreKpi, ...(drill?.riskScoreBreakdown || {}) } : null
     ), [riskScoreKpi, drill?.riskScoreBreakdown])
@@ -408,11 +587,18 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
     // Every ancestor's own {path, label} comes back from the backend on every fetch (see
     // PostureDrillResult.breadcrumb's own javadoc) — a reload from a deep-linked URL renders the
     // full trail with no extra round trips to reconstruct it.
-    const breadcrumbItems = useMemo(() => (drill?.breadcrumb || []).map((b, i, arr) => ({
-        label: b.label,
-        onClick: i === arr.length - 1 ? undefined
-            : () => onNavigate({ drillId: drillState.drillId, path: b.path }),
-    })), [drill?.breadcrumb, drillState, onNavigate])
+    const breadcrumbItems = useMemo(() => {
+        const trail = (drill?.breadcrumb || []).map((b, i, arr) => ({
+            label: b.label,
+            onClick: i === arr.length - 1 ? undefined
+                : () => onNavigate({ drillId: drillState.drillId, path: b.path }),
+        }))
+        // Every drill's own trail starts at its panel root ("Shadow AI tools", "Risk score
+        // breakdown", ...) — this leading crumb is the one thing every level shares: the page this
+        // flyout sits over. Not part of PostureDrillResult.breadcrumb itself (that's a backend
+        // concept scoped to one drillId's own levels; "close the flyout" is a frontend-only action).
+        return [{ label: 'Security posture', onClick: onClose }, ...trail]
+    }, [drill?.breadcrumb, drillState, onNavigate, onClose])
 
     const columnDefs = useMemo(() => (drill?.columns || []).map((c) => ({
         field: c.field,
@@ -420,7 +606,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         flex: 1,
         minWidth: 130,
         cellStyle: { display: 'flex', alignItems: 'center' },
-        ...(c.field === 'detectedAt' ? { cellRenderer: DetectedAtCell } : {}),
+        ...(EPOCH_FIELDS.has(c.field) ? { cellRenderer: EpochCell } : {}),
     })), [drill?.columns])
 
     const onServerFetch = useCallback(({ skip, limit }) => {
@@ -501,31 +687,37 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                     <SpinnerCentered height="200px" />
                 ) : (
                     <>
-                        <Box padding="4" paddingBlockEnd="0">
-                            <HorizontalStack align="space-between" blockAlign="start">
-                                {!isRiskScoreRoot && <DrillStats drill={drill} />}
-                                {(drill.ctas || []).length > 0 && (
-                                    <HorizontalStack gap="2">
-                                        {drill.ctas.map((cta) => (
-                                            <Button key={cta.id} size="slim" onClick={() => navigate(cta.route)}>{cta.label}</Button>
-                                        ))}
+                        {!isProfileLayout && (
+                            <>
+                                <Box padding="4" paddingBlockEnd="0">
+                                    <HorizontalStack align="space-between" blockAlign="start">
+                                        {!isRiskScoreRoot && <DrillStats drill={drill} />}
+                                        {(drill.ctas || []).length > 0 && (
+                                            <HorizontalStack gap="2">
+                                                {drill.ctas.map((cta) => (
+                                                    <Button key={cta.id} size="slim" onClick={() => navigate(cta.route)}>{cta.label}</Button>
+                                                ))}
+                                            </HorizontalStack>
+                                        )}
                                     </HorizontalStack>
-                                )}
-                            </HorizontalStack>
-                            {(drill.dataGaps || []).length > 0 && (
-                                <Box paddingBlockStart="3">
-                                    <VerticalStack gap="2">
-                                        {drill.dataGaps.map((g, i) => (
-                                            <Banner key={i} status="info">{g.impact}</Banner>
-                                        ))}
-                                    </VerticalStack>
+                                    {(drill.dataGaps || []).length > 0 && (
+                                        <Box paddingBlockStart="3">
+                                            <VerticalStack gap="2">
+                                                {drill.dataGaps.map((g, i) => (
+                                                    <Banner key={i} status="info">{g.impact}</Banner>
+                                                ))}
+                                            </VerticalStack>
+                                        </Box>
+                                    )}
                                 </Box>
-                            )}
-                        </Box>
-                        <Box paddingBlockStart="4"><Divider /></Box>
+                                <Box paddingBlockStart="4"><Divider /></Box>
+                            </>
+                        )}
                         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                             {isRiskScoreRoot ? (
                                 <RiskScoreRootBody kpi={mergedRiskScoreKpi} onSubScoreClick={handleSubScoreClick} />
+                            ) : isProfileLayout ? (
+                                <DrillProfileBody drill={drill} onCtaClick={(route) => navigate(route)} />
                             ) : (
                                 <AgGridTable
                                     key={`${drillState.drillId}:${drillState.path || ''}`}

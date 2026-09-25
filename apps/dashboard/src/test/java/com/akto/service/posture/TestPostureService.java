@@ -750,4 +750,211 @@ public class TestPostureService extends MongoBasedTest {
         }
         return null;
     }
+
+    // ── fetchRiskScoreDrill — 3rd level (entity profiles) ────────────────────────
+    //
+    // Same fourVendorCollections/fourBehaviourPolicies/fiveTrendWindowEvents fixtures every other
+    // drill test above reuses. Each sub-score's L2 must now be drillable with a real "id" on every
+    // row (previously a dead end), and its L3 (one entity) must return the "profile" layout with a
+    // real badge/facts/sections built from the exact same in-memory data — see the package
+    // CLAUDE.md's "risk score breakdown third level" section.
+
+    @Test
+    public void testFetchRiskScoreDrill_shadowAiExposure_l2DrillableAndL3Profile() {
+        InsightDataBundle b = bundle(fourVendorCollections(), new ArrayList<>(),
+                new HashSet<>(Arrays.asList("openai", "anthropic")), deviceIdToUsernameForFourVendors(),
+                lastTrafficSeenForFourVendors(), new ArrayList<>(), new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l2 = postureService.fetchRiskScoreDrill(b, fourVendorCollections(), new ArrayList<>(),
+                null, null, null, "shadowAiExposure", 0, 20);
+        assertTrue(l2.isDrillable());
+        assertEquals(2L, ((Number) rowById(l2, "OpenAI").get("devices")).longValue());
+
+        PostureDrillResult l3 = postureService.fetchRiskScoreDrill(b, fourVendorCollections(), new ArrayList<>(),
+                null, null, fiveTrendWindowEvents(), "shadowAiExposure/OpenAI", 0, 20);
+        assertEquals("profile", l3.getLayout());
+        assertEquals(3, l3.getBreadcrumb().size());
+        assertEquals("Sanctioned", l3.getBadge().getLabel());
+        assertEquals("success", l3.getBadge().getTone());
+        assertFalse(l3.isDrillable());
+        assertEquals(2, l3.getSections().size()); // devices table + recent-activity timeline
+    }
+
+    /** SecurityPostureAction calls this BEFORE firing shadowAiExposure's own entity-level
+     *  malicious-event fetch, to scope it server-side (apiCollectionId $in) instead of an
+     *  unfiltered one — see PostureService#shadowAiToolCollectionIds' own javadoc for why this is
+     *  safe only for this one sub-score, not vendorRisk/threatActivity. */
+    @Test
+    public void testShadowAiToolCollectionIds_matchesOnlyThatToolsOwnCollections() {
+        InsightDataBundle b = bundle(fourVendorCollections(), new ArrayList<>(), new HashSet<>(),
+                new HashMap<>(), new HashMap<>(), new ArrayList<>(), new ArrayList<>(), true, TREND_START, TREND_END);
+
+        assertEquals(new HashSet<>(Arrays.asList(101, 102)),
+                new HashSet<>(PostureService.shadowAiToolCollectionIds(b, "OpenAI")));
+        assertEquals(Collections.singletonList(103), PostureService.shadowAiToolCollectionIds(b, "DeepSeek"));
+        assertTrue(PostureService.shadowAiToolCollectionIds(b, "NotARealTool").isEmpty());
+    }
+
+    @Test
+    public void testFetchRiskScoreDrill_dlpIncidents_l2DrillableAndL3Profile() {
+        InsightDataBundle b = bundle(fourVendorCollections(), fourBehaviourPolicies(), new HashSet<>(),
+                deviceIdToUsernameForFourVendors(), lastTrafficSeenForFourVendors(), new ArrayList<>(),
+                new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l2 = postureService.fetchRiskScoreDrill(b, new ArrayList<>(), fiveTrendWindowEvents(),
+                null, null, null, "dlpIncidents", 0, 20);
+        assertTrue(l2.isDrillable());
+        assertNotNull(rowById(l2, "deviceA"));
+
+        PostureDrillResult l3 = postureService.fetchRiskScoreDrill(b, new ArrayList<>(), fiveTrendWindowEvents(),
+                null, null, null, "dlpIncidents/deviceA", 0, 20);
+        assertEquals("profile", l3.getLayout());
+        assertEquals("alice", l3.getTitle()); // deviceIdToUsername display name
+        assertEquals("Critical risk", l3.getBadge().getLabel()); // deviceA's worst event this window is CRITICAL
+        assertEquals("CRITICAL", l3.getSeverity());
+        assertNotNull(l3.getNotice());
+        assertEquals(1, l3.getSections().size()); // AI activity timeline
+        assertEquals(2, l3.getSections().get(0).getTotal()); // both deviceA-prefixed hosts' events
+    }
+
+    @Test
+    public void testFetchRiskScoreDrill_threatActivity_l2DrillableAndL3Profile() {
+        List<HostSeverityCount> hostSeverityCounts = Arrays.asList(
+                new HostSeverityCount("deviceA.ai-agent.chatgpt.com", 2, 1, 0, 0),
+                new HostSeverityCount("deviceC.ai-agent.deepseek.com", 0, 0, 3, 0));
+        InsightDataBundle b = bundle(fourVendorCollections(), new ArrayList<>(), new HashSet<>(),
+                deviceIdToUsernameForFourVendors(), lastTrafficSeenForFourVendors(), hostSeverityCounts,
+                new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l2 = postureService.fetchRiskScoreDrill(b, new ArrayList<>(), new ArrayList<>(),
+                null, null, null, "threatActivity", 0, 20);
+        assertTrue(l2.isDrillable());
+        assertNotNull(rowById(l2, "deviceA"));
+        assertNotNull(rowById(l2, "deviceC"));
+
+        PostureDrillResult l3 = postureService.fetchRiskScoreDrill(b, new ArrayList<>(), new ArrayList<>(),
+                null, null, fiveTrendWindowEvents(), "threatActivity/deviceA", 0, 20);
+        assertEquals("profile", l3.getLayout());
+        assertEquals("Critical risk", l3.getBadge().getLabel());
+        assertTrue(l3.getFacts().stream().anyMatch(f -> "Severity breakdown this window".equals(f.getLabel())
+                && f.getValue().startsWith("2 critical")));
+    }
+
+    @Test
+    public void testFetchRiskScoreDrill_vendorRisk_l2DrillableAndL3Profile() {
+        InsightDataBundle b = bundle(fourVendorCollections(), fourBehaviourPolicies(),
+                new HashSet<>(Arrays.asList("openai", "anthropic")), deviceIdToUsernameForFourVendors(),
+                lastTrafficSeenForFourVendors(), new ArrayList<>(), new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l2 = postureService.fetchRiskScoreDrill(b, fourVendorCollections(), new ArrayList<>(),
+                null, null, null, "vendorRisk", 0, 20);
+        assertTrue(l2.isDrillable());
+        assertNotNull(rowById(l2, "DeepSeek"));
+
+        PostureDrillResult l3 = postureService.fetchRiskScoreDrill(b, fourVendorCollections(), new ArrayList<>(),
+                null, null, fiveTrendWindowEvents(), "vendorRisk/DeepSeek", 0, 20);
+        assertEquals("profile", l3.getLayout());
+        assertEquals("Unapproved", l3.getBadge().getLabel());
+        assertEquals("No", l3.getFacts().stream().filter(f -> "Approved".equals(f.getLabel()))
+                .findFirst().get().getValue());
+        // "Compliance findings" + "Devices" sections, in that order (see vendorRiskProfileDrill).
+        assertEquals(2, l3.getSections().size());
+        assertEquals("findings", l3.getSections().get(0).getId());
+        assertEquals("Met", l3.getSections().get(0).getRows().get(0).get("result")); // Default-Source code
+        // detection is mapped to a compliance framework in fourBehaviourPolicies' own fixture.
+        assertEquals("devices", l3.getSections().get(1).getId());
+        assertEquals(1, l3.getSections().get(1).getTotal());
+    }
+
+    // ── fetchRiskScoreDrill — Compliance gaps (L2 -> frameworks, L3 -> Met/Partial/Gap) ──────────
+
+    private static ComplianceClauseCoverage nistCoverageWithOneMetOnePartial() {
+        ComplianceClauseCoverage coverage = new ComplianceClauseCoverage();
+        coverage.setId("NIST AI Risk Management Framework");
+        Map<String, List<ClauseHit>> hits = new HashMap<>();
+        hits.put("GOVERN - AI risk governance and culture",
+                Collections.singletonList(new ClauseHit("ref1", TREND_START + 100, "Mapped Policy")));
+        hits.put("MAP - Context and AI risk identification",
+                Collections.singletonList(new ClauseHit("ref2", TREND_START + 200, "Unmapped Policy")));
+        coverage.setClauseHits(hits);
+        return coverage;
+    }
+
+    private static List<GuardrailPolicies> oneMappedOneUnmappedPolicy() {
+        GuardrailPolicies.LLMRule mappedRule = new GuardrailPolicies.LLMRule();
+        mappedRule.setEnabled(true);
+        Map<String, List<String>> mappedCompliance = new HashMap<>();
+        mappedCompliance.put("NIST AI Risk Management Framework", Collections.singletonList("GOVERN"));
+        mappedRule.setCompliance(mappedCompliance);
+        GuardrailPolicies mappedPolicy = policy("Mapped Policy", "block", null);
+        mappedPolicy.setLlmRule(mappedRule);
+
+        GuardrailPolicies.LLMRule unmappedRule = new GuardrailPolicies.LLMRule();
+        unmappedRule.setEnabled(true);
+        unmappedRule.setCompliance(new HashMap<>());
+        GuardrailPolicies unmappedPolicy = policy("Unmapped Policy", "block", null);
+        unmappedPolicy.setLlmRule(unmappedRule);
+
+        return Arrays.asList(mappedPolicy, unmappedPolicy);
+    }
+
+    @Test
+    public void testFetchRiskScoreDrill_complianceGaps_l2FrameworksAndL3MetPartialGap() {
+        ComplianceClauseCoverageDao.instance.getMCollection().drop();
+        ComplianceClauseCoverageDao.instance.insertOne(nistCoverageWithOneMetOnePartial());
+
+        InsightDataBundle b = bundle(new ArrayList<>(), oneMappedOneUnmappedPolicy(), new HashSet<>(),
+                new HashMap<>(), new HashMap<>(), new ArrayList<>(), new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l2 = postureService.fetchRiskScoreDrill(b, new ArrayList<>(), new ArrayList<>(),
+                null, null, null, "complianceGaps", 0, 20);
+        assertTrue(l2.isDrillable());
+        assertEquals(1, l2.getTotal());
+        Map<String, Object> frameworkRow = l2.getRows().get(0);
+        assertEquals("NIST AI Risk Management Framework", frameworkRow.get("framework"));
+        assertEquals(2, frameworkRow.get("clausesCovered"));
+        assertEquals(4, frameworkRow.get("totalClauses")); // falls back to the catalog's own count
+        assertEquals(50, frameworkRow.get("value"));
+
+        PostureDrillResult l3 = postureService.fetchRiskScoreDrill(b, new ArrayList<>(), new ArrayList<>(),
+                null, null, null, "complianceGaps/NIST AI Risk Management Framework", 0, 20);
+        assertEquals("profile", l3.getLayout());
+        assertEquals("25% met", l3.getBadge().getLabel()); // 1 of 4 sub-clauses Met
+        assertEquals("critical", l3.getBadge().getTone());
+        assertEquals(1, l3.getSections().size());
+        List<Map<String, Object>> controls = l3.getSections().get(0).getRows();
+        assertEquals(4, controls.size());
+        assertEquals("Met", controlById(controls, "GOVERN").get("status"));
+        assertEquals("Partial", controlById(controls, "MAP").get("status"));
+        assertEquals("Gap", controlById(controls, "MEASURE").get("status"));
+        assertEquals("Gap", controlById(controls, "MANAGE").get("status"));
+    }
+
+    private static Map<String, Object> controlById(List<Map<String, Object>> controls, String id) {
+        for (Map<String, Object> row : controls) {
+            if (id.equals(row.get("control"))) return row;
+        }
+        return null;
+    }
+
+    @Test
+    public void testFetchRiskScoreDrill_unknownEntityReportsGapNotException() {
+        InsightDataBundle b = bundle(fourVendorCollections(), new ArrayList<>(), new HashSet<>(),
+                new HashMap<>(), new HashMap<>(), new ArrayList<>(), new ArrayList<>(), true, TREND_START, TREND_END);
+        PostureService postureService = new PostureService();
+
+        PostureDrillResult l3 = postureService.fetchRiskScoreDrill(b, fourVendorCollections(), new ArrayList<>(),
+                null, null, new ArrayList<>(), "shadowAiExposure/NotARealTool", 0, 20);
+        assertEquals("profile", l3.getLayout());
+        assertFalse(l3.getDataGaps().isEmpty());
+
+        PostureDrillResult unknownSubScore = postureService.fetchRiskScoreDrill(b, fourVendorCollections(),
+                new ArrayList<>(), null, null, new ArrayList<>(), "notARealSubScore/x", 0, 20);
+        assertEquals("Unknown drilldown", unknownSubScore.getTitle());
+    }
 }

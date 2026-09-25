@@ -4,6 +4,9 @@ import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
 import javax.validation.ValidationException;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -25,7 +28,7 @@ import java.util.regex.Pattern;
  */
 public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
 
-    public static final int PROMPT_VERSION = 4;
+    public static final int PROMPT_VERSION = 5;
     public static final String NARRATIVE_INPUT = "narrativeInput"; // JSON string
 
     private static final Pattern NUMERIC_LITERAL = Pattern.compile("(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?%?");
@@ -99,7 +102,9 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         return validateAndBuild(rawResponse, allowedLiterals);
     }
 
-    private BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
+    /** Package-private (not private): InsightNarrativeHandlerTest exercises the literal-rejection
+     *  guard directly against hand-built responses, rather than only through a real `call()`. */
+    BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
         BasicDBObject resp = new BasicDBObject();
         if (rawResponse == null || rawResponse.isEmpty() || "NOT_FOUND".equalsIgnoreCase(rawResponse)) {
             resp.put("error", "empty response");
@@ -160,7 +165,19 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         }
     }
 
-    private String buildPrompt(JSONObject input, String rejectedNote) {
+    /** "<epoch> (<ISO date>)" — orientation for HARD RULE 7's relative-time phrasing, never a
+     *  value the model is meant to copy into its output (it isn't added to allowedLiterals). */
+    static String nowForPrompt() {
+        long nowEpoch = System.currentTimeMillis() / 1000;
+        String iso = Instant.ofEpochSecond(nowEpoch).atZone(ZoneOffset.UTC)
+                .format(DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ROOT));
+        return nowEpoch + " (" + iso + ")";
+    }
+
+    /** Package-private (not private): pure string-building, no network call — same
+     *  "test the pure piece directly" convention this repo already uses elsewhere (see
+     *  InsightNarrativeHandlerTest). */
+    String buildPrompt(JSONObject input, String rejectedNote) {
         String severity = input.optString("severity", "");
         StringBuilder sb = new StringBuilder();
         sb.append("You are rendering a precomputed security finding into prose for a reader who needs to ")
@@ -181,7 +198,15 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("6. SEVERITY below (if non-empty) is the real, Java-computed worst severity behind this ")
           .append("finding — let concern/impact read with that urgency (CRITICAL/HIGH: urgent, immediate; ")
           .append("MEDIUM/LOW: worth doing, not alarming). Never invent a severity or urgency that SEVERITY, ")
-          .append("CAVEATS, and DATA_GAPS don't support — when SEVERITY is empty, stay neutral.\n\n")
+          .append("CAVEATS, and DATA_GAPS don't support — when SEVERITY is empty, stay neutral.\n")
+          .append("7. FACTS/EVIDENCE hold raw Unix epoch seconds under keys like \"detectedAt\", \"firstSeen\", ")
+          .append("\"lastSeen\", \"lastScannedAt\", \"timestamp\", or \"lastHit\" (a plain integer, e.g. ")
+          .append("1758375000) — these are NOT counts. Never print one of these as a bare number. Describe ")
+          .append("timing only in relative, qualitative words (\"recently\", \"earlier this month\", \"on its ")
+          .append("most recent occurrence\", \"within this window\") using CURRENT_TIME below only to judge ")
+          .append("roughly how far in the past it is — never state or compute a specific date, a day count, ")
+          .append("or an age in days/weeks (that would be computing a new number, which rule 1 forbids).\n\n")
+          .append("CURRENT_TIME: ").append(nowForPrompt()).append("\n\n")
           .append("SEVERITY: ").append(severity).append("\n\n")
           .append("FACTS: ").append(input.optJSONArray("metrics")).append("\n\n")
           .append("EVIDENCE: ").append(input.optJSONArray("evidence")).append("\n\n")
@@ -229,7 +254,7 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
      *  and the model can't tell those apart from a "formatted" value — it just sees text with a
      *  number in it. Field-by-field extraction only catches up with each new case one bug report at
      *  a time; scanning everything the prompt actually contains closes the whole class at once. */
-    private Set<String> allowedLiterals(JSONObject input) {
+    Set<String> allowedLiterals(JSONObject input) {
         Set<String> out = new HashSet<>();
         for (String field : new String[] { "metrics", "evidence", "caveats", "dataGaps" }) {
             Object value = input.opt(field);

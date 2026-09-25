@@ -60,6 +60,26 @@ public class PostureDrillResult {
     private String narrativeRemediation;
     private BasicDBObject riskScoreBreakdown;
 
+    /** Null (today's shape) renders the generic AgGridTable. "profile" renders an entity page
+     *  (header + badge + facts + sections) instead — see PostureService's ProfileBuilder and the
+     *  package CLAUDE.md's "risk score breakdown third level" section. Only ever set on the
+     *  risk-score-breakdown drill's own third level (path has 2 segments), one per sub-score. */
+    private String layout;
+    /** Profile layout only — subtitle line under the title ("5 AI tools used · 7 flagged actions
+     *  in this window"). */
+    private String subtitle;
+    /** Profile layout only — the risk/status pill next to the title. */
+    private Badge badge;
+    /** Profile layout only — an info banner above the stats (e.g. the "coaching, not conclusions"
+     *  copy on a device profile). Null when there's nothing to say. */
+    private String notice;
+    /** Profile layout only — the key/value facts card. */
+    private List<Fact> facts = new ArrayList<>();
+    /** Profile layout only — one or more content sections (a timeline or a table) below the facts
+     *  card. Each section's own rows are capped server-side (see PostureService.PROFILE_SECTION_CAP)
+     *  — {@link Section#total} carries the real count for a "showing N of M" footer. */
+    private List<Section> sections = new ArrayList<>();
+
     public void addDataGap(InsightResult.Gap gap) { dataGaps.add(gap); }
 
     @Getter
@@ -80,5 +100,46 @@ public class PostureDrillResult {
     public static class ColumnDef {
         private String field;
         private String headerName;
+    }
+
+    /** tone: "critical" | "warning" | "success" | "info" — matches Polaris Badge's own status
+     *  vocabulary so the frontend can pass it straight through. */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Badge {
+        private String label;
+        private String tone;
+    }
+
+    /** One row of the profile's key/value facts card. tone is optional (null = default text
+     *  color) — used for things like an overdue-training date that should read as a warning. */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Fact {
+        private String label;
+        private String value;
+        private String tone;
+    }
+
+    /** One profile content block. kind "timeline" renders {@link #rows} as a vertical activity
+     *  feed (each row: timestamp/title/detail/severity/status); kind "table" renders them as a
+     *  plain table using {@link #columns}. total is the real, uncapped count behind rows (which
+     *  is capped at PostureService.PROFILE_SECTION_CAP), so the UI can show "Showing N of M". */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Section {
+        private String id;
+        private String title;
+        private String subtitle;
+        private String kind;
+        private List<ColumnDef> columns = new ArrayList<>();
+        private List<Map<String, Object>> rows = new ArrayList<>();
+        private long total;
     }
 }

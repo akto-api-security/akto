@@ -449,8 +449,17 @@ public final class InsightUtil {
     /** Null when the host doesn't match the "<device>.<ai-agent|chrome>.<vendor>..." shape, or
      *  the parsed token isn't a real vendor ("not-attached") — nothing to classify from it. */
     public static String endpointVendorName(ApiCollection c) {
-        if (c == null || c.getHostName() == null) return null;
-        String[] parts = c.getHostName().split("\\.");
+        if (c == null) return null;
+        return endpointVendorNameOfHost(c.getHostName());
+    }
+
+    /** Same as {@link #endpointVendorName(ApiCollection)}, taking a raw hostName directly — for
+     *  callers that only have a host string (e.g. a DashboardMaliciousEvent's own host, or a
+     *  HostSeverityCount), not a full ApiCollection. Extracted so both call sites can't drift on
+     *  the same "<device>.<client-type>.<vendor>..." parsing. */
+    public static String endpointVendorNameOfHost(String hostName) {
+        if (hostName == null) return null;
+        String[] parts = hostName.split("\\.");
         if (parts.length < 3 || !ENDPOINT_AGENT_HOST_MARKERS.contains(parts[1])) return null;
         String vendor = parts[2].trim().toLowerCase(Locale.ROOT);
         if (vendor.isEmpty() || vendor.equals(VENDOR_NOT_ATTACHED)) return null;

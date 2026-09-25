@@ -172,14 +172,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             List<DashboardMaliciousEvent> trendWindowEvents =
                     timedGet("trendWindowEventsFuture (limit " + MAX_THREAT_FETCH_LIMIT + ")", trendWindowEventsFuture);
 
-            // bundle.collections, not bundle.activeCollections: the latter is loaded via a
-            // narrow projection (id/hostName/startTs only, for PolicyHygieneProvider's cheap
-            // uncovered-asset check) that omits tagsList, so isEndpointCollection() would always
-            // read false against it. bundle.collections already carries tagsList. Cheap in-memory
-            // filter, not worth its own future.
-            List<ApiCollection> endpointCollections = bundle.collections.stream()
-                    .filter(c -> c != null && !c.isDeactivated() && c.isEndpointCollection())
-                    .collect(Collectors.toList());
+            List<ApiCollection> endpointCollections = endpointCollectionsOf(bundle);
 
             response = postureService.buildSummary(bundle, priorHostSeverity, priorSubCategory,
                     endpointCollections, totalInspectedActions,
@@ -239,9 +232,17 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                 // complianceGaps, threatActivity — see PostureService#fetchRiskScoreDrill's own
                 // dispatch) reads only `bundle`; none of them ever touch allThreats/priorAllThreats/
                 // priorHostSeverity, so this skips fetchAllMaliciousEvents entirely for those 4.
-                String firstSegment = (path == null || path.isEmpty()) ? "" : path.split("/")[0];
+                String[] pathSegments = (path == null || path.isEmpty()) ? new String[0] : path.split("/");
+                String firstSegment = pathSegments.length > 0 ? pathSegments[0] : "";
                 boolean isRiskScoreRoot = firstSegment.isEmpty();
                 boolean needsAllThreats = isRiskScoreRoot || "dlpIncidents".equals(firstSegment);
+                // The 3rd level (one entity — a tool/device/vendor) for shadowAiExposure/vendorRisk/
+                // threatActivity needs the full, UNFILTERED window event list (dlpIncidents' own
+                // entity level reuses `allThreats` above instead — already PII-filtered, no 2nd
+                // fetch needed; complianceGaps' own entity level needs no events at all).
+                boolean isEntityLevel = pathSegments.length >= 2;
+                boolean needsWindowEvents = isEntityLevel && ("shadowAiExposure".equals(firstSegment)
+                        || "vendorRisk".equals(firstSegment) || "threatActivity".equals(firstSegment));
                 // Only the root's own top-2 "what's driving this" hints and "what moved the score"
                 // table need a prior-window comparison — dlpIncidentsDrill's own full device table
                 // is a current-period snapshot, no diff.
@@ -289,6 +290,35 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                         ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
                                 () -> fetchHostSeverityCounts(priorStart, startTimestamp)))
                         : null;
+                // Same trend-window convention the non-risk-score drillIds' own
+                // trendWindowEventsFuture below uses. shadowAiExposure's own entity level scopes
+                // this server-side to just that tool's own collections (apiCollectionId $in) —
+                // safe ONLY for this sub-score, see RiskScoreProfileDrillService#collectionIdsForTool's
+                // own javadoc for why vendorRisk/threatActivity deliberately stay unfiltered instead
+                // (scoping either of those by known-collection-id would silently under-count real
+                // activity a live collection no longer exists for). vendorRisk/threatActivity keep
+                // the exact same params the non-risk-score branch's own fetch below uses, so THEIR
+                // call can still land in AbstractThreatDetectionAction's maliciousEventsCache if
+                // something else already warmed it for this window.
+                int entityTrendEndTs = endTimestamp;
+                int entityTrendStartTs = startTimestamp > 0 ? startTimestamp
+                        : entityTrendEndTs - (PostureService.TREND_BUCKET_COUNT * 7 * 86400);
+                boolean isShadowAiEntity = needsWindowEvents && "shadowAiExposure".equals(firstSegment);
+                List<Integer> shadowAiToolCollectionIds = isShadowAiEntity
+                        ? PostureService.shadowAiToolCollectionIds(bundle, pathSegments[1])
+                        : null;
+                // Empty means this tool genuinely has zero live collections right now — nothing to
+                // fetch. Passing an empty apiCollectionId list instead of skipping the fetch would
+                // be silently ignored server-side (MaliciousEventService only applies the filter
+                // when the list is non-empty), turning "nothing to show" into an accidental
+                // unfiltered fetch — the exact cost this scoping exists to avoid.
+                boolean shadowAiEntityHasNoCollections = isShadowAiEntity && shadowAiToolCollectionIds.isEmpty();
+                Map<String, Object> windowEventsFilter = (isShadowAiEntity && !shadowAiToolCollectionIds.isEmpty())
+                        ? Collections.<String, Object>singletonMap("apiCollectionId", shadowAiToolCollectionIds) : null;
+                Future<List<DashboardMaliciousEvent>> windowEventsFuture = (needsWindowEvents && !shadowAiEntityHasNoCollections)
+                        ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                                () -> fetchAllMaliciousEvents(entityTrendStartTs, entityTrendEndTs, MAX_THREAT_FETCH_LIMIT, windowEventsFilter, null, true)))
+                        : null;
 
                 List<DashboardMaliciousEvent> allThreats = new ArrayList<>();
                 List<DashboardMaliciousEvent> priorAllThreats = hasPriorWindow ? new ArrayList<>() : null;
@@ -306,13 +336,19 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                 }
                 List<HostSeverityCount> priorHostSeverity = hasPriorWindow
                         ? timedGet("fetchPostureDrill(riskScore): priorHostSeverityFuture", priorHostSeverityFuture) : null;
+                List<DashboardMaliciousEvent> windowEvents;
+                if (!needsWindowEvents) {
+                    windowEvents = null;
+                } else if (shadowAiEntityHasNoCollections) {
+                    windowEvents = new ArrayList<>(); // nothing to fetch — see the comment above
+                } else {
+                    windowEvents = timedGet("fetchPostureDrill(riskScore): windowEventsFuture", windowEventsFuture);
+                }
 
-                List<ApiCollection> endpointCollections = bundle.collections.stream()
-                        .filter(c -> c != null && !c.isDeactivated() && c.isEndpointCollection())
-                        .collect(Collectors.toList());
+                List<ApiCollection> endpointCollections = endpointCollectionsOf(bundle);
 
                 postureDrill = postureService.fetchRiskScoreDrill(bundle, endpointCollections, allThreats,
-                        priorAllThreats, priorHostSeverity, path, skip, limit);
+                        priorAllThreats, priorHostSeverity, windowEvents, path, skip, limit);
             } else {
                 // Same trend-window convention buildSummary/shadowAiTrend use — the page's own
                 // selected range, falling back to a fixed lookback only for an unbounded "all time"
@@ -330,9 +366,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                 List<DashboardMaliciousEvent> trendWindowEvents =
                         timedGet("fetchPostureDrill: trendWindowEventsFuture", trendWindowEventsFuture);
 
-                List<ApiCollection> endpointCollections = bundle.collections.stream()
-                        .filter(c -> c != null && !c.isDeactivated() && c.isEndpointCollection())
-                        .collect(Collectors.toList());
+                List<ApiCollection> endpointCollections = endpointCollectionsOf(bundle);
 
                 postureDrill = postureService.fetchDrill(bundle, endpointCollections, trendWindowEvents,
                         trendStartTs, trendEndTs, drillId, path, skip, limit);
@@ -371,6 +405,20 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             loggerMaker.errorAndAddToDb("Error fetching inspected-actions total: " + e.getMessage());
             return null;
         }
+    }
+
+    /** bundle.collections filtered to active endpoint-shield collections — the same filter was
+     *  copy-pasted at all 3 call sites in this class (fetchPostureSummary, and both branches of
+     *  fetchPostureDrill); pulled into one method so the predicate can't drift between them.
+     *  bundle.collections, not bundle.activeCollections: the latter is loaded via a narrow
+     *  projection (id/hostName/startTs only, for PolicyHygieneProvider's cheap uncovered-asset
+     *  check) that omits tagsList, so isEndpointCollection() would always read false against it.
+     *  bundle.collections already carries tagsList. Cheap in-memory filter, not worth its own
+     *  future. */
+    private static List<ApiCollection> endpointCollectionsOf(InsightDataBundle bundle) {
+        return bundle.collections.stream()
+                .filter(c -> c != null && !c.isDeactivated() && c.isEndpointCollection())
+                .collect(Collectors.toList());
     }
 
     /** Blocks on one future and logs how long that specific wait took — see the call site's own
