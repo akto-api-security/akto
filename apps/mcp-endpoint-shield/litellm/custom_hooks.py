@@ -708,6 +708,11 @@ class GuardrailsHandler(CustomLogger):
 
     async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> dict:
         try:
+            # Remove content blocked earlier in this session before judging, so the
+            # verdict covers only new content and the model never sees rejected text.
+            # Claude Code merges a prompt sent after a block into the blocked message,
+            # so without this every later prompt in the session is blocked too.
+            data = self.strip_quarantined_history(data, kwargs)
             allowed, reason, modified_payload = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
             
             if not allowed:
@@ -734,9 +739,6 @@ class GuardrailsHandler(CustomLogger):
                 else:
                     data = self.apply_redaction(data, modified_payload)
 
-            # Allowed: remove any turn blocked earlier in this session so the
-            # model never sees content the guardrail already rejected.
-            data = self.strip_quarantined_history(data, kwargs)
             return data
         except HTTPException as e:
             logger.info(f"Guardrails validation failed: {e}")
@@ -1170,6 +1172,11 @@ class GuardrailsHandler(CustomLogger):
                 return str(headers[h])
         return None
 
+    @staticmethod
+    def _normalize(text: str) -> str:
+        """Text with harness context stripped and whitespace collapsed, for matching."""
+        return " ".join(HARNESS_CONTEXT_RE.sub("", text or "").split())
+
     @classmethod
     def _turn_text(cls, msg: Any) -> str:
         """Normalized text of one message, harness context stripped, for matching."""
@@ -1180,41 +1187,78 @@ class GuardrailsHandler(CustomLogger):
             txt = " ".join(b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text")
         else:
             txt = str(c or "")
-        return " ".join(HARNESS_CONTEXT_RE.sub("", txt).split())
+        return cls._normalize(txt)
 
-    # Minimum length before a turn is trackable, so short pleasantries can never
-    # match something else by accident.
+    # Texts shorter than this only match a quarantined text exactly, so short
+    # pleasantries can never match something else by accident.
     QUARANTINE_MIN_CHARS = 12
     QUARANTINE_MAX_TEXT = 4000
 
     @classmethod
-    def _fingerprint(cls, msg: Any) -> Optional[str]:
-        """Normalized text used both as the quarantine key and for matching.
+    def _fingerprints(cls, msg: Any) -> list:
+        """Quarantine keys for one user message: one per text block, or one for
+        plain-string content.
 
-        Exact hashing is not enough: when a request is rejected, Claude Code keeps
-        the message and resends it with its own additions appended (e.g.
-        "Continue from where you left off."), so the history copy never hashes to
-        the same value. We keep the text and match by containment instead.
+        Per block, because after a block Claude Code appends the user's next prompt
+        to the rejected message as a new text block instead of starting a new turn.
+        Keying on blocks lets the rejected text be removed while the new prompt
+        stays. Exact hashing is not enough either: Claude Code may resend a
+        rejected text with its own additions appended (e.g. "Continue from where
+        you left off."), so we keep the text and also match by containment.
         """
-        t = cls._turn_text(msg)
-        if len(t) < cls.QUARANTINE_MIN_CHARS:
-            return None
-        return t[: cls.QUARANTINE_MAX_TEXT]
+        if not isinstance(msg, dict):
+            return []
+        c = msg.get("content")
+        texts = ([b.get("text", "") for b in c if isinstance(b, dict) and b.get("type") == "text"]
+                 if isinstance(c, list) else [str(c or "")])
+        return [t[: cls.QUARANTINE_MAX_TEXT] for t in (cls._normalize(x) for x in texts) if t]
 
     @classmethod
     def _matches_quarantined(cls, text: str, bucket: Any) -> bool:
-        """True if this turn is (or contains, or is contained by) a blocked turn."""
-        if len(text) < cls.QUARANTINE_MIN_CHARS:
+        """True if this text is a blocked text, or (when both are long enough)
+        contains or is contained by one."""
+        if not text:
             return False
         for held in bucket:
-            if held == text or held in text or text in held:
+            if held == text:
+                return True
+            if min(len(held), len(text)) >= cls.QUARANTINE_MIN_CHARS and (held in text or text in held):
                 return True
         return False
 
     @classmethod
+    def _without_quarantined(cls, msg: dict, bucket: Any) -> Tuple[dict, bool, bool]:
+        """Remove quarantined text from one user message.
+
+        Returns (message, removed_any, content_left). Text blocks are removed
+        individually; plain-string content can only be quarantined as a whole.
+        content_left ignores harness-only blocks (<system-reminder> scaffolding).
+        """
+        c = msg.get("content")
+        if not isinstance(c, list):
+            quarantined = cls._matches_quarantined(cls._turn_text(msg), bucket)
+            return msg, quarantined, not quarantined and bool(cls._turn_text(msg))
+        kept, removed, left = [], False, False
+        for block in c:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = cls._normalize(block.get("text", ""))
+                if cls._matches_quarantined(text, bucket):
+                    removed = True
+                    continue
+                left = left or bool(text)
+            else:
+                left = True  # images, tool results, documents
+            kept.append(block)
+        if not removed:
+            return msg, False, left
+        out = dict(msg)
+        out["content"] = kept
+        return out, True, left
+
+    @classmethod
     def remember_blocked(cls, data: dict, kwargs: Optional[dict] = None) -> None:
-        """Record the user turn(s) that were just blocked, so later requests can
-        have them stripped out of history."""
+        """Record the text of the user turn that was just blocked, so later
+        requests can have it stripped out."""
         if not QUARANTINE_BLOCKED_HISTORY:
             return
         key = cls._session_key(kwargs, data)
@@ -1226,11 +1270,12 @@ class GuardrailsHandler(CustomLogger):
             return
         last_user = next((m for m in reversed(msgs)
                           if isinstance(m, dict) and m.get("role") == "user"), None)
-        fp = cls._fingerprint(last_user)
-        if not fp:
+        fingerprints = cls._fingerprints(last_user)
+        if not fingerprints:
             return
         bucket = cls._quarantine.setdefault(key, OrderedDict())
-        bucket[fp] = None
+        for fp in fingerprints:
+            bucket[fp] = None
         while len(bucket) > QUARANTINE_MAX_PER_SESSION:
             bucket.popitem(last=False)
         while len(cls._quarantine) > QUARANTINE_MAX_SESSIONS:
@@ -1239,8 +1284,14 @@ class GuardrailsHandler(CustomLogger):
 
     @classmethod
     def strip_quarantined_history(cls, data: dict, kwargs: Optional[dict] = None) -> dict:
-        """Drop previously blocked user turns (and any assistant reply that
-        immediately followed them) from the request before it reaches the model."""
+        """Remove previously blocked text from the request before it is judged or
+        forwarded.
+
+        Blocked text blocks are removed from every user turn, the newest included.
+        A turn left with no content is dropped, with the assistant reply that
+        immediately followed it. The newest turn is kept unchanged if everything in
+        it was blocked before, so it is judged (and blocked) again rather than
+        forwarded empty."""
         if not QUARANTINE_BLOCKED_HISTORY:
             return data
         key = cls._session_key(kwargs, data)
@@ -1250,29 +1301,39 @@ class GuardrailsHandler(CustomLogger):
         if not bucket:
             return data
         msgs = data.get("messages")
-        if not isinstance(msgs, list) or len(msgs) < 2:
+        if not isinstance(msgs, list) or not msgs:
             return data
 
-        # Never strip the newest user turn - that one is being judged right now.
         last_user_idx = next((i for i in range(len(msgs) - 1, -1, -1)
                               if isinstance(msgs[i], dict) and msgs[i].get("role") == "user"), None)
-        drop = set()
+        out, trimmed, dropped, drop_reply = [], 0, 0, False
         for i, m in enumerate(msgs):
-            if i == last_user_idx or not isinstance(m, dict) or m.get("role") != "user":
+            if drop_reply and isinstance(m, dict) and m.get("role") == "assistant":
+                drop_reply = False
+                dropped += 1
                 continue
-            if cls._matches_quarantined(cls._turn_text(m), bucket):
-                drop.add(i)
-                if i + 1 < len(msgs) and isinstance(msgs[i + 1], dict) and msgs[i + 1].get("role") == "assistant":
-                    drop.add(i + 1)
-        if not drop:
+            drop_reply = False
+            if not isinstance(m, dict) or m.get("role") != "user":
+                out.append(m)
+                continue
+            cleaned, removed, left = cls._without_quarantined(m, bucket)
+            if not removed or (i == last_user_idx and not left):
+                out.append(m)
+            elif left:
+                out.append(cleaned)
+                trimmed += 1
+            else:
+                dropped += 1
+                drop_reply = True
+        if not trimmed and not dropped:
             return data
-        cleaned = dict(data)
-        cleaned["messages"] = [m for i, m in enumerate(msgs) if i not in drop]
+        result = dict(data)
+        result["messages"] = out
         logger.info(
-            f"Stripped {len(drop)} quarantined message(s) from history before forwarding "
-            f"({len(msgs)} -> {len(cleaned['messages'])} messages)"
+            f"Stripped quarantined content: {trimmed} message(s) trimmed, {dropped} dropped "
+            f"({len(msgs)} -> {len(out)} messages)"
         )
-        return cleaned
+        return result
 
     def session_trace_headers(self, kwargs: Optional[dict] = None) -> Dict[str, str]:
         """x-akto-installer-* session/trace headers, matching the convention the
