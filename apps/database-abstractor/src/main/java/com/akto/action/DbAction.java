@@ -455,7 +455,11 @@ public class DbAction extends ActionSupport {
     int testResultsCount;
     String leaseToken;
     int leaseSeconds;
-    boolean leaseHeld;
+    // Domain outcome (APPLIED/REJECTED) named directly by the server, not a boolean the client has
+    // to re-derive. No leaseHeld predecessor to stay compatible with - this contract and its only
+    // client (feat/stateless-mini-testing) ship together, unreleased. Named leaseStatus, not
+    // status - a distinct "status" field already exists on this action for crawler-run reporting.
+    String leaseStatus;
     Map<String, String> metadata;
     Bson completedUpdate;
     int totalApiCount;
@@ -2825,7 +2829,8 @@ public class DbAction extends ActionSupport {
             for (BasicDBObject raw : testingRunResultsForRecord) {
                 results.add(buildTestingRunResultFromPayload(raw));
             }
-            leaseHeld = DbLayer.bulkRecordTestingRunResults(results, rerunDeleteIds, doNotMarkIssuesAsFixed, leaseToken, leaseSeconds);
+            leaseStatus = DbLayer.bulkRecordTestingRunResults(results, rerunDeleteIds, doNotMarkIssuesAsFixed, leaseToken, leaseSeconds)
+                    ? "APPLIED" : "REJECTED";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in bulkRecordTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
@@ -2993,7 +2998,8 @@ public class DbAction extends ActionSupport {
 
     public String updateTestResultsCountInTestSummary() {
         try {
-            leaseHeld = DbLayer.updateTestResultsCountInTestSummary(summaryId, testResultsCount, leaseToken, leaseSeconds);
+            leaseStatus = DbLayer.updateTestResultsCountInTestSummary(summaryId, testResultsCount, leaseToken, leaseSeconds)
+                    ? "APPLIED" : "REJECTED";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestResultsCountInTestSummary " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3009,7 +3015,7 @@ public class DbAction extends ActionSupport {
      */
     public String markProducerDone() {
         try {
-            leaseHeld = DbLayer.markProducerDone(summaryId, leaseToken);
+            leaseStatus = DbLayer.markProducerDone(summaryId, leaseToken) ? "APPLIED" : "REJECTED";
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in markProducerDone " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -5446,12 +5452,8 @@ public class DbAction extends ActionSupport {
         this.leaseSeconds = leaseSeconds;
     }
 
-    public boolean getLeaseHeld() {
-        return leaseHeld;
-    }
-
-    public void setLeaseHeld(boolean leaseHeld) {
-        this.leaseHeld = leaseHeld;
+    public String getLeaseStatus() {
+        return leaseStatus;
     }
 
     public Bson getCompletedUpdate() {
