@@ -20,9 +20,10 @@ import java.security.MessageDigest;
  * does not intercept it - the endpoint performs its own Bearer-token auth below.
  *
  * Controls (names match the platform-wide convention shared with the dashboard):
- *   PROMETHEUS_METRICS_ENABLED - "true" serves the endpoint. Backward compatible: a configured
- *                                METRICS_AUTH_TOKEN also implies exposed, so setups that only set
- *                                the token keep working unchanged.
+ *   PROMETHEUS_METRICS_ENABLED - "true" serves the endpoint; anything else returns 404. This is the
+ *                                only exposure switch: unlike the dashboard, a configured token does
+ *                                NOT imply exposed, so a fleet-wide token (e.g. in a shared env file)
+ *                                can coexist with per-deployment enablement.
  *   METRICS_AUTH_ENABLED       - "true"/unset enforces Bearer auth (default); "false" disables it.
  *   METRICS_AUTH_TOKEN         - required when auth is enabled; the expected Bearer credential.
  *
@@ -38,12 +39,12 @@ public class InfraMetricsAction implements Action, ServletResponseAware, Servlet
     // Env vars are fixed for the process lifetime, so resolve the metrics config once at class load.
     private static final String METRICS_AUTH_TOKEN = System.getenv("METRICS_AUTH_TOKEN");
     private static final boolean HAS_TOKEN = METRICS_AUTH_TOKEN != null && !METRICS_AUTH_TOKEN.trim().isEmpty();
-    private static final boolean METRICS_EXPOSED = isTrue(System.getenv("PROMETHEUS_METRICS_ENABLED")) || HAS_TOKEN;
+    private static final boolean METRICS_EXPOSED = isTrue(System.getenv("PROMETHEUS_METRICS_ENABLED"));
     private static final boolean METRICS_AUTH_ENABLED = !isFalse(System.getenv("METRICS_AUTH_ENABLED"));
 
     @Override
     public String execute() throws Exception {
-        // 1) endpoint must be exposed (explicit flag, or a configured token for back-compat)
+        // 1) endpoint must be explicitly exposed
         if (!METRICS_EXPOSED) {
             servletResponse.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return null;
