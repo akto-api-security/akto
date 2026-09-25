@@ -54,6 +54,12 @@ type Config struct {
 	NhiEnabled         bool
 	NhiScanIntervalMin int
 
+	// ClaudeInfoRefreshIntervalSec controls how often the device -> Claude-surface login map is
+	// refreshed. In seconds, not minutes like the caches around it: this one decides which
+	// user-targeted policies apply, so an org switch in Claude Desktop needs to take effect in
+	// about a minute rather than on the policy cache's slower clock.
+	ClaudeInfoRefreshIntervalSec int
+
 	// ValidationTimeoutMs bounds the whole synchronous validate path (all parallel
 	// policy goroutines, their async scanner waits, and each /scan call) with one
 	// deadline. Keep it below the caller's client timeout (data-ingestion's
@@ -207,6 +213,7 @@ func LoadConfig() *Config {
 		CollectionRefreshIntervalMin:     getEnvAsInt("COLLECTION_REFRESH_INTERVAL_MIN", 5),
 		NhiEnabled:                       getEnvAsBool("NHI_ENABLED", true),
 		NhiScanIntervalMin:               getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
+		ClaudeInfoRefreshIntervalSec:     getEnvAsInt("CLAUDE_INFO_REFRESH_INTERVAL_SEC", 60),
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
 		ThreatKafka:                      loadThreatKafkaConfig(),
 		GuardrailRemediationGenerate:     getEnvAsBool("GUARDRAILS_GENERATE_REMEDIATION", false),

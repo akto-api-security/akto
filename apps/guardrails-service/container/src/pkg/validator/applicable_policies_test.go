@@ -90,7 +90,7 @@ func TestFilterPoliciesByDeviceNegatedUserList(t *testing.T) {
 		{"a request with an empty identity header is covered", map[string]string{"X-Akto-Installer-User_email": ""}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := s.filterPoliciesByDevice([]types.Policy{excluded}, "device1.ai-agent.claude-desktop", tc.headers)
+			got := s.filterPoliciesByDevice([]types.Policy{excluded}, "device1.ai-agent.claude-desktop", tc.headers, "")
 			if (len(got) == 1) != tc.applies {
 				t.Fatalf("policy applies = %v, want %v", len(got) == 1, tc.applies)
 			}
@@ -161,7 +161,7 @@ func TestFilterPoliciesByDeviceWithEmaillessRows(t *testing.T) {
 		return map[string]string{"X-Akto-Installer-User_email": email}
 	}
 	applies := func(p types.Policy, email string) bool {
-		return len(s.filterPoliciesByDevice([]types.Policy{p}, "device1.ai-agent.claude-desktop", headersFor(email))) == 1
+		return len(s.filterPoliciesByDevice([]types.Policy{p}, "device1.ai-agent.claude-desktop", headersFor(email), "")) == 1
 	}
 
 	include := types.Policy{Info: types.PolicyInfo{Name: "include"}, UserMetadata: rows}
@@ -209,7 +209,7 @@ func TestFilterPoliciesByDeviceIgnoresLabelCasing(t *testing.T) {
 		{"no device label in the host", "chatgpt.com", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := s.filterPoliciesByDevice([]types.Policy{policy}, tc.mcpServerName, nil)
+			got := s.filterPoliciesByDevice([]types.Policy{policy}, tc.mcpServerName, nil, "")
 			if applied := len(got) == 1; applied != tc.applies {
 				t.Fatalf("policy applied = %v for %q, want %v", applied, tc.mcpServerName, tc.applies)
 			}

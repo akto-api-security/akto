@@ -73,22 +73,32 @@ type mcpListCache struct {
 	mu             sync.RWMutex
 }
 
+// claudeInfoCache caches deviceLabel -> agentType -> that surface's Claude login, used to scope
+// user-targeted policies to the org a request actually came from. See claude_org_match.go.
+type claudeInfoCache struct {
+	byDevice    map[string]map[string]dbabstractor.ClaudeDesktopInfo
+	lastFetched time.Time
+	mu          sync.RWMutex
+}
+
 // Service handles payload validation using akto-gateway library
 type Service struct {
-	config                *config.Config
-	dbClient              *dbabstractor.Client
-	processor             mcp.RequestProcessor // Default processor (skipThreat=false)
-	logger                *zap.Logger
-	cache                 *policyCache
-	mcpListCache          *mcpListCache
-	collectionTagsCache   *collectionTagsCache
-	sessionMgr            *session.SessionManager // Our session manager implementation for session tracking
-	anomalyDetector       *session.AnomalyDetector
-	schemaFetcher         *SchemaFetcher
-	skipPaths             *pathSkipper
-	policyRefreshGroup    singleflight.Group
-	allowlistRefreshGroup singleflight.Group
-	threatAPIClient       *threatapi.Client
+	config                 *config.Config
+	dbClient               *dbabstractor.Client
+	processor              mcp.RequestProcessor // Default processor (skipThreat=false)
+	logger                 *zap.Logger
+	cache                  *policyCache
+	mcpListCache           *mcpListCache
+	claudeInfoCache        *claudeInfoCache
+	collectionTagsCache    *collectionTagsCache
+	sessionMgr             *session.SessionManager // Our session manager implementation for session tracking
+	anomalyDetector        *session.AnomalyDetector
+	schemaFetcher          *SchemaFetcher
+	skipPaths              *pathSkipper
+	policyRefreshGroup     singleflight.Group
+	allowlistRefreshGroup  singleflight.Group
+	claudeInfoRefreshGroup singleflight.Group
+	threatAPIClient        *threatapi.Client
 }
 
 // NewService creates a new validator service
@@ -163,6 +173,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		logger:              logger,
 		cache:               &policyCache{},
 		mcpListCache:        &mcpListCache{},
+		claudeInfoCache:     &claudeInfoCache{},
 		collectionTagsCache: &collectionTagsCache{byHostName: make(map[string]map[string]string)},
 		sessionMgr:          sessionManager,
 		anomalyDetector:     anomalyDetector,
@@ -441,8 +452,9 @@ func deviceIDsContain(ids []string, label string) bool {
 // ApplyToDeviceIds already has device/tag Include-vs-Exclude baked in server-side, so labelMatched
 // needs no further negation. UserMetadata has no such resolution, so NegatedTargetUserNames is
 // applied here instead, against the actual request's email.
-func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string) []types.Policy {
+func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName string, headers map[string]string, path string) []types.Policy {
 	deviceLabel := deviceLabelFromMcpServerName(mcpServerName)
+	host := extractHostHeader(headers)
 	email := ""
 	emailResolved := false
 
@@ -465,11 +477,19 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 			if email != "" {
 				emailMatched = findUserMetadataByEmail(p.UserMetadata, email) != nil
 			}
+			// Org is a second independent way to match: a policy naming a user in an org applies
+			// to that org's Claude traffic even when the request's own email is not one of the
+			// listed rows. The two routes read disjoint rows — findUserMetadataByEmail skips
+			// org-carrying rows precisely so an org pick cannot also match by its plain email —
+			// so this OR widens across rows, never re-widens a row the author scoped down.
+			orgMatched := s.orgMatchesAny(p.UserMetadata, host, deviceLabel, path)
+			emailMatched = emailMatched || orgMatched
 			// Negate OUTSIDE the email guard: an unidentified request is, by definition, not one
 			// of the excluded people, so an Exclude list must still cover it. Negating only when
 			// an email resolved would drop the policy for every client that sends no
 			// x-akto-installer-user_email header (Claude Desktop, mirrored traffic) — failing
-			// open on exactly the requests nobody has vouched for.
+			// open on exactly the requests nobody has vouched for. Negation also wraps the whole
+			// user predicate (email OR org), so excluding a user excludes them by either route.
 			if p.NegatedTargetUserNames {
 				emailMatched = !emailMatched
 			}
@@ -496,8 +516,18 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 }
 
 // findUserMetadataByEmail returns the first UserMetadata row matching email case-insensitively,
-// or nil if none match. UserEmail is the field to match on, but a row whose pick never resolved
-// to an identity doc carries no email at all: GuardrailPoliciesAction synthesizes it with
+// or nil if none match.
+//
+// Rows carrying an org in their UserId are deliberately skipped. Such a row is what the dashboard
+// writes when the policy author picked one specific Claude org for a person, and its UserEmail is
+// that person's ordinary email — identical in every org they belong to. Matching it here would fire
+// the policy for that person everywhere, on every org and on non-Claude hosts too, which is the
+// exact scoping the author picked the org row to avoid. These rows match only via orgMatchesAny.
+// Picking the person AND one of their orgs writes both rows, so the plain row still matches by
+// email and the union behaves as "everywhere" — which is what picking both means.
+//
+// UserEmail is the field to match on, but a row whose pick never resolved to an identity doc
+// carries no email at all: GuardrailPoliciesAction synthesizes it with
 // setUserEmail(moduleInfoEmailsByUsername.get(userName)), which is null whenever module_info has
 // no entry under that exact username — and the dashboard offers email-shaped usernames as picks,
 // so the address is often sitting in UserName instead.
@@ -510,6 +540,9 @@ func (s *Service) filterPoliciesByDevice(policies []types.Policy, mcpServerName 
 // widening a row that does carry an email — there, UserEmail stays the single source of truth.
 func findUserMetadataByEmail(rows []types.AgenticUsers, email string) *types.AgenticUsers {
 	for i := range rows {
+		if orgUUIDFromUserID(rows[i].UserId) != "" {
+			continue
+		}
 		if strings.EqualFold(rows[i].UserEmail, email) {
 			return &rows[i]
 		}
@@ -545,7 +578,9 @@ func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName s
 
 func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
-	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
+	// Endpoint is valCtx's copy of the request path — see validationContextFromParams — which
+	// filterPoliciesByDevice needs for org matching (orgMatchesAny).
+	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders, valCtx.Endpoint)
 	// Bypass "approval" policies whose server is already approved (allow, no threat).
 	return s.filterApprovedServers(policies, valCtx.McpServerName)
 }
@@ -2670,7 +2705,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
-		itemPolicies = s.filterPoliciesByDevice(itemPolicies, mcpServerName, reqHeaders)
+		itemPolicies = s.filterPoliciesByDevice(itemPolicies, mcpServerName, reqHeaders, data.Path)
 		// Bypass "approval" policies whose server is already approved (allow, no threat).
 		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
