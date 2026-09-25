@@ -16,7 +16,7 @@ public class LitellmAgentEndpointRewriteTest {
     private static final String CLAUDE_CLI_UA = "claude-cli/2.1.282 (external, sdk-cli)";
     // Claude Code's metadata.user_id device_id: 64 hex characters.
     private static final String DEVICE_ID = "e5682ef8c5847e7f62e4e2bc2124da809f6b8b98591f2ffb56f5c199bac68ebd";
-    private static final String DEVICE_HOST = "e5682ef8c5847e7f.ai-agent.claudecli";
+    private static final String DEVICE_HOST = "e5682ef8c5847e7f.ai-agent.claudecli-litellm";
 
     /** Envelope as the LiteLLM hook sends it: headers and tag are JSON strings. */
     private static Map<String, Object> envelope(String connector, BasicDBObject headers, BasicDBObject tag) {
@@ -68,7 +68,7 @@ public class LitellmAgentEndpointRewriteTest {
         assertEquals(DEVICE_HOST, headers(data).getString("host"));
         BasicDBObject tag = tag(data);
         assertEquals("ENDPOINT", tag.getString("source"));
-        assertEquals("claudecli", tag.getString("ai-agent"));
+        assertEquals("claudecli-litellm", tag.getString("ai-agent"));
         assertEquals("LiteLLM", tag.getString("litellm"));
         assertEquals(DEVICE_ID, tag.getString("client_device_id"));
         assertEquals(CLAUDE_CLI_UA, headers(data).getString("user-agent"));
@@ -89,14 +89,14 @@ public class LitellmAgentEndpointRewriteTest {
     public void shortDeviceIdIsKeptWhole() {
         Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), baseTag().append("client_device_id", "e568ebd"));
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("e568ebd.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals("e568ebd.ai-agent.claudecli-litellm", headers(data).getString("host"));
     }
 
     @Test
     public void withoutEmailOrDeviceIdTheProxyHostIsUsed() {
         Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), baseTag());
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("localhost-4000.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals("localhost-4000.ai-agent.claudecli-litellm", headers(data).getString("host"));
     }
 
     @Test
@@ -104,7 +104,7 @@ public class LitellmAgentEndpointRewriteTest {
         BasicDBObject h = claudeCodeHeaders().append("x-akto-installer-user_email", "Test.User@example.com");
         Map<String, Object> data = envelope("litellm", h, verdictTag());
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("test-user.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals("test-user.ai-agent.claudecli-litellm", headers(data).getString("host"));
         assertEquals("Test.User@example.com", headers(data).getString("x-akto-installer-user_email"));
     }
 
@@ -112,7 +112,7 @@ public class LitellmAgentEndpointRewriteTest {
     public void emailFromTagIsUsedAndForwardedAsInstallerHeader() {
         Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), ingestTag().append("user_email", "test.user@example.com"));
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("test-user.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals("test-user.ai-agent.claudecli-litellm", headers(data).getString("host"));
         assertEquals("test.user@example.com", headers(data).getString("x-akto-installer-user_email"));
     }
 
@@ -121,7 +121,7 @@ public class LitellmAgentEndpointRewriteTest {
         BasicDBObject h = claudeCodeHeaders().append("x-litellm-spend-logs-metadata", "{\"user_email\": \"test.user@example.com\"}");
         Map<String, Object> data = envelope("litellm", h, verdictTag());
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("test-user.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals("test-user.ai-agent.claudecli-litellm", headers(data).getString("host"));
         assertEquals("test.user@example.com", headers(data).getString("x-akto-installer-user_email"));
     }
 
@@ -130,7 +130,7 @@ public class LitellmAgentEndpointRewriteTest {
         BasicDBObject h = claudeCodeHeaders().append("x-akto-installer-user_email", "first@example.com");
         Map<String, Object> data = envelope("litellm", h, ingestTag().append("user_email", "second@example.com"));
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("first.ai-agent.claudecli", headers(data).getString("host"));
+        assertEquals("first.ai-agent.claudecli-litellm", headers(data).getString("host"));
     }
 
     @Test
@@ -140,7 +140,7 @@ public class LitellmAgentEndpointRewriteTest {
         Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), toolTag);
         LitellmAgentEndpointRewrite.apply(data);
         assertEquals(DEVICE_HOST, headers(data).getString("host"));
-        assertEquals("claudecli", tag(data).getString("ai-agent"));
+        assertEquals("claudecli-litellm", tag(data).getString("ai-agent"));
         assertEquals("ENDPOINT", tag(data).getString("source"));
     }
 
@@ -151,9 +151,9 @@ public class LitellmAgentEndpointRewriteTest {
             .append("client_device_id", DEVICE_ID);
         Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), mcpTag);
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("e5682ef8c5847e7f.claudecli.claude-ai-slack", headers(data).getString("host"));
+        assertEquals("e5682ef8c5847e7f.claudecli-litellm.claude-ai-slack", headers(data).getString("host"));
         BasicDBObject tag = tag(data);
-        assertEquals("claudecli", tag.getString("mcp-client"));
+        assertEquals("claudecli-litellm", tag.getString("mcp-client"));
         assertEquals("ENDPOINT", tag.getString("source"));
         assertFalse(tag.containsField("ai-agent"));
         assertEquals("ENDPOINT", data.get("contextSource"));
@@ -166,7 +166,7 @@ public class LitellmAgentEndpointRewriteTest {
         LitellmAgentEndpointRewrite.apply(data);
         BasicDBObject out = headers(data);
         assertFalse(out.containsField("Host"));
-        assertEquals("litellm-corp-4000.ai-agent.claudecli", out.getString("host"));
+        assertEquals("litellm-corp-4000.ai-agent.claudecli-litellm", out.getString("host"));
     }
 
     @Test
@@ -191,8 +191,8 @@ public class LitellmAgentEndpointRewriteTest {
         Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
         LitellmAgentEndpointRewrite.apply(data);
         assertEquals("ENDPOINT", data.get("contextSource"));
-        assertEquals("localhost-4001.ai-agent.opencode", headers(data).getString("host"));
-        assertEquals("opencode", tag(data).getString("ai-agent"));
+        assertEquals("localhost-4001.ai-agent.opencode-litellm", headers(data).getString("host"));
+        assertEquals("opencode-litellm", tag(data).getString("ai-agent"));
         assertEquals("ENDPOINT", tag(data).getString("source"));
     }
 
@@ -202,16 +202,83 @@ public class LitellmAgentEndpointRewriteTest {
             .append("x-akto-installer-user_email", "test.user@example.com");
         Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
         LitellmAgentEndpointRewrite.apply(data);
-        assertEquals("test-user.ai-agent.opencode", headers(data).getString("host"));
+        assertEquals("test-user.ai-agent.opencode-litellm", headers(data).getString("host"));
     }
 
     @Test
     public void agentIsPickedByUserAgentPrefix() {
-        assertEquals("claudecli", LitellmAgentEndpointRewrite.agentFor(CLAUDE_CLI_UA));
-        assertEquals("opencode", LitellmAgentEndpointRewrite.agentFor("OpenCode/2.0.0"));
+        assertEquals("claudecli-litellm", LitellmAgentEndpointRewrite.agentFor(CLAUDE_CLI_UA));
+        assertEquals("opencode-litellm", LitellmAgentEndpointRewrite.agentFor("OpenCode/2.0.0"));
         assertNull(LitellmAgentEndpointRewrite.agentFor("OpenAI/Python 1.40.0"));
         assertNull(LitellmAgentEndpointRewrite.agentFor("my-opencode/1.0"));
         assertNull(LitellmAgentEndpointRewrite.agentFor(null));
+    }
+
+    private static BasicDBObject genericClientHeaders(String userAgent) {
+        BasicDBObject h = new BasicDBObject("host", "localhost:4001");
+        if (userAgent != null) {
+            h.append("user-agent", userAgent);
+        }
+        return h;
+    }
+
+    @Test
+    public void contextSourceHeaderMovesAnyClientToAtlas() {
+        BasicDBObject h = genericClientHeaders("OpenAI/Python 1.40.0").append("x-akto-contextsource", "ENDPOINT");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("ENDPOINT", data.get("contextSource"));
+        assertEquals("localhost-4001.ai-agent.openai-litellm", headers(data).getString("host"));
+        assertEquals("openai-litellm", tag(data).getString("ai-agent"));
+        assertEquals("ENDPOINT", tag(data).getString("source"));
+    }
+
+    @Test
+    public void contextSourceHeaderMatchIgnoresCaseAndUsesTheEmail() {
+        BasicDBObject h = genericClientHeaders("cursor/1.2.0 (darwin)").append("X-Akto-ContextSource", "endpoint")
+            .append("x-akto-installer-user_email", "test.user@example.com");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("test-user.ai-agent.cursor-litellm", headers(data).getString("host"));
+    }
+
+    @Test
+    public void contextSourceHeaderWithoutUserAgentUsesUnknownAgent() {
+        Map<String, Object> data = envelope("litellm", genericClientHeaders(null).append("x-akto-contextsource", "ENDPOINT"), builtInGuardrailTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("localhost-4001.ai-agent.unknown-litellm", headers(data).getString("host"));
+    }
+
+    @Test
+    public void knownAgentsKeepTheirNameWhenTheHeaderIsSent() {
+        BasicDBObject h = new BasicDBObject("user-agent", OPENCODE_UA).append("host", "localhost:4001").append("x-akto-contextsource", "ENDPOINT");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("opencode-litellm", tag(data).getString("ai-agent"));
+    }
+
+    @Test
+    public void otherContextSourceValuesLeaveGenericClientsUntouched() {
+        Map<String, Object> data = envelope("litellm", genericClientHeaders("OpenAI/Python 1.40.0").append("x-akto-contextsource", "AGENTIC"), builtInGuardrailTag());
+        Map<String, Object> before = new HashMap<>(data);
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals(before, data);
+    }
+
+    @Test
+    public void contextSourceHeaderOnOtherConnectorsIsIgnored() {
+        Map<String, Object> data = envelope("cursor", genericClientHeaders("cursor/1.2.0").append("x-akto-contextsource", "ENDPOINT"), builtInGuardrailTag());
+        Map<String, Object> before = new HashMap<>(data);
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals(before, data);
+    }
+
+    @Test
+    public void agentNameIsDerivedFromTheUserAgentProduct() {
+        assertEquals("openai-litellm", LitellmAgentEndpointRewrite.agentFromUserAgent("OpenAI/Python 1.40.0"));
+        assertEquals("my-agent-litellm", LitellmAgentEndpointRewrite.agentFromUserAgent("My_Agent 2.0"));
+        assertEquals("unknown-litellm", LitellmAgentEndpointRewrite.agentFromUserAgent(null));
+        assertEquals("unknown-litellm", LitellmAgentEndpointRewrite.agentFromUserAgent("  "));
     }
 
     @Test

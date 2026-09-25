@@ -27,13 +27,18 @@ import java.util.Map;
 public final class LitellmAgentEndpointRewrite {
 
     static final String LITELLM_CONNECTOR = "litellm";
-    // User-Agent prefix -> agent segment, the same segment that agent's native Akto hooks use
-    // (AKTO_CONNECTOR_VALUE), so policies scoped to the agent match both.
+    // User-Agent prefix -> agent name: the agent's native Akto connector name (AKTO_CONNECTOR_VALUE)
+    // plus a -litellm suffix, so traffic through LiteLLM shows as its own agent in Atlas.
+    static final String LITELLM_AGENT_SUFFIX = "-litellm";
     static final Map<String, String> AGENTS = new LinkedHashMap<>();
     static {
-        AGENTS.put("claude-cli/", "claudecli");
-        AGENTS.put("opencode/", "opencode");
+        AGENTS.put("claude-cli/", "claudecli" + LITELLM_AGENT_SUFFIX);
+        AGENTS.put("opencode/", "opencode" + LITELLM_AGENT_SUFFIX);
     }
+    // Any LiteLLM client can opt into Atlas by sending this header with ENDPOINT, e.g. an agent not
+    // in AGENTS; its agent name is then taken from its User-Agent (see agentFromUserAgent).
+    static final String CONTEXT_SOURCE_HEADER = "x-akto-contextsource";
+    static final String UNKNOWN_AGENT = "unknown";
     static final String INSTALLER_USER_EMAIL_HEADER = "x-akto-installer-user_email";
     static final String SPEND_LOGS_METADATA_HEADER = "x-litellm-spend-logs-metadata";
     static final String USER_EMAIL_KEY = "user_email";
@@ -47,14 +52,19 @@ public final class LitellmAgentEndpointRewrite {
 
     /**
      * Rewrites contextSource, the host request header and the tag of requestData in place when it
-     * is traffic from a known coding agent (AGENTS) via the LiteLLM connector; anything else is left untouched.
+     * is LiteLLM connector traffic from a known coding agent (AGENTS), or from any client that sends
+     * x-akto-contextsource: ENDPOINT; anything else is left untouched.
      */
     public static void apply(Map<String, Object> requestData) {
         if (!LITELLM_CONNECTOR.equalsIgnoreCase(asString(requestData.get("akto_connector")))) {
             return;
         }
         BasicDBObject headers = parseObject(asString(requestData.get("requestHeaders")));
-        String agent = agentFor(header(headers, "user-agent"));
+        String userAgent = header(headers, "user-agent");
+        String agent = agentFor(userAgent);
+        if (agent == null && Constants.AKTO_ENDPOINT_SOURCE_VALUE.equalsIgnoreCase(header(headers, CONTEXT_SOURCE_HEADER))) {
+            agent = agentFromUserAgent(userAgent);
+        }
         if (agent == null) {
             return;
         }
@@ -97,6 +107,16 @@ public final class LitellmAgentEndpointRewrite {
             }
         }
         return null;
+    }
+
+    /**
+     * Agent name for a client not in AGENTS: the product in its User-Agent (up to the first "/" or
+     * space), slugified, plus the -litellm suffix; e.g. "OpenAI/Python 1.40.0" -> "openai-litellm".
+     */
+    static String agentFromUserAgent(String userAgent) {
+        String product = userAgent == null ? "" : userAgent.trim().split("[/\\s]", 2)[0];
+        String slug = AgentHostUtils.slugify(product);
+        return (slug.isEmpty() ? UNKNOWN_AGENT : slug) + LITELLM_AGENT_SUFFIX;
     }
 
     private static String shortDeviceId(String deviceId) {
