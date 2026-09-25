@@ -1,5 +1,6 @@
 """Cloud-agnostic scan routing shared by the Cloudflare Worker and FastAPI app."""
 
+import json
 import logging
 import time
 from collections.abc import Callable, Coroutine
@@ -16,12 +17,15 @@ from constants import (
     LOCAL_SCANNERS,
     REMOTE_SCANNERS,
     SUPPORTED_SCANNERS,
+    apply_scanner_response_format,
     canonical_scanner,
     force_gemma_only,
     get_default_config,
     strip_qwen_tier,
 )
-from llm_scanner import scan_with_model_map
+from llm_scanner import _clean_json, scan_with_model_map
+from prompts import build_reason_prompt
+from providers import build_provider_from_config
 from remote_scanner import scan_anonymize
 from scanners import scan_local
 from settings import settings
@@ -57,12 +61,49 @@ def scanners_metadata() -> dict:
     }
 
 
+async def _generate_reason(payload: dict) -> dict:
+    """Explain an already-decided block: one call to the FINAL_ARBITER entry, asking
+    only for the reason — not a fresh verdict. Every scanner shares this one prompt."""
+    scanner_name = canonical_scanner(payload.get("scanner_name", ""))
+    text = payload.get("text", "")
+    config = payload.get("config") or {}
+    if not config.get("modelConfigs"):
+        default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+        config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
+    arbiter_entry = next(
+        (e for e in config.get("modelConfigs", []) if e.get("modelRole") == "FINAL_ARBITER"),
+        None,
+    )
+    if arbiter_entry is None:
+        return shape_response(scanner_name, True, 0.0, text, {"reason": ""})
+    provider = build_provider_from_config(arbiter_entry)
+    if provider is None:
+        return shape_response(scanner_name, True, 0.0, text, {"reason": ""})
+    reason = ""
+    try:
+        raw = await provider.complete(build_reason_prompt(scanner_name, text))
+        reason = json.loads(_clean_json(raw)).get("reason", "")
+    except Exception as exc:
+        logging.getLogger(__name__).warning(f"[_generate_reason] LLM call failed: {exc}")
+    return shape_response(scanner_name, True, 0.0, text, {"reason": reason})
+
+
+async def scan_enrichment(payload: dict, env=None) -> dict:
+    """Dispatch a post-verdict enrichment call. Extension point for future async needs."""
+    kind = payload.get("enrichment")
+    if kind == "reason":
+        return await _generate_reason(payload)
+    return {"error": f"unknown enrichment: {kind}"}
+
+
 async def scan_payload(
     payload: dict,
     env=None,
     schedule_fn: ScheduleFn | None = None,
 ) -> dict:
     """Run one scan and return the ScanResponse-shaped dict."""
+    if payload.get("enrichment"):
+        return await scan_enrichment(payload, env)
     started = time.perf_counter()
     schedule = schedule_fn or _noop_schedule
     scanner_name = canonical_scanner(payload.get("scanner_name", ""))
@@ -102,6 +143,7 @@ async def scan_payload(
             config = {**config, "modelConfigs": force_gemma_only(config.get("modelConfigs"))}
         elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
+        config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
         store_fn = None
         if config.get("storeAllResults"):
             store_fn = lambda completed, name: schedule(alerts.store_results(completed, name))

@@ -37,6 +37,7 @@ class ScanRequest(BaseModel):
     # never part of the instruction/data split run over `text` (the user
     # prompt). Omitted requests fall back to segmenting `text` alone.
     system_prompt: str = ""
+    enrichment: str = ""
 
 
 @asynccontextmanager
