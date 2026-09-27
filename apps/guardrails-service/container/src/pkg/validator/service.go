@@ -623,6 +623,34 @@ func (s *Service) filterPoliciesByAccountType(policies []types.Policy, valCtx *m
 	return filtered
 }
 
+// filterPoliciesByName keeps the policies named in the comma-separated policyName (case-insensitive).
+// An empty policyName, or one naming no loaded policy, leaves policies unchanged so a typo in the
+// caller's config can't silently switch protection off.
+func (s *Service) filterPoliciesByName(policies []types.Policy, policyName string) []types.Policy {
+	wanted := make(map[string]struct{})
+	for _, name := range strings.Split(policyName, ",") {
+		if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
+			wanted[name] = struct{}{}
+		}
+	}
+	if len(wanted) == 0 {
+		return policies
+	}
+	filtered := make([]types.Policy, 0, len(wanted))
+	for _, p := range policies {
+		if _, ok := wanted[strings.ToLower(strings.TrimSpace(p.Info.Name))]; ok {
+			filtered = append(filtered, p)
+		}
+	}
+	if len(filtered) == 0 {
+		s.logger.Warn("filterPoliciesByName - no applicable policy matches the requested names, applying all",
+			zap.String("policyName", policyName),
+			zap.Strings("applicablePolicies", policyNames(policies)))
+		return policies
+	}
+	return filtered
+}
+
 func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
@@ -2181,7 +2209,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Narrow to the policies that apply to this server/device/user so all subsequent
 	// checks only fire for rules that belong to them.
-	policies = s.applicablePolicies(policies, valCtx)
+	policies = s.filterPoliciesByName(s.applicablePolicies(policies, valCtx), params.PolicyName)
 
 	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
 	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
@@ -2408,7 +2436,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
 	// Narrow to the policies that apply to this server/device/user.
-	policies = s.applicablePolicies(policies, valCtx)
+	policies = s.filterPoliciesByName(s.applicablePolicies(policies, valCtx), params.PolicyName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),

@@ -22,6 +22,8 @@ public class Gateway {
     // Optional request payload to validate instead of requestPayload, e.g. only the newest user
     // turn of a long conversation. requestPayload is still what gets ingested.
     public static final String GUARDRAILS_REQUEST_PAYLOAD = "guardrailsRequestPayload";
+    // Optional comma-separated policy names the guardrails service narrows its policies to.
+    public static final String GUARDRAILS_POLICY_NAME = "policyName";
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -245,6 +247,7 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "tag");
         putIfNotNull(validateRequest, requestData, "metadata");
         putIfNotNull(validateRequest, requestData, "fullRequest");
+        putIfNotNull(validateRequest, requestData, GUARDRAILS_POLICY_NAME);
 
         String contextSource = getStringField(requestData, "contextSource");
         String endpoint = isResponse ? "/validate/response" : "/validate/request";

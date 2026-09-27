@@ -9,6 +9,7 @@ import com.akto.utils.LitellmAgentEndpointRewrite;
 import com.akto.utils.LitellmUserRegistry;
 import com.akto.utils.LitellmVerdictView;
 import com.akto.utils.McpCollectionResolver;
+import com.akto.utils.VxlanPolicyDirective;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -75,6 +76,8 @@ public class HttpProxyAction extends ActionSupport {
                 path, method, akto_account_id, guardrails, response_guardrails, ingest_data, contextSource);
 
             Map<String, Object> requestData = buildRequestData();
+            // Before the rewrite: a directive's ENDPOINT context source moves the traffic to Atlas.
+            VxlanPolicyDirective.apply(requestData);
             String litellmUserEmail = LitellmAgentEndpointRewrite.apply(requestData);
             if ("true".equalsIgnoreCase(ingest_data)) {
                 // Once per user per process, and only on ingest calls, so verdicts stay fast.
