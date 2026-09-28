@@ -84,10 +84,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
-  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
-  // the threat backend as headers.
-  @Getter @Setter String skillEvaluationMode;
-  @Getter @Setter String configEvaluationMode;
   @Getter @Setter String humanResponse;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
   @Getter @Setter String searchText; // free-text match across filterId/host/actor
@@ -122,12 +118,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
-    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
-      post.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
-    }
-    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
-      post.addHeader("x-config-eval-mode", this.configEvaluationMode);
-    }
+    addEvaluationModeHeaders(post);
     if (this.humanResponse != null && !this.humanResponse.isEmpty()) {
       post.addHeader("x-human-response", this.humanResponse);
     }

@@ -271,6 +271,7 @@ public class InsightService {
                 .append("evidence", evidence)
                 .append("caveats", r.getCaveats())
                 .append("dataGaps", gaps)
+                .append("severity", r.getSeverity() != null ? r.getSeverity() : "")
                 .append("draftConcern", r.getConcern() != null ? r.getConcern() : "")
                 .append("draftImpact", r.getImpact() != null ? r.getImpact() : "")
                 .append("draftRemediation", r.getRemediation() != null ? r.getRemediation() : "");
@@ -288,7 +289,7 @@ public class InsightService {
      * stale prose can never outlive the numbers it describes. TTL below is only a GC backstop. */
     private String fingerprint(InsightContext ctx, InsightProvider provider, BasicDBObject narrativeInput) {
         String raw = ctx.getAccountId() + "|" + ctx.getContextSource() + "|" + provider.id().name() + "|"
-                + provider.providerVersion() + "|" + InsightNarrativeHandler.PROMPT_VERSION + "|" + narrativeInput.toJson();
+                + provider.providerVersion() + "|"  + narrativeInput.toJson();
         return InsightUtil.md5(raw);
     }
 
@@ -309,8 +310,7 @@ public class InsightService {
         applyNarrativeSummaryFields(r, concern, impact, remediation);
 
         long now = System.currentTimeMillis() / 1000;
-        InsightNarrativeCache cache = new InsightNarrativeCache(fingerprint, r.getInsightId(), providerVersion,
-                InsightNarrativeHandler.PROMPT_VERSION, markdown, concern, impact, remediation, now,
+        InsightNarrativeCache cache = new InsightNarrativeCache(fingerprint, r.getInsightId(), providerVersion,markdown, concern, impact, remediation, now,
                 new Date((now + TimeUnit.DAYS.toSeconds(NARRATIVE_TTL_DAYS)) * 1000L));
         InsightNarrativeCacheDao.instance.put(cache);
     }

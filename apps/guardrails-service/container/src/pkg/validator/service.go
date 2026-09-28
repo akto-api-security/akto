@@ -2,9 +2,11 @@ package validator
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -543,24 +545,104 @@ func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName s
 	return filtered
 }
 
+// requestEmail returns the LLM login email from the browser tag, else from the fullRequest OpenAI token.
+func requestEmail(valCtx *mcp.ValidationContext) string {
+	var m map[string]string
+	if valCtx.Tag != "" {
+		_ = json.Unmarshal([]byte(valCtx.Tag), &m)
+	}
+	if email := strings.TrimSpace(m[tagKeyBrowserUserEmail]); email != "" {
+		return email
+	}
+	return openAITokenEmail(authorizationHeader(valCtx.FullRequest))
+}
+
+// authorizationHeader returns the Authorization header from fullRequest.
+func authorizationHeader(fullRequest string) string {
+	if fullRequest == "" {
+		return ""
+	}
+	var fr struct {
+		Headers [][]string `json:"headers"`
+	}
+	_ = json.Unmarshal([]byte(fullRequest), &fr)
+	for _, h := range fr.Headers {
+		if len(h) == 2 && strings.EqualFold(h[0], "authorization") {
+			return h[1]
+		}
+	}
+	return ""
+}
+
+// openAITokenEmail reads the profile email from an OpenAI JWT; unverified as OpenAI rejects forged tokens.
+func openAITokenEmail(authorization string) string {
+	scheme, token, ok := strings.Cut(strings.TrimSpace(authorization), " ")
+	parts := strings.Split(token, ".")
+	if !ok || !strings.EqualFold(scheme, "Bearer") || len(parts) != 3 {
+		return ""
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
+	if err != nil {
+		return ""
+	}
+	var claims struct {
+		Profile struct {
+			Email string `json:"email"`
+		} `json:"https://api.openai.com/profile"`
+	}
+	if json.Unmarshal(raw, &claims) != nil {
+		return ""
+	}
+	return strings.TrimSpace(claims.Profile.Email)
+}
+
+// requestEmailAccountType classifies the login email; missing or invalid is "unknown".
+func requestEmailAccountType(valCtx *mcp.ValidationContext) string {
+	return mcp.ClassifyEmail(requestEmail(valCtx))
+}
+
+// filterPoliciesByAccountType drops SkipEnterpriseAccounts policies for enterprise emails.
+func (s *Service) filterPoliciesByAccountType(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
+	if !slices.ContainsFunc(policies, func(p types.Policy) bool { return p.SkipEnterpriseAccounts }) {
+		return policies
+	}
+	if requestEmailAccountType(valCtx) != accountTypeEnterprise {
+		return policies
+	}
+	filtered := make([]types.Policy, 0, len(policies))
+	var skipped []string
+	for _, p := range policies {
+		if p.SkipEnterpriseAccounts {
+			skipped = append(skipped, p.Info.Name)
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	s.logger.Info("filterPoliciesByAccountType - skipping policies for enterprise account",
+		zap.Strings("skippedPolicies", skipped))
+	return filtered
+}
+
 func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
+	policies = s.filterPoliciesByAccountType(policies, valCtx)
 	// Bypass "approval" policies whose server is already approved (allow, no threat).
 	return s.filterApprovedServers(policies, valCtx.McpServerName)
 }
 
-func (s *Service) HasApplicablePolicies(contextSource, requestHeaders string) (bool, error) {
+func (s *Service) HasApplicablePolicies(contextSource, requestHeaders, tag string) (bool, error) {
 	policies, _, compiledRules, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		return false, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	// Only McpServerName and RequestHeaders are read by the filters; the rest of the
+	// Only McpServerName, RequestHeaders and Tag are read by the filters; the rest of the
 	// context is irrelevant to which policies apply.
 	valCtx := s.validationContextFromParams(&models.ValidateRequestParams{
 		ContextSource:  contextSource,
 		RequestHeaders: requestHeaders,
+		Tag:            tag,
 	}, "", "", "", "HasApplicablePolicies", nil, compiledRules)
 
 	applicable := s.applicablePolicies(policies, valCtx)
@@ -879,6 +961,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 const (
 	tagKeyLoginUserEmailType = "login-user-email-type"
 	tagKeyBrowserLLMAccount  = "browser-llm-account-type" // browser extension only
+	tagKeyBrowserUserEmail   = "browser-user-email"       // browser extension only
 
 	accountTypePersonal   = "personal"
 	accountTypeEnterprise = "enterprise"
@@ -1900,6 +1983,7 @@ func (s *Service) validationContextFromParams(
 		Tag:                params.Tag,
 		AllowedLists:       mcpAllowedHostList,
 		CompiledRegexRules: compiledRules,
+		FullRequest:        params.FullRequest,
 	}
 }
 
@@ -2671,6 +2755,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
 		itemPolicies = s.filterPoliciesByDevice(itemPolicies, mcpServerName, reqHeaders)
+		itemPolicies = s.filterPoliciesByAccountType(itemPolicies, valCtx)
 		// Bypass "approval" policies whose server is already approved (allow, no threat).
 		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",

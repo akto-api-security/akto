@@ -394,7 +394,7 @@ func fileUploadRequest(t *testing.T, filename, content string, fields map[string
 func TestValidateFilePolicyGate(t *testing.T) {
 	t.Run("no applicable policies skips inspection entirely", func(t *testing.T) {
 		var gateCalls int
-		h, processor := newGateTestHandler(func(contextSource, requestHeaders string) (bool, error) {
+		h, processor := newGateTestHandler(func(contextSource, requestHeaders, _ string) (bool, error) {
 			gateCalls++
 			if contextSource != "AGENTIC" {
 				t.Errorf("contextSource = %q, want AGENTIC", contextSource)
@@ -424,7 +424,7 @@ func TestValidateFilePolicyGate(t *testing.T) {
 	})
 
 	t.Run("applicable policies inspect as usual", func(t *testing.T) {
-		h, processor := newGateTestHandler(func(string, string) (bool, error) { return true, nil })
+		h, processor := newGateTestHandler(func(string, string, string) (bool, error) { return true, nil })
 		recorder := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(recorder)
 		c.Request = fileUploadRequest(t, "doc.pdf", "content", nil)
@@ -437,7 +437,7 @@ func TestValidateFilePolicyGate(t *testing.T) {
 	})
 
 	t.Run("gate failure inspects rather than assuming no policies", func(t *testing.T) {
-		h, processor := newGateTestHandler(func(string, string) (bool, error) {
+		h, processor := newGateTestHandler(func(string, string, string) (bool, error) {
 			return false, errors.New("policy fetch failed")
 		})
 		recorder := httptest.NewRecorder()
@@ -524,7 +524,7 @@ func TestValidateFileInspectsUploadsAndURLsTogether(t *testing.T) {
 	}))
 	defer server.Close()
 
-	h, processor := newGateTestHandler(func(string, string) (bool, error) { return true, nil })
+	h, processor := newGateTestHandler(func(string, string, string) (bool, error) { return true, nil })
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = fileUploadRequest(t, "local.pdf", "local content", map[string]string{

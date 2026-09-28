@@ -645,37 +645,15 @@ public class MaliciousEventService {
     }
     applyHumanResponseFilter(query, humanResponseFilter);
 
-    // Skills Evaluations / Misconfigured Settings partitions — Atlas (ENDPOINT) only. An event
-    // belongs to Skills Evaluations iff latestApiEndpoint starts with "/skills/"; it belongs to
-    // Misconfigured Settings iff latestApiEndpoint contains "/config/" (e.g.
-    // "/codex/config/mcp_servers.computer-use.command" — the agent name prefix varies, so this
-    // isn't anchored to the start like the skills pattern). Each mode independently narrows to
-    // just its own partition ("only") or excludes it ("exclude") — Active sets both to "exclude"
-    // so neither shows up there. Done server-side so the total count and pagination stay correct.
-    boolean hasSkillMode = skillEvalMode != null && !skillEvalMode.isEmpty();
-    boolean hasConfigMode = configEvalMode != null && !configEvalMode.isEmpty();
-    if ((hasSkillMode || hasConfigMode) && "ENDPOINT".equalsIgnoreCase(contextSource)) {
+    // Skills Evaluations / Misconfigured Settings partitions (see ThreatUtils.evaluationModeConditions).
+    // Done server-side so the total count and pagination stay correct.
+    List<Document> evaluationModeConditions = ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+    if (!evaluationModeConditions.isEmpty()) {
       List<Document> andConditions = new ArrayList<>();
       andConditions.add(new Document(query));
-
-      Pattern skillsEndpointPattern = Pattern.compile("^/skills/");
-      if ("only".equalsIgnoreCase(skillEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", skillsEndpointPattern));
-      } else if ("exclude".equalsIgnoreCase(skillEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", new Document("$not", skillsEndpointPattern)));
-      }
-
-      Pattern configEndpointPattern = Pattern.compile("/config/");
-      if ("only".equalsIgnoreCase(configEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", configEndpointPattern));
-      } else if ("exclude".equalsIgnoreCase(configEvalMode)) {
-        andConditions.add(new Document("latestApiEndpoint", new Document("$not", configEndpointPattern)));
-      }
-
-      if (andConditions.size() > 1) {
-        query.clear();
-        query.append("$and", andConditions);
-      }
+      andConditions.addAll(evaluationModeConditions);
+      query.clear();
+      query.append("$and", andConditions);
     }
 
     // Check if sortBySeverity flag is set
@@ -706,6 +684,12 @@ public class MaliciousEventService {
 
     long total;
     MongoCursor<MaliciousEventDto> cursor;
+    // $unset rejects an empty field list, so only add it when minimalFields populated excludedFields.
+    List<Document> matchStages = new ArrayList<>();
+    matchStages.add(new Document("$match", query));
+    if (!excludedFields.isEmpty()) {
+      matchStages.add(new Document("$unset", excludedFields));
+    }
     if (dedupeLatestPerHostActorEndpoint) {
       MongoCursor<Document> countCursor = maliciousEventDao.aggregateRaw(accountId, Arrays.asList(
           new Document("$match", query),
@@ -715,9 +699,8 @@ public class MaliciousEventService {
       total = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
       countCursor.close();
 
-      List<Document> pipeline = new ArrayList<>(Arrays.asList(
-          new Document("$match", query),
-          new Document("$unset", excludedFields),
+      List<Document> pipeline = new ArrayList<>(matchStages);
+      pipeline.addAll(Arrays.asList(
           new Document("$sort", new Document("detectedAt", -1)),
           new Document("$group", new Document("_id", dedupeGroupKey).append("doc", new Document("$first", "$$ROOT"))),
           new Document("$replaceRoot", new Document("newRoot", "$doc"))
@@ -734,10 +717,8 @@ public class MaliciousEventService {
     } else if (sortBySeverity) {
       total = maliciousEventDao.countDocuments(accountId, query);
       // Use aggregation pipeline for custom severity sorting
-      cursor = maliciousEventDao.getCollection(accountId)
-          .aggregate(Arrays.asList(
-              new Document("$match", query),
-              new Document("$unset", excludedFields),
+      List<Document> pipeline = new ArrayList<>(matchStages);
+      pipeline.addAll(Arrays.asList(
               new Document("$addFields", new Document("severityRank",
                   new Document("$switch", new Document()
                       .append("branches", Arrays.asList(
@@ -752,20 +733,18 @@ public class MaliciousEventService {
               new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1))),
               new Document("$skip", skip),
               new Document("$limit", limit)
-          ))
-          .cursor();
+          ));
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else if (sortByRiskScore) {
       total = maliciousEventDao.countDocuments(accountId, query);
-      cursor = maliciousEventDao.getCollection(accountId)
-          .aggregate(Arrays.asList(
-              new Document("$match", query),
-              new Document("$unset", excludedFields),
+      List<Document> pipeline = new ArrayList<>(matchStages);
+      pipeline.addAll(Arrays.asList(
               new Document("$addFields", riskScoreSortAddFields()),
               new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)),
               new Document("$skip", skip),
               new Document("$limit", limit)
-          ))
-          .cursor();
+          ));
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else {
       total = maliciousEventDao.countDocuments(accountId, query);
       cursor = maliciousEventDao.getCollection(accountId)
