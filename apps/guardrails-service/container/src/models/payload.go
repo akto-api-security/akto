@@ -92,7 +92,8 @@ type ValidateRequestParams struct {
 	ContextSource   string `json:"contextSource,omitempty"` // Optional context source for policy filtering
 	// PolicyName optionally names the policies to enforce (comma-separated), e.g. chosen in the
 	// LiteLLM guardrail config via an akto_vxlan_id "policy:" directive. Named active policies are
-	// enforced regardless of context source, scope and GUARDRAILS_SKIP_PATHS.
+	// enforced regardless of context source, scope and GUARDRAILS_SKIP_PATHS; when none of the names
+	// is an active policy, no guardrails are applied.
 	PolicyName string `json:"policyName,omitempty"`
 	// SkipThreat is optional; nil/absent means false (same semantics as batch ingest).
 	SkipThreat *bool `json:"skipThreat,omitempty"` // Optional: skip threat reporting to TBS (default: false)

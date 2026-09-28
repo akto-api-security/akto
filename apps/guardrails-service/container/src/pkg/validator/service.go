@@ -643,27 +643,25 @@ func policiesByName(policies []types.Policy, policyName string) []types.Policy {
 	return named
 }
 
-// enforcedPolicies returns the policies to enforce on a request. Policies the request names
-// (policyName, e.g. from a LiteLLM akto_vxlan_id directive) are always enforced when active,
-// whatever their context source or server/device/user/account/approval scope. Without a
-// name, or when no active policy has one of the names, it is the policies in scope for the
-// request, so a typo in the caller's config can't switch protection off.
-func (s *Service) enforcedPolicies(policies []types.Policy, valCtx *mcp.ValidationContext, policyName string) []types.Policy {
+// enforcedPolicies returns the policies to enforce on a request, and false when the request names
+// policies (policyName, e.g. from a LiteLLM akto_vxlan_id directive) but none of them is an active
+// policy: the caller then applies no guardrails at all. Named active policies are always enforced,
+// whatever their context source or server/device/user/account/approval scope. Without a name it is
+// the policies in scope for the request.
+func (s *Service) enforcedPolicies(policies []types.Policy, valCtx *mcp.ValidationContext, policyName string) ([]types.Policy, bool) {
 	if strings.TrimSpace(policyName) == "" {
-		return s.applicablePolicies(policies, valCtx)
+		return s.applicablePolicies(policies, valCtx), true
 	}
 	// s.cache.policies holds every active policy, across context sources.
 	s.cache.mu.RLock()
 	named := policiesByName(s.cache.policies, policyName)
 	s.cache.mu.RUnlock()
-	if len(named) > 0 {
-		return named
+	if len(named) == 0 {
+		s.logger.Warn("enforcedPolicies - no active policy matches the requested names, applying no guardrails",
+			zap.String("policyName", policyName))
+		return nil, false
 	}
-	applicable := s.applicablePolicies(policies, valCtx)
-	s.logger.Warn("enforcedPolicies - no active policy matches the requested names, applying the policies in scope",
-		zap.String("policyName", policyName),
-		zap.Strings("applicablePolicies", policyNames(applicable)))
-	return applicable
+	return named, true
 }
 
 func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
@@ -2225,7 +2223,10 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Narrow to the policies that apply to this server/device/user (or that the request names)
 	// so all subsequent checks only fire for rules that belong to them.
-	policies = s.enforcedPolicies(policies, valCtx, params.PolicyName)
+	policies, ok := s.enforcedPolicies(policies, valCtx, params.PolicyName)
+	if !ok {
+		return &mcp.ValidationResult{Allowed: true, ModifiedPayload: payload}, "", nil
+	}
 
 	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
 	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
@@ -2453,7 +2454,10 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
 	// Narrow to the policies that apply to this server/device/user (or that the request names).
-	policies = s.enforcedPolicies(policies, valCtx, params.PolicyName)
+	policies, ok := s.enforcedPolicies(policies, valCtx, params.PolicyName)
+	if !ok {
+		return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, "", nil
+	}
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
