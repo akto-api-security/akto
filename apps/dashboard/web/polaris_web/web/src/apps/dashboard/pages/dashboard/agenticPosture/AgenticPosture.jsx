@@ -127,6 +127,8 @@ function AgenticPosture() {
 
     const openAgent = (groupKey) => navigate(`/dashboard/agentic-posture/agents/${encodeURIComponent(groupKey)}`)
     const openKpiLink = (kpi) => { if (kpi.linkGroupKey) openAgent(kpi.linkGroupKey) }
+    // Highest-risk rows carry a real ApiCollection id as groupKey, so they open the collection page.
+    const openCollection = (collectionId) => navigate(`/dashboard/observe/inventory/${encodeURIComponent(collectionId)}`)
 
     const term = searchTerm.trim().toLowerCase()
     const highestRiskAgents = useMemo(() => {
@@ -199,7 +201,7 @@ function AgenticPosture() {
             </Section>
 
             <Section title="Highest-Risk Agents" description="Ranked by blast radius — privilege held, data reached, and controls missing.">
-                <HighestRiskAgentsTable agents={highestRiskAgents} onOpenAgent={openAgent} />
+                <HighestRiskAgentsTable agents={highestRiskAgents} onOpenAgent={openCollection} />
             </Section>
 
             <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">

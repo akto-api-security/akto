@@ -354,19 +354,6 @@ const api = {
             }
         })
     },
-
-    // Argus (Agentic Security) posture page — today just the Posture Score hero. See
-    // ArgusPostureAction's javadoc and agenticPosture/postureDataSource.js's merge-over-mock seam.
-    fetchArgusPostureScore: async (startTimestamp, endTimestamp) => {
-        return await request({
-            url: '/api/fetchArgusPostureScore',
-            method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp
-            }
-        })
-    }
 }
 
 export default api;

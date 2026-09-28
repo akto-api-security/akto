@@ -1,6 +1,7 @@
 package com.akto.service.posture;
 
 import com.akto.dao.ApiInfoDao;
+import com.akto.dto.AgenticPostureScoreHistory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
@@ -26,7 +27,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ArgusPostureService {
 
@@ -73,7 +76,7 @@ public class ArgusPostureService {
 
         List<BasicDBObject> kpis = new ArrayList<>();
         kpis.add(assetsKpi(scoped, environment));
-        kpis.add(highRiskAgentsKpi());
+        kpis.add(highRiskAgentsKpi(scoped));
         kpis.add(identityAccessKpi());
         kpis.add(privilegedToolsKpi(scoped, environment, deactivatedIds));
         kpis.add(sensitiveDataKpi(scoped, bundle.sensitiveByCollection));
@@ -102,11 +105,17 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private BasicDBObject highRiskAgentsKpi() {
-        BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", 0L);
-        long newlyHighRisk = 0;
-        kpi.put("secondaryFootnote", countLine(newlyHighRisk, "newly high risk this week", "No change since last week"));
-        kpi.put("secondaryTone", riskTone(newlyHighRisk, "critical"));
+    // Same scoping and threshold as buildHighestRiskAgents, so the tile and the table agree.
+    private BasicDBObject highRiskAgentsKpi(List<ApiCollection> assets) {
+        long highRisk = 0;
+        for (ApiCollection c : assets) {
+            if (c == null || !isAgenticInScope(c) || c.getPostureScore() == null) continue;
+            if (Math.round(c.getPostureScore()) >= SEVERITY_HIGH_AT) highRisk++;
+        }
+        BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", highRisk);
+        // No per-agent history is stored, so a week-over-week delta isn't available yet.
+        kpi.put("secondaryFootnote", "Week-over-week change not tracked yet");
+        kpi.put("secondaryTone", "subdued");
         return kpi;
     }
 
@@ -477,5 +486,144 @@ public class ArgusPostureService {
         if (percent >= TONE_SUCCESS_AT) return "success";
         if (percent >= TONE_WARNING_AT) return "warning";
         return "critical";
+    }
+
+    // Pure read of cron-written history rows; nothing is recomputed here.
+    public BasicDBObject buildPostureScore(AgenticPostureScoreHistory latest, List<AgenticPostureScoreHistory> trendHistory,
+                                            AgenticPostureScoreHistory weekAgoHistory) {
+        BasicDBObject postureScore = new BasicDBObject();
+        postureScore.put("value", latest != null ? Math.round(latest.getValue()) : null);
+        postureScore.put("agentsScored", latest != null ? latest.getAgentsScored() : 0);
+        postureScore.put("agentsWithNoSignal", latest != null ? latest.getAgentsWithNoSignal() : 0);
+        postureScore.put("dataGaps", postureScoreGaps(latest));
+
+        List<Double> trend = safe(trendHistory).stream().filter(Objects::nonNull)
+                .map(AgenticPostureScoreHistory::getValue).collect(Collectors.toList());
+        if (!trend.isEmpty()) postureScore.put("trend", trend);
+
+        if (latest != null && weekAgoHistory != null) {
+            long current = Math.round(latest.getValue());
+            long prior = Math.round(weekAgoHistory.getValue());
+            postureScore.put("delta", current - prior);
+            postureScore.put("deltaTone", current > prior ? "critical" : current < prior ? "success" : "neutral"); // higher is worse
+        }
+
+        return postureScore;
+    }
+
+    // NOT_COMPUTED_YET / NO_ROWS / PARTIAL_COVERAGE depending on how much of the account is scored.
+    private static List<Map<String, Object>> postureScoreGaps(AgenticPostureScoreHistory latest) {
+        List<Map<String, Object>> gaps = new ArrayList<>();
+        if (latest == null) {
+            gaps.add(gapRow("AGENTIC_ASSETS", "NOT_COMPUTED_YET", "The posture score hasn't been computed for this account yet — check back shortly."));
+        } else if (latest.getAgentsScored() == 0) {
+            gaps.add(gapRow("AGENTIC_ASSETS", "NO_ROWS", "No AI agents have been discovered yet, so the posture score can't be computed."));
+        } else if (latest.getAgentsWithNoSignal() > 0) {
+            gaps.add(gapRow("AGENTIC_ASSETS", "PARTIAL_COVERAGE",
+                    latest.getAgentsWithNoSignal() + " of " + latest.getAgentsScored() + " agents haven't been scored yet and are excluded from this average."));
+        }
+        return gaps;
+    }
+
+    private static <T> List<T> safe(List<T> list) {
+        return list == null ? new ArrayList<>() : list;
+    }
+
+    private static final int HIGHEST_RISK_AGENTS_LIMIT = 5;
+
+    private static final Map<String, Integer> SUB_SCORE_WEIGHTS = new HashMap<>();
+    private static final Map<String, String> SUB_SCORE_ISSUE_LABELS = new HashMap<>();
+    static {
+        SUB_SCORE_WEIGHTS.put("redTeam", 30);
+        SUB_SCORE_ISSUE_LABELS.put("redTeam", "Has open red-teaming findings");
+        SUB_SCORE_WEIGHTS.put("guardrailMalicious", 30);
+        SUB_SCORE_ISSUE_LABELS.put("guardrailMalicious", "Has guardrail-caught or malicious activity");
+        SUB_SCORE_WEIGHTS.put("coverage", 10);
+        SUB_SCORE_ISSUE_LABELS.put("coverage", "Not covered by a guardrail policy or red-team scan");
+        SUB_SCORE_WEIGHTS.put("sensitiveData", 10);
+        SUB_SCORE_ISSUE_LABELS.put("sensitiveData", "Accesses sensitive data");
+        SUB_SCORE_WEIGHTS.put("accessAuth", 10);
+        SUB_SCORE_ISSUE_LABELS.put("accessAuth", "Publicly accessible or unauthenticated");
+        SUB_SCORE_WEIGHTS.put("overprivilegedTools", 10);
+        SUB_SCORE_ISSUE_LABELS.put("overprivilegedTools", "Has privileged tool access");
+    }
+
+    public List<BasicDBObject> buildHighestRiskAgents(InsightDataBundle bundle) {
+        List<ApiCollection> scored = new ArrayList<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c == null || c.isDeactivated() || c.getPostureScore() == null) continue;
+            if (isAgenticInScope(c)) scored.add(c);
+        }
+        scored.sort(Comparator.comparingDouble(ApiCollection::getPostureScore).reversed());
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        int rank = 1;
+        for (ApiCollection c : scored) {
+            if (rank > HIGHEST_RISK_AGENTS_LIMIT) break;
+            long score = Math.round(c.getPostureScore());
+
+            BasicDBObject row = new BasicDBObject();
+            row.put("rank", rank++);
+            row.put("groupKey", String.valueOf(c.getId()));
+            row.put("name", agentDisplayName(c));
+            row.put("environment", envBucket(envTagValue(c)));
+            row.put("score", score);
+            row.put("issue", worstIssue(c.getPostureSubScores()));
+            row.put("severity", severityForScore(score));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    // Mirrors UsersCollectionsList#getContextCollections(AGENTIC); must match AgenticPostureScoreCron's gate.
+    private static boolean isAgenticInScope(ApiCollection c) {
+        return (c.isMcpCollection() || c.isGenAICollection()) && !c.isEndpointCollection();
+    }
+
+    private static String agentDisplayName(ApiCollection c) {
+        // Not extractServiceName(hostName): it mis-parses real DNS hosts ("mcp.kite.trade" -> "trade").
+        String assetValue = AgenticObserveUtil.getAssetTagValue(c);
+        if (assetValue != null && !assetValue.trim().isEmpty()) return AgenticObserveUtil.formatDisplayName(assetValue);
+        if (c.getName() != null && !c.getName().trim().isEmpty()) return c.getName();
+        return c.getHostName() != null ? c.getHostName() : "Unknown agent";
+    }
+
+    // Category contributing the most weighted points (subScore/100 * weight), not the highest raw sub-score.
+    private static String worstIssue(Map<String, Object> subScores) {
+        if (subScores != null) {
+            String worstKey = null;
+            double worstEarned = 0;
+            for (Map.Entry<String, Object> e : subScores.entrySet()) {
+                Integer weight = SUB_SCORE_WEIGHTS.get(e.getKey());
+                if (weight == null || !(e.getValue() instanceof Number)) continue;
+                double earned = weight * (((Number) e.getValue()).doubleValue() / 100.0);
+                if (earned > worstEarned) {
+                    worstEarned = earned;
+                    worstKey = e.getKey();
+                }
+            }
+            if (worstKey != null) return SUB_SCORE_ISSUE_LABELS.get(worstKey);
+        }
+        return "No significant issues detected";
+    }
+
+    private static final int SEVERITY_CRITICAL_AT = 75;
+    private static final int SEVERITY_HIGH_AT = 10;
+    private static final int SEVERITY_MEDIUM_AT = 5;
+
+    private static String severityForScore(long score) {
+        if (score >= SEVERITY_CRITICAL_AT) return "CRITICAL";
+        if (score >= SEVERITY_HIGH_AT) return "HIGH";
+        if (score >= SEVERITY_MEDIUM_AT) return "MEDIUM";
+        return "LOW";
+    }
+
+    // Same shape as InsightResult.Gap so the frontend's GapHint renders it.
+    private static Map<String, Object> gapRow(String source, String reason, String impact) {
+        Map<String, Object> row = new HashMap<>();
+        row.put("source", source);
+        row.put("reason", reason);
+        row.put("impact", impact);
+        return row;
     }
 }

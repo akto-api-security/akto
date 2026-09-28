@@ -2,27 +2,33 @@ import postureSummaryMock from './mockData/postureSummary.mock.json'
 import agentDetailMock from './mockData/agentDetail.mock.json'
 import dashboardApi from '../api'
 
-// The single seam between the posture pages and their data. Every export here resolves to
-// exactly the shape the posture actions will eventually return (see the
-// posture plan's backend section) — so wiring up a real phase later means changing this
-// file's internals only, never the page/section components, and can be done one field at a time:
-// merge a real API response's populated keys over the mock object's remaining keys so one section
-// goes live while the rest still reads from mock.
+// Real API keys override mock; sections the backend doesn't return yet still read from mock.
 const MOCK_DELAY_MS = 250
 
 function delay(value) {
     return new Promise((resolve) => setTimeout(() => resolve(value), MOCK_DELAY_MS))
 }
 
-// Posture Summary (environments + kpis) is live; every other section still reads mock. The real
-// response's keys win, so a section goes live the moment its endpoint starts returning its key.
+// Posture score never falls back to mock; a failed/missing response renders as a data gap.
+const POSTURE_SCORE_FETCH_ERROR = {
+    value: null,
+    agentsScored: 0,
+    agentsWithNoSignal: 0,
+    dataGaps: [{ source: 'ARGUS_POSTURE_API', reason: 'REQUEST_FAILED', impact: 'Could not load the posture score right now.' }],
+}
+
 async function fetchPostureSummary(startTimestamp, endTimestamp, environment) {
     try {
-        const resp = await dashboardApi.fetchArgusPostureSummary(startTimestamp, endTimestamp, environment)
-        return { ...postureSummaryMock, ...(resp || {}) }
+        const resp = (await dashboardApi.fetchArgusPostureSummary(startTimestamp, endTimestamp, environment || 'all')) || {}
+        return {
+            ...postureSummaryMock,
+            ...resp,
+            postureScore: resp.postureScore || POSTURE_SCORE_FETCH_ERROR,
+            highestRiskAgents: resp.highestRiskAgents || [],
+        }
     } catch (error) {
-        console.error('fetchArgusPostureSummary failed, falling back to mock:', error)
-        return delay(postureSummaryMock)
+        console.error('fetchArgusPostureSummary failed:', error)
+        return { ...postureSummaryMock, postureScore: POSTURE_SCORE_FETCH_ERROR, highestRiskAgents: [] }
     }
 }
 

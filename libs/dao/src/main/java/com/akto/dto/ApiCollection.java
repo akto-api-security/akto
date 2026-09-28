@@ -86,6 +86,20 @@ public class ApiCollection {
     Integer baseRiskScoreCalculatedAt;
     public static final String BASE_RISK_SCORE_CALCULATED_AT = "baseRiskScoreCalculatedAt";
 
+    // Written by AgenticPostureScoreCron; postureSubScores is the per-category 0-100 breakdown.
+    Double postureScore;
+    public static final String POSTURE_SCORE = "postureScore";
+
+    Map<String, Object> postureSubScores;
+    public static final String POSTURE_SUB_SCORES = "postureSubScores";
+
+    // category -> human-readable coverage gap, e.g. "redTeam" -> "Red-teaming scan not run for this agent".
+    Map<String, String> postureGaps;
+    public static final String POSTURE_GAPS = "postureGaps";
+
+    Integer postureScoreCalculatedAt;
+    public static final String POSTURE_SCORE_CALCULATED_AT = "postureScoreCalculatedAt";
+
 
     String accessType;
     public static final String ACCESS_TYPE = "accessType";
@@ -672,6 +686,38 @@ public class ApiCollection {
 
     public void setBaseRiskScoreCalculatedAt(Integer baseRiskScoreCalculatedAt) {
         this.baseRiskScoreCalculatedAt = baseRiskScoreCalculatedAt;
+    }
+
+    public Double getPostureScore() {
+        return postureScore;
+    }
+
+    public void setPostureScore(Double postureScore) {
+        this.postureScore = postureScore;
+    }
+
+    public Map<String, Object> getPostureSubScores() {
+        return postureSubScores;
+    }
+
+    public void setPostureSubScores(Map<String, Object> postureSubScores) {
+        this.postureSubScores = postureSubScores;
+    }
+
+    public Map<String, String> getPostureGaps() {
+        return postureGaps;
+    }
+
+    public void setPostureGaps(Map<String, String> postureGaps) {
+        this.postureGaps = postureGaps;
+    }
+
+    public Integer getPostureScoreCalculatedAt() {
+        return postureScoreCalculatedAt;
+    }
+
+    public void setPostureScoreCalculatedAt(Integer postureScoreCalculatedAt) {
+        this.postureScoreCalculatedAt = postureScoreCalculatedAt;
     }
 
     public String getServiceTag() {

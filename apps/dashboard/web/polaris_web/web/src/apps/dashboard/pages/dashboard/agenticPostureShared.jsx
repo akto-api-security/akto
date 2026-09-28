@@ -50,6 +50,13 @@ export function riskBand(value) {
     return { tone: 'success' }
 }
 
+// Display label for riskBand's tone; wording is a presentation concern, so it lives client-side.
+export const BAND_LABEL_FOR_TONE = {
+    critical: 'Elevated risk',
+    warning: 'Moderate risk',
+    success: 'Good posture',
+}
+
 // A data gap (dataGaps[] on any KPI/panel a real backend phase sends) — one shared renderer so a
 // reader sees the same "why is this empty/approximate" affordance everywhere on the page.
 export function GapHint({ gaps }) {
