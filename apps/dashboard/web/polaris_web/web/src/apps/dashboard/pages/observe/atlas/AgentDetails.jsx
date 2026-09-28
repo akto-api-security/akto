@@ -440,6 +440,7 @@ function AgentDetails({
             { label: 'Install', value: 'installation-logs' },
             { label: 'Agent', value: 'agent-logs' },
             { label: 'Proxy', value: 'proxy-logs' },
+            { label: 'System Proxy', value: 'system-proxy-logs' },
         ];
 
         const controls = (
