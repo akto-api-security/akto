@@ -117,6 +117,16 @@ public final class LitellmAgentEndpointRewrite {
         return email;
     }
 
+    /** Device id of rewritten traffic: the first label of its {identity}.ai-agent.{agent} host, or null. */
+    public static String deviceId(Map<String, Object> requestData) {
+        String host = header(parseObject(asString(requestData.get("requestHeaders"))), "host");
+        if (host == null) {
+            return null;
+        }
+        String label = host.split("\\.", 2)[0];
+        return label.isEmpty() ? null : label;
+    }
+
     /** Agent segment for a known coding-agent User-Agent (prefix match, any version and casing), else null. */
     static String agentFor(String userAgent) {
         if (userAgent == null) {

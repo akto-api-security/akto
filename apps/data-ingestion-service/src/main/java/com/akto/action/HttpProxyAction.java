@@ -6,6 +6,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
 import com.akto.utils.LitellmAgentEndpointRewrite;
+import com.akto.utils.LitellmDeviceHeartbeat;
 import com.akto.utils.LitellmUserRegistry;
 import com.akto.utils.LitellmVerdictView;
 import com.akto.utils.McpCollectionResolver;
@@ -82,6 +83,10 @@ public class HttpProxyAction extends ActionSupport {
             if ("true".equalsIgnoreCase(ingest_data)) {
                 // Once per user per process, and only on ingest calls, so verdicts stay fast.
                 LitellmUserRegistry.register(litellmUserEmail);
+                if (litellmUserEmail != null) {
+                    // Throttled per device; names the user on the dashboard's device views.
+                    LitellmDeviceHeartbeat.beat(LitellmAgentEndpointRewrite.deviceId(requestData), litellmUserEmail);
+                }
             }
             LitellmVerdictView.apply(requestData);
             applyMcpHostRewrite(requestData);
