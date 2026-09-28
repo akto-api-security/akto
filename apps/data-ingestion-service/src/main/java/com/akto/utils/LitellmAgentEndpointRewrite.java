@@ -9,7 +9,8 @@ import java.util.Map;
 /**
  * Treats traffic that reaches Akto through the LiteLLM connector (Akto's custom hook or LiteLLM's
  * built-in Akto guardrail) as Atlas (endpoint) traffic when the client sends
- * x-akto-contextsource: ENDPOINT; without that header it stays Argus traffic, whoever the client is.
+ * x-akto-contextsource: ENDPOINT or the LiteLLM config asks for it with an akto_vxlan_id directive
+ * (VxlanPolicyDirective, e.g. policy:ENDPOINT:PII Strict); otherwise it stays Argus traffic, whoever the client is.
  * The agent name comes from the client's User-Agent: known coding agents by AGENTS, any other
  * client by agentFromUserAgent. Atlas keys on three things, and the LiteLLM connector sets none of them:
  * <ul>
@@ -37,7 +38,7 @@ public final class LitellmAgentEndpointRewrite {
         AGENTS.put("claude-cli/", "claudecli" + LITELLM_AGENT_SUFFIX);
         AGENTS.put("opencode/", "opencode" + LITELLM_AGENT_SUFFIX);
     }
-    // A LiteLLM client opts into Atlas by sending this header with ENDPOINT; nothing else moves it.
+    // A LiteLLM client opts into Atlas by sending this header with ENDPOINT (or via VxlanPolicyDirective).
     static final String CONTEXT_SOURCE_HEADER = "x-akto-contextsource";
     static final String UNKNOWN_AGENT = "unknown";
     // Open WebUI's logged-in user, sent when Open WebUI runs with ENABLE_FORWARD_USER_INFO_HEADERS=true.
@@ -55,7 +56,8 @@ public final class LitellmAgentEndpointRewrite {
 
     /**
      * Rewrites contextSource, the host request header and the tag of requestData in place when it
-     * is LiteLLM connector traffic that sends x-akto-contextsource: ENDPOINT; anything else is left untouched.
+     * is LiteLLM connector traffic that sends x-akto-contextsource: ENDPOINT or whose contextSource is already
+     * ENDPOINT (set by VxlanPolicyDirective); anything else is left untouched.
      *
      * @return the user email the rewritten traffic carries, or null when it carries none or nothing was rewritten
      */
@@ -64,7 +66,8 @@ public final class LitellmAgentEndpointRewrite {
             return null;
         }
         BasicDBObject headers = parseObject(asString(requestData.get("requestHeaders")));
-        if (!Constants.AKTO_ENDPOINT_SOURCE_VALUE.equalsIgnoreCase(header(headers, CONTEXT_SOURCE_HEADER))) {
+        if (!Constants.AKTO_ENDPOINT_SOURCE_VALUE.equalsIgnoreCase(header(headers, CONTEXT_SOURCE_HEADER))
+            && !Constants.AKTO_ENDPOINT_SOURCE_VALUE.equalsIgnoreCase(asString(requestData.get("contextSource")))) {
             return null;
         }
         String userAgent = header(headers, "user-agent");

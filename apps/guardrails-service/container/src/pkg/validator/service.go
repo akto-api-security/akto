@@ -623,6 +623,49 @@ func (s *Service) filterPoliciesByAccountType(policies []types.Policy, valCtx *m
 	return filtered
 }
 
+// policiesByName returns the policies named in the comma-separated policyName (case-insensitive).
+func policiesByName(policies []types.Policy, policyName string) []types.Policy {
+	wanted := make(map[string]struct{})
+	for _, name := range strings.Split(policyName, ",") {
+		if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
+			wanted[name] = struct{}{}
+		}
+	}
+	if len(wanted) == 0 {
+		return nil
+	}
+	named := make([]types.Policy, 0, len(wanted))
+	for _, p := range policies {
+		if _, ok := wanted[strings.ToLower(strings.TrimSpace(p.Info.Name))]; ok {
+			named = append(named, p)
+		}
+	}
+	return named
+}
+
+// enforcedPolicies returns the policies to enforce on a request. Policies the request names
+// (policyName, e.g. from a LiteLLM akto_vxlan_id directive) are always enforced when active,
+// whatever their context source or server/device/user/account/approval scope. Without a
+// name, or when no active policy has one of the names, it is the policies in scope for the
+// request, so a typo in the caller's config can't switch protection off.
+func (s *Service) enforcedPolicies(policies []types.Policy, valCtx *mcp.ValidationContext, policyName string) []types.Policy {
+	if strings.TrimSpace(policyName) == "" {
+		return s.applicablePolicies(policies, valCtx)
+	}
+	// s.cache.policies holds every active policy, across context sources.
+	s.cache.mu.RLock()
+	named := policiesByName(s.cache.policies, policyName)
+	s.cache.mu.RUnlock()
+	if len(named) > 0 {
+		return named
+	}
+	applicable := s.applicablePolicies(policies, valCtx)
+	s.logger.Warn("enforcedPolicies - no active policy matches the requested names, applying the policies in scope",
+		zap.String("policyName", policyName),
+		zap.Strings("applicablePolicies", policyNames(applicable)))
+	return applicable
+}
+
 func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
@@ -2107,7 +2150,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
-	if s.skipPaths.enabled() {
+	// A request that names policies is never path-skipped: named policies are always enforced.
+	if s.skipPaths.enabled() && strings.TrimSpace(params.PolicyName) == "" {
 		host := hostFromRequestHeaders(params.RequestHeaders)
 		if s.skipPaths.shouldSkip(host, params.Path) {
 			s.logger.Info("ValidateRequest - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
@@ -2179,9 +2223,9 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
-	// Narrow to the policies that apply to this server/device/user so all subsequent
-	// checks only fire for rules that belong to them.
-	policies = s.applicablePolicies(policies, valCtx)
+	// Narrow to the policies that apply to this server/device/user (or that the request names)
+	// so all subsequent checks only fire for rules that belong to them.
+	policies = s.enforcedPolicies(policies, valCtx, params.PolicyName)
 
 	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
 	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
@@ -2360,7 +2404,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
-	if s.skipPaths.enabled() {
+	// A request that names policies is never path-skipped: named policies are always enforced.
+	if s.skipPaths.enabled() && strings.TrimSpace(params.PolicyName) == "" {
 		host := hostFromRequestHeaders(params.RequestHeaders)
 		if s.skipPaths.shouldSkip(host, params.Path) {
 			s.logger.Info("ValidateResponse - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
@@ -2407,8 +2452,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
-	// Narrow to the policies that apply to this server/device/user.
-	policies = s.applicablePolicies(policies, valCtx)
+	// Narrow to the policies that apply to this server/device/user (or that the request names).
+	policies = s.enforcedPolicies(policies, valCtx, params.PolicyName)
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
