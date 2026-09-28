@@ -40,6 +40,9 @@ import DateRangePicker from '../layouts/DateRangePicker';
 import SpinnerCentered from '../progress/SpinnerCentered';
 import { ImportMinor } from '@shopify/polaris-icons';
 
+// Rows per CSV-export request — at or under every backend's per-request cap, so no single call is huge.
+const EXPORT_CHUNK_SIZE = 500;
+
 function GithubServerTable(props) {
 
   const navigate = useNavigate();
@@ -773,12 +776,13 @@ function GithubServerTable(props) {
     });
 
     func.setToast(true, false, "Exporting CSV, please wait...")
-    // Backends often cap rows per request (50/200/500), so keep paging with the size the first
-    // response came back with — the same skip/limit stepping the table's own pagination uses.
+    // Page through in bounded chunks rather than one huge request. Backends also cap rows per
+    // request (50/200/500), so step by the size the first response actually came back with — the
+    // same skip/limit stepping the table's own pagination uses.
     // Rows are de-duped by id and a page adding nothing new stops the loop, so a fetchData that
     // ignores skip can't duplicate rows or spin. Filters are cloned since some pages mutate them.
     const fetchChunk = (skip, limit) => props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, skip, limit, structuredClone(filters), structuredClone(filterOperators), queryValue)
-    const first = await fetchChunk(0, Math.max(total || 0, 10000))
+    const first = await fetchChunk(0, EXPORT_CHUNK_SIZE)
     const rows = [...(first?.value || data)]
     const chunkSize = rows.length
     const expected = first?.total ?? total
