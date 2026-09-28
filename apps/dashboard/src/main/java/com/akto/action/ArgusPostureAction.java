@@ -62,15 +62,18 @@ public class ArgusPostureAction extends UserAction {
             final Integer userId = Context.userId.get();
             final CONTEXT_SOURCE contextSource = Context.contextSource.get();
 
-            if (!ArgusPostureService.DRILL_PROTECTION_COVERAGE.equals(drillId)) {
-                addActionError("Unknown drill: " + drillId);
-                return ERROR.toUpperCase();
-            }
-
             InsightContext ctx = new InsightContext(accountId, userId, contextSource, startTimestamp, endTimestamp);
             InsightDataBundle bundle = insightService.getOrLoadBundle(ctx);
 
-            this.postureDrill = argusPostureService.fetchProtectionCoverageDrill(bundle, environment, skip, limit);
+            switch (drillId == null ? "" : drillId) {
+                case ArgusPostureService.DRILL_PROTECTION_COVERAGE:
+                    this.postureDrill = argusPostureService.fetchProtectionCoverageDrill(bundle, environment, skip, limit);
+                    break;
+                default:
+                    addActionError("Unknown drill: " + drillId);
+                    return ERROR.toUpperCase();
+            }
+
             PostureDrillNarrativeService.attachNarrative(this.postureDrill, ctx, drillId, path,
                     "env=" + ArgusPostureService.environmentKey(environment));
             return SUCCESS.toUpperCase();
