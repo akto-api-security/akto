@@ -3,6 +3,8 @@ package com.akto.utils;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -25,7 +27,8 @@ import java.util.Map;
  * tag and x-litellm-spend-logs-metadata); else the client's device id (the client_device_id tag, e.g. from the Anthropic
  * metadata.user_id Claude Code sends), shortened; else the host the connector sent (the LiteLLM
  * agent name or proxy host). Every call of a conversation carries the same inputs, so it lands on
- * the same host.
+ * the same host. It also gets a session id (sessionId) when it carries none, since the Atlas traces
+ * page only lists traffic that has one.
  */
 public final class LitellmAgentEndpointRewrite {
 
@@ -45,6 +48,11 @@ public final class LitellmAgentEndpointRewrite {
     static final String OPENWEBUI_USER_EMAIL_HEADER = "x-openwebui-user-email";
     static final String INSTALLER_USER_EMAIL_HEADER = "x-akto-installer-user_email";
     static final String SPEND_LOGS_METADATA_HEADER = "x-litellm-spend-logs-metadata";
+    // Session id mini-runtime groups a trace under; Atlas traces without one are not listed.
+    static final String AKTO_SESSION_ID_HEADER = "x-akto-installer-akto_session_id";
+    // Per-conversation session ids clients already send: OpenCode, Claude Code.
+    static final String[] CLIENT_SESSION_ID_HEADERS = {"x-session-id", "x-claude-code-session-id"};
+    static final String GENERATED_SESSION_PREFIX = "litellm-";
     static final String USER_EMAIL_KEY = "user_email";
     static final String MCP_SERVER_NAME_TAG = "mcp_server_name";
     static final String DEVICE_ID_TAG = "client_device_id";
@@ -93,6 +101,9 @@ public final class LitellmAgentEndpointRewrite {
         if (email != null && header(headers, INSTALLER_USER_EMAIL_HEADER) == null) {
             headers.put(INSTALLER_USER_EMAIL_HEADER, email);
         }
+        if (header(headers, AKTO_SESSION_ID_HEADER) == null) {
+            headers.put(AKTO_SESSION_ID_HEADER, sessionId(headers, host));
+        }
         tag.put(Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE);
         tag.put(mcp ? Constants.AKTO_MCP_CLIENT_TAG : Constants.AKTO_AI_AGENT_TAG, agent);
 
@@ -124,6 +135,20 @@ public final class LitellmAgentEndpointRewrite {
         String product = userAgent == null ? "" : userAgent.trim().split("[/\\s]", 2)[0];
         String slug = AgentHostUtils.slugify(product);
         return (slug.isEmpty() ? UNKNOWN_AGENT : slug) + LITELLM_AGENT_SUFFIX;
+    }
+
+    /**
+     * The client's own session id when it sends one, so each conversation is its own session;
+     * otherwise one session per user/agent host per UTC day, so the traffic still has a session.
+     */
+    static String sessionId(BasicDBObject headers, String host) {
+        for (String name : CLIENT_SESSION_ID_HEADERS) {
+            String id = header(headers, name);
+            if (id != null) {
+                return id;
+            }
+        }
+        return GENERATED_SESSION_PREFIX + host + "-" + LocalDate.now(ZoneOffset.UTC);
     }
 
     private static String shortDeviceId(String deviceId) {
