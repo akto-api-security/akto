@@ -80,6 +80,33 @@ public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
 
+    // Applies a step's regex to the raw response body, for values that can't be reached through JSON paths
+    // (e.g. a CSRF token inside an HTML page). The first capture group (or the whole match, if the regex has
+    // no groups) is stored as <nodeId>.response.regex and every capture group N as <nodeId>.response.regex.N
+    public static void populateRegexValues(Map<String, Object> valuesMap, String payloadStr, String nodeId, String regex) {
+        if (StringUtils.isBlank(regex) || payloadStr == null) return;
+
+        Matcher matcher;
+        try {
+            matcher = Pattern.compile(regex).matcher(payloadStr);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("invalid regex for node " + nodeId + ": " + e.getMessage());
+            return;
+        }
+        if (!matcher.find()) return;
+
+        String key = nodeId + ".response.regex";
+        String value = matcher.groupCount() > 0 ? matcher.group(1) : matcher.group();
+        if (value != null) {
+            valuesMap.put(key, value);
+        }
+        for (int i = 1; i <= matcher.groupCount(); i++) {
+            if (matcher.group(i) != null) {
+                valuesMap.put(key + "." + i, matcher.group(i));
+            }
+        }
+    }
+
     public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
         boolean isList = false;
