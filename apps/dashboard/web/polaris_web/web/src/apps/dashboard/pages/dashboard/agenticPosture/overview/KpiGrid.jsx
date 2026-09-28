@@ -19,9 +19,17 @@ const COMING_SOON_KPIS = {
 const KPI_DRILL_ID = {
     protectionCoverage: 'protectionCoverage',
     highRiskAgents: 'highRiskAgents',
+    privilegedTools: 'privilegedTools',
+    sensitiveData: 'sensitiveData',
 }
 
-function KpiGrid({ kpis, onOpenLink, onOpenDrill }) {
+// Assets has no drill of its own — Agentic AI Discovery already is the asset inventory,
+// so the tile navigates there rather than duplicating it in a flyout.
+const KPI_ROUTE = {
+    assets: '/dashboard/observe/agentic-assets',
+}
+
+function KpiGrid({ kpis, onOpenLink, onOpenDrill, onOpenRoute }) {
     return (
         <HorizontalGrid columns={3} gap="3">
             {(kpis || []).map((kpi) => {
@@ -34,14 +42,18 @@ function KpiGrid({ kpis, onOpenLink, onOpenDrill }) {
                     )
                 }
                 const drillId = KPI_DRILL_ID[kpi.id]
+                const route = KPI_ROUTE[kpi.id]
+                const onOpen = drillId ? () => onOpenDrill(drillId)
+                    : route ? () => onOpenRoute(route)
+                    : undefined
                 return (
                     <KpiTile
                         key={kpi.id}
                         kpi={kpi}
                         icon={ICONS[kpi.id]}
                         onOpenLink={onOpenLink}
-                        onOpen={drillId ? () => onOpenDrill(drillId) : undefined}
-                        forceClickable={!!drillId}
+                        onOpen={onOpen}
+                        forceClickable={!!onOpen}
                     />
                 )
             })}

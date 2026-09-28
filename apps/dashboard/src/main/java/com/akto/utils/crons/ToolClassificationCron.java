@@ -183,7 +183,7 @@ public class ToolClassificationCron {
         }
     }
 
-    static String toolNameFromUrl(String url) {
+    public static String toolNameFromUrl(String url) {
         int idx = url.lastIndexOf('/');
         return idx >= 0 && idx < url.length() - 1 ? url.substring(idx + 1) : url;
     }
