@@ -263,6 +263,30 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         return result;
     }
 
+    public Map<Integer, Integer> getCountsByCollection(List<Integer> collectionIds, Bson extraFilter) {
+        Map<Integer, Integer> result = new HashMap<>();
+        if (collectionIds == null || collectionIds.isEmpty()) return result;
+        Bson match = Filters.in(ApiInfo.ID_API_COLLECTION_ID, collectionIds);
+        if (extraFilter != null) match = Filters.and(match, extraFilter);
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(match));
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$" + ApiInfo.ID_API_COLLECTION_ID);
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+
+        MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            try {
+                BasicDBObject doc = cursor.next();
+                BasicDBObject id = (BasicDBObject) doc.get("_id");
+                result.put(id.getInt("apiCollectionId"), doc.getInt("count", 0));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
     // Scoped sibling of ApiCollectionsAction.buildRiskScoreMapNew — same rationale as
     // getLastTrafficSeenForCollections above.
     public Map<Integer, Double> getRiskScoreForCollections(List<Integer> collectionIds) {

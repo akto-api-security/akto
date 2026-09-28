@@ -48,6 +48,10 @@ public class PostureDrillResult {
      *  an escape hatch — this drilldown adds an in-context view, it doesn't remove the old link. */
     private List<InsightResult.Cta> ctas = new ArrayList<>();
     private List<InsightResult.Gap> dataGaps = new ArrayList<>();
+    /** Shown in place of the table when this level has no rows. Zero rows is not always a failure
+     *  — for a gap list it is the good outcome — so a drill that can say something better than
+     *  "nothing here" sets it. Null falls back to the generic empty copy. */
+    private String emptyMessage;
 
     /** Same AI-narrative contract InsightResult uses (see InsightService's own narrative
      *  section) — OK | PENDING | UNAVAILABLE. PENDING means PostureDrillNarrativeService has

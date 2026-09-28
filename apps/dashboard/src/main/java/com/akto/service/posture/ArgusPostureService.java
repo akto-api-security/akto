@@ -7,7 +7,10 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightResult;
+import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
+import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -16,6 +19,9 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +54,12 @@ public class ArgusPostureService {
 
     private static final double TONE_SUCCESS_AT = 100d;
     private static final double TONE_WARNING_AT = 70d;
+
+    public static final String DRILL_PROTECTION_COVERAGE = KPI_PROTECTION_COVERAGE;
+
+    private static final String PROTECTION_NONE = "None";
+    private static final String PROTECTION_ALERT_ONLY = "Alert only";
+    private static final int DEFAULT_DRILL_LIMIT = 20;
 
     public BasicDBObject buildSummary(InsightDataBundle bundle, String environment) {
         List<ApiCollection> assets = new ArrayList<>();
@@ -114,9 +126,7 @@ public class ArgusPostureService {
         if (!assets.isEmpty()) {
             Bson inScope = scopeFilter(assets, environment, deactivatedIds);
 
-            privileged = ApiInfoDao.instance.count(Filters.and(inScope,
-                    Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY),
-                    Filters.ne(ApiInfo.TOOL_INFO_CAPABILITY, ToolCapabilityClassifier.SAFE)));
+            privileged = ApiInfoDao.instance.count(Filters.and(inScope, privilegedToolFilter()));
 
             destructive = ApiInfoDao.instance.count(Filters.and(inScope,
                     Filters.in(ApiInfo.TOOL_INFO_CAPABILITY,
@@ -129,6 +139,12 @@ public class ArgusPostureService {
         kpi.put("secondaryFootnote", countLine(destructive, "destructive", "None destructive"));
         kpi.put("secondaryTone", riskTone(destructive, "critical"));
         return kpi;
+    }
+
+    private static Bson privilegedToolFilter() {
+        return Filters.and(
+                Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY),
+                Filters.ne(ApiInfo.TOOL_INFO_CAPABILITY, ToolCapabilityClassifier.SAFE));
     }
 
     private static Bson scopeFilter(List<ApiCollection> assets, String environment,
@@ -171,27 +187,153 @@ public class ArgusPostureService {
             return kpi;
         }
 
-        if (hasFleetWidePolicy(policies)) {
-            kpi.put("value", 100d);
-            kpi.put("tone", toneForPercent(100d));
-            kpi.put("secondaryFootnote", "All asset(s) covered");
-            kpi.put("secondaryTone", toneForPercent(100d));
-            return kpi;
-        }
-
-        long covered = 0;
-        for (ApiCollection asset : assets) {
-            if (isCovered(asset, policies)) covered++;
-        }
-
-        long notCovered = assets.size() - covered;
-        double percent = percentOf(covered, assets.size());
+        GuardrailsCoverageBreakdown breakdown = computeCoverage(assets, policies);
+        long notCovered = breakdown.uncovered.size();
+        double percent = percentOf(breakdown.covered(), assets.size());
 
         kpi.put("value", percent);
         kpi.put("tone", toneForPercent(percent));
+        kpi.put("footnote", enforcingLine(breakdown.enforcing.size(), assets.size()));
         kpi.put("secondaryFootnote", countLine(notCovered, "asset(s) not covered", "All asset(s) covered"));
         kpi.put("secondaryTone", toneForPercent(percent));
         return kpi;
+    }
+
+    public static class GuardrailsCoverageBreakdown {
+        public final List<ApiCollection> uncovered = new ArrayList<>();
+        public final List<ApiCollection> alertOnly = new ArrayList<>();
+        public final List<ApiCollection> enforcing = new ArrayList<>();
+        public final Map<Integer, List<GuardrailPolicies>> coveringPolicies = new HashMap<>();
+
+        public int covered() {
+            return alertOnly.size() + enforcing.size();
+        }
+    }
+
+    static GuardrailsCoverageBreakdown computeCoverage(List<ApiCollection> assets, List<GuardrailPolicies> policies) {
+        GuardrailsCoverageBreakdown breakdown = new GuardrailsCoverageBreakdown();
+        for (ApiCollection asset : assets) {
+            List<GuardrailPolicies> covering = new ArrayList<>();
+            boolean blocking = false;
+            for (GuardrailPolicies p : policies) {
+                if (p == null) continue;
+                if (!InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) continue;
+                covering.add(p);
+                if (InsightUtil.isBlockingPolicy(p)) blocking = true;
+            }
+            if (covering.isEmpty()) {
+                breakdown.uncovered.add(asset);
+                continue;
+            }
+            breakdown.coveringPolicies.put(asset.getId(), covering);
+            if (blocking) breakdown.enforcing.add(asset);
+            else breakdown.alertOnly.add(asset);
+        }
+        return breakdown;
+    }
+
+    private static String enforcingLine(long enforcing, long total) {
+        if (enforcing == 0) return "No asset(s) enforcing";
+        return enforcing + " of " + total + " asset(s) enforcing";
+    }
+
+    public PostureDrillResult fetchProtectionCoverageDrill(InsightDataBundle bundle, String environment,
+                                                           int skip, int limit) {
+        int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;
+        int effectiveSkip = Math.max(skip, 0);
+
+        List<ApiCollection> assets = new ArrayList<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c == null || c.isDeactivated()) continue;
+            assets.add(c);
+        }
+        List<ApiCollection> scoped = assetsIn(assets, environment);
+        GuardrailsCoverageBreakdown breakdown = computeCoverage(scoped, bundle.policies);
+
+        List<Integer> uncoveredIds = new ArrayList<>();
+        for (ApiCollection c : breakdown.uncovered) uncoveredIds.add(c.getId());
+        Map<Integer, Integer> toolCounts =
+                ApiInfoDao.instance.getCountsByCollection(uncoveredIds, privilegedToolFilter());
+
+        List<ApiCollection> attention = new ArrayList<>(breakdown.uncovered);
+        attention.sort(Comparator.comparingInt(
+                (ApiCollection c) -> toolCounts.getOrDefault(c.getId(), 0)).reversed());
+
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Protection coverage");
+        result.setBreadcrumb(Collections.singletonList(
+                new PostureDrillResult.BreadcrumbItem("", "Protection coverage")));
+        result.setColumns(protectionCoverageColumns());
+        result.setDrillable(false);
+        result.setTotal(attention.size());
+        result.setSkip(effectiveSkip);
+        result.setLimit(effectiveLimit);
+        result.setSummary(protectionCoverageSummary(scoped.size(), breakdown));
+        result.setEmptyMessage(scoped.isEmpty()
+                ? "No asset(s) discovered in this environment."
+                : "All " + scoped.size() + " asset(s) are covered by a policy.");
+        result.setCtas(Arrays.asList(
+                new InsightResult.Cta("create_policy", "Create guardrail policy", "NAVIGATE",
+                        InsightRoutes.GUARDRAIL_POLICIES, new HashMap<>(), true),
+                new InsightResult.Cta("view_violations", "View violations", "NAVIGATE",
+                        InsightRoutes.GUARDRAIL_VIOLATIONS, new HashMap<>(), false)));
+
+        int from = Math.min(effectiveSkip, attention.size());
+        int to = Math.min(from + effectiveLimit, attention.size());
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (ApiCollection asset : attention.subList(from, to)) {
+            rows.add(protectionCoverageRow(asset, bundle, breakdown, toolCounts));
+        }
+        result.setRows(rows);
+        return result;
+    }
+
+    private static List<PostureDrillResult.ColumnDef> protectionCoverageColumns() {
+        return Arrays.asList(
+                new PostureDrillResult.ColumnDef("asset", "Unprotected asset"),
+                new PostureDrillResult.ColumnDef("type", "Type"),
+                new PostureDrillResult.ColumnDef("environment", "Environment"),
+                new PostureDrillResult.ColumnDef("protection", "Protection"),
+                new PostureDrillResult.ColumnDef("sensitiveData", "Sensitive data"),
+                new PostureDrillResult.ColumnDef("privilegedTools", "Privileged tools"));
+    }
+
+    private static List<InsightResult.Metric> protectionCoverageSummary(int inScope,
+                                                                        GuardrailsCoverageBreakdown breakdown) {
+        double percent = percentOf(breakdown.covered(), inScope);
+        return Arrays.asList(
+                new InsightResult.Metric("coverage", "Coverage", percent, "percent", formatPercent(percent)),
+                new InsightResult.Metric("alertMode", "Alert mode", breakdown.alertOnly.size(), "count",
+                        InsightUtil.grouped(breakdown.alertOnly.size())),
+                new InsightResult.Metric("enforcing", "Enforcing", breakdown.enforcing.size(), "count",
+                        InsightUtil.grouped(breakdown.enforcing.size())),
+                new InsightResult.Metric("notCovered", "Not covered", breakdown.uncovered.size(), inScope, "count",
+                        InsightUtil.grouped(breakdown.uncovered.size()), null));
+    }
+
+    private static Map<String, Object> protectionCoverageRow(ApiCollection asset, InsightDataBundle bundle,
+                                                             GuardrailsCoverageBreakdown breakdown,
+                                                             Map<Integer, Integer> toolCounts) {
+        List<GuardrailPolicies> covering = breakdown.coveringPolicies.get(asset.getId());
+        List<String> policyNames = new ArrayList<>();
+        if (covering != null) {
+            for (GuardrailPolicies p : covering) {
+                if (p.getName() != null) policyNames.add(p.getName());
+            }
+        }
+        List<String> sensitiveTypes = bundle.sensitiveByCollection.get(asset.getId());
+
+        Map<String, Object> row = new HashMap<>();
+        row.put("asset", asset.getHostName());
+        row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
+        row.put("environment", envBucket(envTagValue(asset)));
+        row.put("protection", policyNames.isEmpty()
+                ? PROTECTION_NONE
+                : PROTECTION_ALERT_ONLY + " (" + String.join(", ", policyNames) + ")");
+        row.put("sensitiveData", sensitiveTypes == null || sensitiveTypes.isEmpty()
+                ? "None detected" : String.join(", ", sensitiveTypes));
+        row.put("privilegedTools", toolCounts.getOrDefault(asset.getId(), 0));
+        return row;
     }
 
     private static String countLine(long count, String whenSome, String whenNone) {
@@ -203,21 +345,6 @@ public class ArgusPostureService {
         if (orphaned == 0) return shared + " shared";
         if (shared == 0) return orphaned + " orphaned";
         return shared + " shared · " + orphaned + " orphaned";
-    }
-
-    private static boolean hasFleetWidePolicy(List<GuardrailPolicies> policies) {
-        for (GuardrailPolicies p : policies) {
-            if (p != null && p.isApplyToAllServers()) return true;
-        }
-        return false;
-    }
-
-    private static boolean isCovered(ApiCollection asset, List<GuardrailPolicies> policies) {
-        for (GuardrailPolicies p : policies) {
-            if (p == null) continue;
-            if (InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) return true;
-        }
-        return false;
     }
 
     private static String envTagValue(ApiCollection c) {
@@ -276,6 +403,10 @@ public class ArgusPostureService {
         return StringUtils.isBlank(environment) || ENV_ID_ALL.equalsIgnoreCase(environment.trim());
     }
 
+    public static String environmentKey(String environment) {
+        return isAllEnvironments(environment) ? ENV_ID_ALL : environment.trim().toLowerCase(Locale.ROOT);
+    }
+
     public static Bson filterForEnvironment(String environment) {
         if (StringUtils.isBlank(environment)) return Filters.empty();
         switch (environment.trim().toLowerCase(Locale.ROOT)) {
@@ -326,6 +457,11 @@ public class ArgusPostureService {
         env.put("label", label);
         env.put("count", count);
         return env;
+    }
+
+    private static String formatPercent(double percent) {
+        if (percent == Math.floor(percent)) return (long) percent + "%";
+        return percent + "%";
     }
 
     private static double percentOf(long part, long total) {

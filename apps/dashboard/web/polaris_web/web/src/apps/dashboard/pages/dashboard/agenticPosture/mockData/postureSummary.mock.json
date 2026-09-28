@@ -59,8 +59,10 @@
             "label": "Protection Coverage",
             "value": 72,
             "unit": "percent",
-            "footnote": "18 prod agents missing required controls",
-            "tone": "warning"
+            "tone": "warning",
+            "footnote": "12 of 40 asset(s) enforcing",
+            "secondaryFootnote": "11 asset(s) not covered",
+            "secondaryTone": "warning"
         }
     ],
     "dangerousPaths": {

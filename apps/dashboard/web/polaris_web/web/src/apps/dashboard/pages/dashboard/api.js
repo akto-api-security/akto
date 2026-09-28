@@ -308,6 +308,22 @@ const api = {
         })
     },
 
+    fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, environment, skip, limit) => {
+        return await request({
+            url: '/api/fetchArgusPostureDrill',
+            method: 'post',
+            data: {
+                drillId,
+                path: path || '',
+                startTimestamp,
+                endTimestamp,
+                environment,
+                skip: skip || 0,
+                limit: limit || 20
+            }
+        })
+    },
+
     fetchPostureSummary: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchPostureSummary',

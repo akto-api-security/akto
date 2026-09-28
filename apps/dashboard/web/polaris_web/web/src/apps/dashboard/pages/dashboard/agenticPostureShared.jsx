@@ -98,11 +98,13 @@ export function DummyDataOverlay({ panelId, copy, children }) {
 // One KPI tile — Card + label + big value + optional secondary line + optional delta + optional
 // link. A KPI arrives with `status: "COMING_SOON"` instead of a value when its resolver isn't
 // wired up yet — callers render ComingSoonTile in that case rather than this component.
-export function KpiTile({ kpi, icon, onOpenLink }) {
+export function KpiTile({ kpi, icon, onOpenLink, onOpen, forceClickable }) {
     const hasValue = kpi.value !== null && kpi.value !== undefined
     const deltaText = formatDelta(kpi.delta, kpi.deltaUnit)
+    const clickable = hasValue && forceClickable && !!onOpen
     return (
         <Card>
+            <div onClick={clickable ? onOpen : undefined} style={clickable ? { cursor: 'pointer' } : undefined}>
             <Box padding="4">
                 <VerticalStack gap="2">
                     <HorizontalStack align="space-between" blockAlign="center">
@@ -142,6 +144,7 @@ export function KpiTile({ kpi, icon, onOpenLink }) {
                     )}
                 </VerticalStack>
             </Box>
+            </div>
         </Card>
     )
 }

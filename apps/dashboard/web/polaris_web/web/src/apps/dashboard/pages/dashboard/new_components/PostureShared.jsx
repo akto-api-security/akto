@@ -102,11 +102,22 @@ export function RiskScoreRing({ value, size, showValue }) {
 // visual weight than a plain label/value line. One bordered tile per metric, big number over a
 // subdued label, reused by both the generic drill's own stats row and a profile page's own
 // stat row (previously two copies of the same "big number over a subdued label" language).
-export function NumberCard({ label, value }) {
+// The suffix row is a plain flex div, not HorizontalStack: settings.css forces
+// `.Polaris-HorizontalStack { align-items: center !important }`, which would centre the small
+// suffix against the big number instead of sitting it on the same baseline. Cards without a
+// suffix render exactly as before — no wrapper element — so existing callers are untouched.
+export function NumberCard({ label, value, suffix }) {
     return (
         <Card padding="4">
             <VerticalStack gap="1">
-                <Text variant="heading2xl" as="p">{value}</Text>
+                {suffix ? (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                        <Text variant="heading2xl" as="p">{value}</Text>
+                        <Text variant="bodyMd" color="subdued" as="span">{suffix}</Text>
+                    </div>
+                ) : (
+                    <Text variant="heading2xl" as="p">{value}</Text>
+                )}
                 <Text variant="bodySm" color="subdued">{label}</Text>
             </VerticalStack>
         </Card>
@@ -117,7 +128,9 @@ export function NumberCardsRow({ metrics }) {
     if (!metrics || metrics.length === 0) return null
     return (
         <HorizontalGrid columns={{ xs: 2, sm: Math.min(metrics.length, 4) }} gap="3">
-            {metrics.map((m) => <NumberCard key={m.key || m.label} label={m.label} value={m.value} />)}
+            {metrics.map((m) => (
+                <NumberCard key={m.key || m.label} label={m.label} value={m.value} suffix={m.suffix} />
+            ))}
         </HorizontalGrid>
     )
 }

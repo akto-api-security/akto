@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useReducer, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Box, Icon, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { SearchMinor } from '@shopify/polaris-icons'
 import { produce } from 'immer'
@@ -18,6 +18,8 @@ import RiskByDomainSection from './overview/RiskByDomainSection'
 import TopFindingsSection from './overview/TopFindingsSection'
 import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
+import PostureDrillFlyout from '../PostureDrillFlyout'
+import dashboardApi from '../api'
 
 function SectionHeading({ title, description }) {
     return (
@@ -37,18 +39,70 @@ function Section({ title, description, children }) {
     )
 }
 
+const DEFAULT_DATE_RANGE = values.ranges[3] // "Last 30 days" — same default the other posture pages use
+
+function dateRangeFromSearchParams(searchParams) {
+    const sinceParam = searchParams.get('since')
+    const untilParam = searchParams.get('until')
+    if (sinceParam == null || untilParam == null) return null
+    const sinceTs = parseInt(sinceParam, 10)
+    const untilTs = parseInt(untilParam, 10)
+    if (Number.isNaN(sinceTs) || Number.isNaN(untilTs)) return null
+    return { title: 'Custom', alias: 'custom', period: { since: new Date(sinceTs * 1000), until: new Date(untilTs * 1000) } }
+}
+
 function AgenticPosture() {
     const navigate = useNavigate()
+    const [searchParams, setSearchParams] = useSearchParams()
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[3] // "Last 30 days" — same default the other posture pages use
+        searchParams,
+        (sp) => dateRangeFromSearchParams(sp) || DEFAULT_DATE_RANGE
     )
     const [pageData, setPageData] = useState({})
     const [loading, setLoading] = useState(true)
-    const [selectedEnv, setSelectedEnv] = useState('all')
+    const [selectedEnv, setSelectedEnv] = useState(() => searchParams.get('env') || 'all')
     const [searchTerm, setSearchTerm] = useState('')
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+
+    const drillState = useMemo(() => {
+        const drillId = searchParams.get('drill')
+        if (!drillId) return null
+        return { drillId, path: searchParams.get('path') || '' }
+    }, [searchParams])
+
+    useEffect(() => {
+        const since = String(getTimeEpoch('since'))
+        const until = String(getTimeEpoch('until'))
+        if (searchParams.get('since') === since && searchParams.get('until') === until
+            && searchParams.get('env') === selectedEnv) return
+        const next = new URLSearchParams(searchParams)
+        next.set('since', since)
+        next.set('until', until)
+        next.set('env', selectedEnv)
+        setSearchParams(next, { replace: true })
+    }, [currDateRange, selectedEnv]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const openDrill = (drillId, path = '') => {
+        const next = new URLSearchParams(searchParams)
+        next.set('drill', drillId)
+        if (path) next.set('path', path); else next.delete('path')
+        setSearchParams(next, { replace: true })
+    }
+    const navigateDrill = (state) => openDrill(state.drillId, state.path)
+    const closeDrill = () => {
+        const next = new URLSearchParams(searchParams)
+        next.delete('drill')
+        next.delete('path')
+        setSearchParams(next, { replace: true })
+    }
+
+    const fetchArgusDrill = useCallback(
+        (drillId, path, startTimestamp, endTimestamp, skip, limit) =>
+            dashboardApi.fetchArgusPostureDrill(drillId, path, startTimestamp, endTimestamp, selectedEnv, skip, limit),
+        [selectedEnv]
+    )
 
     useEffect(() => {
         let cancelled = false
@@ -132,7 +186,7 @@ function AgenticPosture() {
                         <PostureScoreCard postureScore={pageData.postureScore} />
                     </div>
                     <div style={{ flex: '2.4 1 560px', minWidth: '320px', display: 'grid' }}>
-                        <KpiGrid kpis={pageData.kpis} onOpenLink={openKpiLink} />
+                        <KpiGrid kpis={pageData.kpis} onOpenLink={openKpiLink} onOpenDrill={openDrill} />
                     </div>
                 </div>
             </Section>
@@ -187,6 +241,17 @@ function AgenticPosture() {
                     }
                 />
             )}
+            <PostureDrillFlyout
+                drillState={drillState}
+                onNavigate={navigateDrill}
+                onClose={closeDrill}
+                startTimestamp={getTimeEpoch('since')}
+                endTimestamp={getTimeEpoch('until')}
+                rootLabel="Posture overview"
+                filterStatePrefix="agentic-posture-drill"
+                fetchDrill={fetchArgusDrill}
+                ctaInFooter={true}
+            />
         </Box>
     )
 }

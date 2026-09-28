@@ -11,12 +11,26 @@ const ICONS = {
     protectionCoverage: SecureMajor,
 }
 
-function KpiGrid({ kpis, onOpenLink }) {
+const KPI_DRILL_ID = {
+    protectionCoverage: 'protectionCoverage',
+}
+
+function KpiGrid({ kpis, onOpenLink, onOpenDrill }) {
     return (
         <HorizontalGrid columns={3} gap="3">
-            {(kpis || []).map((kpi) => (
-                <KpiTile key={kpi.id} kpi={kpi} icon={ICONS[kpi.id]} onOpenLink={onOpenLink} />
-            ))}
+            {(kpis || []).map((kpi) => {
+                const drillId = KPI_DRILL_ID[kpi.id]
+                return (
+                    <KpiTile
+                        key={kpi.id}
+                        kpi={kpi}
+                        icon={ICONS[kpi.id]}
+                        onOpenLink={onOpenLink}
+                        onOpen={drillId ? () => onOpenDrill(drillId) : undefined}
+                        forceClickable={!!drillId}
+                    />
+                )
+            })}
         </HorizontalGrid>
     )
 }
