@@ -24,7 +24,8 @@ import java.util.Map;
  * </ul>
  * The identity (first host segment) is, in order: the user's email local part when the traffic
  * carries an email (X-OpenWebUI-User-Email first, then x-akto-installer-user_email, the user_email
- * tag and x-litellm-spend-logs-metadata); else the client's device id (the client_device_id tag, e.g. from the Anthropic
+ * tag, x-litellm-spend-logs-metadata, then the LiteLLM virtual key's owner when its user_id tag is an
+ * email); else the client's device id (the client_device_id tag, e.g. from the Anthropic
  * metadata.user_id Claude Code sends), shortened; else the host the connector sent (the LiteLLM
  * agent name or proxy host). Every call of a conversation carries the same inputs, so it lands on
  * the same host. It also gets a session id (sessionId) when it carries none, since the Atlas traces
@@ -54,6 +55,8 @@ public final class LitellmAgentEndpointRewrite {
     static final String[] CLIENT_SESSION_ID_HEADERS = {"x-session-id", "x-claude-code-session-id"};
     static final String GENERATED_SESSION_PREFIX = "litellm-";
     static final String USER_EMAIL_KEY = "user_email";
+    // Owner of the LiteLLM virtual key (user_api_key_user_id), which LiteLLM's Akto guardrail sends in the tag.
+    static final String KEY_USER_ID_TAG = "user_id";
     static final String MCP_SERVER_NAME_TAG = "mcp_server_name";
     static final String DEVICE_ID_TAG = "client_device_id";
     // Claude Code's device id is 64 hex characters, one more than a host label allows; a 16-character
@@ -87,7 +90,8 @@ public final class LitellmAgentEndpointRewrite {
             header(headers, OPENWEBUI_USER_EMAIL_HEADER),
             header(headers, INSTALLER_USER_EMAIL_HEADER),
             tag.getString(USER_EMAIL_KEY),
-            parseObject(header(headers, SPEND_LOGS_METADATA_HEADER)).getString(USER_EMAIL_KEY));
+            parseObject(header(headers, SPEND_LOGS_METADATA_HEADER)).getString(USER_EMAIL_KEY),
+            emailOrNull(tag.getString(KEY_USER_ID_TAG)));
         String identity = email != null
             ? AgentHostUtils.emailLocalPart(email)
             : firstNonEmpty(shortDeviceId(tag.getString(DEVICE_ID_TAG)), header(headers, "host"));
@@ -149,6 +153,16 @@ public final class LitellmAgentEndpointRewrite {
             }
         }
         return GENERATED_SESSION_PREFIX + host + "-" + LocalDate.now(ZoneOffset.UTC);
+    }
+
+    /** The value when it is an email address, else null (a key's user_id need not be one). */
+    static String emailOrNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        int at = trimmed.indexOf('@');
+        return at > 0 && at == trimmed.lastIndexOf('@') && at < trimmed.length() - 1 ? trimmed : null;
     }
 
     private static String shortDeviceId(String deviceId) {
