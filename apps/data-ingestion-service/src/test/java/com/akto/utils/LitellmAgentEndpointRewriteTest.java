@@ -3,6 +3,8 @@ package com.akto.utils;
 import com.mongodb.BasicDBObject;
 import org.junit.Test;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -358,5 +360,40 @@ public class LitellmAgentEndpointRewriteTest {
         assertEquals("unknown.ai-agent.claudecli", AgentHostUtils.agentHost(null, "claudecli"));
         assertEquals("unknown.ai-agent.claudecli", AgentHostUtils.agentHost("@@@", "claudecli"));
         assertEquals("a-b.ai-agent.claude-cli", AgentHostUtils.agentHost(AgentHostUtils.emailLocalPart("A.B@x.io"), "claude-cli"));
+    }
+    @Test
+    public void clientSessionIdBecomesTheAktoSessionId() {
+        BasicDBObject h = new BasicDBObject("user-agent", OPENCODE_UA).append("host", "localhost:4001")
+            .append("x-akto-contextsource", "ENDPOINT").append("X-Session-Id", "ses_f17c1781bffe");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("ses_f17c1781bffe", headers(data).getString("x-akto-installer-akto_session_id"));
+    }
+
+    @Test
+    public void claudeCodeSessionIdIsUsed() {
+        Map<String, Object> data = envelope("litellm", claudeCodeHeaders(), verdictTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("4d0e795e", headers(data).getString("x-akto-installer-akto_session_id"));
+    }
+
+    @Test
+    public void existingAktoSessionIdIsKept() {
+        BasicDBObject h = claudeCodeHeaders().append("x-akto-installer-akto_session_id", "given");
+        Map<String, Object> data = envelope("litellm", h, verdictTag());
+        LitellmAgentEndpointRewrite.apply(data);
+        assertEquals("given", headers(data).getString("x-akto-installer-akto_session_id"));
+    }
+
+    @Test
+    public void withoutAnySessionHeaderOneSessionPerHostPerDayIsGenerated() {
+        BasicDBObject h = genericClientHeaders("OpenAI/Python 1.40.0").append("x-akto-contextsource", "ENDPOINT");
+        Map<String, Object> first = envelope("litellm", h, builtInGuardrailTag());
+        Map<String, Object> second = envelope("litellm", h, builtInGuardrailTag());
+        LitellmAgentEndpointRewrite.apply(first);
+        LitellmAgentEndpointRewrite.apply(second);
+        String id = headers(first).getString("x-akto-installer-akto_session_id");
+        assertEquals("litellm-localhost-4001.ai-agent.openai-litellm-" + LocalDate.now(ZoneOffset.UTC), id);
+        assertEquals(id, headers(second).getString("x-akto-installer-akto_session_id"));
     }
 }
