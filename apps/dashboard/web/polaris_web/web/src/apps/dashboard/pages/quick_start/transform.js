@@ -1457,6 +1457,18 @@ const litellmImportObj = {
     />
 }
 
+const LITELLM_ATLAS_TEXT = "Bring employee coding agents and AI apps routed through your LiteLLM proxy into Atlas."
+
+// Same LiteLLM tile as Argus, described for Atlas (endpoint) traffic.
+const litellmAtlasObj = {
+    ...litellmImportObj,
+    text: LITELLM_ATLAS_TEXT,
+    component: <BannerComponent
+        content={LITELLM_ATLAS_TEXT}
+        docsUrl={litellmImportObj.docsUrl}
+    />
+}
+
 const difyImportObj = {
     icon: '/public/dify.svg',
     label: "Dify",
@@ -2460,7 +2472,7 @@ const quickStartFunc = {
                 "Agentic IDEs & Apps": agenticIdes,
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
-                "Agentic Proxies": [...agenticProxies, litellmImportObj],
+                "Agentic Proxies": [...agenticProxies, litellmAtlasObj],
                 "Claude Suite": anthropicConnectors,
                 "ChatGPT Suite": openaiConnectors,
                 "Microsoft Suite": microsoftConnectors,
