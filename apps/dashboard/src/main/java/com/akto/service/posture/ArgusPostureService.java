@@ -7,6 +7,7 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -16,6 +17,7 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -34,9 +36,11 @@ public class ArgusPostureService {
     private static final String KPI_SENSITIVE_DATA      = "sensitiveData";
     private static final String KPI_PROTECTION_COVERAGE = "protectionCoverage";
 
-    private static final String ENV_PRODUCTION  = "Production";
-    private static final String ENV_STAGING     = "Staging";
-    private static final String ENV_DEVELOPMENT = "Development";
+    // Display buckets/tag-value lists moved to InsightUtil (environmentBucket/envTagValue) so any
+    // AGENTIC insight provider can group by environment too, without depending on this package.
+    private static final String ENV_PRODUCTION  = InsightUtil.ENV_PRODUCTION;
+    private static final String ENV_STAGING     = InsightUtil.ENV_STAGING;
+    private static final String ENV_DEVELOPMENT = InsightUtil.ENV_DEVELOPMENT;
 
     private static final String ENV_ID_ALL         = "all";
     private static final String ENV_ID_PRODUCTION  = "production";
@@ -71,6 +75,23 @@ public class ArgusPostureService {
         response.put(KEY_ENVIRONMENTS, environments(countByEnvironment(assets)));
         response.put(KEY_KPIS, kpis);
         return response;
+    }
+
+    private static final int TOP_FINDINGS_CAP = 20;
+
+    /**
+     * Flattens every ARGUS_POSTURE provider's per-agent findings into one worst-first list for
+     * the "Top Posture Findings" card. Environment/search filtering happens client-side, same as
+     * the rest of the Argus posture page (see AgenticPosture.jsx's topFindings memo) — this just
+     * ranks and caps what InsightService already computed, no new data reads.
+     */
+    public List<InsightResult.Finding> topFindings(List<InsightResult> insights) {
+        List<InsightResult.Finding> all = new ArrayList<>();
+        for (InsightResult insight : insights) {
+            if (insight.getFindings() != null) all.addAll(insight.getFindings());
+        }
+        all.sort(Comparator.comparingInt(f -> InsightUtil.severityRank(f.getSeverity())));
+        return all.size() > TOP_FINDINGS_CAP ? new ArrayList<>(all.subList(0, TOP_FINDINGS_CAP)) : all;
     }
 
     private BasicDBObject assetsKpi(List<ApiCollection> assets, String environment) {
@@ -213,19 +234,11 @@ public class ArgusPostureService {
     }
 
     private static boolean isCovered(ApiCollection asset, List<GuardrailPolicies> policies) {
-        for (GuardrailPolicies p : policies) {
-            if (p == null) continue;
-            if (InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) return true;
-        }
-        return false;
+        return InsightUtil.collectionCoveredByAnyPolicy(asset, policies);
     }
 
     private static String envTagValue(ApiCollection c) {
-        if (c == null || c.getEnvType() == null) return null;
-        for (CollectionTags tag : c.getEnvType()) {
-            if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
-        }
-        return null;
+        return InsightUtil.envTagValue(c);
     }
 
     private static List<ApiCollection> assetsIn(List<ApiCollection> assets, String environment) {
@@ -265,11 +278,7 @@ public class ArgusPostureService {
     }
 
     public static String envBucket(String envTagValue) {
-        if (StringUtils.isBlank(envTagValue)) return ENV_PRODUCTION;
-        String value = envTagValue.trim().toUpperCase(Locale.ROOT);
-        if (DEV_ENVS.contains(value)) return ENV_DEVELOPMENT;
-        if (STAGING_ENVS.contains(value)) return ENV_STAGING;
-        return ENV_PRODUCTION;
+        return InsightUtil.environmentBucket(envTagValue);
     }
 
     private static boolean isAllEnvironments(String environment) {

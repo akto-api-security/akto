@@ -5,6 +5,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightId;
+import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightService;
 import com.akto.service.posture.ArgusPostureService;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -12,6 +14,9 @@ import com.mongodb.BasicDBObject;
 
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class ArgusPostureAction extends UserAction {
@@ -26,6 +31,7 @@ public class ArgusPostureAction extends UserAction {
     @Getter @Setter private String environment;
 
     @Getter private BasicDBObject response = new BasicDBObject();
+    @Getter private List<InsightResult.Finding> topFindings = new ArrayList<>();
 
     public String fetchArgusPostureSummary() {
         try {
@@ -43,6 +49,26 @@ public class ArgusPostureAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture summary: " + e.getMessage());
             addActionError("Failed to build Argus posture summary");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchArgusPostureFindings() {
+        try {
+            if (endTimestamp == 0) endTimestamp = Context.now();
+
+            final int accountId = Context.accountId.get();
+            final Integer userId = Context.userId.get();
+            final CONTEXT_SOURCE contextSource = Context.contextSource.get();
+
+            InsightContext ctx = new InsightContext(accountId, userId, contextSource, startTimestamp, endTimestamp);
+            List<InsightResult> insights = insightService.listInsights(ctx, InsightId.Group.ARGUS_POSTURE);
+
+            this.topFindings = argusPostureService.topFindings(insights);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Argus posture findings: " + e.getMessage());
+            addActionError("Failed to build Argus posture findings");
             return ERROR.toUpperCase();
         }
     }

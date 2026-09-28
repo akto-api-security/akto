@@ -18,6 +18,12 @@ import com.akto.service.insights.providers.SkillEvaluationConcentrationProvider;
 import com.akto.service.insights.providers.TestPoliciesOnProdProvider;
 import com.akto.service.insights.providers.UngovernedAiRatioProvider;
 import com.akto.service.insights.providers.WhatChangedThisWeekProvider;
+import com.akto.service.insights.providers.agentic.AgentGuardrailCoverageGapProvider;
+import com.akto.service.insights.providers.agentic.AgentGuardrailHotspotsProvider;
+import com.akto.service.insights.providers.agentic.AgentObservabilityRiskProvider;
+import com.akto.service.insights.providers.agentic.AgentRedTeamFindingsProvider;
+import com.akto.service.insights.providers.agentic.AgentUnapprovedComponentsProvider;
+import com.akto.service.insights.providers.agentic.AgentVendorConcentrationProvider;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -53,6 +59,14 @@ public final class InsightProviderRegistry {
         register(new PromptInjectionRepeatsProvider());
         register(new TestPoliciesOnProdProvider());
         register(new SkillEvaluationConcentrationProvider());
+
+        // — Argus (AGENTIC) posture findings, cheapest/most-certain-first like the two groups above —
+        register(new AgentRedTeamFindingsProvider());
+        register(new AgentUnapprovedComponentsProvider());
+        register(new AgentGuardrailCoverageGapProvider());
+        register(new AgentGuardrailHotspotsProvider());
+        register(new AgentVendorConcentrationProvider());
+        register(new AgentObservabilityRiskProvider());
     }
 
     private InsightProviderRegistry() {}

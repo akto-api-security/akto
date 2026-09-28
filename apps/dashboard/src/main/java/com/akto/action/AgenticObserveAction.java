@@ -12,6 +12,7 @@ import com.akto.dao.AgentUsersDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.service.insights.HostCollectionResolver;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.ApiInfo;
@@ -2104,23 +2105,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Getter
     private Map<String, Map<String, Integer>> collectionViolationCounts;
 
-    // Mirrors agenticObserveApi.js's deviceServiceKey exactly — device+service loose-match key for
-    // 2-segment vs 3-segment host attribution (see resolveHostToCollectionIds's javadoc below).
-    private static String deviceServiceKey(String hostName) {
-        if (StringUtils.isBlank(hostName)) return null;
-        String[] parts = hostName.split("\\.");
-        if (parts.length < 2) return null;
-        return parts[0] + " " + parts[parts.length - 1];
-    }
-
-    // Mirrors agenticObserveApi.js's isClaudeConfigHost exactly.
-    private static boolean isClaudeConfigHost(String hostName) {
-        if (StringUtils.isBlank(hostName)) return false;
-        String[] parts = hostName.split("\\.");
-        if (parts.length != 2) return false;
-        String service = parts[1].toLowerCase(Locale.ROOT);
-        return "claude-settings".equals(service) || "claude".equals(service);
-    }
+    // deviceServiceKey/isClaudeConfigHost moved to HostCollectionResolver, which now also owns
+    // the exact/loose/claude-config join below — so any other caller needing "host -> collection
+    // ids" (e.g. the Argus/AGENTIC insight providers) shares this implementation instead of a
+    // second hand-copied matcher.
 
     /**
      * Attributes server-aggregated per-host violation severity counts (from
@@ -2145,47 +2133,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Projections.include(Constants.ID, ApiCollection.HOST_NAME)
             );
 
-            Map<String, List<Integer>> hostToIds = new HashMap<>();
-            Map<String, List<Integer>> looseToIds = new HashMap<>();
-            Map<String, List<Integer>> claudeDeviceToIds = new HashMap<>();
-            List<Integer> allClaudeIds = new ArrayList<>();
-
-            for (ApiCollection c : collections) {
-                String hostName = c.getHostName();
-                if (StringUtils.isBlank(hostName)) continue;
-
-                hostToIds.computeIfAbsent(hostName, k -> new ArrayList<>()).add(c.getId());
-
-                String lk = deviceServiceKey(hostName);
-                if (lk != null) {
-                    looseToIds.computeIfAbsent(lk, k -> new ArrayList<>()).add(c.getId());
-                }
-
-                String[] parts = hostName.split("\\.");
-                String deviceId = parts.length > 0 ? parts[0] : null;
-                String service = parts.length > 0 ? parts[parts.length - 1].toLowerCase(Locale.ROOT) : null;
-                if (StringUtils.isNotBlank(deviceId) && "claude".equals(service)) {
-                    claudeDeviceToIds.computeIfAbsent(deviceId, k -> new ArrayList<>()).add(c.getId());
-                    allClaudeIds.add(c.getId());
-                }
-            }
+            HostCollectionResolver resolver = new HostCollectionResolver(collections);
 
             for (Map.Entry<String, Map<String, Integer>> entry : hostCounts.entrySet()) {
                 String host = entry.getKey();
                 Map<String, Integer> counts = entry.getValue();
                 if (host == null || counts == null) continue;
 
-                List<Integer> ids = hostToIds.get(host);
-                if (ids == null || ids.isEmpty()) {
-                    ids = looseToIds.get(deviceServiceKey(host));
-                }
-                if ((ids == null || ids.isEmpty()) && isClaudeConfigHost(host)) {
-                    String deviceId = host.split("\\.")[0];
-                    List<Integer> pool = claudeDeviceToIds.get(deviceId);
-                    if (pool == null || pool.isEmpty()) pool = allClaudeIds;
-                    ids = pool.isEmpty() ? null : Collections.singletonList(pool.get(0));
-                }
-                if (ids == null || ids.isEmpty()) continue;
+                List<Integer> ids = resolver.resolve(host);
+                if (ids.isEmpty()) continue;
 
                 for (Integer id : ids) {
                     Map<String, Integer> agg = collectionViolationCounts.computeIfAbsent(String.valueOf(id), k -> {

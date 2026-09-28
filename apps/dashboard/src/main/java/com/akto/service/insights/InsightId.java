@@ -28,7 +28,17 @@ public enum InsightId {
     PROMPT_INJECTION_REPEATS("Prompt injection repeats", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
     LIKELY_FALSE_POSITIVES("Likely false positives", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS, true),
     ALERT_MODE_REAL_HITS("Alert-mode policies catching real hits", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
-    POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS);
+    POLICY_HYGIENE("Policy hygiene", InsightId.Category.ACTIONABLE, InsightId.Group.GUARDRAIL_VIOLATIONS),
+
+    // — Argus posture findings (CONTEXT_SOURCE.AGENTIC only) — per-agent findings, not
+    // per-user/device like the two groups above. See service/insights/agentic/** and
+    // service/insights/providers/agentic/**.
+    AGENT_RED_TEAM_FINDINGS("Red-team findings", InsightId.Category.ACTIONABLE, InsightId.Group.ARGUS_POSTURE),
+    AGENT_UNAPPROVED_COMPONENTS("Unapproved & malicious components", InsightId.Category.ACTIONABLE, InsightId.Group.ARGUS_POSTURE),
+    AGENT_GUARDRAIL_COVERAGE_GAP("Guardrail coverage gap", InsightId.Category.ACTIONABLE, InsightId.Group.ARGUS_POSTURE),
+    AGENT_GUARDRAIL_HOTSPOTS("Guardrail activity hotspots", InsightId.Category.ACTIONABLE, InsightId.Group.ARGUS_POSTURE),
+    AGENT_VENDOR_CONCENTRATION("Vendor concentration", InsightId.Category.READ_ONLY, InsightId.Group.ARGUS_POSTURE),
+    AGENT_OBSERVABILITY_RISK("Observability risk", InsightId.Category.ACTIONABLE, InsightId.Group.ARGUS_POSTURE);
 
     private final String title;
     private final Category category;
@@ -57,10 +67,12 @@ public enum InsightId {
     }
 
     /** Which surface an insight belongs to — Atlas Discovery vs the guardrail/violations set
-     *  merged in from feature/dashbaord/guardrail-insights. Callers filter listInsights by this
-     *  so the two never mix in the same list; see InsightService.listInsights. */
+     *  merged in from feature/dashbaord/guardrail-insights, vs the Argus (AGENTIC) posture
+     *  findings. Callers filter listInsights by this so groups never mix in the same list; see
+     *  InsightService.listInsights. */
     public enum Group {
         ATLAS_DISCOVERY,
-        GUARDRAIL_VIOLATIONS
+        GUARDRAIL_VIOLATIONS,
+        ARGUS_POSTURE
     }
 }

@@ -3,95 +3,23 @@ package com.akto.gpt.handlers.gpt_prompts;
 import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
-import javax.validation.ValidationException;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+/**
+ * ENDPOINT/GUARDRAIL_VIOLATIONS insight narratives — concern/impact/remediation grounded in real
+ * evidence rows. See AbstractGroundedNarrativeHandler for the shared retry loop and numeric-
+ * literal guard this handler builds on, and AgenticInsightNarrativeHandler for the sibling
+ * per-finding shape (Argus/ARGUS_POSTURE) that also builds on it.
+ */
+public class InsightNarrativeHandler extends AbstractGroundedNarrativeHandler {
 
-public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
-
-    public static final String NARRATIVE_INPUT = "narrativeInput"; // JSON string
-
-    private static final Pattern NUMERIC_LITERAL = Pattern.compile("(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?%?");
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\([^)]*\\)");
     private static final int MAX_WORDS = 260;
     private static final int MAX_SUMMARY_FIELD_WORDS = 60;
 
-    @Override
-    protected JSONObject getResponseFormat() {
-        try { return new JSONObject("{\"type\":\"json_object\"}"); }
-        catch (Exception e) { return null; }
-    }
-
-    // Confirmed directly against the real Azure endpoint: at the default reasoning effort, this
-    // prompt burned an entire 4000-token budget on invisible reasoning and returned empty content
-    // (finish_reason "length") without ever writing the answer — raising the budget alone doesn't
-    // fix that, it just burns more tokens/latency reasoning about a job with no real judgment call
-    // in it. "minimal" is the right effort here: this handler is a RENDERER, not an analyst — every
-    // fact is already computed, its only job is copying values into prose/JSON.
-    @Override
-    protected String getReasoningEffort() { return "minimal"; }
-
-    @Override
-    protected int getMaxTokens() { return 4000; }
-
-    @Override
-    protected double getTemperature() { return 0.0; }
-
-    @Override
-    protected void validate(BasicDBObject queryData) throws ValidationException {
-        String input = queryData.getString(NARRATIVE_INPUT);
-        if (input == null || input.trim().isEmpty()) {
-            throw new ValidationException(NARRATIVE_INPUT + " is required");
-        }
-    }
-
-    // Overridden (not just getPrompt/processResponse) for two reasons: avoid the base
-    // class's verbose logger.warn(queryData)/logger.warn(prompt) — every cache miss
-    // would otherwise dump asset/user/team names into the DASHBOARD log DB — and to run
-    // the one-retry-on-validation-failure loop.
-    @Override
-    public BasicDBObject handle(BasicDBObject queryData) {
-        try {
-            validate(queryData);
-            JSONObject input = new JSONObject(queryData.getString(NARRATIVE_INPUT));
-            Set<String> allowedLiterals = allowedLiterals(input);
-
-            String prompt = buildPrompt(input, null);
-            BasicDBObject result = tryOnce(prompt, allowedLiterals);
-            if (result.containsField("error")) {
-                // One retry, naming the offending literals back to the model.
-                String rejectedNote = result.getString("error");
-                prompt = buildPrompt(input, rejectedNote);
-                result = tryOnce(prompt, allowedLiterals);
-            }
-            return result;
-        } catch (ValidationException e) {
-            BasicDBObject resp = new BasicDBObject();
-            resp.put("error", "Invalid input parameters.");
-            return resp;
-        } catch (Exception e) {
-            logger.error("InsightNarrativeHandler: " + e.getMessage());
-            BasicDBObject resp = new BasicDBObject();
-            resp.put("error", "Internal server error: " + e.getMessage());
-            return resp;
-        }
-    }
-
-    private BasicDBObject tryOnce(String prompt, Set<String> allowedLiterals) throws Exception {
-        String rawResponse = call(prompt);
-        return validateAndBuild(rawResponse, allowedLiterals);
-    }
-
     /** Package-private (not private): InsightNarrativeHandlerTest exercises the literal-rejection
      *  guard directly against hand-built responses, rather than only through a real `call()`. */
+    @Override
     BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
         BasicDBObject resp = new BasicDBObject();
         if (rawResponse == null || rawResponse.isEmpty() || "NOT_FOUND".equalsIgnoreCase(rawResponse)) {
@@ -112,11 +40,11 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
             Set<String> unknownLiterals = new HashSet<>();
             collectUnknownLiterals(narrative, allowedLiterals, unknownLiterals);
 
-            Map<String, String> summaryFields = new LinkedHashMap<>();
+            java.util.Map<String, String> summaryFields = new java.util.LinkedHashMap<>();
             summaryFields.put("concern", concern);
             summaryFields.put("impact", impact);
             summaryFields.put("remediation", remediation);
-            for (Map.Entry<String, String> e : summaryFields.entrySet()) {
+            for (java.util.Map.Entry<String, String> e : summaryFields.entrySet()) {
                 String value = e.getValue();
                 if (value.isEmpty()) continue; // model may leave one blank when there's genuinely nothing grounded to add
                 if (value.split("\\s+").length > MAX_SUMMARY_FIELD_WORDS) {
@@ -141,30 +69,10 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         }
     }
 
-    private void collectUnknownLiterals(String text, Set<String> allowedLiterals, Set<String> out) {
-        // allowedLiterals already carries both comma and no-comma forms of every number (see
-        // addLiteralsFrom) — the model sometimes adds/drops thousands-separators when copying a
-        // number (e.g. writes "1,252" for a fact whose formatted string is "1252"), which is the
-        // same number, not a fabrication.
-        Matcher m = NUMERIC_LITERAL.matcher(text);
-        while (m.find()) {
-            String literal = m.group();
-            if (!allowedLiterals.contains(literal)) out.add(literal);
-        }
-    }
-
-    /** "<epoch> (<ISO date>)" — orientation for HARD RULE 7's relative-time phrasing, never a
-     *  value the model is meant to copy into its output (it isn't added to allowedLiterals). */
-    static String nowForPrompt() {
-        long nowEpoch = System.currentTimeMillis() / 1000;
-        String iso = Instant.ofEpochSecond(nowEpoch).atZone(ZoneOffset.UTC)
-                .format(DateTimeFormatter.ofPattern("MMM d, yyyy", java.util.Locale.ROOT));
-        return nowEpoch + " (" + iso + ")";
-    }
-
     /** Package-private (not private): pure string-building, no network call — same
      *  "test the pure piece directly" convention this repo already uses elsewhere (see
      *  InsightNarrativeHandlerTest). */
+    @Override
     String buildPrompt(JSONObject input, String rejectedNote) {
         String severity = input.optString("severity", "");
         StringBuilder sb = new StringBuilder();
@@ -249,6 +157,7 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
      *  and the model can't tell those apart from a "formatted" value — it just sees text with a
      *  number in it. Field-by-field extraction only catches up with each new case one bug report at
      *  a time; scanning everything the prompt actually contains closes the whole class at once. */
+    @Override
     Set<String> allowedLiterals(JSONObject input) {
         Set<String> out = new HashSet<>();
         for (String field : new String[] { "metrics", "evidence", "caveats", "dataGaps" }) {
@@ -259,60 +168,5 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         addLiteralsFrom(input.optString("draftImpact", ""), out);
         addLiteralsFrom(input.optString("draftRemediation", ""), out);
         return out;
-    }
-
-    private void addLiteralsFrom(String text, Set<String> out) {
-        if (text == null) return;
-        Matcher m = NUMERIC_LITERAL.matcher(text);
-        while (m.find()) {
-            String literal = m.group();
-            out.add(literal);
-            String stripped = literal.replace(",", "");
-            out.add(stripped); // also allow the same number without a thousands separator
-            out.add(withThousandsSeparators(stripped)); // ...and WITH one, even if the source had none —
-            // a raw evidence-row count (e.g. a plain "10495" int, not a pre-formatted "formatted"
-            // string) has no comma to begin with, but the model naturally writes large numbers with
-            // one in prose. Without this, a real, correctly-copied number gets rejected every single
-            // retry (the source number never changes), which is what actually caused an infinite
-            // regenerate loop for PostureDrillNarrativeService's evidence-only (no "formatted" field)
-            // input shape.
-        }
-    }
-
-    private String withThousandsSeparators(String numeric) {
-        String suffix = "";
-        String body = numeric;
-        if (body.endsWith("%")) { suffix = "%"; body = body.substring(0, body.length() - 1); }
-        String intPart = body;
-        String fracPart = "";
-        int dot = body.indexOf('.');
-        if (dot >= 0) { intPart = body.substring(0, dot); fracPart = body.substring(dot); }
-        if (intPart.isEmpty() || intPart.length() <= 3) return numeric;
-        StringBuilder grouped = new StringBuilder();
-        int digitsSinceComma = 0;
-        for (int i = intPart.length() - 1; i >= 0; i--) {
-            grouped.append(intPart.charAt(i));
-            digitsSinceComma++;
-            if (digitsSinceComma % 3 == 0 && i != 0) grouped.append(',');
-        }
-        return grouped.reverse().toString() + fracPart + suffix;
-    }
-
-    @Override
-    protected String getPrompt(BasicDBObject queryData) {
-        try {
-            return buildPrompt(new JSONObject(queryData.getString(NARRATIVE_INPUT)), null);
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    @Override
-    protected BasicDBObject processResponse(String rawResponse) {
-        // handle() is overridden and does its own validation; this exists only to satisfy
-        // the abstract contract for any super.handle() caller.
-        BasicDBObject resp = new BasicDBObject();
-        resp.put("markdown", rawResponse);
-        return resp;
     }
 }

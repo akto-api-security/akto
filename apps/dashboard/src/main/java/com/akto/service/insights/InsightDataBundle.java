@@ -10,6 +10,7 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
+import com.akto.service.insights.agentic.AgenticInsightData;
 
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,11 @@ public class InsightDataBundle {
     public final List<ApiCollection> activeCollections;
     public final Map<Integer, Integer> collectionLastTrafficSeen;
 
+    // AGENTIC-only reads (Argus posture), bundled the same way the ENDPOINT-only fields above
+    // are — see AgenticInsightData's own javadoc. Always non-null; empty()/loaded=false for any
+    // other CONTEXT_SOURCE.
+    public final AgenticInsightData agentic;
+
     private final InsightsThreatBackendAccess threatAccess;
 
     public InsightDataBundle(InsightContext ctx,
@@ -67,6 +73,7 @@ public class InsightDataBundle {
                               boolean threatBackendAvailable,
                               List<ApiCollection> activeCollections,
                               Map<Integer, Integer> collectionLastTrafficSeen,
+                              AgenticInsightData agentic,
                               InsightsThreatBackendAccess threatAccess) {
         this.ctx = ctx;
         this.collections = collections;
@@ -85,6 +92,7 @@ public class InsightDataBundle {
         this.threatBackendAvailable = threatBackendAvailable;
         this.activeCollections = activeCollections;
         this.collectionLastTrafficSeen = collectionLastTrafficSeen;
+        this.agentic = agentic != null ? agentic : AgenticInsightData.empty();
         this.threatAccess = threatAccess;
     }
 

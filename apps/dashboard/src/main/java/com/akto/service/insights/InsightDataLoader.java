@@ -14,6 +14,10 @@ import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
+import com.akto.dao.testing.AgentConversationResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
@@ -21,15 +25,23 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAllowlist;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
+import com.akto.dto.insights.agentic.AgentFindingGroup;
+import com.akto.dto.insights.agentic.DailyCount;
 import com.akto.dto.nhi_governance.NhiIdentity;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.insights.agentic.AgentIndex;
+import com.akto.service.insights.agentic.AgenticInsightData;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,6 +74,11 @@ import java.util.concurrent.TimeUnit;
  * tell "confirmed zero violations" apart from "couldn't check" — everything else here is
  * our own database, where a failure is exceptional enough that treating it as "zero" for
  * this one feature is an acceptable simplification.
+ *
+ * ENDPOINT and AGENTIC read a genuinely different set of "extra" fields beyond the ones every
+ * context shares (collections/policies/allowlist/threat-backend) — see ContextReader below.
+ * That split is a strategy (EndpointContextReader/AgenticContextReader), chosen once by
+ * contextSource, rather than an if/else per field scattered through load() itself.
  */
 public class InsightDataLoader {
 
@@ -71,6 +88,16 @@ public class InsightDataLoader {
     // them is I/O-bound (waiting on Mongo/HTTP, not CPU), not the "one thread per CPU core" case.
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
+
+    // AGENTIC (Argus posture) read caps — every one keeps a per-group/per-account payload small
+    // regardless of how much raw data underlies it; see the DAO/SearchClient methods these caps
+    // are passed to.
+    private static final int SUMMARY_ID_CAP = 500;
+    private static final int CONVERSATION_IDS_PER_GROUP_CAP = 5;
+    private static final int GLOBAL_CONVERSATION_ID_CAP = 500;
+    private static final int URLS_PER_ISSUE_GROUP_CAP = 3;
+    private static final int NAMES_PER_AUDIT_GROUP_CAP = 5;
+    private static final int TOPICS_PER_SERVICE_CAP = 5;
 
     public InsightDataBundle load(InsightContext ctx) {
         long loadStart = System.currentTimeMillis();
@@ -89,52 +116,31 @@ public class InsightDataLoader {
         Future<List<SkillSeverityCount>> skillSeverityFuture = submitTimed(accountId, userId, contextSource,
                 "skillSeverityFuture (threat backend)", () -> threatAccess.skillSeverityCounts(ctx.getStartTs(), ctx.getEndTs()), List::size);
 
-        // collections/activeCollections run first and synchronously — cheap on their own (tens of
-        // ms), but sensitiveByCollection/collectionLastTrafficSeen below need their results, so
-        // they can't be dispatched until these two resolve. Every other step here is independent
-        // of every other one, so all nine go out as futures together right after.
+        // collections runs first and synchronously — cheap on its own (tens of ms), but every
+        // context-specific reader below needs its result. Already RBAC + context scoped
+        // (AccountsContextDaoWithRbac), so under AGENTIC this list IS the agentic collection ids
+        // — no separate "which collections are agentic" read needed.
         long t0 = System.currentTimeMillis();
         List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                 Filters.empty(),
-                Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
                         ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
                         ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED));
         logStep("collections (findAll, unbounded)", t0, collections.size());
         Map<String, List<ApiCollection>> collectionsByServiceName = indexByServiceName(collections);
 
-        t0 = System.currentTimeMillis();
-        List<ApiCollection> activeCollections = loadActiveCollections();
-        logStep("activeCollections", t0, activeCollections.size());
-
-        Future<Map<String, String>> deviceIdToUsernameFuture =
-                submitTimed(accountId, userId, contextSource, "deviceIdToUsername", this::loadDeviceIdToUsername, Map::size);
-        Future<Map<String, List<DeviceTag>>> userTagsFuture =
-                submitTimed(accountId, userId, contextSource, "userTags (AgentUsersDao.findAll, unbounded)", this::loadUserTags, Map::size);
-        Future<List<McpAuditInfo>> auditRowsFuture = submitTimed(accountId, userId, contextSource,
-                "auditRows (limit 5000)", () -> loadAuditRows(contextSource), List::size);
+        // Shared by every context — policies/allowlist feed both ENDPOINT insight providers and
+        // Argus's own coverage-gap/unapproved-components providers.
         Future<List<GuardrailPolicies>> policiesFuture = submitTimed(accountId, userId, contextSource,
                 "policies (limit 5000 + per-policy device-tag resolution)", this::loadPolicies, List::size);
         Future<Set<String>> allowlistNamesLowerFuture = submitTimed(accountId, userId, contextSource,
                 "allowlistNamesLower (McpAllowlistDao.findAll, unbounded)", this::loadAllowlistNames, Set::size);
-        Future<Map<Integer, List<String>>> sensitiveByCollectionFuture = submitTimed(accountId, userId, contextSource,
-                "sensitiveByCollection (3x SingleTypeInfoDao scans + per-collection lookup)",
-                () -> loadSensitiveByCollection(collections), Map::size);
-        Future<List<UserAnalysisData>> userAnalysisFuture = submitTimed(accountId, userId, contextSource,
-                "userAnalysis (UserAnalysisDataDao.findAll, unbounded)", this::loadUserAnalysis, List::size);
-        Future<List<NhiIdentity>> nhiIdentitiesFuture = submitTimed(accountId, userId, contextSource,
-                "nhiIdentities (NhiIdentityDao.findAll, unbounded)", this::loadNhiIdentities, List::size);
-        Future<Map<Integer, Integer>> collectionLastTrafficSeenFuture = submitTimed(accountId, userId, contextSource,
-                "collectionLastTrafficSeen", () -> loadCollectionLastTrafficSeen(activeCollections), Map::size);
 
-        Map<String, String> deviceIdToUsername = getOrEmpty(deviceIdToUsernameFuture, new HashMap<>(), "deviceIdToUsername");
-        Map<String, List<DeviceTag>> userTags = getOrEmpty(userTagsFuture, new HashMap<>(), "userTags");
-        List<McpAuditInfo> auditRows = getOrEmpty(auditRowsFuture, Collections.emptyList(), "auditRows");
+        BundleFields fields = new BundleFields();
+        contextReaderFor(contextSource).read(this, fields, ctx, accountId, userId, contextSource, collections);
+
         List<GuardrailPolicies> policies = getOrEmpty(policiesFuture, Collections.emptyList(), "policies");
         Set<String> allowlistNamesLower = getOrEmpty(allowlistNamesLowerFuture, Collections.emptySet(), "allowlistNamesLower");
-        Map<Integer, List<String>> sensitiveByCollection = getOrEmpty(sensitiveByCollectionFuture, Collections.emptyMap(), "sensitiveByCollection");
-        List<UserAnalysisData> userAnalysis = getOrEmpty(userAnalysisFuture, Collections.emptyList(), "userAnalysis");
-        List<NhiIdentity> nhiIdentities = getOrEmpty(nhiIdentitiesFuture, Collections.emptyList(), "nhiIdentities");
-        Map<Integer, Integer> collectionLastTrafficSeen = getOrEmpty(collectionLastTrafficSeenFuture, Collections.emptyMap(), "collectionLastTrafficSeen");
 
         boolean threatBackendAvailable = true;
         List<HostSeverityCount> hostSeverityCounts;
@@ -165,10 +171,191 @@ public class InsightDataLoader {
         logger.info("InsightDataLoader: load() total " + (System.currentTimeMillis() - loadStart)
                 + "ms for accountId=" + accountId);
 
-        return new InsightDataBundle(ctx, collections, collectionsByServiceName, deviceIdToUsername, userTags,
-                auditRows, policies, allowlistNamesLower, sensitiveByCollection, userAnalysis, nhiIdentities,
+        return new InsightDataBundle(ctx, collections, collectionsByServiceName, fields.deviceIdToUsername, fields.userTags,
+                fields.auditRows, policies, allowlistNamesLower, fields.sensitiveByCollection, fields.userAnalysis, fields.nhiIdentities,
                 hostSeverityCounts, subCategoryCounts, skillSeverityCounts, threatBackendAvailable,
-                activeCollections, collectionLastTrafficSeen, threatAccess);
+                fields.activeCollections, fields.collectionLastTrafficSeen, fields.agentic, threatAccess);
+    }
+
+    private ContextReader contextReaderFor(CONTEXT_SOURCE contextSource) {
+        return contextSource == CONTEXT_SOURCE.AGENTIC ? AGENTIC_READER : ENDPOINT_READER;
+    }
+
+    private static final ContextReader ENDPOINT_READER = new EndpointContextReader();
+    private static final ContextReader AGENTIC_READER = new AgenticContextReader();
+
+    /**
+     * One CONTEXT_SOURCE's own extra bundle reads — everything beyond collections/policies/
+     * allowlist/threat-backend, which every context shares identically. Each implementation
+     * submits whatever futures it needs via the loader's own submitTimed (still concurrent with
+     * every other step in load()) and fills in BundleFields once they resolve. Implemented as
+     * static nested classes (not a separate top-level file) so they can call this loader's
+     * private load-step/submitTimed/getOrEmpty helpers directly — the only reason this stays one file.
+     */
+    private interface ContextReader {
+        void read(InsightDataLoader loader, BundleFields out, InsightContext ctx, int accountId, Integer userId,
+                  CONTEXT_SOURCE contextSource, List<ApiCollection> collections);
+    }
+
+    /** Mutable accumulator for load()'s context-specific fields, populated by whichever
+     *  ContextReader matches the request and then read once to build the immutable
+     *  InsightDataBundle. Every field defaults to empty so a reader that never touches a field
+     *  (e.g. AgenticContextReader never sets deviceIdToUsername) needs no boilerplate
+     *  "else assign empty" branch — this is exactly what used to be a `agentic ? empty : ...`
+     *  ternary per field. */
+    private static final class BundleFields {
+        Map<String, String> deviceIdToUsername = new HashMap<>();
+        Map<String, List<DeviceTag>> userTags = new HashMap<>();
+        List<McpAuditInfo> auditRows = Collections.emptyList();
+        Map<Integer, List<String>> sensitiveByCollection = Collections.emptyMap();
+        List<UserAnalysisData> userAnalysis = Collections.emptyList();
+        List<NhiIdentity> nhiIdentities = Collections.emptyList();
+        List<ApiCollection> activeCollections = Collections.emptyList();
+        Map<Integer, Integer> collectionLastTrafficSeen = Collections.emptyMap();
+        AgenticInsightData agentic = AgenticInsightData.empty();
+    }
+
+    private static final class EndpointContextReader implements ContextReader {
+        @Override
+        public void read(InsightDataLoader loader, BundleFields out, InsightContext ctx, int accountId, Integer userId,
+                          CONTEXT_SOURCE contextSource, List<ApiCollection> collections) {
+            long t0 = System.currentTimeMillis();
+            out.activeCollections = loader.loadActiveCollections();
+            loader.logStep("activeCollections", t0, out.activeCollections.size());
+
+            Future<Map<String, String>> deviceIdToUsernameFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "deviceIdToUsername", loader::loadDeviceIdToUsername, Map::size);
+            Future<Map<String, List<DeviceTag>>> userTagsFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "userTags (AgentUsersDao.findAll, unbounded)", loader::loadUserTags, Map::size);
+            Future<List<McpAuditInfo>> auditRowsFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "auditRows (limit 5000)", () -> loader.loadAuditRows(contextSource), List::size);
+            Future<Map<Integer, List<String>>> sensitiveByCollectionFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "sensitiveByCollection (3x SingleTypeInfoDao scans + per-collection lookup)",
+                    () -> loader.loadSensitiveByCollection(collections), Map::size);
+            Future<List<UserAnalysisData>> userAnalysisFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "userAnalysis (UserAnalysisDataDao.findAll, unbounded)", loader::loadUserAnalysis, List::size);
+            Future<List<NhiIdentity>> nhiIdentitiesFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "nhiIdentities (NhiIdentityDao.findAll, unbounded)", loader::loadNhiIdentities, List::size);
+            Future<Map<Integer, Integer>> collectionLastTrafficSeenFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "collectionLastTrafficSeen", () -> loader.loadCollectionLastTrafficSeen(out.activeCollections), Map::size);
+
+            out.deviceIdToUsername = loader.getOrEmpty(deviceIdToUsernameFuture, new HashMap<>(), "deviceIdToUsername");
+            out.userTags = loader.getOrEmpty(userTagsFuture, new HashMap<>(), "userTags");
+            out.auditRows = loader.getOrEmpty(auditRowsFuture, Collections.emptyList(), "auditRows");
+            out.sensitiveByCollection = loader.getOrEmpty(sensitiveByCollectionFuture, Collections.emptyMap(), "sensitiveByCollection");
+            out.userAnalysis = loader.getOrEmpty(userAnalysisFuture, Collections.emptyList(), "userAnalysis");
+            out.nhiIdentities = loader.getOrEmpty(nhiIdentitiesFuture, Collections.emptyList(), "nhiIdentities");
+            out.collectionLastTrafficSeen = loader.getOrEmpty(collectionLastTrafficSeenFuture, Collections.emptyMap(), "collectionLastTrafficSeen");
+        }
+    }
+
+    /** Every one of these is a small, already-aggregated-in-Mongo/ES result (see the DAO/
+     *  SearchClient methods themselves for the index/projection/group shape), never a raw findAll
+     *  — see AgenticInsightData's own javadoc. */
+    private static final class AgenticContextReader implements ContextReader {
+        @Override
+        public void read(InsightDataLoader loader, BundleFields out, InsightContext ctx, int accountId, Integer userId,
+                          CONTEXT_SOURCE contextSource, List<ApiCollection> collections) {
+            List<Integer> agenticCollectionIds = new ArrayList<>();
+            for (ApiCollection c : collections) agenticCollectionIds.add(c.getId());
+
+            Future<List<AgentFindingGroup>> openIssueGroupsFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "openIssueGroups (Argus red-team issues)",
+                    () -> TestingRunIssuesDao.instance.openIssueGroupsForDashboard(ctx.getStartTs(), ctx.getEndTs(), URLS_PER_ISSUE_GROUP_CAP),
+                    List::size);
+            Future<RedTeamRead> redTeamFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "redTeam (summaryIds -> vulnGroups/trend -> validated conversations)",
+                    () -> loader.loadRedTeamRead(ctx, agenticCollectionIds), r -> r.vulnGroups.size());
+            Future<List<AgentFindingGroup>> auditGroupsFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "auditGroups (Argus unapproved/malicious components)",
+                    () -> McpAuditInfoDao.instance.auditGroupsForAgents(ctx.getStartTs(), contextSource, NAMES_PER_AUDIT_GROUP_CAP), List::size);
+            Future<List<UserAnalysisData>> serviceObservabilityFuture = loader.submitTimed(accountId, userId, contextSource,
+                    "serviceObservability (Argus, via SearchClient)",
+                    () -> loader.loadAgenticServiceObservability(accountId, ctx), List::size);
+
+            List<AgentFindingGroup> openIssueGroups = loader.getOrEmpty(openIssueGroupsFuture, Collections.emptyList(), "openIssueGroups");
+            RedTeamRead redTeam = loader.getOrEmpty(redTeamFuture,
+                    new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap()), "redTeam");
+            List<AgentFindingGroup> auditGroups = loader.getOrEmpty(auditGroupsFuture, Collections.emptyList(), "auditGroups");
+            List<UserAnalysisData> serviceObservability = loader.getOrEmpty(serviceObservabilityFuture, Collections.emptyList(), "serviceObservability");
+
+            out.agentic = new AgenticInsightData(true, new AgentIndex(collections), openIssueGroups, redTeam.vulnGroups,
+                    redTeam.dailyCounts, redTeam.conversationsById, auditGroups, serviceObservability);
+        }
+    }
+
+    /** Holds loadRedTeamRead's three results together so they can travel through one Future — see
+     *  AgenticContextReader. Loader-internal only; never leaves this class. */
+    private static final class RedTeamRead {
+        final List<AgentFindingGroup> vulnGroups;
+        final List<DailyCount> dailyCounts;
+        final Map<String, AgentConversationResult> conversationsById;
+        RedTeamRead(List<AgentFindingGroup> vulnGroups, List<DailyCount> dailyCounts, Map<String, AgentConversationResult> conversationsById) {
+            this.vulnGroups = vulnGroups;
+            this.dailyCounts = dailyCounts;
+            this.conversationsById = conversationsById;
+        }
+    }
+
+    /**
+     * Which summaries fall in the dashboard's window (a small, indexed, _id-only read), then the
+     * vulnerable-result groups/trend for those summaries + this account's agentic collections (an
+     * aggregation, never raw documents), then the real validated-conversation verdicts for a
+     * capped sample of the conversationIds that surfaced — run as one sequential task (still
+     * executed concurrently with every other AGENTIC/ENDPOINT step via submitTimed — just not
+     * internally). Every step short-circuits to empty on an empty upstream result rather than
+     * ever sending an unscoped/empty-`$in` query.
+     */
+    private RedTeamRead loadRedTeamRead(InsightContext ctx, List<Integer> agenticCollectionIds) {
+        try {
+            if (agenticCollectionIds.isEmpty()) {
+                return new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap());
+            }
+            List<ObjectId> summaryIds = TestingRunResultSummariesDao.instance.summaryIdsInWindow(
+                    ctx.getStartTs(), ctx.getEndTs(), SUMMARY_ID_CAP);
+            if (summaryIds.isEmpty()) {
+                return new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap());
+            }
+
+            Pair<List<AgentFindingGroup>, List<DailyCount>> aggregates = VulnerableTestingRunResultDao.instance
+                    .redTeamAggregates(summaryIds, agenticCollectionIds, CONVERSATION_IDS_PER_GROUP_CAP);
+            List<AgentFindingGroup> vulnGroups = aggregates.getFirst();
+            List<DailyCount> dailyCounts = aggregates.getSecond();
+
+            List<String> conversationIds = new ArrayList<>();
+            outer:
+            for (AgentFindingGroup g : vulnGroups) {
+                if (g.getSample() == null) continue;
+                for (String id : g.getSample()) {
+                    if (conversationIds.size() >= GLOBAL_CONVERSATION_ID_CAP) break outer;
+                    if (id != null) conversationIds.add(id);
+                }
+            }
+
+            Map<String, AgentConversationResult> conversationsById = new HashMap<>();
+            if (!conversationIds.isEmpty()) {
+                for (AgentConversationResult c : AgentConversationResultDao.instance.findValidatedSummaries(conversationIds)) {
+                    conversationsById.put(c.getConversationId(), c);
+                }
+            }
+            return new RedTeamRead(vulnGroups, dailyCounts, conversationsById);
+        } catch (Exception e) {
+            logger.error("InsightDataLoader: loadRedTeamRead failed: " + e.getMessage());
+            return new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap());
+        }
+    }
+
+    /** SearchClientFactory (ES/ADX) call, not a Mongo one — see SearchClient#fetchAgenticServiceObservability
+     *  for the shape/rationale. Wrapped the same "log and return empty" way every Mongo read here is. */
+    private List<UserAnalysisData> loadAgenticServiceObservability(int accountId, InsightContext ctx) {
+        try {
+            long startMs = ctx.getStartTs() * 1000L;
+            long endMs = ctx.getEndTs() * 1000L;
+            return SearchClientFactory.instance().fetchAgenticServiceObservability(accountId, startMs, endMs, TOPICS_PER_SERVICE_CAP);
+        } catch (Exception e) {
+            logger.error("InsightDataLoader: loadAgenticServiceObservability failed: " + e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     /** Submits one load() step to run concurrently with every other one, timing its actual work
