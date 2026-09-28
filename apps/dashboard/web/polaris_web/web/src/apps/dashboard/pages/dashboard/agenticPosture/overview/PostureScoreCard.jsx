@@ -1,4 +1,4 @@
-import { Badge, Box, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
 import { ArrowDownMinor, ArrowUpMinor } from '@shopify/polaris-icons'
 import { GapHint, BAND_LABEL_FOR_TONE, TONE_TEXT_COLOR, riskBand } from '../../agenticPostureShared'
 
@@ -40,7 +40,7 @@ function Sparkline({ points, tone }) {
 }
 
 // Fleet-wide posture score hero; shows "Not computed yet" instead of falling back to mock data.
-function PostureScoreCard({ postureScore }) {
+function PostureScoreCard({ postureScore, onOpenBreakdown }) {
     if (!postureScore) return null
     const { value, agentsScored, agentsWithNoSignal, dataGaps, trend, delta, deltaTone } = postureScore
     const hasValue = value !== null && value !== undefined
@@ -49,10 +49,12 @@ function PostureScoreCard({ postureScore }) {
     const band = hasValue ? riskBand(value) : null
     const bandTone = band ? band.tone : null
     const bandLabel = bandTone ? BAND_LABEL_FOR_TONE[bandTone] : null
+    const clickable = hasValue && !!onOpenBreakdown
 
     return (
         <Card>
-            <Box padding="4" style={{ height: '100%' }}>
+            <Box padding="4" onClick={clickable ? onOpenBreakdown : undefined}
+                style={{ height: '100%', cursor: clickable ? 'pointer' : undefined }}>
                 <VerticalStack gap="4" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <HorizontalStack align="space-between" blockAlign="center">
                         <HorizontalStack gap="1" blockAlign="center">
@@ -81,11 +83,14 @@ function PostureScoreCard({ postureScore }) {
                         </HorizontalStack>
                     )}
                     {hasValue && agentsScored > 0 && (
-                        <Text variant="bodySm" color="subdued">
-                            {agentsWithNoSignal > 0
-                                ? `Based on ${agentsScored - agentsWithNoSignal} of ${agentsScored} agents`
-                                : `Based on ${agentsScored} agent${agentsScored === 1 ? '' : 's'}`}
-                        </Text>
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Text variant="bodySm" color="subdued">
+                                {agentsWithNoSignal > 0
+                                    ? `Based on ${agentsScored - agentsWithNoSignal} of ${agentsScored} agents`
+                                    : `Based on ${agentsScored} agent${agentsScored === 1 ? '' : 's'}`}
+                            </Text>
+                            {clickable && <Button plain>How is this calculated?</Button>}
+                        </HorizontalStack>
                     )}
                 </VerticalStack>
             </Box>

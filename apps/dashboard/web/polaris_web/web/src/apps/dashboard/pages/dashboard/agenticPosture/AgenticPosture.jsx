@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Box, Icon, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Box, Button, HorizontalStack, Icon, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { SearchMinor } from '@shopify/polaris-icons'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
@@ -21,23 +21,29 @@ import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
 import PostureDrillFlyout from '../PostureDrillFlyout'
 import dashboardApi from '../api'
 
-function SectionHeading({ title, description }) {
+function SectionHeading({ title, description, action }) {
     return (
-        <VerticalStack gap="1">
-            <Text variant="headingMd">{title}</Text>
-            {description && <Text variant="bodySm" color="subdued">{description}</Text>}
-        </VerticalStack>
+        <HorizontalStack align="space-between" blockAlign="end">
+            <VerticalStack gap="1">
+                <Text variant="headingMd">{title}</Text>
+                {description && <Text variant="bodySm" color="subdued">{description}</Text>}
+            </VerticalStack>
+            {action}
+        </HorizontalStack>
     )
 }
 
-function Section({ title, description, children }) {
+function Section({ title, description, action, children }) {
     return (
         <VerticalStack gap="4">
-            <SectionHeading title={title} description={description} />
+            <SectionHeading title={title} description={description} action={action} />
             {children}
         </VerticalStack>
     )
 }
+
+// Drills that page through agents show 10 rows per page; the rest keep the flyout's default.
+const DRILL_PAGE_SIZE = { highRiskAgents: 10, postureScore: 10 }
 
 const DEFAULT_DATE_RANGE = values.ranges[3] // "Last 30 days" — same default the other posture pages use
 
@@ -185,7 +191,7 @@ function AgenticPosture() {
                         own wrapper because Card doesn't accept a style/width prop to fix that
                         directly, so a plain "display:flex" wrapper wasn't enough. */}
                     <div style={{ flex: '1 1 280px', minWidth: '280px', display: 'grid' }}>
-                        <PostureScoreCard postureScore={pageData.postureScore} />
+                        <PostureScoreCard postureScore={pageData.postureScore} onOpenBreakdown={() => openDrill('postureScore')} />
                     </div>
                     <div style={{ flex: '2.4 1 560px', minWidth: '320px', display: 'grid' }}>
                         <KpiGrid kpis={pageData.kpis} onOpenLink={openKpiLink} onOpenDrill={openDrill}
@@ -201,7 +207,11 @@ function AgenticPosture() {
                 <DangerousPathsSection dangerousPaths={pageData.dangerousPaths} />
             </Section>
 
-            <Section title="Highest-Risk Agents" description="Ranked by blast radius — privilege held, data reached, and controls missing.">
+            <Section
+                title="Highest-Risk Agents"
+                description="Ranked by blast radius — privilege held, data reached, and controls missing."
+                action={<Button onClick={() => openDrill('highRiskAgents')}>View all agents</Button>}
+            >
                 <HighestRiskAgentsTable agents={highestRiskAgents} onOpenAgent={openCollection} />
             </Section>
 
@@ -254,6 +264,7 @@ function AgenticPosture() {
                 filterStatePrefix="agentic-posture-drill"
                 fetchDrill={fetchArgusDrill}
                 ctaInFooter={true}
+                pageSize={DRILL_PAGE_SIZE[drillState?.drillId] || 20}
             />
         </Box>
     )

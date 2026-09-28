@@ -575,7 +575,7 @@ function RiskScoreRootBody({ kpi, onSubScoreClick }) {
 function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, startTimestamp, endTimestamp,
                               rootLabel = 'Security posture', filterStatePrefix = 'security-posture-drill',
                               fetchDrill = dashboardApi.fetchPostureDrill, width = 760,
-                              ctaInFooter = false }) {
+                              ctaInFooter = false, pageSize = 20 }) {
     const navigate = useNavigate()
     const show = !!drillState
     const [drill, setDrill] = useState(null)
@@ -613,7 +613,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             setLoading(true)
             try {
                 const resp = await fetchDrill(
-                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
+                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, pageSize)
                 if (cancelled) return
                 setDrill(resp || null)
                 firstPageCache.current = resp
@@ -629,7 +629,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
 
         load()
         return () => { cancelled = true }
-    }, [drillState, startTimestamp, endTimestamp, fetchDrill])
+    }, [drillState, startTimestamp, endTimestamp, fetchDrill, pageSize])
 
     // Every ancestor's own {path, label} comes back from the backend on every fetch (see
     // PostureDrillResult.breadcrumb's own javadoc) — a reload from a deep-linked URL renders the
@@ -664,9 +664,9 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             return Promise.resolve({ value: cached.rows, total: cached.total })
         }
         return fetchDrill(
-            drillState.drillId, drillState.path, startTimestamp, endTimestamp, skip, limit || 20
+            drillState.drillId, drillState.path, startTimestamp, endTimestamp, skip, limit || pageSize
         ).then((resp) => ({ value: resp?.rows || [], total: resp?.total || 0 }))
-    }, [drillState?.drillId, drillState?.path, startTimestamp, endTimestamp, fetchDrill])
+    }, [drillState?.drillId, drillState?.path, startTimestamp, endTimestamp, fetchDrill, pageSize])
 
     const handleRowClicked = useCallback((e) => {
         if (!drill?.drillable || e?.data?.id === undefined || e?.data?.id === null) return
@@ -692,7 +692,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             narrativePollCount.current += 1
             try {
                 const resp = await fetchDrill(
-                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
+                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, pageSize)
                 if (cancelled || !resp) return
                 setDrill((prev) => (prev ? {
                     ...prev,
@@ -707,7 +707,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             }
         }, NARRATIVE_POLL_INTERVAL_MS)
         return () => { cancelled = true; clearTimeout(timer) }
-    }, [drill, drillState, startTimestamp, endTimestamp, fetchDrill])
+    }, [drill, drillState, startTimestamp, endTimestamp, fetchDrill, pageSize])
 
     const ctas = drill?.ctas || []
     const dataGaps = drill?.dataGaps || []
@@ -820,7 +820,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                                     getRowStyle={drill.drillable ? () => ({ cursor: 'pointer' }) : undefined}
                                     noOuterBorder
                                     domLayout="autoHeight"
-                                    paginationPageSize={20}
+                                    paginationPageSize={pageSize}
                                     hidePageSizeSelector
                                     filterStateUrl={`${filterStatePrefix}/${drillState?.drillId || ''}/${drillState?.path || ''}`}
                                     sideBar={false}

@@ -624,7 +624,7 @@ public class ArgusPostureService {
         return shared + " shared · " + orphaned + " orphaned";
     }
 
-    private static String envTagValue(ApiCollection c) {
+    static String envTagValue(ApiCollection c) {
         if (c == null || c.getEnvType() == null) return null;
         for (CollectionTags tag : c.getEnvType()) {
             if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
@@ -632,7 +632,7 @@ public class ArgusPostureService {
         return null;
     }
 
-    private static List<ApiCollection> assetsIn(List<ApiCollection> assets, String environment) {
+    static List<ApiCollection> assetsIn(List<ApiCollection> assets, String environment) {
         if (isAllEnvironments(environment)) return assets;
 
         String bucket = bucketForId(environment);
@@ -736,7 +736,7 @@ public class ArgusPostureService {
         return env;
     }
 
-    private static String formatPercent(double percent) {
+    static String formatPercent(double percent) {
         if (percent == Math.floor(percent)) return (long) percent + "%";
         return percent + "%";
     }
@@ -799,34 +799,10 @@ public class ArgusPostureService {
 
     private static final int HIGHEST_RISK_AGENTS_LIMIT = 5;
 
-    private static final Map<String, Integer> SUB_SCORE_WEIGHTS = new HashMap<>();
-    private static final Map<String, String> SUB_SCORE_ISSUE_LABELS = new HashMap<>();
-    static {
-        SUB_SCORE_WEIGHTS.put("redTeam", 30);
-        SUB_SCORE_ISSUE_LABELS.put("redTeam", "Has open red-teaming findings");
-        SUB_SCORE_WEIGHTS.put("guardrailMalicious", 30);
-        SUB_SCORE_ISSUE_LABELS.put("guardrailMalicious", "Has guardrail-caught or malicious activity");
-        SUB_SCORE_WEIGHTS.put("coverage", 10);
-        SUB_SCORE_ISSUE_LABELS.put("coverage", "Not covered by a guardrail policy or red-team scan");
-        SUB_SCORE_WEIGHTS.put("sensitiveData", 10);
-        SUB_SCORE_ISSUE_LABELS.put("sensitiveData", "Accesses sensitive data");
-        SUB_SCORE_WEIGHTS.put("accessAuth", 10);
-        SUB_SCORE_ISSUE_LABELS.put("accessAuth", "Publicly accessible or unauthenticated");
-        SUB_SCORE_WEIGHTS.put("overprivilegedTools", 10);
-        SUB_SCORE_ISSUE_LABELS.put("overprivilegedTools", "Has privileged tool access");
-    }
-
     public List<BasicDBObject> buildHighestRiskAgents(InsightDataBundle bundle) {
-        List<ApiCollection> scored = new ArrayList<>();
-        for (ApiCollection c : bundle.collections) {
-            if (c == null || c.isDeactivated() || c.getPostureScore() == null) continue;
-            if (isAgenticInScope(c)) scored.add(c);
-        }
-        scored.sort(Comparator.comparingDouble(ApiCollection::getPostureScore).reversed());
-
         List<BasicDBObject> rows = new ArrayList<>();
         int rank = 1;
-        for (ApiCollection c : scored) {
+        for (ApiCollection c : scoredAgents(bundle.collections)) {
             if (rank > HIGHEST_RISK_AGENTS_LIMIT) break;
             long score = Math.round(c.getPostureScore());
 
@@ -843,12 +819,23 @@ public class ArgusPostureService {
         return rows;
     }
 
+    // In-scope, active agents with a cron-computed score, highest score first.
+    static List<ApiCollection> scoredAgents(List<ApiCollection> collections) {
+        List<ApiCollection> scored = new ArrayList<>();
+        for (ApiCollection c : collections) {
+            if (c == null || c.isDeactivated() || c.getPostureScore() == null) continue;
+            if (isAgenticInScope(c)) scored.add(c);
+        }
+        scored.sort(Comparator.comparingDouble(ApiCollection::getPostureScore).reversed());
+        return scored;
+    }
+
     // Mirrors UsersCollectionsList#getContextCollections(AGENTIC); must match AgenticPostureScoreCron's gate.
-    private static boolean isAgenticInScope(ApiCollection c) {
+    static boolean isAgenticInScope(ApiCollection c) {
         return (c.isMcpCollection() || c.isGenAICollection()) && !c.isEndpointCollection();
     }
 
-    private static String agentDisplayName(ApiCollection c) {
+    static String agentDisplayName(ApiCollection c) {
         // Not extractServiceName(hostName): it mis-parses real DNS hosts ("mcp.kite.trade" -> "trade").
         String assetValue = AgenticObserveUtil.getAssetTagValue(c);
         if (assetValue != null && !assetValue.trim().isEmpty()) return AgenticObserveUtil.formatDisplayName(assetValue);
@@ -856,30 +843,30 @@ public class ArgusPostureService {
         return c.getHostName() != null ? c.getHostName() : "Unknown agent";
     }
 
-    // Category contributing the most weighted points (subScore/100 * weight), not the highest raw sub-score.
-    private static String worstIssue(Map<String, Object> subScores) {
-        if (subScores != null) {
-            String worstKey = null;
-            double worstEarned = 0;
-            for (Map.Entry<String, Object> e : subScores.entrySet()) {
-                Integer weight = SUB_SCORE_WEIGHTS.get(e.getKey());
-                if (weight == null || !(e.getValue() instanceof Number)) continue;
-                double earned = weight * (((Number) e.getValue()).doubleValue() / 100.0);
-                if (earned > worstEarned) {
-                    worstEarned = earned;
-                    worstKey = e.getKey();
-                }
+    // Category contributing the most weighted points, not the highest raw sub-score.
+    static PostureScoreCategory worstCategory(Map<String, Object> subScores) {
+        PostureScoreCategory worst = null;
+        double worstPoints = 0;
+        for (PostureScoreCategory category : PostureScoreCategory.values()) {
+            double points = category.points(subScores);
+            if (points > worstPoints) {
+                worstPoints = points;
+                worst = category;
             }
-            if (worstKey != null) return SUB_SCORE_ISSUE_LABELS.get(worstKey);
         }
-        return "No significant issues detected";
+        return worst;
+    }
+
+    static String worstIssue(Map<String, Object> subScores) {
+        PostureScoreCategory worst = worstCategory(subScores);
+        return worst != null ? worst.issue : "No significant issues detected";
     }
 
     private static final int SEVERITY_CRITICAL_AT = 75;
-    private static final int SEVERITY_HIGH_AT = 10;
+    static final int SEVERITY_HIGH_AT = 10;
     private static final int SEVERITY_MEDIUM_AT = 5;
 
-    private static String severityForScore(long score) {
+    static String severityForScore(long score) {
         if (score >= SEVERITY_CRITICAL_AT) return "CRITICAL";
         if (score >= SEVERITY_HIGH_AT) return "HIGH";
         if (score >= SEVERITY_MEDIUM_AT) return "MEDIUM";
