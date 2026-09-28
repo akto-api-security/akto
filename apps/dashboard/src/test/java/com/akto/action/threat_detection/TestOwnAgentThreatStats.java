@@ -26,10 +26,10 @@ public class TestOwnAgentThreatStats {
 
     private OwnAgentThreatStats stats() {
         return new OwnAgentThreatStats(Arrays.asList(
-            event("1", "a1", "/chat", "bot.zs.com", "CRITICAL", "PII", "PII-EMAIL", DAY1 + 10, "ACTIVE", true),
-            event("2", "a1", "/chat", "bot.zs.com", "HIGH", "PII", "PII-EMAIL", DAY1 + 20, "ACTIVE", false),
-            event("3", "a2", "/skills/web-search", "bot.zs.com", "LOW", "INJ", "PromptInjection", DAY1 + DAY + 5, "IGNORED", false),
-            event("4", "a3", "/tools", "agent.zs.com", "MEDIUM", "INJ", "PromptInjection", DAY1 + DAY + 50, "UNDER_REVIEW", false)
+            event("1", "a1", "/chat", "bot.example.com", "CRITICAL", "PII", "PII-EMAIL", DAY1 + 10, "ACTIVE", true),
+            event("2", "a1", "/chat", "bot.example.com", "HIGH", "PII", "PII-EMAIL", DAY1 + 20, "ACTIVE", false),
+            event("3", "a2", "/skills/web-search", "bot.example.com", "LOW", "INJ", "PromptInjection", DAY1 + DAY + 5, "IGNORED", false),
+            event("4", "a3", "/tools", "agent.example.com", "MEDIUM", "INJ", "PromptInjection", DAY1 + DAY + 50, "UNDER_REVIEW", false)
         ));
     }
 
@@ -76,7 +76,7 @@ public class TestOwnAgentThreatStats {
         assertEquals("/chat", stats.topApis(8).get(0).getEndpoint());
         assertEquals(2, stats.topApis(8).get(0).getAttacks());
         assertEquals("CRITICAL", stats.topApis(8).get(0).getSeverity());
-        assertEquals("bot.zs.com", stats.topHosts(8).get(0).getHost());
+        assertEquals("bot.example.com", stats.topHosts(8).get(0).getHost());
         assertEquals(3, stats.topHosts(8).get(0).getAttacks());
         assertEquals(1, stats.topHosts(1).size());
         assertEquals("a1", stats.dashboardTopActors(5).get(0).getActor());
@@ -102,6 +102,14 @@ public class TestOwnAgentThreatStats {
         assertEquals(DAY1 + 10, chat.getDiscoveredAt());
         // latest first
         assertEquals("/tools", apis.get(0).getApi());
+    }
+
+    @Test
+    public void testActorsPerCountry() {
+        List<ThreatActorPerCountry> countries = stats().actorsPerCountry();
+        assertEquals(1, countries.size());
+        assertEquals("IN", countries.get(0).getCountry());
+        assertEquals(3, countries.get(0).getCount()); // a1, a2, a3 counted once each
     }
 
     @Test

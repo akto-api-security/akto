@@ -7,14 +7,17 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.User;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 /*
@@ -24,6 +27,9 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
  * products other than Argus.
  */
 public class ArgusCollectionScope {
+
+    private static final ConcurrentHashMap<String, Pair<Set<String>, Integer>> hostsCache = new ConcurrentHashMap<>();
+    private static final int HOSTS_EXPIRY_TIME = 120;
 
     /** True only for Argus requests. Atlas (ENDPOINT), API Security and DAST are never affected. */
     public static boolean isArgusContext() {
@@ -40,7 +46,7 @@ public class ArgusCollectionScope {
                 || !UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
             return null;
         }
-        List<Integer> userCollectionIds = RBACDao.instance.getUserCollectionsById(user.getId(), accountId);
+        List<Integer> userCollectionIds = UsersCollectionsList.getAssignedCollectionIds(user.getId(), accountId);
         return (userCollectionIds == null || userCollectionIds.isEmpty()) ? null : userCollectionIds;
     }
 
@@ -56,17 +62,24 @@ public class ArgusCollectionScope {
 
     /** Host names of the collections the user is limited to (can be empty), or null if the user is not limited. */
     public static Set<String> getRestrictedHosts(User user) {
-        List<ApiCollection> collections = getRestrictedCollections(user);
-        if (collections == null) {
+        List<Integer> collectionIds = getRestrictedCollectionIds(user);
+        if (collectionIds == null) {
             return null;
         }
-        Set<String> hosts = new LinkedHashSet<>();
-        for (ApiCollection collection : collections) {
-            if (collection.getHostName() != null && !collection.getHostName().isEmpty()) {
-                hosts.add(collection.getHostName());
+        // Keyed by the collection ids, so a change in the user's collections is never served from the cache
+        String key = Context.accountId.get() + "|" + new TreeSet<>(collectionIds);
+        Pair<Set<String>, Integer> cached = hostsCache.get(key);
+        if (cached == null || Context.now() - cached.getSecond() > HOSTS_EXPIRY_TIME) {
+            Set<String> hosts = new LinkedHashSet<>();
+            for (ApiCollection collection : ApiCollectionsDao.instance.getMetaForIds(collectionIds)) {
+                if (collection.getHostName() != null && !collection.getHostName().isEmpty()) {
+                    hosts.add(collection.getHostName());
+                }
             }
+            cached = new Pair<>(hosts, Context.now());
+            hostsCache.put(key, cached);
         }
-        return hosts;
+        return new LinkedHashSet<>(cached.getFirst());
     }
 
     /*

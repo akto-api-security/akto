@@ -1,9 +1,10 @@
 package com.akto.interceptor;
 
+import com.akto.action.TraceAction;
+import com.akto.dao.tracing.TraceDao;
+import com.akto.dto.tracing.model.Trace;
 import com.akto.utils.ArgusCollectionScope;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.Arrays;
+import com.mongodb.client.model.Filters;
 import com.akto.audit_logs_util.Audit;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
@@ -47,32 +48,12 @@ import org.apache.struts2.ServletActionContext;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
 
-    // Account-wide settings: blocked for Argus users limited to specific collections (see ArgusCollectionScope)
-    private static final Set<String> ACCOUNT_WIDE_SETTING_ACTIONS = new HashSet<>(Arrays.asList(
-            // threat detection configuration and account-wide threat actions
-            "modifyThreatConfiguration", "toggleArchivalEnabled", "deleteAllMaliciousEvents",
-            "modifyThreatActorStatus", "modifyThreatActorStatusCloudflare", "bulkModifyThreatActorStatusCloudflare",
-            "startPolicyBackfillReplay", "startComplianceClauseScan", "generateThreatReport",
-            // test roles, auth mechanism and auth types
-            "addTestRoles", "saveTestRoleMeta", "deleteTestRole", "updateTestRoles", "deleteAuthFromRole",
-            "updateAuthInRole", "addAuthToRole", "addAuthMechanism",
-            "addCustomAuthType", "updateCustomAuthType", "resetAllCustomAuthTypes", "updateCustomAuthTypeStatus",
-            // default payloads, url settings, api tokens
-            "updateUrlSettings", "saveDefaultPayload", "addApiToken", "deleteApiToken"
-    ));
-
-    private static boolean isAccountWideSettingAction(String actionName) {
-        if (actionName == null) return false;
-        String name = actionName.startsWith("api/") ? actionName.substring(4) : actionName;
-        return ACCOUNT_WIDE_SETTING_ACTIONS.contains(name);
-    }
-
-
     private static final LoggerMaker loggerMaker = new LoggerMaker(RoleAccessInterceptor.class, LoggerMaker.LogDb.DASHBOARD);
     private static final LoggerMaker logger = new LoggerMaker(RoleAccessInterceptor.class, LogDb.DASHBOARD);
     String featureLabel;
     String accessType;
     String actionDescription;
+    String collectionScope;
 
     public void setFeatureLabel(String featureLabel) {
         this.featureLabel = featureLabel;
@@ -84,6 +65,36 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     public void setActionDescription(String actionDescription) {
         this.actionDescription = actionDescription;
+    }
+
+    public void setCollectionScope(String collectionScope) {
+        this.collectionScope = collectionScope;
+    }
+
+    // Error for Argus users limited to specific collections, or null if the request is allowed
+    private String checkCollectionScope(Object action, User user) {
+        if (collectionScope == null) return null;
+        List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(user);
+        if (restrictedIds == null) return null;
+        switch (RbacEnums.CollectionScope.valueOf(collectionScope.toUpperCase())) {
+            case ACCOUNT_WIDE:
+                return "Users limited to specific collections cannot change account-wide settings.";
+            case OWN_COLLECTION:
+                if (action instanceof TraceAction) {
+                    TraceAction traceAction = (TraceAction) action;
+                    int collectionId = traceAction.getApiCollectionId();
+                    if (traceAction.getTraceId() != null && !traceAction.getTraceId().isEmpty()) {
+                        Trace trace = TraceDao.instance.findOne(Filters.eq("_id", traceAction.getTraceId()));
+                        collectionId = trace == null ? -1 : trace.getApiCollectionId();
+                    }
+                    if (!restrictedIds.contains(collectionId)) {
+                        return "You can only view data of the collections assigned to you.";
+                    }
+                }
+                return null;
+            default:
+                return null;
+        }
     }
 
     public final static String FORBIDDEN = "FORBIDDEN";
@@ -255,10 +266,9 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 return FORBIDDEN;
             }
 
-            // Argus users limited to specific collections cannot change account-wide settings
-            if (isAccountWideSettingAction(invocation.getProxy().getActionName())
-                    && ArgusCollectionScope.isLimited(user)) {
-                ((ActionSupport) invocation.getAction()).addActionError("Users limited to specific collections cannot change account-wide settings.");
+            String collectionScopeError = checkCollectionScope(invocation.getAction(), user);
+            if (collectionScopeError != null) {
+                ((ActionSupport) invocation.getAction()).addActionError(collectionScopeError);
                 return FORBIDDEN;
             }
 
