@@ -133,11 +133,13 @@ public class AgenticPostureScoreCron {
             double scoredSum = 0;
             for (ApiCollection c : agentCollections) {
                 List<ApiInfo> apis = apiInfosByCollection.getOrDefault(c.getId(), new ArrayList<>());
-                boolean collectionEverTested = apis.stream().anyMatch(a -> a != null && a.getLastTested() > 0);
+                // An open red-team finding proves a scan ran even when ApiInfo.lastTested wasn't stamped.
+                boolean collectionEverTested = redTeamSeverities.containsKey(c.getId())
+                        || apis.stream().anyMatch(a -> a != null && a.getLastTested() > 0);
                 boolean coveredByPolicy = isCoveredByGuardrailPolicy(policies, c);
 
-                double redTeam = weightedSeverityScore(redTeamSeverities.get(c.getId()));
-                double guardrailMalicious = weightedSeverityScore(maliciousSeveritiesByCollection.get(c.getId()));
+                double redTeam = worstSeverityScore(redTeamSeverities.get(c.getId()));
+                double guardrailMalicious = worstSeverityScore(maliciousSeveritiesByCollection.get(c.getId()));
                 double coverage = coverageSubScore(coveredByPolicy, collectionEverTested);
                 double sensitiveData = sensitiveDataSubScore(c.getId(), sensitiveByCollection);
                 double accessAuth = accessAuthSubScore(apis);
@@ -238,17 +240,14 @@ public class AgenticPostureScoreCron {
         return out;
     }
 
-    // Severity-weighted average of findings; 0 when none (the "never checked" case is scored by Coverage).
-    private static double weightedSeverityScore(Map<String, Integer> bySeverity) {
-        if (bySeverity == null || bySeverity.isEmpty()) return 0.0;
-        long weightedSum = 0, total = 0;
+    // Severity of the worst finding, so extra low-severity findings never dilute a high one; 0 when none.
+    private static double worstSeverityScore(Map<String, Integer> bySeverity) {
+        if (bySeverity == null) return 0.0;
+        int worst = 0;
         for (Map.Entry<String, Integer> e : bySeverity.entrySet()) {
-            int count = e.getValue() == null ? 0 : e.getValue();
-            weightedSum += severityWeight(e.getKey()) * (long) count;
-            total += count;
+            if (e.getValue() != null && e.getValue() > 0) worst = Math.max(worst, severityWeight(e.getKey()));
         }
-        if (total == 0) return 0.0;
-        return weightedSum / (double) total;
+        return worst;
     }
 
     private static int severityWeight(String severity) {
