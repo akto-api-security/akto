@@ -9,10 +9,28 @@ export const PANEL_EMPTY_STATE_COPY = {
     dataLeaving: 'Create policies having PII-types for detecting Data leaks',
     enforcementFunnel: 'Create guardrail policies in Block, Alert mode.',
     attackAttempts: 'Coming Soon',
-    frameworkReadiness: 'Attach compliances to the guardrail policies',
+    frameworkReadiness: 'Run a compliance scan from the Threat Detection page to score framework readiness',
     vendorRiskExposure: 'All data is safe',
     adoptionGap: 'Coming soon',
     riskScoreTrend: 'Coming soon',
+}
+
+// What each posture card measures — shown in its title tooltip, ahead of any data-gap notes.
+// Keyed by KPI id / panel id (mirrors PostureService on the backend).
+export const POSTURE_CARD_INFO = {
+    riskScore: 'Weighted composite of five sub-scores: Shadow AI exposure, DLP incidents, vendor risk, compliance gaps and threat activity. 0–100, lower is better.',
+    criticalAlerts: 'Critical-severity guardrail violations in the selected period, compared with the previous period of the same length.',
+    monitoringCoverage: 'Share of live devices that at least one active guardrail policy applies to.',
+    sensitiveDataIncidents: 'Violations from guardrail policies that have PII detection configured, in the selected period.',
+    shadowAiTrend: 'AI tools by first-seen date, split by whether they are sanctioned in your audit. Sanction status is today\'s, applied across the whole history.',
+    dataLeaving: 'Violations from PII-detecting guardrail policies in the selected period, broken out by policy. Smaller ones are grouped as Others.',
+    enforcementFunnel: 'Guardrail matches in the selected period, split by what the policy did: hard-blocked, warned only, or alerted and let through.',
+    attackAttempts: 'Malicious events detected in the selected period, per week. All are counted as blocked for now — there is no signal yet for attacks that got through.',
+    frameworkReadiness: 'For each compliance framework, the share of its clauses exercised by real guardrail-violation traffic in the selected period. Comes from the compliance scan on the Threat Detection page.',
+    adoptionGap: 'Approved vs. unapproved AI tool adoption per department. Illustrative preview — not available yet.',
+    vendorRiskExposure: 'Each AI vendor by how many devices use it (left to right) and its risk weight (bottom to top). Vendors in the shaded band are high-risk: act on them first.',
+    biggestMovers: 'Vendors that crossed a device-count or attack-count threshold in the last 30 days. Fixed window — does not follow the date filter.',
+    actNow: 'Open discovery and guardrail insights that need attention, worst severity first.',
 }
 
 // Static week-ending-now timestamps for a dummy N-week series — same [ms, value] point shape
@@ -66,14 +84,18 @@ export const DUMMY_ATTACK_ATTEMPTS = {
     route: null,
 }
 
-// These panels have no backend yet at all (not "empty data" — the feature itself isn't built),
-// so unlike the conditionally-real ones above they're ALWAYS shown blurred.
+// Fallback only — shown blurred until a compliance clause scan has run (see
+// ComplianceClauseScanAction / PostureService#frameworkReadiness), same conditional-real pattern
+// as ShadowAiTrendCard etc. above, not "no backend at all" like DUMMY_ADOPTION_GAP below.
 export const DUMMY_FRAMEWORK_READINESS = [
-    { id: 'nist', label: 'NIST AI RMF', value: 78, target: 85, color: '#F2B322' },
-    { id: 'iso', label: 'ISO/IEC 42001', value: 64, target: 72, color: '#F2B322' },
-    { id: 'euai', label: 'EU AI Act (GPAI)', value: 51, target: 65, color: '#F24122' },
-    { id: 'soc2', label: 'SOC 2 · AI addendum', value: 92, target: 90, color: '#23C48C' },
+    { id: 'nist', label: 'NIST AI RMF', value: 78 },
+    { id: 'iso', label: 'ISO/IEC 42001', value: 64 },
+    { id: 'euai', label: 'EU AI Act (GPAI)', value: 51 },
+    { id: 'soc2', label: 'SOC 2 · AI addendum', value: 92 },
 ]
+
+// This one has no backend yet at all (not "empty data" — the feature itself isn't built), so
+// unlike the conditionally-real ones it's ALWAYS shown blurred.
 export const DUMMY_ADOPTION_GAP = [
     { department: 'Engineering', shadowPct: 30, approvedPct: 60, shadowSharePct: 41 },
     { department: 'Sales', shadowPct: 24, approvedPct: 68, shadowSharePct: 28 },

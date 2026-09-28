@@ -40,7 +40,7 @@ Analyze this text and respond ONLY with valid JSON:
 {
   "isCode": <true if the USER is supplying or requesting code, false otherwise>,
   "confidence": <float 0.0 to 1.0 — your estimated p(boolean-above-is-true). Use ~0.9+ when sure it is true, ~0.1 or lower when sure it is false. NEVER invert.>,
-  "reason": "<one sentence explanation>"
+  "reason": "<one sentence explanation; refer to any PII, secret or personal data by category only, never quote the values>"
 }
 
 Text to analyze:

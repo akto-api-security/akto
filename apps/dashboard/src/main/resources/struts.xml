@@ -2457,6 +2457,36 @@
             </result>
         </action>
 
+        <action name="api/startComplianceClauseScan" class="com.akto.action.threat_detection.ComplianceClauseScanAction" method="startComplianceClauseScan">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User started a compliance clause scan</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchBrowserExtensionConfigs" class="com.akto.action.BrowserExtensionConfigAction" method="fetchBrowserExtensionConfigs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -13805,7 +13835,7 @@
             </result>
         </action>
 
-        <action name="api/fetchArgusPostureSummary" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureSummary">
+        <action name="api/fetchPostureDrill" class="com.akto.action.SecurityPostureAction" method="fetchPostureDrill">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -13813,7 +13843,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="SUCCESS" type="json">
-                <param name="root">response</param>
+                <param name="root">postureDrill</param>
             </result>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -13827,7 +13857,7 @@
             </result>
         </action>
 
-        <action name="api/fetchRiskScoreBreakdown" class="com.akto.action.SecurityPostureAction" method="fetchRiskScoreBreakdown">
+         <action name="api/fetchArgusPostureSummary" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureSummary">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -13835,7 +13865,7 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="SUCCESS" type="json">
-                <param name="root">riskScoreBreakdown</param>
+                <param name="root">response</param>
             </result>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>

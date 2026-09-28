@@ -7,6 +7,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpMessage;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -22,6 +23,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class AbstractThreatDetectionAction extends UserAction {
+
+  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
+  // the threat backend as headers.
+  @Getter @Setter String skillEvaluationMode;
+  @Getter @Setter String configEvaluationMode;
 
   private Map<Integer, String> tokens = new HashMap<>();
   private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -244,6 +250,15 @@ public class AbstractThreatDetectionAction extends UserAction {
    *     asset's hostNames) instead of the whole account.
    * @return one count per monthBoundaries entry, or an empty list on any error/empty input.
    */
+  protected void addEvaluationModeHeaders(HttpMessage request) {
+    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
+      request.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
+    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
+      request.addHeader("x-config-eval-mode", this.configEvaluationMode);
+    }
+  }
+
   protected List<Integer> fetchViolationsMonthlyTotals(
       int startTimestamp, int endTimestamp, List<Integer> monthBoundaries, List<String> hostFilter) {
     if (monthBoundaries == null || monthBoundaries.isEmpty()) return new ArrayList<>();

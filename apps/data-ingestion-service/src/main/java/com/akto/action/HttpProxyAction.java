@@ -6,7 +6,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
 import com.akto.utils.McpCollectionResolver;
-import com.akto.utils.SlackUtils;
 import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -58,6 +57,8 @@ public class HttpProxyAction extends ActionSupport {
     private String contextSource;
     // When set, checks a pending Human Approval activity's status instead of validating.
     private String activityId;
+    // Raw request from endpoint shield, used for account-type detection.
+    private String fullRequest;
 
     private Map<String, Object> data;
     private boolean success;
@@ -83,7 +84,6 @@ public class HttpProxyAction extends ActionSupport {
                 String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
                     + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + message;
                 loggerMaker.errorAndAddToDb(errorMsg);
-                sendSlackAlert(errorMsg);
             } else {
                 loggerMaker.infoAndAddToDb("[http-proxy] API completed - path: {}, method: {}, account: {}, latencyMs: {}",
                     path, method, akto_account_id, latencyMs);
@@ -96,18 +96,12 @@ public class HttpProxyAction extends ActionSupport {
             String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
                 + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + e.getMessage();
             loggerMaker.errorAndAddToDb(errorMsg);
-            sendSlackAlert(errorMsg);
             success = false;
             message = "Unexpected error: " + e.getMessage();
             data = new HashMap<>();
             data.put("error", e.getMessage());
             return Action.ERROR.toUpperCase();
         }
-    }
-
-    private void sendSlackAlert(String errorMsg) {
-        String alertText = errorMsg + ", requestData: " + buildRequestData().toString();
-        SlackUtils.sendAlert(alertText);
     }
 
     private String normalizeHostInRequestHeaders(String headers) {
@@ -211,6 +205,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("contextSource", contextSource);
         requestData.put("client_hook", client_hook);
         requestData.put("activityId", activityId);
+        requestData.put("fullRequest", fullRequest);
 
         return requestData;
     }

@@ -263,6 +263,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     // Host + path suggestions are sourced from the browser extension configs.
     const [blockedHosts, setBlockedHosts] = useState([]);
     const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
+    const [blockPublicShare, setBlockPublicShare] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
 
     // Step 13: Exceptions — phrases excluded from evaluation before this policy's detectors run
@@ -298,6 +299,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [negatedTargetDeviceIds, setNegatedTargetDeviceIds] = useState(false);
     const [negatedTargetUserNames, setNegatedTargetUserNames] = useState(false);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
+    const [skipEnterpriseAccounts, setSkipEnterpriseAccounts] = useState(false);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
@@ -496,6 +498,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        blockPublicShare,
         // Step 13
         ignorePhrases,
         // Step 10
@@ -520,6 +523,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         negatedTargetDeviceIds,
         negatedTargetUserNames,
         enterpriseLicenseComplianceCategories,
+        skipEnterpriseAccounts,
         // A negated row with zero values is a deliberate "apply to everything" scope, not an unfinished one
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
             !negatedAgentServers && !negatedMcpServers && !negatedLlmServers &&
@@ -589,7 +593,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 number: EnterpriseLicenseComplianceConfig.number,
                 title: EnterpriseLicenseComplianceConfig.title,
                 summary: EnterpriseLicenseComplianceConfig.getSummary(storedStateData),
-                beta: true,
                 ...EnterpriseLicenseComplianceConfig.validate(storedStateData)
             }
         ];
@@ -820,6 +823,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
         setBlockPersonalAccounts(false);
+        setBlockPublicShare(false);
         setIgnorePhrases([]);
         setApplyOnResponse(false);
         setApplyOnRequest(false);
@@ -830,6 +834,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyToAllUsers(true);
         setTargetTags({});
         setEnterpriseLicenseComplianceCategories([]);
+        setSkipEnterpriseAccounts(false);
     };
 
     const populateFormForEdit = (policy) => {
@@ -986,6 +991,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             pattern: entry.pattern || ""
         })));
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
+        setBlockPublicShare(policy.blockPublicShare || false);
 
         setIgnorePhrases((policy.ignorePhrases || []).map(entry => ({
             phrase: entry.phrase || "",
@@ -1012,6 +1018,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setNegatedTargetDeviceIds(policy.negatedTargetDeviceIds || false);
         setNegatedTargetUserNames(policy.negatedTargetUserNames || false);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
+        setSkipEnterpriseAccounts(policy.skipEnterpriseAccounts || false);
     };
 
     const handleClose = () => {
@@ -1146,6 +1153,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedLlmServersV2: transformedLlmServers,
                 blockedHosts: cleanedBlockedHosts,
                 blockPersonalAccounts,
+                blockPublicShare,
                 ignorePhrases: cleanedIgnorePhrases,
                 applyOnResponse,
                 applyOnRequest,
@@ -1178,6 +1186,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     ).values()
                 ),
                 enterpriseLicenseComplianceCategories,
+                skipEnterpriseAccounts,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -1344,6 +1353,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setBlockedHosts={setBlockedHosts}
                         blockPersonalAccounts={blockPersonalAccounts}
                         setBlockPersonalAccounts={setBlockPersonalAccounts}
+                        blockPublicShare={blockPublicShare}
+                        setBlockPublicShare={setBlockPublicShare}
                         hostSuggestions={hostSuggestions}
                     />
                 );
@@ -1397,6 +1408,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         deviceList={availableUsers}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        skipEnterpriseAccounts={skipEnterpriseAccounts}
+                        setSkipEnterpriseAccounts={setSkipEnterpriseAccounts}
                     />
                 );
             case 13:
@@ -1505,6 +1518,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
             blockPersonalAccounts,
+            blockPublicShare,
             ignorePhrases: (ignorePhrases || [])
                 .filter(entry => entry && (entry.phrase || "").trim())
                 .map(entry => ({

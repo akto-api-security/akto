@@ -1,8 +1,9 @@
 name: Production
 
-env:
-  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-  GAR_REGISTRY: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+# NOTE: Google Artifact Registry (GAR) image push was removed in PR #6496
+# (https://github.com/akto-api-security/akto/pull/6496) — images now go to
+# DockerHub and ECR only. Revert that PR to restore the GCP_REGION /
+# GAR_REGISTRY env vars, the gcloud auth steps, and the GAR image tags.
 
 # Controls when the workflow will run
 on:
@@ -528,26 +529,11 @@ jobs:
           mask-password: "true"
           registry-type: public
 
-      - name: Authenticate to Google Cloud
-        if: vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up Cloud SDK
-        if: vars.GCP_PROJECT_ID != ''
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        if: vars.GCP_PROJECT_ID != ''
-        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
-
       - name: Compute image tags
         id: tags
         env:
           VER: ${{ github.event.inputs.release_version_agent_guard }}
           ECR: ${{ steps.login-ecr.outputs.registry }}/p7q3h0z2
-          GAR_ENABLED: ${{ vars.GCP_PROJECT_ID != '' }}
         run: |
           set -euo pipefail
           for img in worker anonymizer embedder; do
@@ -558,10 +544,6 @@ jobs:
               echo "aktosecurity/$NAME:$VER"
               echo "$ECR/$NAME:local"
               echo "$ECR/$NAME:$VER"
-              if [ "$GAR_ENABLED" = "true" ]; then
-                echo "$GAR_REGISTRY/$NAME:local"
-                echo "$GAR_REGISTRY/$NAME:$VER"
-              fi
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           done
@@ -616,7 +598,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released (worker + anonymizer + embedder) and pushed to DockerHub, ECR & GAR!"
+              "text": "🚀 Agent Guard v${{ github.event.inputs.release_version_agent_guard }} released (worker + anonymizer + embedder) and pushed to DockerHub & ECR!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
