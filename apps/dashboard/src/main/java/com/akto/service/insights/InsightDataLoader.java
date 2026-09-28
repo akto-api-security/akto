@@ -14,10 +14,6 @@ import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.nhi_governance.NhiIdentityDao;
-import com.akto.dao.testing.AgentConversationResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.VulnerableTestingRunResultDao;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
@@ -25,23 +21,15 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAllowlist;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
-import com.akto.dto.insights.agentic.AgentFindingGroup;
-import com.akto.dto.insights.agentic.DailyCount;
 import com.akto.dto.nhi_governance.NhiIdentity;
-import com.akto.dto.testing.AgentConversationResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.service.insights.agentic.AgentIndex;
-import com.akto.service.insights.agentic.AgenticInsightData;
 import com.akto.util.AgenticObserveUtil;
-import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
-import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -88,16 +76,6 @@ public class InsightDataLoader {
     // them is I/O-bound (waiting on Mongo/HTTP, not CPU), not the "one thread per CPU core" case.
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
-
-    // AGENTIC (Argus posture) read caps — every one keeps a per-group/per-account payload small
-    // regardless of how much raw data underlies it; see the DAO/SearchClient methods these caps
-    // are passed to.
-    private static final int SUMMARY_ID_CAP = 500;
-    private static final int CONVERSATION_IDS_PER_GROUP_CAP = 5;
-    private static final int GLOBAL_CONVERSATION_ID_CAP = 500;
-    private static final int URLS_PER_ISSUE_GROUP_CAP = 3;
-    private static final int NAMES_PER_AUDIT_GROUP_CAP = 5;
-    private static final int TOPICS_PER_SERVICE_CAP = 5;
 
     public InsightDataBundle load(InsightContext ctx) {
         long loadStart = System.currentTimeMillis();
@@ -174,7 +152,7 @@ public class InsightDataLoader {
         return new InsightDataBundle(ctx, collections, collectionsByServiceName, fields.deviceIdToUsername, fields.userTags,
                 fields.auditRows, policies, allowlistNamesLower, fields.sensitiveByCollection, fields.userAnalysis, fields.nhiIdentities,
                 hostSeverityCounts, subCategoryCounts, skillSeverityCounts, threatBackendAvailable,
-                fields.activeCollections, fields.collectionLastTrafficSeen, fields.agentic, threatAccess);
+                fields.activeCollections, fields.collectionLastTrafficSeen, threatAccess);
     }
 
     private ContextReader contextReaderFor(CONTEXT_SOURCE contextSource) {
@@ -212,7 +190,6 @@ public class InsightDataLoader {
         List<NhiIdentity> nhiIdentities = Collections.emptyList();
         List<ApiCollection> activeCollections = Collections.emptyList();
         Map<Integer, Integer> collectionLastTrafficSeen = Collections.emptyMap();
-        AgenticInsightData agentic = AgenticInsightData.empty();
     }
 
     private static final class EndpointContextReader implements ContextReader {
@@ -249,112 +226,15 @@ public class InsightDataLoader {
         }
     }
 
-    /** Every one of these is a small, already-aggregated-in-Mongo/ES result (see the DAO/
-     *  SearchClient methods themselves for the index/projection/group shape), never a raw findAll
-     *  — see AgenticInsightData's own javadoc. */
+    /** AGENTIC has no bundle-level extra reads right now — the Argus insight cards
+     *  (ArgusInsightsService) read testing_run_issues/malicious_events/ElasticSearch directly,
+     *  independent of this bundle. This reader's only remaining job is making sure AGENTIC never
+     *  falls through to EndpointContextReader's unbounded ENDPOINT-only findAlls. */
     private static final class AgenticContextReader implements ContextReader {
         @Override
         public void read(InsightDataLoader loader, BundleFields out, InsightContext ctx, int accountId, Integer userId,
                           CONTEXT_SOURCE contextSource, List<ApiCollection> collections) {
-            List<Integer> agenticCollectionIds = new ArrayList<>();
-            for (ApiCollection c : collections) agenticCollectionIds.add(c.getId());
-
-            Future<List<AgentFindingGroup>> openIssueGroupsFuture = loader.submitTimed(accountId, userId, contextSource,
-                    "openIssueGroups (Argus red-team issues)",
-                    () -> TestingRunIssuesDao.instance.openIssueGroupsForDashboard(ctx.getStartTs(), ctx.getEndTs(), URLS_PER_ISSUE_GROUP_CAP),
-                    List::size);
-            Future<RedTeamRead> redTeamFuture = loader.submitTimed(accountId, userId, contextSource,
-                    "redTeam (summaryIds -> vulnGroups/trend -> validated conversations)",
-                    () -> loader.loadRedTeamRead(ctx, agenticCollectionIds), r -> r.vulnGroups.size());
-            Future<List<AgentFindingGroup>> auditGroupsFuture = loader.submitTimed(accountId, userId, contextSource,
-                    "auditGroups (Argus unapproved/malicious components)",
-                    () -> McpAuditInfoDao.instance.auditGroupsForAgents(ctx.getStartTs(), contextSource, NAMES_PER_AUDIT_GROUP_CAP), List::size);
-            Future<List<UserAnalysisData>> serviceObservabilityFuture = loader.submitTimed(accountId, userId, contextSource,
-                    "serviceObservability (Argus, via SearchClient)",
-                    () -> loader.loadAgenticServiceObservability(accountId, ctx), List::size);
-
-            List<AgentFindingGroup> openIssueGroups = loader.getOrEmpty(openIssueGroupsFuture, Collections.emptyList(), "openIssueGroups");
-            RedTeamRead redTeam = loader.getOrEmpty(redTeamFuture,
-                    new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap()), "redTeam");
-            List<AgentFindingGroup> auditGroups = loader.getOrEmpty(auditGroupsFuture, Collections.emptyList(), "auditGroups");
-            List<UserAnalysisData> serviceObservability = loader.getOrEmpty(serviceObservabilityFuture, Collections.emptyList(), "serviceObservability");
-
-            out.agentic = new AgenticInsightData(true, new AgentIndex(collections), openIssueGroups, redTeam.vulnGroups,
-                    redTeam.dailyCounts, redTeam.conversationsById, auditGroups, serviceObservability);
-        }
-    }
-
-    /** Holds loadRedTeamRead's three results together so they can travel through one Future — see
-     *  AgenticContextReader. Loader-internal only; never leaves this class. */
-    private static final class RedTeamRead {
-        final List<AgentFindingGroup> vulnGroups;
-        final List<DailyCount> dailyCounts;
-        final Map<String, AgentConversationResult> conversationsById;
-        RedTeamRead(List<AgentFindingGroup> vulnGroups, List<DailyCount> dailyCounts, Map<String, AgentConversationResult> conversationsById) {
-            this.vulnGroups = vulnGroups;
-            this.dailyCounts = dailyCounts;
-            this.conversationsById = conversationsById;
-        }
-    }
-
-    /**
-     * Which summaries fall in the dashboard's window (a small, indexed, _id-only read), then the
-     * vulnerable-result groups/trend for those summaries + this account's agentic collections (an
-     * aggregation, never raw documents), then the real validated-conversation verdicts for a
-     * capped sample of the conversationIds that surfaced — run as one sequential task (still
-     * executed concurrently with every other AGENTIC/ENDPOINT step via submitTimed — just not
-     * internally). Every step short-circuits to empty on an empty upstream result rather than
-     * ever sending an unscoped/empty-`$in` query.
-     */
-    private RedTeamRead loadRedTeamRead(InsightContext ctx, List<Integer> agenticCollectionIds) {
-        try {
-            if (agenticCollectionIds.isEmpty()) {
-                return new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap());
-            }
-            List<ObjectId> summaryIds = TestingRunResultSummariesDao.instance.summaryIdsInWindow(
-                    ctx.getStartTs(), ctx.getEndTs(), SUMMARY_ID_CAP);
-            if (summaryIds.isEmpty()) {
-                return new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap());
-            }
-
-            Pair<List<AgentFindingGroup>, List<DailyCount>> aggregates = VulnerableTestingRunResultDao.instance
-                    .redTeamAggregates(summaryIds, agenticCollectionIds, CONVERSATION_IDS_PER_GROUP_CAP);
-            List<AgentFindingGroup> vulnGroups = aggregates.getFirst();
-            List<DailyCount> dailyCounts = aggregates.getSecond();
-
-            List<String> conversationIds = new ArrayList<>();
-            outer:
-            for (AgentFindingGroup g : vulnGroups) {
-                if (g.getSample() == null) continue;
-                for (String id : g.getSample()) {
-                    if (conversationIds.size() >= GLOBAL_CONVERSATION_ID_CAP) break outer;
-                    if (id != null) conversationIds.add(id);
-                }
-            }
-
-            Map<String, AgentConversationResult> conversationsById = new HashMap<>();
-            if (!conversationIds.isEmpty()) {
-                for (AgentConversationResult c : AgentConversationResultDao.instance.findValidatedSummaries(conversationIds)) {
-                    conversationsById.put(c.getConversationId(), c);
-                }
-            }
-            return new RedTeamRead(vulnGroups, dailyCounts, conversationsById);
-        } catch (Exception e) {
-            logger.error("InsightDataLoader: loadRedTeamRead failed: " + e.getMessage());
-            return new RedTeamRead(Collections.emptyList(), Collections.emptyList(), Collections.emptyMap());
-        }
-    }
-
-    /** SearchClientFactory (ES/ADX) call, not a Mongo one — see SearchClient#fetchAgenticServiceObservability
-     *  for the shape/rationale. Wrapped the same "log and return empty" way every Mongo read here is. */
-    private List<UserAnalysisData> loadAgenticServiceObservability(int accountId, InsightContext ctx) {
-        try {
-            long startMs = ctx.getStartTs() * 1000L;
-            long endMs = ctx.getEndTs() * 1000L;
-            return SearchClientFactory.instance().fetchAgenticServiceObservability(accountId, startMs, endMs, TOPICS_PER_SERVICE_CAP);
-        } catch (Exception e) {
-            logger.error("InsightDataLoader: loadAgenticServiceObservability failed: " + e.getMessage());
-            return Collections.emptyList();
+            // Nothing extra to load.
         }
     }
 

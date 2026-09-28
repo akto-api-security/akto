@@ -227,8 +227,7 @@ public final class InsightUtil {
         return c != null && hostCoveredByAnyPolicy(c.getHostName(), policies);
     }
 
-    /** Same check as collectionCoveredByAnyPolicy, off a bare host string — for an AgentRef
-     *  (Argus posture), which deliberately holds no ApiCollection reference of its own. */
+    /** Same check as collectionCoveredByAnyPolicy, off a bare host string only. */
     public static boolean hostCoveredByAnyPolicy(String hostName, List<GuardrailPolicies> policies) {
         if (policies == null || hostName == null) return false;
         for (GuardrailPolicies p : policies) {

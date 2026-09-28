@@ -1,13 +1,12 @@
 package com.akto.service.insights;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.context.Context;
 import com.akto.dao.insights.InsightNarrativeCacheDao;
 import com.akto.dto.insights.InsightNarrativeCache;
+import com.akto.gpt.handlers.gpt_prompts.InsightNarrativeHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.service.insights.narrative.AgenticNarrativeStrategy;
-import com.akto.service.insights.narrative.EndpointNarrativeStrategy;
-import com.akto.service.insights.narrative.InsightNarrativeStrategy;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 
@@ -43,8 +42,6 @@ public class InsightService {
     private static final ExecutorService PROVIDER_EXECUTOR = Executors.newFixedThreadPool(6);
 
     private final InsightDataLoader loader = new InsightDataLoader();
-    private final InsightNarrativeStrategy endpointNarrativeStrategy = new EndpointNarrativeStrategy();
-    private final InsightNarrativeStrategy agenticNarrativeStrategy = new AgenticNarrativeStrategy();
 
     private static final class CachedBundle {
         final InsightDataBundle bundle;
@@ -138,27 +135,21 @@ public class InsightService {
         InsightDataBundle bundle = getOrLoadBundle(ctx);
         InsightResult r = computeSafely(provider, bundle, ctx, InsightProvider.Scope.DETAIL);
 
-        InsightNarrativeStrategy strategy = narrativeStrategyFor(provider.id().getGroup());
-        BasicDBObject narrativeInput = strategy.buildNarrativeInput(r);
+        BasicDBObject narrativeInput = buildNarrativeInput(r);
         r.setNarrativeInput(narrativeInput);
-        String fingerprint = fingerprint(ctx, provider, narrativeInput, strategy.promptTag());
+        String fingerprint = fingerprint(ctx, provider, narrativeInput);
 
         if (!forceRefresh) {
             InsightNarrativeCache cached = InsightNarrativeCacheDao.instance.get(fingerprint);
             if (cached != null) {
-                strategy.apply(r, strategy.fromCache(cached));
+                r.setMarkdown(cached.getNarrativeMarkdown());
                 r.setNarrativeStatus("OK");
+                applyNarrativeSummaryFields(r, cached.getNarrativeConcern(), cached.getNarrativeImpact(), cached.getNarrativeRemediation());
                 return r;
             }
         }
-        generateAndCacheNarrative(strategy, r, narrativeInput, fingerprint, provider.providerVersion());
+        generateAndCacheNarrative(r, narrativeInput, fingerprint, provider.providerVersion());
         return r;
-    }
-
-    /** ARGUS_POSTURE (Argus/agentic posture findings) gets its own strategy — every other group
-     *  (ATLAS_DISCOVERY, GUARDRAIL_VIOLATIONS) shares the original concern/impact/remediation one. */
-    private InsightNarrativeStrategy narrativeStrategyFor(InsightId.Group group) {
-        return group == InsightId.Group.ARGUS_POSTURE ? agenticNarrativeStrategy : endpointNarrativeStrategy;
     }
 
     private InsightResult computeSafely(InsightProvider provider, InsightDataBundle bundle, InsightContext ctx, InsightProvider.Scope scope) {
@@ -197,30 +188,88 @@ public class InsightService {
         }
     }
 
-    /** Fingerprint over the exact bytes sent to the LLM plus the strategy's own promptTag — a
-     * changed metric changes the key, so stale prose can never outlive the numbers it describes;
-     * the promptTag guards against the two strategies' narrativeInput JSON ever colliding for some
-     * degenerate input. TTL below is only a GC backstop. */
-    private String fingerprint(InsightContext ctx, InsightProvider provider, BasicDBObject narrativeInput, String promptTag) {
+    private BasicDBObject buildNarrativeInput(InsightResult r) {
+        List<BasicDBObject> metrics = new ArrayList<>();
+        for (InsightResult.Metric m : r.getMetrics()) {
+            metrics.add(new BasicDBObject("key", m.getKey()).append("label", m.getLabel()).append("formatted", m.getFormatted()));
+        }
+        List<BasicDBObject> evidence = new ArrayList<>();
+        for (InsightResult.Evidence e : r.getEvidence()) {
+            evidence.add(new BasicDBObject("id", e.getId()).append("title", e.getTitle())
+                    .append("rows", e.getRows()).append("totalRowCount", e.getTotalRowCount()));
+        }
+        List<BasicDBObject> gaps = new ArrayList<>();
+        for (InsightResult.Gap g : r.getDataGaps()) {
+            gaps.add(new BasicDBObject("source", g.getSource()).append("reason", g.getReason()).append("impact", g.getImpact()));
+        }
+        return new BasicDBObject("insightId", r.getInsightId())
+                .append("metrics", metrics)
+                .append("evidence", evidence)
+                .append("caveats", r.getCaveats())
+                .append("dataGaps", gaps)
+                .append("severity", r.getSeverity() != null ? r.getSeverity() : "")
+                .append("draftConcern", r.getConcern() != null ? r.getConcern() : "")
+                .append("draftImpact", r.getImpact() != null ? r.getImpact() : "")
+                .append("draftRemediation", r.getRemediation() != null ? r.getRemediation() : "");
+    }
+
+    /** The provider's own concern/impact/remediation are a guaranteed, deterministic fallback —
+     *  only replace a field when the model actually returned something non-empty for it. */
+    private void applyNarrativeSummaryFields(InsightResult r, String concern, String impact, String remediation) {
+        if (concern != null && !concern.isEmpty()) r.setConcern(concern);
+        if (impact != null && !impact.isEmpty()) r.setImpact(impact);
+        if (remediation != null && !remediation.isEmpty()) r.setRemediation(remediation);
+    }
+
+    /** Fingerprint over the exact bytes sent to the LLM — a changed metric changes the key, so
+     * stale prose can never outlive the numbers it describes. TTL below is only a GC backstop. */
+    private String fingerprint(InsightContext ctx, InsightProvider provider, BasicDBObject narrativeInput) {
         String raw = ctx.getAccountId() + "|" + ctx.getContextSource() + "|" + provider.id().name() + "|"
-                + provider.providerVersion() + "|" + promptTag + "|" + narrativeInput.toJson();
+                + provider.providerVersion() + "|"  + narrativeInput.toJson();
         return InsightUtil.md5(raw);
     }
 
-    private void generateAndCacheNarrative(InsightNarrativeStrategy strategy, InsightResult r, BasicDBObject narrativeInput,
-                                            String fingerprint, int providerVersion) {
-        BasicDBObject out = strategy.generate(narrativeInput);
+    private void generateAndCacheNarrative(InsightResult r, BasicDBObject narrativeInput, String fingerprint, int providerVersion) {
+        BasicDBObject input = new BasicDBObject(InsightNarrativeHandler.NARRATIVE_INPUT, narrativeInput.toJson());
+        BasicDBObject out = new InsightNarrativeHandler().handle(input);
         if (out.containsField("error")) {
-            logger.error("Narrative generation failed for " + r.getInsightId() + ": " + out.getString("error"));
+            logger.error("InsightNarrativeHandler failed for " + r.getInsightId() + ": " + out.getString("error"));
             r.setNarrativeStatus("UNAVAILABLE");
             return;
         }
-        strategy.apply(r, out);
+        String markdown = out.getString("markdown");
+        String concern = out.getString("concern");
+        String impact = out.getString("impact");
+        String remediation = out.getString("remediation");
+        r.setMarkdown(markdown);
         r.setNarrativeStatus("OK");
+        applyNarrativeSummaryFields(r, concern, impact, remediation);
 
         long now = System.currentTimeMillis() / 1000;
-        InsightNarrativeCache cache = strategy.toCache(fingerprint, r, providerVersion, out, now,
+        InsightNarrativeCache cache = new InsightNarrativeCache(fingerprint, r.getInsightId(), providerVersion,markdown, concern, impact, remediation, now,
                 new Date((now + TimeUnit.DAYS.toSeconds(NARRATIVE_TTL_DAYS)) * 1000L));
         InsightNarrativeCacheDao.instance.put(cache);
+    }
+
+    /**
+     * Argus (AGENTIC) posture insight cards read malicious/guardrail events the same way this
+     * class's own threat-backend futures do (see InsightDataLoader), just outside the bundle —
+     * ArgusPostureService's card-breakdown methods are pure over this raw list rather than
+     * fetching it themselves, so this is the one place that owns the InsightsThreatBackendAccess
+     * instantiation. A capped raw-row fetch (not a server-side aggregation: the threat-detection-
+     * backend has no {@code $group by {apiCollectionId, filterId}} endpoint), minimalFields=true
+     * since only apiCollectionId/filterId/severity/label/timestamp are read, and reuses
+     * AbstractThreatDetectionAction's own 2-minute response cache — the exact same
+     * fetchAllMaliciousEvents(start, end, limit, null, null, true) shape SecurityPostureAction's
+     * trendWindowEventsFuture already uses.
+     */
+    public List<DashboardMaliciousEvent> fetchArgusMaliciousEvents(InsightContext ctx, int limit) {
+        InsightsThreatBackendAccess threatAccess = new InsightsThreatBackendAccess();
+        try {
+            return threatAccess.violationEventsMinimal(ctx.getStartTs(), ctx.getEndTs(), limit, null);
+        } catch (Exception e) {
+            logger.error("InsightService: fetchArgusMaliciousEvents failed: " + e.getMessage());
+            return new ArrayList<>();
+        }
     }
 }

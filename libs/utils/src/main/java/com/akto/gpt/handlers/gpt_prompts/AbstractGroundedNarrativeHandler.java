@@ -17,8 +17,9 @@ import java.util.regex.Pattern;
  * (every number in the model's output must trace back to a real formatted value it was shown),
  * and the model-call tuning (minimal reasoning effort, deterministic temperature, json_object
  * response format) every such handler needs identically. Extracted from InsightNarrativeHandler
- * so AgenticInsightNarrativeHandler (a different output shape — per-finding titles, not
- * concern/impact/remediation) can reuse this exact guard instead of a second hand-copied one.
+ * so a second handler with a different output shape (e.g. ArgusInsightCardNarrativeHandler's
+ * single-summary shape for the Argus posture insight cards) can reuse this exact guard instead of
+ * a second hand-copied one.
  *
  * A subclass owns everything shape-specific: buildPrompt (what FACTS/EVIDENCE/HARD RULES look
  * like and what fields to ask for), allowedLiterals (which input fields actually get embedded in

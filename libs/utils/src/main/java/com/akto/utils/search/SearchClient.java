@@ -85,6 +85,18 @@ public abstract class SearchClient {
     public abstract List<UserAnalysisData> fetchAgenticServiceObservability(
         int accountId, long startMs, long endMs, int topicsPerServiceCap);
 
+    /**
+     * Argus (AGENTIC) posture read: the account-wide (not per-service) topic/subTopic hierarchy
+     * for the dashboard's own window — the top `topicsCap` topics overall, each with its top
+     * `subTopicsCap` subtopics, straight off the indexed AgentQueryRecord fields. Same
+     * atlasTrafficFilter=false rationale as fetchAgenticServiceObservability above (Argus/agentic
+     * traffic is the "not Atlas" half of isAtlasTraffic). Returned map shape matches
+     * UserAnalysisData#topicHierarchy exactly (domain -> subDomain -> doc_count), insertion order
+     * = descending count, so no separate DTO is needed for this global rollup.
+     */
+    public abstract Map<String, Map<String, Integer>> fetchAgenticGlobalTopicHierarchy(
+        int accountId, long startMs, long endMs, int topicsCap, int subTopicsCap);
+
     public abstract List<Map<String, Object>> fetchTraceDetail(
         int accountId, String traceId, Boolean atlasTrafficFilter);
 

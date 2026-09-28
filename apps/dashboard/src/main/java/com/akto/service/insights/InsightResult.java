@@ -47,12 +47,6 @@ public class InsightResult {
     private List<Cta> ctas = new ArrayList<>();
     private List<Gap> dataGaps = new ArrayList<>();
     private List<String> caveats = new ArrayList<>();
-    // Argus (ARGUS_POSTURE group) only — Atlas/guardrail-violations insights render off
-    // metrics/evidence/headline the same way they always have. A Finding is one per-agent card
-    // ("Top Posture Findings" on the Argus page): Java-computed draft title/whyItMatters/
-    // remediation, optionally rewritten by AgenticInsightNarrativeHandler on DETAIL fetch — same
-    // draft-then-maybe-replaced contract concern/impact/remediation already use above.
-    private List<Finding> findings = new ArrayList<>();
     private BasicDBObject narrativeInput;
     private String markdown;
     private String narrativeStatus = "UNAVAILABLE"; // OK | UNAVAILABLE
@@ -62,7 +56,6 @@ public class InsightResult {
     public void addCta(Cta c) { ctas.add(c); }
     public void addDataGap(Gap g) { dataGaps.add(g); }
     public void addCaveat(String c) { caveats.add(c); }
-    public void addFinding(Finding f) { findings.add(f); }
 
     /** READY / PARTIAL / NO_DATA. */
     public enum Status { READY, PARTIAL, NO_DATA }
@@ -127,28 +120,5 @@ public class InsightResult {
             this.totalRowCount = totalRowCount;
             this.truncated = rows != null && rows.size() < totalRowCount;
         }
-    }
-
-    /**
-     * One per-agent posture finding (Argus "Top Posture Findings" card). `id` is stable across
-     * requests (`insightId|collectionId|resource`) so the frontend can key React lists and a
-     * narrative rewrite can be matched back to the row it belongs to. `title`/`whyItMatters`/
-     * `remediation` start as a Java-computed draft; AgenticInsightNarrativeHandler may replace
-     * each with a version grounded in that agent's real evidence (see AgenticNarrativeStrategy) —
-     * same draft-then-maybe-replaced contract as concern/impact/remediation above, never cleared,
-     * only overwritten.
-     */
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-    public static class Finding {
-        private String id;
-        private String severity;
-        private String agentName;
-        private int apiCollectionId;
-        private String environment;
-        private String resource;
-        private String title;
-        private String whyItMatters;
-        private String remediation;
-        private Cta cta;
     }
 }

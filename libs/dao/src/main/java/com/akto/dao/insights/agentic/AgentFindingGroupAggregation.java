@@ -49,6 +49,7 @@ public final class AgentFindingGroupAggregation {
 
         List<Bson> projectFields = new ArrayList<>();
         projectFields.add(Projections.excludeId());
+        projectFields.add(Projections.include("count"));
         projectFields.add(Projections.computed("collectionId", "$_id.collectionId"));
         projectFields.add(Projections.computed("type", "$_id.type"));
         projectFields.add(secondaryField != null

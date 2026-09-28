@@ -143,7 +143,7 @@ final class RiskScoreCalculator {
                     bundle.auditRows, bundle.policies, bundle.allowlistNamesLower, bundle.sensitiveByCollection,
                     bundle.userAnalysis, bundle.nhiIdentities, priorHostSeverity, priorSubCategory,
                     bundle.skillSeverityCounts, true, bundle.activeCollections, bundle.collectionLastTrafficSeen,
-                    bundle.agentic, null);
+                    null);
             List<PostureService.PolicyMatch> priorMatches = PostureService.matchedPolicyCounts(priorView);
             Double priorDlpSubScore = dlpIncidentsSubScore(priorView, priorMatches);
             Double priorThreatSubScore = threatActivitySubScore(priorView);

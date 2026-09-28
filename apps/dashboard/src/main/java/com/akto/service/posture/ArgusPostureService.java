@@ -1,27 +1,49 @@
 package com.akto.service.posture;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.insights.InsightNarrativeCacheDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.agentic_sessions.UserAnalysisData;
+import com.akto.dto.insights.InsightNarrativeCache;
+import com.akto.dto.insights.agentic.AgentFindingGroup;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.gpt.handlers.gpt_prompts.AbstractGroundedNarrativeHandler;
+import com.akto.gpt.handlers.gpt_prompts.ArgusAttackFlowNarrativeHandler;
+import com.akto.gpt.handlers.gpt_prompts.ArgusInsightCardNarrativeHandler;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
-import com.akto.service.insights.InsightResult;
+import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 public class ArgusPostureService {
@@ -77,21 +99,512 @@ public class ArgusPostureService {
         return response;
     }
 
-    private static final int TOP_FINDINGS_CAP = 20;
+    // ── Argus posture insight cards ──────────────────────────────────────────────────────────
+    //
+    // Five fixed cards, each a small, already-aggregated breakdown (never a raw event list) plus
+    // an AI write-up generated/cached separately (see buildInsightCardSummaries) — the same
+    // "fast Java data first, AI summary loaded after" split the rest of this page already uses.
+    // No InsightProvider/Finding involved: these read testing_run_issues (via the DAO-level
+    // AgentFindingGroup shape), vulnerable_testing_run_results/agent_conversation_results (for the
+    // attack-flow card), and the threat-detection-backend's malicious_events directly, through
+    // InsightService's own public passthroughs, and shape the result here — mirroring
+    // buildSummary's own "pure function over pre-fetched data" style above.
+
+    private static final LoggerMaker logger = new LoggerMaker(ArgusPostureService.class, LogDb.DASHBOARD);
+
+    private static final String CARD_RED_TEAM_BREAKDOWN = "RED_TEAM_BREAKDOWN";
+    private static final String CARD_ATTACK_FLOW = "ATTACK_FLOW_ANALYSIS";
+    private static final String CARD_GUARDRAIL_BREAKDOWN = "GUARDRAIL_BREAKDOWN";
+    private static final String CARD_GUARDRAIL_HOTSPOT = "GUARDRAIL_HOTSPOT";
+    private static final String CARD_OBSERVABILITY = "OBSERVABILITY";
+
+    private static final int BREAKDOWN_TOP_N = 10;
+    private static final int TOPICS_CAP = 5;
+    private static final int ATTACK_FLOW_ISSUE_COUNT = 2;
+
+    private static final long CARD_NARRATIVE_TTL_DAYS = 7;
+    private static final int CARD_NARRATIVE_VERSION = 2; // bumped: summary shape gained impact/recommendation
+
+    // I/O-bound (LLM calls) — separate from any Mongo/ES-fetch executor, sized for up to 5
+    // concurrent card summaries (4 regular + 1 attack-flow) so the async summaries endpoint's
+    // total wait is ~max(one card's latency), not the sum of all five.
+    private static final ExecutorService SUMMARY_EXECUTOR = Executors.newFixedThreadPool(5);
+    private static final int SUMMARY_TIMEOUT_SECONDS = 30;
+
+    private final ArgusInsightCardNarrativeHandler cardNarrativeHandler = new ArgusInsightCardNarrativeHandler();
+    private final ArgusAttackFlowNarrativeHandler attackFlowHandler = new ArgusAttackFlowNarrativeHandler();
 
     /**
-     * Flattens every ARGUS_POSTURE provider's per-agent findings into one worst-first list for
-     * the "Top Posture Findings" card. Environment/search filtering happens client-side, same as
-     * the rest of the Argus posture page (see AgenticPosture.jsx's topFindings memo) — this just
-     * ranks and caps what InsightService already computed, no new data reads.
+     * The 5 cards' Java-computed data — fast, no LLM call. `openIssueGroups` comes from
+     * TestingRunIssuesDao#openIssueGroupsForDashboard, `criticalIssueConversations` from
+     * conversationIdsForIssue/findValidatedSummaries scoped to just the 2 most critical open
+     * issues (see pickTopCriticalIssues), `maliciousEvents` from
+     * InsightService#fetchArgusMaliciousEvents, `serviceObservability`/`globalTopics` from
+     * SearchClientFactory's fetchAgenticServiceObservability/fetchAgenticGlobalTopicHierarchy —
+     * the caller (ArgusPostureAction) fetches all of these (in parallel), this method only shapes
+     * them.
      */
-    public List<InsightResult.Finding> topFindings(List<InsightResult> insights) {
-        List<InsightResult.Finding> all = new ArrayList<>();
-        for (InsightResult insight : insights) {
-            if (insight.getFindings() != null) all.addAll(insight.getFindings());
+    public List<BasicDBObject> buildInsightCards(InsightDataBundle bundle, List<AgentFindingGroup> openIssueGroups,
+                                                  Map<String, AgentConversationResult> criticalIssueConversations,
+                                                  List<DashboardMaliciousEvent> maliciousEvents,
+                                                  List<UserAnalysisData> serviceObservability,
+                                                  Map<String, Map<String, Integer>> globalTopics) {
+        Map<Integer, ApiCollection> collectionsById = new HashMap<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c != null) collectionsById.put(c.getId(), c);
         }
-        all.sort(Comparator.comparingInt(f -> InsightUtil.severityRank(f.getSeverity())));
-        return all.size() > TOP_FINDINGS_CAP ? new ArrayList<>(all.subList(0, TOP_FINDINGS_CAP)) : all;
+
+        RedTeamStats redTeam = computeRedTeamStats(openIssueGroups);
+        GuardrailStats guardrail = computeGuardrailStats(maliciousEvents);
+        List<AgentFindingGroup> topCritical = pickTopCriticalIssues(openIssueGroups, ATTACK_FLOW_ISSUE_COUNT);
+
+        List<BasicDBObject> cards = new ArrayList<>();
+        cards.add(redTeamBreakdownCard(redTeam, collectionsById));
+        cards.add(attackFlowCard(topCritical, collectionsById, criticalIssueConversations));
+        cards.add(guardrailBreakdownCard(guardrail, collectionsById));
+        cards.add(guardrailHotspotCard(guardrail, collectionsById));
+        cards.add(observabilityCard(serviceObservability, bundle, globalTopics));
+        return cards;
+    }
+
+    /**
+     * The account's most critical open issues, worst-first (severity, then count) — used both to
+     * decide which conversationIds the caller needs to fetch (attack-flow grounding) and by
+     * attackFlowCard itself. Pure/no I/O — safe to call before the caller has fetched anything
+     * else.
+     */
+    public List<AgentFindingGroup> pickTopCriticalIssues(List<AgentFindingGroup> openIssueGroups, int n) {
+        List<AgentFindingGroup> sorted = new ArrayList<>(safe(openIssueGroups));
+        sorted.sort(Comparator
+                .comparingInt((AgentFindingGroup g) -> InsightUtil.severityRank(g.getSecondary()))
+                .thenComparing(Comparator.comparingLong(AgentFindingGroup::getCount).reversed()));
+        return sorted.size() > n ? new ArrayList<>(sorted.subList(0, n)) : sorted;
+    }
+
+    /**
+     * One AI write-up per card, keyed by card id — meant to be fetched asynchronously, after
+     * buildInsightCards has already rendered, since a cache miss here is a real LLM round-trip
+     * (see ArgusPostureAction#fetchArgusPostureInsightSummaries). Every card generates
+     * concurrently (SUMMARY_EXECUTOR) so a cold cache doesn't serialize 5 LLM calls. Each regular
+     * card's own "facts" array (added by its builder method) is exactly what gets shown to the
+     * model; the attack-flow card instead carries an "issues" array with real conversation
+     * grounding — see attackFlowCard/generateAttackFlowSummary.
+     */
+    public Map<String, BasicDBObject> buildInsightCardSummaries(InsightContext ctx, List<BasicDBObject> cards, boolean forceRefresh) {
+        final int accountId = ctx.getAccountId();
+        final Integer userId = ctx.getUserId();
+        final CONTEXT_SOURCE contextSource = ctx.getContextSource();
+
+        Map<String, Future<BasicDBObject>> futures = new LinkedHashMap<>();
+        for (BasicDBObject card : cards) {
+            String cardId = card.getString("id");
+            if (cardId == null) continue;
+            futures.put(cardId, SUMMARY_EXECUTOR.submit(withContext(accountId, userId, contextSource, () ->
+                    CARD_ATTACK_FLOW.equals(cardId)
+                            ? generateAttackFlowSummary(ctx, card, forceRefresh)
+                            : generateCardSummary(ctx, cardId, card, forceRefresh))));
+        }
+
+        Map<String, BasicDBObject> summaries = new LinkedHashMap<>();
+        for (Map.Entry<String, Future<BasicDBObject>> e : futures.entrySet()) {
+            try {
+                BasicDBObject result = e.getValue().get(SUMMARY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                if (result != null) summaries.put(e.getKey(), result);
+            } catch (Exception ex) {
+                logger.error("Argus insight card summary timed out/failed for " + e.getKey() + ": " + ex.getMessage());
+            }
+        }
+        return summaries;
+    }
+
+    private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
+        return () -> {
+            Context.accountId.set(accountId);
+            Context.userId.set(userId);
+            Context.contextSource.set(contextSource);
+            try {
+                return body.call();
+            } finally {
+                Context.accountId.remove();
+                Context.userId.remove();
+                Context.contextSource.remove();
+            }
+        };
+    }
+
+    private BasicDBObject generateCardSummary(InsightContext ctx, String cardId, BasicDBObject card, boolean forceRefresh) {
+        Object facts = card.get("facts");
+        BasicDBObject narrativeInput = new BasicDBObject("facts", facts != null ? facts : new ArrayList<>());
+        String fingerprint = cardFingerprint(ctx, cardId, narrativeInput);
+
+        if (!forceRefresh) {
+            InsightNarrativeCache cached = InsightNarrativeCacheDao.instance.get(fingerprint);
+            if (cached != null) {
+                return new BasicDBObject("summary", cached.getNarrativeMarkdown())
+                        .append("impact", cached.getNarrativeImpact())
+                        .append("recommendation", cached.getNarrativeRemediation());
+            }
+        }
+
+        BasicDBObject input = new BasicDBObject(AbstractGroundedNarrativeHandler.NARRATIVE_INPUT, narrativeInput.toJson());
+        BasicDBObject out = cardNarrativeHandler.handle(input);
+        if (out.containsField("error")) {
+            logger.error("Argus insight card summary failed for " + cardId + ": " + out.getString("error"));
+            return null;
+        }
+        String summary = out.getString("summary");
+        String impact = out.getString("impact");
+        String recommendation = out.getString("recommendation");
+
+        cacheNarrative(fingerprint, cardId, summary, impact, recommendation);
+        return new BasicDBObject("summary", summary).append("impact", impact).append("recommendation", recommendation);
+    }
+
+    /**
+     * The attack-flow card's summary is structurally different (a list of flows, not one
+     * summary/impact/recommendation triad) — stored as a JSON blob in the shared cache's
+     * narrativeMarkdown field (a plain String; no schema change needed) rather than reusing the
+     * concern/impact/remediation columns, which don't fit a list shape.
+     */
+    private BasicDBObject generateAttackFlowSummary(InsightContext ctx, BasicDBObject card, boolean forceRefresh) {
+        Object issues = card.get("issues");
+        if (!(issues instanceof List) || ((List<?>) issues).isEmpty()) return null;
+
+        BasicDBObject narrativeInput = new BasicDBObject("issues", issues);
+        String fingerprint = cardFingerprint(ctx, CARD_ATTACK_FLOW, narrativeInput);
+
+        if (!forceRefresh) {
+            InsightNarrativeCache cached = InsightNarrativeCacheDao.instance.get(fingerprint);
+            if (cached != null && cached.getNarrativeMarkdown() != null) {
+                try {
+                    return new BasicDBObject(Document.parse(cached.getNarrativeMarkdown()));
+                } catch (Exception ignored) {
+                    // A cached blob that fails to parse just regenerates below, same as a cache miss.
+                }
+            }
+        }
+
+        BasicDBObject input = new BasicDBObject(AbstractGroundedNarrativeHandler.NARRATIVE_INPUT, narrativeInput.toJson());
+        BasicDBObject out = attackFlowHandler.handle(input);
+        if (out.containsField("error")) {
+            logger.error("Argus attack-flow summary failed: " + out.getString("error"));
+            return null;
+        }
+        BasicDBObject result = new BasicDBObject("flows", out.get("flows"));
+        cacheNarrative(fingerprint, CARD_ATTACK_FLOW, result.toJson(), null, null);
+        return result;
+    }
+
+    private String cardFingerprint(InsightContext ctx, String cardId, BasicDBObject narrativeInput) {
+        String raw = ctx.getAccountId() + "|" + ctx.getContextSource() + "|" + cardId + "|"
+                + CARD_NARRATIVE_VERSION + "|" + narrativeInput.toJson();
+        return InsightUtil.md5(raw);
+    }
+
+    private void cacheNarrative(String fingerprint, String cardId, String markdown, String impact, String remediation) {
+        long now = System.currentTimeMillis() / 1000;
+        InsightNarrativeCache cache = new InsightNarrativeCache(fingerprint, cardId, CARD_NARRATIVE_VERSION,
+                markdown, null, impact, remediation, now, new Date((now + TimeUnit.DAYS.toSeconds(CARD_NARRATIVE_TTL_DAYS)) * 1000L));
+        InsightNarrativeCacheDao.instance.put(cache);
+    }
+
+    // ── Red-team cards ────────────────────────────────────────────────────────────────────────
+
+    private static final class RedTeamStats {
+        long totalOpenIssues;
+        final Map<String, Long> bySeverity = new LinkedHashMap<>();
+        AgentFindingGroup topFinding; // the single {agent,vulnType} group with the highest count
+        final Map<Integer, Long> byAgent = new HashMap<>();   // total open-issue count per agent
+        final Map<String, Long> byType = new HashMap<>();     // total open-issue count per vuln type
+    }
+
+    private RedTeamStats computeRedTeamStats(List<AgentFindingGroup> openIssueGroups) {
+        RedTeamStats stats = new RedTeamStats();
+        for (String sev : new String[] { "CRITICAL", "HIGH", "MEDIUM", "LOW" }) stats.bySeverity.put(sev, 0L);
+        for (AgentFindingGroup g : safe(openIssueGroups)) {
+            if (g == null) continue;
+            long count = g.getCount();
+            stats.totalOpenIssues += count;
+            String sev = g.getSecondary() != null ? g.getSecondary().toUpperCase(Locale.ROOT) : null;
+            if (sev != null && stats.bySeverity.containsKey(sev)) stats.bySeverity.merge(sev, count, Long::sum);
+            stats.byAgent.merge(g.getCollectionId(), count, Long::sum);
+            if (g.getType() != null) stats.byType.merge(g.getType(), count, Long::sum);
+            if (stats.topFinding == null || count > stats.topFinding.getCount()) stats.topFinding = g;
+        }
+        return stats;
+    }
+
+    private BasicDBObject redTeamBreakdownCard(RedTeamStats stats, Map<Integer, ApiCollection> collectionsById) {
+        BasicDBObject card = card(CARD_RED_TEAM_BREAKDOWN, "Red-Team Issue Breakdown");
+        card.put("totalOpenIssues", stats.totalOpenIssues);
+        card.put("bySeverity", stats.bySeverity);
+        card.put("cta", cta("view_issues", "Open issues", InsightRoutes.ISSUES));
+
+        List<BasicDBObject> facts = new ArrayList<>();
+        facts.add(fact("totalOpenIssues", "Open red-team issues", InsightUtil.grouped(stats.totalOpenIssues)));
+        for (Map.Entry<String, Long> e : stats.bySeverity.entrySet()) {
+            if (e.getValue() > 0) facts.add(fact("severity_" + e.getKey(), e.getKey() + " severity issues", InsightUtil.grouped(e.getValue())));
+        }
+
+        if (stats.topFinding != null) {
+            String agentName = agentName(stats.topFinding.getCollectionId(), collectionsById);
+            BasicDBObject top = new BasicDBObject("agentName", agentName)
+                    .append("vulnType", stats.topFinding.getType())
+                    .append("severity", stats.topFinding.getSecondary())
+                    .append("count", stats.topFinding.getCount());
+            card.put("topFinding", top);
+            facts.add(fact("topFindingAgent", "Agent with the most common issue", agentName));
+            facts.add(fact("topFindingType", "Most common issue type", stats.topFinding.getType()));
+            facts.add(fact("topFindingCount", "Occurrences of that issue", InsightUtil.grouped(stats.topFinding.getCount())));
+        } else {
+            card.put("topFinding", null);
+        }
+        card.put("facts", facts);
+        return card;
+    }
+
+    /**
+     * "How Agents Were Compromised" — the account's ATTACK_FLOW_ISSUE_COUNT most critical open
+     * issues, each grounded in a real validated red-team conversation (AgentConversationResult's
+     * own validationMessage/remediationMessage — the human-judged outcome of an actual attempt),
+     * not just aggregate counts. The AI step (generateAttackFlowSummary) turns each issue's real
+     * verdict into a short ordered flow of what the attacker attempted and what actually happened
+     * — never a raw request/response dump (see ArgusAttackFlowNarrativeHandler's own hard rules).
+     * An issue with no real conversation behind it (no AgentConversationResult resolved) is
+     * skipped — this card only ever narrates a REAL verdict, never a synthesized one.
+     */
+    private BasicDBObject attackFlowCard(List<AgentFindingGroup> topCritical, Map<Integer, ApiCollection> collectionsById,
+                                          Map<String, AgentConversationResult> conversationsById) {
+        BasicDBObject card = card(CARD_ATTACK_FLOW, "How Agents Were Compromised");
+        card.put("cta", cta("view_issues", "Open issues", InsightRoutes.ISSUES));
+
+        List<BasicDBObject> issues = new ArrayList<>();
+        for (AgentFindingGroup g : safe(topCritical)) {
+            if (g == null || g.getSample() == null) continue;
+            AgentConversationResult conversation = firstResolved(g.getSample(), conversationsById);
+            if (conversation == null || conversation.getValidationMessage() == null) continue;
+
+            String agentName = agentName(g.getCollectionId(), collectionsById);
+            issues.add(new BasicDBObject("agentName", agentName)
+                    .append("vulnType", g.getType())
+                    .append("severity", g.getSecondary())
+                    .append("conversationId", conversation.getConversationId())
+                    .append("validationMessage", conversation.getValidationMessage())
+                    .append("remediationMessage", conversation.getRemediationMessage()));
+        }
+        card.put("issues", issues);
+
+        // A lightweight, immediately-visible preview (agent/type/severity only) — the real flow
+        // narrative arrives async via buildInsightCardSummaries/generateAttackFlowSummary.
+        List<BasicDBObject> preview = new ArrayList<>();
+        for (BasicDBObject issue : issues) {
+            preview.add(new BasicDBObject("agentName", issue.getString("agentName"))
+                    .append("vulnType", issue.getString("vulnType"))
+                    .append("severity", issue.getString("severity")));
+        }
+        card.put("issuePreview", preview);
+        return card;
+    }
+
+    private AgentConversationResult firstResolved(List<String> conversationIds, Map<String, AgentConversationResult> conversationsById) {
+        for (String id : conversationIds) {
+            AgentConversationResult c = conversationsById.get(id);
+            if (c != null) return c;
+        }
+        return null;
+    }
+
+    // ── Guardrail cards ───────────────────────────────────────────────────────────────────────
+
+    private static final class GuardrailStats {
+        long totalEvents;
+        final Map<String, Long> byPolicy = new HashMap<>();   // DashboardMaliciousEvent#getFilterId()
+        final Map<Integer, Long> byAgent = new HashMap<>();   // DashboardMaliciousEvent#getApiCollectionId()
+    }
+
+    /**
+     * filterId is used as the policy label directly — the same convention
+     * PostureService.criticalAlertsDrill already uses (row("policy", e.getFilterId())) — rather
+     * than joining to GuardrailPolicies, since a malicious event's filterId is not reliably a
+     * GuardrailPolicies._id (see MaliciousEventDto's own contextSource/filter-id scoping).
+     */
+    private GuardrailStats computeGuardrailStats(List<DashboardMaliciousEvent> events) {
+        GuardrailStats stats = new GuardrailStats();
+        for (DashboardMaliciousEvent e : safe(events)) {
+            if (e == null) continue;
+            stats.totalEvents++;
+            if (StringUtils.isNotBlank(e.getFilterId())) stats.byPolicy.merge(e.getFilterId(), 1L, Long::sum);
+            if (e.getApiCollectionId() != 0) stats.byAgent.merge(e.getApiCollectionId(), 1L, Long::sum);
+        }
+        return stats;
+    }
+
+    private BasicDBObject guardrailBreakdownCard(GuardrailStats stats, Map<Integer, ApiCollection> collectionsById) {
+        BasicDBObject card = card(CARD_GUARDRAIL_BREAKDOWN, "Guardrail Activity Breakdown");
+        card.put("cta", cta("view_activity", "View guardrail activity", InsightRoutes.GUARDRAIL_ACTIVITY));
+        card.put("totalEvents", stats.totalEvents);
+        card.put("byPolicy", topNByString(stats.byPolicy, "policy", BREAKDOWN_TOP_N));
+        card.put("byAgent", topNByAgent(stats.byAgent, collectionsById, BREAKDOWN_TOP_N));
+
+        List<BasicDBObject> facts = new ArrayList<>();
+        facts.add(fact("totalEvents", "Guardrail/malicious events", InsightUtil.grouped(stats.totalEvents)));
+        int rank = 0;
+        for (Map.Entry<String, Long> e : topEntriesByString(stats.byPolicy, 3)) {
+            facts.add(fact("policy_" + (rank++), "Events under policy " + e.getKey(), InsightUtil.grouped(e.getValue())));
+        }
+        rank = 0;
+        for (Map.Entry<Integer, Long> e : topEntriesByAgent(stats.byAgent, 3)) {
+            facts.add(fact("agent_" + (rank++), "Events on " + agentName(e.getKey(), collectionsById), InsightUtil.grouped(e.getValue())));
+        }
+        card.put("facts", facts);
+        return card;
+    }
+
+    private BasicDBObject guardrailHotspotCard(GuardrailStats stats, Map<Integer, ApiCollection> collectionsById) {
+        BasicDBObject card = card(CARD_GUARDRAIL_HOTSPOT, "Where Guardrail Activity Concentrates");
+        card.put("cta", cta("view_policies", "Review guardrail policies", InsightRoutes.GUARDRAIL_POLICIES));
+        List<BasicDBObject> facts = new ArrayList<>();
+
+        Integer hottestAgentId = maxKey(stats.byAgent);
+        if (hottestAgentId != null) {
+            String agentName = agentName(hottestAgentId, collectionsById);
+            long count = stats.byAgent.get(hottestAgentId);
+            card.put("hottestAgent", new BasicDBObject("agentName", agentName).append("count", count));
+            facts.add(fact("hottestAgent", "Agent generating the most guardrail activity", agentName));
+            facts.add(fact("hottestAgentCount", "Events on that agent", InsightUtil.grouped(count)));
+        } else {
+            card.put("hottestAgent", null);
+        }
+
+        String hottestPolicy = maxKey(stats.byPolicy);
+        if (hottestPolicy != null) {
+            long count = stats.byPolicy.get(hottestPolicy);
+            card.put("hottestPolicy", new BasicDBObject("policy", hottestPolicy).append("count", count));
+            facts.add(fact("hottestPolicy", "Most-triggered policy", hottestPolicy));
+            facts.add(fact("hottestPolicyCount", "Times that policy triggered", InsightUtil.grouped(count)));
+        } else {
+            card.put("hottestPolicy", null);
+        }
+        card.put("facts", facts);
+        return card;
+    }
+
+    // ── Observability card ────────────────────────────────────────────────────────────────────
+
+    private BasicDBObject observabilityCard(List<UserAnalysisData> serviceObservability, InsightDataBundle bundle,
+                                             Map<String, Map<String, Integer>> globalTopics) {
+        BasicDBObject card = card(CARD_OBSERVABILITY, "Agent Token Usage & Topics");
+        card.put("cta", cta("view_observability", "View LLM observability", InsightRoutes.LLM_OBSERVABILITY));
+        List<BasicDBObject> facts = new ArrayList<>();
+
+        long totalTokens = 0;
+        UserAnalysisData hottest = null;
+        for (UserAnalysisData row : safe(serviceObservability)) {
+            if (row == null) continue;
+            long tokens = row.getTotalInputTokens() + row.getTotalOutputTokens();
+            totalTokens += tokens;
+            if (hottest == null || tokens > (hottest.getTotalInputTokens() + hottest.getTotalOutputTokens())) hottest = row;
+        }
+        card.put("totalTokens", totalTokens);
+        facts.add(fact("totalTokens", "Tokens used by agents this window", InsightUtil.grouped(totalTokens)));
+
+        if (hottest != null && hottest.getId() != null && hottest.getId().getServiceId() != null) {
+            List<ApiCollection> matches = bundle.collectionsForServiceName(hottest.getId().getServiceId());
+            String agentName = matches.isEmpty() ? hottest.getId().getServiceId() : matches.get(0).getName();
+            long hottestTokens = hottest.getTotalInputTokens() + hottest.getTotalOutputTokens();
+            card.put("hottestAgent", new BasicDBObject("agentName", agentName).append("tokens", hottestTokens));
+            facts.add(fact("hottestAgent", "Agent with the most token usage", agentName));
+            facts.add(fact("hottestAgentTokens", "Tokens used by that agent", InsightUtil.grouped(hottestTokens)));
+        } else {
+            card.put("hottestAgent", null);
+        }
+
+        List<BasicDBObject> topTopics = new ArrayList<>();
+        int rank = 0;
+        for (Map.Entry<String, Map<String, Integer>> e : safeMap(globalTopics).entrySet()) {
+            if (rank >= TOPICS_CAP) break;
+            long topicCount = 0;
+            List<BasicDBObject> subTopics = new ArrayList<>();
+            for (Map.Entry<String, Integer> sub : e.getValue().entrySet()) {
+                topicCount += sub.getValue();
+                subTopics.add(new BasicDBObject("subTopic", sub.getKey()).append("count", sub.getValue()));
+            }
+            topTopics.add(new BasicDBObject("topic", e.getKey()).append("count", topicCount).append("subTopics", subTopics));
+            facts.add(fact("topic_" + rank, "Topic \"" + e.getKey() + "\"", InsightUtil.grouped(topicCount)));
+            rank++;
+        }
+        card.put("topTopics", topTopics);
+        card.put("facts", facts);
+        return card;
+    }
+
+    // ── Shared card helpers ───────────────────────────────────────────────────────────────────
+
+    private static BasicDBObject card(String id, String title) {
+        return new BasicDBObject("id", id).append("title", title);
+    }
+
+    private static BasicDBObject fact(String key, String label, Object formatted) {
+        return new BasicDBObject("key", key).append("label", label).append("formatted", formatted);
+    }
+
+    /** A Java-determined (never AI-generated) deep link — same {id,label,route} shape the old
+     *  Finding.Cta used, so a route is always a real InsightRoutes constant, never something the
+     *  model invented. */
+    private static BasicDBObject cta(String id, String label, String route) {
+        return new BasicDBObject("id", id).append("label", label).append("route", route);
+    }
+
+    private static String agentName(Integer collectionId, Map<Integer, ApiCollection> collectionsById) {
+        if (collectionId == null) return null;
+        ApiCollection c = collectionsById.get(collectionId);
+        return c != null ? c.getName() : null;
+    }
+
+    /** Highest-value key, or null when the map is empty. Ties keep the first key iterated. */
+    private static <K> K maxKey(Map<K, Long> counts) {
+        K best = null;
+        long bestValue = Long.MIN_VALUE;
+        for (Map.Entry<K, Long> e : counts.entrySet()) {
+            if (e.getValue() > bestValue) { best = e.getKey(); bestValue = e.getValue(); }
+        }
+        return best;
+    }
+
+    private static List<Map.Entry<String, Long>> topEntriesByString(Map<String, Long> counts, int n) {
+        List<Map.Entry<String, Long>> entries = new ArrayList<>(counts.entrySet());
+        entries.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
+        return entries.size() > n ? entries.subList(0, n) : entries;
+    }
+
+    private static List<Map.Entry<Integer, Long>> topEntriesByAgent(Map<Integer, Long> counts, int n) {
+        List<Map.Entry<Integer, Long>> entries = new ArrayList<>(counts.entrySet());
+        entries.sort((a, b) -> Long.compare(b.getValue(), a.getValue()));
+        return entries.size() > n ? entries.subList(0, n) : entries;
+    }
+
+    private static List<BasicDBObject> topNByString(Map<String, Long> counts, String labelKey, int n) {
+        List<BasicDBObject> out = new ArrayList<>();
+        for (Map.Entry<String, Long> e : topEntriesByString(counts, n)) {
+            out.add(new BasicDBObject(labelKey, e.getKey()).append("count", e.getValue()));
+        }
+        return out;
+    }
+
+    private static List<BasicDBObject> topNByAgent(Map<Integer, Long> counts, Map<Integer, ApiCollection> collectionsById, int n) {
+        List<BasicDBObject> out = new ArrayList<>();
+        for (Map.Entry<Integer, Long> e : topEntriesByAgent(counts, n)) {
+            out.add(new BasicDBObject("agentName", agentName(e.getKey(), collectionsById)).append("count", e.getValue()));
+        }
+        return out;
+    }
+
+    private static <T> List<T> safe(List<T> list) {
+        return list != null ? list : new ArrayList<>();
+    }
+
+    private static Map<String, Map<String, Integer>> safeMap(Map<String, Map<String, Integer>> map) {
+        return map != null ? map : new LinkedHashMap<>();
     }
 
     private BasicDBObject assetsKpi(List<ApiCollection> assets, String environment) {

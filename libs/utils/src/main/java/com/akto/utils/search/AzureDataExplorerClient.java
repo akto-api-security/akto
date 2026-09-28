@@ -696,6 +696,14 @@ public class AzureDataExplorerClient extends SearchClient {
         return new ArrayList<>();
     }
 
+    // Skipped for now on this backend, same as fetchAgenticServiceObservability above — see
+    // ElasticSearchClient.fetchAgenticGlobalTopicHierarchy for the intended shape.
+    @Override
+    public Map<String, Map<String, Integer>> fetchAgenticGlobalTopicHierarchy(int accountId, long startMs, long endMs,
+                                                                                int topicsCap, int subTopicsCap) {
+        return new LinkedHashMap<>();
+    }
+
     private long[] queryDataRange(String where, long fallbackMs) {
         String kql = ADX_TABLE + " | where " + where
             + " | summarize minTs=min(" + AgentQueryRecord.F_TIMESTAMP + "), maxTs=max(" + AgentQueryRecord.F_TIMESTAMP + ")"

@@ -859,6 +859,51 @@ public class ElasticSearchClient extends SearchClient {
         return rows;
     }
 
+    @Override
+    public Map<String, Map<String, Integer>> fetchAgenticGlobalTopicHierarchy(int accountId, long startMs, long endMs,
+                                                                                int topicsCap, int subTopicsCap) {
+        Map<String, Map<String, Integer>> hierarchy = new LinkedHashMap<>();
+        if (!isConfigured()) return hierarchy;
+        try {
+            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, null, null, Boolean.FALSE);
+
+            JSONObject aggs = new JSONObject()
+                .put(AGG_TOPIC_HIERARCHY, new JSONObject()
+                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", topicsCap))
+                    .put("aggs", new JSONObject()
+                        .put("subTopics", new JSONObject()
+                            .put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", subTopicsCap)))));
+
+            JSONObject aggsResult = aggregate(filteredQuery, aggs);
+            if (aggsResult == null) return hierarchy;
+
+            JSONObject topicAgg = aggsResult.optJSONObject(AGG_TOPIC_HIERARCHY);
+            JSONArray topicBuckets = topicAgg != null ? topicAgg.optJSONArray("buckets") : null;
+            if (topicBuckets == null) return hierarchy;
+
+            for (int i = 0; i < topicBuckets.length(); i++) {
+                JSONObject tb = topicBuckets.optJSONObject(i);
+                if (tb == null) continue;
+                String topic = tb.optString("key", "");
+                if (topic.isEmpty()) continue;
+                Map<String, Integer> subMap = hierarchy.computeIfAbsent(topic, t -> new LinkedHashMap<>());
+                JSONObject subTopicAgg = tb.optJSONObject("subTopics");
+                JSONArray subBuckets = subTopicAgg != null ? subTopicAgg.optJSONArray("buckets") : null;
+                if (subBuckets != null) {
+                    for (int j = 0; j < subBuckets.length(); j++) {
+                        JSONObject sb = subBuckets.optJSONObject(j);
+                        if (sb == null) continue;
+                        String subTopic = sb.optString("key", "");
+                        if (!subTopic.isEmpty()) subMap.put(subTopic, (int) sb.optLong("doc_count", 0));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("fetchAgenticGlobalTopicHierarchy error for accountId=" + accountId + ": " + e.getMessage());
+        }
+        return hierarchy;
+    }
+
     // ── Spans for a single message/trace ──────────────────────────────────────
 
     /**

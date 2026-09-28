@@ -308,6 +308,31 @@ const api = {
         })
     },
 
+    // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
+    fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsights',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    // Meant to be called after fetchArgusPostureInsights has already rendered — this one does a
+    // real LLM call per card on a cache miss, so it must never block the card data itself.
+    fetchArgusPostureInsightSummaries: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsightSummaries',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
     fetchPostureSummary: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchPostureSummary',

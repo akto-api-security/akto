@@ -189,7 +189,11 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
                         Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP)),
                         Aggregates.group(groupKey,
                                 Accumulators.push("conversationIds", "$" + TestingRunResult.TEST_RESULTS + "." + TestResult.CONVERSATION_ID)),
-                        Aggregates.project(Projections.fields(Projections.excludeId(), Projections.include("conversationIds"),
+                        // _id (the {collId, subType} group key) must survive this project — the Java
+                        // side below reads doc.get("_id") to key conversationIdsByKey. Do NOT add
+                        // Projections.excludeId() here: with _id excluded, doc.get("_id") returns
+                        // null and the very next .getInt() call on it NPEs.
+                        Aggregates.project(Projections.fields(Projections.include("conversationIds"),
                                 Projections.computed("sliced", new BasicDBObject("$slice", Arrays.asList("$conversationIds", convIdsPerGroupCap)))))),
                 new Facet("trend",
                         Aggregates.project(Projections.fields(Projections.include("collId"),
@@ -226,6 +230,43 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
         }
 
         return new Pair<>(groups, trend);
+    }
+
+    /**
+     * A handful of real conversationIds behind one specific {agent, vulnType} pair — used by the
+     * Argus "attack flow" insight card to ground its AI narrative in an actual validated
+     * conversation instead of just aggregate counts. Same {@code apiInfoKey.apiCollectionId,
+     * testSubType} match shape redTeamAggregates already uses, just scoped to one pair (cheaper,
+     * not a new query shape) rather than $in lists over a whole summaryId/collectionId set.
+     * testSubType here is the same classification value as TestingRunIssues' own testSubCategory
+     * (AgentFindingGroup#getType()) — the two collections share that value space.
+     */
+    public List<String> conversationIdsForIssue(int apiCollectionId, String testSubType, int limit) {
+        if (testSubType == null) return new ArrayList<>();
+
+        Bson filter = modifyFilters(Filters.and(
+                Filters.eq(TestingRunResult.VULNERABLE, true),
+                Filters.eq(getFilterKeyString(), apiCollectionId),
+                Filters.eq(TestingRunResult.TEST_SUB_TYPE, testSubType)), false, false);
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(filter));
+        pipeline.add(Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP)));
+        pipeline.add(Aggregates.limit(Math.max(limit, 1) * 5)); // a few raw docs before the unwind fans them out
+        pipeline.add(Aggregates.unwind("$" + TestingRunResult.TEST_RESULTS, new UnwindOptions().preserveNullAndEmptyArrays(true)));
+        pipeline.add(Aggregates.match(Filters.exists(TestingRunResult.TEST_RESULTS + "." + TestResult.CONVERSATION_ID, true)));
+        pipeline.add(Aggregates.project(Projections.fields(Projections.excludeId(),
+                Projections.include(TestingRunResult.TEST_RESULTS + "." + TestResult.CONVERSATION_ID))));
+        pipeline.add(Aggregates.limit(limit));
+
+        List<String> conversationIds = new ArrayList<>();
+        for (BasicDBObject doc : instance.getMCollection().aggregate(pipeline, BasicDBObject.class).into(new ArrayList<>())) {
+            Object testResults = doc.get(TestingRunResult.TEST_RESULTS);
+            if (!(testResults instanceof BasicDBObject)) continue;
+            Object conversationId = ((BasicDBObject) testResults).get(TestResult.CONVERSATION_ID);
+            if (conversationId != null) conversationIds.add(conversationId.toString());
+        }
+        return conversationIds;
     }
 
     @SuppressWarnings("unchecked")

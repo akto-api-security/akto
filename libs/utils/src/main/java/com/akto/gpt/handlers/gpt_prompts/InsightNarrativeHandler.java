@@ -9,8 +9,8 @@ import java.util.Set;
 /**
  * ENDPOINT/GUARDRAIL_VIOLATIONS insight narratives — concern/impact/remediation grounded in real
  * evidence rows. See AbstractGroundedNarrativeHandler for the shared retry loop and numeric-
- * literal guard this handler builds on, and AgenticInsightNarrativeHandler for the sibling
- * per-finding shape (Argus/ARGUS_POSTURE) that also builds on it.
+ * literal guard this handler builds on (also shared by ArgusInsightCardNarrativeHandler, the
+ * Argus posture insight cards' own single-summary sibling).
  */
 public class InsightNarrativeHandler extends AbstractGroundedNarrativeHandler {
 
