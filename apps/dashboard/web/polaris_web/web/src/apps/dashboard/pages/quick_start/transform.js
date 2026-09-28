@@ -2460,7 +2460,7 @@ const quickStartFunc = {
                 "Agentic IDEs & Apps": agenticIdes,
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
-                "Agentic Proxies": agenticProxies,
+                "Agentic Proxies": [...agenticProxies, litellmImportObj],
                 "Claude Suite": anthropicConnectors,
                 "ChatGPT Suite": openaiConnectors,
                 "Microsoft Suite": microsoftConnectors,
