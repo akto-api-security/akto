@@ -2039,6 +2039,40 @@ public class DbLayer {
     private static final int DEFAULT_LEASE_SECONDS = 90;
 
     /**
+     * Claim/reclaim-shaped fencing only. Three clauses, OR'd together exactly as below:
+     *   - leaseExpiryTs is absent (never leased)
+     *   - leaseExpiryTs < now (lease expired)
+     *   - leaseToken matches what's currently stored (caller already owns it)
+     * The first two are separate Mongo clauses only because a range operator never matches a
+     * missing field - a single "missing or expired" condition isn't expressible as one clause.
+     * Semantically they're one idea ("no valid current owner right now"); the third is the other.
+     * An empty leaseToken means an unfenced legacy caller and returns a no-op (matches-everything)
+     * filter.
+     *
+     * Do NOT reuse this for periodic renewal-shaped writes made repeatedly by a pod that believes
+     * it's still actively working (updateTestResultsCountInTestSummary's per-result increments,
+     * markProducerDone, lease extension) - those must match the current owner exactly. An expired
+     * lease there means self-fence, not "free to act", because the caller is asserting ongoing
+     * ownership, not finalizing an attempt it may have discovered already abandoned.
+     *
+     * updateIssueCountInSummaryFenced and markTestRunResultSummaryFailed correctly DO use this
+     * filter despite superficially being "count"/state writes too - both are one-time terminal
+     * writes reachable from the lease-blind discovery fallback (trrs==null, no prior claim this
+     * iteration), where the caller may be legitimately finalizing an attempt nobody currently
+     * owns, not renewing one it already holds. That's claim-shaped, not renewal-shaped, regardless
+     * of the field being written.
+     */
+    private static Bson claimableOrOwnedByFilter(String leaseToken) {
+        if (StringUtils.isEmpty(leaseToken)) {
+            return new BasicDBObject();
+        }
+        return Filters.or(
+                Filters.exists(TestingRunResultSummary.LEASE_EXPIRY_TS, false),
+                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now()),
+                Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken));
+    }
+
+    /**
      * Claims a summary for the caller. When leaseToken is null the caller is an older mini-testing
      * that does not participate in leasing, so this stays exactly what it has always been: an
      * unconditional state flip returning the pre-update document.
@@ -2377,11 +2411,23 @@ public class DbLayer {
 
 
     public static TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId) {
+        return markTestRunResultSummaryFailed(testingRunResultSummaryId, null);
+    }
+
+    /**
+     * With a leaseToken, only proceeds if the document has no valid current owner (never leased,
+     * or lease expired) or the token matches the current owner - closes the gap where a
+     * stale/superseded caller (e.g. one that arrived via the lease-blind discovery fallback) could
+     * mark a different, currently-active owner's attempt FAILED. See claimableOrOwnedByFilter.
+     * No token means the old unconditional behaviour, unchanged, for backward compatibility.
+     */
+    public static TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                 Filters.and(
                         Filters.eq(TestingRunResultSummary.ID, summaryObjectId),
-                        Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
+                        Filters.eq(TestingRunResultSummary.STATE, State.RUNNING),
+                        claimableOrOwnedByFilter(leaseToken)
                 ),
                 Updates.set(TestingRunResultSummary.STATE, State.FAILED)
         );
@@ -2889,11 +2935,27 @@ public class DbLayer {
     }
 
     public static TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues) {
+        return updateIssueCountInSummaryFenced(summaryId, totalCountIssues, null);
+    }
+
+    /**
+     * Terminal (COMPLETED) form, fenced. Same reasoning and same filter shape as
+     * markTestRunResultSummaryFailed(id, leaseToken): a stale caller arriving via the lease-blind
+     * fallback must not be able to complete an attempt a different, currently-active owner still
+     * holds. No token means the old unconditional behaviour, unchanged.
+     *
+     * Named distinctly from the existing (summaryId, totalCountIssues, operator) overload above -
+     * both are (String, Map, String), and Java can't distinguish two such overloads by parameter
+     * name alone.
+     */
+    public static TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq(Constants.ID, summaryObjectId),
+                Filters.and(
+                        Filters.eq(Constants.ID, summaryObjectId),
+                        claimableOrOwnedByFilter(leaseToken)),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
@@ -3427,7 +3489,21 @@ public class DbLayer {
                 NODE_LIMIT);
     }
 
-    public static long countTestingRunResultSummaries(Bson filter){
+    /**
+     * Was Bson filter - never actually worked for any caller. The client crashes trying to
+     * serialize a raw Bson query-builder object into an HTTP request body (no codec exists for
+     * Filters$AndFilter etc.), and the server side had no way to deserialize an interface type from
+     * JSON either. Since nothing has ever depended on the old signature actually working, this is a
+     * clean replacement, not an additive overload - primitives round-trip over JSON with no codec
+     * involved on either side.
+     */
+    public static long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state) {
+        ObjectId testingRunId = new ObjectId(testingRunHexId);
+        Bson filter = Filters.and(
+                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, sinceTimestamp),
+                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+                Filters.eq(TestingRunResultSummary.STATE, state)
+        );
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 

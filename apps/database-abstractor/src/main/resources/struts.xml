@@ -1481,7 +1481,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^leaseHeld$</param>
+                <param name="includeProperties">^leaseStatus$</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -1593,7 +1593,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^leaseHeld$</param>
+                <param name="includeProperties">^leaseStatus$</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -1606,7 +1606,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^leaseHeld$</param>
+                <param name="includeProperties">^leaseStatus$</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
