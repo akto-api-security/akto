@@ -37,11 +37,3 @@ export function applyNavigationSideEffects(option) {
         ensureGuardrailViolationsNewLayout()
     }
 }
-
-export const MAX_RECENT_PROMPTS = 5
-
-export const SUGGESTED_PROMPTS = [
-    "unauthenticated APIs with PII",
-    "criticals older than 30 days",
-    "collections never tested",
-]

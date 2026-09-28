@@ -134,7 +134,7 @@ final class RiskScoreCalculator {
                     bundle.auditRows, bundle.policies, bundle.allowlistNamesLower, bundle.sensitiveByCollection,
                     bundle.userAnalysis, bundle.nhiIdentities, priorHostSeverity, priorSubCategory,
                     bundle.skillSeverityCounts, true, bundle.activeCollections, bundle.collectionLastTrafficSeen,
-                    null);
+                    null, null);
             Double priorDlpSubScore = dlpIncidentsSubScore(priorView);
             Double priorThreatSubScore = threatActivitySubScore(priorView);
             Double priorComplianceSubScore = complianceGapsSubScore(priorView);
