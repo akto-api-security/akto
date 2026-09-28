@@ -1,5 +1,9 @@
 package com.akto.interceptor;
 
+import com.akto.utils.ArgusCollectionScope;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Arrays;
 import com.akto.audit_logs_util.Audit;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
@@ -42,6 +46,27 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.struts2.ServletActionContext;
 
 public class RoleAccessInterceptor extends AbstractInterceptor {
+
+    // Account-wide settings: blocked for Argus users limited to specific collections (see ArgusCollectionScope)
+    private static final Set<String> ACCOUNT_WIDE_SETTING_ACTIONS = new HashSet<>(Arrays.asList(
+            // threat detection configuration and account-wide threat actions
+            "modifyThreatConfiguration", "toggleArchivalEnabled", "deleteAllMaliciousEvents",
+            "modifyThreatActorStatus", "modifyThreatActorStatusCloudflare", "bulkModifyThreatActorStatusCloudflare",
+            "startPolicyBackfillReplay", "startComplianceClauseScan", "generateThreatReport",
+            // test roles, auth mechanism and auth types
+            "addTestRoles", "saveTestRoleMeta", "deleteTestRole", "updateTestRoles", "deleteAuthFromRole",
+            "updateAuthInRole", "addAuthToRole", "addAuthMechanism",
+            "addCustomAuthType", "updateCustomAuthType", "resetAllCustomAuthTypes", "updateCustomAuthTypeStatus",
+            // default payloads, url settings, api tokens
+            "updateUrlSettings", "saveDefaultPayload", "addApiToken", "deleteApiToken"
+    ));
+
+    private static boolean isAccountWideSettingAction(String actionName) {
+        if (actionName == null) return false;
+        String name = actionName.startsWith("api/") ? actionName.substring(4) : actionName;
+        return ACCOUNT_WIDE_SETTING_ACTIONS.contains(name);
+    }
+
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(RoleAccessInterceptor.class, LoggerMaker.LogDb.DASHBOARD);
     private static final LoggerMaker logger = new LoggerMaker(RoleAccessInterceptor.class, LogDb.DASHBOARD);
@@ -227,6 +252,13 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             if(!hasRequiredAccess) {
                 ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
+                return FORBIDDEN;
+            }
+
+            // Argus users limited to specific collections cannot change account-wide settings
+            if (isAccountWideSettingAction(invocation.getProxy().getActionName())
+                    && ArgusCollectionScope.isLimited(user)) {
+                ((ActionSupport) invocation.getAction()).addActionError("Users limited to specific collections cannot change account-wide settings.");
                 return FORBIDDEN;
             }
 

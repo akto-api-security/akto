@@ -2308,6 +2308,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   hasThreatAccess(){
     return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
   },
+  // Argus only: only Admin and Threat Engineer can create, edit, delete or approve guardrail policies (when RBAC is enabled)
+  canManageGuardrailPolicies(){
+    const isArgus = ['Agentic Security', 'MCP Security'].includes(getDashboardCategory())
+    return !isArgus || this.checkLocal() || !(this.checkForRbacFeature() || this.checkForRbacFeatureBasic())
+      || ['ADMIN', 'THREAT_ENGINEER'].includes(window.USER_ROLE)
+  },
   isUserAdmin(){
     const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
     return (scopeRole || window.USER_ROLE) === 'ADMIN'

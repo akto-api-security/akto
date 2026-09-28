@@ -1209,7 +1209,7 @@ function Violations() {
     }, [triggerTableRefresh]);
 
     const colDefs = useMemo(
-        () => buildColDefs(filterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval),
+        () => buildColDefs(filterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval),
         [filterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval],
     );
 

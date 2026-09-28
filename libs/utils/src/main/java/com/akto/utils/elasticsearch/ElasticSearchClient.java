@@ -568,7 +568,8 @@ public class ElasticSearchClient extends SearchClient {
     // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
 
     @Override
-    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
+    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Map<String, List<String>> filters,
+                                      Boolean atlasTrafficFilter, boolean includeTracesContent) {
         long aggTotalSpans = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopApps = new ArrayList<>();
         List<Map<String, Object>> aggAppBreakdown = new ArrayList<>();
@@ -582,7 +583,7 @@ public class ElasticSearchClient extends SearchClient {
                 aggTraceSpark, aggTokenSpark, aggTraceSparkTs);
         }
         try {
-            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, null, null, atlasTrafficFilter);
+            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, filters, null, atlasTrafficFilter);
 
             long argusSparkEndMs = Math.min(endMs, System.currentTimeMillis());
 

@@ -6,6 +6,7 @@ import com.akto.dto.tracing.model.Span;
 import com.akto.dto.tracing.model.Trace;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.ArgusCollectionScope;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -25,6 +26,11 @@ public class TraceAction extends UserAction {
 
     public String fetchLatestTraces() {
         try {
+            // Users limited to specific collections only see traces of their own agents
+            if (!isOwnCollection(apiCollectionId)) {
+                traces = new ArrayList<>();
+                return SUCCESS.toUpperCase();
+            }
 
             Bson filter = Filters.eq("apiCollectionId", apiCollectionId);
             Bson projection = Projections.fields(
@@ -51,6 +57,15 @@ public class TraceAction extends UserAction {
             if (traceId == null || traceId.isEmpty()) {
                 addActionError("Trace ID is required");
                 return ERROR.toUpperCase();
+            }
+
+            // Users limited to specific collections only see traces of their own agents
+            if (ArgusCollectionScope.isLimited(getSUser())) {
+                Trace trace = TraceDao.instance.findOne(Filters.eq("_id", traceId));
+                if (trace == null || !isOwnCollection(trace.getApiCollectionId())) {
+                    spans = new ArrayList<>();
+                    return SUCCESS.toUpperCase();
+                }
             }
 
             Bson filter = Filters.eq("traceId", traceId);
@@ -84,6 +99,11 @@ public class TraceAction extends UserAction {
             return ERROR.toUpperCase();
         }
     }
+    private boolean isOwnCollection(int collectionId) {
+        List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(getSUser());
+        return restrictedIds == null || restrictedIds.contains(collectionId);
+    }
+
     private Map<String, Object> truncateMap(Map<String, Object> data, int maxLines) {
         if (data == null || data.isEmpty()) {
             return new HashMap<>();
