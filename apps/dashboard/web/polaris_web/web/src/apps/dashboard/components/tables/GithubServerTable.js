@@ -773,9 +773,27 @@ function GithubServerTable(props) {
     });
 
     func.setToast(true, false, "Exporting CSV, please wait...")
-    const exportLimit = Math.max(total || 0, 10000);
-    const allData = await props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, 0, exportLimit, filters, filterOperators, queryValue);
-    func.exportTableAsCSV(props.headers, allData?.value || data, fileName)
+    // Backends often cap rows per request (50/200/500), so keep paging with the size the first
+    // response came back with — the same skip/limit stepping the table's own pagination uses.
+    // Rows are de-duped by id and a page adding nothing new stops the loop, so a fetchData that
+    // ignores skip can't duplicate rows or spin. Filters are cloned since some pages mutate them.
+    const fetchChunk = (skip, limit) => props.fetchData(sortKey, sortOrder == 'asc' ? -1 : 1, skip, limit, structuredClone(filters), structuredClone(filterOperators), queryValue)
+    const first = await fetchChunk(0, Math.max(total || 0, 10000))
+    const rows = [...(first?.value || data)]
+    const chunkSize = rows.length
+    const expected = first?.total ?? total
+    if (chunkSize > 0 && chunkSize < expected) {
+      const seen = new Set(rows.map(r => r.id))
+      for (let skip = chunkSize; skip < expected; skip += chunkSize) {
+        const fresh = ((await fetchChunk(skip, chunkSize))?.value || []).filter(r => r.id == null || !seen.has(r.id))
+        if (fresh.length === 0) break
+        fresh.forEach(r => seen.add(r.id))
+        rows.push(...fresh)
+      }
+      // chunk fetches overwrite page state (loading, row caches) — restore the visible page
+      fetchDataRef.current(queryValue)
+    }
+    func.exportTableAsCSV(props.headers, rows, fileName)
   }, [props.onExportCsv, props.headers, props.csvFileName, data, sortSelected, appliedFilters, total, queryValue, props.fetchData])
 
   return (
