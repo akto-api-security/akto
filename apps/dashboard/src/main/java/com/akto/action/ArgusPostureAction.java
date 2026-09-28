@@ -13,6 +13,7 @@ import com.akto.service.posture.ArgusPostureService;
 import com.akto.service.posture.PostureDrillNarrativeService;
 import com.akto.service.posture.PostureDrillResult;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.crons.ArgusPostureRegenerator;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
@@ -114,6 +115,17 @@ public class ArgusPostureAction extends UserAction {
                 0, 1, Sorts.descending(AgenticPostureScoreHistory.COMPUTED_AT));
         AgenticPostureScoreHistory latest = trend.isEmpty() ? null : trend.get(trend.size() - 1);
         return argusPostureService.buildPostureScore(latest, trend, weekAgo.isEmpty() ? null : weekAgo.get(0));
+    }
+
+    public String triggerArgusPostureRegenerate() {
+        boolean started = ArgusPostureRegenerator.trigger(Context.accountId.get());
+        this.response = new BasicDBObject("status", started ? "STARTED" : "ALREADY_RUNNING");
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchArgusPostureRegenerateStatus() {
+        this.response = ArgusPostureRegenerator.status(Context.accountId.get());
+        return SUCCESS.toUpperCase();
     }
 
     @Override

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { RefreshMajor } from '@shopify/polaris-icons'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -43,6 +44,7 @@ function Section({ title, description, action, children }) {
 
 // Drills that page through agents show 10 rows per page; the rest keep the flyout's default.
 const DRILL_PAGE_SIZE = { highRiskAgents: 10, postureScore: 10 }
+const REGENERATE_POLL_MS = 5000
 
 const DEFAULT_DATE_RANGE = values.ranges[3] // "Last 30 days" — same default the other posture pages use
 
@@ -67,6 +69,8 @@ function AgenticPosture() {
     const [pageData, setPageData] = useState({})
     const [loading, setLoading] = useState(true)
     const [selectedEnv, setSelectedEnv] = useState(() => searchParams.get('env') || 'all')
+    const [regenerating, setRegenerating] = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 
@@ -127,7 +131,46 @@ function AgenticPosture() {
         load()
         return () => { cancelled = true }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currDateRange, selectedEnv])
+    }, [currDateRange, selectedEnv, refreshKey])
+
+    // Resume polling if a regeneration was already running when the page opened.
+    useEffect(() => {
+        dashboardApi.fetchArgusPostureRegenerateStatus()
+            .then((status) => { if (status && status.running) setRegenerating(true) })
+            .catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (!regenerating) return
+        const timer = setInterval(async () => {
+            try {
+                const status = await dashboardApi.fetchArgusPostureRegenerateStatus()
+                if (!status || status.running) return
+                setRegenerating(false)
+                if (status.error) {
+                    func.setToast(true, true, 'Posture regeneration failed')
+                } else {
+                    func.setToast(true, false, 'Posture dashboard regenerated')
+                    setRefreshKey((k) => k + 1)
+                }
+            } catch (error) {
+                console.error('Error polling posture regeneration:', error)
+            }
+        }, REGENERATE_POLL_MS)
+        return () => clearInterval(timer)
+    }, [regenerating])
+
+    const regenerate = async () => {
+        try {
+            const resp = await dashboardApi.triggerArgusPostureRegenerate()
+            setRegenerating(true)
+            func.setToast(true, false, resp && resp.status === 'ALREADY_RUNNING'
+                ? 'Regeneration already in progress'
+                : 'Regenerating posture dashboard, this can take a few minutes')
+        } catch (error) {
+            func.setToast(true, true, 'Could not start regeneration')
+        }
+    }
 
     const openAgent = (groupKey) => navigate(`/dashboard/agentic-posture/agents/${encodeURIComponent(groupKey)}`)
     const openKpiLink = (kpi) => { if (kpi.linkGroupKey) openAgent(kpi.linkGroupKey) }
@@ -216,6 +259,9 @@ function AgenticPosture() {
                     title={<Text variant="headingLg">Posture Overview</Text>}
                     isFirstPage={true}
                     components={[<Box key="body">{pageBody}</Box>]}
+                    secondaryActions={
+                        <Button icon={RefreshMajor} onClick={regenerate} loading={regenerating} disabled={regenerating}>Regenerate</Button>
+                    }
                     primaryAction={
                         <DateRangeFilter
                             initialDispatch={currDateRange}

@@ -64,6 +64,12 @@ public class InsightService {
         return cached.bundle;
     }
 
+    // Drops every cached bundle for the account, so the next read reflects freshly written cron output.
+    public static void invalidateAccount(int accountId) {
+        String prefix = accountId + "_";
+        BUNDLE_CACHE.keySet().removeIf(key -> key.startsWith(prefix));
+    }
+
     public List<InsightResult> listInsights(InsightContext ctx, InsightId.Group group) {
         InsightDataBundle bundle = getOrLoadBundle(ctx);
         final int accountId = ctx.getAccountId();

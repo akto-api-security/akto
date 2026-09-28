@@ -308,6 +308,14 @@ const api = {
         })
     },
 
+    triggerArgusPostureRegenerate: async () => {
+        return await request({ url: '/api/triggerArgusPostureRegenerate', method: 'post', data: {} })
+    },
+
+    fetchArgusPostureRegenerateStatus: async () => {
+        return await request({ url: '/api/fetchArgusPostureRegenerateStatus', method: 'post', data: {} })
+    },
+
     fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, environment, skip, limit) => {
         return await request({
             url: '/api/fetchArgusPostureDrill',
