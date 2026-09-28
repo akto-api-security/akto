@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
+import com.akto.service.posture.ArgusAgentPostureDrillService;
 import com.akto.service.posture.ArgusPostureService;
 import com.akto.service.posture.PostureDrillNarrativeService;
 import com.akto.service.posture.PostureDrillResult;
@@ -30,6 +31,7 @@ public class ArgusPostureAction extends UserAction {
     private static final int DELTA_LOOKBACK_SECONDS = 7 * 86400;
 
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
+    private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
     private final InsightService insightService = new InsightService();
 
     @Getter @Setter private int startTimestamp;
@@ -79,6 +81,12 @@ public class ArgusPostureAction extends UserAction {
             switch (drillId == null ? "" : drillId) {
                 case ArgusPostureService.DRILL_PROTECTION_COVERAGE:
                     this.postureDrill = argusPostureService.fetchProtectionCoverageDrill(bundle, environment, skip, limit);
+                    break;
+                case ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE:
+                    this.postureDrill = agentPostureDrillService.fetchPostureScoreDrill(bundle, path, skip, limit);
+                    break;
+                case ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS:
+                    this.postureDrill = agentPostureDrillService.fetchHighRiskAgentsDrill(bundle, environment, path, skip, limit);
                     break;
                 default:
                     addActionError("Unknown drill: " + drillId);

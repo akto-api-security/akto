@@ -13,6 +13,7 @@ const ICONS = {
 
 const KPI_DRILL_ID = {
     protectionCoverage: 'protectionCoverage',
+    highRiskAgents: 'highRiskAgents',
 }
 
 function KpiGrid({ kpis, onOpenLink, onOpenDrill }) {
