@@ -80,6 +80,12 @@ public class ArgusPostureAction extends UserAction {
                 case ArgusPostureService.DRILL_PROTECTION_COVERAGE:
                     this.postureDrill = argusPostureService.fetchProtectionCoverageDrill(bundle, environment, skip, limit);
                     break;
+                case ArgusPostureService.DRILL_PRIVILEGED_TOOLS:
+                    this.postureDrill = argusPostureService.fetchPrivilegedToolsDrill(bundle, environment, skip, limit);
+                    break;
+                case ArgusPostureService.DRILL_SENSITIVE_DATA:
+                    this.postureDrill = argusPostureService.fetchSensitiveDataDrill(bundle, environment, skip, limit);
+                    break;
                 default:
                     addActionError("Unknown drill: " + drillId);
                     return ERROR.toUpperCase();

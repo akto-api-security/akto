@@ -188,7 +188,8 @@ function AgenticPosture() {
                         <PostureScoreCard postureScore={pageData.postureScore} />
                     </div>
                     <div style={{ flex: '2.4 1 560px', minWidth: '320px', display: 'grid' }}>
-                        <KpiGrid kpis={pageData.kpis} onOpenLink={openKpiLink} onOpenDrill={openDrill} />
+                        <KpiGrid kpis={pageData.kpis} onOpenLink={openKpiLink} onOpenDrill={openDrill}
+                            onOpenRoute={(route) => navigate(route)} />
                     </div>
                 </div>
             </Section>

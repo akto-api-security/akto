@@ -11,10 +11,17 @@ import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
+import com.akto.service.insights.PiiPatterns;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
+import com.akto.utils.crons.ToolClassificationCron;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
@@ -23,10 +30,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -59,6 +68,12 @@ public class ArgusPostureService {
     private static final double TONE_WARNING_AT = 70d;
 
     public static final String DRILL_PROTECTION_COVERAGE = KPI_PROTECTION_COVERAGE;
+    public static final String DRILL_PRIVILEGED_TOOLS = KPI_PRIVILEGED_TOOLS;
+    public static final String DRILL_SENSITIVE_DATA = KPI_SENSITIVE_DATA;
+
+    private static final String GUARDED = "Guarded";
+    private static final String PARTLY_GUARDED = "Partly guarded";
+    private static final String UNGUARDED = "Unguarded";
 
     private static final String PROTECTION_NONE = "None";
     private static final String PROTECTION_ALERT_ONLY = "Alert only";
@@ -137,10 +152,7 @@ public class ArgusPostureService {
 
             privileged = ApiInfoDao.instance.count(Filters.and(inScope, privilegedToolFilter()));
 
-            destructive = ApiInfoDao.instance.count(Filters.and(inScope,
-                    Filters.in(ApiInfo.TOOL_INFO_CAPABILITY,
-                            ToolCapabilityClassifier.RESOURCE_DELETE,
-                            ToolCapabilityClassifier.CRITICAL_RESOURCE_WRITE)));
+            destructive = ApiInfoDao.instance.count(Filters.and(inScope, destructiveToolFilter()));
         }
 
         BasicDBObject kpi = kpi(KPI_PRIVILEGED_TOOLS, "Privileged Tools", privileged);
@@ -154,6 +166,12 @@ public class ArgusPostureService {
         return Filters.and(
                 Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY),
                 Filters.ne(ApiInfo.TOOL_INFO_CAPABILITY, ToolCapabilityClassifier.SAFE));
+    }
+
+    private static Bson destructiveToolFilter() {
+        return Filters.in(ApiInfo.TOOL_INFO_CAPABILITY,
+                ToolCapabilityClassifier.RESOURCE_DELETE,
+                ToolCapabilityClassifier.CRITICAL_RESOURCE_WRITE);
     }
 
     private static Bson scopeFilter(List<ApiCollection> assets, String environment,
@@ -244,6 +262,256 @@ public class ArgusPostureService {
     private static String enforcingLine(long enforcing, long total) {
         if (enforcing == 0) return "No asset(s) enforcing";
         return enforcing + " of " + total + " asset(s) enforcing";
+    }
+
+    public PostureDrillResult fetchSensitiveDataDrill(InsightDataBundle bundle, String environment,
+                                                      int skip, int limit) {
+        int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;
+        int effectiveSkip = Math.max(skip, 0);
+
+        List<ApiCollection> assets = new ArrayList<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c == null || c.isDeactivated()) continue;
+            assets.add(c);
+        }
+        List<ApiCollection> scoped = assetsIn(assets, environment);
+
+        List<ApiCollection> withSensitive = new ArrayList<>();
+        for (ApiCollection asset : scoped) {
+            List<String> types = bundle.sensitiveByCollection.get(asset.getId());
+            if (types != null && !types.isEmpty()) withSensitive.add(asset);
+        }
+
+        GuardrailsCoverageBreakdown breakdown = computeCoverage(withSensitive, bundle.policies);
+
+        Map<Integer, List<String>> unguardedByAsset = new HashMap<>();
+        Map<Integer, String> stateByAsset = new HashMap<>();
+        long guarded = 0, partly = 0, unguarded = 0;
+
+        for (ApiCollection asset : withSensitive) {
+            List<String> detected = bundle.sensitiveByCollection.get(asset.getId());
+
+            Set<String> guardedKeys = guardedPiiKeys(breakdown.coveringPolicies.get(asset.getId()));
+            List<String> exposed = new ArrayList<>();
+            for (String type : detected) {
+                if (!guardedKeys.contains(PiiPatterns.piiTypeKey(type))) exposed.add(type);
+            }
+
+            String state = exposed.isEmpty() ? GUARDED
+                    : exposed.size() < detected.size() ? PARTLY_GUARDED
+                    : UNGUARDED;
+            if (GUARDED.equals(state)) guarded++;
+            else if (PARTLY_GUARDED.equals(state)) partly++;
+            else unguarded++;
+
+            unguardedByAsset.put(asset.getId(), exposed);
+            stateByAsset.put(asset.getId(), state);
+        }
+
+        withSensitive.sort(Comparator
+                .comparingInt((ApiCollection c) -> stateRank(stateByAsset.get(c.getId())))
+                .thenComparing(Comparator.comparingInt(
+                        (ApiCollection c) -> unguardedByAsset.get(c.getId()).size()).reversed()));
+
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Sensitive data");
+        result.setBreadcrumb(Collections.singletonList(
+                new PostureDrillResult.BreadcrumbItem("", "Sensitive data")));
+        result.setColumns(sensitiveDataColumns());
+        result.setDrillable(false);
+        result.setTotal(withSensitive.size());
+        result.setSkip(effectiveSkip);
+        result.setLimit(effectiveLimit);
+        result.setSummary(sensitiveDataSummary(guarded, partly, unguarded, withSensitive.size()));
+        result.setEmptyMessage("No assets access sensitive data in this environment.");
+        result.setCtas(Arrays.asList(
+                new InsightResult.Cta("create_policy", "Create guardrail policy", "NAVIGATE",
+                        InsightRoutes.GUARDRAIL_POLICIES, new HashMap<>(), true),
+                new InsightResult.Cta("view_agentic_assets", "View agentic assets", "NAVIGATE",
+                        InsightRoutes.AGENTIC_ASSETS, new HashMap<>(), false)));
+
+        int from = Math.min(effectiveSkip, withSensitive.size());
+        int to = Math.min(from + effectiveLimit, withSensitive.size());
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (ApiCollection asset : withSensitive.subList(from, to)) {
+            rows.add(sensitiveDataRow(asset, bundle, unguardedByAsset, stateByAsset));
+        }
+        result.setRows(rows);
+        return result;
+    }
+
+    /** Normalised PII type names every covering policy explicitly lists. Only `piiTypes` counts —
+     *  an LLM rule's free-text prompt isn't machine-readable, so it is not treated as coverage. */
+    private static Set<String> guardedPiiKeys(List<GuardrailPolicies> covering) {
+        Set<String> keys = new HashSet<>();
+        if (covering == null) return keys;
+        for (GuardrailPolicies p : covering) {
+            if (p == null || p.getPiiTypes() == null) continue;
+            for (GuardrailPolicies.PiiType t : p.getPiiTypes()) {
+                if (t != null && t.getType() != null) keys.add(PiiPatterns.piiTypeKey(t.getType()));
+            }
+        }
+        return keys;
+    }
+
+    private static int stateRank(String state) {
+        if (UNGUARDED.equals(state)) return 0;
+        if (PARTLY_GUARDED.equals(state)) return 1;
+        return 2;
+    }
+
+    private static List<PostureDrillResult.ColumnDef> sensitiveDataColumns() {
+        return Arrays.asList(
+                new PostureDrillResult.ColumnDef("asset", "Asset"),
+                new PostureDrillResult.ColumnDef("type", "Type"),
+                new PostureDrillResult.ColumnDef("environment", "Environment"),
+                new PostureDrillResult.ColumnDef("sensitiveData", "Sensitive data"),
+                new PostureDrillResult.ColumnDef("unguardedTypes", "Unguarded types"),
+                new PostureDrillResult.ColumnDef("protection", "Protection"));
+    }
+
+    /** Every tile is out of the same total (assets holding sensitive data), so each carries it as a
+     *  denominator. It stays out of `formatted` on purpose — that string is what the narrative model
+     *  reads, and "0 / 1" there gets misread as "0 of 1 findings". The UI renders it as a suffix. */
+    private static List<InsightResult.Metric> sensitiveDataSummary(long guarded, long partly,
+                                                                   long unguarded, int total) {
+        return Arrays.asList(
+                new InsightResult.Metric("guarded", "Guarded", guarded, total, "count",
+                        InsightUtil.grouped(guarded), null),
+                new InsightResult.Metric("partlyGuarded", "Partly guarded", partly, total, "count",
+                        InsightUtil.grouped(partly), null),
+                new InsightResult.Metric("unguarded", "Unguarded", unguarded, total, "count",
+                        InsightUtil.grouped(unguarded), null));
+    }
+
+    private static Map<String, Object> sensitiveDataRow(ApiCollection asset, InsightDataBundle bundle,
+                                                        Map<Integer, List<String>> unguardedByAsset,
+                                                        Map<Integer, String> stateByAsset) {
+        List<String> detected = bundle.sensitiveByCollection.get(asset.getId());
+        List<String> exposed = unguardedByAsset.get(asset.getId());
+
+        Map<String, Object> row = new HashMap<>();
+        row.put("asset", asset.getHostName());
+        row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
+        row.put("environment", envBucket(envTagValue(asset)));
+        row.put("sensitiveData", String.join(", ", detected));
+        row.put("unguardedTypes", exposed.isEmpty() ? "-" : String.join(", ", exposed));
+        row.put("protection", stateByAsset.get(asset.getId()));
+        return row;
+    }
+
+    public PostureDrillResult fetchPrivilegedToolsDrill(InsightDataBundle bundle, String environment,
+                                                        int skip, int limit) {
+        int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;
+        int effectiveSkip = Math.max(skip, 0);
+
+        List<ApiCollection> assets = new ArrayList<>();
+        List<Integer> deactivatedIds = new ArrayList<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c == null) continue;
+            if (c.isDeactivated()) deactivatedIds.add(c.getId());
+            else assets.add(c);
+        }
+        List<ApiCollection> scoped = assetsIn(assets, environment);
+
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Privileged tools");
+        result.setBreadcrumb(Collections.singletonList(
+                new PostureDrillResult.BreadcrumbItem("", "Privileged tools")));
+        result.setColumns(privilegedToolsColumns());
+        result.setDrillable(false);
+        result.setSkip(effectiveSkip);
+        result.setLimit(effectiveLimit);
+        result.setEmptyMessage("No privileged tools in this environment.");
+        result.setCtas(Arrays.asList(
+                new InsightResult.Cta("view_agentic_assets", "View agentic assets", "NAVIGATE",
+                        InsightRoutes.AGENTIC_ASSETS, new HashMap<>(), true),
+                new InsightResult.Cta("create_policy", "Create guardrail policy", "NAVIGATE",
+                        InsightRoutes.GUARDRAIL_POLICIES, new HashMap<>(), false)));
+
+        if (scoped.isEmpty()) {
+            result.setSummary(privilegedToolsSummary(0, 0, 0, 0));
+            return result;
+        }
+
+        Bson inScope = scopeFilter(scoped, environment, deactivatedIds);
+        Bson privileged = Filters.and(inScope, privilegedToolFilter());
+
+        Map<String, Long> byCapability = toolCountsByCapability(privileged);
+        long destructive = byCapability.getOrDefault(ToolCapabilityClassifier.RESOURCE_DELETE, 0L)
+                + byCapability.getOrDefault(ToolCapabilityClassifier.CRITICAL_RESOURCE_WRITE, 0L);
+        long credentialRead = byCapability.getOrDefault(ToolCapabilityClassifier.CREDENTIAL_OR_PII_READ, 0L);
+        long fileWrite = byCapability.getOrDefault(ToolCapabilityClassifier.FILE_WRITE, 0L);
+
+        long total = 0;
+        for (long n : byCapability.values()) total += n;
+
+        result.setTotal(total);
+        result.setSummary(privilegedToolsSummary(total, destructive, credentialRead, fileWrite));
+
+        List<ApiInfo> page = ApiInfoDao.instance.findAll(privileged, effectiveSkip, effectiveLimit,
+                Sorts.descending(ApiInfo.LAST_SEEN),
+                Projections.include(Constants.ID, ApiInfo.TOOL_INFO_CAPABILITY, ApiInfo.LAST_SEEN));
+
+        Map<Integer, ApiCollection> byId = new HashMap<>();
+        for (ApiCollection c : scoped) byId.put(c.getId(), c);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (ApiInfo tool : page) rows.add(privilegedToolRow(tool, byId));
+        result.setRows(rows);
+        return result;
+    }
+
+    private static Map<String, Long> toolCountsByCapability(Bson filter) {
+        Map<String, Long> counts = new HashMap<>();
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(filter),
+                Aggregates.group("$" + ApiInfo.TOOL_INFO_CAPABILITY, Accumulators.sum("count", 1)));
+
+        MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.aggregateWithRbac(pipeline).cursor();
+        while (cursor.hasNext()) {
+            BasicDBObject doc = cursor.next();
+            Object capability = doc.get("_id");
+            if (capability == null) continue;
+            counts.put(String.valueOf(capability), (long) doc.getInt("count", 0));
+        }
+        return counts;
+    }
+
+    private static List<PostureDrillResult.ColumnDef> privilegedToolsColumns() {
+        return Arrays.asList(
+                new PostureDrillResult.ColumnDef("tool", "Tool"),
+                new PostureDrillResult.ColumnDef("capability", "Capability"),
+                new PostureDrillResult.ColumnDef("asset", "Asset"),
+                new PostureDrillResult.ColumnDef("environment", "Environment"),
+                new PostureDrillResult.ColumnDef("lastSeen", "Last seen"));
+    }
+
+    private static List<InsightResult.Metric> privilegedToolsSummary(long privileged, long destructive,
+                                                                     long credentialRead, long fileWrite) {
+        return Arrays.asList(
+                new InsightResult.Metric("privileged", "Privileged", privileged, "count",
+                        InsightUtil.grouped(privileged)),
+                new InsightResult.Metric("destructive", "Destructive", destructive, "count",
+                        InsightUtil.grouped(destructive)),
+                new InsightResult.Metric("credentialRead", "Credential / PII read", credentialRead, "count",
+                        InsightUtil.grouped(credentialRead)),
+                new InsightResult.Metric("fileWrite", "File write", fileWrite, "count",
+                        InsightUtil.grouped(fileWrite)));
+    }
+
+    private static Map<String, Object> privilegedToolRow(ApiInfo tool, Map<Integer, ApiCollection> byId) {
+        ApiInfo.ApiInfoKey key = tool.getId();
+        ApiCollection collection = key == null ? null : byId.get(key.getApiCollectionId());
+
+        Map<String, Object> row = new HashMap<>();
+        row.put("tool", key == null || key.getUrl() == null ? "-" : ToolClassificationCron.toolNameFromUrl(key.getUrl()));
+        row.put("capability", InsightUtil.humanizeToolCapability(
+                tool.getToolInfo() == null ? null : tool.getToolInfo().getCapability()));
+        row.put("asset", collection == null ? "-" : collection.getHostName());
+        row.put("environment", collection == null ? "-" : envBucket(envTagValue(collection)));
+        row.put("lastSeen", tool.getLastSeen());
+        return row;
     }
 
     public PostureDrillResult fetchProtectionCoverageDrill(InsightDataBundle bundle, String environment,
