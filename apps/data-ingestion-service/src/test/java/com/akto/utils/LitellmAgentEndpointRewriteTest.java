@@ -396,4 +396,38 @@ public class LitellmAgentEndpointRewriteTest {
         assertEquals("litellm-localhost-4001.ai-agent.openai-litellm-" + LocalDate.now(ZoneOffset.UTC), id);
         assertEquals(id, headers(second).getString("x-akto-installer-akto_session_id"));
     }
+    @Test
+    public void virtualKeyOwnerEmailIdentifiesTheUser() {
+        BasicDBObject h = genericClientHeaders("opencode/1.18.32").append("x-akto-contextsource", "ENDPOINT");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag().append("user_id", "jane@example.com"));
+        assertEquals("jane@example.com", LitellmAgentEndpointRewrite.apply(data));
+        assertEquals("jane.ai-agent.opencode-litellm", headers(data).getString("host"));
+        assertEquals("jane@example.com", headers(data).getString("x-akto-installer-user_email"));
+    }
+
+    @Test
+    public void explicitEmailHeaderWinsOverTheKeyOwner() {
+        BasicDBObject h = genericClientHeaders("opencode/1.18.32").append("x-akto-contextsource", "ENDPOINT")
+            .append("x-akto-installer-user_email", "raj@example.com");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag().append("user_id", "jane@example.com"));
+        assertEquals("raj@example.com", LitellmAgentEndpointRewrite.apply(data));
+    }
+
+    @Test
+    public void keyOwnerThatIsNotAnEmailIsIgnored() {
+        BasicDBObject h = genericClientHeaders("opencode/1.18.32").append("x-akto-contextsource", "ENDPOINT");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag().append("user_id", "default_user_id"));
+        assertNull(LitellmAgentEndpointRewrite.apply(data));
+        assertEquals("localhost-4001.ai-agent.opencode-litellm", headers(data).getString("host"));
+    }
+
+    @Test
+    public void emailOrNullAcceptsOnlyEmailAddresses() {
+        assertEquals("jane@example.com", LitellmAgentEndpointRewrite.emailOrNull(" jane@example.com "));
+        assertNull(LitellmAgentEndpointRewrite.emailOrNull("default_user_id"));
+        assertNull(LitellmAgentEndpointRewrite.emailOrNull("@example.com"));
+        assertNull(LitellmAgentEndpointRewrite.emailOrNull("jane@"));
+        assertNull(LitellmAgentEndpointRewrite.emailOrNull("a@b@c"));
+        assertNull(LitellmAgentEndpointRewrite.emailOrNull(null));
+    }
 }

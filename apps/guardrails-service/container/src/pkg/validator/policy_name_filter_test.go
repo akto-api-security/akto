@@ -38,8 +38,8 @@ func TestPoliciesByName(t *testing.T) {
 	}
 }
 
-// A policy the request names is enforced whatever its context source or scope; without a
-// (matching) name the request gets the policies in scope for it.
+// A policy the request names is enforced whatever its context source or scope; a request naming
+// no active policy gets no guardrails; without a name it gets the policies in scope for it.
 func TestEnforcedPolicies(t *testing.T) {
 	outOfScopeUser := types.Policy{
 		Info:              types.PolicyInfo{Name: "block employee pii"},
@@ -65,17 +65,21 @@ func TestEnforcedPolicies(t *testing.T) {
 		name       string
 		policyName string
 		want       []string
+		wantOK     bool
 	}{
-		{"no name gives the policies in scope", "", []string{"everyone"}},
-		{"named policy out of user scope is enforced", "Block Employee PII", []string{"block employee pii"}},
-		{"named policy of another context source is enforced", "agentic only", []string{"agentic only"}},
-		{"only the named policies are enforced", "block employee pii,everyone", []string{"block employee pii", "everyone"}},
-		{"unknown name falls back to the policies in scope", "nope", []string{"everyone"}},
+		{"no name gives the policies in scope", "", []string{"everyone"}, true},
+		{"named policy out of user scope is enforced", "Block Employee PII", []string{"block employee pii"}, true},
+		{"named policy of another context source is enforced", "agentic only", []string{"agentic only"}, true},
+		{"only the named policies are enforced", "block employee pii,everyone", []string{"block employee pii", "everyone"}, true},
+		{"unknown names next to a known one are ignored", "everyone,nope", []string{"everyone"}, true},
+		{"no matching name applies no guardrails", "nope", []string{}, false},
+		{"inactive or misspelled names apply no guardrails", "block employe pii,other", []string{}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := policyNames(s.enforcedPolicies(endpointPolicies, valCtx, tc.policyName)); !slices.Equal(got, tc.want) {
-				t.Fatalf("enforcedPolicies(%q) = %v, want %v", tc.policyName, got, tc.want)
+			got, ok := s.enforcedPolicies(endpointPolicies, valCtx, tc.policyName)
+			if ok != tc.wantOK || !slices.Equal(policyNames(got), tc.want) {
+				t.Fatalf("enforcedPolicies(%q) = %v, %v; want %v, %v", tc.policyName, policyNames(got), ok, tc.want, tc.wantOK)
 			}
 		})
 	}
