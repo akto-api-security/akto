@@ -11,6 +11,7 @@ import metrics_push
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
+    CONTEXT_SOURCE_KEY,
     FORCE_GEMMA_ONLY_SCANNERS,
     GEMMA_ONLY_SCANNERS,
     LOCAL_SCANNERS,
@@ -98,6 +99,9 @@ async def scan_payload(
         if not config.get("modelConfigs"):
             default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
+        context_source = payload.get("context_source") or ""
+        if context_source:
+            config = {**config, CONTEXT_SOURCE_KEY: context_source}
         if scanner_name in FORCE_GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": force_gemma_only(config.get("modelConfigs"))}
         elif scanner_name in GEMMA_ONLY_SCANNERS:

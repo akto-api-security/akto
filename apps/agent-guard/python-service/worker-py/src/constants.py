@@ -57,6 +57,11 @@ def get_default_config(raw_json: str = "") -> dict[str, Any]:
     return BUILTIN_DEFAULT_CONFIG
 
 
+# Config key carrying the request's top-level `context_source` (AGENTIC/ENDPOINT)
+# down the cascade to prompt builders, alongside the other per-request knobs.
+CONTEXT_SOURCE_KEY = "contextSource"
+
+
 # Routing tables — the single source of truth for which backend handles a scan.
 # BanCode is LLM-judged (code detection via the Gemma arbiter), not the old
 # heuristic — see GEMMA_ONLY_SCANNERS for why it skips the Qwen tier.
