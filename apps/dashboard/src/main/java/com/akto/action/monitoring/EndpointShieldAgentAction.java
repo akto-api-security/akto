@@ -37,7 +37,7 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<Log> agentLogs;
     private int startTime;
     private int endTime;
-    private String logKey; // optional filter: "agent-logs", "proxy-logs", "installation-logs", etc.
+    private String logKey; // optional filter: "agent-logs", "proxy-logs", "system-proxy-logs", "installation-logs", etc.
     private String afterId;  // ObjectId hex cursor — fetch logs older than this document
     private int pageSize;    // number of logs per page; defaults to DEFAULT_PAGE_SIZE
     private long totalCount; // total matching logs (without cursor), for display

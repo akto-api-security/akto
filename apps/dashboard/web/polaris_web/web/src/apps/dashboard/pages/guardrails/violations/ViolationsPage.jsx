@@ -51,6 +51,7 @@ import { extractServiceName } from "@/apps/dashboard/pages/observe/agentic/const
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
+import { fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
 import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "./ViolationFlyoutSections";
@@ -514,6 +515,19 @@ function classifyPolicyType(name) {
 
 // Transform a single backend event into a table row.
 // Kept lightweight — runs only on the current page of results (not all data).
+// Skills Evaluations / Misconfigured Settings partitions (Atlas/ENDPOINT only): "only" on their own
+// tab, "exclude" on Active (both at once, so Active shows neither) - same convention as
+// SusDataTable.jsx. Backend applies these only when contextSource === ENDPOINT; undefined (no-op)
+// for Agentic accounts or the other tabs. Shared by the grid and the summary cards so a card never
+// counts rows its click-through can't show.
+function evaluationModesForTab(tab) {
+    if (!isEndpointSecurityCategory()) return { skillEvaluationMode: undefined, configEvaluationMode: undefined };
+    return {
+        skillEvaluationMode: tab === "skills_evaluations" ? "only" : (tab === "active" ? "exclude" : undefined),
+        configEvaluationMode: tab === "misconfigured_settings" ? "only" : (tab === "active" ? "exclude" : undefined),
+    };
+}
+
 function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceMap) {
     const meta = parseMetadata(event.metadata);
     // typeLabel (request-shape, from the actual URL/method) drives the Type column and the
@@ -1207,43 +1221,24 @@ function Violations() {
         async function loadSummary() {
             setSummaryLoading(true);
             try {
-                // fetchThreatCategoryCount excludes /skills/ events unconditionally on the backend
-                // (ThreatUtils.excludeSkillEndpointFilter), so Skills Evaluations can never be derived
-                // from categoryResp/byType — it'd always read 0. Misconfigured Settings also can't
-                // reliably reuse byType: it buckets by category TEXT (e.g. a skill's "Config Mutation"
-                // sub-category also matches "config"), not by the actual /config/ URL partition. Get
-                // both counts the same way the tabs themselves do: skillEvaluationMode/configEvaluationMode
-                // "only", limit 1, read .total. Atlas (ENDPOINT) only — undefined elsewhere skips the calls.
+                // Atlas (ENDPOINT): Active / Under Review / Ignored / Skills Evaluations / Misconfigured
+                // Settings come from fetchEndpointViolationCounts — the same row counts the tabs show, and
+                // the same numbers the Guardrails Dashboard totals use. getDailyThreatActorsCount's status
+                // totals (dailyResp) don't exclude /config/ events, so they're only the fallback for other
+                // categories or a failed request.
                 const wantsPartitionCounts = isEndpointSecurityCategory();
                 const wantsHumanApprovalCount = isAgenticSecurityCategory();
-                // getDailyThreatActorsCount's totalActiveStatus (below, dailyResp) excludes /skills/
-                // events server-side (ThreatUtils.excludeSkillEndpointFilter in ThreatActorService.java)
-                // but has NO equivalent config-exclusion filter anywhere in that file, so it overcounts
-                // Active by however many /config/ (Misconfigured Settings) events exist — the table
-                // itself (fetchSuspectSampleData with skillEvaluationMode/configEvaluationMode:
-                // "exclude") excludes both and is the source of truth. Rather than touch the shared
-                // ThreatActorService backend (which also feeds 5+ other dashboard widgets), get the
-                // corrected Active/Under Review/Ignored counts the same way the grid does, scoped to
-                // just this page.
+                // The Open Violations card is the Active tab, so its severity chips exclude the same
+                // partitions; Top Users follows whichever tab is open, like the table its clicks filter.
+                const activeTabModes = evaluationModesForTab("active");
+                const currentTabModes = evaluationModesForTab(currentTab);
                 const results = await Promise.allSettled([
-                    threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE"),
+                    threatDetectionApi.fetchCountBySeverity(startTimestamp, endTimestamp, "ACTIVE", activeTabModes.skillEvaluationMode, activeTabModes.configEvaluationMode),
                     threatDetectionApi.fetchThreatCategoryCount(startTimestamp, endTimestamp, activeStatusValue),
                     threatDetectionApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
-                    threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5),
+                    threatDetectionApi.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5, activeStatusValue, currentTabModes.skillEvaluationMode, currentTabModes.configEvaluationMode),
                     wantsPartitionCounts
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "only", undefined)
-                        : Promise.resolve(null),
-                    wantsPartitionCounts
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], undefined, "only")
-                        : Promise.resolve(null),
-                    wantsPartitionCounts
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude")
-                        : Promise.resolve(null),
-                    wantsPartitionCounts
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "UNDER_REVIEW", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined)
-                        : Promise.resolve(null),
-                    wantsPartitionCounts
-                        ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "IGNORED", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined)
+                        ? fetchEndpointViolationCounts(startTimestamp, endTimestamp)
                         : Promise.resolve(null),
                     wantsHumanApprovalCount
                         ? threatDetectionApi.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "HUMAN_APPROVAL", undefined, undefined, undefined, undefined, undefined, false, [], undefined, undefined, undefined, undefined, HUMAN_RESPONSE.PENDING)
@@ -1254,14 +1249,10 @@ function Violations() {
                 const categoryResp = results[1].status === 'fulfilled' ? results[1].value : {};
                 const dailyResp    = results[2].status === 'fulfilled' ? results[2].value : {};
                 const topNResp     = results[3].status === 'fulfilled' ? results[3].value : {};
-                const skillsCountResp = results[4].status === 'fulfilled' ? results[4].value : null;
-                const configCountResp = results[5].status === 'fulfilled' ? results[5].value : null;
-                const activeCountResp = results[6].status === 'fulfilled' ? results[6].value : null;
-                const underReviewCountResp = results[7].status === 'fulfilled' ? results[7].value : null;
-                const ignoredCountResp = results[8].status === 'fulfilled' ? results[8].value : null;
-                const humanApprovalCountResp = results[9].status === 'fulfilled' ? results[9].value : null;
-                const skillsEvaluationsCount = skillsCountResp?.total || 0;
-                const misconfiguredSettingsCount = configCountResp?.total || 0;
+                const partitionCounts = results[4].status === 'fulfilled' ? results[4].value : null;
+                const humanApprovalCountResp = results[5].status === 'fulfilled' ? results[5].value : null;
+                const skillsEvaluationsCount = partitionCounts?.skillsEvaluations || 0;
+                const misconfiguredSettingsCount = partitionCounts?.misconfiguredSettings || 0;
                 const humanApprovalCount = humanApprovalCountResp?.total || 0;
 
                 // Severity counts
@@ -1275,15 +1266,10 @@ function Violations() {
                     }
                 });
 
-                // Status counts: prefer the corrected, skill+config-excluded totals (activeCountResp
-                // etc.) over dailyResp's raw totalActiveStatus/etc, which overcounts by however many
-                // Misconfigured Settings events exist (see comment above). Falls back to dailyResp
-                // when partition counts aren't applicable (non-Endpoint-Security accounts) or a
-                // request failed.
                 const statusCounts = {
-                    ACTIVE: activeCountResp?.total ?? (dailyResp?.totalActiveStatus || 0),
-                    IGNORED: ignoredCountResp?.total ?? (dailyResp?.totalIgnoredStatus || 0),
-                    UNDER_REVIEW: underReviewCountResp?.total ?? (dailyResp?.totalUnderReviewStatus || 0),
+                    ACTIVE: partitionCounts?.active ?? (dailyResp?.totalActiveStatus || 0),
+                    IGNORED: partitionCounts?.ignored ?? (dailyResp?.totalIgnoredStatus || 0),
+                    UNDER_REVIEW: partitionCounts?.underReview ?? (dailyResp?.totalUnderReviewStatus || 0),
                     FIXED: 0,
                 };
 
@@ -1328,7 +1314,7 @@ function Violations() {
             }
         }
         loadSummary();
-    }, [startTimestamp, endTimestamp, activeStatusValue, tableKey]);
+    }, [startTimestamp, endTimestamp, activeStatusValue, currentTab, tableKey]);
 
     // ─── Fetch latency data ──────────────────────────────────────────────────
     useEffect(() => {
@@ -1382,16 +1368,7 @@ function Violations() {
         // (all map to the backend latestAttack).
         const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
         const statusFilter = activeStatusValue;
-        // Skills Evaluations / Misconfigured Settings partitions (Atlas/ENDPOINT only): "only" on
-        // their own tab, "exclude" on Active (both at once, so Active shows neither) - same
-        // convention as SusDataTable.jsx. Backend applies these only when contextSource ===
-        // ENDPOINT; undefined (no-op) for Agentic accounts or the other tabs.
-        const skillEvaluationMode = isEndpointSecurityCategory()
-            ? (isSkillsEvaluationsTab ? "only" : (currentTab === "active" ? "exclude" : undefined))
-            : undefined;
-        const configEvaluationMode = isEndpointSecurityCategory()
-            ? (isMisconfiguredTab ? "only" : (currentTab === "active" ? "exclude" : undefined))
-            : undefined;
+        const { skillEvaluationMode, configEvaluationMode } = evaluationModesForTab(currentTab);
         // Needs Approval is a CLIENT-side view over ACTIVE events (no server-side "behaviour"
         // filter exists) — fetch one big page and filter after mapping, same as SusDataTable.jsx.
         const effectiveSkip = isNeedsApprovalTab ? 0 : skip;

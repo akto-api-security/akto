@@ -95,6 +95,8 @@ type ValidateRequestParams struct {
 	// ActivityID, when set, turns this call into a Human Approval status check instead of
 	// a fresh validation — no other field is required.
 	ActivityID string `json:"activityId,omitempty"`
+	// FullRequest is the raw request from endpoint shield, used for account-type detection.
+	FullRequest string `json:"fullRequest,omitempty"`
 }
 
 // EffectiveSkipThreat returns skip threat reporting bypass: false when nil or unset.

@@ -111,7 +111,7 @@ Analyze this text and respond ONLY with valid JSON:
   "isToxic": <true if this text is toxic, false otherwise>,
   "confidence": <float 0.0 to 1.0 — your estimated p(boolean-above-is-true). Use ~0.9+ when sure it is true, ~0.1 or lower when sure it is false. NEVER invert.>,
   "matchedCategory": "<which enabled category was matched, or empty string if none>",
-  "reason": "<one sentence explanation>"
+  "reason": "<one sentence explanation; refer to any PII, secret or personal data by category only, never quote the values>"
 }
 
 Text to analyze:

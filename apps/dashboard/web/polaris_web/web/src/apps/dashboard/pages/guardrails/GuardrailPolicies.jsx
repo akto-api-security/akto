@@ -691,6 +691,7 @@ function GuardrailPolicies() {
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
+                blockPublicShare: guardrailData.blockPublicShare || false,
                 ignorePhrases: guardrailData.ignorePhrases || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
@@ -739,7 +740,8 @@ function GuardrailPolicies() {
                     : null,
                 url: guardrailData.url || '',
                 confidenceScore: guardrailData.confidenceScore || 0,
-                active: true
+                active: true,
+                skipEnterpriseAccounts: guardrailData.skipEnterpriseAccounts || false
             };
 
             // Prepare request payload with nested policy object

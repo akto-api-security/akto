@@ -53,12 +53,8 @@ public class Gateway {
         try {
             String requestPayload = getStringField(requestData, "requestPayload");
             if (requestPayload == null || requestPayload.isEmpty()) {
-                loggerMaker.warnAndAddToDb("Missing required field: requestPayload");
-                Map<String, Object> error = new HashMap<>();
-                error.put("success", false);
-                error.put("message", "Missing required field: requestPayload");
-                error.put("error", "requestPayload is required");
-                return error;
+                requestPayload = "{}";
+                requestData.put("requestPayload", requestPayload);
             }
 
             Map<String, Object> result = new HashMap<>();
@@ -244,6 +240,7 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "direction");
         putIfNotNull(validateRequest, requestData, "tag");
         putIfNotNull(validateRequest, requestData, "metadata");
+        putIfNotNull(validateRequest, requestData, "fullRequest");
 
         String contextSource = getStringField(requestData, "contextSource");
         String endpoint = isResponse ? "/validate/response" : "/validate/request";
