@@ -87,6 +87,10 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
         return <Badge tone="success">Approved</Badge>;
     }
 
+    if (!func.canManageGuardrailPolicies()) {
+        return null;
+    }
+
     const openModal = () => { setMode("ALWAYS"); setDays("7"); setModalActive(true); };
 
     const handleApprove = async () => {

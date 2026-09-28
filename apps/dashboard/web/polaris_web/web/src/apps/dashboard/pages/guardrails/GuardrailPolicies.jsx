@@ -162,6 +162,7 @@ const sortPinnedSystemPolicies = (systemRows) =>
   });
 
 function GuardrailPolicies() {
+    const canManagePolicies = func.canManageGuardrailPolicies();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -623,7 +624,7 @@ function GuardrailPolicies() {
                     })));
                 },
             },
-            {
+            canManagePolicies && {
                 content: `Delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
                 onAction: async () => {
                     const deleteConfirmationMessage = `Are you sure you want to delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}?`;
@@ -639,7 +640,7 @@ function GuardrailPolicies() {
                     });
                 },
             },
-        ];
+        ].filter(Boolean);
     };
 
     const getActionsList = (item) => {
@@ -647,7 +648,7 @@ function GuardrailPolicies() {
         const actionItems = [{
             title: 'Actions',
             items: [
-                {
+                canManagePolicies && {
                     content: isActive ?
                         <span style={{ color: '#D72C0D' }}>Disable policy</span> :
                         <span style={{ color: '#008060' }}>Enable policy</span>,
@@ -660,7 +661,7 @@ function GuardrailPolicies() {
                     icon: ViewMinor,
                     onAction: () => handleEditPolicy(item),
                 }
-            ]
+            ].filter(Boolean)
         }];
         return actionItems;
     };
@@ -859,7 +860,7 @@ function GuardrailPolicies() {
             }
             isFirstPage={true}
             secondaryActions={<InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Atlas Insights" />}
-            primaryAction={
+            primaryAction={canManagePolicies &&
                 <HorizontalStack gap="2">
                     <Popover
                         active={presetsPopoverActive}
