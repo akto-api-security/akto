@@ -531,10 +531,10 @@ public class ArgusPostureService {
 
     private static final int HIGHEST_RISK_AGENTS_LIMIT = 5;
 
-    public List<BasicDBObject> buildHighestRiskAgents(InsightDataBundle bundle) {
+    public List<BasicDBObject> buildHighestRiskAgents(InsightDataBundle bundle, String environment) {
         List<BasicDBObject> rows = new ArrayList<>();
         int rank = 1;
-        for (ApiCollection c : scoredAgents(bundle.collections)) {
+        for (ApiCollection c : assetsIn(scoredAgents(bundle.collections), environment)) {
             if (rank > HIGHEST_RISK_AGENTS_LIMIT) break;
             long score = Math.round(c.getPostureScore());
 

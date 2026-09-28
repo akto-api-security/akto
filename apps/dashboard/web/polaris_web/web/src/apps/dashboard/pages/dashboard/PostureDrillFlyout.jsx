@@ -63,7 +63,7 @@ function SeverityCell({ value }) {
 // — a row total is always shown (real, not from the backend's own optional summary[]), plus
 // whatever InsightResult.Metric rows the drill sends.
 
-function DrillStats({ drill }) {
+function DrillStats({ drill, hideTotal }) {
     // The denominator stays out of `formatted` on purpose — that string is what the narrative
     // model is given, and "0 / 2" reads to it as "0 of 2 items need attention". It is a display
     // concern only, so it is rendered here instead.
@@ -89,7 +89,7 @@ function DrillStats({ drill }) {
         <VerticalStack gap="3">
             <HorizontalStack gap="2" blockAlign="center">
                 <Text variant="headingMd" as="h3">{title}</Text>
-                <Badge>{(drill.total ?? 0).toLocaleString()}</Badge>
+                {!hideTotal && <Badge>{(drill.total ?? 0).toLocaleString()}</Badge>}
             </HorizontalStack>
             <NumberCardsRow metrics={stats} />
         </VerticalStack>
@@ -575,7 +575,7 @@ function RiskScoreRootBody({ kpi, onSubScoreClick }) {
 function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, startTimestamp, endTimestamp,
                               rootLabel = 'Security posture', filterStatePrefix = 'security-posture-drill',
                               fetchDrill = dashboardApi.fetchPostureDrill, width = 760,
-                              ctaInFooter = false, pageSize = 20 }) {
+                              ctaInFooter = false, pageSize = 20, hideTotalBadge = false }) {
     const navigate = useNavigate()
     const show = !!drillState
     const [drill, setDrill] = useState(null)
@@ -774,9 +774,9 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                                         {/* Only wrapped in a flex row when the CTAs sit beside it — a
                                             HorizontalStack sizes children to content, which stops the
                                             stat cards short of the panel's full width. */}
-                                        {ctasInFooter ? (!isRiskScoreRoot && <DrillStats drill={drill} />) : (
+                                        {ctasInFooter ? (!isRiskScoreRoot && <DrillStats drill={drill} hideTotal={hideTotalBadge} />) : (
                                             <HorizontalStack align="space-between" blockAlign="start">
-                                                {!isRiskScoreRoot && <DrillStats drill={drill} />}
+                                                {!isRiskScoreRoot && <DrillStats drill={drill} hideTotal={hideTotalBadge} />}
                                                 {ctas.length > 0 && (
                                                     <HorizontalStack gap="2">
                                                         {ctas.map((cta) => (

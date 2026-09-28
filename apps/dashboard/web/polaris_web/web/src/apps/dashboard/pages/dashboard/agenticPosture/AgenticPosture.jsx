@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Box, Button, HorizontalStack, Icon, Text, TextField, VerticalStack } from '@shopify/polaris'
-import { SearchMinor } from '@shopify/polaris-icons'
+import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -15,8 +14,8 @@ import KpiGrid from './overview/KpiGrid'
 import DangerousPathsSection from './overview/DangerousPathsSection'
 import HighestRiskAgentsTable from './overview/HighestRiskAgentsTable'
 import RiskByDomainSection from './overview/RiskByDomainSection'
-import TopFindingsSection from './overview/TopFindingsSection'
 import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
+import TopFindingsSection from './overview/TopFindingsSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
 import PostureDrillFlyout from '../PostureDrillFlyout'
 import dashboardApi from '../api'
@@ -68,7 +67,6 @@ function AgenticPosture() {
     const [pageData, setPageData] = useState({})
     const [loading, setLoading] = useState(true)
     const [selectedEnv, setSelectedEnv] = useState(() => searchParams.get('env') || 'all')
-    const [searchTerm, setSearchTerm] = useState('')
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 
@@ -136,41 +134,13 @@ function AgenticPosture() {
     // Highest-risk rows carry a real ApiCollection id as groupKey, so they open the collection page.
     const openCollection = (collectionId) => navigate(`/dashboard/observe/inventory/${encodeURIComponent(collectionId)}`)
 
-    const term = searchTerm.trim().toLowerCase()
-    const highestRiskAgents = useMemo(() => {
-        const rows = pageData.highestRiskAgents || []
-        const filtered = selectedEnv === 'all' ? rows : rows.filter((r) => r.environment === selectedEnv)
-        if (!term) return filtered
-        return filtered.filter((r) => r.name.toLowerCase().includes(term) || (r.issue || '').toLowerCase().includes(term))
-    }, [pageData.highestRiskAgents, selectedEnv, term])
-
-    const topFindings = useMemo(() => {
-        const rows = pageData.topFindings || []
-        const filtered = selectedEnv === 'all' ? rows : rows.filter((r) => r.environment === selectedEnv)
-        if (!term) return filtered
-        return filtered.filter((r) => (r.title || '').toLowerCase().includes(term))
-    }, [pageData.topFindings, selectedEnv, term])
-
     const topbar = (
         <VerticalStack gap="4">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
-                <Box maxWidth="560px">
-                    <Text variant="bodyMd" color="subdued">
-                        What agents exist, which ones are risky, why, and what changed — across every AI agent Argus has discovered.
-                    </Text>
-                </Box>
-                <Box width="260px">
-                    <TextField
-                        value={searchTerm}
-                        onChange={setSearchTerm}
-                        placeholder="Search agents, findings…"
-                        prefix={<Icon source={SearchMinor} color="subdued" />}
-                        autoComplete="off"
-                        clearButton
-                        onClearButtonClick={() => setSearchTerm('')}
-                    />
-                </Box>
-            </div>
+            <Box maxWidth="560px">
+                <Text variant="bodyMd" color="subdued">
+                    What agents exist, which ones are risky, why, and what changed — across every AI agent Argus has discovered.
+                </Text>
+            </Box>
             <EnvironmentTabs environments={pageData.environments} selected={selectedEnv} onSelect={setSelectedEnv} />
         </VerticalStack>
     )
@@ -211,7 +181,7 @@ function AgenticPosture() {
                 description="Ranked by blast radius — privilege held, data reached, and controls missing."
                 action={<Button onClick={() => openDrill('highRiskAgents')}>View all agents</Button>}
             >
-                <HighestRiskAgentsTable agents={highestRiskAgents} onOpenAgent={openCollection} />
+                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={openCollection} />
             </Section>
 
             <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">
@@ -219,7 +189,10 @@ function AgenticPosture() {
             </Section>
 
             <Section title="Top Posture Findings" description="The highest-impact gaps, with exactly what's affected and how to close them.">
-                <TopFindingsSection topFindings={topFindings} onOpenAgent={openAgent} />
+                <TopFindingsSection
+                    topFindings={(pageData.topFindings || []).filter((f) => selectedEnv === 'all' || f.environment === selectedEnv)}
+                    onOpenAgent={openAgent}
+                />
             </Section>
 
             <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">
@@ -264,6 +237,7 @@ function AgenticPosture() {
                 fetchDrill={fetchArgusDrill}
                 ctaInFooter={true}
                 pageSize={DRILL_PAGE_SIZE[drillState?.drillId] || 20}
+                hideTotalBadge={drillState?.drillId === 'highRiskAgents' && !drillState?.path}
             />
         </Box>
     )

@@ -99,7 +99,7 @@ public class TestArgusPostureService {
         ApiCollection notAgentic = collection(3, "plain-api", null, "env", 99.0, sensitiveDriven);
         ApiCollection unscored = collection(4, "unscored", null, Constants.AKTO_GEN_AI_TAG, null, null);
 
-        List<BasicDBObject> rows = service.buildHighestRiskAgents(bundle(Arrays.asList(second, notAgentic, top, unscored)));
+        List<BasicDBObject> rows = service.buildHighestRiskAgents(bundle(Arrays.asList(second, notAgentic, top, unscored)), "all");
 
         assertEquals(2, rows.size());
         assertEquals("1", rows.get(0).get("groupKey"));
@@ -114,7 +114,7 @@ public class TestArgusPostureService {
     public void buildHighestRiskAgents_heavierWeightWinsIssue() {
         // redTeam 40 earns 12 pts (weight 30); sensitiveData 100 earns only 10 (weight 10).
         ApiCollection c = collection(1, "agent", null, Constants.AKTO_GEN_AI_TAG, 30.0, subScores(40, 0, 0, 100, 0, 0));
-        List<BasicDBObject> rows = service.buildHighestRiskAgents(bundle(Arrays.asList(c)));
+        List<BasicDBObject> rows = service.buildHighestRiskAgents(bundle(Arrays.asList(c)), "all");
         assertEquals("Has open red-teaming findings", rows.get(0).get("issue"));
     }
 

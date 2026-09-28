@@ -206,7 +206,6 @@ public class ArgusAgentPostureDrillService {
         long highOrCritical = 0;
         double scoreSum = 0;
         List<Map<String, Object>> rows = new ArrayList<>();
-        int rank = 1;
         for (ApiCollection agent : agents) {
             long score = Math.round(agent.getPostureScore());
             scoreSum += agent.getPostureScore();
@@ -214,7 +213,6 @@ public class ArgusAgentPostureDrillService {
 
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", agent.getId());
-            row.put("rank", rank++);
             row.put("agent", ArgusPostureService.agentDisplayName(agent));
             row.put("type", AgenticObserveUtil.getTypeFromCollection(agent));
             row.put("environment", ArgusPostureService.envBucket(ArgusPostureService.envTagValue(agent)));
@@ -225,7 +223,7 @@ public class ArgusAgentPostureDrillService {
         }
 
         PostureDrillResult result = base("Agents by posture score", trail, Arrays.asList(
-                col("rank", "Rank"), col("agent", "Agent"), col("type", "Type"), col("environment", "Environment"),
+                col("agent", "Agent"), col("type", "Type"), col("environment", "Environment"),
                 col("score", "Score"), col("severity", "Severity"), col("topIssue", "Top issue")), true);
         double avg = agents.isEmpty() ? 0 : scoreSum / agents.size();
         result.setSummary(Arrays.asList(

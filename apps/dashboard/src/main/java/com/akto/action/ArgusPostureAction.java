@@ -58,7 +58,7 @@ public class ArgusPostureAction extends UserAction {
 
             this.response = argusPostureService.buildSummary(bundle, environment);
             response.put("postureScore", fetchPostureScore());
-            response.put("highestRiskAgents", argusPostureService.buildHighestRiskAgents(bundle));
+            response.put("highestRiskAgents", argusPostureService.buildHighestRiskAgents(bundle, environment));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture summary: " + e.getMessage());

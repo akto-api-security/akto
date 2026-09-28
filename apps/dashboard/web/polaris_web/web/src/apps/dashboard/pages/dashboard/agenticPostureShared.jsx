@@ -102,6 +102,18 @@ export function DummyDataOverlay({ panelId, copy, children }) {
     )
 }
 
+// DummyDataOverlay plus a centred "Coming soon" badge for sections that aren't built yet.
+export function ComingSoonOverlay({ panelId, children }) {
+    return (
+        <div style={{ position: 'relative', height: '100%' }}>
+            <DummyDataOverlay panelId={panelId}>{children}</DummyDataOverlay>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <Badge status="new">Coming soon</Badge>
+            </div>
+        </div>
+    )
+}
+
 // One KPI tile — Card + label + big value + optional secondary line + optional delta + optional
 // link. A KPI arrives with `status: "COMING_SOON"` instead of a value when its resolver isn't
 // wired up yet — callers render ComingSoonTile in that case rather than this component.
