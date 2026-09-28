@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Button, HorizontalStack, LegacyCard, Select, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Box, Button, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../../api';
 import { rolesOptions, getRoleDisplayName } from '../../roles/Roles';
+import Dropdown from '../../../../components/layouts/Dropdown';
 
 // Maps SSO groups (as sent in the SAML groups claim) to Akto roles, applied on every login.
 function SamlGroupRoleMapping({ configType, savedMapping }) {
@@ -24,7 +25,7 @@ function SamlGroupRoleMapping({ configType, savedMapping }) {
         }).catch(() => {})
     }, [])
 
-    const roleOptions = [{ label: 'Select role', value: '' }, ...rolesOptions, ...customRoleOptions]
+    const roleOptions = [...rolesOptions, ...customRoleOptions]
 
     const handleAdd = () => {
         const group = newGroup.trim()
@@ -99,7 +100,14 @@ function SamlGroupRoleMapping({ configType, savedMapping }) {
                             <TextField label="Group" value={newGroup} onChange={setNewGroup} placeholder="Group name or Object ID" autoComplete="off" />
                         </Box>
                         <Box minWidth="200px" width="100%">
-                            <Select label="Akto role" options={roleOptions} value={newRole} onChange={setNewRole} />
+                            <Dropdown
+                                key={`akto-role-${Object.keys(mapping).length}`}
+                                id="saml-group-akto-role"
+                                label="Akto role"
+                                menuItems={roleOptions}
+                                initial={newRole}
+                                selected={(role) => setNewRole(role || '')}
+                            />
                         </Box>
                         <Button onClick={handleAdd}>Add</Button>
                     </HorizontalStack>
