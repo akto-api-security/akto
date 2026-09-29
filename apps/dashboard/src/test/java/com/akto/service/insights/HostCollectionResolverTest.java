@@ -1,5 +1,7 @@
 package com.akto.service.insights;
 
+import java.util.Map;
+import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.dto.ApiCollection;
 import org.junit.Test;
 
@@ -83,5 +85,23 @@ public class HostCollectionResolverTest {
         assertTrue(HostCollectionResolver.isClaudeConfigHost("device.claude"));
         assertTrue(HostCollectionResolver.isClaudeConfigHost("device.claude-settings"));
         assertTrue(!HostCollectionResolver.isClaudeConfigHost("device.chrome.claude"));
+    }
+
+    @Test
+    public void severityByCollectionAttributesHostCountsAndSkipsUnknownHosts() {
+        HostCollectionResolver resolver = new HostCollectionResolver(Arrays.asList(
+                collection(1, "mcp.testkg.com"), collection(2, "bedrock-runtime.us-east-1.amazonaws.com")));
+        Map<Integer, Map<String, Integer>> out = resolver.severityByCollection(Arrays.asList(
+                new HostSeverityCount("mcp.testkg.com", 0, 2, 1, 0),
+                new HostSeverityCount("bedrock-runtime.us-east-1.amazonaws.com", 1, 0, 0, 3),
+                new HostSeverityCount("unknown.host", 5, 5, 5, 5)));
+
+        assertEquals(2, out.size());
+        assertEquals(Integer.valueOf(2), out.get(1).get("HIGH"));
+        assertEquals(Integer.valueOf(1), out.get(1).get("MEDIUM"));
+        assertTrue(!out.get(1).containsKey("CRITICAL"));
+        assertEquals(Integer.valueOf(1), out.get(2).get("CRITICAL"));
+        assertEquals(Integer.valueOf(3), out.get(2).get("LOW"));
+        assertTrue(resolver.severityByCollection(null).isEmpty());
     }
 }

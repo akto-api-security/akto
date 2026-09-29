@@ -33,8 +33,6 @@ import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ParallelQueryExecutor;
 import com.akto.util.ThreatDetectionConstants;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.WriteModel;
@@ -1058,28 +1056,6 @@ public class MaliciousEventService {
   public void createIndexIfAbsent(String accountId) {
     ThreatUtils.createIndexIfAbsent(accountId, maliciousEventDao);
     shouldNotCreateIndexes.put(accountId, true);
-  }
-
-  // apiCollectionId -> {severity -> count} of AGENTIC malicious events since startTs, computed on demand for the
-  // dashboard's Argus posture score and its drill.
-  public Map<String, Map<String, Integer>> agenticSeverityCounts(String accountId, List<Integer> apiCollectionIds, int startTs) {
-    List<Bson> pipeline = Arrays.asList(
-        Aggregates.match(Filters.and(
-            ThreatUtils.buildSimpleContextFilterNew("AGENTIC", accountId),
-            Filters.in("latestApiCollectionId", apiCollectionIds),
-            Filters.gte("detectedAt", startTs))),
-        Aggregates.group(new Document("apiCollectionId", "$latestApiCollectionId").append("severity", "$severity"),
-            Accumulators.sum("count", 1)));
-    Map<String, Map<String, Integer>> out = new HashMap<>();
-    for (Document doc : maliciousEventDao.getCollection(accountId).aggregate(pipeline, Document.class)) {
-      Document id = doc.get("_id", Document.class);
-      Object collectionId = id.get("apiCollectionId");
-      String severity = id.getString("severity");
-      if (collectionId == null || severity == null) continue;
-      out.computeIfAbsent(String.valueOf(collectionId), k -> new HashMap<>())
-          .merge(severity.toUpperCase(Locale.ROOT), doc.getInteger("count"), Integer::sum);
-    }
-    return out;
   }
 
   public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource) {

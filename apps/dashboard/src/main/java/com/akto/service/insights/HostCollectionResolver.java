@@ -1,5 +1,6 @@
 package com.akto.service.insights;
 
+import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.dto.ApiCollection;
 import org.apache.commons.lang3.StringUtils;
 
@@ -66,6 +67,23 @@ public class HostCollectionResolver {
             ids = pool.isEmpty() ? null : Collections.singletonList(pool.get(0));
         }
         return ids == null ? Collections.emptyList() : ids;
+    }
+
+    // collectionId -> {severity -> count}, attributing each host's threat-backend counts to the collections it resolves to.
+    public Map<Integer, Map<String, Integer>> severityByCollection(List<HostSeverityCount> hostCounts) {
+        Map<Integer, Map<String, Integer>> out = new HashMap<>();
+        if (hostCounts == null) return out;
+        for (HostSeverityCount hc : hostCounts) {
+            if (hc == null) continue;
+            for (Integer id : resolve(hc.getHost())) {
+                Map<String, Integer> bySeverity = out.computeIfAbsent(id, k -> new HashMap<>());
+                if (hc.getCritical() > 0) bySeverity.merge("CRITICAL", hc.getCritical(), Integer::sum);
+                if (hc.getHigh() > 0) bySeverity.merge("HIGH", hc.getHigh(), Integer::sum);
+                if (hc.getMedium() > 0) bySeverity.merge("MEDIUM", hc.getMedium(), Integer::sum);
+                if (hc.getLow() > 0) bySeverity.merge("LOW", hc.getLow(), Integer::sum);
+            }
+        }
+        return out;
     }
 
     /** Mirrors agenticObserveApi.js's deviceServiceKey exactly — device+service loose-match key
