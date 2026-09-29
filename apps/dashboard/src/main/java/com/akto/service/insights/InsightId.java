@@ -57,8 +57,8 @@ public enum InsightId {
     }
 
     /** Which surface an insight belongs to — Atlas Discovery vs the guardrail/violations set
-     *  merged in from feature/dashbaord/guardrail-insights. Callers filter listInsights by this
-     *  so the two never mix in the same list; see InsightService.listInsights. */
+     *  merged in from feature/dashbaord/guardrail-insights. Callers filter listInsights by this so
+     *  groups never mix in the same list; see InsightService.listInsights. */
     public enum Group {
         ATLAS_DISCOVERY,
         GUARDRAIL_VIOLATIONS

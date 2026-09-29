@@ -25,6 +25,7 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpSchema;
 import com.akto.service.insights.InsightClassificationHelper;
 import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
@@ -88,6 +89,10 @@ public class ToolClassificationCron {
             long startMs = System.currentTimeMillis();
             List<WriteModel<ApiInfo>> updates = new ArrayList<>();
             for (ApiInfo tool : candidates) {
+                ApiInfo.ApiInfoKey key = tool.getId();
+                if (key != null && key.getUrl() != null
+                        && key.getUrl().contains(McpSchema.METHOD_TOOLS_LIST))
+                    continue;
                 classify(accountId, tool, updates);
             }
 

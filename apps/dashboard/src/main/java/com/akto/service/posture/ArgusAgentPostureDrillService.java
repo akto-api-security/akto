@@ -171,7 +171,7 @@ public class ArgusAgentPostureDrillService {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", agent.getId());
             row.put("agent", ArgusPostureService.agentDisplayName(agent));
-            row.put("environment", ArgusPostureService.envBucket(ArgusPostureService.envTagValue(agent)));
+            row.put("environment", ArgusPostureService.envBucket(InsightUtil.envTagValue(agent)));
             row.put("subScore", round1(category.subScore(agent.getPostureSubScores())));
             row.put("points", round1(category.points(agent.getPostureSubScores())));
             row.put("postureScore", Math.round(agent.getPostureScore()));
@@ -214,7 +214,7 @@ public class ArgusAgentPostureDrillService {
             row.put("id", agent.getId());
             row.put("agent", ArgusPostureService.agentDisplayName(agent));
             row.put("type", AgenticObserveUtil.getTypeFromCollection(agent));
-            row.put("environment", ArgusPostureService.envBucket(ArgusPostureService.envTagValue(agent)));
+            row.put("environment", ArgusPostureService.envBucket(InsightUtil.envTagValue(agent)));
             row.put("score", score);
             row.put("severity", ArgusPostureService.severityForScore(score));
             row.put("topIssue", ArgusPostureService.worstIssue(agent.getPostureSubScores()));
@@ -242,7 +242,7 @@ public class ArgusAgentPostureDrillService {
         String name = ArgusPostureService.agentDisplayName(agent);
         long score = Math.round(agent.getPostureScore());
         String severity = ArgusPostureService.severityForScore(score);
-        String environment = ArgusPostureService.envBucket(ArgusPostureService.envTagValue(agent));
+        String environment = ArgusPostureService.envBucket(InsightUtil.envTagValue(agent));
         String type = AgenticObserveUtil.getTypeFromCollection(agent);
         Map<String, Object> subScores = agent.getPostureSubScores();
         int now = Context.now();

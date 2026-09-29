@@ -6,6 +6,7 @@ import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
+import PostureDrillFlyout from '../PostureDrillFlyout'
 import func from '@/util/func'
 import values from '@/util/values'
 import postureDataSource from './postureDataSource'
@@ -14,11 +15,10 @@ import PostureScoreCard from './overview/PostureScoreCard'
 import KpiGrid from './overview/KpiGrid'
 import DangerousPathsSection from './overview/DangerousPathsSection'
 import HighestRiskAgentsTable from './overview/HighestRiskAgentsTable'
-import RiskByDomainSection from './overview/RiskByDomainSection'
+// import RiskByDomainSection from './overview/RiskByDomainSection'
+import InsightCardsSection from './overview/InsightCardsSection'
 import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
-import TopFindingsSection from './overview/TopFindingsSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
-import PostureDrillFlyout from '../PostureDrillFlyout'
 import dashboardApi from '../api'
 
 function SectionHeading({ title, description, action }) {
@@ -71,6 +71,9 @@ function AgenticPosture() {
     const [selectedEnv, setSelectedEnv] = useState(() => searchParams.get('env') || 'all')
     const [regenerating, setRegenerating] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
+    const [insightCards, setInsightCards] = useState([])
+    const [insightSummaries, setInsightSummaries] = useState({})
+    const [insightSummariesLoading, setInsightSummariesLoading] = useState(false)
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 
@@ -119,11 +122,20 @@ function AgenticPosture() {
             try {
                 const startTimestamp = getTimeEpoch('since')
                 const endTimestamp = getTimeEpoch('until')
-                const resp = await postureDataSource.fetchPostureSummary(startTimestamp, endTimestamp, selectedEnv)
-                if (!cancelled) setPageData(resp || {})
+                const [summaryResp, cards] = await Promise.all([
+                    postureDataSource.fetchPostureSummary(startTimestamp, endTimestamp, selectedEnv),
+                    postureDataSource.fetchInsightCards(startTimestamp, endTimestamp),
+                ])
+                if (!cancelled) {
+                    setPageData(summaryResp || {})
+                    setInsightCards(cards)
+                }
             } catch (error) {
-                console.error('Error fetching posture summary:', error)
-                if (!cancelled) setPageData({})
+                console.error('Error fetching posture data:', error)
+                if (!cancelled) {
+                    setPageData({})
+                    setInsightCards([])
+                }
             } finally {
                 if (!cancelled) setLoading(false)
             }
@@ -172,8 +184,31 @@ function AgenticPosture() {
         }
     }
 
+    // Deliberately its own effect, not folded into the cards load above: each card's AI summary
+    // can take a few seconds on a cache miss and must never hold up the (fast, Java-only) card
+    // data itself.
+    useEffect(() => {
+        let cancelled = false
+        async function loadSummaries() {
+            setInsightSummariesLoading(true)
+            setInsightSummaries({})
+            try {
+                const startTimestamp = getTimeEpoch('since')
+                const endTimestamp = getTimeEpoch('until')
+                const summaries = await postureDataSource.fetchInsightCardSummaries(startTimestamp, endTimestamp)
+                if (!cancelled) setInsightSummaries(summaries)
+            } finally {
+                if (!cancelled) setInsightSummariesLoading(false)
+            }
+        }
+        loadSummaries()
+        return () => { cancelled = true }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currDateRange])
+
     const openAgent = (groupKey) => navigate(`/dashboard/agentic-posture/agents/${encodeURIComponent(groupKey)}`)
     const openKpiLink = (kpi) => { if (kpi.linkGroupKey) openAgent(kpi.linkGroupKey) }
+
     // Highest-risk rows carry a real ApiCollection id as groupKey, so they open the collection page.
     const openCollection = (collectionId) => navigate(`/dashboard/observe/inventory/${encodeURIComponent(collectionId)}`)
 
@@ -228,15 +263,12 @@ function AgenticPosture() {
                 <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={openCollection} />
             </Section>
 
-            <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">
+            {/* <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">
                 <RiskByDomainSection riskByDomain={pageData.riskByDomain} />
-            </Section>
+            </Section> */}
 
-            <Section title="Top Posture Findings" description="The highest-impact gaps, with exactly what's affected and how to close them.">
-                <TopFindingsSection
-                    topFindings={(pageData.topFindings || []).filter((f) => selectedEnv === 'all' || f.environment === selectedEnv)}
-                    onOpenAgent={openAgent}
-                />
+            <Section title="Insights" description="Red-team, guardrail activity, and observability — the account-wide picture, each with an AI summary.">
+                <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
             </Section>
 
             <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">

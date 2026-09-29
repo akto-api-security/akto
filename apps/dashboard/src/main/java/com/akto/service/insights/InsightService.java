@@ -1,5 +1,6 @@
 package com.akto.service.insights;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.context.Context;
 import com.akto.dao.insights.InsightNarrativeCacheDao;
 import com.akto.dto.insights.InsightNarrativeCache;
@@ -254,5 +255,27 @@ public class InsightService {
         InsightNarrativeCache cache = new InsightNarrativeCache(fingerprint, r.getInsightId(), providerVersion,markdown, concern, impact, remediation, now,
                 new Date((now + TimeUnit.DAYS.toSeconds(NARRATIVE_TTL_DAYS)) * 1000L));
         InsightNarrativeCacheDao.instance.put(cache);
+    }
+
+    /**
+     * Argus (AGENTIC) posture insight cards read malicious/guardrail events the same way this
+     * class's own threat-backend futures do (see InsightDataLoader), just outside the bundle —
+     * ArgusPostureService's card-breakdown methods are pure over this raw list rather than
+     * fetching it themselves, so this is the one place that owns the InsightsThreatBackendAccess
+     * instantiation. A capped raw-row fetch (not a server-side aggregation: the threat-detection-
+     * backend has no {@code $group by {apiCollectionId, filterId}} endpoint), minimalFields=true
+     * since only apiCollectionId/filterId/severity/label/timestamp are read, and reuses
+     * AbstractThreatDetectionAction's own 2-minute response cache — the exact same
+     * fetchAllMaliciousEvents(start, end, limit, null, null, true) shape SecurityPostureAction's
+     * trendWindowEventsFuture already uses.
+     */
+    public List<DashboardMaliciousEvent> fetchArgusMaliciousEvents(InsightContext ctx, int limit) {
+        InsightsThreatBackendAccess threatAccess = new InsightsThreatBackendAccess();
+        try {
+            return threatAccess.violationEventsMinimal(ctx.getStartTs(), ctx.getEndTs(), limit, null);
+        } catch (Exception e) {
+            logger.error("InsightService: fetchArgusMaliciousEvents failed: " + e.getMessage());
+            return new ArrayList<>();
+        }
     }
 }

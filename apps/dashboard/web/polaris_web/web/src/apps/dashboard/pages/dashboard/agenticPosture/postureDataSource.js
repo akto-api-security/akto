@@ -37,4 +37,39 @@ async function fetchAgentDetail(groupKey, startTimestamp, endTimestamp) {
     return delay(agentDetailMock[groupKey] || null)
 }
 
-export default { fetchPostureSummary, fetchAgentDetail }
+// The 5 Argus posture insight cards (red-team breakdown/hotspot, guardrail breakdown/hotspot,
+// observability) — fast, Java-only data, no LLM call. No mock fallback: a card with no real
+// numbers behind it would be actively misleading, so a failure just means no cards render.
+async function fetchInsightCards(startTimestamp, endTimestamp) {
+    try {
+        const cards = await dashboardApi.fetchArgusPostureInsights(startTimestamp, endTimestamp)
+        return Array.isArray(cards) ? cards : []
+    } catch (error) {
+        console.error('fetchArgusPostureInsights failed:', error)
+        return []
+    }
+}
+
+// Deliberately separate from fetchInsightCards: this one triggers a real LLM call per card
+// (in parallel server-side) on a cache miss, so the caller must fetch it after the cards have
+// already rendered, never await it before first paint. Returns {cardId: {summary,impact,
+// recommendation}} for every card except ATTACK_FLOW_ANALYSIS, which returns {flows:[...]}.
+async function fetchInsightCardSummaries(startTimestamp, endTimestamp) {
+    try {
+        const summaries = await dashboardApi.fetchArgusPostureInsightSummaries(startTimestamp, endTimestamp)
+        return summaries && typeof summaries === 'object' ? summaries : {}
+    } catch (error) {
+        console.error('fetchArgusPostureInsightSummaries failed:', error)
+        return {}
+    }
+}
+
+// One insight card's drilldown flyout — a thin passthrough (no mock fallback, same reasoning as
+// fetchInsightCards: a drill with no real rows behind it would be actively misleading). Signature
+// matches dashboardApi.fetchPostureDrill's own shape 1:1 so PostureDrillFlyout.jsx (built for that
+// endpoint) can be reused verbatim by just swapping which fetch function it's given.
+async function fetchInsightCardDrill(drillId, path, startTimestamp, endTimestamp, environment, skip, limit) {
+    return await dashboardApi.fetchArgusPostureDrill(drillId, path, startTimestamp, endTimestamp, environment, skip, limit)
+}
+
+export default { fetchPostureSummary, fetchAgentDetail, fetchInsightCards, fetchInsightCardSummaries, fetchInsightCardDrill }
