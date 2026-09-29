@@ -1,4 +1,5 @@
 import { Box, Card, HorizontalGrid, HorizontalStack, ProgressBar, Text, VerticalStack } from '@shopify/polaris'
+import { ComingSoonOverlay } from '../../agenticPostureShared'
 import './CoverageGovernanceSection.css'
 
 // bad < 70, average 70-84, good >= 85 — first-pass thresholds, easy to retune once real accounts
@@ -35,16 +36,18 @@ function MetricRow({ metric }) {
 function CoverageGovernanceSection({ coverageGovernance }) {
     const metrics = coverageGovernance || []
     return (
-        <Card>
-            <Box padding="4">
-                <HorizontalGrid columns={3} gap="4">
-                    {metrics.map((metric) => {
-                        const display = metric.status === 'COMING_SOON' ? { ...metric, ...metric.illustrative } : metric
-                        return <MetricRow key={metric.id} metric={display} />
-                    })}
-                </HorizontalGrid>
-            </Box>
-        </Card>
+        <ComingSoonOverlay panelId="coverageGovernance">
+            <Card>
+                <Box padding="4">
+                    <HorizontalGrid columns={3} gap="4">
+                        {metrics.map((metric) => {
+                            const display = metric.status === 'COMING_SOON' ? { ...metric, ...metric.illustrative } : metric
+                            return <MetricRow key={metric.id} metric={display} />
+                        })}
+                    </HorizontalGrid>
+                </Box>
+            </Card>
+        </ComingSoonOverlay>
     )
 }
 
