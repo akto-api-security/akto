@@ -196,18 +196,26 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-                .post("/agentic_severity_counts")
+                .post("/get_collection_severity_counts")
                 .blockingHandler(ctx -> {
+                    String contextSource = getContextSourceHeader(ctx);
+
                     JsonObject body = ctx.body().asJsonObject();
-                    JsonArray ids = body == null ? null : body.getJsonArray("apiCollectionIds");
+                    JsonArray ids = body == null ? null : body.getJsonArray("api_collection_ids");
                     if (ids == null) {
-                        ctx.response().setStatusCode(400).end("apiCollectionIds is required");
+                        ctx.response().setStatusCode(400).end("Invalid request");
                         return;
                     }
                     List<Integer> apiCollectionIds = new ArrayList<>();
                     for (int i = 0; i < ids.size(); i++) apiCollectionIds.add(ids.getInteger(i));
-                    Map<String, Object> counts = new HashMap<>(dsService.agenticSeverityCounts(
-                        ctx.get("accountId"), apiCollectionIds, body.getInteger("startTs", 0)));
+
+                    Map<String, Object> counts = new HashMap<>(threatActorService.fetchCollectionSeverityCounts(
+                        ctx.get("accountId"),
+                        body.getLong("start_ts", 0L),
+                        body.getLong("end_ts", 0L),
+                        contextSource,
+                        apiCollectionIds
+                    ));
                     ctx.response().setStatusCode(200).putHeader("Content-Type", "application/json")
                         .end(new JsonObject(counts).encode());
                 });
