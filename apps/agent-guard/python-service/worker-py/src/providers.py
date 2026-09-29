@@ -13,6 +13,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -97,6 +98,26 @@ async def _post_json_logged(
         raise ValueError(f"{log_tag} non-JSON response from {url}: {body[:200]!r}") from exc
 
 
+def _log_vllm_metrics(provider: str, model: str, base_url: str, body: Any, client_ms: float) -> None:
+    metrics = body.get("metrics") if isinstance(body, dict) else None
+    if isinstance(metrics, dict):
+        fields = " ".join(f"{key}={value}" for key, value in metrics.items())
+        ttft = metrics.get("time_to_first_token_ms")
+        generation = metrics.get("generation_time_ms")
+        if isinstance(ttft, (int, float)) and isinstance(generation, (int, float)):
+            llm_ms = ttft + generation
+            fields += f" llm_ms={llm_ms:.1f} network_ms={client_ms - llm_ms:.1f}"
+    elif metrics is None:
+        fields = "metrics=missing"
+    else:
+        fields = "metrics=invalid"
+    req_id = body.get("id") if isinstance(body, dict) else None
+    logger.info(
+        f"[vllm-metrics] provider={provider} model={model} host={urlparse(base_url).netloc} "
+        f"req_id={req_id} client_ms={client_ms:.1f} {fields}"
+    )
+
+
 class LLMProvider(ABC):
     name: str = ""
 
@@ -114,23 +135,29 @@ class OpenAIProvider(LLMProvider):
         self.name = "openai" if "openai.com" in self.base_url else "openai_compatible"
         logger.info(f"[OpenAI] model={self.model} base_url={self.base_url} api_key={_redact_secret(self.api_key)}")
 
+    include_metrics = False
+
     async def complete(self, prompt: str) -> str:
         headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {
+            "model": self.model,
+            "temperature": 0.1,
+            "max_tokens": 256,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if self.include_metrics:
+            payload["include_metrics"] = True
         client = http_client.get_client()
-        resp = await client.post(
-            f"{self.base_url}/chat/completions",
-            headers=headers,
-            json={
-                "model": self.model,
-                "temperature": 0.1,
-                "max_tokens": 256,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
+        started = time.perf_counter()
+        resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+        client_ms = (time.perf_counter() - started) * 1000
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        body = resp.json()
+        if self.include_metrics:
+            _log_vllm_metrics(self.name, self.model, self.base_url, body, client_ms)
+        return body["choices"][0]["message"]["content"]
 
 
 class AnthropicProvider(LLMProvider):
@@ -717,6 +744,7 @@ class GemmaFastArbiterProvider(OpenAIProvider):
     """Faster (Gemma) arbiter endpoint; falls back to the direct anthropic provider on failure."""
 
     name = "gemma_fast_arbiter"
+    include_metrics = True
 
     def __init__(self, api_key: str, model: str, base_url: str = ""):
         super().__init__(api_key, model, base_url=base_url)
