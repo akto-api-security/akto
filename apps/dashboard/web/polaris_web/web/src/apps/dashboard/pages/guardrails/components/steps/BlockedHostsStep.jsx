@@ -67,7 +67,7 @@ export const BlockedHostsConfig = {
             parts.push(`${rows.length} pattern${rows.length === 1 ? "" : "s"}: ${names}${more}`);
         }
         if (blockPersonalAccounts) {
-            parts.push("personal accounts blocked");
+            parts.push("Block personal accounts");
         }
         if (blockPublicShare) {
             parts.push("Public sharing of chats/artifacts blocked");
