@@ -15,7 +15,7 @@ import PostureScoreCard from './overview/PostureScoreCard'
 import KpiGrid from './overview/KpiGrid'
 import DangerousPathsSection from './overview/DangerousPathsSection'
 import HighestRiskAgentsTable from './overview/HighestRiskAgentsTable'
-import RiskByDomainSection from './overview/RiskByDomainSection'
+// import RiskByDomainSection from './overview/RiskByDomainSection'
 import InsightCardsSection from './overview/InsightCardsSection'
 import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
@@ -263,9 +263,9 @@ function AgenticPosture() {
                 <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={openCollection} />
             </Section>
 
-            <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">
+            {/* <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">
                 <RiskByDomainSection riskByDomain={pageData.riskByDomain} />
-            </Section>
+            </Section> */}
 
             <Section title="Insights" description="Red-team, guardrail activity, and observability — the account-wide picture, each with an AI summary.">
                 <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
