@@ -10,6 +10,7 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.insights.InsightNarrativeCache;
 import com.akto.dto.insights.agentic.AgentFindingGroup;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.gpt.handlers.gpt_prompts.AbstractGroundedNarrativeHandler;
@@ -20,6 +21,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.Constants;
@@ -122,6 +124,21 @@ public class ArgusPostureService {
     private static final int TOPICS_CAP = 5;
     private static final int ATTACK_FLOW_ISSUE_COUNT = 2;
 
+    // ── Insight card drilldowns ───────────────────────────────────────────────────────────────
+    //
+    // One flyout per card (reusing PostureDrillFlyout/PostureDrillResult/PostureDrillNarrativeService
+    // wholesale, per the package CLAUDE.md's own "no drill-down for the Argus insight cards" open
+    // work item — no second mechanism invented). Root level only, single table, no member level:
+    // every card's own real rows already fit in one page, unlike the 5 endpoint-posture panels'
+    // two-level group->member drills. RED_TEAM_BREAKDOWN and ATTACK_FLOW_ANALYSIS share
+    // DRILL_RED_TEAM_ISSUES (both are "the account's open red-team issues", just summarized
+    // differently); GUARDRAIL_BREAKDOWN and GUARDRAIL_HOTSPOT share DRILL_GUARDRAIL_EVENTS likewise.
+    public static final String DRILL_RED_TEAM_ISSUES = "argusRedTeamIssues";
+    public static final String DRILL_GUARDRAIL_EVENTS = "argusGuardrailEvents";
+    public static final String DRILL_OBSERVABILITY = "argusObservability";
+    private static final int DRILL_ROW_CAP = 50;
+    private static final int DEFAULT_DRILL_LIMIT = 20;
+
     private static final long CARD_NARRATIVE_TTL_DAYS = 7;
     private static final int CARD_NARRATIVE_VERSION = 2; // bumped: summary shape gained impact/recommendation
 
@@ -146,6 +163,7 @@ public class ArgusPostureService {
      */
     public List<BasicDBObject> buildInsightCards(InsightDataBundle bundle, List<AgentFindingGroup> openIssueGroups,
                                                   Map<String, AgentConversationResult> criticalIssueConversations,
+                                                  Map<String, Info> testInfoByType,
                                                   List<DashboardMaliciousEvent> maliciousEvents,
                                                   List<UserAnalysisData> serviceObservability,
                                                   Map<String, Map<String, Integer>> globalTopics) {
@@ -153,16 +171,20 @@ public class ArgusPostureService {
         for (ApiCollection c : bundle.collections) {
             if (c != null) collectionsById.put(c.getId(), c);
         }
+        Map<String, GuardrailPolicies> policiesByName = new HashMap<>();
+        for (GuardrailPolicies p : safe(bundle.policies)) {
+            if (p != null && p.getName() != null) policiesByName.put(p.getName().toLowerCase(Locale.ROOT), p);
+        }
 
         RedTeamStats redTeam = computeRedTeamStats(openIssueGroups);
         GuardrailStats guardrail = computeGuardrailStats(maliciousEvents);
         List<AgentFindingGroup> topCritical = pickTopCriticalIssues(openIssueGroups, ATTACK_FLOW_ISSUE_COUNT);
 
         List<BasicDBObject> cards = new ArrayList<>();
-        cards.add(redTeamBreakdownCard(redTeam, collectionsById));
-        cards.add(attackFlowCard(topCritical, collectionsById, criticalIssueConversations));
-        cards.add(guardrailBreakdownCard(guardrail, collectionsById));
-        cards.add(guardrailHotspotCard(guardrail, collectionsById));
+        cards.add(redTeamBreakdownCard(redTeam, topCritical, collectionsById, criticalIssueConversations, testInfoByType));
+        cards.add(attackFlowCard(topCritical, collectionsById, criticalIssueConversations, testInfoByType));
+        cards.add(guardrailBreakdownCard(guardrail, collectionsById, policiesByName));
+        cards.add(guardrailHotspotCard(guardrail, collectionsById, policiesByName));
         cards.add(observabilityCard(serviceObservability, bundle, globalTopics));
         return cards;
     }
@@ -234,7 +256,9 @@ public class ArgusPostureService {
 
     private BasicDBObject generateCardSummary(InsightContext ctx, String cardId, BasicDBObject card, boolean forceRefresh) {
         Object facts = card.get("facts");
-        BasicDBObject narrativeInput = new BasicDBObject("facts", facts != null ? facts : new ArrayList<>());
+        Object context = card.get("context");
+        BasicDBObject narrativeInput = new BasicDBObject("facts", facts != null ? facts : new ArrayList<>())
+                .append("context", context != null ? context : new ArrayList<>());
         String fingerprint = cardFingerprint(ctx, cardId, narrativeInput);
 
         if (!forceRefresh) {
@@ -334,11 +358,15 @@ public class ArgusPostureService {
         return stats;
     }
 
-    private BasicDBObject redTeamBreakdownCard(RedTeamStats stats, Map<Integer, ApiCollection> collectionsById) {
+    private BasicDBObject redTeamBreakdownCard(RedTeamStats stats, List<AgentFindingGroup> topCritical,
+                                                Map<Integer, ApiCollection> collectionsById,
+                                                Map<String, AgentConversationResult> conversationsById,
+                                                Map<String, Info> testInfoByType) {
         BasicDBObject card = card(CARD_RED_TEAM_BREAKDOWN, "Red-Team Issue Breakdown");
         card.put("totalOpenIssues", stats.totalOpenIssues);
         card.put("bySeverity", stats.bySeverity);
         card.put("cta", cta("view_issues", "Open issues", InsightRoutes.ISSUES));
+        card.put("drillId", DRILL_RED_TEAM_ISSUES);
 
         List<BasicDBObject> facts = new ArrayList<>();
         facts.add(fact("totalOpenIssues", "Open red-team issues", InsightUtil.grouped(stats.totalOpenIssues)));
@@ -359,8 +387,44 @@ public class ArgusPostureService {
         } else {
             card.put("topFinding", null);
         }
+
+        // WHY this matters: the account's single most CRITICAL open issue (not just the most
+        // common one above) — grounded in the test template's own real name/description/impact
+        // (YamlTemplate#getInfo(), resolved by ArgusPostureAction#fetchTestInfo) and, when a real
+        // validated conversation exists for it, that conversation's own validationMessage. This is
+        // exactly the "why is this vulnerability type severe" reasoning a bare count can't carry.
+        card.put("context", mostCriticalIssueContext(topCritical, collectionsById, conversationsById, testInfoByType));
         card.put("facts", facts);
         return card;
+    }
+
+    /** Shared by redTeamBreakdownCard and attackFlowCard: the real template info + (when present) a
+     *  real validated conversation for the single most critical open issue — never invented. */
+    private List<BasicDBObject> mostCriticalIssueContext(List<AgentFindingGroup> topCritical,
+                                                          Map<Integer, ApiCollection> collectionsById,
+                                                          Map<String, AgentConversationResult> conversationsById,
+                                                          Map<String, Info> testInfoByType) {
+        List<BasicDBObject> context = new ArrayList<>();
+        if (safe(topCritical).isEmpty()) return context;
+        AgentFindingGroup worst = topCritical.get(0);
+        String agentName = agentName(worst.getCollectionId(), collectionsById);
+
+        Info info = testInfoByType.get(worst.getType());
+        if (info != null) {
+            String label = info.getName() != null ? info.getName() : worst.getType();
+            StringBuilder text = new StringBuilder("Most critical open issue — ").append(label)
+                    .append(" on ").append(agentName).append(" (").append(worst.getSecondary()).append("). ");
+            if (info.getDescription() != null) text.append(info.getDescription()).append(" ");
+            if (info.getImpact() != null) text.append("Real-world impact: ").append(info.getImpact());
+            context.add(new BasicDBObject("key", "mostCriticalIssueTemplate").append("text", text.toString()));
+        }
+
+        AgentConversationResult conversation = worst.getSample() != null ? firstResolved(worst.getSample(), conversationsById) : null;
+        if (conversation != null && conversation.getValidationMessage() != null) {
+            context.add(new BasicDBObject("key", "mostCriticalIssueValidated")
+                    .append("text", "Validated red-team outcome on " + agentName + ": " + conversation.getValidationMessage()));
+        }
+        return context;
     }
 
     /**
@@ -374,9 +438,11 @@ public class ArgusPostureService {
      * skipped — this card only ever narrates a REAL verdict, never a synthesized one.
      */
     private BasicDBObject attackFlowCard(List<AgentFindingGroup> topCritical, Map<Integer, ApiCollection> collectionsById,
-                                          Map<String, AgentConversationResult> conversationsById) {
+                                          Map<String, AgentConversationResult> conversationsById,
+                                          Map<String, Info> testInfoByType) {
         BasicDBObject card = card(CARD_ATTACK_FLOW, "How Agents Were Compromised");
         card.put("cta", cta("view_issues", "Open issues", InsightRoutes.ISSUES));
+        card.put("drillId", DRILL_RED_TEAM_ISSUES);
 
         List<BasicDBObject> issues = new ArrayList<>();
         for (AgentFindingGroup g : safe(topCritical)) {
@@ -385,12 +451,20 @@ public class ArgusPostureService {
             if (conversation == null || conversation.getValidationMessage() == null) continue;
 
             String agentName = agentName(g.getCollectionId(), collectionsById);
-            issues.add(new BasicDBObject("agentName", agentName)
+            BasicDBObject issue = new BasicDBObject("agentName", agentName)
                     .append("vulnType", g.getType())
                     .append("severity", g.getSecondary())
                     .append("conversationId", conversation.getConversationId())
                     .append("validationMessage", conversation.getValidationMessage())
-                    .append("remediationMessage", conversation.getRemediationMessage()));
+                    .append("remediationMessage", conversation.getRemediationMessage());
+
+            Info info = testInfoByType.get(g.getType());
+            if (info != null) {
+                issue.append("vulnTypeName", info.getName())
+                     .append("vulnTypeDescription", info.getDescription())
+                     .append("vulnTypeImpact", info.getImpact());
+            }
+            issues.add(issue);
         }
         card.put("issues", issues);
 
@@ -423,10 +497,12 @@ public class ArgusPostureService {
     }
 
     /**
-     * filterId is used as the policy label directly — the same convention
-     * PostureService.criticalAlertsDrill already uses (row("policy", e.getFilterId())) — rather
-     * than joining to GuardrailPolicies, since a malicious event's filterId is not reliably a
-     * GuardrailPolicies._id (see MaliciousEventDto's own contextSource/filter-id scoping).
+     * filterId IS the guardrail policy's real name (confirmed: GuardrailPolicyReplayAction's own
+     * javadoc — "a guardrail event's filterId is the policy name"; also
+     * ThreatDetectionBackendClient's own "filterIds guardrail policy names (== event filterId)").
+     * So it doubles as both the display label (same convention PostureService.criticalAlertsDrill
+     * already uses: row("policy", e.getFilterId())) and the join key back to the real
+     * GuardrailPolicies document — see resolvePolicy.
      */
     private GuardrailStats computeGuardrailStats(List<DashboardMaliciousEvent> events) {
         GuardrailStats stats = new GuardrailStats();
@@ -439,11 +515,51 @@ public class ArgusPostureService {
         return stats;
     }
 
-    private BasicDBObject guardrailBreakdownCard(GuardrailStats stats, Map<Integer, ApiCollection> collectionsById) {
+    private GuardrailPolicies resolvePolicy(String filterId, Map<String, GuardrailPolicies> policiesByName) {
+        return filterId == null ? null : policiesByName.get(filterId.toLowerCase(Locale.ROOT));
+    }
+
+    /** Adds each row's own real, resolved policy severity (for the frontend's SeverityBadge) — a
+     *  policy name with no resolvable GuardrailPolicies document (e.g. a stale/deleted policy)
+     *  just gets a null severity, never a guessed one. */
+    private void attachPolicySeverity(List<BasicDBObject> policyRows, String nameKey, Map<String, GuardrailPolicies> policiesByName) {
+        for (BasicDBObject row : policyRows) {
+            GuardrailPolicies resolved = resolvePolicy(row.getString(nameKey), policiesByName);
+            row.put("severity", resolved != null ? resolved.getSeverity() : null);
+        }
+    }
+
+    /** A one-line real summary of what a guardrail policy is actually configured to do — behaviour
+     *  (block/warn/alert/approval) is the single most impact-relevant fact: a "warn"-only policy
+     *  lets violations proceed, a "block" policy stops them. */
+    private String policyContextText(GuardrailPolicies policy) {
+        StringBuilder text = new StringBuilder("Policy \"").append(policy.getName()).append("\" behaviour: ")
+                .append(policy.getBehaviour() != null ? policy.getBehaviour() : "unspecified").append(".");
+        if (policy.getSeverity() != null) text.append(" Configured severity: ").append(policy.getSeverity()).append(".");
+        if (StringUtils.isNotBlank(policy.getDescription())) text.append(" ").append(policy.getDescription());
+        if (policy.getDeniedTopics() != null && !policy.getDeniedTopics().isEmpty()) {
+            text.append(" Denied topics: ");
+            boolean first = true;
+            for (GuardrailPolicies.DeniedTopic t : policy.getDeniedTopics()) {
+                if (t == null || t.getTopic() == null) continue;
+                if (!first) text.append(", ");
+                text.append(t.getTopic());
+                first = false;
+            }
+            text.append(".");
+        }
+        return text.toString();
+    }
+
+    private BasicDBObject guardrailBreakdownCard(GuardrailStats stats, Map<Integer, ApiCollection> collectionsById,
+                                                  Map<String, GuardrailPolicies> policiesByName) {
         BasicDBObject card = card(CARD_GUARDRAIL_BREAKDOWN, "Guardrail Activity Breakdown");
         card.put("cta", cta("view_activity", "View guardrail activity", InsightRoutes.GUARDRAIL_ACTIVITY));
+        card.put("drillId", DRILL_GUARDRAIL_EVENTS);
         card.put("totalEvents", stats.totalEvents);
-        card.put("byPolicy", topNByString(stats.byPolicy, "policy", BREAKDOWN_TOP_N));
+        List<BasicDBObject> byPolicy = topNByString(stats.byPolicy, "policy", BREAKDOWN_TOP_N);
+        attachPolicySeverity(byPolicy, "policy", policiesByName);
+        card.put("byPolicy", byPolicy);
         card.put("byAgent", topNByAgent(stats.byAgent, collectionsById, BREAKDOWN_TOP_N));
 
         List<BasicDBObject> facts = new ArrayList<>();
@@ -457,12 +573,24 @@ public class ArgusPostureService {
             facts.add(fact("agent_" + (rank++), "Events on " + agentName(e.getKey(), collectionsById), InsightUtil.grouped(e.getValue())));
         }
         card.put("facts", facts);
+
+        List<BasicDBObject> context = new ArrayList<>();
+        List<Map.Entry<String, Long>> topPolicies = topEntriesByString(stats.byPolicy, 3);
+        if (!topPolicies.isEmpty()) {
+            GuardrailPolicies topPolicy = resolvePolicy(topPolicies.get(0).getKey(), policiesByName);
+            if (topPolicy != null) {
+                context.add(new BasicDBObject("key", "topPolicyConfig").append("text", policyContextText(topPolicy)));
+            }
+        }
+        card.put("context", context);
         return card;
     }
 
-    private BasicDBObject guardrailHotspotCard(GuardrailStats stats, Map<Integer, ApiCollection> collectionsById) {
+    private BasicDBObject guardrailHotspotCard(GuardrailStats stats, Map<Integer, ApiCollection> collectionsById,
+                                                Map<String, GuardrailPolicies> policiesByName) {
         BasicDBObject card = card(CARD_GUARDRAIL_HOTSPOT, "Where Guardrail Activity Concentrates");
         card.put("cta", cta("view_policies", "Review guardrail policies", InsightRoutes.GUARDRAIL_POLICIES));
+        card.put("drillId", DRILL_GUARDRAIL_EVENTS);
         List<BasicDBObject> facts = new ArrayList<>();
 
         Integer hottestAgentId = maxKey(stats.byAgent);
@@ -477,14 +605,20 @@ public class ArgusPostureService {
         }
 
         String hottestPolicy = maxKey(stats.byPolicy);
+        List<BasicDBObject> context = new ArrayList<>();
         if (hottestPolicy != null) {
             long count = stats.byPolicy.get(hottestPolicy);
-            card.put("hottestPolicy", new BasicDBObject("policy", hottestPolicy).append("count", count));
+            GuardrailPolicies resolved = resolvePolicy(hottestPolicy, policiesByName);
+            card.put("hottestPolicy", new BasicDBObject("policy", hottestPolicy).append("count", count)
+                    .append("severity", resolved != null ? resolved.getSeverity() : null));
             facts.add(fact("hottestPolicy", "Most-triggered policy", hottestPolicy));
             facts.add(fact("hottestPolicyCount", "Times that policy triggered", InsightUtil.grouped(count)));
+
+            if (resolved != null) context.add(new BasicDBObject("key", "hottestPolicyConfig").append("text", policyContextText(resolved)));
         } else {
             card.put("hottestPolicy", null);
         }
+        card.put("context", context);
         card.put("facts", facts);
         return card;
     }
@@ -495,6 +629,7 @@ public class ArgusPostureService {
                                              Map<String, Map<String, Integer>> globalTopics) {
         BasicDBObject card = card(CARD_OBSERVABILITY, "Agent Token Usage & Topics");
         card.put("cta", cta("view_observability", "View LLM observability", InsightRoutes.LLM_OBSERVABILITY));
+        card.put("drillId", DRILL_OBSERVABILITY);
         List<BasicDBObject> facts = new ArrayList<>();
 
         long totalTokens = 0;
@@ -536,6 +671,165 @@ public class ArgusPostureService {
         card.put("topTopics", topTopics);
         card.put("facts", facts);
         return card;
+    }
+
+    // ── Insight card drilldowns ───────────────────────────────────────────────────────────────
+
+    /**
+     * One flyout level per drillId — the real rows behind a card, capped at {@link #DRILL_ROW_CAP}
+     * and sorted worst-first (severity, where the row carries one; token volume for observability).
+     * Every row was already sitting in memory by the time ArgusPostureAction#buildCards runs
+     * (openIssueGroups/maliciousEvents/serviceObservability), so — same as PostureService's own
+     * fetchDrill — this is pagination over an in-memory list, not a new query.
+     */
+    public PostureDrillResult fetchDrill(String drillId, int skip, int limit,
+                                          List<AgentFindingGroup> openIssueGroups,
+                                          List<DashboardMaliciousEvent> maliciousEvents,
+                                          List<UserAnalysisData> serviceObservability,
+                                          InsightDataBundle bundle) {
+        int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;
+        Map<Integer, ApiCollection> collectionsById = new HashMap<>();
+        if (bundle != null) {
+            for (ApiCollection c : safe(bundle.collections)) {
+                if (c != null) collectionsById.put(c.getId(), c);
+            }
+        }
+        if (drillId == null) return unknownDrill();
+        switch (drillId) {
+            case DRILL_RED_TEAM_ISSUES:
+                return redTeamIssuesDrill(openIssueGroups, collectionsById, skip, effectiveLimit);
+            case DRILL_GUARDRAIL_EVENTS:
+                return guardrailEventsDrill(maliciousEvents, collectionsById, skip, effectiveLimit);
+            case DRILL_OBSERVABILITY:
+                return observabilityDrill(serviceObservability, bundle, skip, effectiveLimit);
+            default:
+                return unknownDrill();
+        }
+    }
+
+    private PostureDrillResult redTeamIssuesDrill(List<AgentFindingGroup> openIssueGroups,
+                                                   Map<Integer, ApiCollection> collectionsById, int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Open red-team issues");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Open red-team issues"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("agentName", "Agent"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("vulnType", "Issue type"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("severity", "Severity"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("count", "Occurrences"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("lastSeen", "Last seen"));
+        result.setDrillable(false);
+        result.getCtas().add(new InsightResult.Cta("openIssues", "Open issues", "NAVIGATE",
+                InsightRoutes.ISSUES, null, false));
+
+        List<AgentFindingGroup> groups = new ArrayList<>(safe(openIssueGroups));
+        groups.removeIf(g -> g == null);
+        groups.sort(Comparator
+                .comparingInt((AgentFindingGroup g) -> InsightUtil.severityRank(g.getSecondary()))
+                .thenComparing(Comparator.comparingLong(AgentFindingGroup::getCount).reversed()));
+
+        long totalOpenIssues = 0;
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (AgentFindingGroup g : groups) {
+            totalOpenIssues += g.getCount();
+            rows.add(PostureService.row("agentName", agentName(g.getCollectionId(), collectionsById),
+                    "vulnType", g.getType(), "severity", g.getSecondary(), "count", g.getCount(),
+                    "lastSeen", g.getLastSeen()));
+        }
+        result.getSummary().add(new InsightResult.Metric("issueGroups", "Distinct issue groups",
+                groups.size(), "count", InsightUtil.grouped(groups.size())));
+        result.getSummary().add(new InsightResult.Metric("totalOpenIssues", "Open red-team issues",
+                totalOpenIssues, "count", InsightUtil.grouped(totalOpenIssues)));
+
+        capAndPaginate(result, rows, skip, limit);
+        return result;
+    }
+
+    private PostureDrillResult guardrailEventsDrill(List<DashboardMaliciousEvent> maliciousEvents,
+                                                      Map<Integer, ApiCollection> collectionsById, int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Guardrail activity");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Guardrail activity"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("agentName", "Agent"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("policy", "Policy"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("severity", "Severity"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("detectedAt", "Detected at"));
+        result.setDrillable(false);
+        result.getCtas().add(new InsightResult.Cta("viewActivity", "View guardrail activity", "NAVIGATE",
+                InsightRoutes.GUARDRAIL_ACTIVITY, null, false));
+
+        List<DashboardMaliciousEvent> events = new ArrayList<>();
+        for (DashboardMaliciousEvent e : safe(maliciousEvents)) {
+            if (e != null) events.add(e);
+        }
+        events.sort(Comparator
+                .comparingInt((DashboardMaliciousEvent e) -> InsightUtil.severityRank(e.getSeverity()))
+                .thenComparing(Comparator.comparingLong(DashboardMaliciousEvent::getTimestamp).reversed()));
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (DashboardMaliciousEvent e : events) {
+            rows.add(PostureService.row("agentName", agentName(e.getApiCollectionId(), collectionsById),
+                    "policy", e.getFilterId(), "severity", e.getSeverity(), "detectedAt", e.getTimestamp()));
+        }
+        result.getSummary().add(new InsightResult.Metric("totalEvents", "Guardrail/malicious events",
+                events.size(), "count", InsightUtil.grouped(events.size())));
+
+        capAndPaginate(result, rows, skip, limit);
+        return result;
+    }
+
+    private PostureDrillResult observabilityDrill(List<UserAnalysisData> serviceObservability,
+                                                    InsightDataBundle bundle, int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Agent token usage");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Agent token usage"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("agentName", "Agent"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("inputTokens", "Input tokens"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("outputTokens", "Output tokens"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("totalTokens", "Total tokens"));
+        result.setDrillable(false);
+        result.getCtas().add(new InsightResult.Cta("viewObservability", "View LLM observability", "NAVIGATE",
+                InsightRoutes.LLM_OBSERVABILITY, null, false));
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        long grandTotal = 0;
+        for (UserAnalysisData row : safe(serviceObservability)) {
+            if (row == null) continue;
+            long input = row.getTotalInputTokens();
+            long output = row.getTotalOutputTokens();
+            long total = input + output;
+            grandTotal += total;
+            String agentName = row.getId() != null && row.getId().getServiceId() != null
+                    ? row.getId().getServiceId() : null;
+            if (agentName != null && bundle != null) {
+                List<ApiCollection> matches = bundle.collectionsForServiceName(agentName);
+                if (!matches.isEmpty()) agentName = matches.get(0).getName();
+            }
+            rows.add(PostureService.row("agentName", agentName, "inputTokens", input,
+                    "outputTokens", output, "totalTokens", total));
+        }
+        rows.sort((a, b) -> Long.compare((Long) b.get("totalTokens"), (Long) a.get("totalTokens")));
+        result.getSummary().add(new InsightResult.Metric("totalTokens", "Tokens used by agents this window",
+                grandTotal, "tokens", InsightUtil.grouped(grandTotal)));
+
+        capAndPaginate(result, rows, skip, limit);
+        return result;
+    }
+
+    /** Caps `rows` (already sorted worst-first by the caller) at {@link #DRILL_ROW_CAP} — "the top
+     *  50, sorted" — then delegates to PostureService's own skip/limit slice, and sets the level's
+     *  real worst-severity badge from whatever survived the cap. Same "fixed top-N snapshot, not a
+     *  true paginated total" tradeoff PostureService's own criticalAlertsDrill already makes. */
+    private void capAndPaginate(PostureDrillResult result, List<Map<String, Object>> rows, int skip, int limit) {
+        List<Map<String, Object>> capped = rows.size() > DRILL_ROW_CAP ? rows.subList(0, DRILL_ROW_CAP) : rows;
+        PostureService.paginate(result, capped, skip, limit);
+        result.setSeverity(PostureService.worstSeverity(capped));
+    }
+
+    private static PostureDrillResult unknownDrill() {
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Unknown drilldown");
+        result.setDrillable(false);
+        return result;
     }
 
     // ── Shared card helpers ───────────────────────────────────────────────────────────────────

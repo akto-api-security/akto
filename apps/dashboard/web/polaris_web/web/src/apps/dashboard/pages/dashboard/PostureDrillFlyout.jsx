@@ -564,7 +564,13 @@ function RiskScoreRootBody({ kpi, onSubScoreClick }) {
 // and reloadable. This component only renders whatever level `drillState` currently points to and
 // asks the parent (via onNavigate) to move to a different level — a breadcrumb click or a row
 // click when the current level is drillable.
-function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, startTimestamp, endTimestamp }) {
+// Defaults to the endpoint-posture drill endpoint (SecurityPostureAction#fetchPostureDrill) — the
+// Argus insight cards' own flyout (AgenticPosture.jsx) reuses this whole component unchanged by
+// passing postureDataSource.fetchInsightCardDrill instead (ArgusPostureAction#fetchArgusPostureDrill,
+// same (drillId, path, startTimestamp, endTimestamp, skip, limit) signature) — see the package
+// CLAUDE.md's "prefer reusing PostureDrillFlyout's existing mechanism" note, rather than a second,
+// near-identical flyout component.
+function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, startTimestamp, endTimestamp, fetchDrill = dashboardApi.fetchPostureDrill }) {
     const navigate = useNavigate()
     const show = !!drillState
     const [drill, setDrill] = useState(null)
@@ -601,7 +607,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         async function load() {
             setLoading(true)
             try {
-                const resp = await dashboardApi.fetchPostureDrill(
+                const resp = await fetchDrill(
                     drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
                 if (cancelled) return
                 setDrill(resp || null)
@@ -618,7 +624,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
 
         load()
         return () => { cancelled = true }
-    }, [drillState, startTimestamp, endTimestamp])
+    }, [drillState, startTimestamp, endTimestamp, fetchDrill])
 
     // Every ancestor's own {path, label} comes back from the backend on every fetch (see
     // PostureDrillResult.breadcrumb's own javadoc) — a reload from a deep-linked URL renders the
@@ -652,10 +658,10 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             firstPageCache.current = null
             return Promise.resolve({ value: cached.rows, total: cached.total })
         }
-        return dashboardApi.fetchPostureDrill(
+        return fetchDrill(
             drillState.drillId, drillState.path, startTimestamp, endTimestamp, skip, limit || 20
         ).then((resp) => ({ value: resp?.rows || [], total: resp?.total || 0 }))
-    }, [drillState?.drillId, drillState?.path, startTimestamp, endTimestamp])
+    }, [drillState?.drillId, drillState?.path, startTimestamp, endTimestamp, fetchDrill])
 
     const handleRowClicked = useCallback((e) => {
         if (!drill?.drillable || e?.data?.id === undefined || e?.data?.id === null) return
@@ -680,7 +686,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         const timer = setTimeout(async () => {
             narrativePollCount.current += 1
             try {
-                const resp = await dashboardApi.fetchPostureDrill(
+                const resp = await fetchDrill(
                     drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
                 if (cancelled || !resp) return
                 setDrill((prev) => (prev ? {
@@ -696,7 +702,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             }
         }, NARRATIVE_POLL_INTERVAL_MS)
         return () => { cancelled = true; clearTimeout(timer) }
-    }, [drill, drillState, startTimestamp, endTimestamp])
+    }, [drill, drillState, startTimestamp, endTimestamp, fetchDrill])
 
     const ctas = drill?.ctas || []
     const dataGaps = drill?.dataGaps || []

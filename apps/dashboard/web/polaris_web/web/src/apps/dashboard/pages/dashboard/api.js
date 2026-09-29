@@ -364,6 +364,26 @@ const api = {
         })
     },
 
+    // One insight card's drilldown flyout — same PostureDrillFlyout component the endpoint-posture
+    // panels already use, pointed at ArgusPostureAction's own drill endpoint instead of
+    // SecurityPostureAction's. See ArgusPostureService's "insight card drilldowns" section — every
+    // Argus drill is root-only (one level, no `path`), but the param is still sent for contract
+    // parity with the shared flyout component.
+    fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, skip, limit) => {
+        return await request({
+            url: '/api/fetchArgusPostureDrill',
+            method: 'post',
+            data: {
+                drillId,
+                path: path || '',
+                startTimestamp,
+                endTimestamp,
+                skip: skip || 0,
+                limit: limit || 20
+            }
+        })
+    },
+
     // Argus (Agentic Security) posture page — today just the Posture Score hero. See
     // ArgusPostureAction's javadoc and agenticPosture/postureDataSource.js's merge-over-mock seam.
     fetchArgusPostureScore: async (startTimestamp, endTimestamp) => {

@@ -18,9 +18,13 @@ import java.util.Set;
  * quoted at length — the same "ground in real evidence, never invent, never quote raw payload at
  * length" contract the rest of this package's handlers use.
  *
- * Input: {"issues": [{"agentName","vulnType","severity","validationMessage","remediationMessage"}, ...]}
- * (1-2 issues, the account's most critical open red-team findings that had a real validated
- * conversation behind them). Output: {"flows": [{"agentName","steps":["<step1>","<step2>",...],
+ * Input: {"issues": [{"agentName","vulnType","severity","validationMessage","remediationMessage",
+ * "vulnTypeName","vulnTypeDescription","vulnTypeImpact"}, ...]} (1-2 issues, the account's most
+ * critical open red-team findings that had a real validated conversation behind them).
+ * vulnTypeName/Description/Impact come from the test template's own YamlTemplate#getInfo() (see
+ * ArgusPostureService#attackFlowCard) — the real, human-written explanation of why this CLASS of
+ * vulnerability matters, distinct from validationMessage (what happened in THIS specific
+ * conversation). Output: {"flows": [{"agentName","steps":["<step1>","<step2>",...],
  * "impact","recommendation"}, ...]} — one flow per input issue, in the same order.
  */
 public class ArgusAttackFlowNarrativeHandler extends AbstractGroundedNarrativeHandler {
@@ -118,17 +122,22 @@ public class ArgusAttackFlowNarrativeHandler extends AbstractGroundedNarrativeHa
           .append("4. Every number in your output MUST be copied verbatim from a \"formatted\" value in FACTS or ")
           .append("that issue's own fields. Never compute, sum, round, or estimate a number.\n")
           .append("5. Never name an agent that does not appear verbatim in that issue's own agentName.\n")
-          .append("6. recommendation must be grounded in that issue's own remediationMessage, paraphrased.\n")
-          .append("7. Never write a link, URL, or markdown.\n\n")
+          .append("6. \"impact\" MUST explain, in this reader's own words, WHY this class of vulnerability is ")
+          .append("dangerous — ground it in that issue's own vulnTypeDescription/vulnTypeImpact (the test's real, ")
+          .append("human-written explanation), combined with what validationMessage showed actually happened. ")
+          .append("BANNED: generic filler like \"may lead to unaddressed security threats\" or \"lack of ")
+          .append("monitoring\" — name the specific mechanism (e.g. what data/action the agent exposed and how).\n")
+          .append("7. recommendation must be grounded in that issue's own remediationMessage, paraphrased.\n")
+          .append("8. Never write a link, URL, or markdown.\n\n")
           .append("CURRENT_TIME: ").append(nowForPrompt()).append("\n\n")
-          .append("ISSUES (each has the real validated verdict — reconstruct the flow from it):\n")
+          .append("ISSUES (each has the real validated verdict AND the test template's own real description — ")
+          .append("reconstruct the flow and impact from these, never a generic template):\n")
           .append(input.optJSONArray("issues")).append("\n\n")
           .append("Write one flow per issue, same order, each with:\n")
           .append("- agentName: copied verbatim from that issue's own agentName.\n")
           .append("- steps: ").append(MIN_STEPS).append("-").append(MAX_STEPS)
           .append(" short ordered strings (see rule 3).\n")
-          .append("- impact: one sentence, under ").append(MAX_FIELD_WORDS).append(" words, on the concrete ")
-          .append("consequence for that agent.\n")
+          .append("- impact: one sentence, under ").append(MAX_FIELD_WORDS).append(" words (see rule 6).\n")
           .append("- recommendation: one sentence, under ").append(MAX_FIELD_WORDS)
           .append(" words, an imperative instruction grounded in remediationMessage.\n\n")
           .append("Return exactly: {\"flows\": [{\"agentName\": \"<name>\", \"steps\": [\"<step>\", ...], ")
@@ -152,6 +161,9 @@ public class ArgusAttackFlowNarrativeHandler extends AbstractGroundedNarrativeHa
                 addLiteralsFrom(issue.optString("vulnType", ""), out);
                 addLiteralsFrom(issue.optString("validationMessage", ""), out);
                 addLiteralsFrom(issue.optString("remediationMessage", ""), out);
+                addLiteralsFrom(issue.optString("vulnTypeName", ""), out);
+                addLiteralsFrom(issue.optString("vulnTypeDescription", ""), out);
+                addLiteralsFrom(issue.optString("vulnTypeImpact", ""), out);
             }
         }
         return out;

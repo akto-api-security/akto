@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Box, Icon, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { SearchMinor } from '@shopify/polaris-icons'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
+import PostureDrillFlyout from '../PostureDrillFlyout'
 import func from '@/util/func'
 import values from '@/util/values'
 import postureDataSource from './postureDataSource'
@@ -39,6 +40,7 @@ function Section({ title, description, children }) {
 
 function AgenticPosture() {
     const navigate = useNavigate()
+    const [searchParams, setSearchParams] = useSearchParams()
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         values.ranges[3] // "Last 30 days" — same default the other posture pages use
@@ -50,6 +52,29 @@ function AgenticPosture() {
     const [insightCards, setInsightCards] = useState([])
     const [insightSummaries, setInsightSummaries] = useState({})
     const [insightSummariesLoading, setInsightSummariesLoading] = useState(false)
+
+    // { drillId, path } | null — an insight card's own drilldown flyout, reusing
+    // PostureDrillFlyout/SecurityPosture.jsx's own `?drill=&path=` URL-sync convention so a
+    // drilldown link stays shareable/reload-safe (see PostureDrillFlyout's own javadoc-equivalent
+    // comment and the posture package CLAUDE.md's "paginated drilldown flyouts" section).
+    const drillState = useMemo(() => {
+        const drillId = searchParams.get('drill')
+        if (!drillId) return null
+        return { drillId, path: searchParams.get('path') || '' }
+    }, [searchParams])
+    const openDrill = (drillId, path = '') => {
+        const next = new URLSearchParams(searchParams)
+        next.set('drill', drillId)
+        if (path) next.set('path', path); else next.delete('path')
+        setSearchParams(next, { replace: true })
+    }
+    const navigateDrill = (state) => openDrill(state.drillId, state.path)
+    const closeDrill = () => {
+        const next = new URLSearchParams(searchParams)
+        next.delete('drill')
+        next.delete('path')
+        setSearchParams(next, { replace: true })
+    }
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 
@@ -182,7 +207,7 @@ function AgenticPosture() {
             </Section>
 
             <Section title="Insights" description="Red-team, guardrail activity, and observability — the account-wide picture, each with an AI summary.">
-                <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} />
+                <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
             </Section>
 
             <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">
@@ -216,6 +241,14 @@ function AgenticPosture() {
                     }
                 />
             )}
+            <PostureDrillFlyout
+                drillState={drillState}
+                onNavigate={navigateDrill}
+                onClose={closeDrill}
+                startTimestamp={getTimeEpoch('since')}
+                endTimestamp={getTimeEpoch('until')}
+                fetchDrill={postureDataSource.fetchInsightCardDrill}
+            />
         </Box>
     )
 }

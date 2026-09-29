@@ -1,13 +1,37 @@
 import { Box, Button, Card, HorizontalStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
+import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
 
-// One stat within a card — a number/name plus its subdued label.
-function Stat({ label, value }) {
+// One stat within a card — a number/name plus its subdued label, optionally paired with a real
+// (never invented) severity badge — the same SeverityBadge every other severity anywhere else in
+// the app already renders (guardrail violations, PostureDrillFlyout's own table cells).
+function Stat({ label, value, severity }) {
     if (value === null || value === undefined || value === '') return null
     return (
         <VerticalStack gap="1">
             <Text variant="bodySm" color="subdued">{label}</Text>
-            <Text variant="bodyMd" fontWeight="semibold">{value}</Text>
+            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                <Text variant="bodyMd" fontWeight="semibold">{value}</Text>
+                {severity && <SeverityBadge severity={severity} />}
+            </HorizontalStack>
         </VerticalStack>
+    )
+}
+
+// The account's real open-issue severity distribution (RedTeamStats#bySeverity) — every non-zero
+// severity bucket as its own badge, so the card shows HOW SEVERE the open issues are, not just how
+// many there are.
+function SeverityDistribution({ bySeverity }) {
+    const entries = Object.entries(bySeverity || {}).filter(([, count]) => count > 0)
+    if (entries.length === 0) return null
+    return (
+        <HorizontalStack gap="2" wrap>
+            {entries.map(([severity, count]) => (
+                <HorizontalStack key={severity} gap="1" blockAlign="center">
+                    <SeverityBadge severity={severity} />
+                    <Text variant="bodySm" color="subdued">{count}</Text>
+                </HorizontalStack>
+            ))}
+        </HorizontalStack>
     )
 }
 
@@ -21,23 +45,30 @@ function statsFor(card) {
                 <Stat key="total" label="Open issues" value={card.totalOpenIssues} />,
                 card.topFinding && (
                     <Stat key="top" label="Most common issue"
-                        value={`${card.topFinding.vulnType} on ${card.topFinding.agentName} (${card.topFinding.count})`} />
+                        value={`${card.topFinding.vulnType} on ${card.topFinding.agentName} (${card.topFinding.count})`}
+                        severity={card.topFinding.severity} />
                 ),
             ]
         case 'ATTACK_FLOW_ANALYSIS':
             return (card.issuePreview || []).map((issue, i) => (
-                <Stat key={`issue-${i}`} label={`Analyzing (${issue.severity})`} value={`${issue.vulnType} on ${issue.agentName}`} />
+                <Stat key={`issue-${i}`} label="Analyzing" value={`${issue.vulnType} on ${issue.agentName}`} severity={issue.severity} />
             ))
         case 'GUARDRAIL_BREAKDOWN':
             return [
                 <Stat key="total" label="Guardrail events" value={card.totalEvents} />,
                 card.byAgent?.[0] && <Stat key="agent" label="Top agent" value={`${card.byAgent[0].agentName} (${card.byAgent[0].count})`} />,
-                card.byPolicy?.[0] && <Stat key="policy" label="Top policy" value={`${card.byPolicy[0].policy} (${card.byPolicy[0].count})`} />,
+                card.byPolicy?.[0] && (
+                    <Stat key="policy" label="Top policy" value={`${card.byPolicy[0].policy} (${card.byPolicy[0].count})`}
+                        severity={card.byPolicy[0].severity} />
+                ),
             ]
         case 'GUARDRAIL_HOTSPOT':
             return [
                 card.hottestAgent && <Stat key="agent" label="Most active agent" value={`${card.hottestAgent.agentName} (${card.hottestAgent.count})`} />,
-                card.hottestPolicy && <Stat key="policy" label="Most-triggered policy" value={`${card.hottestPolicy.policy} (${card.hottestPolicy.count})`} />,
+                card.hottestPolicy && (
+                    <Stat key="policy" label="Most-triggered policy" value={`${card.hottestPolicy.policy} (${card.hottestPolicy.count})`}
+                        severity={card.hottestPolicy.severity} />
+                ),
             ]
         case 'OBSERVABILITY':
             return [
@@ -119,7 +150,7 @@ function CardBody({ card, summary, summaryLoading }) {
     return <CardSummary summary={summary} />
 }
 
-function InsightCard({ card, summary, summaryLoading, onOpenCta }) {
+function InsightCard({ card, summary, summaryLoading, onOpenCta, onOpenDrill }) {
     const stats = statsFor(card).filter(Boolean)
     return (
         <Card>
@@ -127,10 +158,16 @@ function InsightCard({ card, summary, summaryLoading, onOpenCta }) {
                 <VerticalStack gap="3">
                     <HorizontalStack align="space-between" blockAlign="start">
                         <Text variant="headingSm">{card.title}</Text>
-                        {card.cta && (
-                            <Button plain onClick={() => onOpenCta(card.cta)}>{card.cta.label}</Button>
-                        )}
+                        <HorizontalStack gap="4">
+                            {card.drillId && (
+                                <Button plain onClick={() => onOpenDrill(card.drillId)}>View details</Button>
+                            )}
+                            {card.cta && (
+                                <Button plain onClick={() => onOpenCta(card.cta)}>{card.cta.label}</Button>
+                            )}
+                        </HorizontalStack>
                     </HorizontalStack>
+                    {card.id === 'RED_TEAM_BREAKDOWN' && <SeverityDistribution bySeverity={card.bySeverity} />}
                     {stats.length > 0 && <HorizontalStack gap="6" wrap>{stats}</HorizontalStack>}
                     {(summaryLoading || summary) && (
                         <Box paddingBlockStart="2" borderBlockStartWidth="1" borderColor="border">
@@ -145,7 +182,7 @@ function InsightCard({ card, summary, summaryLoading, onOpenCta }) {
     )
 }
 
-function InsightCardsSection({ cards, summaries, summariesLoading, onOpenRoute }) {
+function InsightCardsSection({ cards, summaries, summariesLoading, onOpenRoute, onOpenDrill }) {
     const rows = cards || []
     if (rows.length === 0) {
         return (
@@ -160,7 +197,8 @@ function InsightCardsSection({ cards, summaries, summariesLoading, onOpenRoute }
     return (
         <VerticalStack gap="3">
             {rows.map((card) => (
-                <InsightCard key={card.id} card={card} summary={summaries?.[card.id]} summaryLoading={summariesLoading} onOpenCta={openCta} />
+                <InsightCard key={card.id} card={card} summary={summaries?.[card.id]} summaryLoading={summariesLoading}
+                    onOpenCta={openCta} onOpenDrill={onOpenDrill} />
             ))}
         </VerticalStack>
     )

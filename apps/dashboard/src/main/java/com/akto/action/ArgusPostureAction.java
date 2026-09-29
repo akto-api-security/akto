@@ -2,29 +2,37 @@ package com.akto.action;
 
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.insights.agentic.AgentFindingGroup;
 import com.akto.dto.testing.AgentConversationResult;
+import com.akto.dto.test_editor.Info;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
 import com.akto.service.posture.ArgusPostureService;
+import com.akto.service.posture.PostureDrillNarrativeService;
+import com.akto.service.posture.PostureDrillResult;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 import lombok.Getter;
 import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -59,6 +67,16 @@ public class ArgusPostureAction extends UserAction {
     @Getter @Setter private int startTimestamp;
     @Getter @Setter private int endTimestamp;
     @Getter @Setter private String environment;
+
+    // ── fetchArgusPostureDrill's own request/response fields ──
+    @Getter @Setter private String drillId;
+    /** Unused today (every Argus drill is root-only, one level, see ArgusPostureService's own
+     *  drilldown section) — kept for contract parity with PostureDrillFlyout.jsx, which always
+     *  sends it, and with PostureDrillNarrativeService's fingerprint, which is keyed on it. */
+    @Getter @Setter private String path;
+    @Getter @Setter private int skip;
+    @Getter @Setter private int limit;
+    @Getter private PostureDrillResult postureDrill;
 
     @Getter private BasicDBObject response = new BasicDBObject();
     @Getter private List<BasicDBObject> insights = new ArrayList<>();
@@ -122,6 +140,62 @@ public class ArgusPostureAction extends UserAction {
         }
     }
 
+    /**
+     * One insight card's drilldown flyout — the real rows behind that card, reusing
+     * PostureDrillFlyout/PostureDrillResult/PostureDrillNarrativeService wholesale (see
+     * ArgusPostureService's own "insight card drilldowns" section). Fetches only what the
+     * requested drillId actually needs, not all 4 card-data reads buildCards makes — a red-team
+     * drill has no reason to also hit ElasticSearch for observability, and vice versa.
+     */
+    public String fetchArgusPostureDrill() {
+        try {
+            if (endTimestamp == 0) endTimestamp = Context.now();
+            InsightContext ctx = buildCtx();
+
+            final int accountId = ctx.getAccountId();
+            final Integer userId = ctx.getUserId();
+            final CONTEXT_SOURCE contextSource = ctx.getContextSource();
+            final long startMs = startTimestamp * 1000L;
+            final long endMs = endTimestamp * 1000L;
+
+            boolean needsIssues = ArgusPostureService.DRILL_RED_TEAM_ISSUES.equals(drillId);
+            boolean needsEvents = ArgusPostureService.DRILL_GUARDRAIL_EVENTS.equals(drillId);
+            boolean needsObservability = ArgusPostureService.DRILL_OBSERVABILITY.equals(drillId);
+
+            Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    () -> insightService.getOrLoadBundle(ctx)));
+            Future<List<AgentFindingGroup>> openIssueGroupsFuture = needsIssues
+                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                            () -> TestingRunIssuesDao.instance.openIssueGroupsForDashboard(startTimestamp, endTimestamp, URLS_PER_ISSUE_GROUP_CAP)))
+                    : null;
+            Future<List<DashboardMaliciousEvent>> maliciousEventsFuture = needsEvents
+                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                            () -> insightService.fetchArgusMaliciousEvents(ctx, MAX_THREAT_FETCH_LIMIT)))
+                    : null;
+            Future<List<UserAnalysisData>> serviceObservabilityFuture = needsObservability
+                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                            () -> SearchClientFactory.instance().fetchAgenticServiceObservability(accountId, startMs, endMs, TOPICS_CAP)))
+                    : null;
+
+            InsightDataBundle bundle = getOrEmpty(bundleFuture, null, "bundle");
+            List<AgentFindingGroup> openIssueGroups = needsIssues
+                    ? getOrEmpty(openIssueGroupsFuture, new ArrayList<>(), "openIssueGroups") : new ArrayList<>();
+            List<DashboardMaliciousEvent> maliciousEvents = needsEvents
+                    ? getOrEmpty(maliciousEventsFuture, new ArrayList<>(), "maliciousEvents") : new ArrayList<>();
+            List<UserAnalysisData> serviceObservability = needsObservability
+                    ? getOrEmpty(serviceObservabilityFuture, new ArrayList<>(), "serviceObservability") : new ArrayList<>();
+
+            postureDrill = argusPostureService.fetchDrill(drillId, skip, limit,
+                    openIssueGroups, maliciousEvents, serviceObservability, bundle);
+            PostureDrillNarrativeService.attachNarrative(postureDrill, ctx, drillId, path);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Argus posture drill: " + e.getMessage());
+            addActionError("Failed to build Argus posture drill");
+            return ERROR.toUpperCase();
+        }
+    }
+
     private InsightContext buildCtx() {
         return new InsightContext(Context.accountId.get(), Context.userId.get(), Context.contextSource.get(),
                 startTimestamp, endTimestamp);
@@ -154,16 +228,21 @@ public class ArgusPostureAction extends UserAction {
                 () -> SearchClientFactory.instance().fetchAgenticGlobalTopicHierarchy(accountId, startMs, endMs, TOPICS_CAP, SUB_TOPICS_CAP)));
 
         List<AgentFindingGroup> openIssueGroups = getOrEmpty(openIssueGroupsFuture, new ArrayList<>(), "openIssueGroups");
+        // Both of these only depend on openIssueGroups, not on each other or on anything above —
+        // submitted together so they run concurrently, not one after the other.
         Future<Map<String, AgentConversationResult>> criticalConversationsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
                 () -> fetchCriticalIssueConversations(openIssueGroups)));
+        Future<Map<String, Info>> testInfoFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                () -> fetchTestInfo(openIssueGroups)));
 
         InsightDataBundle bundle = getOrEmpty(bundleFuture, null, "bundle");
         List<DashboardMaliciousEvent> maliciousEvents = getOrEmpty(maliciousEventsFuture, new ArrayList<>(), "maliciousEvents");
         List<UserAnalysisData> serviceObservability = getOrEmpty(serviceObservabilityFuture, new ArrayList<>(), "serviceObservability");
         Map<String, Map<String, Integer>> globalTopics = getOrEmpty(globalTopicsFuture, new HashMap<>(), "globalTopics");
         Map<String, AgentConversationResult> criticalConversations = getOrEmpty(criticalConversationsFuture, new HashMap<>(), "criticalConversations");
+        Map<String, Info> testInfoByType = getOrEmpty(testInfoFuture, new HashMap<>(), "testInfoByType");
 
-        return argusPostureService.buildInsightCards(bundle, openIssueGroups, criticalConversations,
+        return argusPostureService.buildInsightCards(bundle, openIssueGroups, criticalConversations, testInfoByType,
                 maliciousEvents, serviceObservability, globalTopics);
     }
 
@@ -184,6 +263,20 @@ public class ArgusPostureAction extends UserAction {
             byId.put(c.getConversationId(), c);
         }
         return byId;
+    }
+
+    /** The real, human-written name/description/impact/remediation behind every distinct vuln
+     *  type in this window's open issues — an AgentFindingGroup's own "type" is just the test's id
+     *  (e.g. an enum-shaped string), not something an AI summary can explain the severity of on
+     *  its own. One indexed batch lookup (YamlTemplateDao's own {@code _id} index), never one
+     *  query per type. */
+    private Map<String, Info> fetchTestInfo(List<AgentFindingGroup> openIssueGroups) {
+        Set<String> types = new HashSet<>();
+        for (AgentFindingGroup g : openIssueGroups) {
+            if (g != null && g.getType() != null) types.add(g.getType());
+        }
+        if (types.isEmpty()) return new HashMap<>();
+        return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(Constants.ID, new ArrayList<>(types)));
     }
 
     private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
