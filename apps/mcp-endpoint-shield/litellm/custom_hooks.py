@@ -528,6 +528,10 @@ class GuardrailsHandler(CustomLogger):
         # Surface all virtual-key metadata as tags too, without clobbering the tags above.
         for k, v in self.key_metadata_tags({"metadata": metadata or {}}).items():
             tags.setdefault(k, v)
+        # Client identity too (e.g. Claude Code's device/session ids), so tool calls are
+        # attributed to the same client as the completion they came from.
+        for k, v in self.client_identity_tags(kwargs).items():
+            tags.setdefault(k, v)
 
         host = self._resolve_host({"metadata": metadata or {}}, user_api_key_dict)
         request_headers_out = self.build_forwarded_headers(request_headers_raw, host, kwargs)
@@ -1027,14 +1031,18 @@ class GuardrailsHandler(CustomLogger):
         key_metadata = metadata.get("user_api_key_metadata") or {}
         return {str(k): self._tag_value(v) for k, v in key_metadata.items() if v is not None}
 
-    def client_identity_tags(self, kwargs: Optional[dict] = None) -> dict:
+    def client_identity_tags(self, kwargs: Optional[dict] = None, data: Optional[dict] = None) -> dict:
         """Identity the CLIENT supplied, surfaced as queryable Akto tags.
 
         Reachable without any virtual key, so traffic stays attributable even
         behind a shared key:
           metadata.user_id            Anthropic `metadata.user_id`. Claude Code
                                       puts {device_id, account_uuid, session_id}
-                                      here on every request.
+                                      here on every request. Read from the request
+                                      body (data) when litellm_params.metadata is
+                                      not populated yet, as at pre-call time, so the
+                                      guardrail verdict and blocked-request ingestion
+                                      carry the same identity as the post-call ingest.
           user_agent                  e.g. claude-cli/2.1.252 (...)
           session_id / trace_id       LiteLLM session correlation
           tags                        from the x-litellm-tags header
@@ -1047,7 +1055,7 @@ class GuardrailsHandler(CustomLogger):
 
         # Anthropic metadata.user_id - a JSON blob for Claude Code, opaque string
         # for other clients. Flatten known sub-fields, else keep it whole.
-        raw_user = md.get("user_id")
+        raw_user = md.get("user_id") or ((data or {}).get("metadata") or {}).get("user_id")
         if raw_user:
             parsed = None
             if isinstance(raw_user, str):
@@ -1126,7 +1134,7 @@ class GuardrailsHandler(CustomLogger):
         # Then client-supplied identity (Claude Code account/device/session,
         # user-agent, caller tags, x-litellm-spend-logs-metadata). setdefault so
         # key metadata always wins on a name clash.
-        for k, v in self.client_identity_tags(kwargs).items():
+        for k, v in self.client_identity_tags(kwargs, data).items():
             tags.setdefault(k, v)
         return tags
 
