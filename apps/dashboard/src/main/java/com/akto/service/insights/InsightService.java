@@ -15,7 +15,6 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -83,7 +82,7 @@ public class InsightService {
         }
         List<Future<InsightResult>> futures = new ArrayList<>(providers.size());
         for (InsightProvider provider : providers) {
-            futures.add(PROVIDER_EXECUTOR.submit(withContext(accountId, userId, contextSource,
+            futures.add(PROVIDER_EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                     () -> computeSafely(provider, bundle, ctx, InsightProvider.Scope.LIST))));
         }
 
@@ -117,21 +116,6 @@ public class InsightService {
             case "LOW": return 4;
             default: return 5;
         }
-    }
-
-    private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
-        return () -> {
-            Context.accountId.set(accountId);
-            Context.userId.set(userId);
-            Context.contextSource.set(contextSource);
-            try {
-                return body.call();
-            } finally {
-                Context.accountId.remove();
-                Context.userId.remove();
-                Context.contextSource.remove();
-            }
-        };
     }
 
     public InsightResult getInsightDetail(InsightContext ctx, InsightId id, boolean forceRefresh) {

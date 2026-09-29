@@ -187,7 +187,6 @@ public class ArgusPostureService {
 
         List<BasicDBObject> cards = new ArrayList<>();
         cards.add(redTeamBreakdownCard(redTeam, topCritical, collectionsById, criticalIssueConversations, testInfoByType));
-        cards.add(attackFlowCard(topCritical, collectionsById, criticalIssueConversations, testInfoByType));
         cards.add(guardrailBreakdownCard(guardrail, collectionsById, policiesByName));
         cards.add(guardrailHotspotCard(guardrail, collectionsById, policiesByName));
         cards.add(observabilityCard(serviceObservability, bundle, globalTopics));
@@ -226,7 +225,7 @@ public class ArgusPostureService {
         for (BasicDBObject card : cards) {
             String cardId = card.getString("id");
             if (cardId == null) continue;
-            futures.put(cardId, SUMMARY_EXECUTOR.submit(withContext(accountId, userId, contextSource, () ->
+            futures.put(cardId, SUMMARY_EXECUTOR.submit(Context.withContext(accountId, userId, contextSource, () ->
                     CARD_ATTACK_FLOW.equals(cardId)
                             ? generateAttackFlowSummary(ctx, card, forceRefresh)
                             : generateCardSummary(ctx, cardId, card, forceRefresh))));
@@ -242,21 +241,6 @@ public class ArgusPostureService {
             }
         }
         return summaries;
-    }
-
-    private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
-        return () -> {
-            Context.accountId.set(accountId);
-            Context.userId.set(userId);
-            Context.contextSource.set(contextSource);
-            try {
-                return body.call();
-            } finally {
-                Context.accountId.remove();
-                Context.userId.remove();
-                Context.contextSource.remove();
-            }
-        };
     }
 
     private BasicDBObject generateCardSummary(InsightContext ctx, String cardId, BasicDBObject card, boolean forceRefresh) {
@@ -430,59 +414,6 @@ public class ArgusPostureService {
                     .append("text", "Validated red-team outcome on " + agentName + ": " + conversation.getValidationMessage()));
         }
         return context;
-    }
-
-    /**
-     * "How Agents Were Compromised" — the account's ATTACK_FLOW_ISSUE_COUNT most critical open
-     * issues, each grounded in a real validated red-team conversation (AgentConversationResult's
-     * own validationMessage/remediationMessage — the human-judged outcome of an actual attempt),
-     * not just aggregate counts. The AI step (generateAttackFlowSummary) turns each issue's real
-     * verdict into a short ordered flow of what the attacker attempted and what actually happened
-     * — never a raw request/response dump (see ArgusAttackFlowNarrativeHandler's own hard rules).
-     * An issue with no real conversation behind it (no AgentConversationResult resolved) is
-     * skipped — this card only ever narrates a REAL verdict, never a synthesized one.
-     */
-    private BasicDBObject attackFlowCard(List<AgentFindingGroup> topCritical, Map<Integer, ApiCollection> collectionsById,
-                                          Map<String, AgentConversationResult> conversationsById,
-                                          Map<String, Info> testInfoByType) {
-        BasicDBObject card = card(CARD_ATTACK_FLOW, "How Agents Were Compromised");
-        card.put("cta", cta("view_issues", "Open issues", InsightRoutes.ISSUES));
-        card.put("drillId", DRILL_RED_TEAM_ISSUES);
-
-        List<BasicDBObject> issues = new ArrayList<>();
-        for (AgentFindingGroup g : safe(topCritical)) {
-            if (g == null || g.getSample() == null) continue;
-            AgentConversationResult conversation = firstResolved(g.getSample(), conversationsById);
-            if (conversation == null || conversation.getValidationMessage() == null) continue;
-
-            String agentName = agentName(g.getCollectionId(), collectionsById);
-            BasicDBObject issue = new BasicDBObject("agentName", agentName)
-                    .append("vulnType", g.getType())
-                    .append("severity", g.getSecondary())
-                    .append("conversationId", conversation.getConversationId())
-                    .append("validationMessage", conversation.getValidationMessage())
-                    .append("remediationMessage", conversation.getRemediationMessage());
-
-            Info info = testInfoByType.get(g.getType());
-            if (info != null) {
-                issue.append("vulnTypeName", info.getName())
-                     .append("vulnTypeDescription", info.getDescription())
-                     .append("vulnTypeImpact", info.getImpact());
-            }
-            issues.add(issue);
-        }
-        card.put("issues", issues);
-
-        // A lightweight, immediately-visible preview (agent/type/severity only) — the real flow
-        // narrative arrives async via buildInsightCardSummaries/generateAttackFlowSummary.
-        List<BasicDBObject> preview = new ArrayList<>();
-        for (BasicDBObject issue : issues) {
-            preview.add(new BasicDBObject("agentName", issue.getString("agentName"))
-                    .append("vulnType", issue.getString("vulnType"))
-                    .append("severity", issue.getString("severity")));
-        }
-        card.put("issuePreview", preview);
-        return card;
     }
 
     private AgentConversationResult firstResolved(List<String> conversationIds, Map<String, AgentConversationResult> conversationsById) {

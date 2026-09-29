@@ -58,16 +58,14 @@ public class AgentConversationResultDao extends AccountsContextDao<AgentConversa
             return Collections.emptyList();
         }
 
-        Bson filter = Filters.and(
-                Filters.in(GenericAgentConversation._CONVERSATION_ID, conversationIds),
-                Filters.eq(AgentConversationResult.VALIDATION, true));
+        Bson filter = Filters.in(GenericAgentConversation._CONVERSATION_ID, conversationIds);
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filter));
-        pipeline.add(Aggregates.sort(Sorts.descending(GenericAgentConversation._LAST_UPDATED_AT)));
+        pipeline.add(Aggregates.sort(Sorts.descending(GenericAgentConversation._TIMESTAMP)));
         pipeline.add(Aggregates.project(Projections.fields(
                 Projections.excludeId(),
-                Projections.include(GenericAgentConversation._CONVERSATION_ID, GenericAgentConversation._LAST_UPDATED_AT),
+                Projections.include(GenericAgentConversation._CONVERSATION_ID, GenericAgentConversation._TIMESTAMP),
                 Projections.computed("validationMessage", new BasicDBObject("$substrCP", java.util.Arrays.asList(
                         new BasicDBObject("$ifNull", java.util.Arrays.asList("$" + AgentConversationResult.VALIDATION_MESSAGE, "")), 0, MESSAGE_MAX_CHARS))),
                 Projections.computed("remediationMessage", new BasicDBObject("$substrCP", java.util.Arrays.asList(
@@ -75,7 +73,7 @@ public class AgentConversationResultDao extends AccountsContextDao<AgentConversa
         pipeline.add(Aggregates.group("$" + GenericAgentConversation._CONVERSATION_ID,
                 Accumulators.first("validationMessage", "$" + AgentConversationResult.VALIDATION_MESSAGE),
                 Accumulators.first("remediationMessage", "$" + AgentConversationResult.REMEDIATION_MESSAGE),
-                Accumulators.first(GenericAgentConversation._LAST_UPDATED_AT, "$" + GenericAgentConversation._LAST_UPDATED_AT)));
+                Accumulators.first(GenericAgentConversation._TIMESTAMP, "$" + GenericAgentConversation._TIMESTAMP)));
 
         List<AgentConversationResult> result = new ArrayList<>();
         for (Object o : getMCollection().aggregate(pipeline, BasicDBObject.class).into(new ArrayList<>())) {
@@ -84,7 +82,7 @@ public class AgentConversationResultDao extends AccountsContextDao<AgentConversa
             row.setConversationId(doc.getString("_id"));
             row.setValidationMessage(doc.getString("validationMessage"));
             row.setRemediationMessage(doc.getString("remediationMessage"));
-            row.setLastUpdatedAt(doc.getInt(GenericAgentConversation._LAST_UPDATED_AT));
+            row.setLastUpdatedAt(doc.getInt(GenericAgentConversation._TIMESTAMP));
             result.add(row);
         }
         return result;
