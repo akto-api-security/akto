@@ -226,7 +226,8 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
 
             <SectionCard
                 title="Block personal accounts"
-                description="Prevent users with personal or consumer email accounts from accessing the AI agent. Enterprise accounts (company email domains) are allowed through."
+                description="Blocks personal accounts from accessing AI tools. Work accounts are allowed."
+                beta
             >
                 <Checkbox
                     label="Enable personal account blocking"
@@ -234,7 +235,7 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                     onChange={setBlockPersonalAccounts}
                 />
                 <Box paddingBlockStart="2">
-                    <Banner tone="info">Currently supported for the following browser LLMs: chatgpt.com, claude.ai, gemini.google.com, copilot.microsoft.com and grok.com.</Banner>
+                    <Banner tone="info">Supported for chatgpt.com, claude.ai, copilot.microsoft.com and grok.com through the Akto browser extension, and the ChatGPT app through Endpoint Shield.</Banner>
                 </Box>
             </SectionCard>
 
