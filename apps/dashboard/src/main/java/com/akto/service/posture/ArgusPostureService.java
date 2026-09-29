@@ -1,5 +1,6 @@
 package com.akto.service.posture;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dto.AgenticPostureScoreHistory;
 import com.akto.dto.ApiCollection;
@@ -8,12 +9,14 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightProvider;
 import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.PiiPatterns;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
+import com.akto.util.compliance.ComplianceSubClauseCatalog;
 import com.akto.utils.crons.ToolClassificationCron;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -24,6 +27,7 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -101,6 +105,95 @@ public class ArgusPostureService {
         response.put(KEY_ENVIRONMENTS, environments(countByEnvironment(assets)));
         response.put(KEY_KPIS, kpis);
         return response;
+    }
+
+    private static final int FRAMEWORK_READINESS_EVENT_LIMIT = 3000;
+
+    /**
+     * Framework readiness for Argus's own built-in guardrail controls (prompt injection, harmful
+     * category) — deliberately NOT a port of PostureService#frameworkReadiness's LLM-driven
+     * compliance-clause scan, since that pipeline only ever reads GuardrailPolicies.LLMRule's
+     * compliance map (custom, user-authored rules) and structurally cannot see these two built-in
+     * controls (BasePromptRule/contentFiltering carry no compliance field at all — see
+     * GuardrailControlComplianceMap's javadoc). Instead this computes live, every call, straight from
+     * already-fetched violation events: each event's metadata rule_violated value is matched against
+     * GuardrailControlComplianceMap's fixed prefix groups, no LLM involved.
+     *
+     * <p>Returns the same panel shape PostureService.frameworkReadiness returns
+     * ({@code frameworks: [{framework, value, clausesCovered, totalClauses}], dataGaps}) so the
+     * frontend card can be shared/format-compatible with Atlas's — see
+     * FrameworkReadinessSection.jsx.
+     */
+    public BasicDBObject frameworkReadiness(InsightDataBundle bundle, int trendStartTs, int trendEndTs) {
+        List<DashboardMaliciousEvent> events =
+                bundle.fetchViolationEvents(InsightProvider.Scope.DETAIL, FRAMEWORK_READINESS_EVENT_LIMIT, null, null);
+
+        BasicDBObject panel = new BasicDBObject();
+        List<Map<String, Object>> gaps = new ArrayList<>();
+        if (events == null) {
+            // Fetch failed (threat backend unavailable, etc.) — distinct from "fetched fine, zero
+            // matches", which is a real 0% data point, not a gap.
+            panel.put("frameworks", new ArrayList<>());
+            gaps.add(gapRow("COMPLIANCE_SCAN", "NOT_AVAILABLE",
+                    "Guardrail violation data could not be fetched, so framework readiness could not be computed."));
+            panel.put("dataGaps", gaps);
+            return panel;
+        }
+
+        // framework -> distinct sub-clause ids hit by an in-window violation.
+        Map<String, Set<String>> coveredClausesByFramework = new LinkedHashMap<>();
+        for (String framework : GuardrailControlComplianceMap.frameworks()) {
+            coveredClausesByFramework.put(framework, new HashSet<>());
+        }
+
+        for (DashboardMaliciousEvent event : events) {
+            if (event == null) continue;
+            long ts = event.getTimestamp();
+            if (ts < trendStartTs || ts > trendEndTs) continue;
+
+            String ruleViolated = extractRuleViolated(event.getMetadata());
+            GuardrailControlComplianceMap.ClauseMatch match =
+                    GuardrailControlComplianceMap.matchRuleViolated(ruleViolated);
+            if (match == null) continue;
+
+            coveredClausesByFramework.get(match.framework).add(match.subClauseId);
+        }
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Set<String>> entry : coveredClausesByFramework.entrySet()) {
+            String framework = entry.getKey();
+            int covered = entry.getValue().size();
+            int total = ComplianceSubClauseCatalog.totalClauses(framework);
+            if (total <= 0) continue;
+
+            BasicDBObject row = new BasicDBObject();
+            row.put("framework", framework);
+            row.put("value", (int) Math.round((covered * 100.0) / total));
+            row.put("clausesCovered", covered);
+            row.put("totalClauses", total);
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Integer.compare(b.getInt("clausesCovered"), a.getInt("clausesCovered")));
+
+        panel.put("frameworks", rows);
+        panel.put("dataGaps", gaps);
+        return panel;
+    }
+
+    /** Reads rule_violated out of a violation's metadata JSON — mirrors extractRuleViolated in
+     *  pages/threat_detection/utils/formatUtils.js (checks both key spellings defensively). */
+    private static String extractRuleViolated(String metadataJson) {
+        if (metadataJson == null || metadataJson.isEmpty()) return null;
+        try {
+            JSONObject metadata = new JSONObject(metadataJson);
+            String ruleViolated = metadata.optString("rule_violated", "");
+            if (ruleViolated.isEmpty()) {
+                ruleViolated = metadata.optString("ruleViolated", "");
+            }
+            return ruleViolated.isEmpty() ? null : ruleViolated;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private BasicDBObject assetsKpi(List<ApiCollection> assets, String environment) {

@@ -15,7 +15,7 @@ import KpiGrid from './overview/KpiGrid'
 import DangerousPathsSection from './overview/DangerousPathsSection'
 import HighestRiskAgentsTable from './overview/HighestRiskAgentsTable'
 import RiskByDomainSection from './overview/RiskByDomainSection'
-import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
+import FrameworkReadinessSection from './overview/FrameworkReadinessSection'
 import TopFindingsSection from './overview/TopFindingsSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
 import PostureDrillFlyout from '../PostureDrillFlyout'
@@ -239,8 +239,8 @@ function AgenticPosture() {
                 />
             </Section>
 
-            <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">
-                <CoverageGovernanceSection coverageGovernance={pageData.coverageGovernance} />
+            <Section title="Framework Readiness" description="How much of each compliance framework your guardrails have actually exercised.">
+                <FrameworkReadinessSection frameworkReadiness={pageData.frameworkReadiness} />
             </Section>
 
             <Section title="Changes Since Last Week" description="What's new in the environment — this is what keeps posture operational, not a static snapshot.">
