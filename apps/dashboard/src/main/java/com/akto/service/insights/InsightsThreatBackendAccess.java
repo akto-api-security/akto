@@ -49,4 +49,11 @@ class InsightsThreatBackendAccess extends AbstractThreatDetectionAction {
     List<DashboardMaliciousEvent> violationEvents(int startTs, int endTs, int limit, Map<String, Object> filters, String skillEvalMode) {
         return fetchAllMaliciousEvents(startTs, endTs, limit, filters, skillEvalMode);
     }
+
+    /** Same as violationEvents, minimalFields=true — for a caller (ArgusPostureService's card
+     *  breakdowns) that only reads apiCollectionId/filterId/severity/label/timestamp off each
+     *  event, never the heavy payload/metadata/owaspCategories/remediation fields. */
+    List<DashboardMaliciousEvent> violationEventsMinimal(int startTs, int endTs, int limit, Map<String, Object> filters) {
+        return fetchAllMaliciousEvents(startTs, endTs, limit, filters, null, true);
+    }
 }

@@ -5,6 +5,7 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.GuardrailPolicies.SelectedServer;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.util.AgenticObserveUtil;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
@@ -235,6 +236,96 @@ public final class InsightUtil {
 
     public static boolean policyCoversCollection(GuardrailPolicies p, List<String> resolvedApplyToDeviceIds, ApiCollection c) {
         return policyCoversHost(p, c.getHostName()) && policyCoversDevice(resolvedApplyToDeviceIds, deviceIdOf(c));
+    }
+
+    /** True when any active policy (fleet-wide, or host-targeted onto this collection) covers it.
+     *  Device targeting is intentionally ignored here — this is a collection/agent-level coverage
+     *  check (Argus posture), not a per-device one; passing a null resolvedApplyToDeviceIds to
+     *  policyCoversDevice always resolves to "covered" for that axis, matching the "no ApiCollection
+     *  -> policy link field, host-scope is the real targeting axis" note in posture/CLAUDE.md. */
+    public static boolean collectionCoveredByAnyPolicy(ApiCollection c, List<GuardrailPolicies> policies) {
+        return c != null && hostCoveredByAnyPolicy(c.getHostName(), policies);
+    }
+
+    /** Same check as collectionCoveredByAnyPolicy, off a bare host string only. */
+    public static boolean hostCoveredByAnyPolicy(String hostName, List<GuardrailPolicies> policies) {
+        if (policies == null || hostName == null) return false;
+        for (GuardrailPolicies p : policies) {
+            if (p == null) continue;
+            if (p.isApplyToAllServers()) return true;
+            if (policyCoversHost(p, hostName)) return true;
+        }
+        return false;
+    }
+
+    /** CRITICAL first — the same rank convention InsightService's own list-sort and the Violations
+     *  grid's severity column already use. Missing/unrecognized severity sorts last. Public here so
+     *  every Argus provider that ranks findings by severity shares one implementation. */
+    public static int severityRank(String severity) {
+        if (severity == null) return 5;
+        switch (severity.toUpperCase(Locale.ROOT)) {
+            case "CRITICAL": return 1;
+            case "HIGH": return 2;
+            case "MEDIUM": return 3;
+            case "LOW": return 4;
+            default: return 5;
+        }
+    }
+
+    // ── Environment classification — moved from ArgusPostureService so any AGENTIC provider can
+    // group findings by environment without a package-crossing dependency on service/posture. ──
+
+    public static final String ENV_PRODUCTION = "Production";
+    public static final String ENV_STAGING = "Staging";
+    public static final String ENV_DEVELOPMENT = "Development";
+    private static final List<String> ENV_DEV_VALUES = Arrays.asList("DEV");
+    private static final List<String> ENV_STAGING_VALUES = Arrays.asList("STAGING", "PREPROD", "UAT", "QA", "INTEG");
+
+    /** Raw env-type tag value (e.g. "PROD", "STAGING") on a collection, or null when untagged. */
+    public static String envTagValue(ApiCollection c) {
+        if (c == null || c.getEnvType() == null) return null;
+        for (CollectionTags tag : c.getEnvType()) {
+            if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
+        }
+        return null;
+    }
+
+    /** Buckets a raw env-type tag value into one of the three display buckets. Untagged
+     *  collections default to Production — the same "no tag means it's live traffic" assumption
+     *  ArgusPostureService's KPI tiles already made. */
+    public static String environmentBucket(String envTagValue) {
+        if (StringUtils.isBlank(envTagValue)) return ENV_PRODUCTION;
+        String value = envTagValue.trim().toUpperCase(Locale.ROOT);
+        if (ENV_DEV_VALUES.contains(value)) return ENV_DEVELOPMENT;
+        if (ENV_STAGING_VALUES.contains(value)) return ENV_STAGING;
+        return ENV_PRODUCTION;
+    }
+
+    /** The environment bucket a finding should display for this collection/agent. */
+    public static String environmentOf(ApiCollection c) {
+        return environmentBucket(envTagValue(c));
+    }
+
+    // ── Vendor classification for agentic findings — a superset of endpointVendorNameOfHost's
+    // "<device>.<ai-agent|chrome>.<vendor>" host shape, since an MCP-server-shaped agentic
+    // collection (e.g. a Bedrock/Kiro-hosted agent) never matches that host pattern at all. Tries
+    // the host, then the collection name, then its asset-type tag value, against the same
+    // canonicalVendorName substring map every other vendor grouping in this file already uses —
+    // so "bedrock"/"kiro"/"claude"/... resolve to the identical canonical names regardless of
+    // which field the vendor token happened to show up in. ──
+
+    public static String agenticVendorOf(ApiCollection c) {
+        if (c == null) return null;
+        String vendor = agenticVendorToken(c.getHostName());
+        if (vendor == null) vendor = agenticVendorToken(c.getName());
+        if (vendor == null) vendor = agenticVendorToken(AgenticObserveUtil.getAssetTagValue(c));
+        return vendor;
+    }
+
+    private static String agenticVendorToken(String raw) {
+        if (StringUtils.isBlank(raw)) return null;
+        String canonical = canonicalVendorName(raw.toLowerCase(Locale.ROOT));
+        return "unknown".equals(canonical) ? null : canonical;
     }
 
     // ── Shared content hashing (cache keys for narrative + classification caches) ──────
