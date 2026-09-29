@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Box, Icon, Text, TextField, VerticalStack } from '@shopify/polaris'
-import { SearchMinor } from '@shopify/polaris-icons'
+import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { RefreshMajor } from '@shopify/polaris-icons'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -18,24 +18,45 @@ import HighestRiskAgentsTable from './overview/HighestRiskAgentsTable'
 import RiskByDomainSection from './overview/RiskByDomainSection'
 import InsightCardsSection from './overview/InsightCardsSection'
 import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
+import TopFindingsSection from './overview/TopFindingsSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
+import dashboardApi from '../api'
 
-function SectionHeading({ title, description }) {
+function SectionHeading({ title, description, action }) {
     return (
-        <VerticalStack gap="1">
-            <Text variant="headingMd">{title}</Text>
-            {description && <Text variant="bodySm" color="subdued">{description}</Text>}
+        <HorizontalStack align="space-between" blockAlign="end">
+            <VerticalStack gap="1">
+                <Text variant="headingMd">{title}</Text>
+                {description && <Text variant="bodySm" color="subdued">{description}</Text>}
+            </VerticalStack>
+            {action}
+        </HorizontalStack>
+    )
+}
+
+function Section({ title, description, action, children }) {
+    return (
+        <VerticalStack gap="4">
+            <SectionHeading title={title} description={description} action={action} />
+            {children}
         </VerticalStack>
     )
 }
 
-function Section({ title, description, children }) {
-    return (
-        <VerticalStack gap="4">
-            <SectionHeading title={title} description={description} />
-            {children}
-        </VerticalStack>
-    )
+// Drills that page through agents show 10 rows per page; the rest keep the flyout's default.
+const DRILL_PAGE_SIZE = { highRiskAgents: 10, postureScore: 10 }
+const REGENERATE_POLL_MS = 5000
+
+const DEFAULT_DATE_RANGE = values.ranges[3] // "Last 30 days" — same default the other posture pages use
+
+function dateRangeFromSearchParams(searchParams) {
+    const sinceParam = searchParams.get('since')
+    const untilParam = searchParams.get('until')
+    if (sinceParam == null || untilParam == null) return null
+    const sinceTs = parseInt(sinceParam, 10)
+    const untilTs = parseInt(untilParam, 10)
+    if (Number.isNaN(sinceTs) || Number.isNaN(untilTs)) return null
+    return { title: 'Custom', alias: 'custom', period: { since: new Date(sinceTs * 1000), until: new Date(untilTs * 1000) } }
 }
 
 function AgenticPosture() {
@@ -43,25 +64,35 @@ function AgenticPosture() {
     const [searchParams, setSearchParams] = useSearchParams()
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[3] // "Last 30 days" — same default the other posture pages use
+        searchParams,
+        (sp) => dateRangeFromSearchParams(sp) || DEFAULT_DATE_RANGE
     )
     const [pageData, setPageData] = useState({})
     const [loading, setLoading] = useState(true)
-    const [selectedEnv, setSelectedEnv] = useState('all')
-    const [searchTerm, setSearchTerm] = useState('')
-    const [insightCards, setInsightCards] = useState([])
-    const [insightSummaries, setInsightSummaries] = useState({})
-    const [insightSummariesLoading, setInsightSummariesLoading] = useState(false)
+    const [selectedEnv, setSelectedEnv] = useState(() => searchParams.get('env') || 'all')
+    const [regenerating, setRegenerating] = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
 
-    // { drillId, path } | null — an insight card's own drilldown flyout, reusing
-    // PostureDrillFlyout/SecurityPosture.jsx's own `?drill=&path=` URL-sync convention so a
-    // drilldown link stays shareable/reload-safe (see PostureDrillFlyout's own javadoc-equivalent
-    // comment and the posture package CLAUDE.md's "paginated drilldown flyouts" section).
+    const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+
     const drillState = useMemo(() => {
         const drillId = searchParams.get('drill')
         if (!drillId) return null
         return { drillId, path: searchParams.get('path') || '' }
     }, [searchParams])
+
+    useEffect(() => {
+        const since = String(getTimeEpoch('since'))
+        const until = String(getTimeEpoch('until'))
+        if (searchParams.get('since') === since && searchParams.get('until') === until
+            && searchParams.get('env') === selectedEnv) return
+        const next = new URLSearchParams(searchParams)
+        next.set('since', since)
+        next.set('until', until)
+        next.set('env', selectedEnv)
+        setSearchParams(next, { replace: true })
+    }, [currDateRange, selectedEnv]) // eslint-disable-line react-hooks/exhaustive-deps
+
     const openDrill = (drillId, path = '') => {
         const next = new URLSearchParams(searchParams)
         next.set('drill', drillId)
@@ -76,10 +107,12 @@ function AgenticPosture() {
         setSearchParams(next, { replace: true })
     }
 
-    const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
+    const fetchArgusDrill = useCallback(
+        (drillId, path, startTimestamp, endTimestamp, skip, limit) =>
+            dashboardApi.fetchArgusPostureDrill(drillId, path, startTimestamp, endTimestamp, selectedEnv, skip, limit),
+        [selectedEnv]
+    )
 
-    // Posture summary and the 5 insight cards are fetched together via Promise.all — neither
-    // depends on the other's result, so they're fired concurrently rather than one after another.
     useEffect(() => {
         let cancelled = false
         async function load() {
@@ -108,7 +141,46 @@ function AgenticPosture() {
         load()
         return () => { cancelled = true }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currDateRange, selectedEnv])
+    }, [currDateRange, selectedEnv, refreshKey])
+
+    // Resume polling if a regeneration was already running when the page opened.
+    useEffect(() => {
+        dashboardApi.fetchArgusPostureRegenerateStatus()
+            .then((status) => { if (status && status.running) setRegenerating(true) })
+            .catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (!regenerating) return
+        const timer = setInterval(async () => {
+            try {
+                const status = await dashboardApi.fetchArgusPostureRegenerateStatus()
+                if (!status || status.running) return
+                setRegenerating(false)
+                if (status.error) {
+                    func.setToast(true, true, 'Posture regeneration failed')
+                } else {
+                    func.setToast(true, false, 'Posture dashboard regenerated')
+                    setRefreshKey((k) => k + 1)
+                }
+            } catch (error) {
+                console.error('Error polling posture regeneration:', error)
+            }
+        }, REGENERATE_POLL_MS)
+        return () => clearInterval(timer)
+    }, [regenerating])
+
+    const regenerate = async () => {
+        try {
+            const resp = await dashboardApi.triggerArgusPostureRegenerate()
+            setRegenerating(true)
+            func.setToast(true, false, resp && resp.status === 'ALREADY_RUNNING'
+                ? 'Regeneration already in progress'
+                : 'Regenerating posture dashboard, this can take a few minutes')
+        } catch (error) {
+            func.setToast(true, true, 'Could not start regeneration')
+        }
+    }
 
     // Deliberately its own effect, not folded into the cards load above: each card's AI summary
     // can take a few seconds on a cache miss and must never hold up the (fast, Java-only) card
@@ -142,27 +214,16 @@ function AgenticPosture() {
         if (!term) return filtered
         return filtered.filter((r) => r.name.toLowerCase().includes(term) || (r.issue || '').toLowerCase().includes(term))
     }, [pageData.highestRiskAgents, selectedEnv, term])
+    // Highest-risk rows carry a real ApiCollection id as groupKey, so they open the collection page.
+    const openCollection = (collectionId) => navigate(`/dashboard/observe/inventory/${encodeURIComponent(collectionId)}`)
 
     const topbar = (
         <VerticalStack gap="4">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
-                <Box maxWidth="560px">
-                    <Text variant="bodyMd" color="subdued">
-                        What agents exist, which ones are risky, why, and what changed — across every AI agent Argus has discovered.
-                    </Text>
-                </Box>
-                <Box width="260px">
-                    <TextField
-                        value={searchTerm}
-                        onChange={setSearchTerm}
-                        placeholder="Search agents, findings…"
-                        prefix={<Icon source={SearchMinor} color="subdued" />}
-                        autoComplete="off"
-                        clearButton
-                        onClearButtonClick={() => setSearchTerm('')}
-                    />
-                </Box>
-            </div>
+            <Box maxWidth="560px">
+                <Text variant="bodyMd" color="subdued">
+                    What agents exist, which ones are risky, why, and what changed — across every AI agent Argus has discovered.
+                </Text>
+            </Box>
             <EnvironmentTabs environments={pageData.environments} selected={selectedEnv} onSelect={setSelectedEnv} />
         </VerticalStack>
     )
@@ -183,10 +244,11 @@ function AgenticPosture() {
                         own wrapper because Card doesn't accept a style/width prop to fix that
                         directly, so a plain "display:flex" wrapper wasn't enough. */}
                     <div style={{ flex: '1 1 280px', minWidth: '280px', display: 'grid' }}>
-                        <PostureScoreCard postureScore={pageData.postureScore} />
+                        <PostureScoreCard postureScore={pageData.postureScore} onOpenBreakdown={() => openDrill('postureScore')} />
                     </div>
                     <div style={{ flex: '2.4 1 560px', minWidth: '320px', display: 'grid' }}>
-                        <KpiGrid kpis={pageData.kpis} onOpenLink={openKpiLink} />
+                        <KpiGrid kpis={pageData.kpis} onOpenLink={openKpiLink} onOpenDrill={openDrill}
+                            onOpenRoute={(route) => navigate(route)} />
                     </div>
                 </div>
             </Section>
@@ -198,8 +260,12 @@ function AgenticPosture() {
                 <DangerousPathsSection dangerousPaths={pageData.dangerousPaths} />
             </Section>
 
-            <Section title="Highest-Risk Agents" description="Ranked by blast radius — privilege held, data reached, and controls missing.">
-                <HighestRiskAgentsTable agents={highestRiskAgents} onOpenAgent={openAgent} />
+            <Section
+                title="Highest-Risk Agents"
+                description="Ranked by blast radius — privilege held, data reached, and controls missing."
+                action={<Button onClick={() => openDrill('highRiskAgents')}>View all agents</Button>}
+            >
+                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={openCollection} />
             </Section>
 
             <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">
@@ -231,6 +297,9 @@ function AgenticPosture() {
                     title={<Text variant="headingLg">Posture Overview</Text>}
                     isFirstPage={true}
                     components={[<Box key="body">{pageBody}</Box>]}
+                    secondaryActions={
+                        <Button icon={RefreshMajor} onClick={regenerate} loading={regenerating} disabled={regenerating}>Regenerate</Button>
+                    }
                     primaryAction={
                         <DateRangeFilter
                             initialDispatch={currDateRange}
@@ -247,7 +316,12 @@ function AgenticPosture() {
                 onClose={closeDrill}
                 startTimestamp={getTimeEpoch('since')}
                 endTimestamp={getTimeEpoch('until')}
-                fetchDrill={postureDataSource.fetchInsightCardDrill}
+                rootLabel="Posture overview"
+                filterStatePrefix="agentic-posture-drill"
+                fetchDrill={fetchArgusDrill}
+                ctaInFooter={true}
+                pageSize={DRILL_PAGE_SIZE[drillState?.drillId] || 20}
+                hideTotalBadge={drillState?.drillId === 'highRiskAgents' && !drillState?.path}
             />
         </Box>
     )

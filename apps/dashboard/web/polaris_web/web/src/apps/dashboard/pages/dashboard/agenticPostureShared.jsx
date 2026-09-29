@@ -50,6 +50,13 @@ export function riskBand(value) {
     return { tone: 'success' }
 }
 
+// Display label for riskBand's tone; wording is a presentation concern, so it lives client-side.
+export const BAND_LABEL_FOR_TONE = {
+    critical: 'Elevated risk',
+    warning: 'Moderate risk',
+    success: 'Good posture',
+}
+
 // A data gap (dataGaps[] on any KPI/panel a real backend phase sends) — one shared renderer so a
 // reader sees the same "why is this empty/approximate" affordance everywhere on the page.
 export function GapHint({ gaps }) {
@@ -95,14 +102,28 @@ export function DummyDataOverlay({ panelId, copy, children }) {
     )
 }
 
+// DummyDataOverlay plus a centred "Coming soon" badge for sections that aren't built yet.
+export function ComingSoonOverlay({ panelId, children }) {
+    return (
+        <div style={{ position: 'relative', height: '100%' }}>
+            <DummyDataOverlay panelId={panelId}>{children}</DummyDataOverlay>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                <Badge status="new">Coming soon</Badge>
+            </div>
+        </div>
+    )
+}
+
 // One KPI tile — Card + label + big value + optional secondary line + optional delta + optional
 // link. A KPI arrives with `status: "COMING_SOON"` instead of a value when its resolver isn't
 // wired up yet — callers render ComingSoonTile in that case rather than this component.
-export function KpiTile({ kpi, icon, onOpenLink }) {
+export function KpiTile({ kpi, icon, onOpenLink, onOpen, forceClickable }) {
     const hasValue = kpi.value !== null && kpi.value !== undefined
     const deltaText = formatDelta(kpi.delta, kpi.deltaUnit)
+    const clickable = hasValue && forceClickable && !!onOpen
     return (
         <Card>
+            <div onClick={clickable ? onOpen : undefined} style={clickable ? { cursor: 'pointer' } : undefined}>
             <Box padding="4">
                 <VerticalStack gap="2">
                     <HorizontalStack align="space-between" blockAlign="center">
@@ -142,6 +163,7 @@ export function KpiTile({ kpi, icon, onOpenLink }) {
                     )}
                 </VerticalStack>
             </Box>
+            </div>
         </Card>
     )
 }

@@ -16,6 +16,8 @@ public class SessionContextAction extends AbstractThreatDetectionAction {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
 
+    private static final int OWN_SESSION_EVENTS_LIMIT = 1000;
+
     private String sessionId;
     private SessionDocument sessionData;
     private String errorMessage;
@@ -24,6 +26,15 @@ public class SessionContextAction extends AbstractThreatDetectionAction {
         try {
             if (sessionId == null || sessionId.isEmpty()) {
                 errorMessage = "Session ID is required";
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Users limited to specific collections only see sessions of their own agents.
+            // Session ids are only returned with full fields, so check against their most recent own events.
+            java.util.List<DashboardMaliciousEvent> ownEvents = isLimitedToOwnAgents()
+                ? fetchAllMaliciousEvents(0, 0, OWN_SESSION_EVENTS_LIMIT, null, null, false) : null;
+            if (ownEvents != null && ownEvents.stream().noneMatch(e -> sessionId.equals(e.getSessionId()))) {
+                errorMessage = "Session not found";
                 return Action.ERROR.toUpperCase();
             }
 

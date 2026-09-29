@@ -6,6 +6,7 @@ import com.akto.dto.GuardrailPolicies.SelectedServer;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.util.Constants;
 import org.apache.commons.lang3.StringUtils;
 
@@ -128,6 +129,25 @@ public final class InsightUtil {
 
     public static boolean isBlockingPolicy(GuardrailPolicies p) {
         return "block".equalsIgnoreCase(p.getBehaviour());
+    }
+
+    /** Raw `ApiInfo.ToolInfo.capability` literals ("RESOURCE_DELETE", "CREDENTIAL_OR_PII_READ")
+     *  are what ToolClassificationCron stores — same jargon-in-the-UI problem humanizePolicyMode
+     *  solves, so a "Capability" column gets its display string from here rather than each caller
+     *  inventing one. A blank value means the classification cron hasn't reached that tool yet,
+     *  which is a real state and not an error. */
+    public static String humanizeToolCapability(String capability) {
+        if (capability == null || capability.trim().isEmpty()) {
+            return "Unclassified";
+        }
+        switch (capability.trim().toUpperCase(Locale.ROOT)) {
+            case ToolCapabilityClassifier.RESOURCE_DELETE: return "Resource delete";
+            case ToolCapabilityClassifier.CRITICAL_RESOURCE_WRITE: return "Critical resource write";
+            case ToolCapabilityClassifier.CREDENTIAL_OR_PII_READ: return "Credential / PII read";
+            case ToolCapabilityClassifier.FILE_WRITE: return "File write";
+            case ToolCapabilityClassifier.SAFE: return "Safe";
+            default: return capability.trim();
+        }
     }
 
     /** Raw `GuardrailPolicies.behaviour` ("block"/"warn"/"alert"/"approval") is backend jargon —

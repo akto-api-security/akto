@@ -1,6 +1,6 @@
-import { Badge, Box, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Button, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
 import { ArrowDownMinor, ArrowUpMinor } from '@shopify/polaris-icons'
-import { TONE_TEXT_COLOR } from '../../agenticPostureShared'
+import { GapHint, BAND_LABEL_FOR_TONE, TONE_TEXT_COLOR, riskBand } from '../../agenticPostureShared'
 
 const TONE_STROKE_VAR = {
     critical: 'var(--p-color-icon-critical)',
@@ -8,10 +8,7 @@ const TONE_STROKE_VAR = {
     success: 'var(--p-color-icon-success)',
 }
 
-// A small inline-SVG sparkline (same technique the original mockup uses, no charting library) —
-// sample/illustrative points for now, since there's no real weekly posture-score-history model
-// yet to back a real multi-point trend (see the posture plan). Rendered plainly like the rest of
-// the page's sample data, not hidden behind a placeholder.
+// Real trend line from AgenticPostureScoreHistory; renders nothing with fewer than 2 points.
 function Sparkline({ points, tone }) {
     if (!points || points.length < 2) return null
     const w = 140
@@ -42,38 +39,57 @@ function Sparkline({ points, tone }) {
     )
 }
 
-// Fleet-wide composite score hero — number + band badge + week-over-week delta, plus a sparkline
-// of sample weekly trend points (see Sparkline above for why those are illustrative, not real).
-function PostureScoreCard({ postureScore }) {
+// Fleet-wide posture score hero; shows "Not computed yet" instead of falling back to mock data.
+function PostureScoreCard({ postureScore, onOpenBreakdown }) {
     if (!postureScore) return null
-    const { value, bandLabel, bandTone, delta, deltaTone, deltaDrivenBy, trend } = postureScore
+    const { value, agentsScored, agentsWithNoSignal, dataGaps, trend, delta, deltaTone } = postureScore
+    const hasValue = value !== null && value !== undefined
+    const hasDelta = delta !== null && delta !== undefined
     const deltaPositive = delta > 0
+    const band = hasValue ? riskBand(value) : null
+    const bandTone = band ? band.tone : null
+    const bandLabel = bandTone ? BAND_LABEL_FOR_TONE[bandTone] : null
+    const clickable = hasValue && !!onOpenBreakdown
+
     return (
         <Card>
-            {/* height:100%+flex column, same technique CardWithHeader's useFlexContent option
-                already uses elsewhere in this app, so this card's content fills the full height
-                the KPI grid's two rows give it (see the flex wrapper in ArgusPosture.jsx) instead
-                of clumping at the top with dead space below. */}
-            <Box padding="4" style={{ height: '100%' }}>
+            <Box padding="4" onClick={clickable ? onOpenBreakdown : undefined}
+                style={{ height: '100%', cursor: clickable ? 'pointer' : undefined }}>
                 <VerticalStack gap="4" style={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <HorizontalStack align="space-between" blockAlign="center">
-                        <Text variant="bodySm" fontWeight="semibold" color="subdued">POSTURE SCORE</Text>
+                        <HorizontalStack gap="1" blockAlign="center">
+                            <Text variant="bodySm" fontWeight="semibold" color="subdued">POSTURE SCORE</Text>
+                            <GapHint gaps={dataGaps} />
+                        </HorizontalStack>
                         {bandLabel && <Badge status={bandTone}>{bandLabel}</Badge>}
                     </HorizontalStack>
-                    <HorizontalStack gap="4" blockAlign="center" wrap={false}>
-                        <HorizontalStack gap="2" blockAlign="baseline" wrap={false}>
-                            <Text variant="heading3xl">{value}</Text>
-                            <Text variant="headingMd" color="subdued">/100</Text>
+                    {hasValue ? (
+                        <HorizontalStack gap="4" blockAlign="center" wrap={false}>
+                            <HorizontalStack gap="2" blockAlign="baseline" wrap={false}>
+                                <Text variant="heading3xl">{Math.round(value)}</Text>
+                                <Text variant="headingMd" color="subdued">/100</Text>
+                            </HorizontalStack>
+                            <Sparkline points={trend} tone={bandTone} />
                         </HorizontalStack>
-                        <Sparkline points={trend} tone={bandTone} />
-                    </HorizontalStack>
-                    {delta !== null && delta !== undefined && (
+                    ) : (
+                        <Text variant="heading2xl" color="subdued">Not computed yet</Text>
+                    )}
+                    {hasDelta && (
                         <HorizontalStack gap="1" blockAlign="center">
                             <Box><Icon source={deltaPositive ? ArrowUpMinor : ArrowDownMinor} color={TONE_TEXT_COLOR[deltaTone] || 'subdued'} /></Box>
                             <Text variant="bodyMd" fontWeight="semibold" color={TONE_TEXT_COLOR[deltaTone] || 'subdued'}>
                                 {deltaPositive ? '+' : ''}{delta} pts vs last week
                             </Text>
-                            {deltaDrivenBy && <Text variant="bodyMd" color="subdued">· driven by {deltaDrivenBy}</Text>}
+                        </HorizontalStack>
+                    )}
+                    {hasValue && agentsScored > 0 && (
+                        <HorizontalStack align="space-between" blockAlign="center">
+                            <Text variant="bodySm" color="subdued">
+                                {agentsWithNoSignal > 0
+                                    ? `Based on ${agentsScored - agentsWithNoSignal} of ${agentsScored} agents`
+                                    : `Based on ${agentsScored} agent${agentsScored === 1 ? '' : 's'}`}
+                            </Text>
+                            {clickable && <Button plain>How is this calculated?</Button>}
                         </HorizontalStack>
                     )}
                 </VerticalStack>

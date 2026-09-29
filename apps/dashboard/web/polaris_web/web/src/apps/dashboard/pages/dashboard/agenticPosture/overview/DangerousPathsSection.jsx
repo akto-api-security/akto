@@ -1,11 +1,9 @@
 import { Badge, Box, Card, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import { ComingSoonOverlay } from '../../agenticPostureShared'
 import ChainVisual from '../ChainVisual'
 
-// End-to-end chains where untrusted input reaches a privileged action against a sensitive
-// resource with a control missing in between. Sample data for now (no graph/taint-tracing engine
-// exists yet to detect these for real — see the posture plan's Phase 3); rendered plainly like
-// every other section on this page until real vs. not-yet-wired sections actually diverge.
+// Illustrative chains, blurred behind "Coming soon" until the path-tracing engine exists.
 function PathCard({ path }) {
     return (
         <Card>
@@ -36,9 +34,11 @@ function DangerousPathsSection({ dangerousPaths }) {
     if (!dangerousPaths) return null
     const paths = dangerousPaths.illustrative || []
     return (
-        <VerticalStack gap="3">
-            {paths.map((path) => <PathCard key={path.id} path={path} />)}
-        </VerticalStack>
+        <ComingSoonOverlay panelId="dangerousPaths">
+            <VerticalStack gap="3">
+                {paths.map((path) => <PathCard key={path.id} path={path} />)}
+            </VerticalStack>
+        </ComingSoonOverlay>
     )
 }
 

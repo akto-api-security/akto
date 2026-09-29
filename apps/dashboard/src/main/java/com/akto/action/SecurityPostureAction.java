@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.HostSeverityCount;
@@ -96,6 +97,10 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
     public String fetchPostureSummary() {
         long callStart = System.currentTimeMillis();
+        // Users limited to specific collections (Argus): posture and insights are built from account-wide data, so none is shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            return SUCCESS.toUpperCase();
+        }
         try {
             if (endTimestamp == 0) {
                 endTimestamp = Context.now();
@@ -221,6 +226,11 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
      */
     public String fetchPostureDrill() {
         long callStart = System.currentTimeMillis();
+        // Users limited to specific collections (Argus): posture and insights are built from account-wide data, so none is shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            postureDrill = null;
+            return SUCCESS.toUpperCase();
+        }
         try {
             if (endTimestamp == 0) {
                 endTimestamp = Context.now();

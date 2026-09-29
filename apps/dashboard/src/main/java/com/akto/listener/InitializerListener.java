@@ -186,6 +186,7 @@ public class InitializerListener implements ServletContextListener {
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
     ToolClassificationCron toolClassificationCron = new ToolClassificationCron();
+    AgenticPostureScoreCron agenticPostureScoreCron = new AgenticPostureScoreCron();
     UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
     AgentGuardCorpusLabelingCron agentGuardCorpusLabelingCron = new AgentGuardCorpusLabelingCron();
 
@@ -2615,6 +2616,7 @@ public class InitializerListener implements ServletContextListener {
                         syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                         agentBasePromptDetectionCron.setUpAgentBasePromptDetectionScheduler();
                         toolClassificationCron.setUpToolClassificationCronScheduler();
+                        agenticPostureScoreCron.setUpAgenticPostureScoreCronScheduler();
                         setupAutomatedApiGroupsScheduler();
                     }
 

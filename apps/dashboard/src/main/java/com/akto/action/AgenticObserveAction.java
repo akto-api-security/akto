@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
@@ -146,7 +147,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // fetchAgenticSkillData lives on this same class, fetchAgenticAssetsSummary can just read this
     // cache directly instead of requiring the client to round-trip the whole set back to us. Same
     // TTL/eviction shape as getOrBuildClassification (see its own doc for the rationale).
-    private static final Map<Integer, SkillDataCacheEntry> skillDataCache = new ConcurrentHashMap<>();
+    private static final Map<String, SkillDataCacheEntry> skillDataCache = new ConcurrentHashMap<>();
 
     private static final class SkillDataCacheEntry {
         final Map<String, Float> skillScoreMap;
@@ -167,16 +168,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     }
 
     private SkillDataCacheEntry getOrBuildSkillData() {
-        int accountId = Context.accountId.get();
+        // Users limited to specific collections get their own entry, so their view never mixes with another user's
+        String cacheKey = ArgusCollectionScope.isLimited(getSUser())
+            ? scopedCacheKey() : accountCacheKey();
         long now = System.currentTimeMillis();
-        SkillDataCacheEntry existing = skillDataCache.get(accountId);
+        SkillDataCacheEntry existing = skillDataCache.get(cacheKey);
         if (existing != null && (now - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
             return existing;
         }
         if (skillDataCache.size() > CLASSIFICATION_CACHE_SWEEP_THRESHOLD) {
             skillDataCache.entrySet().removeIf(e -> (now - e.getValue().builtAt) > CLASSIFICATION_CACHE_TTL_MS * 10);
         }
-        return skillDataCache.compute(accountId, (id, cached) -> {
+        return skillDataCache.compute(cacheKey, (id, cached) -> {
             if (cached != null && (System.currentTimeMillis() - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
                 return cached;
             }

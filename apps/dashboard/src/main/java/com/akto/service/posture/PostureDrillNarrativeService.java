@@ -88,9 +88,18 @@ public class PostureDrillNarrativeService {
      *  already accept "a little stale is fine" for a dashboard read. Bonus: a cache hit no longer
      *  needs to build narrativeInput at all — that only happens on a miss now. */
     public static void attachNarrative(PostureDrillResult result, InsightContext ctx, String drillId, String path) {
+        attachNarrative(result, ctx, drillId, path, null);
+    }
+
+    /** scopeKey: any extra request scoping the fingerprint must distinguish but drillId/path do
+     *  not already carry — Argus's environment tab, whose rows and metrics change entirely while
+     *  drillId/path stay fixed. Null for every caller whose level is fully identified by
+     *  drillId/path. */
+    public static void attachNarrative(PostureDrillResult result, InsightContext ctx, String drillId, String path,
+                                       String scopeKey) {
         if (result == null) return;
         try {
-            String fingerprint = fingerprint(ctx, drillId, path);
+            String fingerprint = fingerprint(ctx, drillId, path, scopeKey);
             InsightNarrativeCache cached = InsightNarrativeCacheDao.instance.get(fingerprint);
             if (cached != null) {
                 applyCached(result, cached);
@@ -218,8 +227,12 @@ public class PostureDrillNarrativeService {
      *  Package-private (not private): see {@link #isEmpty}'s own note on why this is unit-tested
      *  directly. */
     static String fingerprint(InsightContext ctx, String drillId, String path) {
+        return fingerprint(ctx, drillId, path, null);
+    }
+
+    static String fingerprint(InsightContext ctx, String drillId, String path, String scopeKey) {
         String raw = ctx.bundleCacheKey() + "|posture-drill|" + drillId + "|" + (path == null ? "" : path) + "|"
-                + DRILL_NARRATIVE_INPUT_VERSION;
+                + DRILL_NARRATIVE_INPUT_VERSION + (scopeKey == null ? "" : "|" + scopeKey);
         return InsightUtil.md5(raw);
     }
 

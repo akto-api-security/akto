@@ -1,4 +1,4 @@
-import { Badge, Box, HorizontalStack, IndexTable, Link, ProgressBar, Text } from '@shopify/polaris'
+import { Badge, Box, Card, HorizontalStack, IndexTable, Link, ProgressBar, Text } from '@shopify/polaris'
 import { riskBand } from '../../agenticPostureShared'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
 
@@ -15,6 +15,15 @@ const HEADINGS = [
 // wrappers (neither is Polaris-pure/CSS-free, see the posture plan's component audit).
 function HighestRiskAgentsTable({ agents, onOpenAgent }) {
     const rows = agents || []
+    if (rows.length === 0) {
+        return (
+            <Card>
+                <Box padding="4">
+                    <Text variant="bodyMd" color="subdued" alignment="center">No agents scored in this environment.</Text>
+                </Box>
+            </Card>
+        )
+    }
     return (
         <IndexTable
             resourceName={{ singular: 'agent', plural: 'agents' }}

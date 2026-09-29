@@ -63,8 +63,16 @@ function SeverityCell({ value }) {
 // — a row total is always shown (real, not from the backend's own optional summary[]), plus
 // whatever InsightResult.Metric rows the drill sends.
 
-function DrillStats({ drill }) {
-    const stats = (drill.summary || []).map((m) => ({ key: m.key, label: m.label, value: m.formatted }))
+function DrillStats({ drill, hideTotal }) {
+    // The denominator stays out of `formatted` on purpose — that string is what the narrative
+    // model is given, and "0 / 2" reads to it as "0 of 2 items need attention". It is a display
+    // concern only, so it is rendered here instead.
+    const stats = (drill.summary || []).map((m) => ({
+        key: m.key,
+        label: m.label,
+        value: m.formatted,
+        suffix: m.denominator !== null && m.denominator !== undefined ? `of ${m.denominator.toLocaleString()}` : undefined,
+    }))
     // The table's first column names what each row is, so the list gets a real title ("Tools")
     // with the count beside it, rather than a generic "Rows" total. That heuristic only holds when
     // each row is a grouped entity (a tool, a vendor, a user); a table of individual guardrail
@@ -81,7 +89,7 @@ function DrillStats({ drill }) {
         <VerticalStack gap="3">
             <HorizontalStack gap="2" blockAlign="center">
                 <Text variant="headingMd" as="h3">{title}</Text>
-                <Badge>{(drill.total ?? 0).toLocaleString()}</Badge>
+                {!hideTotal && <Badge>{(drill.total ?? 0).toLocaleString()}</Badge>}
             </HorizontalStack>
             <NumberCardsRow metrics={stats} />
         </VerticalStack>
@@ -564,13 +572,10 @@ function RiskScoreRootBody({ kpi, onSubScoreClick }) {
 // and reloadable. This component only renders whatever level `drillState` currently points to and
 // asks the parent (via onNavigate) to move to a different level — a breadcrumb click or a row
 // click when the current level is drillable.
-// Defaults to the endpoint-posture drill endpoint (SecurityPostureAction#fetchPostureDrill) — the
-// Argus insight cards' own flyout (AgenticPosture.jsx) reuses this whole component unchanged by
-// passing postureDataSource.fetchInsightCardDrill instead (ArgusPostureAction#fetchArgusPostureDrill,
-// same (drillId, path, startTimestamp, endTimestamp, skip, limit) signature) — see the package
-// CLAUDE.md's "prefer reusing PostureDrillFlyout's existing mechanism" note, rather than a second,
-// near-identical flyout component.
-function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, startTimestamp, endTimestamp, fetchDrill = dashboardApi.fetchPostureDrill }) {
+function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, startTimestamp, endTimestamp,
+                              rootLabel = 'Security posture', filterStatePrefix = 'security-posture-drill',
+                              fetchDrill = dashboardApi.fetchPostureDrill, width = 760,
+                              ctaInFooter = false, pageSize = 20, hideTotalBadge = false }) {
     const navigate = useNavigate()
     const show = !!drillState
     const [drill, setDrill] = useState(null)
@@ -608,7 +613,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             setLoading(true)
             try {
                 const resp = await fetchDrill(
-                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
+                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, pageSize)
                 if (cancelled) return
                 setDrill(resp || null)
                 firstPageCache.current = resp
@@ -624,7 +629,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
 
         load()
         return () => { cancelled = true }
-    }, [drillState, startTimestamp, endTimestamp, fetchDrill])
+    }, [drillState, startTimestamp, endTimestamp, fetchDrill, pageSize])
 
     // Every ancestor's own {path, label} comes back from the backend on every fetch (see
     // PostureDrillResult.breadcrumb's own javadoc) — a reload from a deep-linked URL renders the
@@ -639,8 +644,8 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         // breakdown", ...) — this leading crumb is the one thing every level shares: the page this
         // flyout sits over. Not part of PostureDrillResult.breadcrumb itself (that's a backend
         // concept scoped to one drillId's own levels; "close the flyout" is a frontend-only action).
-        return [{ label: 'Security posture', onClick: onClose }, ...trail]
-    }, [drill?.breadcrumb, drillState, onNavigate, onClose])
+        return [{ label: rootLabel, onClick: onClose }, ...trail]
+    }, [drill?.breadcrumb, drillState, onNavigate, onClose, rootLabel])
 
     const columnDefs = useMemo(() => (drill?.columns || []).map((c) => ({
         field: c.field,
@@ -659,9 +664,9 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             return Promise.resolve({ value: cached.rows, total: cached.total })
         }
         return fetchDrill(
-            drillState.drillId, drillState.path, startTimestamp, endTimestamp, skip, limit || 20
+            drillState.drillId, drillState.path, startTimestamp, endTimestamp, skip, limit || pageSize
         ).then((resp) => ({ value: resp?.rows || [], total: resp?.total || 0 }))
-    }, [drillState?.drillId, drillState?.path, startTimestamp, endTimestamp, fetchDrill])
+    }, [drillState?.drillId, drillState?.path, startTimestamp, endTimestamp, fetchDrill, pageSize])
 
     const handleRowClicked = useCallback((e) => {
         if (!drill?.drillable || e?.data?.id === undefined || e?.data?.id === null) return
@@ -687,7 +692,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             narrativePollCount.current += 1
             try {
                 const resp = await fetchDrill(
-                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, 20)
+                    drillState.drillId, drillState.path, startTimestamp, endTimestamp, 0, pageSize)
                 if (cancelled || !resp) return
                 setDrill((prev) => (prev ? {
                     ...prev,
@@ -702,13 +707,15 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
             }
         }, NARRATIVE_POLL_INTERVAL_MS)
         return () => { cancelled = true; clearTimeout(timer) }
-    }, [drill, drillState, startTimestamp, endTimestamp, fetchDrill])
+    }, [drill, drillState, startTimestamp, endTimestamp, fetchDrill, pageSize])
 
     const ctas = drill?.ctas || []
     const dataGaps = drill?.dataGaps || []
+    // The profile layout renders its own CTAs in ProfileHeader, so it never uses the footer.
+    const ctasInFooter = ctaInFooter && ctas.length > 0 && !isProfileLayout
     // The risk score root has no stats row, so without CTAs/gaps the top strip would render as an
     // empty padded band with a stray divider under the header.
-    const hasTopContent = !isRiskScoreRoot || ctas.length > 0 || dataGaps.length > 0
+    const hasTopContent = !isRiskScoreRoot || (!ctasInFooter && ctas.length > 0) || dataGaps.length > 0
     const narrativeSection = drill && drill.narrativeStatus !== 'UNAVAILABLE' ? (
         <>
             <Divider />
@@ -716,10 +723,25 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         </>
     ) : null
 
+    // Pinned at the bottom of the shell rather than inline beside the stats — the same placement
+    // InsightDetailView uses, so an action stays reachable without scrolling past a long table.
+    const ctaFooter = ctasInFooter ? (
+        <Box padding="4" borderBlockStartWidth="1" borderColor="border-subdued" background="bg">
+            <HorizontalStack gap="3">
+                {ctas.map((cta) => (
+                    <Button key={cta.id} primary={cta.primary} onClick={() => navigate(ctaHref(cta))}>
+                        {cta.label}
+                    </Button>
+                ))}
+            </HorizontalStack>
+        </Box>
+    ) : null
+
     return (
         <AgenticFlyoutShell
             show={show}
-            width={760}
+            width={width}
+            footer={ctaFooter}
             header={
                 <FlyoutBreadcrumb
                     items={breadcrumbItems}
@@ -734,7 +756,9 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                 flyout body — everything below (stats, the table/profile/risk-score body, the pie,
                 the AI summary) is plain document flow inside it, not a chain of independently
                 scrolling panes that fight each other for height. */}
-            <Scrollable shadow style={{ flex: 1, minHeight: 0 }}>
+            {/* No bottom shadow when a footer sits below it — the gradient would land mid-panel
+                instead of on the panel's edge, and the footer's own top border already separates them. */}
+            <Scrollable shadow={!ctaFooter} style={{ flex: 1, minHeight: 0 }}>
                 {/* AgenticFlyoutShell keeps rendering children through its own close transition, so
                     `drillState` can already be null here for a render or two after the close button
                     is clicked, before the effect above catches up and resets `drill` to null too —
@@ -747,16 +771,21 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                             {!isProfileLayout && hasTopContent && (
                                 <>
                                     <VerticalStack gap="3">
-                                        <HorizontalStack align="space-between" blockAlign="start">
-                                            {!isRiskScoreRoot && <DrillStats drill={drill} />}
-                                            {ctas.length > 0 && (
-                                                <HorizontalStack gap="2">
-                                                    {ctas.map((cta) => (
-                                                        <Button key={cta.id} size="slim" onClick={() => navigate(ctaHref(cta))}>{cta.label}</Button>
-                                                    ))}
-                                                </HorizontalStack>
-                                            )}
-                                        </HorizontalStack>
+                                        {/* Only wrapped in a flex row when the CTAs sit beside it — a
+                                            HorizontalStack sizes children to content, which stops the
+                                            stat cards short of the panel's full width. */}
+                                        {ctasInFooter ? (!isRiskScoreRoot && <DrillStats drill={drill} hideTotal={hideTotalBadge} />) : (
+                                            <HorizontalStack align="space-between" blockAlign="start">
+                                                {!isRiskScoreRoot && <DrillStats drill={drill} hideTotal={hideTotalBadge} />}
+                                                {ctas.length > 0 && (
+                                                    <HorizontalStack gap="2">
+                                                        {ctas.map((cta) => (
+                                                            <Button key={cta.id} size="slim" onClick={() => navigate(ctaHref(cta))}>{cta.label}</Button>
+                                                        ))}
+                                                    </HorizontalStack>
+                                                )}
+                                            </HorizontalStack>
+                                        )}
                                         {dataGaps.length > 0 && (
                                             <VerticalStack gap="2">
                                                 {dataGaps.map((g, i) => (
@@ -772,6 +801,14 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                                 <RiskScoreRootBody kpi={mergedRiskScoreKpi} onSubScoreClick={handleSubScoreClick} />
                             ) : isProfileLayout ? (
                                 <DrillProfileBody drill={drill} onCtaClick={(cta) => navigate(ctaHref(cta))} />
+                            ) : drill.total === 0 && drill.emptyMessage ? (
+                                <Box padding="8">
+                                    <VerticalStack inlineAlign="center">
+                                        <Text variant="bodyMd" color="subdued" alignment="center">
+                                            {drill.emptyMessage}
+                                        </Text>
+                                    </VerticalStack>
+                                </Box>
                             ) : (
                                 <AgGridTable
                                     key={`${drillState.drillId}:${drillState.path || ''}`}
@@ -783,9 +820,9 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
                                     getRowStyle={drill.drillable ? () => ({ cursor: 'pointer' }) : undefined}
                                     noOuterBorder
                                     domLayout="autoHeight"
-                                    paginationPageSize={20}
+                                    paginationPageSize={pageSize}
                                     hidePageSizeSelector
-                                    filterStateUrl={`security-posture-drill/${drillState?.drillId || ''}/${drillState?.path || ''}`}
+                                    filterStateUrl={`${filterStatePrefix}/${drillState?.drillId || ''}/${drillState?.path || ''}`}
                                     sideBar={false}
                                 />
                             )}

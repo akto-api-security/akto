@@ -14,6 +14,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.ArgusCollectionScope;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -126,6 +127,11 @@ public class AuditDataAction extends UserAction {
 
             List<Bson> andFilters = new ArrayList<>();
             andFilters.add(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
+            // Users limited to specific collections only see their own agents
+            List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(getSUser());
+            if (restrictedIds != null) {
+                andFilters.add(Filters.in(McpAuditInfo.HOST_COLLECTION_ID, restrictedIds));
+            }
 
             String safeSearch = sanitizeSearch(searchString);
             if (safeSearch != null) {
@@ -279,6 +285,11 @@ public class AuditDataAction extends UserAction {
                             Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false)
                     )
             );
+            // Users limited to specific collections only see their own agents
+            List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(getSUser());
+            if (restrictedIds != null) {
+                base = Filters.and(base, Filters.in(McpAuditInfo.HOST_COLLECTION_ID, restrictedIds));
+            }
             List<String> markedByUsers = new ArrayList<>();
             for (String m : McpAuditInfoDao.instance.getMCollection().distinct(McpAuditInfo.MARKED_BY, base, String.class)) {
                 if (m != null && !m.isEmpty()) markedByUsers.add(m);
@@ -322,6 +333,11 @@ public class AuditDataAction extends UserAction {
                 legacyParts.add(Filters.in(McpAuditInfo.HOST_COLLECTION_ID, collectionsIds));
             }
             filter = Filters.or(filter, Filters.and(legacyParts));
+            // Users limited to specific collections only see their own agents (applies to every row, not only legacy ones)
+            List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(getSUser());
+            if (restrictedIds != null) {
+                filter = Filters.and(filter, Filters.in(McpAuditInfo.HOST_COLLECTION_ID, restrictedIds));
+            }
 
             if (!StringUtils.isBlank(searchString)) {
                 List<Bson> searchOrs = new ArrayList<>();
@@ -790,6 +806,25 @@ public class AuditDataAction extends UserAction {
                 }
             }
 
+            // Users limited to specific collections can only update records of their own agents
+            List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(user);
+            if (restrictedIds != null) {
+                if (mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()) {
+                    addActionError("Not allowed to update this server for all agents");
+                    return ERROR.toUpperCase();
+                }
+                if (!targetIds.isEmpty()) {
+                    targetIds = McpAuditInfoDao.instance.getMCollection()
+                        .distinct(Constants.ID, Filters.and(Filters.in(Constants.ID, targetIds),
+                            Filters.in(McpAuditInfo.HOST_COLLECTION_ID, restrictedIds)), ObjectId.class)
+                        .into(new ArrayList<>());
+                }
+                if (cascadeHostCollectionIds != null) {
+                    cascadeHostCollectionIds = cascadeHostCollectionIds.stream()
+                        .filter(restrictedIds::contains).collect(Collectors.toList());
+                }
+            }
+
             if (targetIds.isEmpty()) {
                 addActionError("No record id provided");
                 return ERROR.toUpperCase();
@@ -859,6 +894,10 @@ public class AuditDataAction extends UserAction {
                         Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
                         Filters.regex(McpAuditInfo.RESOURCE_NAME, "(^|\\.)" + escaped + "$")
                     );
+                    // Users limited to specific collections only clear it on their own agents
+                    if (restrictedIds != null) {
+                        blockAllMatch = Filters.and(blockAllMatch, Filters.in(McpAuditInfo.HOST_COLLECTION_ID, restrictedIds));
+                    }
                     McpAuditInfoDao.instance.updateMany(
                         blockAllMatch,
                         Updates.set(McpAuditInfo.BLOCK_ALL, false)

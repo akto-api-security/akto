@@ -10,11 +10,14 @@ import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.insights.agentic.AgentFindingGroup;
 import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.test_editor.Info;
+import com.akto.dao.AgenticPostureScoreHistoryDao;
+import com.akto.dto.AgenticPostureScoreHistory;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
+import com.akto.service.posture.ArgusAgentPostureDrillService;
 import com.akto.service.posture.ArgusPostureService;
 import com.akto.service.posture.PostureDrillNarrativeService;
 import com.akto.service.posture.PostureDrillResult;
@@ -23,22 +26,15 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.search.SearchClientFactory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.akto.utils.crons.ArgusPostureRegenerator;
+import com.mongodb.client.model.Sorts;
 
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
 
 public class ArgusPostureAction extends UserAction {
 
@@ -60,27 +56,26 @@ public class ArgusPostureAction extends UserAction {
     // waterfall.
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(6);
     private static final int FETCH_TIMEOUT_SECONDS = 20;
+    private static final int TREND_WINDOW_SECONDS = 30 * 86400;
+    private static final int TREND_MAX_POINTS = 500;
+    private static final int DELTA_LOOKBACK_SECONDS = 7 * 86400;
 
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
+    private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
     private final InsightService insightService = new InsightService();
 
     @Getter @Setter private int startTimestamp;
     @Getter @Setter private int endTimestamp;
     @Getter @Setter private String environment;
-
-    // ── fetchArgusPostureDrill's own request/response fields ──
     @Getter @Setter private String drillId;
-    /** Unused today (every Argus drill is root-only, one level, see ArgusPostureService's own
-     *  drilldown section) — kept for contract parity with PostureDrillFlyout.jsx, which always
-     *  sends it, and with PostureDrillNarrativeService's fingerprint, which is keyed on it. */
     @Getter @Setter private String path;
     @Getter @Setter private int skip;
     @Getter @Setter private int limit;
-    @Getter private PostureDrillResult postureDrill;
 
     @Getter private BasicDBObject response = new BasicDBObject();
     @Getter private List<BasicDBObject> insights = new ArrayList<>();
     @Getter private Map<String, BasicDBObject> insightSummaries;
+    @Getter private PostureDrillResult postureDrill;
 
     public String fetchArgusPostureSummary() {
         try {
@@ -94,6 +89,8 @@ public class ArgusPostureAction extends UserAction {
             InsightDataBundle bundle = insightService.getOrLoadBundle(ctx);
 
             this.response = argusPostureService.buildSummary(bundle, environment);
+            response.put("postureScore", fetchPostureScore());
+            response.put("highestRiskAgents", argusPostureService.buildHighestRiskAgents(bundle, environment));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture summary: " + e.getMessage());
@@ -301,6 +298,28 @@ public class ArgusPostureAction extends UserAction {
             loggerMaker.errorAndAddToDb("ArgusPostureAction: " + label + " future failed/timed out: " + e.getMessage());
             return empty;
         }
+    // Latest cron-written history row is the current score; the 30-day window feeds the trend.
+    private BasicDBObject fetchPostureScore() {
+        int now = Context.now();
+        List<AgenticPostureScoreHistory> trend = AgenticPostureScoreHistoryDao.instance.findAll(
+                Filters.gte(AgenticPostureScoreHistory.COMPUTED_AT, now - TREND_WINDOW_SECONDS),
+                0, TREND_MAX_POINTS, Sorts.ascending(AgenticPostureScoreHistory.COMPUTED_AT));
+        List<AgenticPostureScoreHistory> weekAgo = AgenticPostureScoreHistoryDao.instance.findAll(
+                Filters.lte(AgenticPostureScoreHistory.COMPUTED_AT, now - DELTA_LOOKBACK_SECONDS),
+                0, 1, Sorts.descending(AgenticPostureScoreHistory.COMPUTED_AT));
+        AgenticPostureScoreHistory latest = trend.isEmpty() ? null : trend.get(trend.size() - 1);
+        return argusPostureService.buildPostureScore(latest, trend, weekAgo.isEmpty() ? null : weekAgo.get(0));
+    }
+
+    public String triggerArgusPostureRegenerate() {
+        boolean started = ArgusPostureRegenerator.trigger(Context.accountId.get());
+        this.response = new BasicDBObject("status", started ? "STARTED" : "ALREADY_RUNNING");
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchArgusPostureRegenerateStatus() {
+        this.response = ArgusPostureRegenerator.status(Context.accountId.get());
+        return SUCCESS.toUpperCase();
     }
 
     @Override

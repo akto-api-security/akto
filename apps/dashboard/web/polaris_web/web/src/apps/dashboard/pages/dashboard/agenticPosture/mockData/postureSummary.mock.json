@@ -5,15 +5,6 @@
         { "id": "staging", "label": "Staging", "count": 61 },
         { "id": "development", "label": "Development", "count": 81 }
     ],
-    "postureScore": {
-        "value": 68,
-        "bandLabel": "Elevated risk",
-        "bandTone": "critical",
-        "delta": -4,
-        "deltaTone": "critical",
-        "deltaDrivenBy": "Tools & MCP",
-        "trend": [58, 60, 62, 61, 65, 67, 66, 72, 68]
-    },
     "kpis": [
         {
             "id": "assets",
@@ -59,8 +50,10 @@
             "label": "Protection Coverage",
             "value": 72,
             "unit": "percent",
-            "footnote": "18 prod agents missing required controls",
-            "tone": "warning"
+            "tone": "warning",
+            "footnote": "12 of 40 asset(s) enforcing",
+            "secondaryFootnote": "11 asset(s) not covered",
+            "secondaryTone": "warning"
         }
     ],
     "dangerousPaths": {

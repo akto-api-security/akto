@@ -10,6 +10,7 @@ import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
@@ -22,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Thin orchestrator over {@link SearchClient}: resolves request-level filters/context, calls the
@@ -169,12 +171,19 @@ public class LLMObservabilityAction extends UserAction {
         try {
             SearchClient client = SearchClientFactory.instance();
             if (!client.isConfigured()) return SUCCESS.toUpperCase();
+            // Users limited to specific collections only see stats of their own agents
+            Map<String, List<String>> ownAgentFilters = null;
+            if (ArgusCollectionScope.isLimited(getSUser())) {
+                ownAgentFilters = new HashMap<>();
+                List<String> services = buildMultiFilters(false).get(AgentQueryRecord.F_SERVICE_ID_KW);
+                ownAgentFilters.put(AgentQueryRecord.F_SERVICE_ID_KW, services);
+            }
             int accountId = Context.accountId.get();
 
             // Argus view always reports non-Atlas (agent) traffic so the total here matches
             // what the Argus paginated table reports; "false" also covers docs that predate
             // this field and were never Atlas-tagged.
-            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), Boolean.FALSE, isUserRoleAdmin());
+            SearchClient.ArgusStats stats = client.fetchArgusStats(accountId, startMs(), endMs(), ownAgentFilters, Boolean.FALSE, isUserRoleAdmin());
 
             aggTotalSpans   = stats.totalSpans;
             aggInputTokens  = stats.inputTokens;
@@ -206,6 +215,15 @@ public class LLMObservabilityAction extends UserAction {
 
             Boolean atlasFilter = CONTEXT_SOURCE.ENDPOINT.equals(Context.contextSource.get()) ? Boolean.TRUE : null;
             spans = client.fetchTraceDetail(accountId, traceId, atlasFilter);
+
+            // Users limited to specific collections only see traces of their own agents
+            Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+            if (allowedHosts != null && spans != null) {
+                boolean ownTrace = spans.stream().anyMatch(span -> span.get(AgentQueryRecord.F_SERVICE_ID) != null)
+                    && spans.stream().allMatch(span -> span.get(AgentQueryRecord.F_SERVICE_ID) == null
+                        || allowedHosts.contains(span.get(AgentQueryRecord.F_SERVICE_ID).toString()));
+                if (!ownTrace) spans = new ArrayList<>();
+            }
         } catch (Exception e) {
             spans = new ArrayList<>();
         }
@@ -221,6 +239,17 @@ public class LLMObservabilityAction extends UserAction {
             int accountId = Context.accountId.get();
 
             filterChoices = client.fetchPromptFilters(accountId, startMs(), endMs());
+
+            // Users limited to specific collections only get filter values of their own agents.
+            // Users and devices cannot be narrowed by agent here, so they are not offered.
+            Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+            if (allowedHosts != null && filterChoices != null) {
+                List<String> services = filterChoices.getOrDefault(AgentQueryRecord.F_SERVICE_ID, new ArrayList<>());
+                filterChoices.put(AgentQueryRecord.F_SERVICE_ID,
+                    services.stream().filter(allowedHosts::contains).collect(java.util.stream.Collectors.toList()));
+                filterChoices.put(AgentQueryRecord.F_USER_NAME, new ArrayList<>());
+                filterChoices.put(AgentQueryRecord.F_DEVICE_ID, new ArrayList<>());
+            }
         } catch (Exception e) {
             filterChoices = new HashMap<>();
         }
@@ -261,6 +290,8 @@ public class LLMObservabilityAction extends UserAction {
     }
 
     /** Merges single-value fields and multi-value lists into one Map for the SearchClient contract. */
+    private static final String NO_ACCESS_SERVICE_ID = "__akto_no_access__";
+
     private Map<String, List<String>> buildMultiFilters(boolean includeSession) {
         Map<String, List<String>> f = new HashMap<>();
         // Session filter: prefer multi-value list, fall back to single field
@@ -279,6 +310,13 @@ public class LLMObservabilityAction extends UserAction {
         List<String> services = nonEmpty(serviceIds);
         if (services.isEmpty() && serviceId != null && !serviceId.trim().isEmpty())
             services = Collections.singletonList(serviceId.trim());
+        // Users limited to specific collections only see traces of their own agents
+        Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+        if (allowedHosts != null) {
+            services = ArgusCollectionScope.scopeValues(services, allowedHosts);
+            // nothing visible: filter on a value no trace has, so the query returns nothing
+            if (services.isEmpty()) services = Collections.singletonList(NO_ACCESS_SERVICE_ID);
+        }
         if (!services.isEmpty()) f.put(AgentQueryRecord.F_SERVICE_ID_KW, services);
         // deviceId (single-value only; no ag-grid filter for this field)
         if (deviceId != null && !deviceId.trim().isEmpty())

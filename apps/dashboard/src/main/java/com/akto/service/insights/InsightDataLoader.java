@@ -103,7 +103,9 @@ public class InsightDataLoader {
                 Filters.empty(),
                 Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
                         ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
-                        ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED));
+                        ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection.DESCRIPTION, ApiCollection._DEACTIVATED,
+                        ApiCollection.POSTURE_SCORE, ApiCollection.POSTURE_SUB_SCORES, ApiCollection.POSTURE_GAPS,
+                        ApiCollection.POSTURE_SCORE_CALCULATED_AT));
         logStep("collections (findAll, unbounded)", t0, collections.size());
         Map<String, List<ApiCollection>> collectionsByServiceName = indexByServiceName(collections);
 

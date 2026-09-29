@@ -308,27 +308,26 @@ const api = {
         })
     },
 
-    // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
-    fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
-        return await request({
-            url: '/api/fetchArgusPostureInsights',
-            method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp
-            }
-        })
+    triggerArgusPostureRegenerate: async () => {
+        return await request({ url: '/api/triggerArgusPostureRegenerate', method: 'post', data: {} })
     },
 
-    // Meant to be called after fetchArgusPostureInsights has already rendered — this one does a
-    // real LLM call per card on a cache miss, so it must never block the card data itself.
-    fetchArgusPostureInsightSummaries: async (startTimestamp, endTimestamp) => {
+    fetchArgusPostureRegenerateStatus: async () => {
+        return await request({ url: '/api/fetchArgusPostureRegenerateStatus', method: 'post', data: {} })
+    },
+
+    fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, environment, skip, limit) => {
         return await request({
-            url: '/api/fetchArgusPostureInsightSummaries',
+            url: '/api/fetchArgusPostureDrill',
             method: 'post',
             data: {
+                drillId,
+                path: path || '',
                 startTimestamp,
-                endTimestamp
+                endTimestamp,
+                environment,
+                skip: skip || 0,
+                limit: limit || 20
             }
         })
     },
@@ -363,39 +362,6 @@ const api = {
             }
         })
     },
-
-    // One insight card's drilldown flyout — same PostureDrillFlyout component the endpoint-posture
-    // panels already use, pointed at ArgusPostureAction's own drill endpoint instead of
-    // SecurityPostureAction's. See ArgusPostureService's "insight card drilldowns" section — every
-    // Argus drill is root-only (one level, no `path`), but the param is still sent for contract
-    // parity with the shared flyout component.
-    fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, skip, limit) => {
-        return await request({
-            url: '/api/fetchArgusPostureDrill',
-            method: 'post',
-            data: {
-                drillId,
-                path: path || '',
-                startTimestamp,
-                endTimestamp,
-                skip: skip || 0,
-                limit: limit || 20
-            }
-        })
-    },
-
-    // Argus (Agentic Security) posture page — today just the Posture Score hero. See
-    // ArgusPostureAction's javadoc and agenticPosture/postureDataSource.js's merge-over-mock seam.
-    fetchArgusPostureScore: async (startTimestamp, endTimestamp) => {
-        return await request({
-            url: '/api/fetchArgusPostureScore',
-            method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp
-            }
-        })
-    }
 }
 
 export default api;
