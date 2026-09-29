@@ -135,7 +135,8 @@ const getHeaders = () => {
     },
   ];
 
-  if (isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+  const isGuardrailCategory = isAgenticSecurityCategory() || isEndpointSecurityCategory();
+  if (isGuardrailCategory || isApiSecurityCategory()) {
     baseHeaders.push({
       text: "Reason",
       value: "reason",
@@ -144,6 +145,9 @@ const getHeaders = () => {
       type: CellType.TEXT,
       tooltipKey: "reasonFull",
     });
+  }
+
+  if (isGuardrailCategory) {
     baseHeaders.push({
       text: "Evidence",
       value: "evidenceLine",
@@ -1116,14 +1120,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         ),
+        ...((isAgenticSecurityCategory() || isEndpointSecurityCategory() || isApiSecurityCategory()) && (() => {
+          const r = parseStoredReason(x?.metadata);
+          if (!r) return { reason: "", reasonFull: "" };
+          const { preview, full } = truncateToWords(r, 30);
+          return { reason: preview, reasonFull: full };
+        })()),
         ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
           riskScore: parseStoredRiskScore(x?.metadata) ?? "",
-          ...(() => {
-            const r = parseStoredReason(x?.metadata);
-            if (!r) return { reason: "", reasonFull: "" };
-            const { preview, full } = truncateToWords(r, 30);
-            return { reason: preview, reasonFull: full };
-          })(),
           ...(() => {
             const { preview, full } = truncateToChars(x?.evidenceLine || "", 120);
             return { evidenceLine: preview || "-", evidenceLineFull: full };
