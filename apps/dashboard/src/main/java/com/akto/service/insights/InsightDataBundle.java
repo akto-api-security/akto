@@ -138,10 +138,10 @@ public class InsightDataBundle {
         }
     }
 
-    // collectionId -> {severity -> count} of AGENTIC events since startTs; null when the threat backend is unavailable.
+    // collectionId -> {severity -> count} since startTs, in the request's context source; null when the threat backend is unavailable.
     public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs) {
         if (!threatBackendAvailable || threatAccess == null) return null;
-        return threatAccess.agenticSeverityCounts(collectionIds, startTs);
+        return threatAccess.collectionSeverityCounts(startTs, 0, collectionIds);
     }
 
     // Newest-first events for these collections; null when the threat backend is unavailable.

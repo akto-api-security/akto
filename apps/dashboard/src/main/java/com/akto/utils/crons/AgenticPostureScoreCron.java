@@ -125,7 +125,7 @@ public class AgenticPostureScoreCron {
             int now = Context.now();
             // Aggregated on demand by the threat backend, which owns threat Mongo.
             Map<Integer, Map<String, Integer>> maliciousSeverities =
-                    new ThreatBackend().agenticSeverityCounts(collectionIds, now - MALICIOUS_EVENTS_WINDOW_SECONDS);
+                    new ThreatBackend().severityCounts(CONTEXT_SOURCE.AGENTIC, now - MALICIOUS_EVENTS_WINDOW_SECONDS, now, collectionIds);
             // Skip rather than score the guardrail category as 0, which would drop every agent's score and the trend.
             if (maliciousSeverities == null) {
                 loggerMaker.errorAndAddToDb("Agentic posture score cron: threat backend unreachable, keeping previous scores for accountId=" + accountId);
@@ -220,10 +220,10 @@ public class AgenticPostureScoreCron {
         return (earned / available) * 100.0;
     }
 
-    // Exposes AbstractThreatDetectionAction's protected threat-backend call outside a Struts request.
+    // Exposes AbstractThreatDetectionAction's threat-backend call outside a Struts request.
     private static class ThreatBackend extends AbstractThreatDetectionAction {
-        Map<Integer, Map<String, Integer>> agenticSeverityCounts(List<Integer> collectionIds, int startTs) {
-            return fetchAgenticSeverityCounts(collectionIds, startTs);
+        Map<Integer, Map<String, Integer>> severityCounts(CONTEXT_SOURCE contextSource, int startTs, int endTs, List<Integer> collectionIds) {
+            return fetchCollectionSeverityCounts(contextSource.name(), startTs, endTs, collectionIds);
         }
     }
 

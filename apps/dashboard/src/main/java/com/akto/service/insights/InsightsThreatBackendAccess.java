@@ -30,8 +30,8 @@ class InsightsThreatBackendAccess extends AbstractThreatDetectionAction {
         return fetchSubcategoryWiseCounts(startTs, endTs, null, null);
     }
 
-    Map<Integer, Map<String, Integer>> agenticSeverityCounts(List<Integer> collectionIds, int startTs) {
-        return fetchAgenticSeverityCounts(collectionIds, startTs);
+    Map<Integer, Map<String, Integer>> collectionSeverityCounts(int startTs, int endTs, List<Integer> collectionIds) {
+        return fetchCollectionSeverityCounts(startTs, endTs, collectionIds);
     }
 
     List<SkillSeverityCount> skillSeverityCounts(int startTs, int endTs) {
