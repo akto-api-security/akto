@@ -67,6 +67,29 @@ function SchemaValidationError({ sampleData}) {
     )
 }
 
+// Detector-supplied explanation of why the event was flagged (metadata.reason, e.g. WeakAuthentication).
+// Guardrail categories already show their reason in the events table, so they are skipped here.
+function DetectionReason({ sampleData }) {
+    if (!sampleData?.metadata || isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+        return null;
+    }
+    let reason = '';
+    try {
+        reason = JSON.parse(sampleData.metadata)?.reason || '';
+    } catch (e) {
+        return null;
+    }
+    if (!reason) {
+        return null;
+    }
+
+    return (
+        <Banner title="Detection Reason" status="critical">
+            <Text variant="bodyMd">{reason}</Text>
+        </Banner>
+    )
+}
+
 function VulnerabilityEvidence({ segments }) {
     if (!Array.isArray(segments) || segments.length === 0) {
         return null;
@@ -128,7 +151,7 @@ function VulnerabilityEvidence({ segments }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false} = props;
 
     const [page, setPage] = useState(0);
 
@@ -173,6 +196,7 @@ function SampleDataList(props) {
 
     return (
       <VerticalStack gap="3">
+         {showDetectionReason ? <DetectionReason sampleData={currentSample} /> : null}
          <SchemaValidationError sampleData={currentSample} />
          {SHOW_VULNERABILITY_EVIDENCE ? (
            <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} />
