@@ -308,6 +308,14 @@ const api = {
         })
     },
 
+    fetchArgusPostureChanges: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureChanges',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, environment }
+        })
+    },
+
     triggerArgusPostureRegenerate: async () => {
         return await request({ url: '/api/triggerArgusPostureRegenerate', method: 'post', data: {} })
     },
