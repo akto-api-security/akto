@@ -4,6 +4,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.utils.OperationalAlerts;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
@@ -20,6 +21,7 @@ import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
@@ -129,6 +131,9 @@ public class GuardrailsClient {
 
     @SuppressWarnings("unchecked")
     public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
+        // Single result reference assigned on every return path, so the decision counter is
+        // recorded exactly once (in finally) regardless of which branch we exit through.
+        Map<String, Object> result = null;
         try {
             String jsonRequest = objectMapper.writeValueAsString(request);
             String url = guardrailsServiceUrl + endpoint;
@@ -157,18 +162,21 @@ public class GuardrailsClient {
 
                 if (response.isSuccessful()) {
                     try {
-                        return objectMapper.readValue(responseBody, Map.class);
+                        result = objectMapper.readValue(responseBody, Map.class);
+                        return result;
                     } catch (Exception parseEx) {
                         loggerMaker.warnAndAddToDb(
                             "Guardrails response not parseable, failing open - path: {}, error: {}",
                             request.get("path"), parseEx.getMessage());
-                        return buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                        result = buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                        return result;
                     }
                 }
                 loggerMaker.warnAndAddToDb(
                     "Guardrails service returned error status {}, failing open - path: {}",
                     response.code(), request.get("path"));
-                return buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
+                result = buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
+                return result;
             }
 
         } catch (Exception e) {
@@ -182,8 +190,78 @@ public class GuardrailsClient {
             }
 
             alertServiceUnreachable(endpoint, e);
-            return buildFailOpenResponse(e.getMessage());
+            result = buildFailOpenResponse(e.getMessage());
+            return result;
+        } finally {
+            recordDecision(endpoint, result);
         }
+    }
+
+    /** Guardrails validation counter, tagged by decision (Prometheus: akto_guardrails_validations_total). */
+    public static final String GUARDRAILS_VALIDATIONS_METRIC = "akto.guardrails.validations";
+
+    private static final String DECISION_ALLOWED = "allowed";
+    private static final String DECISION_BLOCKED = "blocked";
+    private static final String DECISION_FAIL_OPEN = "fail_open";
+    private static final String DECISION_UNKNOWN = "unknown";
+
+    // One Counter per (endpoint, decision) pair, cached so we do not rebuild a meter on every
+    // validation. Counters bind to the global registry; a registry added later (e.g. the Prometheus
+    // registry in InfraMetricsListener, or a test SimpleMeterRegistry) still receives them.
+    private static final ConcurrentHashMap<String, Counter> DECISION_COUNTERS = new ConcurrentHashMap<>();
+
+    /**
+     * Records exactly one guardrails decision per callValidate. Every verdict in the platform flows
+     * through callValidate (http-proxy, the webhooks and Gateway), so this single point covers them
+     * all. Wrapped in try/catch so a metrics failure can never break or slow the validation path.
+     */
+    private static void recordDecision(String endpoint, Map<String, Object> result) {
+        try {
+            decisionCounter(endpoint, classifyDecision(result)).increment();
+        } catch (Exception ignore) {
+            // metrics must never affect the guardrails call path
+        }
+    }
+
+    private static Counter decisionCounter(String endpoint, String decision) {
+        return DECISION_COUNTERS.computeIfAbsent(endpoint + "|" + decision, key ->
+                Counter.builder(GUARDRAILS_VALIDATIONS_METRIC)
+                        .tag("endpoint", endpoint)
+                        .tag("decision", decision)
+                        .tag("account.id", OperationalAlerts.deploymentAccountId())
+                        .register(Metrics.globalRegistry));
+    }
+
+    /**
+     * fail_open wins whenever no real verdict was produced (buildFailOpenResponse sets failOpen=true,
+     * and also Allowed=true - so this must be checked first). Otherwise the verdict is read from both
+     * key casings, mirroring Gateway.isAllowed. A real response that carries no verdict field is
+     * reported as "unknown" - never assumed allowed, so an answered-but-verdictless response is not
+     * miscounted as an allow.
+     */
+    private static String classifyDecision(Map<String, Object> result) {
+        if (result == null || isFailOpen(result)) {
+            return DECISION_FAIL_OPEN;
+        }
+        Object verdict = result.get("Allowed");
+        if (verdict == null) {
+            verdict = result.get("allowed");
+        }
+        if (verdict == null) {
+            return DECISION_UNKNOWN;
+        }
+        boolean allowed = (verdict instanceof Boolean)
+                ? (Boolean) verdict
+                : Boolean.parseBoolean(verdict.toString());
+        return allowed ? DECISION_ALLOWED : DECISION_BLOCKED;
+    }
+
+    private static boolean isFailOpen(Map<String, Object> result) {
+        Object failOpen = result.get("failOpen");
+        if (failOpen instanceof Boolean) {
+            return (Boolean) failOpen;
+        }
+        return failOpen != null && Boolean.parseBoolean(failOpen.toString());
     }
 
     /** Endpoint and exception type only: never request data, which may carry customer payloads. */
