@@ -6,7 +6,6 @@ import com.akto.dao.context.Context;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.util.http_util.CoreHTTPClient;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 
@@ -52,25 +51,19 @@ public class AbstractThreatDetectionAction extends UserAction {
     return backendUrl;
   }
 
-  // apiCollectionId -> {severity -> count} for the window in the request's context source; null when the call fails.
-  protected Map<Integer, Map<String, Integer>> fetchCollectionSeverityCounts(
-      int startTimestamp, int endTimestamp, List<Integer> apiCollectionIds) {
-    String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
-    return fetchCollectionSeverityCounts(contextSourceValue, startTimestamp, endTimestamp, apiCollectionIds);
-  }
-
-  // Same, for an explicit context source (any CONTEXT_SOURCE name), e.g. from a cron with no request context.
-  protected Map<Integer, Map<String, Integer>> fetchCollectionSeverityCounts(
-      String contextSourceValue, int startTimestamp, int endTimestamp, List<Integer> apiCollectionIds) {
+  // Per-host critical/high/medium/low counts for the window, in the request's context source (same route and
+  // signature as master's fetchHostSeverityCounts; parsed from JSON since this branch lacks the proto class).
+  protected List<HostSeverityCount> fetchHostSeverityCounts(int startTimestamp, int endTimestamp) {
+    List<HostSeverityCount> out = new ArrayList<>();
     try {
-      String url = String.format("%s/api/dashboard/get_collection_severity_counts", this.getBackendUrl());
+      String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
       MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
       Map<String, Object> body = new HashMap<>();
       body.put("start_ts", startTimestamp);
       body.put("end_ts", endTimestamp);
-      body.put("api_collection_ids", apiCollectionIds);
       String msg = objectMapper.valueToTree(body).toString();
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
 
       Request request = new Request.Builder()
           .url(url)
@@ -81,12 +74,16 @@ public class AbstractThreatDetectionAction extends UserAction {
           .build();
 
       try (Response resp = httpClient.newCall(request).execute()) {
-        if (!resp.isSuccessful() || resp.body() == null) return null;
-        return objectMapper.readValue(resp.body().string(), new TypeReference<Map<Integer, Map<String, Integer>>>() {});
+        if (!resp.isSuccessful() || resp.body() == null) return out;
+        for (com.fasterxml.jackson.databind.JsonNode h : objectMapper.readTree(resp.body().string()).path("hostCounts")) {
+          out.add(new HostSeverityCount(h.path("host").asText(), h.path("critical").asInt(),
+              h.path("high").asInt(), h.path("medium").asInt(), h.path("low").asInt()));
+        }
       }
     } catch (Exception e) {
-      return null;
+      return new ArrayList<>();
     }
+    return out;
   }
 
   /**
