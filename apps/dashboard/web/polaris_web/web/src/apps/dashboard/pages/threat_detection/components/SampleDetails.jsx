@@ -508,6 +508,7 @@ function SampleDetails(props) {
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                     onAddAsSearchFilter={onAddAsSearchFilter}
+                    showDetectionReason
                 />
             </Box>)
     }
