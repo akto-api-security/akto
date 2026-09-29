@@ -3,6 +3,7 @@ import settingFunctions from '../../module';
 import settingRequests from '../../api';
 import CustomSamlSso from './CustomSamlSso';
 import CopyCommand from '../../../../components/shared/CopyCommand';
+import SamlGroupRoleMapping from './SamlGroupRoleMapping';
 
 function AzureSso() {
 
@@ -15,6 +16,7 @@ function AzureSso() {
 
     const [loginUrl, setLoginUrl] = useState('')
     const [azureIdentity, setAzureIdentity] = useState('')
+    const [groupRoleMapping, setGroupRoleMapping] = useState({})
 
 
     const cardContent = "Enable Login via Azure AD on your Akto dashboard";
@@ -64,6 +66,7 @@ function AzureSso() {
             await settingRequests.fetchAzureSso("AZURE").then((resp)=> {
                 setLoginUrl(resp.loginUrl)
                 setAzureIdentity(resp.ssoEntityId)
+                setGroupRoleMapping(resp.groupRoleMapping || {})
             })
             setLoading(false)
         } catch (error) {
@@ -94,6 +97,7 @@ function AzureSso() {
             pageTitle={"Azure AD SSO SAML"}
             loading={loading}
             certificateName={"Federation Metadata XML"}
+            additionalComponent={<SamlGroupRoleMapping configType={"AZURE"} savedMapping={groupRoleMapping} />}
         />
     )
 }

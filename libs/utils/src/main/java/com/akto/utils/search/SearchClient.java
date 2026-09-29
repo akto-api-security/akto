@@ -58,8 +58,15 @@ public abstract class SearchClient {
         int accountId, long startMs, long endMs,
         Map<String, List<String>> filters, Boolean atlasTrafficFilter);
 
+    public ArgusStats fetchArgusStats(
+        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
+        return fetchArgusStats(accountId, startMs, endMs, null, atlasTrafficFilter, includeTracesContent);
+    }
+
+    /** Same as above, narrowed by field filters (e.g. serviceId) - null for no filters. */
     public abstract ArgusStats fetchArgusStats(
-        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent);
+        int accountId, long startMs, long endMs, Map<String, List<String>> filters,
+        Boolean atlasTrafficFilter, boolean includeTracesContent);
 
     /**
      * Time-ranged replacement for UserAnalysisDataDao's lifetime-total read — sums input/output

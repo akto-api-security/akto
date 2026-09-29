@@ -597,7 +597,8 @@ public class AzureDataExplorerClient extends SearchClient {
     // ── Argus aggregated stats ────────────────────────────────────────────────────
 
     @Override
-    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
+    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Map<String, List<String>> filters,
+                                      Boolean atlasTrafficFilter, boolean includeTracesContent) {
         long aggTotalSpans = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopApps = new ArrayList<>();
         List<Map<String, Object>> aggAppBreakdown = new ArrayList<>();
@@ -611,7 +612,7 @@ public class AzureDataExplorerClient extends SearchClient {
                 aggTraceSpark, aggTokenSpark, aggTraceSparkTs);
         }
         try {
-            String where = buildWhereConditions(accountId, startMs, endMs, null, atlasTrafficFilter);
+            String where = buildWhereConditions(accountId, startMs, endMs, filters, atlasTrafficFilter);
 
             String totalsKql = ADX_TABLE + " | where " + where
                 + " | summarize totalSpans=count(), sumIn=sum(" + AgentQueryRecord.F_INPUT_TOKENS + "), sumOut=sum(" + AgentQueryRecord.F_OUTPUT_TOKENS + ")";
