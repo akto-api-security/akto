@@ -813,7 +813,7 @@ const ServerSettingsStep = ({
                                     />
                                 </VerticalStack>
                                 {skipEnterpriseAccounts && (
-                                    <Banner tone="info">Supported for chatgpt.com, claude.ai, copilot.microsoft.com and grok.com through the Akto browser extension, and the ChatGPT app through Endpoint Shield.</Banner>
+                                    <Banner tone="info">Supported for chatgpt.com, claude.ai and grok.com through the Akto browser extension, and the ChatGPT app through Endpoint Shield.</Banner>
                                 )}
                             </VerticalStack>
                         </Box>
