@@ -16,7 +16,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -113,7 +112,7 @@ public class PostureDrillNarrativeService {
             if (!IN_FLIGHT.add(fingerprint)) return; // someone else is already generating this exact level
 
             final int capturedAccountId = ctx.getAccountId();
-            NARRATIVE_EXECUTOR.submit(withAccountContext(capturedAccountId, () -> {
+            NARRATIVE_EXECUTOR.submit(Context.withContext(capturedAccountId, () -> {
                 try {
                     generateAndCache(drillId, path, narrativeInput, fingerprint);
                 } finally {
@@ -236,18 +235,4 @@ public class PostureDrillNarrativeService {
         return InsightUtil.md5(raw);
     }
 
-    /** InsightNarrativeCacheDao is an AccountsContextDao — its collection lives in the
-     *  per-account DB named after Context.accountId.get(), so a background task that outlives the
-     *  request thread must re-set it itself (same convention SecurityPostureAction's own
-     *  withContext / InsightDataLoader's already follow). */
-    private static Callable<Void> withAccountContext(int accountId, Callable<Void> body) {
-        return () -> {
-            Context.accountId.set(accountId);
-            try {
-                return body.call();
-            } finally {
-                Context.accountId.remove();
-            }
-        };
-    }
 }

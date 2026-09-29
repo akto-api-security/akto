@@ -248,7 +248,7 @@ public class InsightDataLoader {
      *  the three threat-backend futures already do. */
     private <T> Future<T> submitTimed(int accountId, Integer userId, CONTEXT_SOURCE contextSource, String label,
                                        Callable<T> body, java.util.function.ToIntFunction<T> rowCount) {
-        return EXECUTOR.submit(withContext(accountId, userId, contextSource, () -> {
+        return EXECUTOR.submit(Context.withContext(accountId, userId, contextSource, () -> {
             long t0 = System.currentTimeMillis();
             T result = body.call();
             logStep(label, t0, rowCount.applyAsInt(result));
@@ -272,21 +272,6 @@ public class InsightDataLoader {
     private void logStep(String label, long startMs, int rowCount) {
         logger.info("InsightDataLoader: " + label + " took " + (System.currentTimeMillis() - startMs)
                 + "ms, " + rowCount + " rows");
-    }
-
-    private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
-        return () -> {
-            Context.accountId.set(accountId);
-            Context.userId.set(userId);
-            Context.contextSource.set(contextSource);
-            try {
-                return body.call();
-            } finally {
-                Context.accountId.remove();
-                Context.userId.remove();
-                Context.contextSource.remove();
-            }
-        };
     }
 
     private Map<String, List<ApiCollection>> indexByServiceName(List<ApiCollection> collections) {

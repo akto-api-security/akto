@@ -245,13 +245,12 @@ public class VulnerableTestingRunResultDao extends TestingRunResultDao {
         if (testSubType == null) return new ArrayList<>();
 
         Bson filter = modifyFilters(Filters.and(
-                Filters.eq(TestingRunResult.VULNERABLE, true),
                 Filters.eq(getFilterKeyString(), apiCollectionId),
                 Filters.eq(TestingRunResult.TEST_SUB_TYPE, testSubType)), false, false);
 
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(filter));
-        pipeline.add(Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP)));
+        pipeline.add(Aggregates.sort(Sorts.descending(Constants.ID)));
         pipeline.add(Aggregates.limit(Math.max(limit, 1) * 5)); // a few raw docs before the unwind fans them out
         pipeline.add(Aggregates.unwind("$" + TestingRunResult.TEST_RESULTS, new UnwindOptions().preserveNullAndEmptyArrays(true)));
         pipeline.add(Aggregates.match(Filters.exists(TestingRunResult.TEST_RESULTS + "." + TestResult.CONVERSATION_ID, true)));

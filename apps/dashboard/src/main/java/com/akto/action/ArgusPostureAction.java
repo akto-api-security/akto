@@ -33,7 +33,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.*;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -171,7 +170,7 @@ public class ArgusPostureAction extends UserAction {
             final long endMs = endTimestamp * 1000L;
 
             if (BUNDLE_ONLY_DRILLS.contains(drillId)) {
-                InsightDataBundle bundle = getOrEmpty(EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                InsightDataBundle bundle = getOrEmpty(EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                         () -> insightService.getOrLoadBundle(ctx))), null, "bundle");
                 String envScopeKey = "env=" + ArgusPostureService.environmentKey(environment);
                 switch (drillId) {
@@ -199,18 +198,18 @@ public class ArgusPostureAction extends UserAction {
             boolean needsEvents = ArgusPostureService.DRILL_GUARDRAIL_EVENTS.equals(drillId);
             boolean needsObservability = ArgusPostureService.DRILL_OBSERVABILITY.equals(drillId);
 
-            Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+            Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                     () -> insightService.getOrLoadBundle(ctx)));
             Future<List<AgentFindingGroup>> openIssueGroupsFuture = needsIssues
-                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                             () -> TestingRunIssuesDao.instance.openIssueGroupsForDashboard(startTimestamp, endTimestamp, URLS_PER_ISSUE_GROUP_CAP)))
                     : null;
             Future<List<DashboardMaliciousEvent>> maliciousEventsFuture = needsEvents
-                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                             () -> insightService.fetchArgusMaliciousEvents(ctx, MAX_THREAT_FETCH_LIMIT)))
                     : null;
             Future<List<UserAnalysisData>> serviceObservabilityFuture = needsObservability
-                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                             () -> SearchClientFactory.instance().fetchAgenticServiceObservability(accountId, startMs, endMs, TOPICS_CAP)))
                     : null;
 
@@ -253,23 +252,23 @@ public class ArgusPostureAction extends UserAction {
         long startMs = startTimestamp * 1000L;
         long endMs = endTimestamp * 1000L;
 
-        Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+        Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                 () -> insightService.getOrLoadBundle(ctx)));
-        Future<List<AgentFindingGroup>> openIssueGroupsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+        Future<List<AgentFindingGroup>> openIssueGroupsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                 () -> TestingRunIssuesDao.instance.openIssueGroupsForDashboard(startTimestamp, endTimestamp, URLS_PER_ISSUE_GROUP_CAP)));
-        Future<List<DashboardMaliciousEvent>> maliciousEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+        Future<List<DashboardMaliciousEvent>> maliciousEventsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                 () -> insightService.fetchArgusMaliciousEvents(ctx, MAX_THREAT_FETCH_LIMIT)));
-        Future<List<UserAnalysisData>> serviceObservabilityFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+        Future<List<UserAnalysisData>> serviceObservabilityFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                 () -> SearchClientFactory.instance().fetchAgenticServiceObservability(accountId, startMs, endMs, TOPICS_CAP)));
-        Future<Map<String, Map<String, Integer>>> globalTopicsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+        Future<Map<String, Map<String, Integer>>> globalTopicsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                 () -> SearchClientFactory.instance().fetchAgenticGlobalTopicHierarchy(accountId, startMs, endMs, TOPICS_CAP, SUB_TOPICS_CAP)));
 
         List<AgentFindingGroup> openIssueGroups = getOrEmpty(openIssueGroupsFuture, new ArrayList<>(), "openIssueGroups");
         // Both of these only depend on openIssueGroups, not on each other or on anything above —
         // submitted together so they run concurrently, not one after the other.
-        Future<Map<String, AgentConversationResult>> criticalConversationsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+        Future<Map<String, AgentConversationResult>> criticalConversationsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                 () -> fetchCriticalIssueConversations(openIssueGroups)));
-        Future<Map<String, Info>> testInfoFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+        Future<Map<String, Info>> testInfoFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                 () -> fetchTestInfo(openIssueGroups)));
 
         InsightDataBundle bundle = getOrEmpty(bundleFuture, null, "bundle");
@@ -314,21 +313,6 @@ public class ArgusPostureAction extends UserAction {
         }
         if (types.isEmpty()) return new HashMap<>();
         return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(Constants.ID, new ArrayList<>(types)));
-    }
-
-    private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
-        return () -> {
-            Context.accountId.set(accountId);
-            Context.userId.set(userId);
-            Context.contextSource.set(contextSource);
-            try {
-                return body.call();
-            } finally {
-                Context.accountId.remove();
-                Context.userId.remove();
-                Context.contextSource.remove();
-            }
-        };
     }
 
     private <T> T getOrEmpty(Future<T> future, T empty, String label) {
