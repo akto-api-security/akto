@@ -2305,6 +2305,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return access;
   },
 
+  hasAccessToNewPosture(){
+    const activeAccount = window?.ACTIVE_ACCOUNT
+    const allowedAccountsForPosture = [1779231193, 1783981503];
+    return allowedAccountsForPosture.some(x => x === activeAccount)
+  },
+
   hasThreatAccess(){
     return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
   },

@@ -4,6 +4,7 @@ import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.SkillSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.GuardrailPolicies;
@@ -154,7 +155,7 @@ public class InsightDataBundle {
             long endMs = ctx.getEndTs() * 1000L;
             long startMs = endMs - MALICIOUS_INVOCATION_WINDOW_MS;
             return com.akto.utils.search.SearchClientFactory.instance()
-                    .searchMaliciousComponentInvocations(1779231193, maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
+                    .searchMaliciousComponentInvocations(Context.accountId.get(), maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
         } catch (Exception e) {
             return null;
         }
