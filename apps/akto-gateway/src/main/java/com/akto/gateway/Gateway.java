@@ -240,6 +240,7 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "direction");
         putIfNotNull(validateRequest, requestData, "tag");
         putIfNotNull(validateRequest, requestData, "metadata");
+        putIfNotNull(validateRequest, requestData, "fullRequest");
 
         String contextSource = getStringField(requestData, "contextSource");
         String endpoint = isResponse ? "/validate/response" : "/validate/request";

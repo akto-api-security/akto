@@ -11,7 +11,7 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import { categoryToShortName, getDashboardCategory } from '../apps/main/labelHelper';
+import { categoryToShortName, getDashboardCategory, isAgenticSecurityCategory, isMCPSecurityCategory } from '../apps/main/labelHelper';
 
 import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
@@ -2305,8 +2305,26 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return access;
   },
 
+  hasAccessToNewPosture(){
+    const activeAccount = window?.ACTIVE_ACCOUNT
+    const allowedAccountsForPosture = [1779231193, 1783981503];
+    return allowedAccountsForPosture.some(x => x === activeAccount)
+  },
+
   hasThreatAccess(){
     return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+  },
+  // Argus only: only Admin and Threat Engineer can create, edit, delete or approve guardrail policies (when RBAC is enabled)
+  canManageGuardrailPolicies(){
+    const isArgus = isAgenticSecurityCategory() || isMCPSecurityCategory()
+    if (!isArgus || this.checkLocal() || !(this.checkForRbacFeature() || this.checkForRbacFeatureBasic()) || this.isUserAdmin()) {
+      return true
+    }
+    // Role for the current product; a custom role name is not a base role, so use the resolved base role then
+    const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
+    const baseRoles = ['ADMIN', 'MEMBER', 'DEVELOPER', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER', 'NO_ACCESS']
+    const role = baseRoles.includes(scopeRole) ? scopeRole : window.USER_ROLE
+    return ['ADMIN', 'THREAT_ENGINEER'].includes(role)
   },
   isUserAdmin(){
     const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]

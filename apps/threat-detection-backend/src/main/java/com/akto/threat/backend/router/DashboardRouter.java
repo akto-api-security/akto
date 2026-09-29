@@ -395,7 +395,9 @@ public class DashboardRouter implements ARouter {
                     threatApiService.getSeverityWiseCount(
                         ctx.get("accountId"),
                         req,
-                        contextSource
+                        contextSource,
+                        ctx.request().getHeader("x-skill-eval-mode"),
+                        ctx.request().getHeader("x-config-eval-mode")
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -688,7 +690,10 @@ public class DashboardRouter implements ARouter {
                         req.getEndTs(),
                         req.getLatestAttackList(),
                         req.getLimit(),
-                        contextSource
+                        contextSource,
+                        req.getStatus(),
+                        ctx.request().getHeader("x-skill-eval-mode"),
+                        ctx.request().getHeader("x-config-eval-mode")
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
