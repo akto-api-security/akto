@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
  * wiring live here; callers just pass the tag values and the measurements.
  *
  * Cardinality discipline: account_id is attached ONLY to the request counter (1 series per combo);
- * the latency histogram stays tenant-agnostic and uses explicit SLO buckets (25ms..5s), with no
+ * the latency histogram stays tenant-agnostic and uses explicit SLO buckets (25ms..30s), with no
  * client-side percentiles (Grafana computes them via histogram_quantile over the buckets).
  */
 public class CyborgMetrics {
@@ -25,7 +25,7 @@ public class CyborgMetrics {
     private static final Duration[] LATENCY_SLOS = new Duration[] {
             Duration.ofMillis(25), Duration.ofMillis(100), Duration.ofMillis(250),
             Duration.ofMillis(500), Duration.ofSeconds(1), Duration.ofMillis(2500),
-            Duration.ofSeconds(5)
+            Duration.ofSeconds(5), Duration.ofSeconds(10), Duration.ofSeconds(30)
     };
 
     private CyborgMetrics() {
@@ -62,7 +62,7 @@ public class CyborgMetrics {
                 .tags(baseTags)
                 .serviceLevelObjectives(LATENCY_SLOS)
                 .minimumExpectedValue(Duration.ofMillis(25))
-                .maximumExpectedValue(Duration.ofSeconds(5))
+                .maximumExpectedValue(Duration.ofSeconds(30))
                 .register(InfraMetricsListener.registry)
                 .record(durationMs, TimeUnit.MILLISECONDS);
     }
@@ -93,7 +93,7 @@ public class CyborgMetrics {
                 .tags(tags)
                 .serviceLevelObjectives(LATENCY_SLOS)
                 .minimumExpectedValue(Duration.ofMillis(25))
-                .maximumExpectedValue(Duration.ofSeconds(5))
+                .maximumExpectedValue(Duration.ofSeconds(30))
                 .register(InfraMetricsListener.registry)
                 .record(durationMs, TimeUnit.MILLISECONDS);
     }
