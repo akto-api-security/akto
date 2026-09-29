@@ -499,6 +499,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 11
         blockedHosts,
         blockPublicShare,
+        blockPersonalAccounts,
         // Step 13
         ignorePhrases,
         // Step 10
