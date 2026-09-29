@@ -29,6 +29,7 @@ public class TestResult extends GenericTestResult {
 
     private boolean requiresConfig;
 
+    public static final String CONVERSATION_ID = "conversationId";
     private String conversationId;
     private boolean resultTypeAgentic;
     private int externalApiTokens;

@@ -12,6 +12,7 @@ import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -136,6 +137,18 @@ public class InsightDataBundle {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    // collectionId -> {severity -> count} since startTs, in the request's context source; null when the threat backend is unavailable.
+    public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs) {
+        if (!threatBackendAvailable || threatAccess == null) return null;
+        return threatAccess.collectionSeverityCounts(startTs, 0, collectionIds);
+    }
+
+    // Newest-first events for these collections; null when the threat backend is unavailable.
+    public List<DashboardMaliciousEvent> listMaliciousEvents(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        if (!threatBackendAvailable || threatAccess == null) return null;
+        return threatAccess.violationEvents(startTs, endTs, limit, Collections.singletonMap("apiCollectionId", collectionIds), null);
     }
 
     private static final long MALICIOUS_INVOCATION_WINDOW_MS = 15L * 24 * 3600 * 1000;

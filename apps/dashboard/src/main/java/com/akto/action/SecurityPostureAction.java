@@ -35,7 +35,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -145,19 +144,19 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
 
             // Shared with the Insights feature rather than loaded again: the same page renders
             // "Act now" from insights, so one bundle serves both.
-            Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+            Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                     () -> insightService.getOrLoadBundle(ctx)));
             Future<List<HostSeverityCount>> priorHostSeverityFuture = hasPriorWindow
-                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                             () -> fetchHostSeverityCounts(priorStart, startTimestamp)))
                     : null;
             Future<List<ThreatCategoryCount>> priorSubCategoryFuture = hasPriorWindow
-                    ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                    ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                             () -> fetchSubcategoryWiseCounts(priorStart, startTimestamp, null, null)))
                     : null;
-            Future<Long> totalInspectedActionsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+            Future<Long> totalInspectedActionsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                     () -> fetchTotalInspectedActions(accountId, startTimestamp, endTimestamp)));
-            Future<List<Integer>> weeklyAttackCountsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+            Future<List<Integer>> weeklyAttackCountsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                     () -> fetchViolationsMonthlyTotals(trendStartTs, trendEndTs, trendBoundaries, null)));
             // Raw events over [rawEventFetchStartTs, trendEndTs] — the wider of the trend window
             // and biggestMoversStartTs (see above), so one fetch serves both "Biggest movers"
@@ -165,7 +164,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
             // the Critical alerts / Sensitive data incidents KPI sparklines (which need per-event
             // severity/category to bucket by the selected range; the bucketed aggregation
             // fetchViolationsMonthlyTotals uses has no severity/category filter).
-            Future<List<DashboardMaliciousEvent>> trendWindowEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+            Future<List<DashboardMaliciousEvent>> trendWindowEventsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                     () -> fetchAllMaliciousEvents(rawEventFetchStartTs, trendEndTs, MAX_THREAT_FETCH_LIMIT, null, null, true)));
 
             // Each .get() below only blocks on ITS OWN future (all were submitted above and are
@@ -270,7 +269,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                 // longer run in parallel with them (a bundle load is normally near-free: 60s-cached,
                 // ~0ms on a warm hit, per this action's own timedGet logs).
                 InsightDataBundle bundle = timedGet("fetchPostureDrill(riskScore): bundleFuture",
-                        EXECUTOR.submit(withContext(accountId, userId, contextSource, () -> insightService.getOrLoadBundle(ctx))));
+                        EXECUTOR.submit(Context.withContext(accountId, userId, contextSource, () -> insightService.getOrLoadBundle(ctx))));
 
                 // Server-side filter, not a client-side one: fetchAllMaliciousEvents is the heaviest
                 // call this page makes (unbounded up to MAX_THREAT_FETCH_LIMIT), and every consumer of
@@ -298,11 +297,11 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                 // budget).
                 int combinedFetchStart = hasPriorWindow ? priorStart : startTimestamp;
                 Future<List<DashboardMaliciousEvent>> combinedThreatsFuture = shouldFetchAllThreats
-                        ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                        ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                                 () -> fetchAllMaliciousEvents(combinedFetchStart, endTimestamp, MAX_THREAT_FETCH_LIMIT, piiFilter, null, true)))
                         : null;
                 Future<List<HostSeverityCount>> priorHostSeverityFuture = hasPriorWindow
-                        ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                        ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                                 () -> fetchHostSeverityCounts(priorStart, startTimestamp)))
                         : null;
                 // Same trend-window convention the non-risk-score drillIds' own
@@ -331,7 +330,7 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                 Map<String, Object> windowEventsFilter = (isShadowAiEntity && !shadowAiToolCollectionIds.isEmpty())
                         ? Collections.<String, Object>singletonMap("apiCollectionId", shadowAiToolCollectionIds) : null;
                 Future<List<DashboardMaliciousEvent>> windowEventsFuture = (needsWindowEvents && !shadowAiEntityHasNoCollections)
-                        ? EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                        ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                                 () -> fetchAllMaliciousEvents(entityTrendStartTs, entityTrendEndTs, MAX_THREAT_FETCH_LIMIT, windowEventsFilter, null, true)))
                         : null;
 
@@ -372,9 +371,9 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
                 int trendStartTs = startTimestamp > 0 ? startTimestamp
                         : trendEndTs - (PostureService.TREND_BUCKET_COUNT * 7 * 86400);
 
-                Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                Future<InsightDataBundle> bundleFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                         () -> insightService.getOrLoadBundle(ctx)));
-                Future<List<DashboardMaliciousEvent>> trendWindowEventsFuture = EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                Future<List<DashboardMaliciousEvent>> trendWindowEventsFuture = EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                         () -> fetchAllMaliciousEvents(trendStartTs, trendEndTs, MAX_THREAT_FETCH_LIMIT, null, null, true)));
 
                 InsightDataBundle bundle = timedGet("fetchPostureDrill: bundleFuture", bundleFuture);
@@ -513,24 +512,6 @@ public class SecurityPostureAction extends AbstractThreatDetectionAction {
         T result = future.get(EXTERNAL_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         loggerMaker.infoAndAddToDb("SecurityPostureAction: " + label + " took " + (System.currentTimeMillis() - t0) + "ms");
         return result;
-    }
-
-    /** Threat-backend/search-backend calls run in worker threads — Context ThreadLocals must be
-     *  captured by the caller and re-set inside each task, or the worker queries the wrong account
-     *  (same convention and same reasoning as InsightDataLoader#withContext). */
-    private static <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
-        return () -> {
-            Context.accountId.set(accountId);
-            Context.userId.set(userId);
-            Context.contextSource.set(contextSource);
-            try {
-                return body.call();
-            } finally {
-                Context.accountId.remove();
-                Context.userId.remove();
-                Context.contextSource.remove();
-            }
-        };
     }
 
     /** InsightService already sorts worst-first with disabled ("Coming soon") cards last — this

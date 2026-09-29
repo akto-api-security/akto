@@ -1479,6 +1479,42 @@ public class ThreatActorService {
   // the host join key, without pulling every raw event doc (up to the 100k cap, tens of MB) to the
   // browser just to run a per-row severity tally. Mirrors fetchTopNData's hostPipeline above, but groups
   // by {host, severity} instead of host alone, and has no result-count limit.
+  // apiCollectionId -> {severity -> count} for the window; same context/skill filters as fetchHostSeverityCounts.
+  public Map<String, Map<String, Integer>> fetchCollectionSeverityCounts(
+      String accountId, long startTs, long endTs, String contextSource, List<Integer> apiCollectionIds) {
+    Map<String, Map<String, Integer>> byCollection = new HashMap<>();
+    if (apiCollectionIds == null || apiCollectionIds.isEmpty()) return byCollection;
+
+    Document match = new Document("latestApiCollectionId", new Document("$in", apiCollectionIds));
+    if (startTs > 0 || endTs > 0) {
+      Document tsRange = new Document();
+      if (startTs > 0) tsRange.append("$gte", startTs);
+      if (endTs > 0) tsRange.append("$lte", endTs);
+      match.append("detectedAt", tsRange);
+    }
+    match.putAll(ThreatUtils.buildSimpleContextFilterNew(contextSource, accountId));
+    match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+
+    List<Document> pipeline = Arrays.asList(
+        new Document("$match", match),
+        new Document("$group", new Document("_id",
+            new Document("apiCollectionId", "$latestApiCollectionId")
+                .append("severity", new Document("$ifNull", Arrays.asList(new Document("$toUpper", "$severity"), "UNKNOWN"))))
+            .append("count", new Document("$sum", 1))));
+
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        Document id = (Document) doc.get("_id");
+        Object collectionId = id.get("apiCollectionId");
+        if (collectionId == null) continue;
+        byCollection.computeIfAbsent(String.valueOf(collectionId), k -> new HashMap<>())
+            .merge(id.getString("severity"), doc.getInteger("count", 0), Integer::sum);
+      }
+    }
+    return byCollection;
+  }
+
   public FetchHostSeverityCountsResponse fetchHostSeverityCounts(
       String accountId, long startTs, long endTs, String contextSource, List<Integer> monthBoundaries) {
     return fetchHostSeverityCounts(accountId, startTs, endTs, contextSource, monthBoundaries, Collections.emptyList());
