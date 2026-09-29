@@ -167,6 +167,7 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
     Backed by the same gemma_fast_arbiter settings (GEMMA_VLLM_ARBITER_BASE_URL/GEMMA_26B_VLLM_KEY)
     the cascade's FINAL_ARBITER role already uses.
     """
+    start = time.perf_counter()
     logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
     provider = providers.build_provider_from_config(
         {"provider": "gemma_fast_arbiter", "model": body.model or _GUARDRAILS_ARBITER_MODEL}
@@ -177,7 +178,13 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
     try:
         content = await provider.complete(body.prompt)
     except Exception as exc:
-        logger.warning(f"[GuardrailsLLM] call failed: {exc!r}")
+        failed_ms = (time.perf_counter() - start) * 1000
+        logger.warning(f"[GuardrailsLLM] call failed: {exc!r} ms={failed_ms:.0f}")
         raise HTTPException(status_code=502, detail=f"guardrails LLM call failed: {exc!r}") from exc
+    elapsed_ms = (time.perf_counter() - start) * 1000
     logger.debug(f"[GuardrailsLLM] response: {content!r}")
+    logger.info(
+        f"[GuardrailsLLM] provider={provider.name} prompt_len={len(body.prompt)} "
+        f"response_len={len(content)} ms={elapsed_ms:.0f}"
+    )
     return {"content": content}
