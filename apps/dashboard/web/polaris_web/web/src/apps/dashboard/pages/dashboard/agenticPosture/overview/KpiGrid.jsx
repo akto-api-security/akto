@@ -26,7 +26,7 @@ const KPI_DRILL_ID = {
 // Assets has no drill of its own — the inventory page already lists every asset, so the tile
 // navigates there rather than duplicating it in a flyout.
 const KPI_ROUTE = {
-    assets: '/dashboard/observe/inventory?filters=#hostname',
+    assets: '/dashboard/observe/inventory',
 }
 
 function KpiGrid({ kpis, onOpenLink, onOpenDrill, onOpenRoute }) {
