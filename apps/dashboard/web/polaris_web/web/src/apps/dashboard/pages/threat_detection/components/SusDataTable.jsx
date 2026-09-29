@@ -19,7 +19,7 @@ import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
 import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
-import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
+import { HumanApprovalActions, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
 
 const resourceName = {
   singular: "activity",
@@ -507,7 +507,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
   if (isAgenticSecurityCategory()) {
     guardrailExtraTabs.push({
-      content: <HumanApprovalTabLabel count={pendingHumanApprovalCount} />,
+      // IndexFilters calls .trim() on tab content, so it must be a string (not a node).
+      content: pendingHumanApprovalCount > 0
+        ? `Human Approval (${pendingHumanApprovalCount.toLocaleString()})`
+        : 'Human Approval',
+      badge: 'Beta',
       accessibilityLabel: humanApprovalTabAccessibilityLabel(pendingHumanApprovalCount),
       onAction: () => { setCurrentTab('human_approval'); },
       id: 'human_approval',
