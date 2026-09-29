@@ -46,8 +46,9 @@ public class CustomRole {
             case "DEVELOPER":
             case "MEMBER":
             case "GUEST":
-            case "THREAT ENGINEER":
-            case "THREAT VIEWER":
+            // Role enum names, which is what callers pass and every reader Role.valueOf()s back.
+            case "THREAT_ENGINEER":
+            case "THREAT_VIEWER":
                 break;
             default:
                 baseRole = "GUEST";
