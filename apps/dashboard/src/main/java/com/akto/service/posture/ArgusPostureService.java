@@ -1040,6 +1040,13 @@ public class ArgusPostureService {
         }
     }
 
+    /** Connector-created collections carry a name but no hostName; policies target them by that
+     *  name, so it is the identity used for both matching and display. */
+    static String assetIdentity(ApiCollection c) {
+        if (c == null) return null;
+        return c.getHostName() != null ? c.getHostName() : c.getName();
+    }
+
     static GuardrailsCoverageBreakdown computeCoverage(List<ApiCollection> assets, List<GuardrailPolicies> policies) {
         GuardrailsCoverageBreakdown breakdown = new GuardrailsCoverageBreakdown();
         for (ApiCollection asset : assets) {
@@ -1047,7 +1054,7 @@ public class ArgusPostureService {
             boolean blocking = false;
             for (GuardrailPolicies p : policies) {
                 if (p == null) continue;
-                if (!InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) continue;
+                if (!InsightUtil.policyCoversHost(p, assetIdentity(asset))) continue;
                 covering.add(p);
                 if (InsightUtil.isBlockingPolicy(p)) blocking = true;
             }
@@ -1194,7 +1201,7 @@ public class ArgusPostureService {
         List<String> exposed = unguardedByAsset.get(asset.getId());
 
         Map<String, Object> row = new HashMap<>();
-        row.put("asset", asset.getHostName());
+        row.put("asset", assetIdentity(asset));
         row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
         row.put("environment", envBucket(envTagValue(asset)));
         row.put("sensitiveData", String.join(", ", detected));
@@ -1311,7 +1318,7 @@ public class ArgusPostureService {
         row.put("tool", key == null || key.getUrl() == null ? "-" : ToolClassificationCron.toolNameFromUrl(key.getUrl()));
         row.put("capability", InsightUtil.humanizeToolCapability(
                 tool.getToolInfo() == null ? null : tool.getToolInfo().getCapability()));
-        row.put("asset", collection == null ? "-" : collection.getHostName());
+        row.put("asset", collection == null ? "-" : assetIdentity(collection));
         row.put("environment", collection == null ? "-" : envBucket(envTagValue(collection)));
         row.put("lastSeen", tool.getLastSeen());
         return row;
@@ -1404,7 +1411,7 @@ public class ArgusPostureService {
         List<String> sensitiveTypes = bundle.sensitiveByCollection.get(asset.getId());
 
         Map<String, Object> row = new HashMap<>();
-        row.put("asset", asset.getHostName());
+        row.put("asset", assetIdentity(asset));
         row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
         row.put("environment", envBucket(envTagValue(asset)));
         row.put("protection", policyNames.isEmpty()

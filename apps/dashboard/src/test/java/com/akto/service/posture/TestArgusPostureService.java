@@ -299,17 +299,18 @@ public class TestArgusPostureService {
         assertEquals(1, b.enforcing.size());
     }
 
-    // applyToDeviceIds == null means "no device targeting", which is the only shape an Argus
-    // policy ever has; a non-null list is an Atlas policy and must not widen to every device.
+    // Devices are an Atlas concept; an Argus policy never populates applyToDeviceIds, so coverage
+    // here is decided purely by server targeting.
     @Test
-    public void computeCoverage_resolvedDeviceIdsThatExcludeTheAsset_leaveItUncovered() {
+    public void computeCoverage_deviceTargetingIsIgnored() {
         GuardrailPolicies p = fleetWide("p", "block");
         p.setApplyToDeviceIds(new ArrayList<>(Arrays.asList("some-other-device")));
 
         ArgusPostureService.GuardrailsCoverageBreakdown b =
                 ArgusPostureService.computeCoverage(Arrays.asList(host(1, "a.akto.io")), Arrays.asList(p));
 
-        assertEquals(1, b.uncovered.size());
+        assertEquals(0, b.uncovered.size());
+        assertEquals(1, b.enforcing.size());
     }
 
     @Test
@@ -509,5 +510,59 @@ public class TestArgusPostureService {
         p.setApplyToAllServers(false);
         p.setSelectedMcpServersV2(new ArrayList<>(Arrays.asList(new SelectedServer(server, server))));
         return p;
+    }
+
+    // ── assetIdentity: connector-created collections have a name but no hostName ──────
+
+    @Test
+    public void assetIdentity_prefersHostNameWhenPresent() {
+        ApiCollection c = host(1, "a.akto.io");
+        c.setName("ignored");
+
+        assertEquals("a.akto.io", ArgusPostureService.assetIdentity(c));
+    }
+
+    @Test
+    public void assetIdentity_fallsBackToNameWhenHostNameMissing() {
+        ApiCollection c = host(1, null);
+        c.setName("aria-agentic");
+
+        assertEquals("aria-agentic", ArgusPostureService.assetIdentity(c));
+    }
+
+    @Test
+    public void assetIdentity_nullSafe() {
+        assertNull(ArgusPostureService.assetIdentity(null));
+    }
+
+    @Test
+    public void computeCoverage_hostlessAssetIsCoveredByFleetWidePolicy() {
+        ApiCollection hostless = host(1, null);
+        hostless.setName("aria-agentic");
+
+        ArgusPostureService.GuardrailsCoverageBreakdown b = ArgusPostureService.computeCoverage(
+                Arrays.asList(hostless), Arrays.asList(fleetWide("all", "block")));
+
+        assertEquals(0, b.uncovered.size());
+        assertEquals(1, b.enforcing.size());
+    }
+
+    @Test
+    public void computeCoverage_hostlessAssetMatchesAPolicyTargetingItsName() {
+        ApiCollection hostless = host(1, null);
+        hostless.setName("aria-agentic");
+
+        ArgusPostureService.GuardrailsCoverageBreakdown b = ArgusPostureService.computeCoverage(
+                Arrays.asList(hostless), Arrays.asList(targeted("p", "alert", "aria-agentic")));
+
+        assertEquals(1, b.alertOnly.size());
+    }
+
+    @Test
+    public void computeCoverage_assetWithNeitherHostNorNameStaysUncovered() {
+        ArgusPostureService.GuardrailsCoverageBreakdown b = ArgusPostureService.computeCoverage(
+                Arrays.asList(host(1, null)), Arrays.asList(fleetWide("all", "block")));
+
+        assertEquals(1, b.uncovered.size());
     }
 }
