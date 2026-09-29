@@ -181,11 +181,11 @@ const router = createBrowserRouter([
                     },
                     {
                         path: "agentic-posture",
-                        element: <AgenticPosture/>,
+                        element: func.isAgenticPostureEnabled() ? <AgenticPosture/> : <Navigate to="/dashboard/home" replace/>,
                     },
                     {
                         path: "agentic-posture/agents/:groupKey",
-                        element: <AgenticPostureAgentDetail/>,
+                        element: func.isAgenticPostureEnabled() ? <AgenticPostureAgentDetail/> : <Navigate to="/dashboard/home" replace/>,
                     },
                     {
                         path: "view",
