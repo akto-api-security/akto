@@ -52,18 +52,34 @@ public class AbstractThreatDetectionAction extends UserAction {
     return backendUrl;
   }
 
-  // apiCollectionId -> {severity -> count} of AGENTIC malicious events since startTimestamp, aggregated on demand by
-  // the threat backend (it owns threat Mongo); null when the call fails.
-  protected Map<Integer, Map<String, Integer>> fetchAgenticSeverityCounts(List<Integer> apiCollectionIds, int startTimestamp) {
+  // apiCollectionId -> {severity -> count} for the window in the request's context source; null when the call fails.
+  protected Map<Integer, Map<String, Integer>> fetchCollectionSeverityCounts(
+      int startTimestamp, int endTimestamp, List<Integer> apiCollectionIds) {
+    String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+    return fetchCollectionSeverityCounts(contextSourceValue, startTimestamp, endTimestamp, apiCollectionIds);
+  }
+
+  // Same, for an explicit context source (any CONTEXT_SOURCE name), e.g. from a cron with no request context.
+  protected Map<Integer, Map<String, Integer>> fetchCollectionSeverityCounts(
+      String contextSourceValue, int startTimestamp, int endTimestamp, List<Integer> apiCollectionIds) {
     try {
+      String url = String.format("%s/api/dashboard/get_collection_severity_counts", this.getBackendUrl());
+      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
       Map<String, Object> body = new HashMap<>();
-      body.put("apiCollectionIds", apiCollectionIds);
-      body.put("startTs", startTimestamp);
+      body.put("start_ts", startTimestamp);
+      body.put("end_ts", endTimestamp);
+      body.put("api_collection_ids", apiCollectionIds);
+      String msg = objectMapper.valueToTree(body).toString();
+
       Request request = new Request.Builder()
-          .url(this.getBackendUrl() + "/api/dashboard/agentic_severity_counts")
-          .post(RequestBody.create(objectMapper.writeValueAsString(body), MediaType.parse("application/json; charset=utf-8")))
+          .url(url)
+          .post(RequestBody.create(msg, JSON))
           .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
           .build();
+
       try (Response resp = httpClient.newCall(request).execute()) {
         if (!resp.isSuccessful() || resp.body() == null) return null;
         return objectMapper.readValue(resp.body().string(), new TypeReference<Map<Integer, Map<String, Integer>>>() {});
