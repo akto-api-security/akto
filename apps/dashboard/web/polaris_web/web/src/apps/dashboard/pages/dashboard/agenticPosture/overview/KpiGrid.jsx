@@ -23,10 +23,10 @@ const KPI_DRILL_ID = {
     sensitiveData: 'sensitiveData',
 }
 
-// Assets has no drill of its own — Agentic AI Discovery already is the asset inventory,
-// so the tile navigates there rather than duplicating it in a flyout.
+// Assets has no drill of its own — the inventory page already lists every asset, so the tile
+// navigates there rather than duplicating it in a flyout.
 const KPI_ROUTE = {
-    assets: '/dashboard/observe/agentic-assets',
+    assets: '/dashboard/observe/inventory?filters=#hostname',
 }
 
 function KpiGrid({ kpis, onOpenLink, onOpenDrill, onOpenRoute }) {
