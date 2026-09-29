@@ -10,7 +10,7 @@ import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import ValidationReasonBanner from './ValidationReasonBanner';
 import func from '../../../../util/func';
-import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper';
+import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from '../../../main/labelHelper';
 import transform from './customDiffEditor';
 import { filterLocatableSegments } from './vulnerabilityEvidence';
 
@@ -68,9 +68,9 @@ function SchemaValidationError({ sampleData}) {
 }
 
 // Detector-supplied explanation of why the event was flagged (metadata.reason, e.g. WeakAuthentication).
-// Guardrail categories already show their reason in the events table, so they are skipped here.
+// API Security only: guardrail events also carry metadata.reason and are shown in their own views.
 function DetectionReason({ sampleData }) {
-    if (!sampleData?.metadata || isAgenticSecurityCategory() || isEndpointSecurityCategory()) {
+    if (!sampleData?.metadata || !isApiSecurityCategory()) {
         return null;
     }
     let reason = '';
