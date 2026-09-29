@@ -29,7 +29,6 @@ const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
 const TABS_ENDPOINT_SECURITY_BASE = ['MCP Servers', 'Skills'];
 // Vendors is still only for the internal test account — see LeftNav's same gate on the AI
 // Security Posture nav item, which this tab was built to support.
-const VENDORS_TAB_ACCOUNT_ID = 1779231193;
 const TABS_ENDPOINT_SECURITY = [...TABS_ENDPOINT_SECURITY_BASE, 'Vendors'];
 const MCP_TYPES = ['mcp-tool', 'mcp-resource', 'mcp-prompt', 'mcp-server'];
 
@@ -453,7 +452,7 @@ function AuditData() {
     const isEndpointSecurity = isEndpointSecurityCategory();
     const activeAccount = window?.ACTIVE_ACCOUNT
     const definedTableTabs = isEndpointSecurity
-        ? (activeAccount === VENDORS_TAB_ACCOUNT_ID ? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
+        ? (func.hasAccessToNewPosture() ? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
         : TABS_DEFAULT;
 
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
@@ -1183,7 +1182,7 @@ function AuditData() {
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.SKILLS]: skillsTotal }));
             }
-            if (isEndpointSecurity && activeAccount === VENDORS_TAB_ACCOUNT_ID && selectedTab !== TAB_IDS.VENDORS) {
+            if (isEndpointSecurity && func.hasAccessToNewPosture() && selectedTab !== TAB_IDS.VENDORS) {
                 const vendorsTotal = await countVendors();
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.VENDORS]: vendorsTotal }));
