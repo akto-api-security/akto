@@ -142,19 +142,19 @@ public class InsightDataBundle {
     }
 
     private static final int HOST_COUNTS_BUCKET_SECONDS = 300;
-    // Rounded startTs -> account-wide host counts. Lives as long as this (60s-cached) bundle, so repeated drill/profile
+    // Rounded startTs -> account-wide events. Lives as long as this (60s-cached) bundle, so repeated drill/profile
     // opens share one threat-backend call per window instead of one per request or per agent.
-    private final Map<Integer, List<HostSeverityCount>> hostCountsSince = new ConcurrentHashMap<>();
+    private final Map<Integer, List<DashboardMaliciousEvent>> hostCountsSince = new ConcurrentHashMap<>();
     private volatile HostCollectionResolver hostResolver;
 
-    // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host like the
-    // Argus observe page (event collection ids aren't reliable); null when the threat backend is unavailable.
+    // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host, then actor
+    // (event collection ids aren't reliable); null when the threat backend is unavailable.
     public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs) {
         if (!threatBackendAvailable || threatAccess == null) return null;
         int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
-        List<HostSeverityCount> hostCounts = hostCountsSince.get(since);
+        List<DashboardMaliciousEvent> hostCounts = hostCountsSince.get(since);
         if (hostCounts == null) {
-            hostCounts = threatAccess.hostSeverityCounts(since, Context.now());
+            hostCounts = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
             hostCountsSince.putIfAbsent(since, hostCounts);
         }
         if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);

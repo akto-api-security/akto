@@ -182,7 +182,7 @@ public class ArgusPostureService {
         }
 
         RedTeamStats redTeam = computeRedTeamStats(openIssueGroups);
-        GuardrailStats guardrail = computeGuardrailStats(maliciousEvents);
+        GuardrailStats guardrail = computeGuardrailStats(maliciousEvents, new HostCollectionResolver(bundle.collections));
         List<AgentFindingGroup> topCritical = pickTopCriticalIssues(openIssueGroups, ATTACK_FLOW_ISSUE_COUNT);
 
         List<BasicDBObject> cards = new ArrayList<>();
@@ -429,7 +429,7 @@ public class ArgusPostureService {
     private static final class GuardrailStats {
         long totalEvents;
         final Map<String, Long> byPolicy = new HashMap<>();   // DashboardMaliciousEvent#getFilterId()
-        final Map<Integer, Long> byAgent = new HashMap<>();   // DashboardMaliciousEvent#getApiCollectionId()
+        final Map<Integer, Long> byAgent = new HashMap<>();   // collection resolved from the event's host, then actor
     }
 
     /**
@@ -440,13 +440,14 @@ public class ArgusPostureService {
      * already uses: row("policy", e.getFilterId())) and the join key back to the real
      * GuardrailPolicies document — see resolvePolicy.
      */
-    private GuardrailStats computeGuardrailStats(List<DashboardMaliciousEvent> events) {
+    private GuardrailStats computeGuardrailStats(List<DashboardMaliciousEvent> events, HostCollectionResolver resolver) {
         GuardrailStats stats = new GuardrailStats();
         for (DashboardMaliciousEvent e : safe(events)) {
             if (e == null) continue;
             stats.totalEvents++;
             if (StringUtils.isNotBlank(e.getFilterId())) stats.byPolicy.merge(e.getFilterId(), 1L, Long::sum);
-            if (e.getApiCollectionId() != 0) stats.byAgent.merge(e.getApiCollectionId(), 1L, Long::sum);
+            Integer agentId = agentIdForEvent(e, resolver);
+            if (agentId != null) stats.byAgent.merge(agentId, 1L, Long::sum);
         }
         return stats;
     }
@@ -701,9 +702,10 @@ public class ArgusPostureService {
                 .comparingInt((DashboardMaliciousEvent e) -> InsightUtil.severityRank(e.getSeverity()))
                 .thenComparing(Comparator.comparingLong(DashboardMaliciousEvent::getTimestamp).reversed()));
 
+        HostCollectionResolver resolver = new HostCollectionResolver(new ArrayList<>(collectionsById.values()));
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DashboardMaliciousEvent e : events) {
-            rows.add(PostureService.row("agentName", agentName(e.getApiCollectionId(), collectionsById),
+            rows.add(PostureService.row("agentName", agentName(agentIdForEvent(e, resolver), collectionsById),
                     "policy", e.getFilterId(), "severity", e.getSeverity(), "detectedAt", e.getTimestamp()));
         }
         result.getSummary().add(new InsightResult.Metric("totalEvents", "Guardrail/malicious events",
@@ -788,7 +790,14 @@ public class ArgusPostureService {
     private static String agentName(Integer collectionId, Map<Integer, ApiCollection> collectionsById) {
         if (collectionId == null) return null;
         ApiCollection c = collectionsById.get(collectionId);
-        return c != null ? c.getName() : null;
+        return c != null ? agentDisplayName(c) : null;
+    }
+
+    // An event's apiCollectionId is not a real collection id for guardrail traffic, so attribute it by host, then actor
+    // (HostCollectionResolver.resolveEvent, same as the posture score); null when unmatched.
+    private static Integer agentIdForEvent(DashboardMaliciousEvent e, HostCollectionResolver resolver) {
+        List<Integer> ids = resolver.resolveEvent(e.getHost(), e.getActor());
+        return ids.isEmpty() ? null : ids.get(0);
     }
 
     /** Highest-value key, or null when the map is empty. Ties keep the first key iterated. */

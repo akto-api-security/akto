@@ -1,7 +1,7 @@
 package com.akto.service.insights;
 
 import java.util.Map;
-import com.akto.action.threat_detection.HostSeverityCount;
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dto.ApiCollection;
 import org.junit.Test;
 
@@ -87,21 +87,51 @@ public class HostCollectionResolverTest {
         assertTrue(!HostCollectionResolver.isClaudeConfigHost("device.chrome.claude"));
     }
 
+    private static DashboardMaliciousEvent event(String host, String actor, String severity) {
+        DashboardMaliciousEvent e = new DashboardMaliciousEvent();
+        e.setHost(host);
+        e.setActor(actor);
+        e.setSeverity(severity);
+        return e;
+    }
+
     @Test
-    public void severityByCollectionAttributesHostCountsAndSkipsUnknownHosts() {
+    public void resolveEventFallsBackToActorOnlyWhenHostMatchesNothing() {
         HostCollectionResolver resolver = new HostCollectionResolver(Arrays.asList(
-                collection(1, "mcp.testkg.com"), collection(2, "bedrock-runtime.us-east-1.amazonaws.com")));
+                collection(1, "mcp.testkg.com"), collection(2, "aria-usertask-role")));
+
+        assertEquals(Collections.singletonList(1), resolver.resolveEvent("mcp.testkg.com", "aria-usertask-role"));
+        assertEquals(Collections.singletonList(2), resolver.resolveEvent("bedrock-runtime.us-east-1.amazonaws.com", "aria-usertask-role"));
+        assertTrue(resolver.resolveEvent("bedrock-runtime.us-east-1.amazonaws.com", "someone@example.com").isEmpty());
+        assertTrue(resolver.resolveEvent("bedrock-runtime.us-east-1.amazonaws.com", null).isEmpty());
+    }
+
+    @Test
+    public void severityByCollectionCountsOnlyResolvedEvents() {
+        HostCollectionResolver resolver = new HostCollectionResolver(Arrays.asList(
+                collection(1, "mcp.testkg.com"), collection(2, "aria-usertask-role")));
         Map<Integer, Map<String, Integer>> out = resolver.severityByCollection(Arrays.asList(
-                new HostSeverityCount("mcp.testkg.com", 0, 2, 1, 0),
-                new HostSeverityCount("bedrock-runtime.us-east-1.amazonaws.com", 1, 0, 0, 3),
-                new HostSeverityCount("unknown.host", 5, 5, 5, 5)));
+                event("mcp.testkg.com", "10.0.0.1", "high"),
+                event("mcp.testkg.com", "10.0.0.1", "MEDIUM"),
+                event("bedrock-runtime.us-east-1.amazonaws.com", "aria-usertask-role", "HIGH"),
+                event("bedrock-runtime.us-east-1.amazonaws.com", "someone@example.com", "CRITICAL")));
 
         assertEquals(2, out.size());
-        assertEquals(Integer.valueOf(2), out.get(1).get("HIGH"));
+        assertEquals(Integer.valueOf(1), out.get(1).get("HIGH"));
         assertEquals(Integer.valueOf(1), out.get(1).get("MEDIUM"));
-        assertTrue(!out.get(1).containsKey("CRITICAL"));
-        assertEquals(Integer.valueOf(1), out.get(2).get("CRITICAL"));
-        assertEquals(Integer.valueOf(3), out.get(2).get("LOW"));
+        assertEquals(Integer.valueOf(1), out.get(2).get("HIGH"));
         assertTrue(resolver.severityByCollection(null).isEmpty());
+    }
+
+    @Test
+    public void resolveMatchesHostLikeGuardrailsAndPrefersAgenticTwin() {
+        HostCollectionResolver resolver = new HostCollectionResolver(Arrays.asList(
+                collection(1, "mcp.example.com"), collection(2, "mcp.example.com-agentic"),
+                collection(3, "aws_runtime_agent"), collection(4, "Mixed.Case.Host")));
+
+        assertEquals(Collections.singletonList(2), resolver.resolve("mcp.example.com"));
+        assertEquals(Collections.singletonList(3), resolver.resolve("aws-runtime-agent"));
+        assertEquals(Collections.singletonList(4), resolver.resolve("mixed.case.host"));
+        assertEquals(Collections.singletonList(3), resolver.resolveEvent("bedrock-runtime.us-east-1.amazonaws.com", "AWS-Runtime-Agent"));
     }
 }

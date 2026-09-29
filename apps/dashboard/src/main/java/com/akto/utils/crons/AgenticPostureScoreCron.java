@@ -1,7 +1,7 @@
 package com.akto.utils.crons;
 
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
-import com.akto.action.threat_detection.HostSeverityCount;
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.AgenticPostureScoreHistoryDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
@@ -52,6 +52,7 @@ public class AgenticPostureScoreCron {
 
     private static final int PER_ACCOUNT_LIMIT = 10000;
     private static final int MALICIOUS_EVENTS_WINDOW_SECONDS = 90 * 86400;
+    private static final int MAX_MALICIOUS_EVENTS = 100_000;
 
     private static final int POINTS_RED_TEAM             = 30;
     private static final int POINTS_GUARDRAIL_MALICIOUS  = 30;
@@ -127,9 +128,9 @@ public class AgenticPostureScoreCron {
             Map<Integer, List<String>> sensitiveByCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(null);
 
             int now = Context.now();
-            // Per-host counts from the threat backend, attributed to agents by host like the Argus observe page.
-            List<HostSeverityCount> hostCounts =
-                    new ThreatBackend().hostSeverityCounts(now - MALICIOUS_EVENTS_WINDOW_SECONDS, now);
+            // Attributed to agents by host, then actor (see HostCollectionResolver.resolveEvent).
+            List<DashboardMaliciousEvent> hostCounts = new AbstractThreatDetectionAction().fetchAllMaliciousEvents(
+                    now - MALICIOUS_EVENTS_WINDOW_SECONDS, now, MAX_MALICIOUS_EVENTS, null, null, true);
             Map<Integer, Map<String, Integer>> maliciousSeverities =
                     new HostCollectionResolver(agentCollections).severityByCollection(hostCounts);
             List<WriteModel<ApiCollection>> updates = new ArrayList<>();
@@ -219,13 +220,6 @@ public class AgenticPostureScoreCron {
         double available = POINTS_RED_TEAM + POINTS_GUARDRAIL_MALICIOUS + POINTS_COVERAGE
                 + POINTS_SENSITIVE_DATA + POINTS_ACCESS_AUTH + POINTS_OVERPRIVILEGED_TOOLS;
         return (earned / available) * 100.0;
-    }
-
-    // Exposes AbstractThreatDetectionAction's protected threat-backend call outside a Struts request.
-    private static class ThreatBackend extends AbstractThreatDetectionAction {
-        List<HostSeverityCount> hostSeverityCounts(int startTs, int endTs) {
-            return fetchHostSeverityCounts(startTs, endTs);
-        }
     }
 
     // Severity of the worst finding, so extra low-severity findings never dilute a high one; 0 when none.
