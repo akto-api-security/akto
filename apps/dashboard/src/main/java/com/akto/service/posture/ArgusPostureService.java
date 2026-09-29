@@ -1427,7 +1427,10 @@ public class ArgusPostureService {
         return shared + " shared · " + orphaned + " orphaned";
     }
 
-    private static String envTagValue(ApiCollection c) {
+    // Package-private (not private): TestArgusPostureService exercises this wrapper directly, and
+    // ArgusAgentPostureDrillService calls InsightUtil.envTagValue directly instead — same package,
+    // same convention PostureService's own paginate/worstSeverity helpers already use.
+    static String envTagValue(ApiCollection c) {
         return InsightUtil.envTagValue(c);
     }
 

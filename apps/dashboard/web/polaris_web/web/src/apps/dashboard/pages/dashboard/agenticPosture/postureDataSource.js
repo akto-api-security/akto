@@ -67,8 +67,8 @@ async function fetchInsightCardSummaries(startTimestamp, endTimestamp) {
 // fetchInsightCards: a drill with no real rows behind it would be actively misleading). Signature
 // matches dashboardApi.fetchPostureDrill's own shape 1:1 so PostureDrillFlyout.jsx (built for that
 // endpoint) can be reused verbatim by just swapping which fetch function it's given.
-async function fetchInsightCardDrill(drillId, path, startTimestamp, endTimestamp, skip, limit) {
-    return await dashboardApi.fetchArgusPostureDrill(drillId, path, startTimestamp, endTimestamp, skip, limit)
+async function fetchInsightCardDrill(drillId, path, startTimestamp, endTimestamp, environment, skip, limit) {
+    return await dashboardApi.fetchArgusPostureDrill(drillId, path, startTimestamp, endTimestamp, environment, skip, limit)
 }
 
 export default { fetchPostureSummary, fetchAgentDetail, fetchInsightCards, fetchInsightCardSummaries, fetchInsightCardDrill }

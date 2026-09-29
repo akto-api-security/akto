@@ -18,7 +18,6 @@ import HighestRiskAgentsTable from './overview/HighestRiskAgentsTable'
 import RiskByDomainSection from './overview/RiskByDomainSection'
 import InsightCardsSection from './overview/InsightCardsSection'
 import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
-import TopFindingsSection from './overview/TopFindingsSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
 import dashboardApi from '../api'
 
@@ -72,6 +71,9 @@ function AgenticPosture() {
     const [selectedEnv, setSelectedEnv] = useState(() => searchParams.get('env') || 'all')
     const [regenerating, setRegenerating] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
+    const [insightCards, setInsightCards] = useState([])
+    const [insightSummaries, setInsightSummaries] = useState({})
+    const [insightSummariesLoading, setInsightSummariesLoading] = useState(false)
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000)
 
@@ -207,13 +209,6 @@ function AgenticPosture() {
     const openAgent = (groupKey) => navigate(`/dashboard/agentic-posture/agents/${encodeURIComponent(groupKey)}`)
     const openKpiLink = (kpi) => { if (kpi.linkGroupKey) openAgent(kpi.linkGroupKey) }
 
-    const term = searchTerm.trim().toLowerCase()
-    const highestRiskAgents = useMemo(() => {
-        const rows = pageData.highestRiskAgents || []
-        const filtered = selectedEnv === 'all' ? rows : rows.filter((r) => r.environment === selectedEnv)
-        if (!term) return filtered
-        return filtered.filter((r) => r.name.toLowerCase().includes(term) || (r.issue || '').toLowerCase().includes(term))
-    }, [pageData.highestRiskAgents, selectedEnv, term])
     // Highest-risk rows carry a real ApiCollection id as groupKey, so they open the collection page.
     const openCollection = (collectionId) => navigate(`/dashboard/observe/inventory/${encodeURIComponent(collectionId)}`)
 

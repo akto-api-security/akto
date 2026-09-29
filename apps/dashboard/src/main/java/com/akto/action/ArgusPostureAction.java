@@ -33,8 +33,11 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 public class ArgusPostureAction extends UserAction {
 
@@ -138,11 +141,15 @@ public class ArgusPostureAction extends UserAction {
     }
 
     /**
-     * One insight card's drilldown flyout — the real rows behind that card, reusing
-     * PostureDrillFlyout/PostureDrillResult/PostureDrillNarrativeService wholesale (see
-     * ArgusPostureService's own "insight card drilldowns" section). Fetches only what the
-     * requested drillId actually needs, not all 4 card-data reads buildCards makes — a red-team
-     * drill has no reason to also hit ElasticSearch for observability, and vice versa.
+     * Every Argus flyout drill, dispatched by drillId: the posture-score breakdown and the
+     * highest-risk-agents list (both agent-level, environment-scoped, handled by
+     * ArgusAgentPostureDrillService — see PostureScoreCard/KpiGrid's own onOpenDrill wiring) or
+     * one of the 5 insight cards' own drilldowns (red-team issues / guardrail events /
+     * observability — see ArgusPostureService's "insight card drilldowns" section). The card
+     * drills fetch only what the requested drillId actually needs, not all 4 card-data reads
+     * buildCards makes — a red-team drill has no reason to also hit ElasticSearch for
+     * observability, and vice versa. Both families reuse the same
+     * PostureDrillFlyout/PostureDrillResult/PostureDrillNarrativeService mechanism.
      */
     public String fetchArgusPostureDrill() {
         try {
@@ -154,6 +161,17 @@ public class ArgusPostureAction extends UserAction {
             final CONTEXT_SOURCE contextSource = ctx.getContextSource();
             final long startMs = startTimestamp * 1000L;
             final long endMs = endTimestamp * 1000L;
+
+            if (ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE.equals(drillId)
+                    || ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS.equals(drillId)) {
+                InsightDataBundle bundle = getOrEmpty(EXECUTOR.submit(withContext(accountId, userId, contextSource,
+                        () -> insightService.getOrLoadBundle(ctx))), null, "bundle");
+                postureDrill = ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE.equals(drillId)
+                        ? agentPostureDrillService.fetchPostureScoreDrill(bundle, path, skip, limit)
+                        : agentPostureDrillService.fetchHighRiskAgentsDrill(bundle, environment, path, skip, limit);
+                PostureDrillNarrativeService.attachNarrative(postureDrill, ctx, drillId, path);
+                return SUCCESS.toUpperCase();
+            }
 
             boolean needsIssues = ArgusPostureService.DRILL_RED_TEAM_ISSUES.equals(drillId);
             boolean needsEvents = ArgusPostureService.DRILL_GUARDRAIL_EVENTS.equals(drillId);
@@ -298,6 +316,8 @@ public class ArgusPostureAction extends UserAction {
             loggerMaker.errorAndAddToDb("ArgusPostureAction: " + label + " future failed/timed out: " + e.getMessage());
             return empty;
         }
+    }
+
     // Latest cron-written history row is the current score; the 30-day window feeds the trend.
     private BasicDBObject fetchPostureScore() {
         int now = Context.now();
