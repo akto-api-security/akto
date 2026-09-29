@@ -430,7 +430,7 @@ public class DaoInit {
             });
         }
 
-        clients[0] = MongoClients.create(builder.build());
+        clients[0] = com.akto.util.DbNames.wrap(MongoClients.create(builder.build()));
     }
 
     public static void init(ConnectionString connectionString) {
