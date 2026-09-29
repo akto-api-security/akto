@@ -2696,7 +2696,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     },
 
     isAgenticPostureEnabled(){
-      const agenticPostureAccounts = [1000000, 1703087742];
+      const agenticPostureAccounts = [1000000, 1703087742, 1726615470];
       return this.isAktoUser() && agenticPostureAccounts.includes(Number(window?.ACTIVE_ACCOUNT));
     },
 
