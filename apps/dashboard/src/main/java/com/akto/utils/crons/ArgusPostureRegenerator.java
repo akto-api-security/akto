@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightService;
+import com.akto.service.posture.ArgusPostureChangesService;
 import com.mongodb.BasicDBObject;
 
 import java.util.Map;
@@ -59,6 +60,7 @@ public class ArgusPostureRegenerator {
             TOOL_CLASSIFICATION_CRON.forceRunForAccount(accountId);
             POSTURE_SCORE_CRON.forceRunForAccount(accountId);
             InsightService.invalidateAccount(accountId);
+            ArgusPostureChangesService.invalidateAccount(accountId);
         } catch (Exception e) {
             status.error = "Regeneration failed";
             loggerMaker.errorAndAddToDb(e, "Argus posture regenerate failed for accountId=" + accountId + ": " + e.getMessage());

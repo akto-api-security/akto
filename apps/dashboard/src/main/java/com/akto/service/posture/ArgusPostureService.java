@@ -1595,8 +1595,8 @@ public class ArgusPostureService {
     }
 
     private static final int SEVERITY_CRITICAL_AT = 75;
-    static final int SEVERITY_HIGH_AT = 10;
-    private static final int SEVERITY_MEDIUM_AT = 5;
+    static final int SEVERITY_HIGH_AT = 50;
+    private static final int SEVERITY_MEDIUM_AT = 25;
 
     static String severityForScore(long score) {
         if (score >= SEVERITY_CRITICAL_AT) return "CRITICAL";

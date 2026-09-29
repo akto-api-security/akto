@@ -7,6 +7,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.HttpMessage;
 
@@ -74,6 +75,27 @@ public class AbstractThreatDetectionAction extends UserAction {
 
   public String getBackendUrl() {
     return ThreatDetectionBackendClient.backendUrl();
+  }
+
+  // apiCollectionId -> {severity -> count} of AGENTIC malicious events since startTimestamp, aggregated on demand by
+  // the threat backend (it owns threat Mongo); null when the call fails.
+  protected Map<Integer, Map<String, Integer>> fetchAgenticSeverityCounts(List<Integer> apiCollectionIds, int startTimestamp) {
+    try {
+      Map<String, Object> body = new HashMap<>();
+      body.put("apiCollectionIds", apiCollectionIds);
+      body.put("startTs", startTimestamp);
+      Request request = new Request.Builder()
+          .url(this.getBackendUrl() + "/api/dashboard/agentic_severity_counts")
+          .post(RequestBody.create(objectMapper.writeValueAsString(body), MediaType.parse("application/json; charset=utf-8")))
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .build();
+      try (Response resp = httpClient.newCall(request).execute()) {
+        if (!resp.isSuccessful() || resp.body() == null) return null;
+        return objectMapper.readValue(resp.body().string(), new TypeReference<Map<Integer, Map<String, Integer>>>() {});
+      }
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /**

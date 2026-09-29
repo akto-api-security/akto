@@ -20,12 +20,22 @@ function ChangeRow({ row }) {
             </Box>
             <Text variant="bodyMd" fontWeight="semibold">{row.count}</Text>
             <Text variant="bodyMd" color="subdued">{row.label}</Text>
+            {row.detail && <Text variant="bodySm" color="subdued">({row.detail})</Text>}
         </HorizontalStack>
     )
 }
 
 function ChangesSinceLastWeekSection({ changesThisWeek }) {
     const rows = changesThisWeek || []
+    if (rows.length === 0) {
+        return (
+            <Card>
+                <Box padding="4">
+                    <Text variant="bodyMd" color="subdued" alignment="center">No changes to show for the last 7 days.</Text>
+                </Box>
+            </Card>
+        )
+    }
     return (
         <Card>
             <Box padding="4">

@@ -308,6 +308,14 @@ const api = {
         })
     },
 
+    fetchArgusPostureChanges: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureChanges',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, environment }
+        })
+    },
+
     // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
     fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
         return await request({

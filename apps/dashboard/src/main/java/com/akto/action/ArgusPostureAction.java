@@ -18,6 +18,7 @@ import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
 import com.akto.service.posture.ArgusAgentPostureDrillService;
+import com.akto.service.posture.ArgusPostureChangesService;
 import com.akto.service.posture.ArgusPostureService;
 import com.akto.service.posture.PostureDrillNarrativeService;
 import com.akto.service.posture.PostureDrillResult;
@@ -72,6 +73,7 @@ public class ArgusPostureAction extends UserAction {
 
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
     private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
+    private final ArgusPostureChangesService changesService = new ArgusPostureChangesService();
     private final InsightService insightService = new InsightService();
 
     @Getter @Setter private int startTimestamp;
@@ -89,13 +91,7 @@ public class ArgusPostureAction extends UserAction {
 
     public String fetchArgusPostureSummary() {
         try {
-            if (endTimestamp == 0) endTimestamp = Context.now();
-
-            final int accountId = Context.accountId.get();
-            final Integer userId = Context.userId.get();
-            final CONTEXT_SOURCE contextSource = Context.contextSource.get();
-
-            InsightContext ctx = new InsightContext(accountId, userId, contextSource, startTimestamp, endTimestamp);
+            InsightContext ctx = buildCtx();
             InsightDataBundle bundle = insightService.getOrLoadBundle(ctx);
 
             this.response = argusPostureService.buildSummary(bundle, environment);
@@ -233,6 +229,7 @@ public class ArgusPostureAction extends UserAction {
     }
 
     private InsightContext buildCtx() {
+        if (endTimestamp == 0) endTimestamp = Context.now();
         return new InsightContext(Context.accountId.get(), Context.userId.get(), Context.contextSource.get(),
                 startTimestamp, endTimestamp);
     }
@@ -335,6 +332,19 @@ public class ArgusPostureAction extends UserAction {
                 0, 1, Sorts.descending(AgenticPostureScoreHistory.COMPUTED_AT));
         AgenticPostureScoreHistory latest = trend.isEmpty() ? null : trend.get(trend.size() - 1);
         return argusPostureService.buildPostureScore(latest, trend, weekAgo.isEmpty() ? null : weekAgo.get(0));
+    }
+
+    public String fetchArgusPostureChanges() {
+        try {
+            InsightContext ctx = buildCtx();
+            this.response = changesService.fetchChanges(ctx.getAccountId(), ctx.getUserId(), environment,
+                    () -> insightService.getOrLoadBundle(ctx));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Argus posture changes: " + e.getMessage());
+            addActionError("Failed to build Argus posture changes");
+            return ERROR.toUpperCase();
+        }
     }
 
     public String triggerArgusPostureRegenerate() {
