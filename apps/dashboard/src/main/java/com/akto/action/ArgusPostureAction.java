@@ -63,6 +63,14 @@ public class ArgusPostureAction extends UserAction {
     private static final int TREND_MAX_POINTS = 500;
     private static final int DELTA_LOOKBACK_SECONDS = 7 * 86400;
 
+    // Drills whose only input is the insight bundle — no issue/event/observability fetch.
+    private static final Set<String> BUNDLE_ONLY_DRILLS = new HashSet<>(Arrays.asList(
+            ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE,
+            ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS,
+            ArgusPostureService.DRILL_PROTECTION_COVERAGE,
+            ArgusPostureService.DRILL_PRIVILEGED_TOOLS,
+            ArgusPostureService.DRILL_SENSITIVE_DATA));
+
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
     private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
     private final InsightService insightService = new InsightService();
@@ -162,14 +170,28 @@ public class ArgusPostureAction extends UserAction {
             final long startMs = startTimestamp * 1000L;
             final long endMs = endTimestamp * 1000L;
 
-            if (ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE.equals(drillId)
-                    || ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS.equals(drillId)) {
+            if (BUNDLE_ONLY_DRILLS.contains(drillId)) {
                 InsightDataBundle bundle = getOrEmpty(EXECUTOR.submit(withContext(accountId, userId, contextSource,
                         () -> insightService.getOrLoadBundle(ctx))), null, "bundle");
-                postureDrill = ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE.equals(drillId)
-                        ? agentPostureDrillService.fetchPostureScoreDrill(bundle, path, skip, limit)
-                        : agentPostureDrillService.fetchHighRiskAgentsDrill(bundle, environment, path, skip, limit);
-                PostureDrillNarrativeService.attachNarrative(postureDrill, ctx, drillId, path);
+                String envScopeKey = "env=" + ArgusPostureService.environmentKey(environment);
+                switch (drillId) {
+                    case ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE:
+                        postureDrill = agentPostureDrillService.fetchPostureScoreDrill(bundle, path, skip, limit);
+                        break;
+                    case ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS:
+                        postureDrill = agentPostureDrillService.fetchHighRiskAgentsDrill(bundle, environment, path, skip, limit);
+                        break;
+                    case ArgusPostureService.DRILL_PROTECTION_COVERAGE:
+                        postureDrill = argusPostureService.fetchProtectionCoverageDrill(bundle, environment, skip, limit);
+                        break;
+                    case ArgusPostureService.DRILL_PRIVILEGED_TOOLS:
+                        postureDrill = argusPostureService.fetchPrivilegedToolsDrill(bundle, environment, skip, limit);
+                        break;
+                    default:
+                        postureDrill = argusPostureService.fetchSensitiveDataDrill(bundle, environment, skip, limit);
+                        break;
+                }
+                PostureDrillNarrativeService.attachNarrative(postureDrill, ctx, drillId, path, envScopeKey);
                 return SUCCESS.toUpperCase();
             }
 
