@@ -13,6 +13,7 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import httpx
 
@@ -97,6 +98,26 @@ async def _post_json_logged(
         raise ValueError(f"{log_tag} non-JSON response from {url}: {body[:200]!r}") from exc
 
 
+def _log_vllm_metrics(provider: str, model: str, base_url: str, body: Any, client_ms: float) -> None:
+    metrics = body.get("metrics") if isinstance(body, dict) else None
+    if isinstance(metrics, dict):
+        fields = " ".join(f"{key}={value}" for key, value in metrics.items())
+        ttft = metrics.get("time_to_first_token_ms")
+        generation = metrics.get("generation_time_ms")
+        if isinstance(ttft, (int, float)) and isinstance(generation, (int, float)):
+            llm_ms = ttft + generation
+            fields += f" llm_ms={llm_ms:.1f} network_ms={client_ms - llm_ms:.1f}"
+    elif metrics is None:
+        fields = "metrics=missing"
+    else:
+        fields = "metrics=invalid"
+    req_id = body.get("id") if isinstance(body, dict) else None
+    logger.info(
+        f"[vllm-metrics] provider={provider} model={model} host={urlparse(base_url).netloc} "
+        f"req_id={req_id} client_ms={client_ms:.1f} {fields}"
+    )
+
+
 class LLMProvider(ABC):
     name: str = ""
 
@@ -114,23 +135,29 @@ class OpenAIProvider(LLMProvider):
         self.name = "openai" if "openai.com" in self.base_url else "openai_compatible"
         logger.info(f"[OpenAI] model={self.model} base_url={self.base_url} api_key={_redact_secret(self.api_key)}")
 
+    include_metrics = False
+
     async def complete(self, prompt: str) -> str:
         headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {
+            "model": self.model,
+            "temperature": 0.1,
+            "max_tokens": 256,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if self.include_metrics:
+            payload["include_metrics"] = True
         client = http_client.get_client()
-        resp = await client.post(
-            f"{self.base_url}/chat/completions",
-            headers=headers,
-            json={
-                "model": self.model,
-                "temperature": 0.1,
-                "max_tokens": 256,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
+        started = time.perf_counter()
+        resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+        client_ms = (time.perf_counter() - started) * 1000
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        body = resp.json()
+        if self.include_metrics:
+            _log_vllm_metrics(self.name, self.model, self.base_url, body, client_ms)
+        return body["choices"][0]["message"]["content"]
 
 
 class AnthropicProvider(LLMProvider):
@@ -641,6 +668,105 @@ def _build_qwen3guard() -> LLMProvider | None:
     )
 
 
+# ── Faster per-role alternates — old provider is the fallback on failure ──────
+# Own model/baseUrl per modelConfigs entry, same as "openai_compatible"; on any
+# error, each calls the existing builder for its role's original provider.
+
+# Fast leg's own budget — bounds how long an unreachable/hung host can delay
+# the fallback (asyncio.CancelledError from the caller's own timeout isn't an
+# Exception, so an unreachable host must fail from inside our own except).
+_FAST_LEG_TIMEOUT_S = 1.5
+
+
+class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
+    """Faster Qwen3Guard-hosting endpoint; falls back to qwen3guard (Vertex AI) on failure.
+
+    Same contract as the real qwen3guard (raw text in, Safety:/Categories: out) —
+    the model always answers that way regardless of prompt, on Vertex or here, so
+    this can't take the ABCD path gemma_fast/gemma_fast_arbiter use.
+    """
+
+    name = "qwen3guard_fast"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        # OpenAIProvider.__init__ overwrites self.name — reassert it.
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "qwen3guard_fast"
+
+    async def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> tuple[str, list | None]:
+        try:
+            headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            client = http_client.get_client()
+            body = await asyncio.wait_for(
+                _post_json_logged(
+                    client,
+                    f"{self.base_url}/chat/completions",
+                    headers,
+                    {"model": self.model, **_qwen3guard_params(text, top_logprobs, temperature)},
+                    "[Qwen3GuardFast]",
+                ),
+                timeout=_FAST_LEG_TIMEOUT_S,
+            )
+            return _choice_content_and_logprobs(body)
+        except Exception as exc:
+            logger.warning(f"[Qwen3GuardFast] fast endpoint failed ({exc!r}), falling back to qwen3guard")
+            fallback = _build_qwen3guard()
+            if not isinstance(fallback, Qwen3GuardOutput):
+                raise
+            return await fallback.complete_with_logprobs(text, top_logprobs, temperature)
+
+
+class GemmaFastProvider(OpenAIProvider):
+    """Faster Gemma endpoint; falls back to gemma_foundry on failure."""
+
+    name = "gemma_fast"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast"
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
+        except Exception as exc:
+            logger.warning(f"[GemmaFast] fast endpoint failed ({exc!r}), falling back to gemma_foundry")
+            fallback = _build_foundry("gemma_foundry", "", "", "")
+            if fallback is None:
+                raise
+            return await fallback.complete(prompt)
+
+
+class GemmaFastArbiterProvider(OpenAIProvider):
+    """Faster (Gemma) arbiter endpoint. No built-in fallback: a backup is a FINAL_ARBITER_BACKUP modelConfigs entry."""
+
+    name = "gemma_fast_arbiter"
+    include_metrics = True
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast_arbiter"
+
+    async def complete(self, prompt: str) -> str:
+        return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
+
+
+_FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
+
+# Fast provider name → settings attr holding its default endpoint. An entry's
+# own "baseUrl" always overrides this; when the entry omits it, this is how
+# the code knows which host to hit — add one more pair here for a new "_fast"
+# provider, no other wiring needed.
+_FAST_PROVIDER_BASE_URL_SETTING: dict[str, str] = {
+    "qwen3guard_fast": "QWEN3GUARD_VLLM_BASE_URL",
+    "gemma_fast": "GEMMA_VLLM_BASE_URL",
+    "gemma_fast_arbiter": "GEMMA_VLLM_ARBITER_BASE_URL",
+}
+
+
 # Foundry provider name → (class, settings-var prefix). BASE_URL/API_KEY are
 # required (entry baseUrl overrides the env); DEPLOYMENT/MODEL are optional.
 # All classes take the same (base_url, api_key, deployment, model) constructor:
@@ -690,6 +816,21 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "anthropic_foundry": lambda model, base_url, deployment: _build_foundry(
         "anthropic_foundry", model, base_url, deployment
     ),
+    "qwen3guard_fast": lambda model, base_url, _d: (
+        Qwen3GuardFastProvider(settings.QWEN_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast": lambda model, base_url, _d: (
+        GemmaFastProvider(settings.GEMMA_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast_arbiter": lambda model, base_url, _d: (
+        GemmaFastArbiterProvider(settings.GEMMA_26B_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
 }
 
 
@@ -699,6 +840,23 @@ def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "
         logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
         return None
     return _cached_provider((provider_name, model, base_url, deployment), lambda: builder(model, base_url, deployment))
+
+
+class FallbackProvider(LLMProvider):
+    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any]):
+        self.primary = primary
+        self.backup_entry = backup_entry
+        self.name = primary.name
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await asyncio.wait_for(self.primary.complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
+        except Exception as exc:
+            backup = build_provider_from_config(self.backup_entry)
+            if backup is None:
+                raise
+            logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}")
+            return await backup.complete(prompt)
 
 
 def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:
@@ -716,6 +874,9 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
     if name in ("openai", "ollama", "openai_compatible"):
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
+    if name in _FAST_PROVIDERS:
+        base_url = (entry.get("baseUrl") or "").strip() or getattr(settings, _FAST_PROVIDER_BASE_URL_SETTING[name], "")
+        return _dispatch(name, model, base_url)
     if name in _FOUNDRY_PROVIDERS:
         # deployment (azureml-model-deployment header) is a routing label, not a
         # secret — safe to allow per-entry, unlike apiKey. This lets two

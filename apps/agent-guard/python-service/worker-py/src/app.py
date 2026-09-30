@@ -7,13 +7,15 @@ import time
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
 import metrics_push
 import providers
 import scan_diag
+from constants import get_default_config
+from model_map import build_arbiter
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -38,6 +40,11 @@ class ScanRequest(BaseModel):
     # prompt). Omitted requests fall back to segmenting `text` alone.
     system_prompt: str = ""
     enrichment: str = ""
+
+
+class GuardrailsLLMRequest(BaseModel):
+    prompt: str
+    model: str = ""
 
 
 @asynccontextmanager
@@ -147,3 +154,34 @@ async def scan(body: ScanRequest):
 @app.post("/scan/batch")
 async def scan_batch(body: list[ScanRequest]):
     return [await scan_payload(item.model_dump(), schedule_fn=_schedule_background) for item in body]
+
+
+@app.post("/guardrails/llm")
+async def guardrails_llm(body: GuardrailsLLMRequest):
+    """Single-provider prompt-in/text-out passthrough for the gateway's PII/custom-guardrail
+    block+redact decisions — bypasses ModelMapScanner's cascade entirely, one provider call.
+    Primary = the FINAL_ARBITER entry of the model config (DEFAULT_MODEL_CONFIG_JSON, else the built-in default).
+    Backup = its FINAL_ARBITER_BACKUP entry, tried when the primary fails; no such entry = no backup.
+    """
+    start = time.perf_counter()
+    logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
+    provider = build_arbiter(get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"], body.model)
+    if provider is None:
+        logger.warning("[GuardrailsLLM] not configured (no usable FINAL_ARBITER entry in the model config)")
+        raise HTTPException(
+            status_code=503,
+            detail="guardrails LLM not configured (no usable FINAL_ARBITER entry in the model config)",
+        )
+    try:
+        content = await provider.complete(body.prompt)
+    except Exception as exc:
+        failed_ms = (time.perf_counter() - start) * 1000
+        logger.warning(f"[GuardrailsLLM] call failed: {exc!r} ms={failed_ms:.0f}")
+        raise HTTPException(status_code=502, detail=f"guardrails LLM call failed: {exc!r}") from exc
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    logger.debug(f"[GuardrailsLLM] response: {content!r}")
+    logger.info(
+        f"[GuardrailsLLM] provider={provider.name} prompt_len={len(body.prompt)} "
+        f"response_len={len(content)} ms={elapsed_ms:.0f}"
+    )
+    return {"content": content}

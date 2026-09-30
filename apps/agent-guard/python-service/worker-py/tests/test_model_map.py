@@ -33,10 +33,12 @@ class FakeScanner:
     script = {}
     calls = []
     formats = {}
+    built = []
 
     def __init__(self, provider, response_format=""):
         self.provider = provider
         self.response_format = response_format
+        FakeScanner.built.append(self)
         FakeScanner.formats[provider.name] = response_format
 
     async def scan(self, scanner_name, scanner_type, text, config):
@@ -54,6 +56,7 @@ def patch_providers(monkeypatch):
     FakeScanner.calls = []
     FakeScanner.formats = {}
     FakeScanner.script = {}
+    FakeScanner.built = []
     monkeypatch.setattr(model_map, "build_provider_from_config", lambda entry: FakeProvider(entry["provider"]))
     # run() does `from llm_scanner import LLMScanner`; patch it there.
     import llm_scanner
@@ -297,3 +300,33 @@ async def test_response_format_is_per_model_not_global():
     ]
     await _run(cfg, {"gemma_foundry": UNSAFE, "gemma_vertexai": UNSAFE})
     assert FakeScanner.formats == {"gemma_foundry": "abcd", "gemma_vertexai": ""}
+
+
+# ── FINAL_ARBITER_BACKUP: a modelConfigs entry, never a scanner of its own ──
+
+
+def _arbiter_scanner():
+    return next(sc for sc in FakeScanner.built if sc.provider.name == "gemma_vertexai")
+
+
+async def test_arbiter_is_wrapped_when_a_backup_entry_exists():
+    from providers import FallbackProvider
+
+    cfg = [_entry("gemma_vertexai", "FINAL_ARBITER"), _entry("anthropic", "FINAL_ARBITER_BACKUP")]
+    await _run(cfg, {"gemma_vertexai": SAFE})
+    assert isinstance(_arbiter_scanner().provider, FallbackProvider)
+
+
+async def test_arbiter_is_not_wrapped_without_a_backup_entry():
+    from providers import FallbackProvider
+
+    await _run([_entry("gemma_vertexai", "FINAL_ARBITER")], {"gemma_vertexai": SAFE})
+    assert not isinstance(_arbiter_scanner().provider, FallbackProvider)
+
+
+async def test_backup_entry_never_runs_and_is_not_reported_in_details():
+    cfg = [_entry("gemma_vertexai", "FINAL_ARBITER"), _entry("anthropic", "FINAL_ARBITER_BACKUP")]
+    r = await _run(cfg, {"gemma_vertexai": UNSAFE})
+    assert FakeScanner.calls == ["gemma_vertexai"]
+    assert r["is_valid"] is False
+    assert "anthropic" not in r["details"]
