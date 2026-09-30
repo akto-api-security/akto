@@ -4,18 +4,22 @@ Differences from the container version:
   - httpx.AsyncClient + async complete()
   - every request sets Accept-Encoding: identity (Pyodide double-gunzip fix)
   - Vertex auth uses gcp_auth.get_token() instead of google-auth credentials
+  - Bedrock IAM auth uses aws_auth.sign_headers() instead of botocore
 """
 
 import asyncio
+import json
 import logging
 import math
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, Optional
+from urllib.parse import quote
 
 import httpx
 
+import aws_auth
 import gcp_auth
 import http_client
 from settings import settings
@@ -63,7 +67,14 @@ def _cached_provider(
 
 
 async def _post_json_logged(
-    client: httpx.AsyncClient, url: str, headers: dict, json_body: dict, log_tag: str, extra: str = ""
+    client: httpx.AsyncClient,
+    url: str,
+    headers: dict,
+    json_body: dict | None,
+    log_tag: str,
+    extra: str = "",
+    *,
+    content: bytes | None = None,
 ) -> dict:
     """POST + parse JSON, logging enough on failure to diagnose without a debugger.
 
@@ -73,10 +84,14 @@ async def _post_json_logged(
     deployment, quota exceeded), and non-JSON/malformed bodies. Callers still
     see the same exceptions as before (nothing swallowed), just with a log
     line alongside so a client-only failure doesn't require a repro to debug.
+
+    Pass pre-serialized `content` instead of `json_body` when the request is
+    signed over its body bytes (SigV4) — those exact bytes must be what's sent.
     """
     ctx = f" ({extra})" if extra else ""
+    body_kwargs: dict[str, Any] = {"content": content} if content is not None else {"json": json_body}
     try:
-        resp = await client.post(url, headers=headers, json=json_body)
+        resp = await client.post(url, headers=headers, **body_kwargs)
     except httpx.RequestError as exc:
         logger.error(f"{log_tag} request to {url} failed{ctx}: {exc!r}")
         raise
@@ -442,6 +457,98 @@ class Qwen3GuardFoundryProvider(Qwen3GuardOutput, AzureFoundryProvider):
         return _choice_content_and_logprobs(body)
 
 
+# Converse stopReasons meaning Bedrock itself withheld the answer — surfaced as
+# errors so the cascade counts them as a provider failure, not a verdict.
+_BEDROCK_BLOCKED_STOP_REASONS = {"guardrail_intervened", "content_filtered"}
+
+
+def _converse_text(body: dict) -> str:
+    """Extract the first text block from a Bedrock Converse response.
+
+    Skips non-text blocks (e.g. reasoningContent from reasoning models, which
+    precede the answer) and raises a descriptive ValueError with the body
+    attached — same rationale as _choice_content_and_logprobs.
+    """
+    stop_reason = body.get("stopReason")
+    if stop_reason in _BEDROCK_BLOCKED_STOP_REASONS:
+        raise ValueError(f"Bedrock withheld the response (stopReason={stop_reason}): {body!r}"[:500])
+    message = (body.get("output") or {}).get("message") or {}
+    for block in message.get("content") or []:
+        if "text" in block:
+            return block["text"]
+    raise ValueError(f"Converse response has no text content block: {body!r}"[:500])
+
+
+class BedrockProvider(LLMProvider):
+    """Any AWS Bedrock model via the model-agnostic Converse API.
+
+    Auth, in precedence order: a Bedrock API key (sent as Bearer); static IAM
+    credentials; else the pod's IAM role (EKS Pod Identity / IRSA), fetched
+    and refreshed by aws_auth. Both IAM modes are SigV4-signed per request.
+    The model id may be a foundation
+    model id, a cross-region inference profile (us.anthropic.…) or an ARN —
+    it is percent-encoded into the path either way."""
+
+    name = "bedrock"
+    _log_tag = "[Bedrock]"
+
+    def __init__(
+        self,
+        model: str,
+        region: str,
+        api_key: str = "",
+        credentials: aws_auth.AwsCredentials | None = None,
+        base_url: str = "",
+    ):
+        if api_key:
+            auth = f"api_key={_redact_secret(api_key)}"
+        elif credentials is not None:
+            auth = f"iam access_key_id={_redact_secret(credentials.access_key_id)}"
+        elif source := aws_auth.role_credentials_source():
+            auth = f"iam role via {source}"
+        else:
+            raise ValueError("BedrockProvider needs an api_key, IAM credentials or an IAM role in the environment")
+        self.model = model
+        self.region = region
+        self.api_key = api_key
+        self.credentials = credentials
+        self.base_url = (base_url or f"https://bedrock-runtime.{region}.amazonaws.com").rstrip("/")
+        logger.info(f"{self._log_tag} model={self.model} region={self.region} base_url={self.base_url} {auth}")
+
+    def _converse_url(self) -> str:
+        return f"{self.base_url}/model/{quote(self.model, safe='')}/converse"
+
+    async def _headers(self, url: str, payload: bytes) -> dict[str, str]:
+        headers = dict(_IDENTITY, **{"Content-Type": "application/json", "Accept": "application/json"})
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            return headers
+        creds = self.credentials or await aws_auth.get_role_credentials(self.region)
+        headers.update(aws_auth.sign_headers("POST", url, headers, payload, creds, self.region))
+        return headers
+
+    async def complete(self, prompt: str) -> str:
+        payload = json.dumps(
+            {
+                "messages": [{"role": "user", "content": [{"text": prompt}]}],
+                "inferenceConfig": {"maxTokens": 512, "temperature": 0.1},
+            },
+            separators=(",", ":"),
+        ).encode()
+        url = self._converse_url()
+        client = http_client.get_client()
+        body = await _post_json_logged(
+            client,
+            url,
+            await self._headers(url, payload),
+            None,
+            self._log_tag,
+            f"model={self.model} region={self.region}",
+            content=payload,
+        )
+        return _converse_text(body)
+
+
 # ── Qwen3Guard parser (ported verbatim — sync) ────────────────────────────────
 
 
@@ -675,6 +782,34 @@ def _build_foundry(provider_name: str, model: str, base_url: str, deployment: st
     )
 
 
+def _build_bedrock(model: str, base_url: str) -> LLMProvider | None:
+    """Region + model are required; auth prefers the Bedrock API key, then
+    static IAM access keys, then the pod's IAM role (EKS Pod Identity / IRSA —
+    no keys configured at all). model/baseUrl may come per-entry, the
+    credentials and region only from env."""
+    env = _require(
+        {"BEDROCK_REGION": settings.BEDROCK_REGION, "BEDROCK_MODEL": model or settings.BEDROCK_MODEL},
+        label="[Providers] bedrock",
+    )
+    if env is None:
+        return None
+    common = {"model": env["BEDROCK_MODEL"], "region": env["BEDROCK_REGION"], "base_url": base_url}
+    if settings.BEDROCK_API_KEY:
+        return BedrockProvider(api_key=settings.BEDROCK_API_KEY, **common)
+    if settings.BEDROCK_ACCESS_KEY_ID and settings.BEDROCK_SECRET_ACCESS_KEY:
+        creds = aws_auth.AwsCredentials(
+            settings.BEDROCK_ACCESS_KEY_ID, settings.BEDROCK_SECRET_ACCESS_KEY, settings.BEDROCK_SESSION_TOKEN
+        )
+        return BedrockProvider(credentials=creds, **common)
+    if aws_auth.role_credentials_source():
+        return BedrockProvider(**common)
+    logger.warning(
+        "[Providers] bedrock: no credentials (set BEDROCK_API_KEY, or BEDROCK_ACCESS_KEY_ID + "
+        "BEDROCK_SECRET_ACCESS_KEY, or run with an IAM role via EKS Pod Identity / IRSA); skipping"
+    )
+    return None
+
+
 _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "openai": lambda model, _b, _d: _build_openai_compatible(model, base_url=""),
     "openai_compatible": lambda model, base_url, _d: _build_openai_compatible(model, base_url),
@@ -690,6 +825,7 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "anthropic_foundry": lambda model, base_url, deployment: _build_foundry(
         "anthropic_foundry", model, base_url, deployment
     ),
+    "bedrock": lambda model, base_url, _d: _build_bedrock(model, base_url),
 }
 
 
@@ -723,6 +859,10 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
         # roles) against two different deployments on the same Foundry
         # resource/endpoint, without needing separate env-var prefixes.
         return _dispatch(name, model, (entry.get("baseUrl") or "").strip(), (entry.get("deployment") or "").strip())
+    if name == "bedrock":
+        # model/baseUrl (e.g. a VPC interface endpoint) are routing, not secrets;
+        # credentials and region stay env-only.
+        return _dispatch(name, model, (entry.get("baseUrl") or "").strip())
     return _dispatch(name, model, "")
 
 
