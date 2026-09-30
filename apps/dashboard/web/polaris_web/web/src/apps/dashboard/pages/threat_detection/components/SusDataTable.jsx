@@ -1421,7 +1421,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
   const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
   const headers = getHeaders();
-  if (currentTab === 'needs_approval') {
+  if (currentTab === 'needs_approval' && func.canManageGuardrailPolicies()) {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
   if (currentTab === 'human_approval') {

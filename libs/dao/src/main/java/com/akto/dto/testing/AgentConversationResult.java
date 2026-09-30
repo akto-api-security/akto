@@ -17,7 +17,11 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AgentConversationResult extends GenericAgentConversation {
-    
+
+    public static final String VALIDATION = "validation";
+    public static final String VALIDATION_MESSAGE = "validationMessage";
+    public static final String REMEDIATION_MESSAGE = "remediationMessage";
+
     private boolean validation;
     private String validationMessage;
     private String remediationMessage;

@@ -1,10 +1,10 @@
 package com.akto.utils.crons;
 
+import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.dao.AgenticPostureScoreHistoryDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.GuardrailPoliciesDao;
-import com.akto.dao.MaliciousEventDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
@@ -31,13 +31,10 @@ import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
-import org.bson.Document;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -126,9 +123,14 @@ public class AgenticPostureScoreCron {
             Map<Integer, List<String>> sensitiveByCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(null);
 
             int now = Context.now();
-            Map<Integer, Map<String, Integer>> maliciousSeveritiesByCollection =
-                    fetchMaliciousEventSeverities(accountId, collectionIds, now);
-
+            // Aggregated on demand by the threat backend, which owns threat Mongo.
+            Map<Integer, Map<String, Integer>> maliciousSeverities =
+                    new ThreatBackend().severityCounts(CONTEXT_SOURCE.AGENTIC, now - MALICIOUS_EVENTS_WINDOW_SECONDS, now, collectionIds);
+            // Skip rather than score the guardrail category as 0, which would drop every agent's score and the trend.
+            if (maliciousSeverities == null) {
+                loggerMaker.errorAndAddToDb("Agentic posture score cron: threat backend unreachable, keeping previous scores for accountId=" + accountId);
+                return;
+            }
             List<WriteModel<ApiCollection>> updates = new ArrayList<>();
             double scoredSum = 0;
             for (ApiCollection c : agentCollections) {
@@ -139,7 +141,7 @@ public class AgenticPostureScoreCron {
                 boolean coveredByPolicy = isCoveredByGuardrailPolicy(policies, c);
 
                 double redTeam = worstSeverityScore(redTeamSeverities.get(c.getId()));
-                double guardrailMalicious = worstSeverityScore(maliciousSeveritiesByCollection.get(c.getId()));
+                double guardrailMalicious = worstSeverityScore(maliciousSeverities.get(c.getId()));
                 double coverage = coverageSubScore(coveredByPolicy, collectionEverTested);
                 double sensitiveData = sensitiveDataSubScore(c.getId(), sensitiveByCollection);
                 double accessAuth = accessAuthSubScore(apis);
@@ -218,26 +220,11 @@ public class AgenticPostureScoreCron {
         return (earned / available) * 100.0;
     }
 
-    // {collectionId -> {severity -> count}} from malicious_events, which also holds guardrail violations.
-    private static Map<Integer, Map<String, Integer>> fetchMaliciousEventSeverities(
-            int accountId, List<Integer> collectionIds, int now) {
-        Map<Integer, Map<String, Integer>> out = new HashMap<>();
-        List<Document> pipeline = Arrays.asList(
-                new Document("$match", new Document("latestApiCollectionId", new Document("$in", collectionIds))
-                        .append("detectedAt", new Document("$gte", now - MALICIOUS_EVENTS_WINDOW_SECONDS))),
-                new Document("$group", new Document("_id",
-                        new Document("collectionId", "$latestApiCollectionId").append("severity", "$severity"))
-                        .append("count", new Document("$sum", 1))));
-        for (Document d : MaliciousEventDao.instance.aggregateRaw(String.valueOf(accountId), pipeline)) {
-            Document id = (Document) d.get("_id");
-            Integer collectionId = id == null ? null : id.getInteger("collectionId");
-            String severity = id == null ? null : id.getString("severity");
-            if (collectionId == null || severity == null) continue;
-            int count = d.getInteger("count", 0);
-            out.computeIfAbsent(collectionId, k -> new HashMap<>())
-                    .merge(severity.toUpperCase(Locale.ROOT), count, Integer::sum);
+    // Exposes AbstractThreatDetectionAction's threat-backend call outside a Struts request.
+    private static class ThreatBackend extends AbstractThreatDetectionAction {
+        Map<Integer, Map<String, Integer>> severityCounts(CONTEXT_SOURCE contextSource, int startTs, int endTs, List<Integer> collectionIds) {
+            return fetchCollectionSeverityCounts(contextSource.name(), startTs, endTs, collectionIds);
         }
-        return out;
     }
 
     // Severity of the worst finding, so extra low-severity findings never dilute a high one; 0 when none.

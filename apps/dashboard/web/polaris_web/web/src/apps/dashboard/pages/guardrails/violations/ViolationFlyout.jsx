@@ -372,7 +372,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
                                     onStatusUpdate={onStatusUpdate}
                                     row={row}
                                 />
-                                {row.behaviour === "approval" && <ApproveServerButton row={row} />}
+                                {row.behaviour === "approval" && func.canManageGuardrailPolicies() && <ApproveServerButton row={row} />}
                             </>
                         )}
                         {isHumanApprovalEvent && pending && (

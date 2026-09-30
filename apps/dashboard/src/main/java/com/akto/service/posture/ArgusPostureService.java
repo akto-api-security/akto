@@ -9,6 +9,9 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.gpt.handlers.gpt_prompts.AbstractGroundedNarrativeHandler;
+import com.akto.gpt.handlers.gpt_prompts.ArgusAttackFlowNarrativeHandler;
+import com.akto.gpt.handlers.gpt_prompts.ArgusInsightCardNarrativeHandler;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightProvider;
@@ -18,6 +21,7 @@ import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.PiiPatterns;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.crons.ToolClassificationCron;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -27,6 +31,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.json.JSONObject;
 
@@ -58,9 +63,11 @@ public class ArgusPostureService {
     private static final String KPI_SENSITIVE_DATA      = "sensitiveData";
     private static final String KPI_PROTECTION_COVERAGE = "protectionCoverage";
 
-    private static final String ENV_PRODUCTION  = "Production";
-    private static final String ENV_STAGING     = "Staging";
-    private static final String ENV_DEVELOPMENT = "Development";
+    // Display buckets/tag-value lists moved to InsightUtil (environmentBucket/envTagValue) so any
+    // AGENTIC insight provider can group by environment too, without depending on this package.
+    private static final String ENV_PRODUCTION  = InsightUtil.ENV_PRODUCTION;
+    private static final String ENV_STAGING     = InsightUtil.ENV_STAGING;
+    private static final String ENV_DEVELOPMENT = InsightUtil.ENV_DEVELOPMENT;
 
     private static final String ENV_ID_ALL         = "all";
     private static final String ENV_ID_PRODUCTION  = "production";
@@ -85,7 +92,6 @@ public class ArgusPostureService {
 
     private static final String PROTECTION_NONE = "None";
     private static final String PROTECTION_ALERT_ONLY = "Alert only";
-    private static final int DEFAULT_DRILL_LIMIT = 20;
 
     public BasicDBObject buildSummary(InsightDataBundle bundle, String environment) {
         List<ApiCollection> assets = new ArrayList<>();
@@ -460,6 +466,13 @@ public class ArgusPostureService {
         }
     }
 
+    /** Connector-created collections carry a name but no hostName; policies target them by that
+     *  name, so it is the identity used for both matching and display. */
+    static String assetIdentity(ApiCollection c) {
+        if (c == null) return null;
+        return c.getHostName() != null ? c.getHostName() : c.getName();
+    }
+
     static GuardrailsCoverageBreakdown computeCoverage(List<ApiCollection> assets, List<GuardrailPolicies> policies) {
         GuardrailsCoverageBreakdown breakdown = new GuardrailsCoverageBreakdown();
         for (ApiCollection asset : assets) {
@@ -467,7 +480,7 @@ public class ArgusPostureService {
             boolean blocking = false;
             for (GuardrailPolicies p : policies) {
                 if (p == null) continue;
-                if (!InsightUtil.policyCoversCollection(p, p.getApplyToDeviceIds(), asset)) continue;
+                if (!InsightUtil.policyCoversHost(p, assetIdentity(asset))) continue;
                 covering.add(p);
                 if (InsightUtil.isBlockingPolicy(p)) blocking = true;
             }
@@ -614,7 +627,7 @@ public class ArgusPostureService {
         List<String> exposed = unguardedByAsset.get(asset.getId());
 
         Map<String, Object> row = new HashMap<>();
-        row.put("asset", asset.getHostName());
+        row.put("asset", assetIdentity(asset));
         row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
         row.put("environment", envBucket(envTagValue(asset)));
         row.put("sensitiveData", String.join(", ", detected));
@@ -731,7 +744,7 @@ public class ArgusPostureService {
         row.put("tool", key == null || key.getUrl() == null ? "-" : ToolClassificationCron.toolNameFromUrl(key.getUrl()));
         row.put("capability", InsightUtil.humanizeToolCapability(
                 tool.getToolInfo() == null ? null : tool.getToolInfo().getCapability()));
-        row.put("asset", collection == null ? "-" : collection.getHostName());
+        row.put("asset", collection == null ? "-" : assetIdentity(collection));
         row.put("environment", collection == null ? "-" : envBucket(envTagValue(collection)));
         row.put("lastSeen", tool.getLastSeen());
         return row;
@@ -824,7 +837,7 @@ public class ArgusPostureService {
         List<String> sensitiveTypes = bundle.sensitiveByCollection.get(asset.getId());
 
         Map<String, Object> row = new HashMap<>();
-        row.put("asset", asset.getHostName());
+        row.put("asset", assetIdentity(asset));
         row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
         row.put("environment", envBucket(envTagValue(asset)));
         row.put("protection", policyNames.isEmpty()
@@ -847,12 +860,11 @@ public class ArgusPostureService {
         return shared + " shared · " + orphaned + " orphaned";
     }
 
+    // Package-private (not private): TestArgusPostureService exercises this wrapper directly, and
+    // ArgusAgentPostureDrillService calls InsightUtil.envTagValue directly instead — same package,
+    // same convention PostureService's own paginate/worstSeverity helpers already use.
     static String envTagValue(ApiCollection c) {
-        if (c == null || c.getEnvType() == null) return null;
-        for (CollectionTags tag : c.getEnvType()) {
-            if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
-        }
-        return null;
+        return InsightUtil.envTagValue(c);
     }
 
     static List<ApiCollection> assetsIn(List<ApiCollection> assets, String environment) {
@@ -892,11 +904,7 @@ public class ArgusPostureService {
     }
 
     public static String envBucket(String envTagValue) {
-        if (StringUtils.isBlank(envTagValue)) return ENV_PRODUCTION;
-        String value = envTagValue.trim().toUpperCase(Locale.ROOT);
-        if (DEV_ENVS.contains(value)) return ENV_DEVELOPMENT;
-        if (STAGING_ENVS.contains(value)) return ENV_STAGING;
-        return ENV_PRODUCTION;
+        return InsightUtil.environmentBucket(envTagValue);
     }
 
     private static boolean isAllEnvironments(String environment) {
@@ -1016,10 +1024,6 @@ public class ArgusPostureService {
         return gaps;
     }
 
-    private static <T> List<T> safe(List<T> list) {
-        return list == null ? new ArrayList<>() : list;
-    }
-
     private static final int HIGHEST_RISK_AGENTS_LIMIT = 5;
 
     public List<BasicDBObject> buildHighestRiskAgents(InsightDataBundle bundle, String environment) {
@@ -1086,8 +1090,8 @@ public class ArgusPostureService {
     }
 
     private static final int SEVERITY_CRITICAL_AT = 75;
-    static final int SEVERITY_HIGH_AT = 10;
-    private static final int SEVERITY_MEDIUM_AT = 5;
+    static final int SEVERITY_HIGH_AT = 50;
+    private static final int SEVERITY_MEDIUM_AT = 25;
 
     static String severityForScore(long score) {
         if (score >= SEVERITY_CRITICAL_AT) return "CRITICAL";

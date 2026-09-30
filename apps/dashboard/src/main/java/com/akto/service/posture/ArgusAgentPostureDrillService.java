@@ -1,7 +1,7 @@
 package com.akto.service.posture;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiInfoDao;
-import com.akto.dao.MaliciousEventDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
@@ -18,7 +18,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
@@ -172,7 +171,7 @@ public class ArgusAgentPostureDrillService {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", agent.getId());
             row.put("agent", ArgusPostureService.agentDisplayName(agent));
-            row.put("environment", ArgusPostureService.envBucket(ArgusPostureService.envTagValue(agent)));
+            row.put("environment", ArgusPostureService.envBucket(InsightUtil.envTagValue(agent)));
             row.put("subScore", round1(category.subScore(agent.getPostureSubScores())));
             row.put("points", round1(category.points(agent.getPostureSubScores())));
             row.put("postureScore", Math.round(agent.getPostureScore()));
@@ -215,7 +214,7 @@ public class ArgusAgentPostureDrillService {
             row.put("id", agent.getId());
             row.put("agent", ArgusPostureService.agentDisplayName(agent));
             row.put("type", AgenticObserveUtil.getTypeFromCollection(agent));
-            row.put("environment", ArgusPostureService.envBucket(ArgusPostureService.envTagValue(agent)));
+            row.put("environment", ArgusPostureService.envBucket(InsightUtil.envTagValue(agent)));
             row.put("score", score);
             row.put("severity", ArgusPostureService.severityForScore(score));
             row.put("topIssue", ArgusPostureService.worstIssue(agent.getPostureSubScores()));
@@ -243,7 +242,7 @@ public class ArgusAgentPostureDrillService {
         String name = ArgusPostureService.agentDisplayName(agent);
         long score = Math.round(agent.getPostureScore());
         String severity = ArgusPostureService.severityForScore(score);
-        String environment = ArgusPostureService.envBucket(ArgusPostureService.envTagValue(agent));
+        String environment = ArgusPostureService.envBucket(InsightUtil.envTagValue(agent));
         String type = AgenticObserveUtil.getTypeFromCollection(agent);
         Map<String, Object> subScores = agent.getPostureSubScores();
         int now = Context.now();
@@ -256,16 +255,14 @@ public class ArgusAgentPostureDrillService {
                 Sorts.descending(TestingRunIssues.LAST_SEEN));
         issues.sort(Comparator.comparingInt((TestingRunIssues i) -> severityRank(i.getSeverity() == null ? null : i.getSeverity().name())));
 
-        String accountId = String.valueOf(Context.accountId.get());
-        Bson eventFilter = Filters.and(Filters.eq("latestApiCollectionId", agent.getId()),
-                Filters.gte("detectedAt", (long) now - MALICIOUS_EVENTS_WINDOW_SECONDS));
-        long eventCount = MaliciousEventDao.instance.countDocuments(accountId, eventFilter);
-        List<Document> events = new ArrayList<>();
-        MaliciousEventDao.instance.aggregateRaw(accountId, Arrays.asList(
-                new Document("$match", new Document("latestApiCollectionId", agent.getId())
-                        .append("detectedAt", new Document("$gte", (long) now - MALICIOUS_EVENTS_WINDOW_SECONDS))),
-                new Document("$sort", new Document("detectedAt", -1)),
-                new Document("$limit", PROFILE_SECTION_CAP))).into(events);
+        // Null when the threat backend is unavailable; the malicious metric and section are then left out.
+        List<Integer> agentIds = Collections.singletonList(agent.getId());
+        int eventsSince = now - MALICIOUS_EVENTS_WINDOW_SECONDS;
+        Map<Integer, Map<String, Integer>> severityCounts = bundle.maliciousSeverityCounts(agentIds, eventsSince);
+        Long eventCount = severityCounts == null ? null : severityCounts.getOrDefault(agent.getId(), Collections.emptyMap())
+                .values().stream().mapToLong(Integer::longValue).sum();
+        List<DashboardMaliciousEvent> events = eventCount == null ? null
+                : bundle.listMaliciousEvents(eventsSince, now, PROFILE_SECTION_CAP, agentIds);
 
         Bson toolFilter = Filters.and(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, agent.getId()),
                 Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY), Filters.ne(ApiInfo.TOOL_INFO_CAPABILITY, "SAFE"));
@@ -282,11 +279,14 @@ public class ArgusAgentPostureDrillService {
         result.setSeverity(severity);
         result.setBadge(new PostureDrillResult.Badge(capitalize(severity), badgeTone(severity)));
         result.setSubtitle("Posture score " + score + " / 100 · " + environment + " · " + type);
-        result.setSummary(Arrays.asList(
-                new InsightResult.Metric("postureScore", "Posture score", score, "count", score + " / 100"),
-                new InsightResult.Metric("openFindings", "Open red-team findings", openIssues, "count", InsightUtil.grouped(openIssues)),
-                new InsightResult.Metric("maliciousEvents", "Malicious events (90d)", eventCount, "count", InsightUtil.grouped(eventCount)),
-                new InsightResult.Metric("privilegedTools", "Privileged tools", toolCount, "count", InsightUtil.grouped(toolCount))));
+        List<InsightResult.Metric> summary = new ArrayList<>();
+        summary.add(new InsightResult.Metric("postureScore", "Posture score", score, "count", score + " / 100"));
+        summary.add(new InsightResult.Metric("openFindings", "Open red-team findings", openIssues, "count", InsightUtil.grouped(openIssues)));
+        if (eventCount != null) {
+            summary.add(new InsightResult.Metric("maliciousEvents", "Malicious events (90d)", eventCount, "count", InsightUtil.grouped(eventCount)));
+        }
+        summary.add(new InsightResult.Metric("privilegedTools", "Privileged tools", toolCount, "count", InsightUtil.grouped(toolCount)));
+        result.setSummary(summary);
         result.setFacts(Arrays.asList(
                 new PostureDrillResult.Fact("Host", agent.getHostName() == null ? "-" : agent.getHostName(), null),
                 new PostureDrillResult.Fact("Top issue", ArgusPostureService.worstIssue(subScores), null),
@@ -296,13 +296,13 @@ public class ArgusAgentPostureDrillService {
                 new PostureDrillResult.Fact("Red-team scan", scanGap == null ? "Scanned" : scanGap, scanGap == null ? null : "critical"),
                 new PostureDrillResult.Fact("Sensitive data",
                         sensitiveTypes == null || sensitiveTypes.isEmpty() ? "None detected" : String.join(", ", sensitiveTypes), null)));
-        result.setSections(Arrays.asList(
-                scoreBreakdownSection(subScores),
-                remediationSection(subScores),
-                redTeamSection(issues, openIssues),
-                maliciousEventsSection(events, eventCount),
-                privilegedToolsSection(tools, toolCount)));
-        result.setCtas(profileCtas(agent, openIssues, scanGap != null, eventCount, coveringPolicies.isEmpty()));
+        List<PostureDrillResult.Section> sections = new ArrayList<>(Arrays.asList(
+                scoreBreakdownSection(subScores), remediationSection(subScores), redTeamSection(issues, openIssues)));
+        if (events != null) sections.add(maliciousEventsSection(events, eventCount));
+        sections.add(privilegedToolsSection(tools, toolCount));
+        result.setSections(sections);
+        result.setCtas(profileCtas(agent, openIssues, scanGap != null, eventCount != null && eventCount > 0,
+                coveringPolicies.isEmpty()));
         return result;
     }
 
@@ -356,15 +356,14 @@ public class ArgusAgentPostureDrillService {
                 rows, total);
     }
 
-    private static PostureDrillResult.Section maliciousEventsSection(List<Document> events, long total) {
+    private static PostureDrillResult.Section maliciousEventsSection(List<DashboardMaliciousEvent> events, long total) {
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (Document event : events) {
-            Object detectedAt = event.get("detectedAt");
+        for (DashboardMaliciousEvent event : events) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("timestamp", detectedAt instanceof Number ? ((Number) detectedAt).longValue() : 0L);
-            row.put("title", event.getString("subCategory") != null ? event.getString("subCategory") : event.getString("category"));
-            row.put("detail", event.getString("latestApiEndpoint"));
-            row.put("severity", event.getString("severity"));
+            row.put("timestamp", event.getTimestamp());
+            row.put("title", event.getSubCategory() != null ? event.getSubCategory() : event.getCategory());
+            row.put("detail", event.getUrl());
+            row.put("severity", event.getSeverity());
             rows.add(row);
         }
         return new PostureDrillResult.Section("maliciousEvents", "Guardrail & malicious activity",
@@ -412,11 +411,11 @@ public class ArgusAgentPostureDrillService {
 
     // Header renders the last CTA as primary, so the most urgent action goes last.
     private static List<InsightResult.Cta> profileCtas(ApiCollection agent, long openIssues, boolean neverScanned,
-                                                       long eventCount, boolean noPolicy) {
+                                                       boolean hasEvents, boolean noPolicy) {
         List<InsightResult.Cta> ctas = new ArrayList<>();
         ctas.add(cta("open_collection", "Open collection", InsightRoutes.INVENTORY + "/" + agent.getId(), false));
         if (noPolicy) ctas.add(policyCta(false));
-        if (eventCount > 0) ctas.add(violationsCta(false));
+        if (hasEvents) ctas.add(violationsCta(false));
         if (openIssues > 0) ctas.add(issuesCta(agent.getId(), false));
         else if (neverScanned) ctas.add(cta("run_red_team", "Run red-team scan", TESTING_ROUTE, false));
         ctas.get(ctas.size() - 1).setPrimary(true);
@@ -442,7 +441,7 @@ public class ArgusAgentPostureDrillService {
     private static class CategoryEvidence {
         private final InsightDataBundle bundle;
         private final Map<Integer, Map<String, Integer>> redTeam;
-        private final Map<Integer, Long> malicious;
+        private final Map<Integer, Map<String, Integer>> malicious;
         private final ArgusPostureService.GuardrailsCoverageBreakdown coverage;
 
         CategoryEvidence(InsightDataBundle bundle, List<ApiCollection> agents) {
@@ -454,7 +453,9 @@ public class ArgusAgentPostureDrillService {
             this.redTeam = ids.isEmpty() ? new HashMap<>()
                     : TestingRunIssuesDao.instance.getSeveritiesMapForCollections(
                             Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, ids), false, groupedId);
-            this.malicious = maliciousCounts(ids);
+            Map<Integer, Map<String, Integer>> counts = ids.isEmpty() ? null
+                    : bundle.maliciousSeverityCounts(ids, Context.now() - MALICIOUS_EVENTS_WINDOW_SECONDS);
+            this.malicious = counts == null ? new HashMap<>() : counts;
             this.coverage = ArgusPostureService.computeCoverage(agents, bundle.policies);
         }
 
@@ -466,8 +467,9 @@ public class ArgusAgentPostureDrillService {
                     return bySeverity == null || bySeverity.isEmpty() ? "Open findings" : severityLine(bySeverity) + " open";
                 }
                 case GUARDRAIL_MALICIOUS: {
-                    long count = malicious.getOrDefault(agent.getId(), 0L);
-                    return count + " event" + (count == 1 ? "" : "s") + " in the last 90 days";
+                    // Same threat-backend aggregation the score is computed from.
+                    Map<String, Integer> bySeverity = malicious.get(agent.getId());
+                    return bySeverity == null || bySeverity.isEmpty() ? null : severityLine(bySeverity) + " in the last 90 days";
                 }
                 case COVERAGE: {
                     List<String> gaps = new ArrayList<>();
@@ -490,21 +492,6 @@ public class ArgusAgentPostureDrillService {
                 default:
                     return "-";
             }
-        }
-
-        private static Map<Integer, Long> maliciousCounts(List<Integer> ids) {
-            Map<Integer, Long> out = new HashMap<>();
-            if (ids.isEmpty()) return out;
-            long since = (long) Context.now() - MALICIOUS_EVENTS_WINDOW_SECONDS;
-            List<Document> pipeline = Arrays.asList(
-                    new Document("$match", new Document("latestApiCollectionId", new Document("$in", ids))
-                            .append("detectedAt", new Document("$gte", since))),
-                    new Document("$group", new Document("_id", "$latestApiCollectionId").append("count", new Document("$sum", 1))));
-            for (Document d : MaliciousEventDao.instance.aggregateRaw(String.valueOf(Context.accountId.get()), pipeline)) {
-                Object id = d.get("_id");
-                if (id instanceof Number) out.put(((Number) id).intValue(), ((Number) d.get("count")).longValue());
-            }
-            return out;
         }
     }
 

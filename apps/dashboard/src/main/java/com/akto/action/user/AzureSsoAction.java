@@ -3,11 +3,14 @@ package com.akto.action.user;
 import com.opensymphony.xwork2.Action;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 import com.akto.action.UserAction;
+import com.akto.dao.CustomRoleDao;
 import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.sso.SAMLConfig;
@@ -26,6 +29,7 @@ public class AzureSsoAction extends UserAction{
     private String acsUrl ;
     private String applicationIdentifier;
     private ConfigType configType;
+    private Map<String, String> groupRoleMapping;
 
     private SAMLConfig getConfig(ConfigType configType, String domain){
         SAMLConfig config = new SAMLConfig(configType,Context.accountId.get());
@@ -70,6 +74,50 @@ public class AzureSsoAction extends UserAction{
         return Action.SUCCESS.toUpperCase();
     }
 
+    private SAMLConfig findSamlConfig() {
+        return SSOConfigsDao.instance.findOne(
+            Filters.and(
+                Filters.eq(Constants.ID, String.valueOf(Context.accountId.get())),
+                Filters.eq("configType", configType.name())
+            )
+        );
+    }
+
+    public String saveSamlGroupRoleMapping() {
+        if (this.groupRoleMapping != null) {
+            for (Map.Entry<String, String> entry : this.groupRoleMapping.entrySet()) {
+                String group = entry.getKey();
+                String role = entry.getValue();
+                // Mongo map keys cannot contain '.' or start with '$'
+                if (group == null || group.trim().isEmpty() || group.contains(".") || group.startsWith("$")) {
+                    addActionError("Invalid group name: " + group);
+                    return ERROR.toUpperCase();
+                }
+                boolean validRole = false;
+                try {
+                    validRole = Role.valueOf(role) != Role.NO_ACCESS;
+                } catch (Exception e) {
+                    validRole = role != null && CustomRoleDao.instance.findRoleByName(role) != null;
+                }
+                if (!validRole) {
+                    addActionError("Invalid role: " + role);
+                    return ERROR.toUpperCase();
+                }
+            }
+        }
+
+        if (findSamlConfig() == null) {
+            addActionError("SSO is not set up.");
+            return ERROR.toUpperCase();
+        }
+
+        SSOConfigsDao.instance.updateOne(
+            Filters.eq(Constants.ID, String.valueOf(Context.accountId.get())),
+            Updates.set(SAMLConfig.GROUP_ROLE_MAPPING, this.groupRoleMapping)
+        );
+        return SUCCESS.toUpperCase();
+    }
+
     @Override
     public String execute() throws Exception {
         String idString = String.valueOf(Context.accountId.get());
@@ -87,6 +135,7 @@ public class AzureSsoAction extends UserAction{
         if (samlConfig != null) {
             this.loginUrl = samlConfig.getLoginUrl();
             this.ssoEntityId = samlConfig.getEntityId();
+            this.groupRoleMapping = samlConfig.getGroupRoleMapping();
         }
 
         return SUCCESS.toUpperCase();
@@ -122,5 +171,13 @@ public class AzureSsoAction extends UserAction{
 
     public void setConfigType(ConfigType configType) {
         this.configType = configType;
+    }
+
+    public Map<String, String> getGroupRoleMapping() {
+        return groupRoleMapping;
+    }
+
+    public void setGroupRoleMapping(Map<String, String> groupRoleMapping) {
+        this.groupRoleMapping = groupRoleMapping;
     }
 }
