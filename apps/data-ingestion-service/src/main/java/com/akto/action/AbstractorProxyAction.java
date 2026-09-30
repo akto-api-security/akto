@@ -2,8 +2,8 @@ package com.akto.action;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
-import com.akto.gateway.GuardrailsClient;
 import com.akto.log.LoggerMaker;
+import com.akto.metrics.AktoMetrics;
 import com.akto.testing.ApiExecutor;
 import com.akto.utils.OperationalAlerts;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -123,12 +123,12 @@ public class AbstractorProxyAction extends ActionSupport implements ServletReque
      */
     private static void recordAbstractorCall(String subpath, int statusCode, long startNanos) {
         try {
-            Timer.builder(GuardrailsClient.EXTERNAL_HTTP_CLIENT_METRIC)
-                    .tag("client", "ultron")
-                    .tag("account.id", OperationalAlerts.deploymentAccountId())
-                    .tag("method", "POST")
-                    .tag("uri", (subpath == null || subpath.isEmpty()) ? "unknown" : "/api/" + subpath)
-                    .tag("status", Integer.toString(statusCode))
+            Timer.builder(AktoMetrics.HTTP_CLIENT_REQUESTS)
+                    .tag(AktoMetrics.TAG_CLIENT, AktoMetrics.CLIENT_ULTRON)
+                    .tag(AktoMetrics.TAG_ACCOUNT_ID, OperationalAlerts.deploymentAccountId())
+                    .tag(AktoMetrics.TAG_METHOD, "POST")
+                    .tag(AktoMetrics.TAG_URI, (subpath == null || subpath.isEmpty()) ? "unknown" : "/api/" + subpath)
+                    .tag(AktoMetrics.TAG_STATUS, Integer.toString(statusCode))
                     .register(Metrics.globalRegistry)
                     .record(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
         } catch (Exception ignore) {

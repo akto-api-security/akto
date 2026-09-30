@@ -1,5 +1,6 @@
 package com.akto.gateway;
 
+import com.akto.metrics.AktoMetrics;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.search.MeterNotFoundException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -22,7 +23,7 @@ import static org.junit.Assert.assertEquals;
  */
 public class GuardrailsDecisionMetricTest {
 
-    private static final String METRIC = GuardrailsClient.GUARDRAILS_VALIDATIONS_METRIC;
+    private static final String METRIC = AktoMetrics.GUARDRAILS_VALIDATIONS;
     private static final String ENDPOINT = "/api/validate/request";
 
     private SimpleMeterRegistry registry;

@@ -1,7 +1,7 @@
 package com.akto.utils;
 
-import com.akto.gateway.GuardrailsClient;
 import com.akto.log.LoggerMaker;
+import com.akto.metrics.AktoMetrics;
 import com.akto.util.http_util.CoreHTTPClient;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
@@ -36,9 +36,9 @@ public class HttpTrafficPublisher implements TrafficPublisher {
             // Same shared outbound-client metric as guardrails, tagged client="http_ingest".
             // Buckets and status/tag normalization are applied centrally in InfraMetricsListener.
             .eventListener(OkHttpMetricsEventListener
-                    .builder(Metrics.globalRegistry, GuardrailsClient.EXTERNAL_HTTP_CLIENT_METRIC)
-                    .tags(Tags.of("client", "http_ingest",
-                            "account.id", OperationalAlerts.deploymentAccountId()))
+                    .builder(Metrics.globalRegistry, AktoMetrics.HTTP_CLIENT_REQUESTS)
+                    .tags(Tags.of(AktoMetrics.TAG_CLIENT, AktoMetrics.CLIENT_HTTP_INGEST,
+                            AktoMetrics.TAG_ACCOUNT_ID, OperationalAlerts.deploymentAccountId()))
                     .uriMapper(req -> req.url().encodedPath())
                     .includeHostTag(false)
                     .build())

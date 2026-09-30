@@ -12,9 +12,9 @@ import io.micrometer.core.instrument.config.MeterFilter;
 import io.micrometer.core.instrument.distribution.DistributionStatisticConfig;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
-import com.akto.gateway.GuardrailsClient;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AktoMetrics;
 
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
@@ -75,13 +75,14 @@ public class InfraMetricsListener implements ServletContextListener {
         }
 
         registry.config()
-                .meterFilter(MeterFilter.ignoreTags("target.scheme", "target.host", "target.port", "outcome"))
-                .meterFilter(MeterFilter.replaceTagValues("status",
+                .meterFilter(MeterFilter.ignoreTags("target.scheme", "target.host", "target.port",
+                        AktoMetrics.TAG_OUTCOME))
+                .meterFilter(MeterFilter.replaceTagValues(AktoMetrics.TAG_STATUS,
                         value -> isNumeric(value) ? value : "0"))
                 .meterFilter(new MeterFilter() {
                     @Override
                     public DistributionStatisticConfig configure(Meter.Id id, DistributionStatisticConfig config) {
-                        if (GuardrailsClient.EXTERNAL_HTTP_CLIENT_METRIC.equals(id.getName())) {
+                        if (AktoMetrics.HTTP_CLIENT_REQUESTS.equals(id.getName())) {
                             return DistributionStatisticConfig.builder()
                                     .serviceLevelObjectives(bucketsNanos)
                                     .build()
