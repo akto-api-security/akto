@@ -322,11 +322,37 @@ func GetValueAtPathFromJSON(payload string, path string) (string, bool) {
 	if err := json.Unmarshal([]byte(payload), &data); err != nil {
 		return "", false
 	}
-	v := valueAtPath(data, strings.Split(normalizePath(path), "."))
+	parts := strings.Split(normalizePath(path), ".")
+	decodeWrappedTopLevelField(data, parts)
+	v := valueAtPath(data, parts)
 	if v == nil {
 		return "", false
 	}
 	return coerceValueToString(v)
+}
+
+// decodeWrappedTopLevelField replaces a top-level field holding a JSON-encoded object
+// or array with its decoded value when the path continues past it, e.g.
+// {"body": "{\"messages\": [...]}"} with path body.messages...
+// Deliberately top-level only: decoding nested strings would let user-controlled
+// content (a JSON-shaped prompt) steer which part of it gets scanned.
+func decodeWrappedTopLevelField(data any, parts []string) {
+	root, ok := data.(map[string]any)
+	if !ok || len(parts) < 2 {
+		return
+	}
+	s, ok := root[parts[0]].(string)
+	if !ok {
+		return
+	}
+	var decoded any
+	if err := json.Unmarshal([]byte(s), &decoded); err != nil {
+		return
+	}
+	switch decoded.(type) {
+	case map[string]any, []any:
+		root[parts[0]] = decoded
+	}
 }
 
 func coerceValueToString(v any) (string, bool) {
@@ -362,16 +388,6 @@ func valueAtPath(data any, parts []string) any {
 	key := parts[0]
 	rest := parts[1:]
 	switch m := data.(type) {
-	case string:
-		// Path continues into a JSON-encoded string, e.g. {"body": "{\"messages\": [...]}"}.
-		var decoded any
-		if err := json.Unmarshal([]byte(m), &decoded); err != nil {
-			return nil
-		}
-		if _, isString := decoded.(string); isString {
-			return nil
-		}
-		return valueAtPath(decoded, parts)
 	case map[string]any:
 		next, ok := m[key]
 		if !ok {
