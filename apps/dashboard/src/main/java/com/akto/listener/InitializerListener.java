@@ -193,6 +193,7 @@ public class InitializerListener implements ServletContextListener {
     EndpointDescriptionCron endpointDescriptionCron = new EndpointDescriptionCron();
     AgentBaseRiskScoreCron agentBaseRiskScoreCron = new AgentBaseRiskScoreCron();
     ToolClassificationCron toolClassificationCron = new ToolClassificationCron();
+    AgenticPostureScoreCron agenticPostureScoreCron = new AgenticPostureScoreCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -2554,6 +2555,7 @@ public class InitializerListener implements ServletContextListener {
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     agentBaseRiskScoreCron.setUpAgentBaseRiskScoreCronScheduler();
                     toolClassificationCron.setUpToolClassificationCronScheduler();
+                    agenticPostureScoreCron.setUpAgenticPostureScoreCronScheduler();
                     collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
                     endpointDescriptionCron.setUpEndpointDescriptionCronScheduler();
                     if(runJobFunctionsAnyway) {

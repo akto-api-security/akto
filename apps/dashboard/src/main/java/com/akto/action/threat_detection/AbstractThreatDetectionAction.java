@@ -51,6 +51,41 @@ public class AbstractThreatDetectionAction extends UserAction {
     return backendUrl;
   }
 
+  // Per-host critical/high/medium/low counts for the window, in the request's context source (same route and
+  // signature as master's fetchHostSeverityCounts; parsed from JSON since this branch lacks the proto class).
+  protected List<HostSeverityCount> fetchHostSeverityCounts(int startTimestamp, int endTimestamp) {
+    List<HostSeverityCount> out = new ArrayList<>();
+    try {
+      String url = String.format("%s/api/dashboard/get_host_severity_counts", this.getBackendUrl());
+      MediaType JSON = MediaType.parse("application/json; charset=utf-8");
+
+      Map<String, Object> body = new HashMap<>();
+      body.put("start_ts", startTimestamp);
+      body.put("end_ts", endTimestamp);
+      String msg = objectMapper.valueToTree(body).toString();
+      String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
+
+      Request request = new Request.Builder()
+          .url(url)
+          .post(RequestBody.create(msg, JSON))
+          .addHeader("Authorization", "Bearer " + this.getApiToken())
+          .addHeader("Content-Type", "application/json")
+          .addHeader("x-context-source", contextSourceValue)
+          .build();
+
+      try (Response resp = httpClient.newCall(request).execute()) {
+        if (!resp.isSuccessful() || resp.body() == null) return out;
+        for (com.fasterxml.jackson.databind.JsonNode h : objectMapper.readTree(resp.body().string()).path("hostCounts")) {
+          out.add(new HostSeverityCount(h.path("host").asText(), h.path("critical").asInt(),
+              h.path("high").asInt(), h.path("medium").asInt(), h.path("low").asInt()));
+        }
+      }
+    } catch (Exception e) {
+      return new ArrayList<>();
+    }
+    return out;
+  }
+
   /**
    * Fetch malicious events from threat-backend service
    * @param startTimestamp Start timestamp for time range filter (0 or negative to skip)
