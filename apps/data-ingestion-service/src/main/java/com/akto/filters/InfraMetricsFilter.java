@@ -4,7 +4,6 @@ import com.akto.dao.context.Context;
 import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.metrics.AktoMetrics;
 import com.akto.metrics.MetricLabelBuilder;
 import com.akto.utils.OperationalAlerts;
 
@@ -60,16 +59,16 @@ public class InfraMetricsFilter implements Filter {
             // Same tag convention as the outbound-client metric (method/uri/status/account_id)
             // so server and client metrics read the same way.
             ArrayList<Tag> tags = new ArrayList<>(Arrays.asList(
-                    Tag.of(AktoMetrics.TAG_METHOD, method),
-                    Tag.of(AktoMetrics.TAG_URI, uri),
-                    Tag.of(AktoMetrics.TAG_STATUS, Integer.toString(statusCode)),
-                    Tag.of(AktoMetrics.TAG_ACCOUNT_ID, accountId)
+                    Tag.of("method", method),
+                    Tag.of("uri", uri),
+                    Tag.of("status", Integer.toString(statusCode)),
+                    Tag.of("account.id", accountId)
             ));
 
             // Single histogram, Micrometer appends the base unit -> publishes
             // akto_http_server_requests_seconds with _count/_sum/_bucket{le=...}. Named
             // symmetrically with akto.http.client.requests; buckets match the client layout.
-            Timer.builder(AktoMetrics.HTTP_SERVER_REQUESTS)
+            Timer.builder("akto.http.server.requests")
                     .description("HTTP server request duration")
                     .tags(tags)
                     // Bucket boundaries: 50ms, 200ms, 500ms, 1s, 3s, 5s, 10s (plus +Inf).
