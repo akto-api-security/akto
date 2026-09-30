@@ -69,7 +69,8 @@ public class ArgusPostureAction extends UserAction {
             ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS,
             ArgusPostureService.DRILL_PROTECTION_COVERAGE,
             ArgusPostureService.DRILL_PRIVILEGED_TOOLS,
-            ArgusPostureService.DRILL_SENSITIVE_DATA));
+            ArgusPostureService.DRILL_SENSITIVE_DATA,
+            ArgusPostureService.DRILL_FRAMEWORK_READINESS));
 
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
     private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
@@ -97,6 +98,7 @@ public class ArgusPostureAction extends UserAction {
             this.response = argusPostureService.buildSummary(bundle, environment);
             response.put("postureScore", fetchPostureScore());
             response.put("highestRiskAgents", argusPostureService.buildHighestRiskAgents(bundle, environment));
+            response.put("frameworkReadiness", argusPostureService.frameworkReadiness(bundle, startTimestamp, endTimestamp));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture summary: " + e.getMessage());
@@ -181,6 +183,10 @@ public class ArgusPostureAction extends UserAction {
                         break;
                     case ArgusPostureService.DRILL_PRIVILEGED_TOOLS:
                         postureDrill = argusPostureService.fetchPrivilegedToolsDrill(bundle, environment, skip, limit);
+                        break;
+                    case ArgusPostureService.DRILL_FRAMEWORK_READINESS:
+                        postureDrill = argusPostureService.fetchFrameworkReadinessDrill(
+                                bundle, startTimestamp, endTimestamp, path, skip, limit);
                         break;
                     default:
                         postureDrill = argusPostureService.fetchSensitiveDataDrill(bundle, environment, skip, limit);
