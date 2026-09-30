@@ -39,7 +39,7 @@ public class TestToolClassificationCronIntegration {
     private static final int ACCOUNT_ID = 1_000_000;
     private static final int ARGUS_COLL = 999_000_001;
     private static final int ATLAS_COLL = 999_000_002;
-    private static final int THIRTY_DAYS = 30 * 24 * 60 * 60;
+    private static final int SEVEN_DAYS = 7 * 24 * 60 * 60;
 
     private final ToolClassificationCron cron = new ToolClassificationCron();
 
@@ -97,8 +97,12 @@ public class TestToolClassificationCronIntegration {
     }
 
     private List<ApiInfo> seededCandidates() {
+        return seededCandidates(false);
+    }
+
+    private List<ApiInfo> seededCandidates(boolean forceRefresh) {
         List<ApiInfo> mine = new ArrayList<>();
-        for (ApiInfo r : cron.findCandidates()) {
+        for (ApiInfo r : cron.findCandidates(forceRefresh)) {
             if (r.getId().getApiCollectionId() == ARGUS_COLL || r.getId().getApiCollectionId() == ATLAS_COLL) {
                 mine.add(r);
             }
@@ -127,13 +131,13 @@ public class TestToolClassificationCronIntegration {
 
     @Test
     public void staleClassifiedRowIsACandidateAgain() {
-        toolRow(ARGUS_COLL, "/mcp/tools/call/stale", Context.now(), Context.now() - THIRTY_DAYS - 60);
+        toolRow(ARGUS_COLL, "/mcp/tools/call/stale", Context.now(), Context.now() - SEVEN_DAYS - 60);
         assertEquals(Arrays.asList("/mcp/tools/call/stale"), urlsOf(seededCandidates()));
     }
 
     @Test
     public void rowJustInsideTheThresholdIsNotACandidate() {
-        toolRow(ARGUS_COLL, "/mcp/tools/call/borderline", Context.now(), Context.now() - THIRTY_DAYS + 600);
+        toolRow(ARGUS_COLL, "/mcp/tools/call/borderline", Context.now(), Context.now() - SEVEN_DAYS + 600);
         assertTrue(seededCandidates().isEmpty());
     }
 
@@ -144,12 +148,12 @@ public class TestToolClassificationCronIntegration {
     }
 
     @Test
-    public void candidatesComeBackNewestSeenFirst() {
+    public void candidatesComeBackLeastRecentlyClassifiedFirst() {
         int now = Context.now();
-        toolRow(ARGUS_COLL, "/mcp/tools/call/oldest", now - 5000, null);
-        toolRow(ARGUS_COLL, "/mcp/tools/call/newest", now, null);
-        toolRow(ARGUS_COLL, "/mcp/tools/call/middle", now - 2500, null);
-        assertEquals(Arrays.asList("/mcp/tools/call/newest", "/mcp/tools/call/middle", "/mcp/tools/call/oldest"),
+        toolRow(ARGUS_COLL, "/mcp/tools/call/recent", now, now - SEVEN_DAYS - 60);
+        toolRow(ARGUS_COLL, "/mcp/tools/call/never", now, null);
+        toolRow(ARGUS_COLL, "/mcp/tools/call/ancient", now, now - SEVEN_DAYS - 90000);
+        assertEquals(Arrays.asList("/mcp/tools/call/never", "/mcp/tools/call/ancient", "/mcp/tools/call/recent"),
                 urlsOf(seededCandidates()));
     }
 
@@ -159,7 +163,7 @@ public class TestToolClassificationCronIntegration {
         for (int i = 0; i < 260; i++) {
             toolRow(ARGUS_COLL, "/mcp/tools/call/bulk_" + i, now - i, null);
         }
-        assertEquals(200, cron.findCandidates().size());
+        assertEquals(200, cron.findCandidates(false).size());
     }
 
     @Test
@@ -183,7 +187,7 @@ public class TestToolClassificationCronIntegration {
     @Test
     public void realArgusDataHasNoUnclassifiedToolsLeft() {
         cleanup();
-        for (ApiInfo r : cron.findCandidates()) {
+        for (ApiInfo r : cron.findCandidates(false)) {
             assertFalse("unexpected leftover candidate: " + r.getId().getUrl(),
                     r.getId().getUrl().contains("/tools/call/"));
         }
@@ -237,12 +241,25 @@ public class TestToolClassificationCronIntegration {
     }
 
     @Test
-    public void rowsWithNoLastSeenSortLast() {
+    public void rowsWithNoCalculatedAtSortFirst() {
         int now = Context.now();
-        toolRow(ARGUS_COLL, "/mcp/tools/call/seen", now, null);
-        toolRow(ARGUS_COLL, "/mcp/tools/call/never_seen", 0, null);
-        assertEquals(Arrays.asList("/mcp/tools/call/seen", "/mcp/tools/call/never_seen"),
+        toolRow(ARGUS_COLL, "/mcp/tools/call/classified", now, now - SEVEN_DAYS - 60);
+        toolRow(ARGUS_COLL, "/mcp/tools/call/never_classified", now, null);
+        assertEquals(Arrays.asList("/mcp/tools/call/never_classified", "/mcp/tools/call/classified"),
                 urlsOf(seededCandidates()));
+    }
+
+    @Test
+    public void forceRefreshReturnsFreshlyClassifiedRows() {
+        toolRow(ARGUS_COLL, "/mcp/tools/call/fresh", Context.now(), Context.now());
+        assertTrue(seededCandidates().isEmpty());
+        assertEquals(Arrays.asList("/mcp/tools/call/fresh"), urlsOf(seededCandidates(true)));
+    }
+
+    @Test
+    public void forceRefreshStillExcludesAtlasCollections() {
+        toolRow(ATLAS_COLL, "/mcp/tools/call/atlas_tool", Context.now(), Context.now());
+        assertTrue("force refresh skips the TTL, never the Argus scope", seededCandidates(true).isEmpty());
     }
 
     @Test
@@ -290,7 +307,7 @@ public class TestToolClassificationCronIntegration {
             usage.when(() -> com.akto.billing.UsageMetricUtils.getFeatureAccessSaas(
                     org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyString()))
                     .thenReturn(new com.akto.dto.billing.FeatureAccess(false));
-            cron.processAccount(new com.akto.dto.Account(ACCOUNT_ID, "test"));
+            cron.processAccount(new com.akto.dto.Account(ACCOUNT_ID, "test"), false);
         }
         ApiInfo stored = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(row.getId()));
         assertNotNull(stored);
@@ -304,7 +321,7 @@ public class TestToolClassificationCronIntegration {
                      org.mockito.Mockito.mockStatic(com.akto.billing.UsageMetricUtils.class)) {
             usage.when(() -> com.akto.billing.UsageMetricUtils.getFeatureAccessSaas(
                     org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyString())).thenReturn(null);
-            cron.processAccount(new com.akto.dto.Account(ACCOUNT_ID, "test"));
+            cron.processAccount(new com.akto.dto.Account(ACCOUNT_ID, "test"), false);
         }
         assertNull(ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(row.getId())).getToolInfo());
     }
@@ -317,7 +334,7 @@ public class TestToolClassificationCronIntegration {
             usage.when(() -> com.akto.billing.UsageMetricUtils.getFeatureAccessSaas(
                     org.mockito.Mockito.anyInt(), org.mockito.Mockito.anyString()))
                     .thenReturn(new com.akto.dto.billing.FeatureAccess(true));
-            cron.processAccount(new com.akto.dto.Account(ACCOUNT_ID, "test"));
+            cron.processAccount(new com.akto.dto.Account(ACCOUNT_ID, "test"), false);
         }
     }
 
