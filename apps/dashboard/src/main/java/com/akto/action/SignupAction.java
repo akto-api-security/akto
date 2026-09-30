@@ -295,7 +295,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping before init: " + this.scopeRoleMapping);
                 if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName(), pendingInviteCode.getAccountId(), email);
+                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), pendingInviteCode.getAccountId(), email);
                     logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after init: " + this.scopeRoleMapping);
                 }
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
@@ -384,7 +384,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping before init: " + this.scopeRoleMapping);
             if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName(), invitedToAccountId, email);
+                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), invitedToAccountId, email);
                 logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after init: " + this.scopeRoleMapping);
             }
             // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -604,7 +604,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping before init: " + this.scopeRoleMapping);
                     if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName(), accountId, email);
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), accountId, email);
                         logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after init: " + this.scopeRoleMapping);
                     }
                     // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes

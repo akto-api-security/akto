@@ -84,6 +84,19 @@ public class RBAC {
         public String getName() {
             return name;
         }
+
+        /** Role for a stored role string: the enum name, or the display name some older records store (e.g. "SECURITY ENGINEER"). Null if neither. */
+        public static Role fromName(String roleName) {
+            if (roleName == null) {
+                return null;
+            }
+            for (Role role : values()) {
+                if (role.name().equals(roleName) || role.getName().equals(roleName)) {
+                    return role;
+                }
+            }
+            return null;
+        }
     }
 
     public RBAC(int userId, String role) {
@@ -287,19 +300,15 @@ public class RBAC {
             return null;
         }
 
-        try {
-            return Role.valueOf(roleStr);
-        } catch (IllegalArgumentException e) {
+        Role role = Role.fromName(roleStr);
+        if (role != null) {
+            return role;
         }
 
         try {
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
-            if (customRole != null && customRole.getBaseRole() != null) {
-                try {
-                    return Role.valueOf(customRole.getBaseRole());
-                } catch (IllegalArgumentException e) {
-                    return Role.GUEST;
-                }
+            if (customRole != null && Role.fromName(customRole.getBaseRole()) != null) {
+                return Role.fromName(customRole.getBaseRole());
             }
         } catch (Exception e) {
         }

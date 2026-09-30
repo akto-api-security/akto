@@ -97,6 +97,8 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         }
     }
 
+    private static final boolean DENY_ON_ERROR = "true".equalsIgnoreCase(System.getenv("AKTO_RBAC_DENY_ON_ERROR"));
+
     public final static String FORBIDDEN = "FORBIDDEN";
     public final static String USER = "user";
 
@@ -349,8 +351,14 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
         } catch(Exception e) {
             String api = invocation.getProxy().getActionName();
-            String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage();
+            // A failed access check must not grant access. Until AKTO_RBAC_DENY_ON_ERROR is on, it is only logged (report-only).
+            boolean deny = DENY_ON_ERROR && DashboardMode.isMetered();
+            String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage() + (deny ? " (denied)" : " (allowed, report-only)");
             loggerMaker.errorAndAddToDb(e, error);
+            if (deny) {
+                ((ActionSupport) invocation.getAction()).addActionError("Unable to verify your access. Please try again or contact your admin.");
+                return FORBIDDEN;
+            }
         }
 
         String result = invocation.invoke();

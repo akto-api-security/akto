@@ -113,11 +113,13 @@ public class RBACDao extends CommonContextDao<RBAC> {
                 return Role.MEMBER;
             }
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
-            if (customRole != null) {
-                actualRole = Role.valueOf(customRole.getBaseRole());
-            } else {
-                actualRole = Role.valueOf(currentRole);
+            Role resolvedRole = Role.fromName(customRole != null ? customRole.getBaseRole() : currentRole);
+            if (resolvedRole == null) {
+                // unknown or deleted role: least privilege instead of an exception (which callers treated as full access)
+                logger.error(String.format("Unknown role %s for userId: %d accountId: %d", currentRole, userId, accountId));
+                resolvedRole = Role.GUEST;
             }
+            actualRole = resolvedRole;
         }
         return actualRole;
     }
