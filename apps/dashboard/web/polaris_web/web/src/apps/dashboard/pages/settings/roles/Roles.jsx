@@ -7,6 +7,7 @@ import { usersCollectionRenderItem } from "../rbac/utils";
 import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
+import Dropdown from "../../../components/layouts/Dropdown";
 
 const rolesOptions = [
     {
@@ -73,6 +74,30 @@ function isThreatFeatureGranted() {
     }
     return stiggFeatures?.THREAT_DETECTION?.isGranted === true
 }
+
+// Permissions an admin can change per custom role; anything not changed keeps the base role's access
+const PERMISSION_FEATURES = [
+    { feature: 'INVITE_MEMBERS', label: 'Invite users and change their roles' },
+    { feature: 'THREAT_PROTECTION', label: 'Threat protection and guardrail activity' },
+    { feature: 'THREAT_SETTINGS', label: 'Threat settings and data retention' },
+    { feature: 'AI_AGENTS', label: 'AI agents' },
+    { feature: 'API_COLLECTIONS', label: 'API collections and inventory' },
+    { feature: 'SENSITIVE_DATA', label: 'Sensitive data' },
+    { feature: 'SAMPLE_DATA', label: 'Request and response samples' },
+    { feature: 'START_TEST_RUN', label: 'Run tests' },
+    { feature: 'TEST_RESULTS', label: 'Test results' },
+    { feature: 'ISSUES', label: 'Issues' },
+    { feature: 'INTEGRATIONS', label: 'Integrations' },
+    { feature: 'API_TOKENS', label: 'API tokens' },
+]
+
+const ROLE_DEFAULT = 'ROLE_DEFAULT'
+const accessOptions = [
+    { label: 'Base role default', value: ROLE_DEFAULT },
+    { label: 'No access', value: 'NO_ACCESS' },
+    { label: 'Read', value: 'READ' },
+    { label: 'Read and write', value: 'READ_WRITE' },
+]
 
 const Roles = () => {
 
@@ -169,6 +194,26 @@ const Roles = () => {
         })
     }
 
+    const updatePermission = (role, feature, access) => {
+        setRoles(prevRoles => {
+            return prevRoles.map(r => {
+                if (r.name === role) {
+                    const permissionOverrides = { ...(r.permissionOverrides || {}) }
+                    if (access === ROLE_DEFAULT) {
+                        delete permissionOverrides[feature]
+                    } else {
+                        permissionOverrides[feature] = access
+                    }
+                    return {
+                        ...r,
+                        permissionOverrides
+                    }
+                }
+                return r;
+            })
+        })
+    }
+
     const updateDefaultInviteRole = (role, value) => {
         setRoles(prevRoles => {
             return prevRoles.map(r => {
@@ -185,7 +230,7 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData))
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {})
         await getRoleData();
     }
 
@@ -274,6 +319,25 @@ const Roles = () => {
                                                         />
                                                     ) : null}
                                                 </HorizontalStack>
+                                            </Box>
+                                            <Box>
+                                                <VerticalStack gap={2}>
+                                                    <Text variant="headingSm" as="h4">Permissions</Text>
+                                                    <Text variant="bodySm" color="subdued">Change what this role can do. Anything left at the default keeps the base role's access.</Text>
+                                                    {PERMISSION_FEATURES.map(({ feature, label }) => (
+                                                        <HorizontalStack key={feature} align="space-between" blockAlign="center" wrap={false} gap={4}>
+                                                            <Text variant="bodyMd">{label}</Text>
+                                                            <Box minWidth="180px">
+                                                                <Dropdown
+                                                                    id={`permission-${name}-${feature}`}
+                                                                    menuItems={accessOptions}
+                                                                    initial={item?.permissionOverrides?.[feature] || ROLE_DEFAULT}
+                                                                    selected={(access) => updatePermission(name, feature, access)}
+                                                                />
+                                                            </Box>
+                                                        </HorizontalStack>
+                                                    ))}
+                                                </VerticalStack>
                                             </Box>
                                             <Box>
                                                 <SearchableResourceList

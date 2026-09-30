@@ -2,12 +2,36 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
+import com.akto.util.Pair;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CustomRoleDao extends AccountsContextDao<CustomRole> {
 
     public static final CustomRoleDao instance = new CustomRoleDao();
+
+    // Per-request access checks read custom roles through this cache; role create/update/delete clear it
+    private static final ConcurrentHashMap<String, Pair<CustomRole, Integer>> roleCache = new ConcurrentHashMap<>();
+    private static final int ROLE_CACHE_EXPIRY_TIME = 60;
+
+    public CustomRole findRoleByNameCached(String roleName) {
+        if (roleName == null) {
+            return null;
+        }
+        String key = Context.accountId.get() + "|" + roleName;
+        Pair<CustomRole, Integer> entry = roleCache.get(key);
+        if (entry == null || Context.now() - entry.getSecond() > ROLE_CACHE_EXPIRY_TIME) {
+            entry = new Pair<>(findRoleByName(roleName), Context.now());
+            roleCache.put(key, entry);
+        }
+        return entry.getFirst();
+    }
+
+    public static void clearRoleCache() {
+        roleCache.clear();
+    }
 
     public void createIndicesIfAbsent() {
         boolean exists = false;

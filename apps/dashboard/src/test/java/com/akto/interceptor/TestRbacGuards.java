@@ -21,13 +21,17 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import com.akto.MongoBasedTest;
+import com.akto.action.RoleAction;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.User;
 import com.akto.dto.rbac.RbacEnums;
+import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
@@ -131,5 +135,84 @@ public class TestRbacGuards extends MongoBasedTest {
         assertEquals(Role.MEMBER, storedRole(202, "SECURITY ENGINEER")); // display name stored by older signups
         assertEquals(Role.THREAT_ENGINEER, storedRole(203, "TEAM_ROLE"));
         assertEquals(Role.GUEST, storedRole(204, "SOME_DELETED_ROLE")); // least privilege, not an exception
+    }
+
+    private static void insertRole(String name, Role baseRole, boolean threatToggle, Map<String, String> overrides) {
+        CustomRole role = new CustomRole(name, baseRole.name(), new ArrayList<>(), false, threatToggle, new ArrayList<>());
+        role.setPermissionOverrides(overrides);
+        CustomRoleDao.instance.insertOne(role);
+        CustomRoleDao.clearRoleCache();
+    }
+
+    private static ReadWriteAccess access(int userId, Feature feature) {
+        Role role = RBACDao.getCurrentRoleForUser(userId, ACCOUNT_ID);
+        return RBACDao.resolveFeatureAccess(userId, ACCOUNT_ID, feature, role.getReadWriteAccessForFeature(feature));
+    }
+
+    @Test
+    public void testPermissionOverrides() {
+        Context.accountId.set(ACCOUNT_ID);
+        Context.contextSource.set(CONTEXT_SOURCE.API);
+        RBACDao.instance.getMCollection().drop();
+        CustomRoleDao.instance.getMCollection().drop();
+
+        Map<String, String> runtimeAdmin = new HashMap<>();
+        runtimeAdmin.put(Feature.THREAT_SETTINGS.name(), ReadWriteAccess.NO_ACCESS.name());
+        runtimeAdmin.put(Feature.INVITE_MEMBERS.name(), ReadWriteAccess.READ.name());
+        runtimeAdmin.put(Feature.ADMIN_ACTIONS.name(), ReadWriteAccess.READ_WRITE.name()); // never applied
+        insertRole("RUNTIME_ADMIN", Role.THREAT_ENGINEER, false, runtimeAdmin);
+        insertRole("MEMBER_WITH_THREAT", Role.MEMBER, true, null);
+        insertRole("PLAIN_MEMBER", Role.MEMBER, false, null);
+
+        storedRole(301, "RUNTIME_ADMIN");
+        assertEquals(ReadWriteAccess.READ_WRITE, access(301, Feature.THREAT_PROTECTION));
+        assertEquals(ReadWriteAccess.NO_ACCESS, access(301, Feature.THREAT_SETTINGS));
+        assertEquals(ReadWriteAccess.READ, access(301, Feature.INVITE_MEMBERS));
+        assertEquals(ReadWriteAccess.READ, access(301, Feature.ADMIN_ACTIONS));
+
+        // threat settings follow threat protection, including the existing toggle, so nothing changes by default
+        storedRole(302, "MEMBER_WITH_THREAT");
+        assertEquals(ReadWriteAccess.READ_WRITE, access(302, Feature.THREAT_SETTINGS));
+        storedRole(303, "PLAIN_MEMBER");
+        assertEquals(ReadWriteAccess.NO_ACCESS, access(303, Feature.THREAT_SETTINGS));
+        storedRole(304, "THREAT_ENGINEER");
+        assertEquals(ReadWriteAccess.READ_WRITE, access(304, Feature.THREAT_SETTINGS));
+
+        for (Role role : Role.values()) {
+            assertEquals(role.getReadWriteAccessForFeature(Feature.THREAT_PROTECTION), role.getReadWriteAccessForFeature(Feature.THREAT_SETTINGS));
+        }
+    }
+
+    private static RoleAction roleAction(String name, Map<String, String> overrides) {
+        RoleAction action = new RoleAction();
+        Map<String, Object> session = new HashMap<>();
+        User admin = new User();
+        admin.setId(1);
+        session.put("user", admin);
+        action.setSession(session);
+        action.setRoleName(name);
+        action.setBaseRole(Role.MEMBER.name());
+        action.setApiCollectionIds(new ArrayList<>());
+        action.setPermissionOverrides(overrides);
+        return action;
+    }
+
+    @Test
+    public void testRoleActionValidation() {
+        Context.accountId.set(ACCOUNT_ID);
+        CustomRoleDao.instance.getMCollection().drop();
+        assertEquals("ERROR", roleAction("admin", null).createCustomRole()); // reserved name in any case
+
+        Map<String, String> bad = new HashMap<>();
+        bad.put(Feature.ADMIN_ACTIONS.name(), ReadWriteAccess.READ_WRITE.name());
+        assertEquals("ERROR", roleAction("TEAM_X", bad).createCustomRole());
+        bad.clear();
+        bad.put("NOT_A_FEATURE", ReadWriteAccess.READ.name());
+        assertEquals("ERROR", roleAction("TEAM_X", bad).createCustomRole());
+
+        Map<String, String> good = new HashMap<>();
+        good.put(Feature.INVITE_MEMBERS.name(), ReadWriteAccess.NO_ACCESS.name());
+        assertEquals("SUCCESS", roleAction("TEAM_X", good).createCustomRole());
+        assertEquals(good, CustomRoleDao.instance.findRoleByName("TEAM_X").getPermissionOverrides());
     }
 }

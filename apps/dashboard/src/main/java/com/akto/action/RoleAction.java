@@ -2,6 +2,7 @@ package com.akto.action;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.akto.dao.CustomRoleDao;
@@ -12,6 +13,8 @@ import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -95,7 +98,7 @@ public class RoleAction extends UserAction {
             /*
              * We do not want role name from the reserved names.
              */
-            Role.valueOf(this.roleName);
+            Role.valueOf(this.roleName.toUpperCase());
             addActionError(this.roleName + " is a reserved keyword.");
             return false;
         } catch(Exception e){
@@ -120,6 +123,29 @@ public class RoleAction extends UserAction {
     @Setter
     private boolean threatProtectionEnabled;
 
+    @Setter
+    private Map<String, String> permissionOverrides;
+
+    private boolean validatePermissionOverrides() {
+        if (permissionOverrides == null) {
+            return true;
+        }
+        for (Map.Entry<String, String> entry : permissionOverrides.entrySet()) {
+            try {
+                Feature feature = Feature.valueOf(entry.getKey());
+                ReadWriteAccess.valueOf(entry.getValue());
+                if (!CustomRole.isOverridable(feature)) {
+                    addActionError(entry.getKey() + " cannot be changed for a role.");
+                    return false;
+                }
+            } catch (Exception e) {
+                addActionError("Invalid permission: " + entry.getKey() + " = " + entry.getValue());
+                return false;
+            }
+        }
+        return true;
+    }
+
     public String createCustomRole() {
 
         if (!validateRoleName()) {
@@ -142,12 +168,14 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(!defaultInviteCheck()){
+        if(!defaultInviteCheck() || !validatePermissionOverrides()){
             return ERROR.toUpperCase();
         }
 
         CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, threatProtectionEnabled, new ArrayList<>());
+        role.setPermissionOverrides(permissionOverrides);
         CustomRoleDao.instance.insertOne(role);
+        CustomRoleDao.clearRoleCache();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
     }
@@ -173,13 +201,18 @@ public class RoleAction extends UserAction {
         if(!defaultInviteCheck() && !existingRole.getDefaultInviteRole()){
             return ERROR.toUpperCase();
         }
+        if (!validatePermissionOverrides()) {
+            return ERROR.toUpperCase();
+        }
 
         CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, roleName),Updates.combine(
             Updates.set(CustomRole.BASE_ROLE, baseRole),
             Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
             Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole),
-            Updates.set(CustomRole.THREAT_PROTECTION_ENABLED, threatProtectionEnabled)
+            Updates.set(CustomRole.THREAT_PROTECTION_ENABLED, threatProtectionEnabled),
+            Updates.set(CustomRole.PERMISSION_OVERRIDES, permissionOverrides)
         ));
+        CustomRoleDao.clearRoleCache();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();
@@ -217,6 +250,7 @@ public class RoleAction extends UserAction {
         }
 
         CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
+        CustomRoleDao.clearRoleCache();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();

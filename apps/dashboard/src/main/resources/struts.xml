@@ -438,7 +438,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="featureLabel">INVITE_MEMBERS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Admin updated scope-role mapping for user in Akto dashboard</param>
             </interceptor-ref>
@@ -12562,7 +12562,7 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="featureLabel">THREAT_SETTINGS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted all malicious events</param>
                 <param name="collectionScope">ACCOUNT_WIDE</param>
@@ -13003,7 +13003,7 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="featureLabel">THREAT_SETTINGS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User modified a threat actor status</param>
                 <param name="collectionScope">ACCOUNT_WIDE</param>
@@ -13037,7 +13037,7 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="featureLabel">THREAT_SETTINGS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User toggled archival enabled</param>
                 <param name="collectionScope">ACCOUNT_WIDE</param>

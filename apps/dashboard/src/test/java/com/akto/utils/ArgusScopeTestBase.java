@@ -91,6 +91,7 @@ public abstract class ArgusScopeTestBase extends MongoBasedTest {
         role.setBaseRole(baseRole);
         role.setApiCollectionsId(Arrays.asList(1, 2));
         CustomRoleDao.instance.insertOne(role);
+        CustomRoleDao.clearRoleCache();
     }
 
     protected void insertUser(int userId, String agenticRole) {

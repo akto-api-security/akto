@@ -7,6 +7,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -57,42 +58,43 @@ public class RBACDao extends CommonContextDao<RBAC> {
     private static final Set<Role> FIXED_THREAT_ACCESS_ROLES = new HashSet<>(java.util.Arrays.asList(
             Role.ADMIN, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
 
+    /** The user's current custom role, or null for built-in roles. */
+    private static CustomRole currentCustomRole(int userId, int accountId) {
+        RBAC rbac = getCurrentRBACForUser(userId, accountId);
+        if (rbac == null) {
+            return null;
+        }
+        String currentRole = instance.fetchRole(rbac);
+        /*
+         * Custom role names cannot collide with built-in ones (RoleAction rejects
+         * reserved keywords), so a built-in role can skip the lookup entirely.
+         */
+        if (currentRole == null || currentRole.isEmpty() || Role.fromName(currentRole) != null) {
+            return null;
+        }
+        return CustomRoleDao.instance.findRoleByNameCached(currentRole);
+    }
+
     /*
-     * A custom role on any other base role may be granted threat protection by its toggle.
+     * Access to a feature for the user's current role: the base role's access, then for threat
+     * features the custom role's threat toggle, then any per-feature override on the custom role.
      * The toggle can only ever add access, never remove what the base role already gives.
-     * Callers should invoke this only for Feature.THREAT_PROTECTION, since it costs a
-     * custom role lookup.
      */
-    public static ReadWriteAccess resolveThreatAccess(int userId, int accountId, ReadWriteAccess baseRoleAccess) {
+    public static ReadWriteAccess resolveFeatureAccess(int userId, int accountId, Feature feature, ReadWriteAccess baseRoleAccess) {
         try {
-            RBAC rbac = getCurrentRBACForUser(userId, accountId);
-            if (rbac == null) {
-                return baseRoleAccess;
-            }
-
-            String currentRole = instance.fetchRole(rbac);
-            if (currentRole == null || currentRole.isEmpty()) {
-                return baseRoleAccess;
-            }
-
-            /*
-             * Custom role names cannot collide with built-in ones (RoleAction rejects
-             * reserved keywords), so a built-in role can skip the lookup entirely.
-             */
-            try {
-                Role.valueOf(currentRole);
-                return baseRoleAccess;
-            } catch (IllegalArgumentException builtInRoleNotFound) {
-                // not a built-in role, so it may be a custom one
-            }
-
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
+            CustomRole customRole = currentCustomRole(userId, accountId);
             if (customRole == null || customRole.getBaseRole() == null) {
                 return baseRoleAccess;
             }
 
+            ReadWriteAccess override = customRole.overrideFor(feature);
+            if (override != null) {
+                return override;
+            }
+
+            boolean threatFeature = feature == Feature.THREAT_PROTECTION || feature == Feature.THREAT_SETTINGS;
             // the base role decides on its own; the toggle is not consulted
-            if (FIXED_THREAT_ACCESS_ROLES.contains(Role.valueOf(customRole.getBaseRole()))) {
+            if (!threatFeature || FIXED_THREAT_ACCESS_ROLES.contains(Role.fromName(customRole.getBaseRole()))) {
                 return baseRoleAccess;
             }
 
@@ -112,8 +114,11 @@ public class RBACDao extends CommonContextDao<RBAC> {
             if(currentRole == null){
                 return Role.MEMBER;
             }
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
-            Role resolvedRole = Role.fromName(customRole != null ? customRole.getBaseRole() : currentRole);
+            Role resolvedRole = Role.fromName(currentRole);
+            if (resolvedRole == null) {
+                CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
+                resolvedRole = customRole == null ? null : Role.fromName(customRole.getBaseRole());
+            }
             if (resolvedRole == null) {
                 // unknown or deleted role: least privilege instead of an exception (which callers treated as full access)
                 logger.error(String.format("Unknown role %s for userId: %d accountId: %d", currentRole, userId, accountId));
@@ -179,7 +184,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
             currentRole = rbac.getRole();
         }
 
-        CustomRole customRole = CustomRoleDao.instance.findRoleByName(currentRole);
+        CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
         Set<Integer> apiCollectionsId = new HashSet<>();
         if (customRole != null) {
             apiCollectionsId.addAll(customRole.getApiCollectionsId());

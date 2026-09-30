@@ -1,6 +1,10 @@
 package com.akto.dto;
 
 import java.util.List;
+import java.util.Map;
+
+import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -12,6 +16,7 @@ public class CustomRole {
     public static final String API_COLLECTIONS_ID = "apiCollectionsId";
     public static final String DEFAULT_INVITE_ROLE = "defaultInviteRole";
     public static final String THREAT_PROTECTION_ENABLED = "threatProtectionEnabled";
+    public static final String PERMISSION_OVERRIDES = "permissionOverrides";
     private String name;
     private String baseRole;
     private List<Integer> apiCollectionsId;
@@ -36,6 +41,32 @@ public class CustomRole {
     @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
+
+    /*
+     * Per-feature access set by an admin for this role (Feature name -> READ / READ_WRITE / NO_ACCESS).
+     * Replaces the base role's access for that feature. Features not listed keep the base role's access.
+     */
+    @Getter
+    @Setter
+    private Map<String, String> permissionOverrides;
+
+    /** Features whose access is fixed by the role itself and can never be overridden. */
+    public static boolean isOverridable(Feature feature) {
+        return feature != Feature.ADMIN_ACTIONS && feature != Feature.USER_ACTIONS;
+    }
+
+    /** The override for a feature, or null if there is none (or it is not a valid access value). */
+    public ReadWriteAccess overrideFor(Feature feature) {
+        if (permissionOverrides == null || feature == null || !isOverridable(feature)) {
+            return null;
+        }
+        String access = permissionOverrides.get(feature.name());
+        try {
+            return access == null ? null : ReadWriteAccess.valueOf(access);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
 
     public CustomRole() {
     }

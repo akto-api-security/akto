@@ -71,6 +71,10 @@ public class RBAC {
         }
 
         public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
+            if (feature == Feature.THREAT_SETTINGS) {
+                // same as threat protection unless a custom role overrides it
+                feature = Feature.THREAT_PROTECTION;
+            }
             // change default for dev and and feature label to NO_ACCESS
             ReadWriteAccess defaultAccess = ReadWriteAccess.READ;
             if(this.name.equals(Role.DEVELOPER.name()) || this.name.equals(Role.GUEST.name())){
@@ -306,7 +310,7 @@ public class RBAC {
         }
 
         try {
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
+            CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(roleStr);
             if (customRole != null && Role.fromName(customRole.getBaseRole()) != null) {
                 return Role.fromName(customRole.getBaseRole());
             }
