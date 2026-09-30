@@ -1,5 +1,6 @@
 package com.akto.action.settings;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
@@ -178,6 +179,12 @@ public class ModuleInfoAction extends UserAction {
      * skip/limit/filters still apply against the deduped set.
      */
     public String fetchEndpointShieldAgents() {
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            moduleInfos = new ArrayList<>();
+            total = 0;
+            return SUCCESS.toUpperCase();
+        }
         Bson filter = buildEndpointShieldFilter();
         Bson groupId = endpointShieldGroupId();
 
@@ -231,6 +238,14 @@ public class ModuleInfoAction extends UserAction {
     public String fetchEndpointShieldFilterOptions() {
         Bson base = Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString());
         filterOptions = new HashMap<>();
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            filterOptions.put("hostnames", new ArrayList<>());
+            filterOptions.put("usernames", new ArrayList<>());
+            filterOptions.put("deviceIds", new ArrayList<>());
+            filterOptions.put("oses", new ArrayList<>());
+            return SUCCESS.toUpperCase();
+        }
         filterOptions.put("hostnames", distinctStrings(ModuleInfo.NAME, base));
         filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
         filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
@@ -276,6 +291,11 @@ public class ModuleInfoAction extends UserAction {
      * "projected" response was still ~3MB at 1000-device scale.
      */
     public String fetchEndpointShieldUserMetadata() {
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            moduleInfos = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
         Bson filter = Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString());
         Bson projection = Projections.include(
                 ModuleInfoDao.ID, ModuleInfo.NAME,
@@ -572,6 +592,11 @@ public class ModuleInfoAction extends UserAction {
     }
 
     public String fetchAgenticUsers() {
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            agenticUsers = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
         // The list is the plain union of both identity sources — every agent_users doc plus every
         // username reporting a device in module_info — deduped by username. A user with no device
         // in either source still belongs in the list: they are a real identity that can be tagged,
@@ -658,6 +683,8 @@ public class ModuleInfoAction extends UserAction {
         copy.setUserId(u.getUserId());
         copy.setLastUpdatedAt(u.getLastUpdatedAt());
         copy.setLastUpdatedBy(u.getLastUpdatedBy());
+        copy.setOrganizationName(u.getOrganizationName());
+        copy.setOrganizationType(u.getOrganizationType());
         copy.setDevices(u.getDevices() == null ? new ArrayList<>() : new ArrayList<>(u.getDevices()));
         copy.setDeviceTags(u.getDeviceTags() == null ? null : new ArrayList<>(u.getDeviceTags()));
         return copy;

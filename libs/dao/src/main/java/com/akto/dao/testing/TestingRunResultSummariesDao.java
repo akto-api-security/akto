@@ -1,11 +1,13 @@
 package com.akto.dao.testing;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.akto.dao.MCollection;
 import org.bson.conversions.Bson;
@@ -16,6 +18,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -126,6 +129,38 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
 
     }
 
+    /**
+     * Small, index-backed step 1 of the Argus (AGENTIC) red-team read: which summaries fall in the
+     * dashboard's own date range. Projects only `_id` — never the summary documents themselves —
+     * and is capped so a very active account can't hand
+     * VulnerableTestingRunResultDao#redTeamAggregates an unbounded `testRunResultSummaryId $in`
+     * list.
+     *
+     * Deliberately does NOT narrow by TestingRun.dashboardContext first (an earlier version of
+     * this method did): that field is only set on test runs created after dashboardContext
+     * shipped, so filtering on it would silently drop every older run's summaries from this
+     * window. The real scoping — RBAC and "does this summary's result actually belong to one of
+     * this account's agentic collections" — happens one step later, in
+     * VulnerableTestingRunResultDao#redTeamAggregates' own `apiInfoKey.apiCollectionId $in`
+     * filter (plus its RBAC modifyFilters call); this step is purely "narrow the id space by time"
+     * off the {@code startTimestamp} index, nothing more.
+     */
+    public List<ObjectId> summaryIdsInWindow(int startTs, int endTs, int cap) {
+        List<ObjectId> summaryIds = new ArrayList<>();
+        MongoCursor<TestingRunResultSummary> cursor = instance.getMCollection()
+                .find(Filters.and(
+                        Filters.gte(TestingRunResultSummary.START_TIMESTAMP, startTs),
+                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, endTs)))
+                .projection(Projections.include(Constants.ID))
+                .sort(Sorts.descending(TestingRunResultSummary.START_TIMESTAMP))
+                .limit(cap)
+                .cursor();
+        while (cursor.hasNext()) {
+            summaryIds.add(cursor.next().getId());
+        }
+        return summaryIds;
+    }
+
     public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get()+"";
@@ -148,6 +183,14 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
                 new IndexOptions().name("testingRunId_1_startTimestamp_-1"));
 
         IndexOptions sparseIndex = new IndexOptions().sparse(true);
+
+        /*
+         * mini-testing polls for attempts whose lease has lapsed, so that predicate runs on a loop.
+         * Sparse because only summaries currently owned by a module carry the field - a single
+         * field sparse index omits the rest, which keeps it to the handful of in-flight runs.
+         */
+        Bson leaseExpiryIndex = Indexes.ascending(TestingRunResultSummary.LEASE_EXPIRY_TS);
+        createIndexIfAbsent(dbName, getCollName(), leaseExpiryIndex, sparseIndex.name("leaseExpiryTs_1"));
 
         Bson branchIndex = Indexes.ascending("metadata.branch");
         createIndexIfAbsent(dbName, getCollName(), branchIndex, sparseIndex.name("metadata.branch_1"));

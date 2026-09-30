@@ -3,103 +3,24 @@ package com.akto.gpt.handlers.gpt_prompts;
 import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
-import javax.validation.ValidationException;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Renders one insight's precomputed metric bundle into markdown, plus grounds the
- * provider's own concern/impact/remediation drafts in the real evidence rows (naming
- * actual hosts/users/topics instead of just aggregate counts). This handler NEVER
- * computes a number — every figure in its input is already Java-computed (see
- * InsightService.buildNarrativeInput); its only job is prose. validateAndBuild()
- * mechanically enforces that for every field it returns: any numeric literal in the
- * model's output that isn't copied verbatim from the input is grounds for rejection,
- * with one retry before giving up. Bump PROMPT_VERSION whenever the prompt changes —
- * it is baked into the narrative cache key so old prose can never outlive a changed
- * prompt.
+ * ENDPOINT/GUARDRAIL_VIOLATIONS insight narratives — concern/impact/remediation grounded in real
+ * evidence rows. See AbstractGroundedNarrativeHandler for the shared retry loop and numeric-
+ * literal guard this handler builds on (also shared by ArgusInsightCardNarrativeHandler, the
+ * Argus posture insight cards' own single-summary sibling).
  */
-public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
+public class InsightNarrativeHandler extends AbstractGroundedNarrativeHandler {
 
-    public static final int PROMPT_VERSION = 3;
-    public static final String NARRATIVE_INPUT = "narrativeInput"; // JSON string
-
-    private static final Pattern NUMERIC_LITERAL = Pattern.compile("\\d[\\d,]*(?:\\.\\d+)?%?");
-    private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\([^)]*\\)");
     private static final int MAX_WORDS = 260;
     private static final int MAX_SUMMARY_FIELD_WORDS = 60;
 
+    /** Package-private (not private): InsightNarrativeHandlerTest exercises the literal-rejection
+     *  guard directly against hand-built responses, rather than only through a real `call()`. */
     @Override
-    protected JSONObject getResponseFormat() {
-        try { return new JSONObject("{\"type\":\"json_object\"}"); }
-        catch (Exception e) { return null; }
-    }
-
-    // Confirmed directly against the real Azure endpoint: at the default reasoning effort, this
-    // prompt burned an entire 4000-token budget on invisible reasoning and returned empty content
-    // (finish_reason "length") without ever writing the answer — raising the budget alone doesn't
-    // fix that, it just burns more tokens/latency reasoning about a job with no real judgment call
-    // in it. "minimal" is the right effort here: this handler is a RENDERER, not an analyst — every
-    // fact is already computed, its only job is copying values into prose/JSON.
-    @Override
-    protected String getReasoningEffort() { return "minimal"; }
-
-    @Override
-    protected int getMaxTokens() { return 4000; }
-
-    @Override
-    protected double getTemperature() { return 0.0; }
-
-    @Override
-    protected void validate(BasicDBObject queryData) throws ValidationException {
-        String input = queryData.getString(NARRATIVE_INPUT);
-        if (input == null || input.trim().isEmpty()) {
-            throw new ValidationException(NARRATIVE_INPUT + " is required");
-        }
-    }
-
-    // Overridden (not just getPrompt/processResponse) for two reasons: avoid the base
-    // class's verbose logger.warn(queryData)/logger.warn(prompt) — every cache miss
-    // would otherwise dump asset/user/team names into the DASHBOARD log DB — and to run
-    // the one-retry-on-validation-failure loop.
-    @Override
-    public BasicDBObject handle(BasicDBObject queryData) {
-        try {
-            validate(queryData);
-            JSONObject input = new JSONObject(queryData.getString(NARRATIVE_INPUT));
-            Set<String> allowedLiterals = allowedLiterals(input);
-
-            String prompt = buildPrompt(input, null);
-            BasicDBObject result = tryOnce(prompt, allowedLiterals);
-            if (result.containsField("error")) {
-                // One retry, naming the offending literals back to the model.
-                String rejectedNote = result.getString("error");
-                prompt = buildPrompt(input, rejectedNote);
-                result = tryOnce(prompt, allowedLiterals);
-            }
-            return result;
-        } catch (ValidationException e) {
-            BasicDBObject resp = new BasicDBObject();
-            resp.put("error", "Invalid input parameters.");
-            return resp;
-        } catch (Exception e) {
-            logger.error("InsightNarrativeHandler: " + e.getMessage());
-            BasicDBObject resp = new BasicDBObject();
-            resp.put("error", "Internal server error: " + e.getMessage());
-            return resp;
-        }
-    }
-
-    private BasicDBObject tryOnce(String prompt, Set<String> allowedLiterals) throws Exception {
-        String rawResponse = call(prompt);
-        return validateAndBuild(rawResponse, allowedLiterals);
-    }
-
-    private BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
+    BasicDBObject validateAndBuild(String rawResponse, Set<String> allowedLiterals) {
         BasicDBObject resp = new BasicDBObject();
         if (rawResponse == null || rawResponse.isEmpty() || "NOT_FOUND".equalsIgnoreCase(rawResponse)) {
             resp.put("error", "empty response");
@@ -119,11 +40,11 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
             Set<String> unknownLiterals = new HashSet<>();
             collectUnknownLiterals(narrative, allowedLiterals, unknownLiterals);
 
-            Map<String, String> summaryFields = new LinkedHashMap<>();
+            java.util.Map<String, String> summaryFields = new java.util.LinkedHashMap<>();
             summaryFields.put("concern", concern);
             summaryFields.put("impact", impact);
             summaryFields.put("remediation", remediation);
-            for (Map.Entry<String, String> e : summaryFields.entrySet()) {
+            for (java.util.Map.Entry<String, String> e : summaryFields.entrySet()) {
                 String value = e.getValue();
                 if (value.isEmpty()) continue; // model may leave one blank when there's genuinely nothing grounded to add
                 if (value.split("\\s+").length > MAX_SUMMARY_FIELD_WORDS) {
@@ -148,25 +69,18 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         }
     }
 
-    private void collectUnknownLiterals(String text, Set<String> allowedLiterals, Set<String> out) {
-        // allowedLiterals already carries both comma and no-comma forms of every number (see
-        // addLiteralsFrom) — the model sometimes adds/drops thousands-separators when copying a
-        // number (e.g. writes "1,252" for a fact whose formatted string is "1252"), which is the
-        // same number, not a fabrication.
-        Matcher m = NUMERIC_LITERAL.matcher(text);
-        while (m.find()) {
-            String literal = m.group();
-            if (!allowedLiterals.contains(literal)) out.add(literal);
-        }
-    }
-
-    private String buildPrompt(JSONObject input, String rejectedNote) {
+    /** Package-private (not private): pure string-building, no network call — same
+     *  "test the pure piece directly" convention this repo already uses elsewhere (see
+     *  InsightNarrativeHandlerTest). */
+    @Override
+    String buildPrompt(JSONObject input, String rejectedNote) {
+        String severity = input.optString("severity", "");
         StringBuilder sb = new StringBuilder();
-        sb.append("You are rendering a precomputed security finding into prose for someone new to this ")
-          .append("product who won't know what to do next. You are a RENDERER, not an analyst — every ")
-          .append("number below has already been computed in Java; your job is to make it specific and ")
-          .append("concrete, grounded in the real rows in EVIDENCE (actual hosts/users/topics/examples), ")
-          .append("not just the aggregate counts in FACTS. Return JSON.\n\n")
+        sb.append("You are rendering a precomputed security finding into prose for a reader who needs to ")
+          .append("decide what to do next, not just read what happened. You are a RENDERER, not an analyst ")
+          .append("— every number below has already been computed in Java; your job is to make it specific, ")
+          .append("concrete, and ACTION-DRIVEN, grounded in the real rows in EVIDENCE (actual hosts/users/")
+          .append("topics/examples), not just the aggregate counts in FACTS. Return JSON.\n\n")
           .append("HARD RULES:\n")
           .append("1. Every number in your output (in every field) MUST be copied verbatim from a ")
           .append("\"formatted\" value in FACTS or a cell value in EVIDENCE. Never compute, sum, round, or ")
@@ -176,7 +90,27 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("3. Never write a link, URL, or call to action — those are rendered separately.\n")
           .append("4. Include every sentence in CAVEATS and every \"impact\" in DATA_GAPS, verbatim, ")
           .append("somewhere in narrative.\n")
-          .append("5. If something is not in FACTS or EVIDENCE, say it is unavailable — never estimate it.\n\n")
+          .append("5. If something is not in FACTS or EVIDENCE, say it is unavailable — never estimate it.\n")
+          .append("6. SEVERITY below (if non-empty) is the real, Java-computed worst severity behind this ")
+          .append("finding — let concern/impact read with that urgency (CRITICAL/HIGH: urgent, immediate; ")
+          .append("MEDIUM/LOW: worth doing, not alarming). Never invent a severity or urgency that SEVERITY, ")
+          .append("CAVEATS, and DATA_GAPS don't support — when SEVERITY is empty, stay neutral.\n")
+          .append("7. FACTS/EVIDENCE hold raw Unix epoch seconds under keys like \"detectedAt\", \"firstSeen\", ")
+          .append("\"lastSeen\", \"lastScannedAt\", \"timestamp\", or \"lastHit\" (a plain integer, e.g. ")
+          .append("1758375000) — these are NOT counts. Never print one of these as a bare number. Describe ")
+          .append("timing only in relative, qualitative words (\"recently\", \"earlier this month\", \"on its ")
+          .append("most recent occurrence\", \"within this window\") using CURRENT_TIME below only to judge ")
+          .append("roughly how far in the past it is — never state or compute a specific date, a day count, ")
+          .append("or an age in days/weeks (that would be computing a new number, which rule 1 forbids).\n")
+          .append("8. When a row in EVIDENCE has an \"evidenceSample\" field, that is the real, verbatim ")
+          .append("intercepted request/response text behind that row — the strongest possible grounding for ")
+          .append("WHY that specific row matters. Prefer it over the row's other fields when explaining a ")
+          .append("row's importance, and pair it with that row's own \"policy\" field (the guardrail policy ")
+          .append("that fired) to say what was detected, not just that something was. Never invent detail ")
+          .append("beyond what evidenceSample actually shows, and never quote it verbatim at length — ")
+          .append("paraphrase what it reveals in your own words.\n\n")
+          .append("CURRENT_TIME: ").append(nowForPrompt()).append("\n\n")
+          .append("SEVERITY: ").append(severity).append("\n\n")
           .append("FACTS: ").append(input.optJSONArray("metrics")).append("\n\n")
           .append("EVIDENCE: ").append(input.optJSONArray("evidence")).append("\n\n")
           .append("CAVEATS: ").append(input.optJSONArray("caveats")).append("\n\n")
@@ -198,10 +132,15 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
           .append("as a stray dash), no literal section labels like \"What we found\", \"Why it matters\", ")
           .append("\"Summary\", no markdown heading (#, ##). Under 200 words total, no emojis.\n")
           .append("- concern: one sentence, under 40 words, on what was specifically found — name real ")
-          .append("entities from EVIDENCE where possible.\n")
-          .append("- impact: one to two sentences, under 40 words, on what happens if this is left ")
-          .append("unaddressed.\n")
-          .append("- remediation: one to two sentences, under 40 words, the concrete next step to take.\n\n")
+          .append("entities from EVIDENCE where possible. Open with the severity word (e.g. \"A CRITICAL...\") ")
+          .append("only when SEVERITY is non-empty — never state a severity otherwise.\n")
+          .append("- impact: one to two sentences, under 40 words, on the concrete consequence of leaving ")
+          .append("this unaddressed — name what actually breaks or who's exposed (from EVIDENCE/FACTS), not ")
+          .append("generic risk language like \"could pose a risk.\"\n")
+          .append("- remediation: one to two sentences, under 40 words, phrased as a direct instruction, not ")
+          .append("a vague suggestion — start with an imperative verb (Review/Disable/Rotate/Escalate/Notify/")
+          .append("Update/Contact) and name the specific policy, host, or device from EVIDENCE it applies to ")
+          .append("wherever EVIDENCE names one.\n\n")
           .append("Return exactly: {\"narrative\": \"<markdown>\", \"concern\": \"<text>\", ")
           .append("\"impact\": \"<text>\", \"remediation\": \"<text>\"}. This is a json response.\n");
         if (rejectedNote != null) {
@@ -218,7 +157,8 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
      *  and the model can't tell those apart from a "formatted" value — it just sees text with a
      *  number in it. Field-by-field extraction only catches up with each new case one bug report at
      *  a time; scanning everything the prompt actually contains closes the whole class at once. */
-    private Set<String> allowedLiterals(JSONObject input) {
+    @Override
+    Set<String> allowedLiterals(JSONObject input) {
         Set<String> out = new HashSet<>();
         for (String field : new String[] { "metrics", "evidence", "caveats", "dataGaps" }) {
             Object value = input.opt(field);
@@ -228,33 +168,5 @@ public class InsightNarrativeHandler extends AzureOpenAIPromptHandler {
         addLiteralsFrom(input.optString("draftImpact", ""), out);
         addLiteralsFrom(input.optString("draftRemediation", ""), out);
         return out;
-    }
-
-    private void addLiteralsFrom(String text, Set<String> out) {
-        if (text == null) return;
-        Matcher m = NUMERIC_LITERAL.matcher(text);
-        while (m.find()) {
-            String literal = m.group();
-            out.add(literal);
-            out.add(literal.replace(",", "")); // also allow the same number without a thousands separator
-        }
-    }
-
-    @Override
-    protected String getPrompt(BasicDBObject queryData) {
-        try {
-            return buildPrompt(new JSONObject(queryData.getString(NARRATIVE_INPUT)), null);
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    @Override
-    protected BasicDBObject processResponse(String rawResponse) {
-        // handle() is overridden and does its own validation; this exists only to satisfy
-        // the abstract contract for any super.handle() caller.
-        BasicDBObject resp = new BasicDBObject();
-        resp.put("markdown", rawResponse);
-        return resp;
     }
 }

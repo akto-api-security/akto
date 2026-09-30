@@ -11,6 +11,7 @@
 # Controlled by flags in config.env (Jamf/enterprise only — all default off):
 #   ENABLE_PROMPT_HOOKS_GITHUB_CLI=true  — installs userPromptSubmitted hook
 #   ENABLE_MCP_HOOKS_GITHUB_CLI=true     — installs preToolUse/postToolUse MCP hooks
+#   AKTO_HEARTBEAT_ENABLED=true          — registers the device with the abstractor (default off)
 # ========================================================================================
 
 # Ensure common binary paths are available (RTR/remote execution uses minimal PATH)
@@ -288,6 +289,8 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="github_cli"
 export CONTEXT_SOURCE="ENDPOINT"
+# Device registration with the abstractor — off unless enabled in config.env.
+export AKTO_HEARTBEAT_ENABLED="\${AKTO_HEARTBEAT_ENABLED:-false}"
 export DEVICE_ID="$device_id"
 
 # Log hook startup env for diagnostics
@@ -326,6 +329,8 @@ export AKTO_SYNC_MODE="true"
 export AKTO_TIMEOUT="5"
 export AKTO_CONNECTOR="github_cli"
 export CONTEXT_SOURCE="ENDPOINT"
+# Device registration with the abstractor — off unless enabled in config.env.
+export AKTO_HEARTBEAT_ENABLED="\${AKTO_HEARTBEAT_ENABLED:-false}"
 export DEVICE_ID="$device_id"
 
 # Execute Python hook script

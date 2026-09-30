@@ -354,7 +354,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       const metadataType = edgeInfo?.metadata?.type || 'default';
       const nodeInfo = getNodeCategoryFromType(metadataType);
 
-      if (nodeInfo.category === 'mcp') {
+      if (nodeInfo.category === 'mcp' && nodeInfo.type === 'MCP Server') {
         stats['MCP Servers']++;
       } else if (nodeInfo.category === 'ai-model') {
         stats['AI Models']++;

@@ -537,7 +537,16 @@ public class InventoryAction extends UserAction {
     }
 
     public String fetchSummaryInfoForChanges(){
-        long countEndpoints = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections);
+        // where the view is available, count from it: same collection and same discoveredTimestamp
+        // predicate the endpoints table below the card uses, instead of counting host header rows
+        // in single_type_info.
+        long countEndpoints;
+        if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
+            countEndpoints = EndpointInfoViewDao.instance.getMCollection()
+                    .countDocuments(endpointInfoViewWindowFilter());
+        } else {
+            countEndpoints = SingleTypeInfoDao.instance.fetchEndpointsCount(startTimestamp, endTimestamp, deactivatedCollections);
+        }
         int countSensitiveApis = SingleTypeInfoDao.instance.getSensitiveApisCount(new ArrayList<>(), false, (
                 Filters.and(
                         Filters.and(
@@ -553,6 +562,106 @@ public class InventoryAction extends UserAction {
         response.put("sensitiveEndpointsCount", countSensitiveApis);
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * The view carries every column this table renders, so it can serve the rows on its own — no
+     * api_info hydration. It cannot serve a responseCodes filter though: that field is not in the
+     * view, so those requests stay on api_info.
+     */
+    private boolean useEndpointInfoView() {
+        // filters is only populated by struts when the request carries one, so it can be null here
+        if (filters != null) {
+            List responseCodeFilter = filters.get("responseCodes");
+            if (responseCodeFilter != null && !responseCodeFilter.isEmpty()) return false;
+        }
+        return AccountSettingsDao.isEndpointInfoViewEnabled();
+    }
+
+    /**
+     * The window the card counts and the table pages, including the rbac collection scope.
+     *
+     * Both callers must use this: the card counting a wider set than the table can reach is exactly
+     * how the two numbers drifted apart before, just in the other direction — a user scoped to a
+     * subset of collections saw a count that included rows the table below it filtered out.
+     */
+    private Bson endpointInfoViewWindowFilter() {
+        List<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.gt(EndpointInfoView.DISCOVERED_TIMESTAMP, startTimestamp));
+        filterList.add(Filters.lt(EndpointInfoView.DISCOVERED_TIMESTAMP, endTimestamp));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds != null) {
+                filterList.add(Filters.in(EndpointInfoView.API_COLLECTION_ID, collectionIds));
+            }
+        } catch (Exception e) {
+        }
+
+        return Filters.and(filterList);
+    }
+
+    /** The window filter above, plus the search box and the table's own filters. */
+    private Bson prepareEndpointInfoViewFilters() {
+        List<Bson> filterList = new ArrayList<>();
+        filterList.add(endpointInfoViewWindowFilter());
+
+        String regexPattern = getRegexPattern();
+        if (!regexPattern.isEmpty()) {
+            filterList.add(Filters.or(
+                    Filters.regex(EndpointInfoView.URL, regexPattern, "i"),
+                    Filters.regex(EndpointInfoView.METHOD, regexPattern, "i")));
+        }
+
+        // the view stores apiCollectionId/url/method flat, not under a compound _id
+        for (Map.Entry<String, List> entry: (filters == null ? new HashMap<String, List>() : filters).entrySet()) {
+            List value = entry.getValue();
+            if (value == null || value.isEmpty()) continue;
+            switch (entry.getKey()) {
+                case "apiCollectionId":
+                    filterList.add(Filters.in(EndpointInfoView.API_COLLECTION_ID, value));
+                    break;
+                case "method":
+                    filterList.add(Filters.in(EndpointInfoView.METHOD, value));
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        return Filters.and(filterList);
+    }
+
+    /**
+     * Shapes a view row into the ApiInfo the endpoints table already expects, so the response
+     * contract and the frontend stay untouched.
+     *
+     * actualAuthType must never come back null: the table does actualAuthType.join(", ") without a
+     * guard, so a null there takes out the whole page rather than one cell.
+     */
+    private ApiInfo toApiInfo(EndpointInfoView view) {
+        ApiInfo apiInfo = new ApiInfo(new ApiInfoKey(view.getApiCollectionId(), view.getUrl(), view.getMethod()));
+        apiInfo.setDiscoveredTimestamp(view.getDiscoveredTimestamp());
+        apiInfo.setLastSeen(view.getLastSeen());
+        apiInfo.setLastTested(view.getLastTested());
+        apiInfo.setRiskScore(view.getRiskScore());
+        apiInfo.setSeverityScore(view.getSeverityScore());
+        apiInfo.setApiType(view.getApiType());
+
+        List<String> actualAuthType = view.getActualAuthType();
+        apiInfo.setActualAuthType(actualAuthType == null ? new ArrayList<>() : actualAuthType);
+
+        Set<ApiInfo.ApiAccessType> accessTypes = new HashSet<>();
+        if (view.getActualAccessType() != null) {
+            for (String accessType: view.getActualAccessType()) {
+                try {
+                    accessTypes.add(ApiInfo.ApiAccessType.valueOf(accessType));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        apiInfo.setApiAccessTypes(accessTypes);
+        return apiInfo;
     }
 
     public String loadRecentEndpoints() {
@@ -573,6 +682,32 @@ public class InventoryAction extends UserAction {
         }
 
         int pageLimit = Math.min(limit == 0 ? 50 : limit, 200);
+
+        // serve from the view where it exists, so this table and the count above it are the same
+        // query over the same collection. responseCodes is not a field on the view, so a request
+        // using that filter falls back to api_info rather than silently ignoring it.
+        if (useEndpointInfoView()) {
+            Bson viewFilter = prepareEndpointInfoViewFilters();
+            // discoveredTimestamp alone is not unique — a url merge stamps every endpoint it
+            // touches with the same second — so sorting on it by itself gives mongo no stable
+            // order across skip/limit calls, and rows get repeated or dropped at page boundaries.
+            // _id breaks the tie deterministically.
+            List<EndpointInfoView> views = EndpointInfoViewDao.instance.findAll(
+                    viewFilter, skip, pageLimit,
+                    Sorts.orderBy(Sorts.descending(EndpointInfoView.DISCOVERED_TIMESTAMP),
+                                  Sorts.ascending(Constants.ID)));
+
+            List<ApiInfo> viewList = new ArrayList<>();
+            for (EndpointInfoView view: views) {
+                viewList.add(toApiInfo(view));
+            }
+
+            response = new BasicDBObject();
+            response.put("endpoints", viewList);
+            response.put("totalCount", EndpointInfoViewDao.instance.getMCollection().countDocuments(viewFilter));
+            return Action.SUCCESS.toUpperCase();
+        }
+
         Bson filter = Filters.and(prepareFilters("API_INFO"), searchFilter);
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());

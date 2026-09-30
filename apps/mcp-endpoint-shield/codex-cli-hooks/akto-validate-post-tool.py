@@ -365,6 +365,21 @@ def call_guardrails(
         return True, "", ""
 
 
+def _strip_jsonrpc_envelope(value: Any) -> Any:
+    try:
+        if isinstance(value, str):
+            parsed = json.loads(value)
+            if isinstance(parsed, dict) and "jsonrpc" in parsed and "id" in parsed:
+                stripped = {k: v for k, v in parsed.items() if k not in ("jsonrpc", "id")}
+                return json.dumps(stripped, sort_keys=True, ensure_ascii=False)
+            return value
+        if isinstance(value, dict) and "jsonrpc" in value and "id" in value:
+            return {k: v for k, v in value.items() if k not in ("jsonrpc", "id")}
+        return value
+    except Exception:
+        return value
+
+
 def posttool_fingerprint(
     tool_name: str,
     tool_use_id: str,
@@ -375,8 +390,8 @@ def posttool_fingerprint(
         {
             "t": tool_name,
             "u": tool_use_id or "",
-            "i": tool_input,
-            "r": tool_response,
+            "i": _strip_jsonrpc_envelope(tool_input),
+            "r": _strip_jsonrpc_envelope(tool_response),
         },
         sort_keys=True,
         ensure_ascii=False,
@@ -604,7 +619,7 @@ def main():
         if not allowed:
             if _is_warn_behaviour(behaviour):
                 block_reason = (
-                    "Warning!!, tool result blocked, please review it. Send again to bypass. "
+                    "Warning!!, tool result blocked, please review it. "
                     f"Reason for blocking: {gr_reason}"
                 )
             else:

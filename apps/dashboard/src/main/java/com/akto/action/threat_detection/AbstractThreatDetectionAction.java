@@ -5,21 +5,53 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpMessage;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import okhttp3.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class AbstractThreatDetectionAction extends UserAction {
 
+  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
+  // the threat backend as headers.
+  @Getter @Setter String skillEvaluationMode;
+  @Getter @Setter String configEvaluationMode;
+
   private Map<Integer, String> tokens = new HashMap<>();
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+
+  // fetchAllMaliciousReq's own cache — a raw-event fetch this heavy (up to MAX_THREAT_FETCH_LIMIT
+  // events, full payload/metadata per row) is routinely called more than once for the same
+  // account/window/filters within a few seconds of each other (e.g. SecurityPostureAction's
+  // fetchPostureSummary and fetchRiskScoreBreakdown both fetch the identical current-window
+  // allThreats when someone opens the risk score flyout right after the page loads). 2 minutes,
+  // per accountId+params, same tradeoff InsightService's own 60s bundle cache already accepts for
+  // "this account's data can be a couple minutes stale on a dashboard read".
+  private static final long MALICIOUS_EVENTS_CACHE_TTL_MS = 120_000;
+  private static final Map<String, CachedMaliciousEventResponse> maliciousEventsCache = new ConcurrentHashMap<>();
+
+  private static final class CachedMaliciousEventResponse {
+    final MaliciousEventResponse response;
+    final long loadedAtMs;
+    CachedMaliciousEventResponse(MaliciousEventResponse response, long loadedAtMs) {
+      this.response = response;
+      this.loadedAtMs = loadedAtMs;
+    }
+  }
 
   public AbstractThreatDetectionAction() {
     super();
@@ -57,7 +89,13 @@ public class AbstractThreatDetectionAction extends UserAction {
       int endTimestamp,
       int limit,
       Map<String, Object> additionalFilters) {
-    return fetchAllMaliciousEvents(startTimestamp, endTimestamp, limit, additionalFilters, null);
+      MaliciousEventResponse dbObject = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, null);
+      return dbObject.getEvents();
+  }
+
+  public long getTotalEvents(int startTimestamp,int endTimestamp, Map<String, Object> additionalFilters){
+    MaliciousEventResponse dbObject = fetchAllMaliciousReq(startTimestamp, endTimestamp, 1, additionalFilters, null);
+    return dbObject.getTotalEvent();
   }
 
   /**
@@ -67,20 +105,130 @@ public class AbstractThreatDetectionAction extends UserAction {
    * additionalFilters. "only" narrows to just /skills/&lt;name&gt; events; "exclude" (or null)
    * behaves like the header was never sent.
    */
+
+  @Getter 
+  @Setter 
+  @AllArgsConstructor 
+  @NoArgsConstructor 
+  private class MaliciousEventResponse {
+    private List<DashboardMaliciousEvent> events;
+    private long totalEvent;
+  }
+
   public List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
+    int startTimestamp,
+    int endTimestamp,
+    int limit,
+    Map<String, Object> additionalFilters,
+    String skillEvalMode
+  ){
+    MaliciousEventResponse res = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode);
+    return res.getEvents();
+  }
+
+  /**
+   * Same as the 5-arg overload, plus minimalFields — true drops payload/metadata/
+   * owaspCategories/remediation/evidenceLine/humanResponse from each event (see
+   * ThreatDetectionBackendClient#listMaliciousRequests's minimalFields doc). For a caller like
+   * SecurityPostureAction that only reads filterId/category/host off these events, not one that
+   * displays them (e.g. a violations table), which should keep using the 4/5-arg overloads.
+   */
+  public List<DashboardMaliciousEvent> fetchAllMaliciousEvents(
+    int startTimestamp,
+    int endTimestamp,
+    int limit,
+    Map<String, Object> additionalFilters,
+    String skillEvalMode,
+    boolean minimalFields
+  ){
+    MaliciousEventResponse res = fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    return res.getEvents();
+  }
+
+  public MaliciousEventResponse fetchAllMaliciousReq(
       int startTimestamp,
       int endTimestamp,
       int limit,
       Map<String, Object> additionalFilters,
       String skillEvalMode) {
+    return fetchAllMaliciousReq(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, false);
+  }
+
+  public MaliciousEventResponse fetchAllMaliciousReq(
+      int startTimestamp,
+      int endTimestamp,
+      int limit,
+      Map<String, Object> additionalFilters,
+      String skillEvalMode,
+      boolean minimalFields) {
+    // Users limited to specific collections only see activity of their own agents. Applied before the
+    // cache key, so the key carries the user's hosts and one user's results are never served to another.
+    if (isLimitedToOwnAgents()) {
+      Map<String, Object> scopedFilters = additionalFilters == null ? new HashMap<>() : new HashMap<>(additionalFilters);
+      if (!ArgusCollectionScope.scopeActivityFilters(getSUser(), scopedFilters)) {
+        return new MaliciousEventResponse(new ArrayList<>(), 0);
+      }
+      additionalFilters = scopedFilters;
+    }
+    String cacheKey = maliciousEventsCacheKey(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    CachedMaliciousEventResponse cached = maliciousEventsCache.get(cacheKey);
+    if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < MALICIOUS_EVENTS_CACHE_TTL_MS) {
+      return cached.response;
+    }
+    MaliciousEventResponse fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    maliciousEventsCache.put(cacheKey, new CachedMaliciousEventResponse(fresh, System.currentTimeMillis()));
+    return fresh;
+  }
+
+  /** Users limited to specific collections (Argus) - see ArgusCollectionScope. */
+  protected boolean isLimitedToOwnAgents() {
+    return ArgusCollectionScope.isLimited(getSUser());
+  }
+
+  protected static final int OWN_EVENTS_LIMIT = 100_000;
+
+  /**
+   * All-time events of the user's own agents (host-scoped, minimal fields, cached), or null if the
+   * user is not limited to specific collections. Used to check that an event opened or changed by id
+   * belongs to the user.
+   */
+  protected List<DashboardMaliciousEvent> fetchOwnEventsIfLimited() {
+    if (!isLimitedToOwnAgents()) {
+      return null;
+    }
+    return fetchAllMaliciousEvents(0, 0, OWN_EVENTS_LIMIT, null, null, true);
+  }
+
+  /** accountId (the cache is static/shared across every action instance) + every param that
+   *  changes the query, so two different windows/filters never collide. additionalFilters'
+   *  Map#toString() is good enough here — every current caller passes either null or a small,
+   *  literal-keyed map, not something where key-order instability would matter. minimalFields is
+   *  part of the key too — a minimal-fields response must never be served to a caller that asked
+   *  for full rows (or vice versa: caching a full response wouldn't be wrong, just wasteful). */
+  private static String maliciousEventsCacheKey(int startTimestamp, int endTimestamp, int limit,
+                                                 Map<String, Object> additionalFilters, String skillEvalMode,
+                                                 boolean minimalFields) {
+    return Context.accountId.get() + "|" + startTimestamp + "|" + endTimestamp + "|" + limit
+        + "|" + additionalFilters + "|" + skillEvalMode + "|" + minimalFields;
+  }
+
+  private MaliciousEventResponse fetchAllMaliciousReqUncached(
+      int startTimestamp,
+      int endTimestamp,
+      int limit,
+      Map<String, Object> additionalFilters,
+      String skillEvalMode,
+      boolean minimalFields) {
     final List<DashboardMaliciousEvent> result = new ArrayList<>();
+    long total = 0;
     try {
       String contextSourceValue = Context.contextSource.get() != null ? Context.contextSource.get().toString() : "";
       ListMaliciousRequestsResponse m = ThreatDetectionBackendClient.listMaliciousRequests(
           Context.accountId.get(), startTimestamp, endTimestamp, limit, additionalFilters,
-          contextSourceValue, skillEvalMode);
+          contextSourceValue, skillEvalMode, minimalFields);
 
       if (m != null) {
+        total = m.getTotal();
         result.addAll(m.getMaliciousEventsList().stream()
             .map(smr -> {
               DashboardMaliciousEvent event = new DashboardMaliciousEvent(
@@ -119,9 +267,8 @@ public class AbstractThreatDetectionAction extends UserAction {
     } catch (Exception e) {
       // Error handling is left to the caller - return empty list on error
     }
-    return result;
+    return new MaliciousEventResponse(result, total);
   }
-
   /**
    * Per-month violation totals, bucketed server-side by the threat-detection-backend (a single
    * cheap $bucket aggregation, not a raw-event fetch) — lets a caller build a trend sparkline
@@ -132,6 +279,15 @@ public class AbstractThreatDetectionAction extends UserAction {
    *     asset's hostNames) instead of the whole account.
    * @return one count per monthBoundaries entry, or an empty list on any error/empty input.
    */
+  protected void addEvaluationModeHeaders(HttpMessage request) {
+    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
+      request.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
+    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
+      request.addHeader("x-config-eval-mode", this.configEvaluationMode);
+    }
+  }
+
   protected List<Integer> fetchViolationsMonthlyTotals(
       int startTimestamp, int endTimestamp, List<Integer> monthBoundaries, List<String> hostFilter) {
     if (monthBoundaries == null || monthBoundaries.isEmpty()) return new ArrayList<>();

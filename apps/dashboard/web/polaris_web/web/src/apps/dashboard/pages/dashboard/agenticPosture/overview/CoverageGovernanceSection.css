@@ -1,0 +1,9 @@
+/* Polaris's ProgressBar `color` prop only supports highlight (blue)/primary/success (green)/
+   critical (red) — there's no orange/warning option, and the component doesn't forward a `style`
+   prop to override it directly. This overrides the same CSS custom property Polaris's own
+   "highlight" variant sets, scoped to just this section's "average" bars, using an attribute
+   selector (not the exact class name) so it survives Polaris's internal hash suffixes changing
+   across versions. */
+.coverage-progress-average [class*="Polaris-ProgressBar--colorHighlight"] {
+    --pc-progress-bar-indicator: var(--p-color-bg-warning-strong-experimental);
+}

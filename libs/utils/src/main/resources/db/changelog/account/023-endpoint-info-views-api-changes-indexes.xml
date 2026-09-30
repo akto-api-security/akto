@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        The api changes page (InventoryAction#fetchSummaryInfoForChanges and #loadRecentEndpoints)
+        now counts and pages endpoint_info_views instead of single_type_info / api_info, filtering a
+        discoveredTimestamp range with no collection predicate. Neither index the view already had
+        can serve that: apiCollectionI-discoveredTime_-1 has the wrong leading field, and
+        merge_key_unique is on apiCollectionId/url/method. Without these the count falls back to a
+        collection scan — measured 21.6s on a 2M endpoint view against 363ms once indexed.
+
+        Mirrors EndpointInfoViewDao.createIndicesIfAbsent and EndpointInfoViewTempDao
+        .createIndicesIfAbsent, and the names match MCollection.generateIndexName, so this is a
+        no-op wherever DaoInit or a view rebuild has already created them.
+
+        Note the view collection is replaced wholesale by EndpointInfoViewCron's rebuild
+        (endpoint_info_views_temp is indexed, then renamed over endpoint_info_views). That is why
+        the definitions live on the temp dao as well — indexes created here survive only until the
+        next rebuild, after which the temp dao's copies take over. Both are kept in step.
+
+        preConditions guard accounts that have never had the view enabled: for those the collection
+        does not exist and the changeSet is marked ran rather than failing.
+    -->
+
+    <changeSet id="023-account-endpoint-info-views-has-host-header-discovered-timestamp-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="endpoint_info_views"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="endpoint_info_views">
+            <mongodb:keys>{ "hasHostHeader": 1, "discoveredTimestamp": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "hasHostHeader-discoveredTime_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="endpoint_info_views">
+                <mongodb:keys>{ "hasHostHeader": 1, "discoveredTimestamp": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="023-account-endpoint-info-views-discovered-timestamp-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="endpoint_info_views"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="endpoint_info_views">
+            <mongodb:keys>{ "discoveredTimestamp": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "discoveredTimestamp_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="endpoint_info_views">
+                <mongodb:keys>{ "discoveredTimestamp": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

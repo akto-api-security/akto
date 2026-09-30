@@ -395,9 +395,24 @@ def call_guardrails(
         return True, "", ""
 
 
+def _strip_jsonrpc_envelope(value: Any) -> Any:
+    try:
+        if isinstance(value, str):
+            parsed = json.loads(value)
+            if isinstance(parsed, dict) and "jsonrpc" in parsed and "id" in parsed:
+                stripped = {k: v for k, v in parsed.items() if k not in ("jsonrpc", "id")}
+                return json.dumps(stripped, sort_keys=True, ensure_ascii=False)
+            return value
+        if isinstance(value, dict) and "jsonrpc" in value and "id" in value:
+            return {k: v for k, v in value.items() if k not in ("jsonrpc", "id")}
+        return value
+    except Exception:
+        return value
+
+
 def posttool_fingerprint(tool_name: str, tool_args: str, result_text: str) -> str:
     canonical = json.dumps(
-        {"t": tool_name, "a": tool_args, "r": result_text},
+        {"t": tool_name, "a": _strip_jsonrpc_envelope(tool_args), "r": _strip_jsonrpc_envelope(result_text)},
         sort_keys=True,
         ensure_ascii=False,
     )
@@ -658,9 +673,8 @@ def main():
         if not allowed:
             if _is_warn_behaviour(behaviour):
                 alert_message = (
-                    f"⚠️ Akto Security Warning: Tool result from '{tool_name}' was flagged "
-                    f"but allowed (warn mode). Please review before proceeding.\n"
-                    f"Reason: {gr_reason or 'Policy violation'}"
+                    f"⚠️ Akto Security Warning: Tool result from '{tool_name}' blocked, please review it.\n"
+                    f"Reason for blocking: {gr_reason or 'Policy violation'}"
                 )
             else:
                 alert_message = (

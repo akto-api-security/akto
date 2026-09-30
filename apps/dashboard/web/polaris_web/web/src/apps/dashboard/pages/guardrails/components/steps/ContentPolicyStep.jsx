@@ -105,7 +105,7 @@ const ContentPolicyStep = ({
                     acc[framework] = true;
                     return acc;
                 }, {});
-                suggestions[index] = { suggested: topic.compliance, accepted };
+                suggestions[index] = { suggested: topic.compliance, accepted, evaluated: true };
             }
         });
         if (Object.keys(suggestions).length > 0) {
@@ -302,7 +302,7 @@ const ContentPolicyStep = ({
             }, {});
             setTopicComplianceSuggestions(prev => ({
                 ...prev,
-                [index]: { suggested, accepted, loading: false }
+                [index]: { suggested, accepted, loading: false, evaluated: true }
             }));
 
             setDeniedTopics(prev => {
@@ -387,9 +387,8 @@ const ContentPolicyStep = ({
                         loading={suggestion?.loading}
                         complianceMap={acceptedCompliance}
                         onRemove={(framework) => toggleFrameworkAcceptance(index, framework)}
-                        onAdd={Object.keys(suggestion?.suggested || {}).length > 0
-                            ? (framework) => toggleFrameworkAcceptance(index, framework)
-                            : undefined}
+                        onAdd={(framework) => toggleFrameworkAcceptance(index, framework)}
+                        evaluated={!!suggestion?.evaluated}
                     />
                 </VerticalStack>
             </Box>
@@ -455,9 +454,8 @@ const ContentPolicyStep = ({
                         topicComplianceSuggestions[editingIndex]?.accepted || {}
                     )}
                     onRemove={(framework) => toggleFrameworkAcceptance(editingIndex, framework)}
-                    onAdd={Object.keys(topicComplianceSuggestions[editingIndex]?.suggested || {}).length > 0
-                        ? (framework) => toggleFrameworkAcceptance(editingIndex, framework)
-                        : undefined}
+                    onAdd={(framework) => toggleFrameworkAcceptance(editingIndex, framework)}
+                    evaluated={!!topicComplianceSuggestions[editingIndex]?.evaluated}
                 />
                 <HorizontalStack align="end" gap="2">
                     <Button onClick={cancelEditing}>Cancel</Button>

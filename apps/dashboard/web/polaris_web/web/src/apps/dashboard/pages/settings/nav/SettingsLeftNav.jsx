@@ -66,7 +66,7 @@ const SettingsLeftNav = () => {
         selected: page === "self-hosted",
         onClick: () => navigate("/dashboard/settings/self-hosted")
     }] : []
-    const auditLogsArr = ((window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && window.USER_ROLE === 'ADMIN') ? [{
+    const auditLogsArr = ((window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && func.isUserAdmin()) ? [{
         label: 'Audit logs',
         icon: ComposeMajor,
         selected: page === 'audit-logs',

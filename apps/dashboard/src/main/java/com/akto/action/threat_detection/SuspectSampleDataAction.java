@@ -14,6 +14,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.ArgusCollectionScope;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 import lombok.Getter;
@@ -84,10 +86,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
-  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
-  // the threat backend as headers.
-  @Getter @Setter String skillEvaluationMode;
-  @Getter @Setter String configEvaluationMode;
   @Getter @Setter String humanResponse;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
   @Getter @Setter String searchText; // free-text match across filterId/host/actor
@@ -122,12 +120,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
-    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
-      post.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
-    }
-    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
-      post.addHeader("x-config-eval-mode", this.configEvaluationMode);
-    }
+    addEvaluationModeHeaders(post);
     if (this.humanResponse != null && !this.humanResponse.isEmpty()) {
       post.addHeader("x-human-response", this.humanResponse);
     }
@@ -191,6 +184,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.matchClaudeConfig != null) {
       filter.put("matchClaudeConfig", this.matchClaudeConfig);
+    }
+
+    // Users limited to specific collections only see activity of their own agents
+    if (!ArgusCollectionScope.scopeActivityFilters(getSUser(), filter)) {
+      this.maliciousEvents = new ArrayList<>();
+      this.total = 0;
+      return SUCCESS.toUpperCase();
     }
 
     filter.put("latestAttack", latestAttack);
@@ -291,6 +291,27 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
+  /*
+   * For users limited to specific collections, narrows eventId/eventIds to their own events.
+   * Filter-based (select all) changes cannot be narrowed by host, so they are refused.
+   * Returns false if nothing the user owns is left to change.
+   */
+  private boolean keepOnlyOwnEventIds() {
+    List<DashboardMaliciousEvent> ownEvents = fetchOwnEventsIfLimited();
+    if (ownEvents == null) {
+      return true;
+    }
+    Set<String> ownIds = ownEvents.stream().map(DashboardMaliciousEvent::getId).collect(Collectors.toSet());
+    if (this.eventId != null && !this.eventId.isEmpty()) {
+      return ownIds.contains(this.eventId);
+    }
+    if (this.eventIds != null && !this.eventIds.isEmpty()) {
+      this.eventIds = this.eventIds.stream().filter(ownIds::contains).collect(Collectors.toList());
+      return !this.eventIds.isEmpty();
+    }
+    return false;
+  }
+
   public String fetchFilters() {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
@@ -338,6 +359,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                           .filter(allowedTemplates::contains)
                           .collect(Collectors.toList());
                 });
+        // Users limited to specific collections only get filter values of their own agents.
+        // Actors and urls cannot be narrowed by host here, so they are not offered.
+        Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+        if (allowedHosts != null) {
+          this.hosts = this.hosts == null ? new ArrayList<>() : this.hosts.stream().filter(allowedHosts::contains).collect(Collectors.toList());
+          this.ips = new ArrayList<>();
+          this.urls = new ArrayList<>();
+        }
       }
     } catch (Exception e) {
       e.printStackTrace();
@@ -417,6 +446,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String updateMaliciousEventStatus() {
+    // Users limited to specific collections can only change events of their own agents
+    if (!keepOnlyOwnEventIds()) {
+      this.updateSuccess = false;
+      this.updateMessage = "Select specific events of your own agents";
+      this.updatedCount = 0;
+      return ERROR.toUpperCase();
+    }
     // Build filter if needed for filter-based updates
     Filter.Builder filterBuilder = null;
     if ((this.eventId == null || this.eventId.isEmpty()) &&
@@ -606,6 +642,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   // Unified delete method that handles both eventIds and filter
   public String deleteMaliciousEvents() {
+    // Users limited to specific collections can only delete events of their own agents
+    if (!keepOnlyOwnEventIds()) {
+      addActionError("Select specific events of your own agents");
+      return ERROR.toUpperCase();
+    }
     HttpPost post = new HttpPost(
             String.format("%s/api/dashboard/delete_malicious_events", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());

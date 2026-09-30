@@ -93,7 +93,11 @@ export function buildAgentInlineTopologyComponents(hasLlm, toolNames = [], asset
     }
     (toolNames || []).forEach((name, i) => {
         if (!name) return;
-        items.push({ id: `inline-tool-${i}`, cat: "mcp", type: "Tool", label: name, edgeColor: "#4cbebb" });
+        // cat: "tool" (amber), not "mcp" (teal) - these are the agent's own inline tools, not
+        // a connected MCP server, and reusing the MCP category here made the context graph
+        // visually fold agent tools into the MCP count. Color matches topologyTools.TOOL_EDGE_COLOR
+        // (not imported directly - that module already imports from this one).
+        items.push({ id: `inline-tool-${i}`, cat: "tool", type: "Tool", label: name, edgeColor: "#D97706" });
     });
     return items;
 }

@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { Badge, Box, Collapsible, Divider, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons";
+import { ChevronDownMinor, ChevronUpMinor, MagicMinor } from "@shopify/polaris-icons";
 import { ModelChip } from "./LLMCellRenderers";
 import GuardrailVerdict, { GuardrailVerdictBadge } from "./GuardrailVerdict";
-import { formatDurationMs, truncate } from "./constants";
+import { formatDurationMs, truncate, SPAN_KIND_TONE, SPAN_KIND_LABEL } from "./constants";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,16 @@ function agentTurnMessage(obj, fallbackRole) {
         tool_calls:   obj.tool_calls,
         tool_results: obj.tool_results,
     };
+}
+
+function hasAgentId(queryPayload) {
+    if (!queryPayload) return false;
+    try {
+        const obj = JSON.parse(queryPayload);
+        return Boolean(obj?.body?.agent_id);
+    } catch (_) {
+        return false;
+    }
 }
 
 function messageText(msg) {
@@ -178,6 +188,7 @@ export default function SpanSection({ span, index, id }) {
     const spanName  = span._promptText || `Span ${index + 1}`;
     const inputTok  = Number(span.inputTokens  || span._inputTokens  || 0);
     const outputTok = Number(span.outputTokens || span._outputTokens || 0);
+    const isAgentSpan = useMemo(() => hasAgentId(span.queryPayload), [span.queryPayload]);
 
     return (
         <Box id={id} borderWidth="1" borderColor="border" borderRadius="2" background="bg" padding={"2"}>
@@ -188,7 +199,13 @@ export default function SpanSection({ span, index, id }) {
                 <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="3">
                     {/* left: badge + title — allowed to shrink/truncate */}
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                        <Badge status="success" size="small">LLM</Badge>
+                        {isAgentSpan ? (
+                            <Badge status={SPAN_KIND_TONE.agent} size="small">{SPAN_KIND_LABEL.agent}</Badge>
+                        ) : (
+                            <Box>
+                                <Icon source={MagicMinor} color="base" />
+                            </Box>
+                        )}
                         <Tooltip content={spanName} dismissOnMouseOut>
                             <Text variant="bodySm" fontWeight="semibold" truncate>{truncate(spanName, 45)}</Text>
                         </Tooltip>

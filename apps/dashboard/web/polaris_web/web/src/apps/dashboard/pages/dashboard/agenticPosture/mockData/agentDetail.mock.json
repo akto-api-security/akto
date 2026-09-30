@@ -1,0 +1,179 @@
+{
+    "refund-agent-prod": {
+        "header": {
+            "groupKey": "refund-agent-prod",
+            "name": "refund-agent-prod",
+            "description": "Autonomous finance agent that adjudicates and issues customer refunds against Stripe from support-ticket context.",
+            "environment": "production",
+            "severity": "CRITICAL",
+            "riskScore": 92,
+            "created": "Feb 2026",
+            "lastActive": "12 minutes ago",
+            "framework": "LangGraph, GPT-based",
+            "invocationTrigger": "Triggered on support ticket refund request"
+        },
+        "openedFromFinding": "refund-agent-prod can issue refunds without approval",
+        "dangerousPath": {
+            "status": "COMING_SOON",
+            "illustrative": { "chain": [
+                { "label": "Employee Prompt", "type": "source" },
+                { "label": "FinanceAgent", "type": "agent" },
+                { "label": "Refund Tool", "type": "tool" },
+                { "label": "Stripe", "type": "resource" }
+            ] }
+        },
+        "owner": { "name": "Priya Shah", "team": "Finance Engineering", "slack": null, "onCall": null },
+        "identity": {
+            "status": "COMING_SOON",
+            "orphaned": false,
+            "ownerName": "Priya Shah",
+            "illustrative": { "type": "OAuth service identity", "credential": "Dedicated key · rotated 30d", "shared": false }
+        },
+        "permissions": [
+            { "scope": "stripe:refunds:write", "resource": "Stripe", "usedIn30d": true, "callCount": 89, "status": "Unbounded", "statusTone": "critical" },
+            { "scope": "stripe:charges:read", "resource": "Stripe", "usedIn30d": true, "callCount": 340, "status": "Scoped", "statusTone": "success" },
+            { "scope": "internal:ledger:write", "resource": "Internal ledger", "usedIn30d": true, "callCount": 89, "status": "Scoped", "statusTone": "success" },
+            { "scope": "email:send:external", "resource": "Notification service", "usedIn30d": true, "callCount": 89, "status": "No domain allowlist", "statusTone": "warning" }
+        ],
+        "tools": [
+            { "name": "Refund Tool", "kind": "MCP tool", "detail": "privileged · destructive · issues real Stripe refunds", "status": "No approval gate", "statusTone": "critical", "privileged": true },
+            { "name": "Ledger Read Tool", "kind": "MCP tool", "detail": "read-only · internal ledger lookups", "status": "Scoped", "statusTone": "success", "privileged": false },
+            { "name": "Email Notification Tool", "kind": "MCP tool", "detail": "privileged · can send to any external address", "status": "No domain allowlist", "statusTone": "warning", "privileged": true }
+        ],
+        "data": {
+            "categories": ["Customer PII", "Order history", "Payment metadata"],
+            "sensitiveAccess": true,
+            "canSendExternally": true,
+            "canSendExternallyDetail": "via Email Notification Tool, no recipient allowlist"
+        },
+        "protection": [
+            { "control": "Approval workflow", "status": "Missing", "statusTone": "critical" },
+            { "control": "Per-transaction rate limit", "status": "None", "statusTone": "critical" },
+            { "control": "Prompt-injection filtering", "status": "Partial — not scoped to tool calls", "statusTone": "warning" },
+            { "control": "Output validation", "status": "Present", "statusTone": "success" }
+        ],
+        "runtimeActivity": {
+            "invocations30d": 1204,
+            "actionsIssuedLabel": "Refund actions issued",
+            "actionsIssued": 89,
+            "largestActionLabel": "Largest single refund",
+            "largestAction": "$12,400",
+            "lastScanned": { "type": "CONTINUOUS_TESTING", "when": "2 hours ago" },
+            "anomaly": {
+                "status": "COMING_SOON",
+                "illustrative": { "headline": "Anomaly: refund volume up 340% week over week", "detail": "89 refunds issued this week vs. 20 the week prior — well outside the agent's normal range." }
+            }
+        }
+    },
+    "research-agent": {
+        "header": {
+            "groupKey": "research-agent",
+            "name": "research-agent",
+            "description": "Research assistant agent that browses the open internet and summarizes findings for internal teams.",
+            "environment": "production",
+            "severity": "CRITICAL",
+            "riskScore": 88,
+            "created": "Nov 2025",
+            "lastActive": "3 minutes ago",
+            "framework": "LangGraph, GPT-based",
+            "invocationTrigger": "Triggered on employee research request"
+        },
+        "openedFromFinding": "research-agent can send sensitive data to arbitrary URLs",
+        "dangerousPath": {
+            "status": "COMING_SOON",
+            "illustrative": { "chain": [
+                { "label": "Internet", "type": "source" },
+                { "label": "ResearchAgent", "type": "agent" },
+                { "label": "Shell Tool", "type": "tool" },
+                { "label": "Production Kubernetes", "type": "resource" }
+            ] }
+        },
+        "owner": { "name": "Amara Chen", "team": "Data Platform", "slack": null, "onCall": null },
+        "identity": {
+            "status": "COMING_SOON",
+            "orphaned": false,
+            "ownerName": "Amara Chen",
+            "illustrative": { "type": "OAuth service identity", "credential": "Dedicated key · rotated 12d", "shared": false }
+        },
+        "permissions": [
+            { "scope": "http:outbound:*", "resource": "Outbound HTTP", "usedIn30d": true, "callCount": 512, "status": "Unbounded", "statusTone": "critical" },
+            { "scope": "kb:internal:read", "resource": "Internal knowledge base", "usedIn30d": true, "callCount": 210, "status": "Scoped", "statusTone": "success" }
+        ],
+        "tools": [
+            { "name": "Web Fetch Tool", "kind": "MCP tool", "detail": "privileged · no destination allowlist", "status": "No domain allowlist", "statusTone": "critical", "privileged": true },
+            { "name": "Shell Tool", "kind": "MCP tool", "detail": "privileged · destructive · standing access to production Kubernetes", "status": "No approval gate", "statusTone": "critical", "privileged": true }
+        ],
+        "data": {
+            "categories": ["Internal documents", "Source code references"],
+            "sensitiveAccess": true,
+            "canSendExternally": true,
+            "canSendExternallyDetail": "via Web Fetch Tool, no destination allowlist"
+        },
+        "protection": [
+            { "control": "Approval workflow", "status": "Missing", "statusTone": "critical" },
+            { "control": "Per-transaction rate limit", "status": "None", "statusTone": "critical" },
+            { "control": "Prompt-injection filtering", "status": "Missing", "statusTone": "critical" },
+            { "control": "Output validation", "status": "Present", "statusTone": "success" }
+        ],
+        "runtimeActivity": {
+            "invocations30d": 3021,
+            "actionsIssuedLabel": "Outbound requests issued",
+            "actionsIssued": 512,
+            "largestActionLabel": "Largest single payload",
+            "largestAction": "4.2 MB",
+            "lastScanned": { "type": "ONE_TIME", "when": "6 days ago" },
+            "anomaly": { "status": "COMING_SOON", "illustrative": { "headline": "No anomaly detected", "detail": "Volume within the agent's normal range this week." } }
+        }
+    },
+    "support-agent": {
+        "header": {
+            "groupKey": "support-agent",
+            "name": "support-agent",
+            "description": "Customer support agent that answers tickets using Salesforce case history.",
+            "environment": "production",
+            "severity": "HIGH",
+            "riskScore": 74,
+            "created": "Jan 2026",
+            "lastActive": "1 minute ago",
+            "framework": "LangGraph, GPT-based",
+            "invocationTrigger": "Triggered on new support ticket"
+        },
+        "openedFromFinding": "support-agent uses a shared Salesforce credential",
+        "dangerousPath": { "status": "COMING_SOON", "illustrative": { "chain": [
+            { "label": "Uploaded Document", "type": "source" },
+            { "label": "SupportAgent", "type": "agent" },
+            { "label": "SQL MCP", "type": "tool" },
+            { "label": "Customer DB", "type": "resource" }
+        ] } },
+        "owner": { "name": "Owner not mapped", "team": null, "slack": null, "onCall": null },
+        "identity": { "status": "COMING_SOON", "orphaned": true, "ownerName": null, "illustrative": { "type": "Shared service identity", "credential": "Shared Salesforce credential", "shared": true } },
+        "permissions": [
+            { "scope": "salesforce:cases:read", "resource": "Salesforce", "usedIn30d": true, "callCount": 980, "status": "Scoped", "statusTone": "success" },
+            { "scope": "salesforce:cases:write", "resource": "Salesforce", "usedIn30d": true, "callCount": 140, "status": "Unbounded", "statusTone": "critical" }
+        ],
+        "tools": [
+            { "name": "SQL MCP", "kind": "MCP tool", "detail": "privileged · write access to customer database", "status": "No approval gate", "statusTone": "critical", "privileged": true }
+        ],
+        "data": {
+            "categories": ["Customer PII", "Case history"],
+            "sensitiveAccess": true,
+            "canSendExternally": false,
+            "canSendExternallyDetail": null
+        },
+        "protection": [
+            { "control": "Approval workflow", "status": "Missing", "statusTone": "critical" },
+            { "control": "Per-transaction rate limit", "status": "None", "statusTone": "critical" },
+            { "control": "Prompt-injection filtering", "status": "Present", "statusTone": "success" },
+            { "control": "Output validation", "status": "Missing", "statusTone": "critical" }
+        ],
+        "runtimeActivity": {
+            "invocations30d": 2140,
+            "actionsIssuedLabel": "Case updates issued",
+            "actionsIssued": 140,
+            "largestActionLabel": "Largest single batch update",
+            "largestAction": "48 cases",
+            "lastScanned": { "type": "RECURRING", "when": "1 day ago" },
+            "anomaly": { "status": "COMING_SOON", "illustrative": { "headline": "No anomaly detected", "detail": "Volume within the agent's normal range this week." } }
+        }
+    }
+}

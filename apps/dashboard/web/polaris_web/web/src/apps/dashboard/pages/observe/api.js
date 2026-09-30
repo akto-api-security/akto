@@ -86,6 +86,36 @@ export default {
         });
     },
 
+    // Vendors tab — vendor names observed in endpoint-shield traffic, each with its traffic
+    // count and current approval state (approval shares the same mcp_allowlist collection as
+    // MCP servers, so an approved vendor also counts toward RiskScoreCalculator's vendor-risk
+    // sub-score on the posture page).
+    async fetchVendorAudit() {
+        const resp = await request({
+            url: '/api/fetchVendorAllowlistAudit',
+            method: 'post',
+            data: {},
+        });
+        return resp?.vendorAudit || [];
+    },
+    async addVendorAllowlistEntries(vendorNames) {
+        const list = Array.isArray(vendorNames) ? vendorNames : [vendorNames];
+        const names = [...new Set(list.map((v) => String(v ?? '').trim()).filter(Boolean))];
+        if (!names.length) return null;
+        return request({
+            url: '/api/addVendorAllowlistEntry',
+            method: 'post',
+            data: { vendorNames: names },
+        });
+    },
+    async removeVendorAllowlistEntry(vendorName) {
+        return request({
+            url: '/api/removeVendorAllowlistEntry',
+            method: 'post',
+            data: { vendorName },
+        });
+    },
+
     // Paginated AGENT_SKILL audit rows from mcp_audit_info — same response shape as
     // fetchAuditData ({ auditData: [...], total: N }). One row per (skill, mcpHost)
     // detection. The Skills tab uses this both for table rows and for the badge count.

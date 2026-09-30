@@ -430,6 +430,14 @@ const settingRequests = {
         })
     },
 
+    saveSamlGroupRoleMapping(groupRoleMapping, configType) {
+        return request({
+            url: '/api/saveSamlGroupRoleMapping',
+            method: 'post',
+            data: {groupRoleMapping, configType}
+        })
+    },
+
     addAzureSso(loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType) {
         return request({
             url: '/api/addSAMLSso',

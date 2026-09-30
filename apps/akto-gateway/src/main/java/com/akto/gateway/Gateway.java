@@ -19,6 +19,11 @@ public class Gateway {
     // way _traces already does. Keeping it out of requestHeaders matters: a recorded header becomes
     // part of the API's schema and its stored sample, and would be replayed during tests.
     private static final String GUARDRAIL_FIELD = "_guardrail";
+    // Optional request payload to validate instead of requestPayload, e.g. only the newest user
+    // turn of a long conversation. requestPayload is still what gets ingested.
+    public static final String GUARDRAILS_REQUEST_PAYLOAD = "guardrailsRequestPayload";
+    // Optional comma-separated policy names the guardrails service narrows its policies to.
+    public static final String GUARDRAILS_POLICY_NAME = "policyName";
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -53,12 +58,8 @@ public class Gateway {
         try {
             String requestPayload = getStringField(requestData, "requestPayload");
             if (requestPayload == null || requestPayload.isEmpty()) {
-                loggerMaker.warnAndAddToDb("Missing required field: requestPayload");
-                Map<String, Object> error = new HashMap<>();
-                error.put("success", false);
-                error.put("message", "Missing required field: requestPayload");
-                error.put("error", "requestPayload is required");
-                return error;
+                requestPayload = "{}";
+                requestData.put("requestPayload", requestPayload);
             }
 
             Map<String, Object> result = new HashMap<>();
@@ -223,7 +224,8 @@ public class Gateway {
 
     private Map<String, Object> callGuardrails(Map<String, Object> requestData, boolean isResponse) {
         Map<String, Object> validateRequest = new HashMap<>();
-        validateRequest.put("requestPayload", requestData.get("requestPayload"));
+        Object verdictPayload = requestData.get(GUARDRAILS_REQUEST_PAYLOAD);
+        validateRequest.put("requestPayload", verdictPayload != null ? verdictPayload : requestData.get("requestPayload"));
         validateRequest.put("contextSource", requestData.get("contextSource"));
 
         putIfNotNull(validateRequest, requestData, "path");
@@ -244,6 +246,8 @@ public class Gateway {
         putIfNotNull(validateRequest, requestData, "direction");
         putIfNotNull(validateRequest, requestData, "tag");
         putIfNotNull(validateRequest, requestData, "metadata");
+        putIfNotNull(validateRequest, requestData, "fullRequest");
+        putIfNotNull(validateRequest, requestData, GUARDRAILS_POLICY_NAME);
 
         String contextSource = getStringField(requestData, "contextSource");
         String endpoint = isResponse ? "/validate/response" : "/validate/request";

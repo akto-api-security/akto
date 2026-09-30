@@ -1,5 +1,6 @@
 package com.akto.action.threat_detection;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.ProtoMessageUtils;
 import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.dao.context.Context;
@@ -20,9 +21,11 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -109,7 +112,25 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return categoryDisplayNames;
   }
 
+  /* Own events (host-scoped by fetchAllMaliciousReq) for users limited to specific collections, same filters as the backend aggregations */
+  private OwnAgentThreatStats ownAgentStats() {
+    Map<String, Object> filters = new HashMap<>();
+    if (latestAttack != null && !latestAttack.isEmpty()) {
+      filters.put("latestAttack", latestAttack);
+    }
+    List<DashboardMaliciousEvent> events = fetchAllMaliciousEvents(startTs, endTs, OWN_EVENTS_LIMIT, filters, getSkillEvaluationMode(), true);
+    if (events != null && severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
+      events = events.stream().filter(e -> severityStatusFilter.equalsIgnoreCase(e.getStatus())).collect(Collectors.toList());
+    }
+    return new OwnAgentThreatStats(events);
+  }
+
   public String fetchThreatCategoryCount() {
+    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
+    if (isLimitedToOwnAgents()) {
+      this.categoryCounts = ownAgentStats().subCategoryCounts(getCategoryDisplayNames());
+      return SUCCESS.toUpperCase();
+    }
     Map<String, String> categoryDisplayNames = getCategoryDisplayNames();
     this.categoryCounts = fetchSubcategoryWiseCounts(startTs, endTs, latestAttack, severityStatusFilter).stream()
         .map(c -> new ThreatCategoryCount(
@@ -120,12 +141,18 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchCountBySeverity() {
+    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
+    if (isLimitedToOwnAgents()) {
+      this.categoryCounts = ownAgentStats().severityCounts();
+      return SUCCESS.toUpperCase();
+    }
     HttpPost post = new HttpPost(
         String.format("%s/api/dashboard/get_severity_wise_count", this.getBackendUrl()));
 
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+    addEvaluationModeHeaders(post);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -164,6 +191,19 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String getDailyThreatActorsCount() {
+    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
+    if (isLimitedToOwnAgents()) {
+      OwnAgentThreatStats stats = ownAgentStats();
+      this.actorsCounts = stats.dailyActors();
+      this.totalAnalysed = stats.getEvents().size();
+      this.totalAttacks = stats.successfulExploits();
+      this.totalCriticalActors = stats.totalCriticalActors(this.actorsCounts);
+      this.totalActiveStatus = stats.countByStatus("ACTIVE");
+      this.totalIgnoredStatus = stats.countByStatus("IGNORED");
+      this.totalUnderReviewStatus = stats.countByStatus("UNDER_REVIEW");
+      this.activeActorsCount = stats.activeActors();
+      return SUCCESS.toUpperCase();
+    }
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_daily_actor_count", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -213,6 +253,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String getThreatActivityTimeline() {
+    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
+    if (isLimitedToOwnAgents()) {
+      this.threatActivityTimelines = ownAgentStats().activityTimeline();
+      return SUCCESS.toUpperCase();
+    }
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_threat_activity_timeline", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -258,6 +303,13 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatApis() {
+    // Users limited to specific collections: built from their own events (backend lists the whole account)
+    if (isLimitedToOwnAgents()) {
+      List<DashboardThreatApi> ownApis = ownAgentStats().threatApis();
+      this.total = ownApis.size();
+      this.apis = new ArrayList<>(ownApis.subList(Math.min(skip, ownApis.size()), Math.min(skip + LIMIT, ownApis.size())));
+      return SUCCESS.toUpperCase();
+    }
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_threat_apis", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -311,10 +363,18 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatTopNData() {
+    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
+    if (isLimitedToOwnAgents()) {
+      OwnAgentThreatStats stats = ownAgentStats();
+      this.topApis = stats.topApis(8);
+      this.topHosts = stats.topHosts(8);
+      return SUCCESS.toUpperCase();
+    }
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_top_n_data", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
     post.addHeader("x-context-source", Context.contextSource.get() != null ? Context.contextSource.get().toString() : "");
+    addEvaluationModeHeaders(post);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -322,6 +382,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
         put("limit", 8);
+        if (severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
+          put("status", severityStatusFilter);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -355,6 +418,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       return ERROR.toUpperCase();
     }
 
+
     return SUCCESS.toUpperCase();
   }
 
@@ -366,6 +430,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     // AbstractThreatDetectionAction.fetchHostSeverityCounts, the single place this
     // request/response shape is built.
     this.hostSeverityCounts = fetchHostSeverityCounts(startTs, endTs);
+    // Users limited to specific collections only see their own agents
+    Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+    if (allowedHosts != null && this.hostSeverityCounts != null) {
+      this.hostSeverityCounts = this.hostSeverityCounts.stream()
+          .filter(h -> allowedHosts.contains(h.getHost())).collect(Collectors.toList());
+    }
     return SUCCESS.toUpperCase();
   }
 
@@ -374,6 +444,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   // skill's declaring collection is shared with the agent/device that invoked it), so this is
   // keyed by the skill name extracted server-side from the /skills/<name> endpoint instead.
   public String fetchSkillSeverityCounts() {
+    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
+    if (isLimitedToOwnAgents()) {
+      this.skillSeverityCounts = ownAgentStats().skillSeverityCounts();
+      return SUCCESS.toUpperCase();
+    }
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_skill_severity_counts", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -522,6 +597,14 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();
+    }
+
+    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
+    if (isLimitedToOwnAgents()) {
+      OwnAgentThreatStats stats = ownAgentStats();
+      this.dashboardTopActors = stats.dashboardTopActors(limit);
+      this.dashboardTopApis = stats.dashboardTopApis(limit);
+      this.recentMaliciousCount = stats.countSince(Context.now() - 300);
     }
 
     // Query metrics_data for TD_KAFKA_RECORD_COUNT in last 5 mins (dashboard mongo)

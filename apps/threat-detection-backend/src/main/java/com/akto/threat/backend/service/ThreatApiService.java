@@ -209,6 +209,11 @@ public class ThreatApiService {
 
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
     String accountId, ThreatSeverityWiseCountRequest req, String contextSource) {
+    return getSeverityWiseCount(accountId, req, contextSource, null, null);
+  }
+
+  public ThreatSeverityWiseCountResponse getSeverityWiseCount(
+    String accountId, ThreatSeverityWiseCountRequest req, String contextSource, String skillEvalMode, String configEvalMode) {
 
     List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
 
@@ -234,6 +239,10 @@ public class ThreatApiService {
           match.putAll(contextFilter);
       }
       match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+      List<Document> evaluationModeConditions = ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+      if (!evaluationModeConditions.isEmpty()) {
+          match.append("$and", evaluationModeConditions);
+      }
 
       List<Document> pipeline = new ArrayList<>();
       pipeline.add(new Document("$match", match));

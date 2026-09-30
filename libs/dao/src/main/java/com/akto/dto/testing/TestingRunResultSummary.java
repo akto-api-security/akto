@@ -18,6 +18,9 @@ public class TestingRunResultSummary {
     public static final String METADATA_STRING = "metadata";
     public static final String TESTS_INITIATED_COUNT = "testInitiatedCount";
     public static final String TOTAL_EXTERNAL_API_TOKENS = "totalExternalApiTokens";
+    public static final String PRODUCER_DONE = "producerDone";
+    public static final String LEASE_EXPIRY_TS = "leaseExpiryTs";
+    public static final String LEASE_TOKEN = "leaseToken";
 
     private ObjectId id;
     private int startTimestamp;
@@ -34,6 +37,21 @@ public class TestingRunResultSummary {
     private int testInitiatedCount;
 
     private int testIdConfig;
+
+    /*
+     * Written by mini-testing. producerDone marks the point where every message of an attempt has
+     * been written to kafka: before it the message set is partial, so a module picking the summary
+     * up must re-produce; after it, the set is complete and consumption can be resumed instead.
+     *
+     * The lease is what lets a second module safely take over an attempt whose owner died.
+     * leaseToken is minted per claim rather than per pod, so a module that restarts and re-claims
+     * fences out its own previous threads. Both are plain primitives on purpose - an ObjectId or
+     * Date here is bean-introspected into {timestamp, date} by the abstractor's json layer and
+     * silently rebuilt as a fresh value client-side.
+     */
+    private boolean producerDone;
+    private int leaseExpiryTs;
+    private String leaseToken;
     /*
     * originalTestingRunResultSummaryId this will be used to trigger running testingRunResults
     *
@@ -206,5 +224,29 @@ public class TestingRunResultSummary {
 
     public void setOriginalTestingRunResultSummaryId(ObjectId originalTestingRunResultSummaryId) {
         this.originalTestingRunResultSummaryId = originalTestingRunResultSummaryId;
+    }
+
+    public boolean getProducerDone() {
+        return producerDone;
+    }
+
+    public void setProducerDone(boolean producerDone) {
+        this.producerDone = producerDone;
+    }
+
+    public int getLeaseExpiryTs() {
+        return leaseExpiryTs;
+    }
+
+    public void setLeaseExpiryTs(int leaseExpiryTs) {
+        this.leaseExpiryTs = leaseExpiryTs;
+    }
+
+    public String getLeaseToken() {
+        return leaseToken;
+    }
+
+    public void setLeaseToken(String leaseToken) {
+        this.leaseToken = leaseToken;
     }
 }

@@ -1,6 +1,6 @@
 import { Autocomplete, Avatar, Icon, Link, TextContainer, Popover, TextField, Listbox, Box, Checkbox } from '@shopify/polaris';
 import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import func from "@/util/func";
 
 // Include-mode "select all" sentinel: stored as the sole value, means "match present + future" while staying Include (mirrors an empty Exclude bucket on the backend).
@@ -19,6 +19,7 @@ function DropdownSearch(props) {
     const [inputValue, setInputValue] = useState(value ? value : undefined);
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
+    const revealCountRef = useRef(sliceMaxVal || 20);
     const [checked,setChecked] = useState(false)
     // Used only by the headerContent branch below (self-managed popover, see there)
     const [popoverActive, setPopoverActive] = useState(false)
@@ -71,14 +72,16 @@ function DropdownSearch(props) {
     const negatedText = (count) => count === 0 ? 'All selected' : `All except ${count}`;
 
     const updateText = useCallback(
-        (value) => {
+        (value, revealMore) => {
             setInputValue(value);
 
             if (!loading) {
                 setLoading(true);
             }
 
-            const defaultSliceValue = sliceMaxVal || 20
+            const batchSize = sliceMaxVal || 20
+            revealCountRef.current = revealMore ? revealCountRef.current + batchSize : batchSize
+            const defaultSliceValue = revealCountRef.current
 
             setTimeout(() => {
                 if (value === '' && selectedOptions.length === 0) {
@@ -151,6 +154,9 @@ function DropdownSearch(props) {
             } else if (allowMultiple) {
                 if (negated) {
                     setInputValue(negatedText(selected.length));
+                }
+                else if (selected.length === 1 && selected[0] === ALL_VALUES_SENTINEL) {
+                    setInputValue('All selected');
                 }
                 else if(showSelectedItemLabels) {
                     if(selectedText.length === optionsList.length) setInputValue("All items selected");
@@ -249,7 +255,10 @@ function DropdownSearch(props) {
 
     // headerContent needs to render inside the option-list popover; Autocomplete has no slot for that, so build the popover from Listbox instead (same primitive Autocomplete uses internally).
     if (headerContent) {
-        const sections = (options[0]?.options ? options : [{ title: '', options }]).slice(0, sliceMaxVal || 20);
+        const displayCap = revealCountRef.current;
+        const sections = options[0]?.options
+            ? options.slice(0, displayCap)
+            : [{ title: '', options: options.slice(0, displayCap) }];
         const noResults = !loading && sections.every(s => (s.options || []).length === 0);
 
         const popoverTextField = (
@@ -298,7 +307,7 @@ function DropdownSearch(props) {
                             </div>
                         )}
                     </Popover.Pane>
-                    <Popover.Pane>
+                    <Popover.Pane height="300px" onScrolledToBottom={() => updateText(inputValue || '', true)}>
                         <Listbox
                             accessibilityLabel={placeholder}
                             onSelect={(val) => {
