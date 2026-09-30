@@ -5,8 +5,10 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpMessage;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -22,6 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class AbstractThreatDetectionAction extends UserAction {
+
+  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
+  // the threat backend as headers.
+  @Getter @Setter String skillEvaluationMode;
+  @Getter @Setter String configEvaluationMode;
 
   private Map<Integer, String> tokens = new HashMap<>();
   private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -154,6 +161,15 @@ public class AbstractThreatDetectionAction extends UserAction {
       Map<String, Object> additionalFilters,
       String skillEvalMode,
       boolean minimalFields) {
+    // Users limited to specific collections only see activity of their own agents. Applied before the
+    // cache key, so the key carries the user's hosts and one user's results are never served to another.
+    if (isLimitedToOwnAgents()) {
+      Map<String, Object> scopedFilters = additionalFilters == null ? new HashMap<>() : new HashMap<>(additionalFilters);
+      if (!ArgusCollectionScope.scopeActivityFilters(getSUser(), scopedFilters)) {
+        return new MaliciousEventResponse(new ArrayList<>(), 0);
+      }
+      additionalFilters = scopedFilters;
+    }
     String cacheKey = maliciousEventsCacheKey(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
     CachedMaliciousEventResponse cached = maliciousEventsCache.get(cacheKey);
     if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < MALICIOUS_EVENTS_CACHE_TTL_MS) {
@@ -162,6 +178,25 @@ public class AbstractThreatDetectionAction extends UserAction {
     MaliciousEventResponse fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
     maliciousEventsCache.put(cacheKey, new CachedMaliciousEventResponse(fresh, System.currentTimeMillis()));
     return fresh;
+  }
+
+  /** Users limited to specific collections (Argus) - see ArgusCollectionScope. */
+  protected boolean isLimitedToOwnAgents() {
+    return ArgusCollectionScope.isLimited(getSUser());
+  }
+
+  protected static final int OWN_EVENTS_LIMIT = 100_000;
+
+  /**
+   * All-time events of the user's own agents (host-scoped, minimal fields, cached), or null if the
+   * user is not limited to specific collections. Used to check that an event opened or changed by id
+   * belongs to the user.
+   */
+  protected List<DashboardMaliciousEvent> fetchOwnEventsIfLimited() {
+    if (!isLimitedToOwnAgents()) {
+      return null;
+    }
+    return fetchAllMaliciousEvents(0, 0, OWN_EVENTS_LIMIT, null, null, true);
   }
 
   /** accountId (the cache is static/shared across every action instance) + every param that
@@ -244,6 +279,15 @@ public class AbstractThreatDetectionAction extends UserAction {
    *     asset's hostNames) instead of the whole account.
    * @return one count per monthBoundaries entry, or an empty list on any error/empty input.
    */
+  protected void addEvaluationModeHeaders(HttpMessage request) {
+    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
+      request.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
+    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
+      request.addHeader("x-config-eval-mode", this.configEvaluationMode);
+    }
+  }
+
   protected List<Integer> fetchViolationsMonthlyTotals(
       int startTimestamp, int endTimestamp, List<Integer> monthBoundaries, List<String> hostFilter) {
     if (monthBoundaries == null || monthBoundaries.isEmpty()) return new ArrayList<>();

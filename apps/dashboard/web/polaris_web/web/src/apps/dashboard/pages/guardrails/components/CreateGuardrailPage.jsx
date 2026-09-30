@@ -299,6 +299,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [negatedTargetDeviceIds, setNegatedTargetDeviceIds] = useState(false);
     const [negatedTargetUserNames, setNegatedTargetUserNames] = useState(false);
     const [enterpriseLicenseComplianceCategories, setEnterpriseLicenseComplianceCategories] = useState([]);
+    const [skipEnterpriseAccounts, setSkipEnterpriseAccounts] = useState(false);
 
     const [agenticUsers, setAgenticUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(false);
@@ -498,6 +499,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         // Step 11
         blockedHosts,
         blockPublicShare,
+        blockPersonalAccounts,
         // Step 13
         ignorePhrases,
         // Step 10
@@ -522,6 +524,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         negatedTargetDeviceIds,
         negatedTargetUserNames,
         enterpriseLicenseComplianceCategories,
+        skipEnterpriseAccounts,
         // A negated row with zero values is a deliberate "apply to everything" scope, not an unfinished one
         serverScopeLeftDirty: leftSteps.has(ServerSettingsConfig.number) && !applyToAllServers &&
             !negatedAgentServers && !negatedMcpServers && !negatedLlmServers &&
@@ -832,6 +835,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setApplyToAllUsers(true);
         setTargetTags({});
         setEnterpriseLicenseComplianceCategories([]);
+        setSkipEnterpriseAccounts(false);
     };
 
     const populateFormForEdit = (policy) => {
@@ -1015,6 +1019,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setNegatedTargetDeviceIds(policy.negatedTargetDeviceIds || false);
         setNegatedTargetUserNames(policy.negatedTargetUserNames || false);
         setEnterpriseLicenseComplianceCategories(policy.enterpriseLicenseComplianceCategories || []);
+        setSkipEnterpriseAccounts(policy.skipEnterpriseAccounts || false);
     };
 
     const handleClose = () => {
@@ -1182,6 +1187,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     ).values()
                 ),
                 enterpriseLicenseComplianceCategories,
+                skipEnterpriseAccounts,
                 ...(isEditMode && editingPolicy ? { hexId: editingPolicy.hexId } : {})
             };
 
@@ -1403,6 +1409,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         deviceList={availableUsers}
                         showConditionError={leftSteps.has(ServerSettingsConfig.number)}
                         showUserConditionError={leftSteps.has(ServerSettingsConfig.number)}
+                        skipEnterpriseAccounts={skipEnterpriseAccounts}
+                        setSkipEnterpriseAccounts={setSkipEnterpriseAccounts}
                     />
                 );
             case 13:

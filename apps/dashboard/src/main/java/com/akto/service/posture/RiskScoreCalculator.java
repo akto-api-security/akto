@@ -6,12 +6,15 @@ import com.akto.action.threat_detection.ThreatCategoryCount;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightResult;
+import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightUtil.GovernanceBucket;
 import com.akto.util.AgenticObserveUtil;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -92,12 +95,18 @@ final class RiskScoreCalculator {
 
     static BasicDBObject compute(InsightDataBundle bundle, List<ApiCollection> endpointCollections,
                                   List<HostSeverityCount> priorHostSeverity,
-                                  List<ThreatCategoryCount> priorSubCategory) {
+                                  List<ThreatCategoryCount> priorSubCategory,
+                                  List<PostureService.PolicyMatch> matches) {
+        // `matches` is buildSummary's own already-computed PostureService.matchedPolicyCounts(bundle)
+        // — passed in, not recomputed here, because buildSummary ALSO needs it for
+        // dataLeavingBreakdown/enforcementFunnel over the identical bundle; threading one shared
+        // instance through all three avoids 3 rebuilds of the same policyByNameLower map +
+        // subCategoryCounts scan in that one synchronous call.
         Double shadowAiSubScore = shadowAiExposureSubScore(bundle);
-        Double dlpSubScore = dlpIncidentsSubScore(bundle);
+        Double dlpSubScore = dlpIncidentsSubScore(bundle, matches);
         Double threatSubScore = threatActivitySubScore(bundle);
         VendorRiskAnalysis vendorAnalysis = vendorRiskAnalysis(endpointCollections, bundle.allowlistNamesLower);
-        Double complianceSubScore = complianceGapsSubScore(bundle);
+        Double complianceSubScore = complianceGapsSubScore(bundle, matches);
 
         Double composite = weightedComposite(shadowAiSubScore, dlpSubScore, vendorAnalysis.subScore,
                 complianceSubScore, threatSubScore);
@@ -135,9 +144,10 @@ final class RiskScoreCalculator {
                     bundle.userAnalysis, bundle.nhiIdentities, priorHostSeverity, priorSubCategory,
                     bundle.skillSeverityCounts, true, bundle.activeCollections, bundle.collectionLastTrafficSeen,
                     null);
-            Double priorDlpSubScore = dlpIncidentsSubScore(priorView);
+            List<PostureService.PolicyMatch> priorMatches = PostureService.matchedPolicyCounts(priorView);
+            Double priorDlpSubScore = dlpIncidentsSubScore(priorView, priorMatches);
             Double priorThreatSubScore = threatActivitySubScore(priorView);
-            Double priorComplianceSubScore = complianceGapsSubScore(priorView);
+            Double priorComplianceSubScore = complianceGapsSubScore(priorView, priorMatches);
 
             Double priorComposite = weightedComposite(shadowAiSubScore, priorDlpSubScore, vendorAnalysis.subScore,
                     priorComplianceSubScore, priorThreatSubScore);
@@ -219,11 +229,16 @@ final class RiskScoreCalculator {
                                            List<DashboardMaliciousEvent> allThreats,
                                            List<DashboardMaliciousEvent> priorAllThreats,
                                            List<HostSeverityCount> priorHostSeverity) {
+        // Same dedup as compute()'s own note: dlpIncidentsSubScore/complianceGapsSubScore/
+        // complianceGapsByPolicy each used to independently call matchedPolicyCounts(bundle) —
+        // 3 rebuilds of the identical policyByNameLower map + subCategoryCounts scan, all inside
+        // this one synchronous call (the risk-score breakdown flyout's root level).
+        List<PostureService.PolicyMatch> matches = PostureService.matchedPolicyCounts(bundle);
         Double shadowAiSubScore = shadowAiExposureSubScore(bundle);
-        Double dlpSubScore = dlpIncidentsSubScore(bundle);
+        Double dlpSubScore = dlpIncidentsSubScore(bundle, matches);
         Double threatSubScore = threatActivitySubScore(bundle);
         VendorRiskAnalysis vendorAnalysis = vendorRiskAnalysis(endpointCollections, bundle.allowlistNamesLower);
-        Double complianceSubScore = complianceGapsSubScore(bundle);
+        Double complianceSubScore = complianceGapsSubScore(bundle, matches);
 
         List<BasicDBObject> subScores = new ArrayList<>();
         subScores.add(subScoreRow("shadowAiExposure", "Shadow AI exposure", 30, shadowAiSubScore,
@@ -256,8 +271,8 @@ final class RiskScoreCalculator {
         breakdown.put("shadowAiTopServices", shadowAiTopUnapprovedServices(bundle));
         breakdown.put("dlpDeviceMovements",
                 dlpDeviceMovements(allThreats, priorAllThreats, bundle.policies, bundle.deviceIdToUsername));
-        breakdown.put("vendorRiskTopUnapproved", vendorRiskTopUnapprovedDevices(endpointCollections, bundle.allowlistNamesLower));
-        breakdown.put("complianceGapsByPolicy", complianceGapsByPolicy(bundle));
+        breakdown.put("vendorRiskTopUnapproved", vendorRiskTopUnapprovedDevices(vendorAnalysis.rows));
+        breakdown.put("complianceGapsByPolicy", complianceGapsByPolicy(matches));
         return breakdown;
     }
 
@@ -403,8 +418,11 @@ final class RiskScoreCalculator {
     }
 
     /** Null only when no policy has PII detection configured at all. Zero matches with at least
-     *  one PII policy configured is a real, good score — not excluded. */
-    private static Double dlpIncidentsSubScore(InsightDataBundle bundle) {
+     *  one PII policy configured is a real, good score — not excluded. `matches` is the caller's
+     *  own already-computed {@code PostureService.matchedPolicyCounts(bundle)} — passed in rather
+     *  than recomputed here, since compute()/computeBreakdown() both also need it for
+     *  complianceGapsSubScore/complianceGapsByPolicy over the SAME bundle. */
+    private static Double dlpIncidentsSubScore(InsightDataBundle bundle, List<PostureService.PolicyMatch> matches) {
         boolean anyPiiPolicyConfigured = false;
         for (GuardrailPolicies p : PostureService.safe(bundle.policies)) {
             if (p != null && InsightUtil.policyHasPiiDetection(p)) { anyPiiPolicyConfigured = true; break; }
@@ -412,7 +430,7 @@ final class RiskScoreCalculator {
         if (!anyPiiPolicyConfigured) return null;
 
         long matched = 0, hardBlocked = 0;
-        for (PostureService.PolicyMatch m : PostureService.matchedPolicyCounts(bundle)) {
+        for (PostureService.PolicyMatch m : matches) {
             if (!InsightUtil.policyHasPiiDetection(m.policy)) continue;
             matched += m.count;
             if (InsightUtil.isBlockingPolicy(m.policy)) hardBlocked += m.count;
@@ -542,6 +560,44 @@ final class RiskScoreCalculator {
         DEFAULT_DATA_LEAVING_POLICIES.put("Default-Credentials Alert", "Credentials");
     }
 
+    /** {approved, weight} for one vendor — extracted from vendorRiskAnalysis's own per-vendor loop
+     *  so the risk-score breakdown's own L3 vendor profile badge can't disagree with the L2
+     *  table's own weight column. Package-private (not private): called from PostureService via
+     *  {@link #vendorRiskProfileDrill}. */
+    static final class VendorTier {
+        final boolean approved;
+        final int weight;
+        VendorTier(boolean approved, int weight) { this.approved = approved; this.weight = weight; }
+    }
+
+    /** deviceId -> [hostName, firstSeen] for one vendor's own endpoint collections — the exact
+     *  same grouping vendorRiskDrill's own member level and vendorRiskProfileDrill each used to
+     *  independently loop endpointCollections for (byte-for-byte identical filter/group logic),
+     *  now computed once. Mirrors RiskScoreProfileDrillService#collectionsForTool's own "one
+     *  membership test, reused by every caller" pattern for Shadow AI tools. */
+    private static Map<String, Object[]> devicesForVendor(List<ApiCollection> endpointCollections, String vendor) {
+        Map<String, Object[]> byDevice = new LinkedHashMap<>(); // deviceId -> [hostName, firstSeen]
+        for (ApiCollection c : PostureService.safe(endpointCollections)) {
+            if (c == null || c.isDeactivated()) continue;
+            String v = InsightUtil.endpointVendorName(c);
+            if (v == null || !v.equals(vendor)) continue;
+            String deviceId = InsightUtil.deviceIdOf(c);
+            if (deviceId == null) deviceId = "unknown";
+            Object[] seen = byDevice.computeIfAbsent(deviceId, k -> new Object[]{c.getHostName(), 0});
+            int firstSeen = (int) seen[1];
+            if (c.getStartTs() > 0 && (firstSeen == 0 || c.getStartTs() < firstSeen)) seen[1] = c.getStartTs();
+        }
+        return byDevice;
+    }
+
+    static VendorTier vendorRiskTier(String vendor, Set<String> allowlistNamesLower) {
+        // vendor is endpointVendorName's display-cased form ("OpenAI") — allowlistNamesLower is
+        // strictly lowercase (see vendorRiskAnalysis's own note on this).
+        boolean approved = allowlistNamesLower.contains(vendor.toLowerCase(Locale.ROOT));
+        int weight = approved ? KNOWN_RISKY_VENDORS.getOrDefault(vendor, 0) : UNAPPROVED_VENDOR_WEIGHT;
+        return new VendorTier(approved, weight);
+    }
+
     private static final class VendorRiskAnalysis {
         final List<BasicDBObject> rows;
         final Double subScore;
@@ -574,11 +630,9 @@ final class RiskScoreCalculator {
             String vendor = e.getKey();
             long count = e.getValue().size();
             total += count;
-            // vendor is endpointVendorName's display-cased form ("OpenAI") — allowlistNamesLower
-            // is strictly lowercase, so this must lower before checking membership or every
-            // canonicalized vendor reads as unapproved regardless of the actual allowlist.
-            boolean approved = allowlistNamesLower.contains(vendor.toLowerCase(Locale.ROOT));
-            int weight = approved ? KNOWN_RISKY_VENDORS.getOrDefault(vendor, 0) : UNAPPROVED_VENDOR_WEIGHT;
+            VendorTier tier = vendorRiskTier(vendor, allowlistNamesLower);
+            boolean approved = tier.approved;
+            int weight = tier.weight;
             if (!approved) unapprovedCount += count;
             else if (weight > 0) riskyApprovedCount += count;
 
@@ -599,31 +653,196 @@ final class RiskScoreCalculator {
     }
 
     /**
-     * "What's driving this" for the Vendor risk sub-score above — for now, just the top 2
-     * unapproved vendors by distinct device count (not collection count: vendorRiskAnalysis's own
-     * "count" above is per-collection, and one device can carry several collections for the same
-     * vendor across sessions, so that number would overstate device reach).
+     * "What's driving this" for the Vendor risk sub-score above — the top 2 unapproved vendors by
+     * distinct device count. Derived from vendorRiskAnalysis's own already-computed rows (each
+     * already carries {@code approved} and a real distinct-device {@code count} — see that
+     * method's own "Devices, not collections" note) rather than re-scanning endpointCollections a
+     * second time for the identical vendor/device grouping computeBreakdown's own call site
+     * already paid for. vendorAnalysis.rows is already sorted by count descending, so filtering
+     * out the approved ones and taking the first 2 remaining is exactly "top 2 unapproved by
+     * count" — no re-sort needed.
      */
-    private static List<BasicDBObject> vendorRiskTopUnapprovedDevices(List<ApiCollection> endpointCollections,
-                                                                        Set<String> allowlistNamesLower) {
-        Map<String, Set<String>> devicesByVendor = new LinkedHashMap<>();
-        for (ApiCollection c : PostureService.safe(endpointCollections)) {
-            if (c == null || c.isDeactivated()) continue;
-            String vendor = InsightUtil.endpointVendorName(c);
-            if (vendor == null || allowlistNamesLower.contains(vendor.toLowerCase(Locale.ROOT))) continue;
-            String deviceId = InsightUtil.deviceIdOf(c);
-            devicesByVendor.computeIfAbsent(vendor, k -> new HashSet<>()).add(deviceId != null ? deviceId : "unknown");
+    private static List<BasicDBObject> vendorRiskTopUnapprovedDevices(List<BasicDBObject> vendorAnalysisRows) {
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (BasicDBObject r : PostureService.safe(vendorAnalysisRows)) {
+            if (r == null || r.getBoolean("approved")) continue;
+            BasicDBObject row = new BasicDBObject();
+            row.put("vendor", r.getString("vendor"));
+            row.put("deviceCount", (int) r.getLong("count"));
+            rows.add(row);
+            if (rows.size() >= 2) break;
+        }
+        return rows;
+    }
+
+    // ── Vendor risk drill ────────────────────────────────────────────────────────
+    //
+    // Lives here rather than in PostureService, next to vendorRiskAnalysis, which does the same
+    // endpointCollections grouping this reuses rather than duplicating. See PostureService#fetchDrill
+    // for the dispatch and PostureService.paginate/PostureDrillResult for the shared shape.
+
+    static PostureDrillResult vendorRiskDrill(List<ApiCollection> endpointCollections, Set<String> allowlistNamesLower,
+                                               Map<String, String> deviceIdToUsername, List<String> path,
+                                               int skip, int limit) {
+        PostureDrillResult result = new PostureDrillResult();
+
+        if (path.isEmpty()) {
+            result.setTitle("Vendor risk");
+            result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Vendor risk"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("vendor", "Vendor"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("approved", "Approved"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("devices", "Devices"));
+            result.getColumns().add(new PostureDrillResult.ColumnDef("weight", "Risk weight"));
+            result.setDrillable(true);
+
+            VendorRiskAnalysis analysis = vendorRiskAnalysis(endpointCollections, allowlistNamesLower);
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (BasicDBObject r : analysis.rows) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", r.getString("vendor"));
+                row.put("vendor", r.getString("vendor"));
+                row.put("approved", r.getBoolean("approved"));
+                row.put("devices", r.getLong("count"));
+                row.put("weight", r.getInt("weight"));
+                rows.add(row);
+            }
+            PostureService.paginate(result, rows, skip, limit);
+            if (rows.isEmpty()) {
+                result.addDataGap(new InsightResult.Gap("VENDOR_RISK", PostureService.REASON_NO_ROWS,
+                        "No endpoint traffic resolves to a known vendor yet."));
+            }
+            return result;
         }
 
-        List<BasicDBObject> rows = new ArrayList<>();
-        for (Map.Entry<String, Set<String>> e : devicesByVendor.entrySet()) {
-            BasicDBObject row = new BasicDBObject();
-            row.put("vendor", e.getKey());
-            row.put("deviceCount", e.getValue().size());
+        String vendor = path.get(0);
+        result.setTitle(vendor + " — devices");
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem("", "Vendor risk"));
+        result.getBreadcrumb().add(new PostureDrillResult.BreadcrumbItem(vendor, vendor));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("device", "Device / user"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("tool", "Tool / host"));
+        result.getColumns().add(new PostureDrillResult.ColumnDef("firstSeen", "First seen"));
+        result.setDrillable(false);
+
+        Map<String, Object[]> byDevice = devicesForVendor(endpointCollections, vendor);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map.Entry<String, Object[]> e : byDevice.entrySet()) {
+            String deviceId = e.getKey();
+            String display = deviceIdToUsername != null ? deviceIdToUsername.getOrDefault(deviceId, deviceId) : deviceId;
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("device", display);
+            row.put("tool", e.getValue()[0]);
+            row.put("firstSeen", e.getValue()[1]);
             rows.add(row);
         }
-        rows.sort((a, b) -> Integer.compare(b.getInt("deviceCount"), a.getInt("deviceCount")));
-        return rows.subList(0, Math.min(2, rows.size()));
+        rows.sort((a, b) -> Integer.compare((int) b.get("firstSeen"), (int) a.get("firstSeen")));
+        PostureService.paginate(result, rows, skip, limit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap("VENDOR_RISK", PostureService.REASON_NO_ROWS,
+                    "No devices found for vendor \"" + vendor + "\"."));
+        }
+        return result;
+    }
+
+    /** Risk-score breakdown's own L3 for one vendor — reuses this same device grouping for the
+     *  "Devices" section, plus a "Compliance findings" table (one row per policy whose category
+     *  matched this vendor's traffic this window: Met when that policy has any compliance
+     *  mapping, Gap when it doesn't — same policyHasComplianceMapping definition Framework
+     *  readiness/Compliance gaps use) and event-count stats — all over the same all-window
+     *  events/endpointCollections every other L3 handler shares, no new query. */
+    static PostureDrillResult vendorRiskProfileDrill(List<ApiCollection> endpointCollections, Set<String> allowlistNamesLower,
+                                                       Map<String, String> deviceIdToUsername,
+                                                       List<HostSeverityCount> hostSeverityCounts,
+                                                       List<DashboardMaliciousEvent> windowEvents,
+                                                       List<GuardrailPolicies> policies, String vendor) {
+        VendorTier tier = vendorRiskTier(vendor, allowlistNamesLower);
+        String riskLabel = tier.weight >= 5 ? "High risk" : tier.weight >= 3 ? "Unapproved" : "Low risk";
+        String tone = tier.weight >= 5 ? "critical" : tier.weight >= 3 ? "warning" : "success";
+
+        Map<String, Object[]> byDevice = devicesForVendor(endpointCollections, vendor);
+        int firstSeenOverall = 0;
+        for (Object[] seen : byDevice.values()) {
+            int fs = (int) seen[1];
+            if (fs > 0 && (firstSeenOverall == 0 || fs < firstSeenOverall)) firstSeenOverall = fs;
+        }
+
+        List<DashboardMaliciousEvent> vendorEvents = new ArrayList<>();
+        for (DashboardMaliciousEvent e : PostureService.safe(windowEvents)) {
+            if (e == null || e.getHost() == null) continue;
+            if (vendor.equals(InsightUtil.endpointVendorNameOfHost(e.getHost()))) vendorEvents.add(e);
+        }
+        vendorEvents.sort((a, b) -> Long.compare(b.getTimestamp(), a.getTimestamp()));
+        long criticalEvents = 0;
+        for (DashboardMaliciousEvent e : vendorEvents) {
+            if ("CRITICAL".equalsIgnoreCase(e.getSeverity())) criticalEvents++;
+        }
+
+        PostureDrillResult.Badge badge = new PostureDrillResult.Badge(riskLabel, tone);
+        PostureDrillResult result = RiskScoreProfileDrillService.newProfileResult("Vendor risk", "vendorRisk", vendor, vendor,
+                byDevice.size() + " device" + (byDevice.size() == 1 ? "" : "s") + " · "
+                        + (tier.approved ? "Enterprise approved" : "Unapproved usage"), badge);
+        result.setSeverity(RiskScoreProfileDrillService.worstSeverityOfEvents(vendorEvents));
+
+        List<InsightResult.Metric> summary = new ArrayList<>();
+        summary.add(new InsightResult.Metric("events", "Malicious events", (long) vendorEvents.size(), "count", String.valueOf(vendorEvents.size())));
+        summary.add(new InsightResult.Metric("critical", "Critical", criticalEvents, "count", String.valueOf(criticalEvents)));
+        result.setSummary(summary);
+
+        List<PostureDrillResult.Fact> facts = new ArrayList<>();
+        facts.add(new PostureDrillResult.Fact("Approved", tier.approved ? "Yes" : "No", tier.approved ? null : "critical"));
+        boolean knownRisky = KNOWN_RISKY_VENDORS.containsKey(vendor);
+        facts.add(new PostureDrillResult.Fact("Data handling",
+                knownRisky ? "Reported to train on user input by default" : "No known training-on-input signal",
+                knownRisky ? "critical" : null));
+        facts.add(new PostureDrillResult.Fact("Devices affected", String.valueOf(byDevice.size()), null));
+        facts.add(new PostureDrillResult.Fact("First seen", RiskScoreProfileDrillService.humanEpoch(firstSeenOverall), null));
+        result.setFacts(facts);
+
+        Map<String, GuardrailPolicies> policyByNameLower = PostureService.policyByNameLower(policies);
+        Map<String, Long> countByPolicy = new LinkedHashMap<>();
+        Map<String, GuardrailPolicies> policyObjByName = new LinkedHashMap<>();
+        for (DashboardMaliciousEvent e : vendorEvents) {
+            if (e.getCategory() == null) continue;
+            GuardrailPolicies p = policyByNameLower.get(e.getCategory().toLowerCase(Locale.ROOT));
+            if (p == null) continue;
+            countByPolicy.merge(p.getName(), 1L, Long::sum);
+            policyObjByName.putIfAbsent(p.getName(), p);
+        }
+        List<Map<String, Object>> findingRows = new ArrayList<>();
+        for (Map.Entry<String, Long> e : countByPolicy.entrySet()) {
+            GuardrailPolicies p = policyObjByName.get(e.getKey());
+            boolean mapped = PostureService.policyHasComplianceMapping(p);
+            findingRows.add(PostureService.row("policy", e.getKey(), "result", mapped ? "Met" : "Gap",
+                    "evidence", e.getValue() + " event" + (e.getValue() == 1 ? "" : "s") + " this window"));
+        }
+        findingRows.sort((a, b) -> Boolean.compare(!"Gap".equals(a.get("result")), !"Gap".equals(b.get("result"))));
+        List<PostureDrillResult.ColumnDef> findingColumns = Arrays.asList(
+                new PostureDrillResult.ColumnDef("policy", "Policy"),
+                new PostureDrillResult.ColumnDef("result", "Result"),
+                new PostureDrillResult.ColumnDef("evidence", "Evidence"));
+        result.getSections().add(RiskScoreProfileDrillService.tableSection("findings", "Compliance findings",
+                "Policies matched on this vendor's traffic this window", findingColumns, findingRows));
+
+        List<Map<String, Object>> deviceRows = new ArrayList<>();
+        for (Map.Entry<String, Object[]> e : byDevice.entrySet()) {
+            String deviceId = e.getKey();
+            String display = deviceIdToUsername != null ? deviceIdToUsername.getOrDefault(deviceId, deviceId) : deviceId;
+            deviceRows.add(PostureService.row("device", display, "tool", e.getValue()[0], "firstSeen", e.getValue()[1]));
+        }
+        deviceRows.sort((a, b) -> Integer.compare((int) b.get("firstSeen"), (int) a.get("firstSeen")));
+        List<PostureDrillResult.ColumnDef> deviceColumns = Arrays.asList(
+                new PostureDrillResult.ColumnDef("device", "Device / user"),
+                new PostureDrillResult.ColumnDef("tool", "Tool / host"),
+                new PostureDrillResult.ColumnDef("firstSeen", "First seen"));
+        result.getSections().add(RiskScoreProfileDrillService.tableSection("devices", "Devices", null, deviceColumns, deviceRows));
+
+        result.getCtas().add(new InsightResult.Cta("openFullView", "Open in Guardrail violations", "NAVIGATE",
+                InsightRoutes.GUARDRAIL_VIOLATIONS, null, false));
+        if (byDevice.isEmpty() && vendorEvents.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap("VENDOR_RISK", PostureService.REASON_NO_ROWS,
+                    "No devices or activity found for vendor \"" + vendor + "\"."));
+        }
+        return result;
     }
 
     // ── Compliance gaps ──────────────────────────────────────────────────────────
@@ -641,8 +860,9 @@ final class RiskScoreCalculator {
     /** Null only when no policy maps to a compliance framework at all (nothing to assess — same
      *  data-gap condition Framework readiness reports). Zero matched events with at least one
      *  compliance-mapped policy configured is a real, good score — not excluded. Mirrors
-     *  dlpIncidentsSubScore's shape exactly, over the same matchedPolicyCounts join. */
-    private static Double complianceGapsSubScore(InsightDataBundle bundle) {
+     *  dlpIncidentsSubScore's shape exactly, over the same matchedPolicyCounts join — `matches`
+     *  is the caller's own already-computed one, same reasoning as dlpIncidentsSubScore's. */
+    private static Double complianceGapsSubScore(InsightDataBundle bundle, List<PostureService.PolicyMatch> matches) {
         boolean anyPolicyMapsToCompliance = false;
         for (GuardrailPolicies p : PostureService.safe(bundle.policies)) {
             if (PostureService.policyHasComplianceMapping(p)) { anyPolicyMapsToCompliance = true; break; }
@@ -650,7 +870,7 @@ final class RiskScoreCalculator {
         if (!anyPolicyMapsToCompliance) return null;
 
         long matched = 0, uncovered = 0;
-        for (PostureService.PolicyMatch m : PostureService.matchedPolicyCounts(bundle)) {
+        for (PostureService.PolicyMatch m : matches) {
             matched += m.count;
             if (!PostureService.policyHasComplianceMapping(m.policy)) uncovered += m.count;
         }
@@ -665,9 +885,20 @@ final class RiskScoreCalculator {
      * DLP hit is, but it IS attributable to the policy that fired it. Top 2 policies by
      * uncovered count.
      */
-    private static List<BasicDBObject> complianceGapsByPolicy(InsightDataBundle bundle) {
+    private static List<BasicDBObject> complianceGapsByPolicy(List<PostureService.PolicyMatch> matches) {
+        List<BasicDBObject> rows = complianceGapsByPolicyAll(matches);
+        return rows.subList(0, Math.min(2, rows.size()));
+    }
+
+    /** Uncapped core of {@link #complianceGapsByPolicy} — every policy with at least one
+     *  compliance-uncovered match this window, not just the top 2. Feeds the risk-score
+     *  breakdown's own "Compliance gaps" drilldown level (see
+     *  PostureService#fetchRiskScoreDrill) — the top-2 version above stays capped for the
+     *  existing inline "what's driving this" hint line. Takes the already-computed
+     *  {@code matches} rather than a bundle, same dedup as complianceGapsSubScore's own. */
+    static List<BasicDBObject> complianceGapsByPolicyAll(List<PostureService.PolicyMatch> matches) {
         Map<String, Long> uncoveredCountByPolicy = new HashMap<>();
-        for (PostureService.PolicyMatch m : PostureService.matchedPolicyCounts(bundle)) {
+        for (PostureService.PolicyMatch m : matches) {
             if (PostureService.policyHasComplianceMapping(m.policy)) continue;
             uncoveredCountByPolicy.merge(m.policy.getName(), m.count, Long::sum);
         }
@@ -680,6 +911,56 @@ final class RiskScoreCalculator {
             rows.add(row);
         }
         rows.sort((a, b) -> Long.compare(b.getLong("count"), a.getLong("count")));
-        return rows.subList(0, Math.min(2, rows.size()));
+        return rows;
+    }
+
+    /**
+     * Full (uncapped) per-device PII-incident count for the current window — the risk-score
+     * breakdown's own "DLP incidents" drilldown level. Deliberately simpler than
+     * {@link #dlpDeviceMovements}: that method needs a prior window to compute a diff (and is
+     * capped to 2 for the inline hint line); fetchPostureDrill's DRILL_RISK_SCORE branch doesn't
+     * thread a "which specific device moved" comparison this deep, so this is just "how many PII
+     * incidents does each device have right now", same {@link #piiEventCountByDevice} join, every
+     * device, sorted worst-first.
+     */
+    static List<BasicDBObject> dlpIncidentsAllDevices(List<DashboardMaliciousEvent> events,
+                                                        List<GuardrailPolicies> policies,
+                                                        Map<String, String> deviceIdToUsername) {
+        Map<String, GuardrailPolicies> policyByNameLower = PostureService.policyByNameLower(policies);
+        Map<String, Long> byDevice = piiEventCountByDevice(events, policyByNameLower);
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Long> e : byDevice.entrySet()) {
+            BasicDBObject row = new BasicDBObject();
+            row.put("deviceId", e.getKey());
+            row.put("username", deviceIdToUsername != null ? deviceIdToUsername.getOrDefault(e.getKey(), e.getKey()) : e.getKey());
+            row.put("incidents", e.getValue());
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Long.compare(b.getLong("incidents"), a.getLong("incidents")));
+        return rows;
+    }
+
+    /**
+     * Full (uncapped) per-device current-window violation count — the risk-score breakdown's own
+     * "Threat activity" drilldown level. Same {@link #totalActivityByDevice} grouping
+     * {@link #threatActivityDeviceMovements} uses, but a current-period snapshot rather than a
+     * window-over-window diff (no prior-window comparison this deep), every device, sorted
+     * worst-first.
+     */
+    static List<BasicDBObject> threatActivityAllDevices(List<HostSeverityCount> current,
+                                                          Map<String, String> deviceIdToUsername) {
+        Map<String, Long> byDevice = totalActivityByDevice(current);
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Long> e : byDevice.entrySet()) {
+            BasicDBObject row = new BasicDBObject();
+            row.put("deviceId", e.getKey());
+            row.put("username", deviceIdToUsername != null ? deviceIdToUsername.getOrDefault(e.getKey(), e.getKey()) : e.getKey());
+            row.put("violations", e.getValue());
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Long.compare(b.getLong("violations"), a.getLong("violations")));
+        return rows;
     }
 }

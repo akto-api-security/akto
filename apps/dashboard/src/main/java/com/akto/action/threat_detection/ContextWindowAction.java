@@ -65,6 +65,12 @@ public class ContextWindowAction extends AbstractThreatDetectionAction {
                 return SUCCESS.toUpperCase();
             }
 
+            // Users limited to specific collections only see messages of their own agents (same matching as the activity list)
+            List<DashboardMaliciousEvent> ownEvents = fetchOwnEventsIfLimited();
+            if (ownEvents != null && ownEvents.stream().noneMatch(e -> host.equals(e.getHost()))) {
+                return SUCCESS.toUpperCase();
+            }
+
             ElasticSearchClient client = ElasticSearchClient.instance();
             if (!client.isConfigured()) {
                 return SUCCESS.toUpperCase();

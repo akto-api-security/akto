@@ -9,7 +9,7 @@ import func from "@/util/func"
 import Details from '../components/Details';
 import { CancelMajor } from "@shopify/polaris-icons"
 
-function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName, isButtonActive}) {
+function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signinUrl, integrationSteps, cardContent, handleSubmitOutSide, handleDeleteOutside, samlUrlDocs, loading, showCustomInputs, certificateName, isButtonActive, additionalComponent}) {
     const [componentType, setComponentType] = useState(0) ;
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [files, setFiles] = useState(null)
@@ -102,9 +102,12 @@ function CustomSamlSso({ssoType,entityTitle, entityId, loginURL,pageTitle, signi
 
     const azureSSOComponent = (
         loading ? <SpinnerCentered /> :
-        <LegacyCard title={pageTitle}>
-            {componentType === 0 ? stepsComponent : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
-        </LegacyCard>
+        <VerticalStack gap="4">
+            <LegacyCard title={pageTitle}>
+                {componentType === 0 ? stepsComponent : componentType === 1 ? formComponent : <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} /> }
+            </LegacyCard>
+            {componentType === 2 && additionalComponent}
+        </VerticalStack>
     )
 
     const useCardContent = (

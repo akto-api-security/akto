@@ -477,6 +477,7 @@ message FetchTopNDataRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   uint32 limit = 4;
+  optional string status = 5; // Narrow top hosts to one status (e.g. ACTIVE); omitted counts every status
 }
 
 message FetchTopNDataResponse {

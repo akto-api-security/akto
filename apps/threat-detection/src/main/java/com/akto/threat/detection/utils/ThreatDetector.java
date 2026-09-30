@@ -149,36 +149,41 @@ public class ThreatDetector {
     }
 
     public boolean isWeakAuthenticationThreat(HttpResponseParams httpResponseParams) {
+        return getWeakAuthenticationReason(httpResponseParams) != null;
+    }
+
+    /**
+     * Returns a human-readable reason why the request's authentication is weak,
+     * or null if no weakness was detected. The reason is stored in the malicious
+     * event metadata, so it names the offending header/cookie where possible.
+     */
+    public String getWeakAuthenticationReason(HttpResponseParams httpResponseParams) {
         if (httpResponseParams == null || httpResponseParams.getRequestParams() == null) {
-            return false;
+            return null;
         }
 
         Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         if (headers == null || headers.isEmpty()) {
-            return false;
+            return null;
         }
 
         // Step 1: Check structural issues in Authorization header
         if (hasDuplicateAuthHeaders(headers)) {
-            logger.debug("Weak authentication: Multiple Authorization headers detected");
-            return true;
+            return "Multiple Authorization headers in request";
         }
 
         if (hasHeaderInjection(headers)) {
-            logger.debug("Weak authentication: Header injection detected");
-            return true;
+            return "Header injection (CR/LF characters) in Authorization header";
         }
 
         if (hasOversizedToken(headers)) {
-            logger.debug("Weak authentication: Oversized token detected");
-            return true;
+            return "Oversized Authorization header (more than 2048 characters)";
         }
 
         // Step 1.5: Check for Bearer with empty/malformed token directly
         // This catches cases that AuthPolicy might not classify as BEARER type
         if (hasEmptyOrMalformedBearer(headers)) {
-            logger.debug("Weak authentication: Empty or malformed Bearer token detected");
-            return true;
+            return "Empty or malformed Bearer token in Authorization header";
         }
 
         // Step 2: Use AuthPolicy to find auth types
@@ -186,8 +191,7 @@ public class ThreatDetector {
 
         // Step 3: Basic auth is always weak
         if (authTypes.contains(ApiInfo.AuthType.BASIC)) {
-            logger.debug("Weak authentication: Basic Auth detected");
-            return true;
+            return "Basic authentication used in Authorization header";
         }
 
         // Step 4: For Bearer auth, apply extra validations
@@ -196,45 +200,80 @@ public class ThreatDetector {
 
             // Check for empty bearer token
             if (token == null || token.trim().isEmpty()) {
-                logger.debug("Weak authentication: Empty bearer token detected");
-                return true;
+                return "Empty Bearer token in Authorization header";
             }
 
             // Check if it's a valid JWT
             if (KeyTypes.isJWT(token)) {
-                if (isWeakJwtAlgorithm(token)) {
-                    logger.debug("Weak authentication: Weak JWT algorithm detected");
-                    return true;
-                }
-                if (isJwtExpired(token)) {
-                    logger.debug("Weak authentication: Expired JWT detected");
-                    return true;
+                String jwtReason = getWeakJwtReason(token, "Authorization Bearer token");
+                if (jwtReason != null) {
+                    return jwtReason;
                 }
             } else {
                 // Not a valid JWT - check if it's a fake/suspicious token
                 if (token.length() < 10) {
-                    logger.debug("Weak authentication: Fake/invalid bearer token detected");
-                    return true;
+                    return "Invalid Bearer token in Authorization header (only " + token.length() + " characters)";
                 }
             }
         }
 
         // Step 5: Check JWT tokens in cookies and other headers
         if (authTypes.contains(ApiInfo.AuthType.JWT)) {
-            List<String> jwtTokens = AuthPolicy.extractAllJwtTokens(headers);
-            for (String jwt : jwtTokens) {
-                if (isWeakJwtAlgorithm(jwt)) {
-                    logger.debug("Weak authentication: Weak JWT algorithm detected in cookie/header");
-                    return true;
-                }
-                if (isJwtExpired(jwt)) {
-                    logger.debug("Weak authentication: Expired JWT detected in cookie/header");
-                    return true;
+            for (Pair<String, String> located : findJwtTokensWithLocation(headers)) {
+                String jwtReason = getWeakJwtReason(located.getSecond(), located.getFirst());
+                if (jwtReason != null) {
+                    return jwtReason;
                 }
             }
         }
 
-        return false;
+        return null;
+    }
+
+    private String getWeakJwtReason(String jwt, String location) {
+        if (isWeakJwtAlgorithm(jwt)) {
+            return "Weak JWT algorithm (alg=" + extractAlgFromJwt(jwt) + ") in " + location;
+        }
+        Long exp = extractExpFromJwt(jwt);
+        if (exp != null && isJwtExpired(jwt)) {
+            long expiredForSeconds = (System.currentTimeMillis() / 1000) - exp;
+            return "Expired JWT in " + location + " (expired " + expiredForSeconds + "s before detection)";
+        }
+        return null;
+    }
+
+    /**
+     * Same token sources as AuthPolicy.extractAllJwtTokens, but keeps where each token was found
+     * (as a display string) so the reason can point at the offending cookie/header.
+     */
+    private List<Pair<String, String>> findJwtTokensWithLocation(Map<String, List<String>> headers) {
+        List<Pair<String, String>> result = new ArrayList<>();
+
+        String bearerToken = AuthPolicy.extractBearerToken(headers);
+        if (bearerToken != null && KeyTypes.isJWT(bearerToken)) {
+            result.add(new Pair<>("Authorization Bearer token", bearerToken));
+        }
+
+        List<String> cookieList = headers.getOrDefault(AuthPolicy.COOKIE_NAME, new ArrayList<>());
+        for (Map.Entry<String, String> cookie : AuthPolicy.parseCookie(cookieList).entrySet()) {
+            if (KeyTypes.isJWT(cookie.getValue())) {
+                result.add(new Pair<>("cookie '" + cookie.getKey() + "'", cookie.getValue()));
+            }
+        }
+
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String headerName = entry.getKey();
+            if (headerName == null || headerName.equalsIgnoreCase(AuthPolicy.AUTHORIZATION_HEADER_NAME)
+                    || entry.getValue() == null) {
+                continue;
+            }
+            for (String value : entry.getValue()) {
+                if (KeyTypes.isJWT(value)) {
+                    result.add(new Pair<>("header '" + headerName + "'", value));
+                }
+            }
+        }
+        return result;
     }
 
     private boolean hasDuplicateAuthHeaders(Map<String, List<String>> headers) {

@@ -568,7 +568,8 @@ public class ElasticSearchClient extends SearchClient {
     // ── Argus aggregated stats (total spans + token sums + top apps/traces + sparklines) ──
 
     @Override
-    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
+    public ArgusStats fetchArgusStats(int accountId, long startMs, long endMs, Map<String, List<String>> filters,
+                                      Boolean atlasTrafficFilter, boolean includeTracesContent) {
         long aggTotalSpans = 0, aggInputTokens = 0, aggOutputTokens = 0;
         List<Map<String, Object>> aggTopApps = new ArrayList<>();
         List<Map<String, Object>> aggAppBreakdown = new ArrayList<>();
@@ -582,7 +583,7 @@ public class ElasticSearchClient extends SearchClient {
                 aggTraceSpark, aggTokenSpark, aggTraceSparkTs);
         }
         try {
-            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, null, null, atlasTrafficFilter);
+            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, filters, null, atlasTrafficFilter);
 
             long argusSparkEndMs = Math.min(endMs, System.currentTimeMillis());
 
@@ -783,6 +784,125 @@ public class ElasticSearchClient extends SearchClient {
             logger.error("fetchUserAnalysisTokenTotals error for accountId=" + accountId + ": " + e.getMessage());
         }
         return rows;
+    }
+
+    // ── Argus (AGENTIC) per-service observability — token totals + real topic breakdown ────
+
+    @Override
+    public List<UserAnalysisData> fetchAgenticServiceObservability(int accountId, long startMs, long endMs, int topicsPerServiceCap) {
+        List<UserAnalysisData> rows = new ArrayList<>();
+        if (!isConfigured()) return rows;
+        try {
+            // false (not null): Argus/agentic traffic is the "not Atlas" half of the isAtlasTraffic
+            // split — see this method's own javadoc on SearchClient.
+            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, null, null, Boolean.FALSE);
+
+            JSONObject subAggs = tokenSubAggs()
+                .put(AGG_TOPIC_HIERARCHY, new JSONObject()
+                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", topicsPerServiceCap))
+                    .put("aggs", new JSONObject()
+                        .put("subTopics", new JSONObject()
+                            .put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", topicsPerServiceCap)))));
+
+            JSONObject aggs = new JSONObject()
+                .put(AGG_USER_ANALYSIS_SERVICE, new JSONObject()
+                    .put("terms", new JSONObject()
+                        .put("field", AgentQueryRecord.F_SERVICE_ID_KW)
+                        .put("size", USER_ANALYSIS_SERVICE_SIZE))
+                    .put("aggs", subAggs));
+
+            JSONObject aggsResult = aggregate(filteredQuery, aggs);
+            if (aggsResult == null) return rows;
+
+            JSONObject serviceAgg = aggsResult.optJSONObject(AGG_USER_ANALYSIS_SERVICE);
+            JSONArray serviceBuckets = serviceAgg != null ? serviceAgg.optJSONArray("buckets") : null;
+            if (serviceBuckets == null) return rows;
+
+            for (int i = 0; i < serviceBuckets.length(); i++) {
+                JSONObject serviceBucket = serviceBuckets.optJSONObject(i);
+                if (serviceBucket == null) continue;
+                String serviceId = serviceBucket.optString("key", "");
+                if (serviceId.isEmpty()) continue;
+
+                UserAnalysisData row = new UserAnalysisData();
+                row.setId(new UserAnalysisDataKey(serviceId, ""));
+                row.setTotalInputTokens(subAggLong(serviceBucket, AGG_IN_TOKENS));
+                row.setTotalOutputTokens(subAggLong(serviceBucket, AGG_OUT_TOKENS));
+
+                Map<String, Map<String, Integer>> hierarchy = new LinkedHashMap<>();
+                JSONObject topicAgg = serviceBucket.optJSONObject(AGG_TOPIC_HIERARCHY);
+                JSONArray topicBuckets = topicAgg != null ? topicAgg.optJSONArray("buckets") : null;
+                if (topicBuckets != null) {
+                    for (int j = 0; j < topicBuckets.length(); j++) {
+                        JSONObject tb = topicBuckets.optJSONObject(j);
+                        if (tb == null) continue;
+                        String domain = tb.optString("key", "");
+                        if (domain.isEmpty()) continue;
+                        Map<String, Integer> subMap = hierarchy.computeIfAbsent(domain, d -> new LinkedHashMap<>());
+                        JSONObject subTopicAgg = tb.optJSONObject("subTopics");
+                        JSONArray subBuckets = subTopicAgg != null ? subTopicAgg.optJSONArray("buckets") : null;
+                        if (subBuckets != null) {
+                            for (int k = 0; k < subBuckets.length(); k++) {
+                                JSONObject sb = subBuckets.optJSONObject(k);
+                                if (sb == null) continue;
+                                String subDomain = sb.optString("key", "");
+                                if (!subDomain.isEmpty()) subMap.put(subDomain, (int) sb.optLong("doc_count", 0));
+                            }
+                        }
+                    }
+                }
+                row.setTopicHierarchy(hierarchy);
+                rows.add(row);
+            }
+        } catch (Exception e) {
+            logger.error("fetchAgenticServiceObservability error for accountId=" + accountId + ": " + e.getMessage());
+        }
+        return rows;
+    }
+
+    @Override
+    public Map<String, Map<String, Integer>> fetchAgenticGlobalTopicHierarchy(int accountId, long startMs, long endMs,
+                                                                                int topicsCap, int subTopicsCap) {
+        Map<String, Map<String, Integer>> hierarchy = new LinkedHashMap<>();
+        if (!isConfigured()) return hierarchy;
+        try {
+            JSONObject filteredQuery = buildQuery(accountId, startMs, endMs, null, null, Boolean.FALSE);
+
+            JSONObject aggs = new JSONObject()
+                .put(AGG_TOPIC_HIERARCHY, new JSONObject()
+                    .put("terms", new JSONObject().put("field", AgentQueryRecord.F_TOPIC_KW).put("size", topicsCap))
+                    .put("aggs", new JSONObject()
+                        .put("subTopics", new JSONObject()
+                            .put("terms", new JSONObject().put("field", AgentQueryRecord.F_SUB_TOPIC_KW).put("size", subTopicsCap)))));
+
+            JSONObject aggsResult = aggregate(filteredQuery, aggs);
+            if (aggsResult == null) return hierarchy;
+
+            JSONObject topicAgg = aggsResult.optJSONObject(AGG_TOPIC_HIERARCHY);
+            JSONArray topicBuckets = topicAgg != null ? topicAgg.optJSONArray("buckets") : null;
+            if (topicBuckets == null) return hierarchy;
+
+            for (int i = 0; i < topicBuckets.length(); i++) {
+                JSONObject tb = topicBuckets.optJSONObject(i);
+                if (tb == null) continue;
+                String topic = tb.optString("key", "");
+                if (topic.isEmpty()) continue;
+                Map<String, Integer> subMap = hierarchy.computeIfAbsent(topic, t -> new LinkedHashMap<>());
+                JSONObject subTopicAgg = tb.optJSONObject("subTopics");
+                JSONArray subBuckets = subTopicAgg != null ? subTopicAgg.optJSONArray("buckets") : null;
+                if (subBuckets != null) {
+                    for (int j = 0; j < subBuckets.length(); j++) {
+                        JSONObject sb = subBuckets.optJSONObject(j);
+                        if (sb == null) continue;
+                        String subTopic = sb.optString("key", "");
+                        if (!subTopic.isEmpty()) subMap.put(subTopic, (int) sb.optLong("doc_count", 0));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("fetchAgenticGlobalTopicHierarchy error for accountId=" + accountId + ": " + e.getMessage());
+        }
+        return hierarchy;
     }
 
     // ── Spans for a single message/trace ──────────────────────────────────────

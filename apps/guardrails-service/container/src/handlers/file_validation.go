@@ -96,7 +96,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	// Pre-flight policy gate: with no policy applicable to this caller there is nothing
 	// to enforce, so skip fetching, extracting and inspecting the content entirely.
 	if h.policyGate != nil {
-		applicable, err := h.policyGate(contextSource, requestHeaders)
+		applicable, err := h.policyGate(contextSource, requestHeaders, strings.TrimSpace(c.PostForm("tag")))
 		if err != nil {
 			// Could not tell — inspect rather than assume there is nothing to enforce.
 			h.logger.Warn("Policy gate failed; inspecting content",

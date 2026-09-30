@@ -87,6 +87,10 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
         return <Badge tone="success">Approved</Badge>;
     }
 
+    if (!func.canManageGuardrailPolicies()) {
+        return null;
+    }
+
     const openModal = () => { setMode("ALWAYS"); setDays("7"); setModalActive(true); };
 
     const handleApprove = async () => {
@@ -504,6 +508,7 @@ function SampleDetails(props) {
                     }) : []}
                     redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
                     onAddAsSearchFilter={onAddAsSearchFilter}
+                    showDetectionReason
                 />
             </Box>)
     }

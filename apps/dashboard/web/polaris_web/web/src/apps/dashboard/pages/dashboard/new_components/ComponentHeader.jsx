@@ -1,7 +1,7 @@
 import { Box, Button, HorizontalStack, Text, Icon, Tooltip } from '@shopify/polaris'
 import { CancelMinor, DragHandleMinor } from '@shopify/polaris-icons'
 
-const ComponentHeader = ({ title, itemId, onRemove, tooltipContent }) => {
+const ComponentHeader = ({ title, itemId, onRemove, tooltipContent, action }) => {
     const titleStyle = {
         borderBottom: '1px dotted #BEBEBF',
         display: 'inline-block',
@@ -36,6 +36,7 @@ const ComponentHeader = ({ title, itemId, onRemove, tooltipContent }) => {
                             <Text variant='headingMd'>{title}</Text>
                         )}
                     </HorizontalStack>
+                    {action}
                     {onRemove && (
                         <div className="component-header-close-button">
                             <Button monochrome plain icon={CancelMinor} onClick={() => onRemove(itemId)} />

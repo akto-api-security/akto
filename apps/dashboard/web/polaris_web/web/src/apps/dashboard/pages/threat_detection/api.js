@@ -149,9 +149,11 @@ const threatDetectionRequests = {
             data: {refId, eventType, actor, filterId}
         })
     },
-    fetchCountBySeverity(startTs, endTs, severityStatusFilter) {
+    fetchCountBySeverity(startTs, endTs, severityStatusFilter, skillEvaluationMode, configEvaluationMode) {
         const data = { startTs, endTs };
         if (severityStatusFilter) data.severityStatusFilter = severityStatusFilter;
+        if (skillEvaluationMode) data.skillEvaluationMode = skillEvaluationMode;
+        if (configEvaluationMode) data.configEvaluationMode = configEvaluationMode;
         return request({
             url: '/api/fetchCountBySeverity',
             method: 'post',
@@ -239,11 +241,16 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5, severityStatusFilter, skillEvaluationMode, configEvaluationMode) {
         return request({
             url: '/api/fetchThreatTopNData',
             method: 'post',
-            data: {startTs, endTs, latestAttack: latestAttack || [], limit}
+            data: {
+                startTs, endTs, latestAttack: latestAttack || [], limit,
+                ...(severityStatusFilter ? { severityStatusFilter } : {}),
+                ...(skillEvaluationMode ? { skillEvaluationMode } : {}),
+                ...(configEvaluationMode ? { configEvaluationMode } : {}),
+            }
         })
     },
     exportThreatActivityToAdx(startTimestamp, endTimestamp) {

@@ -1,5 +1,10 @@
 package com.akto.interceptor;
 
+import com.akto.action.TraceAction;
+import com.akto.dao.tracing.TraceDao;
+import com.akto.dto.tracing.model.Trace;
+import com.akto.utils.ArgusCollectionScope;
+import com.mongodb.client.model.Filters;
 import com.akto.audit_logs_util.Audit;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
@@ -48,6 +53,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
     String featureLabel;
     String accessType;
     String actionDescription;
+    String collectionScope;
 
     public void setFeatureLabel(String featureLabel) {
         this.featureLabel = featureLabel;
@@ -59,6 +65,36 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
     public void setActionDescription(String actionDescription) {
         this.actionDescription = actionDescription;
+    }
+
+    public void setCollectionScope(String collectionScope) {
+        this.collectionScope = collectionScope;
+    }
+
+    // Error for Argus users limited to specific collections, or null if the request is allowed
+    private String checkCollectionScope(Object action, User user) {
+        if (collectionScope == null) return null;
+        List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(user);
+        if (restrictedIds == null) return null;
+        switch (RbacEnums.CollectionScope.valueOf(collectionScope.toUpperCase())) {
+            case ACCOUNT_WIDE:
+                return "Users limited to specific collections cannot change account-wide settings.";
+            case OWN_COLLECTION:
+                if (action instanceof TraceAction) {
+                    TraceAction traceAction = (TraceAction) action;
+                    int collectionId = traceAction.getApiCollectionId();
+                    if (traceAction.getTraceId() != null && !traceAction.getTraceId().isEmpty()) {
+                        Trace trace = TraceDao.instance.findOne(Filters.eq("_id", traceAction.getTraceId()));
+                        collectionId = trace == null ? -1 : trace.getApiCollectionId();
+                    }
+                    if (!restrictedIds.contains(collectionId)) {
+                        return "You can only view data of the collections assigned to you.";
+                    }
+                }
+                return null;
+            default:
+                return null;
+        }
     }
 
     public final static String FORBIDDEN = "FORBIDDEN";
@@ -227,6 +263,12 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             if(!hasRequiredAccess) {
                 ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
+                return FORBIDDEN;
+            }
+
+            String collectionScopeError = checkCollectionScope(invocation.getAction(), user);
+            if (collectionScopeError != null) {
+                ((ActionSupport) invocation.getAction()).addActionError(collectionScopeError);
                 return FORBIDDEN;
             }
 

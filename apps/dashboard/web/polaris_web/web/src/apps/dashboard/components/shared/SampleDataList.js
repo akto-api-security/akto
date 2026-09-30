@@ -10,7 +10,7 @@ import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import ValidationReasonBanner from './ValidationReasonBanner';
 import func from '../../../../util/func';
-import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory } from '../../../main/labelHelper';
+import { getDashboardCategory, mapLabel, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from '../../../main/labelHelper';
 import transform from './customDiffEditor';
 import { filterLocatableSegments } from './vulnerabilityEvidence';
 
@@ -64,6 +64,29 @@ function SchemaValidationError({ sampleData}) {
             </Banner>
 
         </VerticalStack>
+    )
+}
+
+// Detector-supplied explanation of why the event was flagged (metadata.reason, e.g. WeakAuthentication).
+// API Security only: guardrail events also carry metadata.reason and are shown in their own views.
+function DetectionReason({ sampleData }) {
+    if (!sampleData?.metadata || !isApiSecurityCategory()) {
+        return null;
+    }
+    let reason = '';
+    try {
+        reason = JSON.parse(sampleData.metadata)?.reason || '';
+    } catch (e) {
+        return null;
+    }
+    if (!reason) {
+        return null;
+    }
+
+    return (
+        <Banner title="Detection Reason" status="critical">
+            <Text variant="bodyMd">{reason}</Text>
+        </Banner>
     )
 }
 
@@ -128,7 +151,7 @@ function VulnerabilityEvidence({ segments }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false} = props;
 
     const [page, setPage] = useState(0);
 
@@ -173,6 +196,7 @@ function SampleDataList(props) {
 
     return (
       <VerticalStack gap="3">
+         {showDetectionReason ? <DetectionReason sampleData={currentSample} /> : null}
          <SchemaValidationError sampleData={currentSample} />
          {SHOW_VULNERABILITY_EVIDENCE ? (
            <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} />

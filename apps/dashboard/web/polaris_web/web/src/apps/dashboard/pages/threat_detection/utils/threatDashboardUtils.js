@@ -5,6 +5,7 @@ import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory }
 import values from "@/util/values";
 import GUARDRAIL_RULE_DEFINITIONS from "../constants/guardrailRuleDefinitions";
 import { formatDisplayName } from "../../observe/agentic/mcpClientHelper";
+import api from "../api";
 
 // New tab starts with a fresh PersistStore, so carry the category via ?category= (see ThreatReport.jsx).
 const getCategoryParam = () => categoryToShortName[getDashboardCategory()];
@@ -209,4 +210,25 @@ export const openThreatActorsPage = (filters = {}) => {
     if (categoryParam) params.set("category", categoryParam);
     const url = `${window.location.origin}/dashboard/protection/threat-actor?${params.toString()}`;
     window.open(url, "_blank");
+};
+
+// Atlas (ENDPOINT) violation counts, counted exactly the way the Guardrails Activity tabs count their
+// own rows (list query, limit 1, read .total) — so every page that shows a violation total agrees with
+// the Activity page by construction. Active excludes the Skills Evaluations and Misconfigured Settings
+// partitions; Misconfigured Settings is deduped to one row per host/user/setting. A count whose
+// request fails comes back null so callers can fall back.
+export const fetchEndpointViolationCounts = async (startTimestamp, endTimestamp) => {
+    const countRows = (status, skillEvaluationMode, configEvaluationMode) =>
+        api.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, status, undefined, undefined, undefined, undefined, undefined, false, [], skillEvaluationMode, configEvaluationMode)
+            .then((resp) => resp?.total ?? null)
+            .catch(() => null);
+    const [active, skillsEvaluations, misconfiguredSettings, underReview, ignored] = await Promise.all([
+        countRows("ACTIVE", "exclude", "exclude"),
+        countRows("ACTIVE", "only", undefined),
+        countRows("ACTIVE", undefined, "only"),
+        countRows("UNDER_REVIEW"),
+        countRows("IGNORED"),
+    ]);
+    const total = [active, skillsEvaluations, misconfiguredSettings, underReview, ignored].reduce((sum, c) => sum + (c || 0), 0);
+    return { active, skillsEvaluations, misconfiguredSettings, underReview, ignored, total };
 };

@@ -188,6 +188,9 @@ public class GuardrailPolicies {
 
     private List<String> enterpriseLicenseComplianceCategories;
 
+    // Skip this policy for enterprise (work email) accounts.
+    private boolean skipEnterpriseAccounts;
+
     public String getHexId() {
         if (this.id != null) {
             return this.id.toHexString();
