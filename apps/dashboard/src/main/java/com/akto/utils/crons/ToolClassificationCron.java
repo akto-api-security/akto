@@ -4,7 +4,6 @@ import static com.akto.task.Cluster.callDibs;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -21,7 +20,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.Account;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -30,7 +28,6 @@ import com.akto.service.insights.InsightClassificationHelper;
 import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -44,7 +41,7 @@ public class ToolClassificationCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ToolClassificationCron.class, LogDb.DASHBOARD);
 
     private static final int PER_ACCOUNT_LIMIT = 200;
-    private static final int RECLASSIFY_THRESHOLD_SECONDS = 30 * 24 * 60 * 60;
+    private static final int RECLASSIFY_THRESHOLD_SECONDS = 7 * 24 * 60 * 60;
 
     private static final Pattern TOOL_URL = Pattern.compile("/tools?/");
 
@@ -61,13 +58,13 @@ public class ToolClassificationCron {
                 loggerMaker.infoAndAddToDb("Tool classification cron dibs not acquired, thus skipping cron");
                 return;
             }
-            AccountTask.instance.executeTask(this::processAccount, "tool-classification-cron");
+            AccountTask.instance.executeTask(account -> processAccount(account, false), "tool-classification-cron");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in tool classification cron: " + e.getMessage());
         }
     }
 
-    private void processAccount(Account account) {
+    private void processAccount(Account account, boolean forceRefresh) {
         int accountId = account.getId();
         try {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
@@ -77,7 +74,7 @@ public class ToolClassificationCron {
                 return;
             }
 
-            List<ApiInfo> candidates = findCandidates();
+            List<ApiInfo> candidates = findCandidates(forceRefresh);
             if (candidates.isEmpty()) {
                 loggerMaker.infoAndAddToDb("Tool classification cron: no candidates for accountId=" + accountId);
                 return;
@@ -108,26 +105,16 @@ public class ToolClassificationCron {
         }
     }
 
-    /**
-     * Tool rows in Argus collections whose classification is missing or stale.
-     *
-     * The collection scope is resolved explicitly rather than left to the DAO's RBAC filter:
-     * that filter only engages when a userId or contextSource is set on the thread, and neither
-     * is inside a cron, so an unscoped query would pick up Atlas collections too.
-     */
-    private List<ApiInfo> findCandidates() {
-        Set<Integer> argusCollectionIds = UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.AGENTIC);
-        if (argusCollectionIds == null || argusCollectionIds.isEmpty()) return new ArrayList<>();
-
-        Bson filter = Filters.and(
-                Filters.in(ApiInfo.ID_API_COLLECTION_ID, argusCollectionIds),
-                Filters.regex(ApiInfo.ID_URL, TOOL_URL),
+    private List<ApiInfo> findCandidates(boolean forceRefresh) {
+        Bson toolFilter = Filters.regex(ApiInfo.ID_URL, TOOL_URL);
+        Bson filter = forceRefresh ? toolFilter : Filters.and(
+                toolFilter,
                 Filters.or(
                         Filters.exists(ApiInfo.TOOL_INFO_CALCULATED_AT, false),
                         Filters.lte(ApiInfo.TOOL_INFO_CALCULATED_AT, Context.now() - RECLASSIFY_THRESHOLD_SECONDS)));
 
         return ApiInfoDao.instance.findAll(filter, 0, PER_ACCOUNT_LIMIT,
-                Sorts.descending(ApiInfo.LAST_SEEN), Projections.include(Constants.ID));
+                Sorts.ascending(ApiInfo.TOOL_INFO_CALCULATED_AT), Projections.include(Constants.ID));
     }
 
     private void classify(int accountId, ApiInfo tool, List<WriteModel<ApiInfo>> updates) {
@@ -200,6 +187,6 @@ public class ToolClassificationCron {
             loggerMaker.errorAndAddToDb("forceRunForAccount: no account found for accountId=" + accountId);
             return;
         }
-        processAccount(account);
+        processAccount(account, true);
     }
 }
