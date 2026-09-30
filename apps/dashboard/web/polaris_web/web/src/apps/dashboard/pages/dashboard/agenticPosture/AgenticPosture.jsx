@@ -240,7 +240,10 @@ function AgenticPosture() {
             </Section>
 
             <Section title="Framework Readiness" description="How much of each compliance framework your guardrails have actually exercised.">
-                <FrameworkReadinessSection frameworkReadiness={pageData.frameworkReadiness} />
+                <FrameworkReadinessSection
+                    frameworkReadiness={pageData.frameworkReadiness}
+                    onOpen={() => openDrill('frameworkReadiness')}
+                />
             </Section>
 
             <Section title="Changes Since Last Week" description="What's new in the environment — this is what keeps posture operational, not a static snapshot.">

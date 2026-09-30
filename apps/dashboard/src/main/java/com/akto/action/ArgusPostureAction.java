@@ -96,6 +96,10 @@ public class ArgusPostureAction extends UserAction {
                 case ArgusPostureService.DRILL_SENSITIVE_DATA:
                     this.postureDrill = argusPostureService.fetchSensitiveDataDrill(bundle, environment, skip, limit);
                     break;
+                case ArgusPostureService.DRILL_FRAMEWORK_READINESS:
+                    this.postureDrill = argusPostureService.fetchFrameworkReadinessDrill(
+                            bundle, startTimestamp, endTimestamp, path, skip, limit);
+                    break;
                 default:
                     addActionError("Unknown drill: " + drillId);
                     return ERROR.toUpperCase();
