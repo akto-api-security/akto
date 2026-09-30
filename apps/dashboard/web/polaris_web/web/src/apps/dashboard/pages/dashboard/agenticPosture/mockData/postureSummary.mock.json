@@ -116,62 +116,13 @@
         { "id": "dataExposure", "label": "Data Exposure", "count": 22, "agentCount": 19, "delta": 2, "deltaTone": "warning" },
         { "id": "protectionControls", "label": "Protection Controls", "count": 18, "agentCount": 18, "delta": -5, "deltaTone": "success" }
     ],
-    "topFindings": [
-        {
-            "id": "finding-1",
-            "severity": "CRITICAL",
-            "title": "refund-agent-prod can issue refunds without approval",
-            "groupKey": "refund-agent-prod",
-            "environment": "production",
-            "owner": "Finance Engineering",
-            "resource": "Stripe — Refund API",
-            "whyItMatters": "Unbounded financial impact from a single prompt: no cap, no approver, and no distinction between routine and unusual refunds.",
-            "remediation": "Require human approval above a set threshold and add a per-transaction cap on the Refund Tool."
-        },
-        {
-            "id": "finding-2",
-            "severity": "HIGH",
-            "title": "support-agent uses a shared Salesforce credential",
-            "groupKey": "support-agent",
-            "environment": "production",
-            "owner": "Support Engineering",
-            "resource": "Salesforce — shared service account",
-            "whyItMatters": "Actions can't be attributed to a single agent or session, which blocks incident response and hides misuse.",
-            "remediation": "Issue a scoped, per-agent credential and rotate the shared one."
-        },
-        {
-            "id": "finding-3",
-            "severity": "CRITICAL",
-            "title": "research-agent can send sensitive data to arbitrary URLs",
-            "groupKey": "research-agent",
-            "environment": "production",
-            "owner": "Data Platform",
-            "resource": "Outbound HTTP — no egress allowlist",
-            "whyItMatters": "This is an exfiltration path for anything the agent can read, triggerable by a single crafted instruction.",
-            "remediation": "Enforce a destination allowlist on the agent's outbound HTTP tool."
-        },
-        {
-            "id": "finding-4",
-            "severity": "MEDIUM",
-            "title": "analytics-agent has 184 AWS permissions but uses 9",
-            "groupKey": "analytics-agent",
-            "environment": "production",
-            "owner": "Data Platform",
-            "resource": "AWS IAM role — analytics-agent-role",
-            "whyItMatters": "175 unused permissions is a large blast radius if this agent's credentials are ever compromised.",
-            "remediation": "Right-size the IAM policy to observed 30-day usage."
-        },
-        {
-            "id": "finding-5",
-            "severity": "HIGH",
-            "title": "customer-agent can invoke an unauthenticated MCP server",
-            "groupKey": "customer-agent",
-            "environment": "staging",
-            "owner": "Platform Engineering",
-            "resource": "internal-tools MCP server",
-            "whyItMatters": "Any caller on the network can trigger tool actions with no identity check on the other end.",
-            "remediation": "Put the MCP server behind authenticated transport before promoting it."
-        }
+    "coverageGovernance": [
+        { "id": "agentDiscovery", "label": "Agent discovery", "value": 94 },
+        { "id": "ownershipMapped", "label": "Ownership mapped", "value": 81 },
+        { "id": "identityMapped", "label": "Identity mapped", "value": 88 },
+        { "id": "permissionVisibility", "label": "Permission visibility", "status": "COMING_SOON", "illustrative": { "value": 76 } },
+        { "id": "runtimeActivityObserved", "label": "Runtime activity observed", "value": 69 },
+        { "id": "guardrailEnforcement", "label": "Guardrail enforcement", "value": 72 }
     ],
     "changesThisWeek": [
         { "id": "newAgents", "icon": "plus", "count": 12, "label": "new agents discovered" },

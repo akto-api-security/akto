@@ -804,8 +804,8 @@ const ServerSettingsStep = ({
                                         onChange={() => setSkipEnterpriseAccounts(false)}
                                     />
                                     <RadioButton
-                                        label="Only personal accounts"
-                                        helpText="Excludes work email accounts. Personal and unidentified accounts remain covered."
+                                        label="Personal accounts only"
+                                        helpText="Applies to personal accounts only. Work accounts are excluded."
                                         checked={!!skipEnterpriseAccounts}
                                         id="account_scope_personal"
                                         name="accountScope"
@@ -813,7 +813,7 @@ const ServerSettingsStep = ({
                                     />
                                 </VerticalStack>
                                 {skipEnterpriseAccounts && (
-                                    <Banner tone="info">Supported for the Akto browser extension and ChatGPT / Codex via Endpoint Shield. All other traffic remains covered.</Banner>
+                                    <Banner tone="info">Supported for chatgpt.com, claude.ai and grok.com through the Akto browser extension, and the ChatGPT app through Endpoint Shield.</Banner>
                                 )}
                             </VerticalStack>
                         </Box>

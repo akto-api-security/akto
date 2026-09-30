@@ -58,7 +58,7 @@ public class Main {
             .codecRegistry(codecRegistry)
             .build();
 
-    MongoClient threatProtectionMongo = MongoClients.create(clientSettings);
+    MongoClient threatProtectionMongo = com.akto.util.DbNames.wrap(MongoClients.create(clientSettings));
 
     // Initialize legacy DaoInit for AuthenticationInterceptor (ConfigsDao)
     // ConfigsDao uses CommonContextDao which connects to "common" database

@@ -62,7 +62,8 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
         try (MongoCursor<String> dbNames = mongoClient.listDatabaseNames().cursor()) {
             while (dbNames.hasNext()) {
-                String dbName = dbNames.next();
+                // Physical name -> the name the code uses; null if it is not one of ours.
+                String dbName = com.akto.util.DbNames.logical(dbNames.next());
                 if (shouldSkipDatabase(dbName)) continue;
 
                 Integer accId = null;

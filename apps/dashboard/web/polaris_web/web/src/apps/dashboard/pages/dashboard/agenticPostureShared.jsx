@@ -75,6 +75,7 @@ export const POSTURE_EMPTY_STATE_COPY = {
     permissionVisibility: 'Permission visibility needs the agent permission resolver, which isn’t wired up yet.',
     identityAccess: 'Identity & access needs the agent permission/identity resolvers, which aren’t wired up yet.',
     changesPlaceholder: 'This change type needs a resolver that isn’t wired up yet.',
+    coverageGovernance: 'Coverage and governance metrics are coming soon.',
 }
 
 // When a panel genuinely has no data yet (not "zero, confirmed"), render the SAME component with

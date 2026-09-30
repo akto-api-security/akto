@@ -4,6 +4,7 @@ import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.SkillSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.GuardrailPolicies;
@@ -12,9 +13,11 @@ import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * One immutable snapshot of every Mongo/threat-backend read the 10 providers need,
@@ -138,10 +141,26 @@ public class InsightDataBundle {
         }
     }
 
-    // collectionId -> {severity -> count} since startTs, in the request's context source; null when the threat backend is unavailable.
+    private static final int HOST_COUNTS_BUCKET_SECONDS = 300;
+    // Rounded startTs -> account-wide events. Lives as long as this (60s-cached) bundle, so repeated drill/profile
+    // opens share one threat-backend call per window instead of one per request or per agent.
+    private final Map<Integer, List<DashboardMaliciousEvent>> hostCountsSince = new ConcurrentHashMap<>();
+    private volatile HostCollectionResolver hostResolver;
+
+    // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host, then actor
+    // (event collection ids aren't reliable); null when the threat backend is unavailable.
     public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs) {
         if (!threatBackendAvailable || threatAccess == null) return null;
-        return threatAccess.collectionSeverityCounts(startTs, 0, collectionIds);
+        int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
+        List<DashboardMaliciousEvent> hostCounts = hostCountsSince.get(since);
+        if (hostCounts == null) {
+            hostCounts = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
+            hostCountsSince.putIfAbsent(since, hostCounts);
+        }
+        if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);
+        Map<Integer, Map<String, Integer>> byCollection = hostResolver.severityByCollection(hostCounts);
+        byCollection.keySet().retainAll(new HashSet<>(collectionIds));
+        return byCollection;
     }
 
     // Newest-first events for these collections; null when the threat backend is unavailable.
@@ -167,7 +186,7 @@ public class InsightDataBundle {
             long endMs = ctx.getEndTs() * 1000L;
             long startMs = endMs - MALICIOUS_INVOCATION_WINDOW_MS;
             return com.akto.utils.search.SearchClientFactory.instance()
-                    .searchMaliciousComponentInvocations(1779231193, maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
+                    .searchMaliciousComponentInvocations(Context.accountId.get(), maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
         } catch (Exception e) {
             return null;
         }
