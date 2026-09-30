@@ -52,6 +52,12 @@ public class RBAC {
     @Setter
     private int accessExpiresAt;
 
+    /** Short description of the user's roles for audit logs, e.g. "{API=ADMIN, AGENTIC=TEAM_A}" plus any expiry. */
+    public String accessSummary() {
+        String roles = (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) ? new java.util.TreeMap<>(scopeRoleMapping).toString() : String.valueOf(role);
+        return accessExpiresAt > 0 ? roles + " expiresAt=" + accessExpiresAt : roles;
+    }
+
     public boolean hasAccessExpired() {
         return accessExpiresAt > 0 && accessExpiresAt <= Context.now();
     }

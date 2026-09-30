@@ -250,4 +250,63 @@ public class TestRbacGuards extends MongoBasedTest {
         assertEquals(Collections.singletonList(11), grantedCollections(401));
         assertEquals(Collections.singletonList(12), grantedCollections(402));
     }
+
+    private static Map<String, Map<String, String>> roleCheckParamsByAction() throws Exception {
+        Document struts = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new File("src/main/resources/struts.xml"));
+        NodeList actions = struts.getElementsByTagName("action");
+        Map<String, Map<String, String>> result = new HashMap<>();
+        for (int i = 0; i < actions.getLength(); i++) {
+            Element action = (Element) actions.item(i);
+            Map<String, String> params = roleCheckParams(action);
+            if (params != null) result.put(action.getAttribute("name"), params);
+        }
+        return result;
+    }
+
+    private static Set<Role> rolesAllowed(Map<String, String> params) {
+        Set<Role> allowed = new HashSet<>();
+        Feature feature = Feature.valueOf(params.get("featureLabel"));
+        for (Role role : Role.values()) {
+            if (role == Role.NO_ACCESS) continue; // refused earlier, before the feature check
+            ReadWriteAccess access = role.getReadWriteAccessForFeature(feature);
+            if (RoleAccessInterceptor.hasRequiredAccess(feature.name(), params.get("accessType"), access, role.getName().toUpperCase())) {
+                allowed.add(role);
+            }
+        }
+        return allowed;
+    }
+
+    /*
+     * Which built-in roles can call sensitive actions, straight from struts.xml and the role definitions.
+     * A relabelled action or a changed role map that widens access fails here.
+     */
+    @Test
+    public void testSensitiveActionsMatrix() throws Exception {
+        Map<String, Map<String, String>> actions = roleCheckParamsByAction();
+        Set<Role> adminOnly = new HashSet<>(Collections.singletonList(Role.ADMIN));
+        Set<Role> teamManagers = new HashSet<>(Arrays.asList(Role.ADMIN, Role.MEMBER, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
+        Set<Role> threatSettings = new HashSet<>(Arrays.asList(Role.ADMIN, Role.THREAT_ENGINEER));
+        Set<Role> integrationWriters = new HashSet<>(Arrays.asList(Role.ADMIN, Role.DEVELOPER));
+
+        Map<String, Set<Role>> expected = new HashMap<>();
+        for (String action : Arrays.asList("api/createCustomRole", "api/updateCustomRole", "api/deleteCustomRole",
+                "api/saveSamlGroupRoleMapping", "api/removeUser", "api/makeAdmin", "api/resetUserPassword",
+                "api/updateUserCollections", "api/fetchApiAuditLogsFromDb")) {
+            expected.put(action, adminOnly);
+        }
+        expected.put("api/updateUserScopeRoleMapping", teamManagers);
+        expected.put("api/inviteUsers", teamManagers);
+        expected.put("api/modifyThreatConfiguration", threatSettings);
+        expected.put("api/toggleArchivalEnabled", threatSettings);
+        expected.put("api/deleteAllMaliciousEvents", threatSettings);
+        expected.put("api/addDatadogIntegration", integrationWriters);
+        expected.put("api/addSplunkIntegration", integrationWriters);
+        expected.put("api/addAwsWafIntegration", integrationWriters);
+
+        for (Map.Entry<String, Set<Role>> entry : expected.entrySet()) {
+            Map<String, String> params = actions.get(entry.getKey());
+            assertTrue(entry.getKey() + " has no role check", params != null);
+            assertEquals(entry.getKey(), entry.getValue(), rolesAllowed(params));
+        }
+    }
 }

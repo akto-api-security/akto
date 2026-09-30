@@ -221,4 +221,25 @@ public class TestRoleAssignment extends MongoBasedTest {
         assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", 0)); // cleared
         assertEquals(RBAC.Role.MEMBER, RBACDao.getCurrentRoleForUser(MEMBER, ACCOUNT_ID));
     }
+
+    @Test
+    public void testAuditDescribesBeforeAndAfter() {
+        TeamAction action = new TeamAction();
+        Map<String, Object> session = new HashMap<>();
+        session.put("user", user(ADMIN));
+        action.setSession(session);
+        action.setEmail("user" + MEMBER + "@example.com");
+        action.setScopeRoleMapping(Collections.singletonMap(CONTEXT_SOURCE.API.name(), "GUEST"));
+        assertEquals("user=user2@example.com before={API=MEMBER} requested={API=GUEST}", action.auditAccessChange());
+
+        RoleAction roleAction = roleAction("TEAM_A_USER", null);
+        assertTrue(roleAction.auditRoleChange().startsWith("role=TEAM_A_USER before={base=MEMBER, collections=[11, 12]"));
+
+        // audit helpers are not bean getters, so they never end up in the actions' JSON responses
+        for (Class<?> actionClass : Arrays.asList(TeamAction.class, RoleAction.class, com.akto.action.user.AzureSsoAction.class)) {
+            for (java.lang.reflect.Method method : actionClass.getMethods()) {
+                assertFalse(method.getName(), method.getName().startsWith("getAudit"));
+            }
+        }
+    }
 }

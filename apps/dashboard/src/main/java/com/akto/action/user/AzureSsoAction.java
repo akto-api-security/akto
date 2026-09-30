@@ -1,5 +1,9 @@
 package com.akto.action.user;
 
+import com.akto.audit_logs_util.Audit;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
+
 import com.opensymphony.xwork2.Action;
 
 import java.util.ArrayList;
@@ -84,6 +88,14 @@ public class AzureSsoAction extends UserAction{
         );
     }
 
+    // audit: the SSO group mapping before this request and what was asked for
+    public String auditSsoMapping() {
+        SAMLConfig existing = findSamlConfig();
+        String before = existing == null ? "none" : existing.getGroupRoleMapping() + " removeAccessWithoutGroup=" + existing.isRemoveAccessWithoutGroup();
+        return "before=" + before + " requested=" + groupRoleMapping + " removeAccessWithoutGroup=" + removeAccessWithoutGroup;
+    }
+
+    @Audit(description = "User changed the SSO group to role mapping", resource = Resource.SSO_CONFIG, operation = Operation.UPDATE, metadataGenerators = {"auditSsoMapping"})
     public String saveSamlGroupRoleMapping() {
         if (this.groupRoleMapping != null) {
             for (Map.Entry<String, String> entry : this.groupRoleMapping.entrySet()) {

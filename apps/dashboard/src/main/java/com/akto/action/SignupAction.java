@@ -1,5 +1,10 @@
 package com.akto.action;
 
+import com.akto.dto.audit_logs.Resource;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.ApiAuditLogs;
+import com.akto.dao.audit_logs.ApiAuditLogsDao;
+import com.akto.audit_logs_util.AuditLogsUtil;
 import static com.akto.dao.MCollection.SET;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -854,6 +859,27 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return scopeRoleMapping;
     }
 
+    // audit log for roles set by the SSO group mapping at login; nothing is written when the roles do not change
+    private void auditSsoRoleChange(String userEmail, int accountId, Map<String, String> newScopeRoleMapping) {
+        try {
+            User user = UsersDao.instance.findOne(eq(User.LOGIN, userEmail));
+            RBAC rbac = user == null ? null : RBACDao.instance.findOne(Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)));
+            String before = rbac == null ? "none" : rbac.accessSummary();
+            String after = new TreeMap<>(newScopeRoleMapping).toString();
+            if (before.equals(after)) {
+                return;
+            }
+            Context.accountId.set(accountId);
+            List<String> ipAddresses = AuditLogsUtil.getClientIpAddresses(servletRequest);
+            BasicDBObject metadata = new BasicDBObject("auditAccessChange", "user=" + userEmail + " before=" + before + " requested=" + after);
+            ApiAuditLogsDao.instance.insertOne(new ApiAuditLogs(Context.now(), "signup-azure-saml",
+                    "SSO login set the user's product roles from the group mapping", userEmail, "SSO",
+                    ipAddresses.isEmpty() ? null : ipAddresses.get(0), ipAddresses, Resource.USER_ACCESS, Operation.UPDATE, metadata));
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Error writing SSO role change audit log: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
     // Existing Admins are never changed by the SSO group mapping, so a wrong mapping cannot lock the account out
     private boolean isExistingAdmin(String userEmail, int accountId) {
         User user = UsersDao.instance.findOne(eq(User.LOGIN, userEmail));
@@ -1278,6 +1304,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[Azure SSO] email=" + useremail + ", groups=" + samlGroups + ", groupScopeRoleMapping=" + groupScopeRoleMapping);
 
             if (groupScopeRoleMapping != null) {
+                auditSsoRoleChange(useremail, this.accountId, groupScopeRoleMapping);
                 this.scopeRoleMapping = groupScopeRoleMapping;
                 createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null, groupScopeRoleMapping);
                 clearUserRbacCache(useremail, this.accountId);

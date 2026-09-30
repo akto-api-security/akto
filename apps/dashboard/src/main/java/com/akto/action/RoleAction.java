@@ -3,8 +3,10 @@ package com.akto.action;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
@@ -13,6 +15,8 @@ import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.CollectionRule;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -195,6 +199,22 @@ public class RoleAction extends UserAction {
         return true;
     }
 
+    // audit: the role as it was before this request and what was asked for
+    public String auditRoleChange() {
+        CustomRole existing = roleName == null ? null : CustomRoleDao.instance.findRoleByName(roleName.toUpperCase());
+        String before = existing == null ? "none" : describeRole(existing.getBaseRole(), existing.getApiCollectionsId(),
+                existing.getCollectionRules(), existing.getPermissionOverrides(), existing.getAssignableRoles());
+        return "role=" + roleName + " before=" + before + " requested="
+                + describeRole(baseRole, apiCollectionIds, collectionRules, permissionOverrides, assignableRoles);
+    }
+
+    private static String describeRole(String baseRole, List<Integer> collections, List<CollectionRule> rules,
+                                        Map<String, String> overrides, List<String> assignable) {
+        return "{base=" + baseRole + ", collections=" + collections + ", rules=" + rules
+                + ", overrides=" + (overrides == null ? null : new TreeMap<>(overrides)) + ", canGive=" + assignable + "}";
+    }
+
+    @Audit(description = "User created a custom role", resource = Resource.CUSTOM_ROLE, operation = Operation.CREATE, metadataGenerators = {"auditRoleChange"})
     public String createCustomRole() {
 
         if (!validateRoleName()) {
@@ -231,6 +251,7 @@ public class RoleAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User updated a custom role", resource = Resource.CUSTOM_ROLE, operation = Operation.UPDATE, metadataGenerators = {"auditRoleChange"})
     public String updateCustomRole(){
         if (!validateRoleName()) {
             return ERROR.toUpperCase();
@@ -271,6 +292,7 @@ public class RoleAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User deleted a custom role", resource = Resource.CUSTOM_ROLE, operation = Operation.DELETE, metadataGenerators = {"auditRoleChange"})
     public String deleteCustomRole(){
         CustomRole existingRole = CustomRoleDao.instance.findRoleByName(roleName);
 

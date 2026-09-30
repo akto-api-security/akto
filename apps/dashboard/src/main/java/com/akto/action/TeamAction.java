@@ -4,6 +4,7 @@ import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
@@ -11,6 +12,8 @@ import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.User;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
@@ -318,12 +321,14 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User removed a user from the account", resource = Resource.USER_ACCESS, operation = Operation.DELETE, metadataGenerators = {"auditAccessChange"})
     public String removeUser() {
         return performAction(ActionType.REMOVE_USER, null);
     }
 
     private String userRole;
 
+    @Audit(description = "User changed another user's role", resource = Resource.USER_ACCESS, operation = Operation.UPDATE, metadataGenerators = {"auditAccessChange"})
     public String makeAdmin(){
         return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
     }
@@ -337,6 +342,19 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         this.accessExpiresAt = accessExpiresAt;
     }
 
+    // audit: the user's roles before this request and what was asked for (read before the action runs)
+    public String auditAccessChange() {
+        String before = "none";
+        User target = email == null ? null : UsersDao.instance.findOne(Filters.eq(User.LOGIN, email));
+        if (target != null) {
+            RBAC rbac = RBACDao.instance.findOne(Filters.and(Filters.eq(RBAC.USER_ID, target.getId()), Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get())));
+            before = rbac == null ? "none" : rbac.accessSummary();
+        }
+        String after = scopeRoleMapping != null && !scopeRoleMapping.isEmpty() ? new TreeMap<>(scopeRoleMapping).toString() : String.valueOf(userRole);
+        return "user=" + email + " before=" + before + " requested=" + after + (accessExpiresAt != null ? " accessExpiresAt=" + accessExpiresAt : "");
+    }
+
+    @Audit(description = "User changed another user's product roles", resource = Resource.USER_ACCESS, operation = Operation.UPDATE, metadataGenerators = {"auditAccessChange"})
     public String updateUserScopeRoleMapping() {
         int accId = Context.accountId.get();
         Bson findQ = Filters.and(Filters.eq(User.LOGIN, email), Filters.exists(User.ACCOUNTS + "." + accId));
