@@ -840,6 +840,20 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         return scopeRoleMapping;
     }
 
+    // opt-in per account: with a group mapping set, a user in none of the mapped groups loses access instead of keeping it
+    private static boolean shouldRemoveAccessWithoutGroup(SAMLConfig samlConfig) {
+        return samlConfig.isRemoveAccessWithoutGroup()
+                && samlConfig.getGroupRoleMapping() != null && !samlConfig.getGroupRoleMapping().isEmpty();
+    }
+
+    private static Map<String, String> noAccessScopeRoleMapping(int accountId) {
+        Map<String, String> scopeRoleMapping = new HashMap<>();
+        for (String scope : RBAC.getEnabledScopesForAccount(accountId)) {
+            scopeRoleMapping.put(scope, RBAC.Role.NO_ACCESS.name());
+        }
+        return scopeRoleMapping;
+    }
+
     // Existing Admins are never changed by the SSO group mapping, so a wrong mapping cannot lock the account out
     private boolean isExistingAdmin(String userEmail, int accountId) {
         User user = UsersDao.instance.findOne(eq(User.LOGIN, userEmail));
@@ -1257,6 +1271,9 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             Map<String, String> groupScopeRoleMapping = null;
             if (this.accountId == resolvedAccountId && !isExistingAdmin(useremail, resolvedAccountId)) {
                 groupScopeRoleMapping = resolveSamlGroupScopeRoleMapping(samlConfig, samlGroups, resolvedAccountId);
+                if (groupScopeRoleMapping == null && shouldRemoveAccessWithoutGroup(samlConfig)) {
+                    groupScopeRoleMapping = noAccessScopeRoleMapping(resolvedAccountId);
+                }
             }
             logger.infoAndAddToDb("[Azure SSO] email=" + useremail + ", groups=" + samlGroups + ", groupScopeRoleMapping=" + groupScopeRoleMapping);
 

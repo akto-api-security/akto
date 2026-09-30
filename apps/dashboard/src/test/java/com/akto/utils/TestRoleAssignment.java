@@ -193,4 +193,32 @@ public class TestRoleAssignment extends MongoBasedTest {
         assertEquals("SUCCESS", roleAction("TEAM_B_ADMIN", Collections.singletonList("TEAM_A_USER")).createCustomRole());
         assertEquals(Collections.singletonList("TEAM_A_USER"), CustomRoleDao.instance.findRoleByName("TEAM_B_ADMIN").getAssignableRoles());
     }
+
+    static String updateRoleWithExpiry(int caller, int target, String role, Integer accessExpiresAt) {
+        TeamAction action = new TeamAction();
+        Map<String, Object> session = new HashMap<>();
+        session.put("user", user(caller));
+        action.setSession(session);
+        action.setEmail("user" + target + "@example.com");
+        action.setScopeRoleMapping(Collections.singletonMap(CONTEXT_SOURCE.API.name(), role));
+        action.setAccessExpiresAt(accessExpiresAt);
+        String result = action.updateUserScopeRoleMapping();
+        clearCaches();
+        return result;
+    }
+
+    @Test
+    public void testAccessExpiry() {
+        int now = Context.now();
+        assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", now + 3600));
+        assertEquals(RBAC.Role.MEMBER, RBACDao.getCurrentRoleForUser(MEMBER, ACCOUNT_ID));
+        assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", null)); // unchanged
+        assertEquals(now + 3600, rbac(MEMBER).getAccessExpiresAt());
+
+        assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", now - 1));
+        assertEquals(RBAC.Role.NO_ACCESS, RBACDao.getCurrentRoleForUser(MEMBER, ACCOUNT_ID));
+
+        assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", 0)); // cleared
+        assertEquals(RBAC.Role.MEMBER, RBACDao.getCurrentRoleForUser(MEMBER, ACCOUNT_ID));
+    }
 }

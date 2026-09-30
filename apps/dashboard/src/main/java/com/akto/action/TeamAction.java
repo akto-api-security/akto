@@ -130,6 +130,9 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (rbac != null && rbac.getScopeRoleMapping() != null && !rbac.getScopeRoleMapping().isEmpty()) {
                 userObj.append("scopeRoleMapping", rbac.getScopeRoleMapping());
             }
+            if (rbac != null && rbac.getAccessExpiresAt() > 0) {
+                userObj.append("accessExpiresAt", rbac.getAccessExpiresAt());
+            }
 
             try {
                 String login = userObj.getString(User.LOGIN);
@@ -327,6 +330,13 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
     private Map<String, String> scopeRoleMapping;
 
+    // optional: epoch seconds when the user's access ends (0 = never, null = unchanged)
+    private Integer accessExpiresAt;
+
+    public void setAccessExpiresAt(Integer accessExpiresAt) {
+        this.accessExpiresAt = accessExpiresAt;
+    }
+
     public String updateUserScopeRoleMapping() {
         int accId = Context.accountId.get();
         Bson findQ = Filters.and(Filters.eq(User.LOGIN, email), Filters.exists(User.ACCOUNTS + "." + accId));
@@ -411,13 +421,18 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                 Filters.eq(RBAC.ACCOUNT_ID, accId)
             );
 
+            List<Bson> updates = new ArrayList<>(Arrays.asList(
+                    Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping),
+                    Updates.setOnInsert(RBAC.USER_ID, userDetails.getId()),
+                    Updates.setOnInsert(RBAC.ACCOUNT_ID, accId)
+            ));
+            // null keeps the current expiry, 0 removes it
+            if (accessExpiresAt != null) {
+                updates.add(Updates.set(RBAC.ACCESS_EXPIRES_AT, Math.max(accessExpiresAt, 0)));
+            }
             RBACDao.instance.getMCollection().updateOne(
                     filterRbac,
-                    Updates.combine(
-                            Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping),
-                            Updates.setOnInsert(RBAC.USER_ID, userDetails.getId()),
-                            Updates.setOnInsert(RBAC.ACCOUNT_ID, accId)
-                    ),
+                    Updates.combine(updates),
                     new UpdateOptions().upsert(true)
             );
 

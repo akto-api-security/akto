@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import com.akto.dao.context.Context;
+
 
 import org.bson.types.ObjectId;
 
@@ -43,6 +45,16 @@ public class RBAC {
     @Getter
     @Setter
     private List<String> allowedFeaturesForUser;
+
+    // Epoch seconds after which the user has no access in this account (0 = never). Set per user for time-bound access.
+    public static final String ACCESS_EXPIRES_AT = "accessExpiresAt";
+    @Getter
+    @Setter
+    private int accessExpiresAt;
+
+    public boolean hasAccessExpired() {
+        return accessExpiresAt > 0 && accessExpiresAt <= Context.now();
+    }
 
     public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
     @Getter

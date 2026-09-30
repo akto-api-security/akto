@@ -96,6 +96,7 @@ const Users = () => {
         currentRole: "",
         currentScopeRoleMapping: {},
         editingScopeRoleMapping: {},
+        accessExpiresOn: "", // YYYY-MM-DD, empty = never
         isSimpleRole: false // true if user only has simple role, false if has scopeRoleMapping
     })
 
@@ -314,7 +315,15 @@ const Users = () => {
         return getRoleDisplayName(oldRole)
     }
 
-    const openEditScopeRoleModal = (userId, email, name, currentRole, currentScopeRoleMapping) => {
+    // access expiry is stored as epoch seconds; the modal edits it as a local date
+    const toDateInput = (epochSeconds) => {
+        if (!epochSeconds) return ""
+        const d = new Date(epochSeconds * 1000)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    const toEpochEndOfDay = (dateInput) => dateInput ? Math.floor(new Date(`${dateInput}T23:59:59`).getTime() / 1000) : 0
+
+    const openEditScopeRoleModal = (userId, email, name, currentRole, currentScopeRoleMapping, accessExpiresAt) => {
         const isSimpleRole = !currentScopeRoleMapping || Object.keys(currentScopeRoleMapping).length === 0
         setEditScopeRoleModal({
             isActive: true,
@@ -324,6 +333,7 @@ const Users = () => {
             currentRole,
             currentScopeRoleMapping: currentScopeRoleMapping || {},
             editingScopeRoleMapping: currentScopeRoleMapping ? { ...currentScopeRoleMapping } : {},
+            accessExpiresOn: toDateInput(accessExpiresAt),
             isSimpleRole
         })
     }
@@ -337,6 +347,7 @@ const Users = () => {
             currentRole: "",
             currentScopeRoleMapping: {},
             editingScopeRoleMapping: {},
+            accessExpiresOn: "",
             isSimpleRole: false
         })
     }
@@ -365,17 +376,18 @@ const Users = () => {
     }
 
     const saveEditedScopeRoleMapping = async () => {
-        const { email, editingScopeRoleMapping } = editScopeRoleModal
+        const { email, editingScopeRoleMapping, accessExpiresOn } = editScopeRoleModal
+        const accessExpiresAt = toEpochEndOfDay(accessExpiresOn)
 
         try {
             // Call backend to update scope-role mapping
-            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping)
+            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping, accessExpiresAt)
 
             // Update UI
             const scopes = Object.keys(editingScopeRoleMapping)
             setUsers(users.map(user =>
                 user.login === email
-                    ? { ...user, scopeRoleMapping: editingScopeRoleMapping, productScopes: scopes }
+                    ? { ...user, scopeRoleMapping: editingScopeRoleMapping, productScopes: scopes, accessExpiresAt }
                     : user
             ))
             func.setToast(true, false, "User access updated successfully")
@@ -515,7 +527,7 @@ const Users = () => {
                                                 }
 
                                                 <Button
-                                                    onClick={() => openEditScopeRoleModal(id, login, name, role, item?.scopeRoleMapping)}
+                                                    onClick={() => openEditScopeRoleModal(id, login, name, role, item?.scopeRoleMapping, item?.accessExpiresAt)}
                                                 >
                                                     Edit Access
                                                 </Button>
@@ -694,6 +706,18 @@ const Users = () => {
                                     )
                                 })}
                             </Box>
+                        </Box>
+                        <Box paddingBlockStart="400">
+                            <TextField
+                                type="date"
+                                label="Access expires on (optional)"
+                                helpText="After this date the user has no access in any product until it is extended. Leave empty for no expiry."
+                                value={editScopeRoleModal.accessExpiresOn}
+                                onChange={(value) => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: value }))}
+                                autoComplete="off"
+                                clearButton
+                                onClearButtonClick={() => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: "" }))}
+                            />
                         </Box>
                     </Modal.Section>
                 </Modal>

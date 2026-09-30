@@ -30,6 +30,7 @@ public class AzureSsoAction extends UserAction{
     private String applicationIdentifier;
     private ConfigType configType;
     private Map<String, String> groupRoleMapping;
+    private boolean removeAccessWithoutGroup;
 
     private SAMLConfig getConfig(ConfigType configType, String domain){
         SAMLConfig config = new SAMLConfig(configType,Context.accountId.get());
@@ -113,7 +114,10 @@ public class AzureSsoAction extends UserAction{
 
         SSOConfigsDao.instance.updateOne(
             Filters.eq(Constants.ID, String.valueOf(Context.accountId.get())),
-            Updates.set(SAMLConfig.GROUP_ROLE_MAPPING, this.groupRoleMapping)
+            Updates.combine(
+                Updates.set(SAMLConfig.GROUP_ROLE_MAPPING, this.groupRoleMapping),
+                Updates.set(SAMLConfig.REMOVE_ACCESS_WITHOUT_GROUP, this.removeAccessWithoutGroup)
+            )
         );
         return SUCCESS.toUpperCase();
     }
@@ -136,6 +140,7 @@ public class AzureSsoAction extends UserAction{
             this.loginUrl = samlConfig.getLoginUrl();
             this.ssoEntityId = samlConfig.getEntityId();
             this.groupRoleMapping = samlConfig.getGroupRoleMapping();
+            this.removeAccessWithoutGroup = samlConfig.isRemoveAccessWithoutGroup();
         }
 
         return SUCCESS.toUpperCase();
@@ -179,5 +184,13 @@ public class AzureSsoAction extends UserAction{
 
     public void setGroupRoleMapping(Map<String, String> groupRoleMapping) {
         this.groupRoleMapping = groupRoleMapping;
+    }
+
+    public boolean isRemoveAccessWithoutGroup() {
+        return removeAccessWithoutGroup;
+    }
+
+    public void setRemoveAccessWithoutGroup(boolean removeAccessWithoutGroup) {
+        this.removeAccessWithoutGroup = removeAccessWithoutGroup;
     }
 }

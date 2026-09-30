@@ -134,6 +134,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
     }
 
     public String fetchRole (RBAC userRbac) {
+        // time-bound access has ended: no access in any product until someone extends it
+        if (userRbac.hasAccessExpired()) {
+            return Role.NO_ACCESS.getName();
+        }
 
         String currentRole = null;
         if (userRbac.getScopeRoleMapping() != null && !userRbac.getScopeRoleMapping().isEmpty()) {

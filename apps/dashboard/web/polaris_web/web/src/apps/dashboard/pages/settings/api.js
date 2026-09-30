@@ -42,13 +42,14 @@ const settingRequests = {
         })
     },
 
-    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+    updateUserScopeRoleMapping(email, scopeRoleMapping, accessExpiresAt) {
         return request({
             url: '/api/updateUserScopeRoleMapping',
             method: 'post',
             data: {
                 email: email,
-                scopeRoleMapping: scopeRoleMapping
+                scopeRoleMapping: scopeRoleMapping,
+                accessExpiresAt: accessExpiresAt
             }
         })
     },
@@ -430,11 +431,11 @@ const settingRequests = {
         })
     },
 
-    saveSamlGroupRoleMapping(groupRoleMapping, configType) {
+    saveSamlGroupRoleMapping(groupRoleMapping, configType, removeAccessWithoutGroup) {
         return request({
             url: '/api/saveSamlGroupRoleMapping',
             method: 'post',
-            data: {groupRoleMapping, configType}
+            data: {groupRoleMapping, configType, removeAccessWithoutGroup}
         })
     },
 

@@ -317,6 +317,10 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         SSOConfigsDao.instance.insertOne(new SAMLConfig(ConfigType.AZURE, ACCOUNT_ID));
         assertEquals("SUCCESS", action.saveSamlGroupRoleMapping());
         assertEquals(mapping, SSOConfigsDao.getSAMLConfigByAccountId(ACCOUNT_ID).getGroupRoleMapping());
+        assertFalse(SSOConfigsDao.getSAMLConfigByAccountId(ACCOUNT_ID).isRemoveAccessWithoutGroup());
+        action.setRemoveAccessWithoutGroup(true);
+        assertEquals("SUCCESS", action.saveSamlGroupRoleMapping());
+        assertTrue(SSOConfigsDao.getSAMLConfigByAccountId(ACCOUNT_ID).isRemoveAccessWithoutGroup());
 
         for (Map.Entry<String, String> invalid : new HashMap<String, String>() {{
             put("g.dotted", "ADMIN");
@@ -395,5 +399,25 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         assertNotNull(new CollectionRule("([bad", null, null).validate());
         assertNotNull(new CollectionRule(null, null, null).validate());
         assertNotNull(new CollectionRule("^x", "team", "a").validate());
+    }
+
+    @Test
+    public void testSsoRemoveAccessWithoutGroup() throws Exception {
+        Method should = SignupAction.class.getDeclaredMethod("shouldRemoveAccessWithoutGroup", SAMLConfig.class);
+        should.setAccessible(true);
+        SAMLConfig samlConfig = new SAMLConfig(ConfigType.AZURE, ACCOUNT_ID);
+        samlConfig.setRemoveAccessWithoutGroup(true);
+        assertFalse((Boolean) should.invoke(null, samlConfig)); // no mapping set: nothing to reconcile against
+        samlConfig.setGroupRoleMapping(Collections.singletonMap("group-a", "MEMBER"));
+        assertTrue((Boolean) should.invoke(null, samlConfig));
+        samlConfig.setRemoveAccessWithoutGroup(false);
+        assertFalse((Boolean) should.invoke(null, samlConfig)); // off by default: users keep their role
+
+        Method noAccess = SignupAction.class.getDeclaredMethod("noAccessScopeRoleMapping", int.class);
+        noAccess.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, String> mapping = (Map<String, String>) noAccess.invoke(null, ACCOUNT_ID);
+        assertFalse(mapping.isEmpty()); // an empty mapping would fall back to the old single role
+        for (String role : mapping.values()) assertEquals("NO_ACCESS", role);
     }
 }
