@@ -69,7 +69,8 @@ public class ArgusPostureAction extends UserAction {
             ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS,
             ArgusPostureService.DRILL_PROTECTION_COVERAGE,
             ArgusPostureService.DRILL_PRIVILEGED_TOOLS,
-            ArgusPostureService.DRILL_SENSITIVE_DATA));
+            ArgusPostureService.DRILL_SENSITIVE_DATA,
+            ArgusPostureService.DRILL_FRAMEWORK_READINESS));
 
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
     private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
@@ -185,7 +186,8 @@ public class ArgusPostureAction extends UserAction {
                         break;
                     case ArgusPostureService.DRILL_FRAMEWORK_READINESS:
                         postureDrill = argusPostureService.fetchFrameworkReadinessDrill(
-                            bundle, startTimestamp, endTimestamp, path, skip, limit);
+                                bundle, startTimestamp, endTimestamp, path, skip, limit);
+                        break;
                     default:
                         postureDrill = argusPostureService.fetchSensitiveDataDrill(bundle, environment, skip, limit);
                         break;
