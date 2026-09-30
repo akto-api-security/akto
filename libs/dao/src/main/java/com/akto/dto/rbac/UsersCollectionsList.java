@@ -58,6 +58,13 @@ public class UsersCollectionsList {
         }
     }
 
+    /** Clears every user's cached collections for an account, e.g. after a custom role's collections change. */
+    public static void deleteAccountCollectionIdsFromCache(int accountId) {
+        String accountPart = "|" + accountId + "|";
+        usersCollectionMap.keySet().removeIf(key -> key.contains(accountPart));
+        assignedCollectionsMap.keySet().removeIf(key -> key.contains(accountPart));
+    }
+
     /** Cached RBACDao.getUserCollectionsById for the current product scope: null for admin, empty when no collections are assigned. */
     public static List<Integer> getAssignedCollectionIds(int userId, int accountId) {
         String key = usersCollectionKey(userId, accountId, Context.contextSource.get());

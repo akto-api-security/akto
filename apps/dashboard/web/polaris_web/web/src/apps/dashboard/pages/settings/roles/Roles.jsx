@@ -1,4 +1,5 @@
-import { Box, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
+import { Box, Button, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
+import { DeleteMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import func from "@/util/func";
 import settingRequests from "../api";
@@ -214,6 +215,30 @@ const Roles = () => {
         })
     }
 
+    const updateCollectionRules = (role, collectionRules) => {
+        setRoles(prevRoles => prevRoles.map(r => r.name === role ? { ...r, collectionRules } : r))
+    }
+
+    const [newHostPattern, setNewHostPattern] = useState('')
+    const [newTag, setNewTag] = useState('')
+
+    const addCollectionRule = (role, currentRules) => {
+        const host = newHostPattern.trim()
+        const tag = newTag.trim()
+        if ((host.length > 0) === (tag.length > 0)) {
+            func.setToast(true, true, "Enter either a host pattern or a tag")
+            return
+        }
+        let rule = { hostRegex: host }
+        if (tag.length > 0) {
+            const [tagKey, ...rest] = tag.split('=')
+            rule = { tagKey: tagKey.trim(), tagValue: rest.join('=').trim() }
+        }
+        updateCollectionRules(role, [...(currentRules || []), rule])
+        setNewHostPattern('')
+        setNewTag('')
+    }
+
     const updateDefaultInviteRole = (role, value) => {
         setRoles(prevRoles => {
             return prevRoles.map(r => {
@@ -230,7 +255,7 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {})
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {}, roleData.collectionRules || [])
         await getRoleData();
     }
 
@@ -337,6 +362,28 @@ const Roles = () => {
                                                             </Box>
                                                         </HorizontalStack>
                                                     ))}
+                                                </VerticalStack>
+                                            </Box>
+                                            <Box>
+                                                <VerticalStack gap={2}>
+                                                    <Text variant="headingSm" as="h4">Also include collections matching</Text>
+                                                    <Text variant="bodySm" color="subdued">Collections added later that match a rule are included automatically.</Text>
+                                                    {(item.collectionRules || []).map((rule, index) => (
+                                                        <HorizontalStack key={index} align="space-between" blockAlign="center" wrap={false}>
+                                                            <Text variant="bodyMd">{rule.hostRegex ? `Host matches ${rule.hostRegex}` : `Tag ${rule.tagKey} = ${rule.tagValue}`}</Text>
+                                                            <Button plain icon={DeleteMinor} accessibilityLabel="Remove rule"
+                                                                onClick={() => updateCollectionRules(name, item.collectionRules.filter((_, i) => i !== index))} />
+                                                        </HorizontalStack>
+                                                    ))}
+                                                    <HorizontalStack gap={3} blockAlign="end" wrap={false}>
+                                                        <Box width="100%">
+                                                            <TextField label="Host pattern (regex)" value={newHostPattern} onChange={setNewHostPattern} placeholder="^team-a-.*" autoComplete="off" />
+                                                        </Box>
+                                                        <Box width="100%">
+                                                            <TextField label="or tag" value={newTag} onChange={setNewTag} placeholder="team=team-a" autoComplete="off" />
+                                                        </Box>
+                                                        <Button onClick={() => addCollectionRule(name, item.collectionRules)}>Add</Button>
+                                                    </HorizontalStack>
                                                 </VerticalStack>
                                             </Box>
                                             <Box>

@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -21,7 +22,10 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import com.akto.MongoBasedTest;
+import com.akto.action.ApiCollectionsAction;
 import com.akto.action.RoleAction;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
@@ -214,5 +218,36 @@ public class TestRbacGuards extends MongoBasedTest {
         good.put(Feature.INVITE_MEMBERS.name(), ReadWriteAccess.NO_ACCESS.name());
         assertEquals("SUCCESS", roleAction("TEAM_X", good).createCustomRole());
         assertEquals(good, CustomRoleDao.instance.findRoleByName("TEAM_X").getPermissionOverrides());
+    }
+
+    private static List<Integer> grantedCollections(int userId) {
+        return RBACDao.instance.findOne(com.mongodb.client.model.Filters.and(
+                com.mongodb.client.model.Filters.eq(RBAC.USER_ID, userId),
+                com.mongodb.client.model.Filters.eq(RBAC.ACCOUNT_ID, ACCOUNT_ID))).getApiCollectionsId();
+    }
+
+    @Test
+    public void testDeletingLastCollectionKeepsUserLimited() {
+        Context.accountId.set(ACCOUNT_ID);
+        Context.userId.set(null);
+        ApiCollectionsDao.instance.getMCollection().drop();
+        RBACDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(11, "team-a-only"));
+        ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(12, "team-a-other"));
+        for (int[] grant : new int[][]{{401, 11}, {402, 11, 12}}) {
+            RBAC rbac = new RBAC(grant[0], Role.MEMBER.name(), ACCOUNT_ID);
+            List<Integer> ids = new ArrayList<>();
+            for (int i = 1; i < grant.length; i++) ids.add(grant[i]);
+            rbac.setApiCollectionsId(ids);
+            RBACDao.instance.insertOne(rbac);
+        }
+
+        ApiCollectionsAction action = new ApiCollectionsAction();
+        action.setApiCollections(Collections.singletonList(ApiCollection.createManualCollection(11, "team-a-only")));
+        action.deleteMultipleCollections();
+
+        // an empty list would mean "all collections", so the last grant is kept (and now matches nothing)
+        assertEquals(Collections.singletonList(11), grantedCollections(401));
+        assertEquals(Collections.singletonList(12), grantedCollections(402));
     }
 }

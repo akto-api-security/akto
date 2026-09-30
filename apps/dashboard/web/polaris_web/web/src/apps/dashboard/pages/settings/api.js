@@ -673,11 +673,11 @@ const settingRequests = {
             data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules}
         })
     },
     deleteCustomRole(roleName) {

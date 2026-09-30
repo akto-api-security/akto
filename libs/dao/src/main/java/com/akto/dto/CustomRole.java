@@ -3,6 +3,7 @@ package com.akto.dto;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.dto.rbac.CollectionRule;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 
@@ -17,6 +18,7 @@ public class CustomRole {
     public static final String DEFAULT_INVITE_ROLE = "defaultInviteRole";
     public static final String THREAT_PROTECTION_ENABLED = "threatProtectionEnabled";
     public static final String PERMISSION_OVERRIDES = "permissionOverrides";
+    public static final String COLLECTION_RULES = "collectionRules";
     private String name;
     private String baseRole;
     private List<Integer> apiCollectionsId;
@@ -49,6 +51,11 @@ public class CustomRole {
     @Getter
     @Setter
     private Map<String, String> permissionOverrides;
+
+    // Collections included by host pattern or tag, on top of apiCollectionsId
+    @Getter
+    @Setter
+    private List<CollectionRule> collectionRules;
 
     /** Features whose access is fixed by the role itself and can never be overridden. */
     public static boolean isOverridable(Feature feature) {

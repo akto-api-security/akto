@@ -13,7 +13,9 @@ import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.CollectionRule;
 import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
@@ -126,6 +128,29 @@ public class RoleAction extends UserAction {
     @Setter
     private Map<String, String> permissionOverrides;
 
+    @Setter
+    private List<CollectionRule> collectionRules;
+
+    private boolean validateCollectionRules() {
+        if (collectionRules == null) {
+            return true;
+        }
+        for (CollectionRule rule : collectionRules) {
+            String error = rule == null ? "Invalid collection rule" : rule.validate();
+            if (error != null) {
+                addActionError(error);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // users of a role cache their collections; clear them so a role change applies right away
+    private void clearRoleCaches() {
+        CustomRoleDao.clearRoleCache();
+        UsersCollectionsList.deleteAccountCollectionIdsFromCache(Context.accountId.get());
+    }
+
     private boolean validatePermissionOverrides() {
         if (permissionOverrides == null) {
             return true;
@@ -168,14 +193,15 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(!defaultInviteCheck() || !validatePermissionOverrides()){
+        if(!defaultInviteCheck() || !validatePermissionOverrides() || !validateCollectionRules()){
             return ERROR.toUpperCase();
         }
 
         CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, threatProtectionEnabled, new ArrayList<>());
         role.setPermissionOverrides(permissionOverrides);
+        role.setCollectionRules(collectionRules);
         CustomRoleDao.instance.insertOne(role);
-        CustomRoleDao.clearRoleCache();
+        clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
     }
@@ -201,7 +227,7 @@ public class RoleAction extends UserAction {
         if(!defaultInviteCheck() && !existingRole.getDefaultInviteRole()){
             return ERROR.toUpperCase();
         }
-        if (!validatePermissionOverrides()) {
+        if (!validatePermissionOverrides() || !validateCollectionRules()) {
             return ERROR.toUpperCase();
         }
 
@@ -210,9 +236,10 @@ public class RoleAction extends UserAction {
             Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
             Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole),
             Updates.set(CustomRole.THREAT_PROTECTION_ENABLED, threatProtectionEnabled),
-            Updates.set(CustomRole.PERMISSION_OVERRIDES, permissionOverrides)
+            Updates.set(CustomRole.PERMISSION_OVERRIDES, permissionOverrides),
+            Updates.set(CustomRole.COLLECTION_RULES, collectionRules)
         ));
-        CustomRoleDao.clearRoleCache();
+        clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();
@@ -250,7 +277,7 @@ public class RoleAction extends UserAction {
         }
 
         CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
-        CustomRoleDao.clearRoleCache();
+        clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();

@@ -43,6 +43,7 @@ import com.akto.dto.Setup;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.rbac.CollectionRule;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.traffic.CollectionTags;
@@ -351,5 +352,48 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         insertAudit(3, "other-team-server");
         assertEquals(1, fetchAudit(TEAM_A).size());
         assertEquals(2, fetchAudit(ADMIN).size());
+    }
+
+    // ── Collection rules on custom roles ───────────────────────────────────────
+
+    private void insertRuleRole(String name, CollectionRule rule) {
+        CustomRole role = new CustomRole();
+        role.setName(name);
+        role.setBaseRole("THREAT_ENGINEER");
+        role.setApiCollectionsId(new ArrayList<>());
+        role.setCollectionRules(Collections.singletonList(rule));
+        CustomRoleDao.instance.insertOne(role);
+        CustomRoleDao.clearRoleCache();
+    }
+
+    @Test
+    public void testCollectionRules() {
+        insertAgentCollection(4, "team-a-new-agent.example.com"); // added later, matches the host rule
+        insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
+        insertUser(106, "TEAM_A_BY_HOST");
+        as(106, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(new HashSet<>(Arrays.asList(1, 4)), new HashSet<>(ArgusCollectionScope.getRestrictedCollectionIds(user(106))));
+        assertEquals(new HashSet<>(Arrays.asList(OWN_HOST, "team-a-new-agent.example.com")), ArgusCollectionScope.getRestrictedHosts(user(106)));
+
+        insertRuleRole("TEAM_BY_TAG", new CollectionRule(null, Constants.AKTO_GEN_AI_TAG, "Gen AI"));
+        insertUser(107, "TEAM_BY_TAG");
+        as(107, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(new HashSet<>(Arrays.asList(1, 2, 3, 4)), new HashSet<>(ArgusCollectionScope.getRestrictedCollectionIds(user(107))));
+
+        // rules that match nothing yet: the user sees nothing, never everything
+        insertRuleRole("TEAM_NONE_YET", new CollectionRule("^no-such-agent-", null, null));
+        insertUser(108, "TEAM_NONE_YET");
+        as(108, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), ArgusCollectionScope.getRestrictedCollectionIds(user(108)));
+        assertTrue(ArgusCollectionScope.getRestrictedHosts(user(108)).isEmpty());
+    }
+
+    @Test
+    public void testCollectionRuleValidation() {
+        assertNull(new CollectionRule("^team-a-", null, null).validate());
+        assertNull(new CollectionRule(null, "team", "a").validate());
+        assertNotNull(new CollectionRule("([bad", null, null).validate());
+        assertNotNull(new CollectionRule(null, null, null).validate());
+        assertNotNull(new CollectionRule("^x", "team", "a").validate());
     }
 }

@@ -4,14 +4,18 @@ import static com.mongodb.client.model.Filters.eq;
 import static com.mongodb.client.model.Updates.set;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.CustomRole;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.rbac.CollectionRule;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -186,8 +190,14 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
         CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
         Set<Integer> apiCollectionsId = new HashSet<>();
+        boolean hasRules = customRole != null && customRole.getCollectionRules() != null && !customRole.getCollectionRules().isEmpty();
         if (customRole != null) {
-            apiCollectionsId.addAll(customRole.getApiCollectionsId());
+            if (customRole.getApiCollectionsId() != null) {
+                apiCollectionsId.addAll(customRole.getApiCollectionsId());
+            }
+            if (hasRules) {
+                apiCollectionsId.addAll(ruleCollectionIds(accountId, customRole.getCollectionRules()));
+            }
         }
 
         if (rbac.getApiCollectionsId() == null) {
@@ -197,7 +207,50 @@ public class RBACDao extends CommonContextDao<RBAC> {
             apiCollectionsId.addAll(rbac.getApiCollectionsId());
         }
 
+        // an empty list means all collections, so a role limited by rules that match nothing yet must still see nothing
+        if (hasRules && apiCollectionsId.isEmpty()) {
+            apiCollectionsId.add(NO_COLLECTION_ID);
+        }
+
         return new ArrayList<>(apiCollectionsId);
+    }
+
+    /** Collection id that matches no collection; keeps a limited user limited when nothing matches. */
+    public static final int NO_COLLECTION_ID = Integer.MIN_VALUE;
+
+    private static final ConcurrentHashMap<String, Pair<Set<Integer>, Integer>> ruleCollectionsCache = new ConcurrentHashMap<>();
+    private static final int RULE_CACHE_EXPIRY_TIME = 2 * 60;
+
+    /** Collections matching a role's host / tag rules, cached per account and rule set. */
+    public static Set<Integer> ruleCollectionIds(int accountId, List<CollectionRule> rules) {
+        String key = accountId + "|" + rules;
+        Pair<Set<Integer>, Integer> cached = ruleCollectionsCache.get(key);
+        if (cached != null && Context.now() - cached.getSecond() <= RULE_CACHE_EXPIRY_TIME) {
+            return cached.getFirst();
+        }
+        List<Bson> filters = new ArrayList<>();
+        for (CollectionRule rule : rules) {
+            if (rule == null || rule.validate() != null) {
+                continue;
+            }
+            if (rule.getHostRegex() != null && !rule.getHostRegex().trim().isEmpty()) {
+                filters.add(Filters.regex(ApiCollection.HOST_NAME, rule.getHostRegex()));
+            } else {
+                filters.add(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, rule.getTagKey()),
+                        Filters.eq(CollectionTags.VALUE, rule.getTagValue()))));
+            }
+        }
+        Set<Integer> ids = new HashSet<>();
+        if (!filters.isEmpty()) {
+            // raw query: the RBAC-filtered DAO methods resolve the user's collections through this method
+            for (ApiCollection collection : ApiCollectionsDao.instance.getMCollection()
+                    .find(Filters.or(filters)).projection(Projections.include(ApiCollection.ID))) {
+                ids.add(collection.getId());
+            }
+        }
+        ruleCollectionsCache.put(key, new Pair<>(ids, Context.now()));
+        return ids;
     }
 
     public HashMap<Integer, List<Integer>> getAllUsersCollections(int accountId) {
