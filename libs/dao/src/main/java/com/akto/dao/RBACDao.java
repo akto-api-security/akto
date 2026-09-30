@@ -92,6 +92,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
             }
 
             ReadWriteAccess override = customRole.overrideFor(feature);
+            if (override == null && feature == Feature.THREAT_SETTINGS) {
+                // threat settings follow threat protection unless changed on their own
+                override = customRole.overrideFor(Feature.THREAT_PROTECTION);
+            }
             if (override != null) {
                 return override;
             }
@@ -164,6 +168,14 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     
     public List<Integer> getUserCollectionsById(int userId, int accountId) {
+        return getUserCollectionsById(userId, accountId, true);
+    }
+
+    /*
+     * includeRules=false gives only the explicit grants (role and user collection ids), for screens that
+     * edit and save those grants back; rule matches must never be saved as fixed per-user grants.
+     */
+    private List<Integer> getUserCollectionsById(int userId, int accountId, boolean includeRules) {
         RBAC rbac = getCurrentRBACForUser(userId, accountId);
 
         if (rbac == null) {
@@ -194,7 +206,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
         CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
         Set<Integer> apiCollectionsId = new HashSet<>();
-        boolean hasRules = customRole != null && customRole.getCollectionRules() != null && !customRole.getCollectionRules().isEmpty();
+        boolean hasRules = includeRules && customRole != null && customRole.getCollectionRules() != null && !customRole.getCollectionRules().isEmpty();
         if (customRole != null) {
             if (customRole.getApiCollectionsId() != null) {
                 apiCollectionsId.addAll(customRole.getApiCollectionsId());
@@ -247,11 +259,20 @@ public class RBACDao extends CommonContextDao<RBAC> {
         }
         Set<Integer> ids = new HashSet<>();
         if (!filters.isEmpty()) {
-            // raw query: the RBAC-filtered DAO methods resolve the user's collections through this method
-            for (ApiCollection collection : ApiCollectionsDao.instance.getMCollection()
-                    .find(Filters.or(filters)).projection(Projections.include(ApiCollection.ID))) {
-                ids.add(collection.getId());
+            try {
+                // raw query: the RBAC-filtered DAO methods resolve the user's collections through this method
+                for (ApiCollection collection : ApiCollectionsDao.instance.getMCollection()
+                        .find(Filters.or(filters)).projection(Projections.include(ApiCollection.ID))) {
+                    ids.add(collection.getId());
+                }
+            } catch (Exception e) {
+                // e.g. a pattern Mongo rejects: match nothing, so the user stays limited instead of seeing everything
+                logger.error("Error resolving collection rules " + rules + ": " + e.getMessage());
+                ids.clear();
             }
+        }
+        if (ruleCollectionsCache.size() > 1000) {
+            ruleCollectionsCache.clear(); // keeps the cache bounded when rules change often
         }
         ruleCollectionsCache.put(key, new Pair<>(ids, Context.now()));
         return ids;
@@ -263,7 +284,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
         List<Integer> userList = UsersDao.instance.getAllUsersIdsForTheAccount(accountId);
 
         for (int userId : userList) {
-            collectionList.put(userId, getUserCollectionsById(userId, accountId));
+            collectionList.put(userId, getUserCollectionsById(userId, accountId, false));
         }
 
         return collectionList;

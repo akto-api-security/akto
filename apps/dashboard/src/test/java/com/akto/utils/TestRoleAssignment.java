@@ -59,7 +59,7 @@ public class TestRoleAssignment extends MongoBasedTest {
 
     static void clearCaches() {
         CustomRoleDao.clearRoleCache();
-        for (int id = 1; id <= 7; id++) {
+        for (int id = 1; id <= 10; id++) {
             RBACDao.instance.deleteUserEntryFromCache(new Pair<>(id, ACCOUNT_ID));
             UsersCollectionsList.deleteCollectionIdsFromCache(id, ACCOUNT_ID);
         }
@@ -91,33 +91,33 @@ public class TestRoleAssignment extends MongoBasedTest {
 
     @Test
     public void testUnlimitedCallersFollowTheHierarchy() {
-        assertTrue(RoleAssignment.canAssign(ADMIN, ACCOUNT_ID, "ADMIN"));
-        assertTrue(RoleAssignment.canAssign(ADMIN, ACCOUNT_ID, "TEAM_A_ADMIN"));
-        assertTrue(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "GUEST"));
-        assertTrue(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "TEAM_A_USER")); // custom role on a base in the hierarchy
-        assertFalse(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "ADMIN"));
-        assertFalse(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "THREAT_ENGINEER"));
+        assertTrue(RoleAssignment.canAssign(ADMIN, ACCOUNT_ID, "API", "ADMIN"));
+        assertTrue(RoleAssignment.canAssign(ADMIN, ACCOUNT_ID, "API", "TEAM_A_ADMIN"));
+        assertTrue(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "API", "GUEST"));
+        assertTrue(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "API", "TEAM_A_USER")); // custom role on a base in the hierarchy
+        assertFalse(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "API", "ADMIN"));
+        assertFalse(RoleAssignment.canAssign(MEMBER, ACCOUNT_ID, "API", "THREAT_ENGINEER"));
         assertFalse(RoleAssignment.canManage(MEMBER, ACCOUNT_ID, rbac(ADMIN)));
         assertTrue(RoleAssignment.canManage(MEMBER, ACCOUNT_ID, rbac(GUEST)));
-        assertTrue(RoleAssignment.canAssign(GUEST, ACCOUNT_ID, "NO_ACCESS"));
+        assertTrue(RoleAssignment.canAssign(GUEST, ACCOUNT_ID, "API", "NO_ACCESS"));
     }
 
     @Test
     public void testTeamAdminOnlyGivesItsRoles() {
         assertEquals(Collections.singleton("TEAM_A_USER"), RoleAssignment.limitedAssignableRoles(TEAM_ADMIN, ACCOUNT_ID));
-        assertTrue(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "TEAM_A_USER"));
-        assertTrue(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "NO_ACCESS"));
+        assertTrue(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "TEAM_A_USER"));
+        assertTrue(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "NO_ACCESS"));
         // built-in roles see every collection, so a team admin can never give them
-        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "THREAT_ENGINEER"));
-        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "GUEST"));
-        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "TEAM_A_ADMIN"));
+        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "THREAT_ENGINEER"));
+        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "GUEST"));
+        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "TEAM_A_ADMIN"));
         assertTrue(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(TEAM_USER)));
         assertFalse(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(THREAT_ENGINEER)));
         assertFalse(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(ADMIN)));
 
-        // a scoped role without a list gives nothing (previously it could give any role in its hierarchy)
-        assertTrue(RoleAssignment.limitedAssignableRoles(SCOPED_NO_LIST, ACCOUNT_ID).isEmpty());
-        assertFalse(RoleAssignment.canAssign(SCOPED_NO_LIST, ACCOUNT_ID, "THREAT_ENGINEER"));
+        // a scoped role without a list keeps the role hierarchy, exactly as before
+        assertEquals(null, RoleAssignment.limitedAssignableRoles(SCOPED_NO_LIST, ACCOUNT_ID));
+        assertTrue(RoleAssignment.canAssign(SCOPED_NO_LIST, ACCOUNT_ID, "API", "THREAT_ENGINEER"));
         assertEquals(null, RoleAssignment.limitedAssignableRoles(THREAT_ENGINEER, ACCOUNT_ID));
     }
 
@@ -155,20 +155,71 @@ public class TestRoleAssignment extends MongoBasedTest {
     }
 
     @Test
-    public void testRoleHierarchyApiForTeamAdmins() {
+    public void testAssignableRolesApi() {
         TeamAction action = new TeamAction();
         Map<String, Object> session = new HashMap<>();
         session.put("user", user(TEAM_ADMIN));
         action.setSession(session);
-        assertEquals("SUCCESS", action.getRoleHierarchy());
-        assertEquals(Collections.singletonList("TEAM_A_USER"), action.getUserRoleHierarchy());
+        assertEquals("SUCCESS", action.fetchAssignableRoles());
+        assertEquals(Collections.singletonList("TEAM_A_USER"), action.getAssignableRoles());
 
         action = new TeamAction();
         session = new HashMap<>();
         session.put("user", user(MEMBER));
         action.setSession(session);
+        assertEquals("SUCCESS", action.fetchAssignableRoles());
+        assertEquals(null, action.getAssignableRoles()); // role hierarchy applies
         assertEquals("SUCCESS", action.getRoleHierarchy());
-        assertEquals(Arrays.asList("MEMBER", "DEVELOPER", "GUEST"), action.getUserRoleHierarchy());
+        assertEquals(Arrays.asList(RBAC.Role.MEMBER, RBAC.Role.DEVELOPER, RBAC.Role.GUEST), Arrays.asList(action.getUserRoleHierarchy()));
+    }
+
+    @Test
+    public void testChecksRunInTheProductTheRoleIsGivenFor() {
+        // team admin in API, plain Security Engineer in Argus
+        Map<String, String> scopeRoleMapping = new HashMap<>();
+        scopeRoleMapping.put(CONTEXT_SOURCE.API.name(), "TEAM_A_ADMIN");
+        scopeRoleMapping.put(CONTEXT_SOURCE.AGENTIC.name(), "MEMBER");
+        RBACDao.instance.updateOne(Filters.and(Filters.eq(RBAC.USER_ID, TEAM_ADMIN), Filters.eq(RBAC.ACCOUNT_ID, ACCOUNT_ID)),
+                com.mongodb.client.model.Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping));
+        clearCaches();
+
+        Context.contextSource.set(CONTEXT_SOURCE.AGENTIC); // request sent from Argus
+        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "MEMBER")); // but the role is for API
+        assertTrue(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "AGENTIC", "MEMBER"));
+        assertEquals(CONTEXT_SOURCE.AGENTIC, Context.contextSource.get()); // request scope restored
+        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "NOT_A_PRODUCT", "MEMBER"));
+    }
+
+    @Test
+    public void testAssignableRoleRecheckedWhenGiven() {
+        assertTrue(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "TEAM_A_USER"));
+        // the role is later widened to all collections: a team admin can no longer give it
+        CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, "TEAM_A_USER"),
+                com.mongodb.client.model.Updates.set(CustomRole.API_COLLECTIONS_ID, new ArrayList<>()));
+        clearCaches();
+        assertFalse(RoleAssignment.canAssign(TEAM_ADMIN, ACCOUNT_ID, "API", "TEAM_A_USER"));
+    }
+
+    @Test
+    public void testAdminCanFixUserWithUnknownRole() {
+        insertUser(8, "SOME_DELETED_ROLE");
+        clearCaches();
+        assertTrue(RoleAssignment.canManage(ADMIN, ACCOUNT_ID, rbac(8)));
+        assertFalse(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(8)));
+    }
+
+    @Test
+    public void testPasswordResetRefusedForUsersOfOtherAccounts() {
+        User shared = user(9);
+        shared.getAccounts().put("999", new UserAccountEntry(999, "other"));
+        UsersDao.instance.insertOne(shared);
+        TeamAction action = new TeamAction();
+        Map<String, Object> session = new HashMap<>();
+        session.put("user", user(ADMIN));
+        action.setSession(session);
+        action.setUserEmail(shared.getLogin());
+        assertEquals("ERROR", action.resetUserPassword());
+        assertTrue(action.getActionErrors().iterator().next().contains("other accounts"));
     }
 
     static RoleAction roleAction(String name, List<String> assignable) {
@@ -220,6 +271,11 @@ public class TestRoleAssignment extends MongoBasedTest {
 
         assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", 0)); // cleared
         assertEquals(RBAC.Role.MEMBER, RBACDao.getCurrentRoleForUser(MEMBER, ACCOUNT_ID));
+
+        // only admins set or remove it
+        assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, GUEST, "GUEST", now + 3600));
+        assertEquals("SUCCESS", updateRoleWithExpiry(MEMBER, GUEST, "GUEST", 0));
+        assertEquals(now + 3600, rbac(GUEST).getAccessExpiresAt());
     }
 
     @Test
@@ -241,5 +297,17 @@ public class TestRoleAssignment extends MongoBasedTest {
                 assertFalse(method.getName(), method.getName().startsWith("getAudit"));
             }
         }
+    }
+
+    @Test
+    public void testInvitePermissionOverrideBlocksRoleChanges() {
+        CustomRole runtimeAdmin = new CustomRole("RUNTIME_ADMIN", "THREAT_ENGINEER", new ArrayList<>(), false, false, new ArrayList<>());
+        runtimeAdmin.setPermissionOverrides(Collections.singletonMap("INVITE_MEMBERS", "READ"));
+        CustomRoleDao.instance.insertOne(runtimeAdmin);
+        insertUser(10, "RUNTIME_ADMIN");
+        clearCaches();
+        assertEquals("ERROR", updateRole(10, GUEST, "MEMBER"));
+        assertEquals("SUCCESS", updateRole(THREAT_ENGINEER, GUEST, "MEMBER")); // built-in roles unchanged
+        assertEquals("SUCCESS", updateRole(MEMBER, GUEST, "DEVELOPER"));
     }
 }

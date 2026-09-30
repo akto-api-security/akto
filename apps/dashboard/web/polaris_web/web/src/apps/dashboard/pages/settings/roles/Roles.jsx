@@ -267,12 +267,15 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {}, roleData.collectionRules || [], roleData.assignableRoles || [])
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {}, roleData.collectionRules || [],
+            (roleData.assignableRoles || []).filter(r => tempRoles.some(t => t.name === r && isGivableByTeamAdmin(t))))
         await getRoleData();
     }
 
     const handleClose = () => {
         setRoles(tempRoles)
+        setNewHostPattern('')
+        setNewTag('')
     }
 
     const [newRoleName, setNewRoleName] = useState('')

@@ -216,11 +216,18 @@ const Users = () => {
             roleHierarchyResp.push('RESET_PASSWORD')
         }
 
+        // team admins can only give the roles set on their custom role
+        const assignableResp = await settingRequests.fetchAssignableRoles().catch(() => ({}))
+        const teamAdminRoles = assignableResp?.assignableRoles
+        if (teamAdminRoles) {
+            roleHierarchyResp = [...teamAdminRoles]
+        }
+
         const customRolesResponse = await settingRequests.getCustomRoles()
         if(customRolesResponse.roles){
             setCustomRoles(customRolesResponse.roles.map(x => {
 
-                if(roleHierarchyResp.includes(x.baseRole)){
+                if(!teamAdminRoles && roleHierarchyResp.includes(x.baseRole)){
                     roleHierarchyResp.push(x.name)
                 }
                 if(x.defaultInviteRole){
@@ -381,7 +388,8 @@ const Users = () => {
 
         try {
             // Call backend to update scope-role mapping
-            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping, accessExpiresAt)
+            // only admins set the expiry; the backend ignores it from anyone else
+            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping, window.USER_ROLE === 'ADMIN' ? accessExpiresAt : undefined)
 
             // Update UI
             const scopes = Object.keys(editingScopeRoleMapping)
@@ -707,7 +715,7 @@ const Users = () => {
                                 })}
                             </Box>
                         </Box>
-                        <Box paddingBlockStart="400">
+                        {window.USER_ROLE === 'ADMIN' ? <Box paddingBlockStart="400">
                             <TextField
                                 type="date"
                                 label="Access expires on (optional)"
@@ -718,7 +726,7 @@ const Users = () => {
                                 clearButton
                                 onClearButtonClick={() => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: "" }))}
                             />
-                        </Box>
+                        </Box> : null}
                     </Modal.Section>
                 </Modal>
 

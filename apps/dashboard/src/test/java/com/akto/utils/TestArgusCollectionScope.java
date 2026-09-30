@@ -22,7 +22,6 @@ import org.junit.Test;
 import com.akto.MongoBasedTest;
 import com.akto.action.AuditDataAction;
 import com.akto.action.GuardrailPoliciesAction;
-import com.akto.action.SignupAction;
 import com.akto.action.user.AzureSsoAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.CustomRoleDao;
@@ -259,19 +258,14 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         }
     }
 
-    // ── Azure group -> role ────────────────────────────────────────────────────
+    // ── SSO group -> role (shared by every SSO provider) ───────────────────────
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> resolveGroupRole(Map<String, String> mapping, List<String> groups) throws Exception {
-        SAMLConfig samlConfig = new SAMLConfig(ConfigType.AZURE, ACCOUNT_ID);
-        samlConfig.setGroupRoleMapping(mapping);
-        Method method = SignupAction.class.getDeclaredMethod("resolveSamlGroupScopeRoleMapping", SAMLConfig.class, List.class, int.class);
-        method.setAccessible(true);
-        return (Map<String, String>) method.invoke(new SignupAction(), samlConfig, groups, ACCOUNT_ID);
+    private static Map<String, String> rolesForLogin(Map<String, String> mapping, List<String> groups) {
+        return SsoRoleMapping.rolesForLogin("new-user@example.com", ACCOUNT_ID, mapping, groups, false, true);
     }
 
     @Test
-    public void testAzureGroupRole() throws Exception {
+    public void testSsoGroupRole() {
         Map<String, String> mapping = new HashMap<>();
         mapping.put("g-guest", "GUEST");
         mapping.put("g-team-a", "TEAM_A_ADMIN");
@@ -279,27 +273,41 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         mapping.put("g-deleted-role", "NO_SUCH_ROLE");
 
         // most privileged wins; custom role ranked by its base role (Threat Engineer > Developer > Guest)
-        Map<String, String> result = resolveGroupRole(mapping, Arrays.asList("g-guest", "g-team-a", "g-dev"));
+        Map<String, String> result = rolesForLogin(mapping, Arrays.asList("g-guest", "g-team-a", "g-dev"));
         assertFalse(result.isEmpty());
         assertTrue(result.values().stream().allMatch("TEAM_A_ADMIN"::equals));
-        assertTrue(resolveGroupRole(mapping, Arrays.asList("g-guest", "g-dev")).values().stream().allMatch("DEVELOPER"::equals));
+        assertTrue(rolesForLogin(mapping, Arrays.asList("g-guest", "g-dev")).values().stream().allMatch("DEVELOPER"::equals));
 
         // no match, unknown role, no groups, no mapping -> null (login unchanged)
-        assertNull(resolveGroupRole(mapping, Collections.singletonList("g-unknown")));
-        assertNull(resolveGroupRole(mapping, Collections.singletonList("g-deleted-role")));
-        assertNull(resolveGroupRole(mapping, new ArrayList<>()));
-        assertNull(resolveGroupRole(new HashMap<>(), Collections.singletonList("g-team-a")));
-        assertNull(resolveGroupRole(null, Collections.singletonList("g-team-a")));
+        assertNull(rolesForLogin(mapping, Collections.singletonList("g-unknown")));
+        assertNull(rolesForLogin(mapping, Collections.singletonList("g-deleted-role")));
+        assertNull(rolesForLogin(mapping, new ArrayList<>()));
+        assertNull(rolesForLogin(new HashMap<>(), Collections.singletonList("g-team-a")));
+        assertNull(rolesForLogin(null, Collections.singletonList("g-team-a")));
+
+        // existing admins are never changed
+        assertNull(SsoRoleMapping.rolesForLogin(user(ADMIN).getLogin(), ACCOUNT_ID, mapping, Collections.singletonList("g-guest"), true, true));
+        assertTrue(SsoRoleMapping.isExistingAdmin(user(ADMIN).getLogin(), ACCOUNT_ID));
+        assertFalse(SsoRoleMapping.isExistingAdmin(user(TEAM_A).getLogin(), ACCOUNT_ID));
+        assertFalse(SsoRoleMapping.isExistingAdmin("new-user@example.com", ACCOUNT_ID));
     }
 
     @Test
-    public void testExistingAdminNotChangedByGroups() throws Exception {
-        Method method = SignupAction.class.getDeclaredMethod("isExistingAdmin", String.class, int.class);
-        method.setAccessible(true);
-        SignupAction action = new SignupAction();
-        assertTrue((Boolean) method.invoke(action, user(ADMIN).getLogin(), ACCOUNT_ID));
-        assertFalse((Boolean) method.invoke(action, user(TEAM_A).getLogin(), ACCOUNT_ID));
-        assertFalse((Boolean) method.invoke(action, "new-user@example.com", ACCOUNT_ID));
+    public void testSsoRemoveAccessWithoutGroup() {
+        Map<String, String> mapping = Collections.singletonMap("group-a", "MEMBER");
+        List<String> noMappedGroup = Collections.singletonList("some-other-group");
+        String email = user(TEAM_A).getLogin();
+
+        // off by default: users keep their role
+        assertNull(SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, mapping, noMappedGroup, false, true));
+        // on, with the full group list: no access in every product (never an empty mapping, which means the old single role)
+        Map<String, String> removed = SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, mapping, noMappedGroup, true, true);
+        assertFalse(removed.isEmpty());
+        for (String role : removed.values()) assertEquals("NO_ACCESS", role);
+        // on, but the IdP did not send the full group list (claim missing or too many groups): keep the role
+        assertNull(SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, mapping, noMappedGroup, true, false));
+        // on, but no mapping set: nothing to reconcile against
+        assertNull(SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, new HashMap<>(), noMappedGroup, true, true));
     }
 
     @Test
@@ -390,6 +398,20 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         as(108, CONTEXT_SOURCE.AGENTIC);
         assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), ArgusCollectionScope.getRestrictedCollectionIds(user(108)));
         assertTrue(ArgusCollectionScope.getRestrictedHosts(user(108)).isEmpty());
+
+        // screens that edit per-user grants only see explicit grants, never rule matches or the sentinel
+        for (int userId : new int[]{106, 108}) {
+            UsersDao.instance.updateOne(com.mongodb.client.model.Filters.eq("_id", userId),
+                    com.mongodb.client.model.Updates.set(User.ACCOUNTS + "." + ACCOUNT_ID, new com.akto.dto.UserAccountEntry(ACCOUNT_ID, "account")));
+        }
+        assertTrue(RBACDao.instance.getAllUsersCollections(ACCOUNT_ID).get(106).isEmpty());
+        assertTrue(RBACDao.instance.getAllUsersCollections(ACCOUNT_ID).get(108).isEmpty());
+
+        // a pattern Mongo cannot run matches nothing: the user stays limited instead of seeing everything
+        insertRuleRole("TEAM_BAD_PATTERN", new CollectionRule("\\p{javaLowerCase}+", null, null));
+        insertUser(109, "TEAM_BAD_PATTERN");
+        as(109, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), ArgusCollectionScope.getRestrictedCollectionIds(user(109)));
     }
 
     @Test
@@ -399,25 +421,7 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         assertNotNull(new CollectionRule("([bad", null, null).validate());
         assertNotNull(new CollectionRule(null, null, null).validate());
         assertNotNull(new CollectionRule("^x", "team", "a").validate());
-    }
-
-    @Test
-    public void testSsoRemoveAccessWithoutGroup() throws Exception {
-        Method should = SignupAction.class.getDeclaredMethod("shouldRemoveAccessWithoutGroup", SAMLConfig.class);
-        should.setAccessible(true);
-        SAMLConfig samlConfig = new SAMLConfig(ConfigType.AZURE, ACCOUNT_ID);
-        samlConfig.setRemoveAccessWithoutGroup(true);
-        assertFalse((Boolean) should.invoke(null, samlConfig)); // no mapping set: nothing to reconcile against
-        samlConfig.setGroupRoleMapping(Collections.singletonMap("group-a", "MEMBER"));
-        assertTrue((Boolean) should.invoke(null, samlConfig));
-        samlConfig.setRemoveAccessWithoutGroup(false);
-        assertFalse((Boolean) should.invoke(null, samlConfig)); // off by default: users keep their role
-
-        Method noAccess = SignupAction.class.getDeclaredMethod("noAccessScopeRoleMapping", int.class);
-        noAccess.setAccessible(true);
-        @SuppressWarnings("unchecked")
-        Map<String, String> mapping = (Map<String, String>) noAccess.invoke(null, ACCOUNT_ID);
-        assertFalse(mapping.isEmpty()); // an empty mapping would fall back to the old single role
-        for (String role : mapping.values()) assertEquals("NO_ACCESS", role);
+        assertNotNull(new CollectionRule(null, "team", "").validate()); // a tag rule needs a value
+        assertNotNull(new CollectionRule(new String(new char[201]).replace('\0', 'a'), null, null).validate());
     }
 }

@@ -735,12 +735,6 @@ public class ApiCollectionsAction extends UserAction {
         int accountIdForRbac = Context.accountId.get();
         List<Integer> affectedUserIds = new ArrayList<>();
         try {
-            for (RBAC rbac : RBACDao.instance.findAll(Filters.and(
-                    Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
-                    Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)))) {
-                affectedUserIds.add(rbac.getUserId());
-            }
-
             /*
              * An empty list means "all collections", so a grant whose every collection is deleted keeps
              * its (now unmatched) ids: it must end up seeing nothing, not everything.
@@ -756,6 +750,7 @@ public class ApiCollectionsAction extends UserAction {
             for (RBAC rbac : RBACDao.instance.findAll(Filters.and(
                     Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
                     Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)))) {
+                affectedUserIds.add(rbac.getUserId());
                 if (!deletedIds.containsAll(rbac.getApiCollectionsId())) {
                     RBACDao.instance.updateOne(Filters.eq(Constants.ID, rbac.getId()),
                             Updates.pullAll(RBAC.API_COLLECTIONS_ID, apiCollectionIds));

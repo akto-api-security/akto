@@ -12,6 +12,8 @@ import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.User;
+import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
@@ -372,7 +374,16 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
         // Caller can only edit users, and assign roles, that they are allowed to give (role hierarchy, or a team admin's roles)
         int callerId = getSUser().getId();
-        if (!RoleAssignment.canManage(callerId, accId, RBACDao.getCurrentRBACForUser(userDetails.getId(), accId))) {
+        // a custom role can turn off changing other users' roles with its "Invite users" permission
+        CustomRole callerRole = RBACDao.currentCustomRole(callerId, accId);
+        ReadWriteAccess inviteOverride = callerRole == null ? null : callerRole.overrideFor(Feature.INVITE_MEMBERS);
+        if (inviteOverride != null && inviteOverride != ReadWriteAccess.READ_WRITE) {
+            addActionError("Your role cannot change other users' roles.");
+            return Action.ERROR.toUpperCase();
+        }
+        // fresh read, not the cached entry, so a role given moments ago is respected
+        RBAC targetRbac = RBACDao.instance.findOne(Filters.and(Filters.eq(RBAC.USER_ID, userDetails.getId()), Filters.eq(RBAC.ACCOUNT_ID, accId)));
+        if (!RoleAssignment.canManage(callerId, accId, targetRbac)) {
             addActionError("User not allowed to update role for: " + email);
             return Action.ERROR.toUpperCase();
         }
@@ -405,7 +416,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
                         return Action.ERROR.toUpperCase();
                     }
-                    if (!baseRole.equals(Role.NO_ACCESS) && !RoleAssignment.canAssign(callerId, accId, roleStr)) {
+                    if (!baseRole.equals(Role.NO_ACCESS) && !RoleAssignment.canAssign(callerId, accId, scope, roleStr)) {
                         addActionError("Invalid role: " + roleStr);
                         loggerMaker.errorAndAddToDb("Invalid role attempted in scope-role mapping: " + roleStr + " for user: " + email);
                         return Action.ERROR.toUpperCase();
@@ -420,7 +431,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                             loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
                             return Action.ERROR.toUpperCase();
                         }
-                        if (!baseRole.equals(Role.NO_ACCESS) && !RoleAssignment.canAssign(callerId, accId, roleStr)) {
+                        if (!baseRole.equals(Role.NO_ACCESS) && !RoleAssignment.canAssign(callerId, accId, scope, roleStr)) {
                             addActionError("Invalid role: " + roleStr);
                             return Action.ERROR.toUpperCase();
                         }
@@ -444,8 +455,8 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                     Updates.setOnInsert(RBAC.USER_ID, userDetails.getId()),
                     Updates.setOnInsert(RBAC.ACCOUNT_ID, accId)
             ));
-            // null keeps the current expiry, 0 removes it
-            if (accessExpiresAt != null) {
+            // null keeps the current expiry, 0 removes it; only admins set or remove it
+            if (accessExpiresAt != null && RBACDao.getCurrentRoleForUser(callerId, accId) == Role.ADMIN) {
                 updates.add(Updates.set(RBAC.ACCESS_EXPIRES_AT, Math.max(accessExpiresAt, 0)));
             }
             RBACDao.instance.getMCollection().updateOne(
@@ -466,26 +477,30 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         }
     }
 
-    private List<String> userRoleHierarchy;
+    private Role[] userRoleHierarchy;
 
     public String getRoleHierarchy(){
         try {
-            // team admins (limited to collections) get the roles they may give instead of the hierarchy
-            Set<String> assignable = RoleAssignment.limitedAssignableRoles(getSUser().getId(), Context.accountId.get());
-            if (assignable != null) {
-                this.userRoleHierarchy = new ArrayList<>(assignable);
-                return Action.SUCCESS.toUpperCase();
-            }
             Role currentRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
-            this.userRoleHierarchy = new ArrayList<>();
-            for (Role role : currentRole.getRoleHierarchy()) {
-                this.userRoleHierarchy.add(role.name());
-            }
+            this.userRoleHierarchy = currentRole.getRoleHierarchy();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("User role doesn't exist.");
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    private List<String> assignableRoles;
+
+    // roles a team admin may give in this product; null for everyone else (the role hierarchy applies)
+    public String fetchAssignableRoles() {
+        Set<String> assignable = RoleAssignment.limitedAssignableRoles(getSUser().getId(), Context.accountId.get());
+        this.assignableRoles = assignable == null ? null : new ArrayList<>(assignable);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public List<String> getAssignableRoles() {
+        return assignableRoles;
     }
 
     String userEmail;
@@ -505,6 +520,12 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         User forgotPasswordUser = UsersDao.instance.findOne(Filters.and(Filters.eq(User.LOGIN, userEmail), Filters.exists(User.ACCOUNTS + "." + Context.accountId.get())));
         if(forgotPasswordUser == null) {
             addActionError("User not found.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        // passwords are shared across accounts, so an admin of one account must not get a login to the user's other accounts
+        if (forgotPasswordUser.getAccounts() != null && forgotPasswordUser.getAccounts().size() > 1) {
+            addActionError("This user belongs to other accounts too. Ask them to use 'Forgot password' on the login page.");
             return Action.ERROR.toUpperCase();
         }
 
@@ -587,7 +608,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         this.userRole = userRole;
     }
 
-    public List<String> getUserRoleHierarchy() {
+    public Role[] getUserRoleHierarchy() {
         return userRoleHierarchy;
     }
 

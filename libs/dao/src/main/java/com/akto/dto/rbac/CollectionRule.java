@@ -25,12 +25,24 @@ public class CollectionRule {
         this.tagValue = tagValue;
     }
 
+    private static final int MAX_PATTERN_LENGTH = 200;
+
+    private boolean hasHost() {
+        return hostRegex != null && !hostRegex.trim().isEmpty();
+    }
+
     /** Null if the rule is valid, otherwise why it is not. */
     public String validate() {
-        boolean hasHost = hostRegex != null && !hostRegex.trim().isEmpty();
+        boolean hasHost = hasHost();
         boolean hasTag = tagKey != null && !tagKey.trim().isEmpty();
         if (hasHost == hasTag) {
             return "A collection rule needs either a host pattern or a tag.";
+        }
+        if (hasTag && (tagValue == null || tagValue.trim().isEmpty())) {
+            return "A tag rule needs a value, e.g. team=team-a";
+        }
+        if (hasHost && hostRegex.length() > MAX_PATTERN_LENGTH) {
+            return "Host pattern is too long (max " + MAX_PATTERN_LENGTH + " characters).";
         }
         if (hasHost) {
             try {
@@ -44,6 +56,6 @@ public class CollectionRule {
 
     @Override
     public String toString() {
-        return hostRegex != null ? "host~" + hostRegex : "tag:" + tagKey + "=" + tagValue;
+        return hasHost() ? "host~" + hostRegex : "tag:" + tagKey + "=" + tagValue;
     }
 }

@@ -182,6 +182,13 @@ public class TestRbacGuards extends MongoBasedTest {
         storedRole(304, "THREAT_ENGINEER");
         assertEquals(ReadWriteAccess.READ_WRITE, access(304, Feature.THREAT_SETTINGS));
 
+        // an override on threat protection also covers threat settings, unless those are changed on their own
+        Map<String, String> noThreat = new HashMap<>();
+        noThreat.put(Feature.THREAT_PROTECTION.name(), ReadWriteAccess.NO_ACCESS.name());
+        insertRole("TE_WITHOUT_THREAT", Role.THREAT_ENGINEER, false, noThreat);
+        storedRole(305, "TE_WITHOUT_THREAT");
+        assertEquals(ReadWriteAccess.NO_ACCESS, access(305, Feature.THREAT_SETTINGS));
+
         for (Role role : Role.values()) {
             assertEquals(role.getReadWriteAccessForFeature(Feature.THREAT_PROTECTION), role.getReadWriteAccessForFeature(Feature.THREAT_SETTINGS));
         }
@@ -294,7 +301,8 @@ public class TestRbacGuards extends MongoBasedTest {
                 "api/updateUserCollections", "api/fetchApiAuditLogsFromDb")) {
             expected.put(action, adminOnly);
         }
-        expected.put("api/updateUserScopeRoleMapping", teamManagers);
+        // every role can call it (as before); who can change whom is decided inside the action
+        expected.put("api/updateUserScopeRoleMapping", new HashSet<>(Arrays.asList(Role.ADMIN, Role.MEMBER, Role.DEVELOPER, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER)));
         expected.put("api/inviteUsers", teamManagers);
         expected.put("api/modifyThreatConfiguration", threatSettings);
         expected.put("api/toggleArchivalEnabled", threatSettings);

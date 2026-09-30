@@ -22,6 +22,7 @@ import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.util.Pair;
+import com.akto.utils.RoleAssignment;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -158,15 +159,8 @@ public class RoleAction extends UserAction {
             return true;
         }
         for (String name : assignableRoles) {
-            CustomRole role = CustomRoleDao.instance.findRoleByName(name);
-            if (role == null) {
-                addActionError("Role " + name + " does not exist.");
-                return false;
-            }
-            boolean scoped = (role.getApiCollectionsId() != null && !role.getApiCollectionsId().isEmpty())
-                    || (role.getCollectionRules() != null && !role.getCollectionRules().isEmpty());
-            if (Role.ADMIN.name().equals(role.getBaseRole()) || !scoped) {
-                addActionError("Role " + name + " cannot be given by a team admin: it must be limited to collections and not based on Admin.");
+            if (!RoleAssignment.isGivableByTeamAdmin(CustomRoleDao.instance.findRoleByName(name))) {
+                addActionError("Role " + name + " cannot be given by a team admin: it must exist, be limited to collections and not be based on Admin.");
                 return false;
             }
         }
@@ -325,6 +319,8 @@ public class RoleAction extends UserAction {
         }
 
         CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
+        // a role created later with the same name must not become givable by team admins on its own
+        CustomRoleDao.instance.updateMany(Filters.eq(CustomRole.ASSIGNABLE_ROLES, roleName), Updates.pull(CustomRole.ASSIGNABLE_ROLES, roleName));
         clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 

@@ -1,10 +1,5 @@
 package com.akto.action;
 
-import com.akto.dto.audit_logs.Resource;
-import com.akto.dto.audit_logs.Operation;
-import com.akto.dto.audit_logs.ApiAuditLogs;
-import com.akto.dao.audit_logs.ApiAuditLogsDao;
-import com.akto.audit_logs_util.AuditLogsUtil;
 import static com.akto.dao.MCollection.SET;
 import static com.mongodb.client.model.Filters.eq;
 
@@ -55,6 +50,7 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.OrganizationCache;
 import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.util.Pair;
+import com.akto.utils.SsoRoleMapping;
 import com.akto.utils.Utils;
 import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
@@ -626,7 +622,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[Okta SSO] email=" + email + ", username=" + username + ", oktaGroups=" + oktaGroups
                     + ", dashboardRole=" + resolvedRole);
 
-            createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
+            /*
+             * Opt-in: with "remove access for users in none of the mapped groups" on, roles come from the explicit
+             * group mapping the same way as every other SSO provider. Off (default), Okta logins work exactly as before.
+             */
+            Map<String, String> groupScopeRoleMapping = null;
+            if (oktaConfig.isRemoveAccessWithoutGroup() && accountId == oktaConfig.getAccountId() && oktaGroups != null) {
+                groupScopeRoleMapping = SsoRoleMapping.rolesForLogin(email, accountId, oktaGroupToAktoUserRoleMap, oktaGroups,
+                        true, !oktaGroups.isEmpty());
+            }
+            if (groupScopeRoleMapping != null) {
+                SsoRoleMapping.auditRoleChange(email, accountId, groupScopeRoleMapping, "authorization-code/callback", servletRequest);
+                this.scopeRoleMapping = groupScopeRoleMapping;
+                createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), null, groupScopeRoleMapping);
+                SsoRoleMapping.clearUserCache(email, accountId);
+            } else {
+                createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
+            }
             code = "";
         } catch (Exception e) {
             logger.errorAndAddToDb("Error while signing in via okta sso: " + e.getMessage(), LogDb.DASHBOARD);
@@ -792,117 +804,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     // SAML attributes that carry the user's groups (Azure AD sends the first one)
     private static final List<String> SAML_GROUPS_ATTRIBUTES = Arrays.asList(
             "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups", "groups");
-
-    // Most privileged first, following the role hierarchies
-    private static final List<RBAC.Role> SSO_GROUP_ROLE_PRIORITY = Arrays.asList(
-            RBAC.Role.ADMIN, RBAC.Role.THREAT_ENGINEER, RBAC.Role.THREAT_VIEWER,
-            RBAC.Role.MEMBER, RBAC.Role.DEVELOPER, RBAC.Role.GUEST);
-
-    /*
-     * Role for the user from the SAML SSO group -> role mapping, applied to every product the account
-     * is licensed for. If the user is in several mapped groups, the most privileged role wins.
-     * Returns null when no mapping is set or none of the user's groups match, so login works as before.
-     */
-    private Map<String, String> resolveSamlGroupScopeRoleMapping(SAMLConfig samlConfig, List<String> groups, int accountId) {
-        Map<String, String> groupRoleMapping = samlConfig.getGroupRoleMapping();
-        if (groupRoleMapping == null || groupRoleMapping.isEmpty() || groups == null || groups.isEmpty()) {
-            return null;
-        }
-        // custom roles are stored in the account's db
-        Context.accountId.set(accountId);
-
-        String bestRole = null;
-        int bestPriority = Integer.MAX_VALUE;
-        for (String group : groups) {
-            String mappedRole = groupRoleMapping.get(group);
-            if (mappedRole == null) continue;
-            RBAC.Role baseRole;
-            try {
-                baseRole = RBAC.Role.valueOf(mappedRole);
-            } catch (IllegalArgumentException e) {
-                CustomRole customRole = CustomRoleDao.instance.findRoleByName(mappedRole);
-                if (customRole == null) continue;
-                try {
-                    baseRole = RBAC.Role.valueOf(customRole.getBaseRole());
-                } catch (IllegalArgumentException ex) {
-                    continue;
-                }
-            }
-            int priority = SSO_GROUP_ROLE_PRIORITY.indexOf(baseRole);
-            if (priority >= 0 && priority < bestPriority) {
-                bestPriority = priority;
-                bestRole = mappedRole;
-            }
-        }
-        if (bestRole == null) {
-            return null;
-        }
-
-        Map<String, String> scopeRoleMapping = new HashMap<>();
-        for (String scope : RBAC.getEnabledScopesForAccount(accountId)) {
-            scopeRoleMapping.put(scope, bestRole);
-        }
-        return scopeRoleMapping;
-    }
-
-    // opt-in per account: with a group mapping set, a user in none of the mapped groups loses access instead of keeping it
-    private static boolean shouldRemoveAccessWithoutGroup(SAMLConfig samlConfig) {
-        return samlConfig.isRemoveAccessWithoutGroup()
-                && samlConfig.getGroupRoleMapping() != null && !samlConfig.getGroupRoleMapping().isEmpty();
-    }
-
-    private static Map<String, String> noAccessScopeRoleMapping(int accountId) {
-        Map<String, String> scopeRoleMapping = new HashMap<>();
-        for (String scope : RBAC.getEnabledScopesForAccount(accountId)) {
-            scopeRoleMapping.put(scope, RBAC.Role.NO_ACCESS.name());
-        }
-        return scopeRoleMapping;
-    }
-
-    // audit log for roles set by the SSO group mapping at login; nothing is written when the roles do not change
-    private void auditSsoRoleChange(String userEmail, int accountId, Map<String, String> newScopeRoleMapping) {
-        try {
-            User user = UsersDao.instance.findOne(eq(User.LOGIN, userEmail));
-            RBAC rbac = user == null ? null : RBACDao.instance.findOne(Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)));
-            String before = rbac == null ? "none" : rbac.accessSummary();
-            String after = new TreeMap<>(newScopeRoleMapping).toString();
-            if (before.equals(after)) {
-                return;
-            }
-            Context.accountId.set(accountId);
-            List<String> ipAddresses = AuditLogsUtil.getClientIpAddresses(servletRequest);
-            BasicDBObject metadata = new BasicDBObject("auditAccessChange", "user=" + userEmail + " before=" + before + " requested=" + after);
-            ApiAuditLogsDao.instance.insertOne(new ApiAuditLogs(Context.now(), "signup-azure-saml",
-                    "SSO login set the user's product roles from the group mapping", userEmail, "SSO",
-                    ipAddresses.isEmpty() ? null : ipAddresses.get(0), ipAddresses, Resource.USER_ACCESS, Operation.UPDATE, metadata));
-        } catch (Exception e) {
-            logger.errorAndAddToDb("Error writing SSO role change audit log: " + e.getMessage(), LogDb.DASHBOARD);
-        }
-    }
-
-    // Existing Admins are never changed by the SSO group mapping, so a wrong mapping cannot lock the account out
-    private boolean isExistingAdmin(String userEmail, int accountId) {
-        User user = UsersDao.instance.findOne(eq(User.LOGIN, userEmail));
-        if (user == null) {
-            return false;
-        }
-        RBAC rbac = RBACDao.instance.findOne(Filters.and(Filters.eq(RBAC.USER_ID, user.getId()), Filters.eq(RBAC.ACCOUNT_ID, accountId)));
-        if (rbac == null) {
-            return false;
-        }
-        if (rbac.getScopeRoleMapping() != null && !rbac.getScopeRoleMapping().isEmpty()) {
-            return rbac.getScopeRoleMapping().containsValue(RBAC.Role.ADMIN.name());
-        }
-        return RBAC.Role.ADMIN.name().equals(rbac.getRole());
-    }
-
-    private void clearUserRbacCache(String userEmail, int accountId) {
-        User user = UsersDao.instance.findOne(eq(User.LOGIN, userEmail));
-        if (user != null) {
-            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(user.getId(), accountId));
-            UsersCollectionsList.deleteCollectionIdsFromCache(user.getId(), accountId);
-        }
-    }
 
     private String resolveHighestPriorityRole(List<String> keys, Map<String, String> mapping) {
         if (keys == null || keys.isEmpty() || mapping == null || mapping.isEmpty()) return null;
@@ -1266,6 +1167,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             String useremail = null;
             String username = null;
             List<String> samlGroups = new ArrayList<>();
+            boolean samlGroupsComplete = false;
             List<String> errors = auth.getErrors();
             if (!errors.isEmpty()) {
                 logger.errorAndAddToDb("Error in authenticating azure user \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
@@ -1279,6 +1181,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 for (String groupsAttribute : SAML_GROUPS_ATTRIBUTES) {
                     if (attributes.get(groupsAttribute) != null) {
                         samlGroups.addAll(attributes.get(groupsAttribute));
+                        samlGroupsComplete = true;
+                    }
+                }
+                // over 150 groups Azure AD sends a link instead of the groups, so the list is not complete
+                for (String attribute : attributes.keySet()) {
+                    if (attribute.endsWith("groups.link")) {
+                        samlGroupsComplete = false;
                     }
                 }
                 String nameId = auth.getNameId();
@@ -1295,19 +1204,17 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             // Role from the SSO group -> role mapping. Only for the account this SSO config belongs to.
             Map<String, String> groupScopeRoleMapping = null;
-            if (this.accountId == resolvedAccountId && !isExistingAdmin(useremail, resolvedAccountId)) {
-                groupScopeRoleMapping = resolveSamlGroupScopeRoleMapping(samlConfig, samlGroups, resolvedAccountId);
-                if (groupScopeRoleMapping == null && shouldRemoveAccessWithoutGroup(samlConfig)) {
-                    groupScopeRoleMapping = noAccessScopeRoleMapping(resolvedAccountId);
-                }
+            if (this.accountId == resolvedAccountId) {
+                groupScopeRoleMapping = SsoRoleMapping.rolesForLogin(useremail, resolvedAccountId, samlConfig.getGroupRoleMapping(),
+                        samlGroups, samlConfig.isRemoveAccessWithoutGroup(), samlGroupsComplete);
             }
             logger.infoAndAddToDb("[Azure SSO] email=" + useremail + ", groups=" + samlGroups + ", groupScopeRoleMapping=" + groupScopeRoleMapping);
 
             if (groupScopeRoleMapping != null) {
-                auditSsoRoleChange(useremail, this.accountId, groupScopeRoleMapping);
+                SsoRoleMapping.auditRoleChange(useremail, this.accountId, groupScopeRoleMapping, "signup-azure-saml", servletRequest);
                 this.scopeRoleMapping = groupScopeRoleMapping;
                 createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null, groupScopeRoleMapping);
-                clearUserRbacCache(useremail, this.accountId);
+                SsoRoleMapping.clearUserCache(useremail, this.accountId);
             } else {
                 createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null);
             }

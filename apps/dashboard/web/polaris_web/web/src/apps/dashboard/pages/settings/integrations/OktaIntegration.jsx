@@ -56,6 +56,7 @@ function OktaIntegration() {
     /** Master on/off switch for the background sync that writes Okta groups into device tags for
      * every org user. Disabled until a Management API token exists, since the sync needs one. */
     const [syncGroupsToUserTags, setSyncGroupsToUserTags] = useState(false)
+    const [removeAccessWithoutGroup, setRemoveAccessWithoutGroup] = useState(false)
     /** Fetched from Okta Management API (all groups) when Edit + API token; used to autosuggest group name. */
     const [oktaGroupNames, setOktaGroupNames] = useState([])
     const [loadingOktaGroups, setLoadingOktaGroups] = useState(false)
@@ -142,6 +143,7 @@ function OktaIntegration() {
                 setOktaGroupToAktoUserRoleMap(grpMap)
                 setSavedOktaGroupToAktoUserRoleMap(grpMap)
                 setSyncGroupsToUserTags(resp.syncGroupsToUserTags === true)
+                setRemoveAccessWithoutGroup(resp.removeAccessWithoutGroup === true)
                 setComponentType(2)
             }
         } catch {
@@ -188,7 +190,7 @@ function OktaIntegration() {
         try {
             let toastMsg = 'Group mappings saved successfully!'
             let resp
-            const baseOpts = { syncGroupsToUserTags }
+            const baseOpts = { syncGroupsToUserTags, removeAccessWithoutGroup }
             if (!hasSavedManagementToken) {
                 const t = editApiToken.trim()
                 resp = await settingRequests.saveOktaGroupRoleMapping(
@@ -471,6 +473,12 @@ function OktaIntegration() {
                 helpText={tokenWillBePresentInEdit
                     ? 'Every Okta group is kept in sync as a "group" tag for every user in the background.'
                     : 'Set a Management API token above to enable this.'}
+            />
+            <Checkbox
+                label="Manage roles from Okta groups on every login"
+                checked={removeAccessWithoutGroup}
+                onChange={setRemoveAccessWithoutGroup}
+                helpText="On each Okta login, users get the mapped role for every product (the most privileged if they are in several groups), and users in none of the mapped groups get no access. Admins are never changed. Off: logins work as before."
             />
             <HorizontalStack align="end" gap="2">
                 <Button onClick={handleCancelEdit}>Cancel</Button>

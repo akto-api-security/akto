@@ -31,6 +31,7 @@ import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
 
 public class InviteUserAction extends UserAction{
 
@@ -71,7 +72,7 @@ public class InviteUserAction extends UserAction{
      * @param roleStr the role string to validate
      * @return the base Role if valid, null if invalid
      */
-    private Role validateAndGetBaseRole(String roleStr) {
+    private Role validateAndGetBaseRole(String scope, String roleStr) {
         Role baseRole = null;
         CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
 
@@ -87,7 +88,7 @@ public class InviteUserAction extends UserAction{
         }
 
         // role hierarchy, or for team admins the roles they may give
-        if (!RoleAssignment.canAssign(getSUser().getId(), Context.accountId.get(), roleStr)) {
+        if (!RoleAssignment.canAssign(getSUser().getId(), Context.accountId.get(), scope, roleStr)) {
             addActionError("User not allowed to invite for role: " + roleStr);
             return null;
         }
@@ -224,7 +225,7 @@ public class InviteUserAction extends UserAction{
                 String scope = entry.getKey();
                 String roleStr = entry.getValue();
 
-                Role baseRole = validateAndGetBaseRole(roleStr);
+                Role baseRole = validateAndGetBaseRole(scope, roleStr);
 
                 if (baseRole == null) {
                     return ERROR.toUpperCase();
@@ -252,7 +253,7 @@ public class InviteUserAction extends UserAction{
             loggerMaker.debugAndAddToDb("After ensuring complete mapping: " + scopeRoleToSave);
         } else if (this.inviteeRole != null && !this.inviteeRole.isEmpty()) {
             // Backward compatibility: old single role
-            Role baseRole = validateAndGetBaseRole(this.inviteeRole);
+            Role baseRole = validateAndGetBaseRole("API", this.inviteeRole);
             if (baseRole == null) {
                 return ERROR.toUpperCase();
             }
@@ -292,11 +293,18 @@ public class InviteUserAction extends UserAction{
              * There should only be one invite code per user per account.
              * So if we update with upsert:true per account-inviteeEmail
              */
+            Bson inviteFilter = Filters.and(
+                    Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
+                    Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, inviteeEmail));
+            // re-inviting replaces a pending invite, so the caller must be allowed to give the roles it already carries
+            PendingInviteCode existingInvite = PendingInviteCodesDao.instance.findOne(inviteFilter);
+            if (existingInvite != null && !RoleAssignment.canManage(user_id, Context.accountId.get(),
+                    existingInvite.getScopeRoleMapping(), existingInvite.getInviteeRole())) {
+                addActionError("User not allowed to change the pending invite for: " + inviteeEmail);
+                return ERROR.toUpperCase();
+            }
             PendingInviteCodesDao.instance.updateOne(
-                    Filters.and(
-                        Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
-                        Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, inviteeEmail)
-                    ),
+                    inviteFilter,
                     Updates.combine(
                         Updates.set(PendingInviteCode.SCOPE_ROLE_MAPPING, scopeRoleToSave),
                         Updates.set(PendingInviteCode.INVITE_CODE, inviteCode),

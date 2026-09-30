@@ -411,6 +411,9 @@ const settingRequests = {
             oktaGroupToAktoUserRoleMap,
             syncGroupsToUserTags: opts.syncGroupsToUserTags === true,
         }
+        if (Object.prototype.hasOwnProperty.call(opts, 'removeAccessWithoutGroup')) {
+            data.removeAccessWithoutGroup = opts.removeAccessWithoutGroup === true
+        }
         if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
             const t = opts.managementApiToken
             // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
@@ -600,6 +603,13 @@ const settingRequests = {
             data: {
                 allowRedundantEndpointsList
             }
+        });
+    },
+    fetchAssignableRoles(){
+        return request({
+            url: '/api/fetchAssignableRoles',
+            method: 'post',
+            data: {}
         });
     },
     getRoleHierarchy(){
