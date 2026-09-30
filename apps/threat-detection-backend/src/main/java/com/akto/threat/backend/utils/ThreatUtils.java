@@ -323,6 +323,8 @@ public class ThreatUtils {
         requiredIndexes.put("idx_context_detectedAt_host", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("host")));
         requiredIndexes.put("idx_context_detectedAt_latestApiEndpoint", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("latestApiEndpoint")));
         requiredIndexes.put("idx_context_detectedAt_category_subCategory", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.descending("detectedAt"), Indexes.ascending("category"), Indexes.ascending("subCategory")));
+        // Covers fetchCollectionSeverityCounts, so it is answered from the index without reading event docs.
+        requiredIndexes.put("idx_context_collection_detectedAt_severity", Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("latestApiCollectionId"), Indexes.ascending("detectedAt"), Indexes.ascending("severity")));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {

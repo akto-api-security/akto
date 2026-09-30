@@ -15,9 +15,9 @@ import PostureScoreCard from './overview/PostureScoreCard'
 import KpiGrid from './overview/KpiGrid'
 import DangerousPathsSection from './overview/DangerousPathsSection'
 import HighestRiskAgentsTable from './overview/HighestRiskAgentsTable'
-// import RiskByDomainSection from './overview/RiskByDomainSection'
+import RiskByDomainSection from './overview/RiskByDomainSection'
 import InsightCardsSection from './overview/InsightCardsSection'
-import CoverageGovernanceSection from './overview/CoverageGovernanceSection'
+import FrameworkReadinessSection from './overview/FrameworkReadinessSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
 import dashboardApi from '../api'
 
@@ -271,8 +271,11 @@ function AgenticPosture() {
                 <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
             </Section>
 
-            <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">
-                <CoverageGovernanceSection coverageGovernance={pageData.coverageGovernance} />
+            <Section title="Framework Readiness" description="How much of each compliance framework your guardrails have actually exercised.">
+                <FrameworkReadinessSection
+                    frameworkReadiness={pageData.frameworkReadiness}
+                    onOpen={() => openDrill('frameworkReadiness')}
+                />
             </Section>
 
             <Section title="Changes Since Last Week" description="What's new in the environment — this is what keeps posture operational, not a static snapshot.">

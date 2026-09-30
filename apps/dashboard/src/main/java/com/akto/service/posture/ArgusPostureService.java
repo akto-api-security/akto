@@ -2,12 +2,14 @@ package com.akto.service.posture;
 
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.insights.InsightNarrativeCacheDao;
 import com.akto.dto.AgenticPostureScoreHistory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
+import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.insights.InsightNarrativeCache;
 import com.akto.dto.insights.agentic.AgentFindingGroup;
@@ -35,6 +37,7 @@ import com.mongodb.client.model.Sorts;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.json.JSONObject;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -75,6 +78,8 @@ public class ArgusPostureService {
     public static final String DRILL_PRIVILEGED_TOOLS = KPI_PRIVILEGED_TOOLS;
     public static final String DRILL_SENSITIVE_DATA = KPI_SENSITIVE_DATA;
 
+    public static final String DRILL_FRAMEWORK_READINESS = "frameworkReadiness";
+
     private static final String GUARDED = "Guarded";
     private static final String PARTLY_GUARDED = "Partly guarded";
     private static final String UNGUARDED = "Unguarded";
@@ -106,6 +111,236 @@ public class ArgusPostureService {
         return response;
     }
 
+
+    private static final int FRAMEWORK_READINESS_EVENT_LIMIT = 3000;
+
+    /**
+     * Framework readiness for Argus's built-in guardrail controls (prompt injection, harmful
+     * category, PII, etc.), computed live from real violations — not a port of
+     * PostureService#frameworkReadiness, since that pipeline only reads GuardrailPolicies.LLMRule's
+     * compliance map and can't see built-in controls at all.
+     *
+     * <p>Framework/clause data comes from {@link GuardrailComplianceInfosDao} (collection
+     * {@code guardrail_compliance_infos}) — the same source the violations table's own "Compliance"
+     * column reads. totalClauses per framework is the union of every clause any configured
+     * capability claims for it (not ComplianceSubClauseCatalog — its ids use a different scheme).
+     *
+     * <p>Returns the same shape PostureService.frameworkReadiness does
+     * ({@code frameworks: [{framework, value, clausesCovered, totalClauses}], dataGaps}).
+     */
+    /** Panel-facing: same top-6 cap PostureService#frameworkReadiness uses for Atlas's own card
+     *  (frameworkCoverageRows' {@code Math.min(6, rows.size())}) — the full, uncapped list is what
+     *  the drill flyout shows instead (see #fetchFrameworkReadinessDrill, which calls
+     *  #frameworkReadinessRows directly). */
+    public BasicDBObject frameworkReadiness(InsightDataBundle bundle, int trendStartTs, int trendEndTs) {
+        FrameworkReadinessRows computed = frameworkReadinessRows(bundle, trendStartTs, trendEndTs);
+        List<BasicDBObject> top = computed.rows.subList(0, Math.min(6, computed.rows.size()));
+
+        BasicDBObject panel = new BasicDBObject();
+        panel.put("frameworks", top);
+        panel.put("dataGaps", computed.gaps);
+        return panel;
+    }
+
+    private static final class FrameworkReadinessRows {
+        final List<BasicDBObject> rows;
+        final List<Map<String, Object>> gaps;
+
+        FrameworkReadinessRows(List<BasicDBObject> rows, List<Map<String, Object>> gaps) {
+            this.rows = rows;
+            this.gaps = gaps;
+        }
+    }
+
+    private FrameworkReadinessRows frameworkReadinessRows(InsightDataBundle bundle, int trendStartTs, int trendEndTs) {
+        List<Map<String, Object>> gaps = new ArrayList<>();
+
+        Map<String, Map<String, List<String>>> complianceByCapability = loadComplianceByCapability();
+        if (complianceByCapability.isEmpty()) {
+            gaps.add(gapRow("COMPLIANCE_SCAN", "NOT_CONFIGURED",
+                    "No guardrail compliance mapping is configured for this account yet, so framework readiness can't be computed."));
+            return new FrameworkReadinessRows(new ArrayList<>(), gaps);
+        }
+
+        Map<String, Set<String>> allClausesByFramework = new LinkedHashMap<>();
+        for (Map<String, List<String>> frameworkClauses : complianceByCapability.values()) {
+            for (Map.Entry<String, List<String>> entry : frameworkClauses.entrySet()) {
+                allClausesByFramework
+                        .computeIfAbsent(entry.getKey(), k -> new LinkedHashSet<>())
+                        .addAll(safeList(entry.getValue()));
+            }
+        }
+
+        List<DashboardMaliciousEvent> events =
+                bundle.fetchViolationEvents(InsightProvider.Scope.DETAIL, FRAMEWORK_READINESS_EVENT_LIMIT, null, null);
+        if (events == null) {
+            // Fetch failed — distinct from a genuine zero-match result, which isn't a gap.
+            gaps.add(gapRow("COMPLIANCE_SCAN", "NOT_AVAILABLE",
+                    "Guardrail violation data could not be fetched, so framework readiness could not be computed."));
+            return new FrameworkReadinessRows(new ArrayList<>(), gaps);
+        }
+
+        Map<String, Set<String>> coveredClausesByFramework = new LinkedHashMap<>();
+        for (String framework : allClausesByFramework.keySet()) {
+            coveredClausesByFramework.put(framework, new HashSet<>());
+        }
+
+        for (DashboardMaliciousEvent event : events) {
+            if (event == null) continue;
+            long ts = event.getTimestamp();
+            if (ts < trendStartTs || ts > trendEndTs) continue;
+
+            String ruleViolated = extractRuleViolated(event.getMetadata());
+            String capability = GuardrailControlComplianceMap.capabilityForRuleViolated(ruleViolated);
+            if (capability == null) continue;
+
+            Map<String, List<String>> frameworkClauses = complianceByCapability.get(capability);
+            if (frameworkClauses == null) continue;
+
+            for (Map.Entry<String, List<String>> entry : frameworkClauses.entrySet()) {
+                coveredClausesByFramework.get(entry.getKey()).addAll(safeList(entry.getValue()));
+            }
+        }
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Set<String>> entry : allClausesByFramework.entrySet()) {
+            String framework = entry.getKey();
+            int total = entry.getValue().size();
+            if (total <= 0) continue;
+            int covered = coveredClausesByFramework.getOrDefault(framework, Collections.emptySet()).size();
+
+            BasicDBObject row = new BasicDBObject();
+            row.put("framework", framework);
+            row.put("value", (int) Math.round((covered * 100.0) / total));
+            row.put("clausesCovered", covered);
+            row.put("totalClauses", total);
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Integer.compare(b.getInt("clausesCovered"), a.getInt("clausesCovered")));
+
+        return new FrameworkReadinessRows(rows, gaps);
+    }
+
+    private Map<String, Map<String, List<String>>> loadComplianceByCapability() {
+        Map<String, Map<String, List<String>>> out = new LinkedHashMap<>();
+        List<GuardrailComplianceInfo> docs = GuardrailComplianceInfosDao.instance.findAll(Filters.empty());
+        for (GuardrailComplianceInfo doc : safe(docs)) {
+            if (doc == null || doc.getId() == null) continue;
+            String capability = doc.getId().replace("guardrails/", "").replace(".conf", "");
+            if (capability.isEmpty() || doc.getMapComplianceToListClauses() == null) continue;
+            out.put(capability, doc.getMapComplianceToListClauses());
+        }
+        return out;
+    }
+
+    private static List<String> safeList(List<String> list) {
+        return list != null ? list : Collections.emptyList();
+    }
+
+    /** Reads rule_violated out of a violation's metadata JSON — mirrors extractRuleViolated in
+     *  pages/threat_detection/utils/formatUtils.js (checks both key spellings defensively). */
+    private static String extractRuleViolated(String metadataJson) {
+        if (metadataJson == null || metadataJson.isEmpty()) return null;
+        try {
+            JSONObject metadata = new JSONObject(metadataJson);
+            String ruleViolated = metadata.optString("rule_violated", "");
+            if (ruleViolated.isEmpty()) {
+                ruleViolated = metadata.optString("ruleViolated", "");
+            }
+            return ruleViolated.isEmpty() ? null : ruleViolated;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public PostureDrillResult fetchFrameworkReadinessDrill(InsightDataBundle bundle, int trendStartTs,
+                                                             int trendEndTs, String path, int skip, int limit) {
+        int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;
+        int effectiveSkip = Math.max(skip, 0);
+        PostureDrillResult result = new PostureDrillResult();
+
+        if (path == null || path.isEmpty()) {
+            result.setTitle("Framework readiness");
+            result.setBreadcrumb(Collections.singletonList(
+                    new PostureDrillResult.BreadcrumbItem("", "Framework readiness")));
+            result.setColumns(Arrays.asList(
+                    new PostureDrillResult.ColumnDef("framework", "Framework"),
+                    new PostureDrillResult.ColumnDef("value", "Readiness %"),
+                    new PostureDrillResult.ColumnDef("clausesCovered", "Clauses covered"),
+                    new PostureDrillResult.ColumnDef("totalClauses", "Total clauses")));
+            result.setDrillable(true);
+
+            FrameworkReadinessRows computed = frameworkReadinessRows(bundle, trendStartTs, trendEndTs);
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (BasicDBObject frameworkRow : computed.rows) {
+                Map<String, Object> row = new LinkedHashMap<>(frameworkRow);
+                row.put("id", frameworkRow.getString("framework"));
+                rows.add(row);
+            }
+            setPage(result, rows, effectiveSkip, effectiveLimit);
+            if (rows.isEmpty()) {
+                result.addDataGap(new InsightResult.Gap("COMPLIANCE_SCAN", "NOT_CONFIGURED",
+                        "No guardrail compliance mapping is configured for this account yet."));
+            }
+            return result;
+        }
+
+        String framework = path;
+        result.setTitle(framework + " — evidence");
+        result.setBreadcrumb(Arrays.asList(
+                new PostureDrillResult.BreadcrumbItem("", "Framework readiness"),
+                new PostureDrillResult.BreadcrumbItem(framework, framework)));
+        result.setColumns(Arrays.asList(
+                new PostureDrillResult.ColumnDef("capability", "Capability"),
+                new PostureDrillResult.ColumnDef("clauses", "Clauses demonstrated"),
+                new PostureDrillResult.ColumnDef("policy", "Policy"),
+                new PostureDrillResult.ColumnDef("refId", "Event"),
+                new PostureDrillResult.ColumnDef("detectedAt", "Detected at")));
+        result.setDrillable(false);
+
+        Map<String, Map<String, List<String>>> complianceByCapability = loadComplianceByCapability();
+        List<DashboardMaliciousEvent> events =
+                bundle.fetchViolationEvents(InsightProvider.Scope.DETAIL, FRAMEWORK_READINESS_EVENT_LIMIT, null, null);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (DashboardMaliciousEvent event : safe(events)) {
+            if (event == null) continue;
+            long ts = event.getTimestamp();
+            if (ts < trendStartTs || ts > trendEndTs) continue;
+
+            String capability = GuardrailControlComplianceMap.capabilityForRuleViolated(
+                    extractRuleViolated(event.getMetadata()));
+            if (capability == null) continue;
+
+            Map<String, List<String>> frameworkClauses = complianceByCapability.get(capability);
+            List<String> clauses = frameworkClauses == null ? null : frameworkClauses.get(framework);
+            if (clauses == null || clauses.isEmpty()) continue;
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("capability", capability);
+            row.put("clauses", String.join(", ", clauses));
+            row.put("policy", event.getFilterId());
+            row.put("refId", event.getId());
+            row.put("detectedAt", (int) ts);
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Integer.compare((int) b.get("detectedAt"), (int) a.get("detectedAt")));
+        setPage(result, rows, effectiveSkip, effectiveLimit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap("COMPLIANCE_SCAN", "NO_ROWS",
+                    "No guardrail activity demonstrating \"" + framework + "\" in this window."));
+        }
+        return result;
+    }
+
+    private static void setPage(PostureDrillResult result, List<Map<String, Object>> rows, int skip, int limit) {
+        result.setTotal(rows.size());
+        result.setSkip(skip);
+        result.setLimit(limit);
+        int from = Math.min(skip, rows.size());
+        int to = Math.min(from + limit, rows.size());
+        result.setRows(rows.subList(from, to));
+    }
     // ── Argus posture insight cards ──────────────────────────────────────────────────────────
     //
     // Five fixed cards, each a small, already-aggregated breakdown (never a raw event list) plus
@@ -182,7 +417,7 @@ public class ArgusPostureService {
         }
 
         RedTeamStats redTeam = computeRedTeamStats(openIssueGroups);
-        GuardrailStats guardrail = computeGuardrailStats(maliciousEvents, new HostCollectionResolver(bundle.collections));
+        GuardrailStats guardrail = computeGuardrailStats(maliciousEvents);
         List<AgentFindingGroup> topCritical = pickTopCriticalIssues(openIssueGroups, ATTACK_FLOW_ISSUE_COUNT);
 
         List<BasicDBObject> cards = new ArrayList<>();
@@ -429,7 +664,7 @@ public class ArgusPostureService {
     private static final class GuardrailStats {
         long totalEvents;
         final Map<String, Long> byPolicy = new HashMap<>();   // DashboardMaliciousEvent#getFilterId()
-        final Map<Integer, Long> byAgent = new HashMap<>();   // collection resolved from the event's host, then actor
+        final Map<Integer, Long> byAgent = new HashMap<>();   // DashboardMaliciousEvent#getApiCollectionId()
     }
 
     /**
@@ -440,14 +675,13 @@ public class ArgusPostureService {
      * already uses: row("policy", e.getFilterId())) and the join key back to the real
      * GuardrailPolicies document — see resolvePolicy.
      */
-    private GuardrailStats computeGuardrailStats(List<DashboardMaliciousEvent> events, HostCollectionResolver resolver) {
+    private GuardrailStats computeGuardrailStats(List<DashboardMaliciousEvent> events) {
         GuardrailStats stats = new GuardrailStats();
         for (DashboardMaliciousEvent e : safe(events)) {
             if (e == null) continue;
             stats.totalEvents++;
             if (StringUtils.isNotBlank(e.getFilterId())) stats.byPolicy.merge(e.getFilterId(), 1L, Long::sum);
-            Integer agentId = agentIdForEvent(e, resolver);
-            if (agentId != null) stats.byAgent.merge(agentId, 1L, Long::sum);
+            if (e.getApiCollectionId() != 0) stats.byAgent.merge(e.getApiCollectionId(), 1L, Long::sum);
         }
         return stats;
     }
@@ -702,10 +936,9 @@ public class ArgusPostureService {
                 .comparingInt((DashboardMaliciousEvent e) -> InsightUtil.severityRank(e.getSeverity()))
                 .thenComparing(Comparator.comparingLong(DashboardMaliciousEvent::getTimestamp).reversed()));
 
-        HostCollectionResolver resolver = new HostCollectionResolver(new ArrayList<>(collectionsById.values()));
         List<Map<String, Object>> rows = new ArrayList<>();
         for (DashboardMaliciousEvent e : events) {
-            rows.add(PostureService.row("agentName", agentName(agentIdForEvent(e, resolver), collectionsById),
+            rows.add(PostureService.row("agentName", agentName(e.getApiCollectionId(), collectionsById),
                     "policy", e.getFilterId(), "severity", e.getSeverity(), "detectedAt", e.getTimestamp()));
         }
         result.getSummary().add(new InsightResult.Metric("totalEvents", "Guardrail/malicious events",
@@ -790,14 +1023,7 @@ public class ArgusPostureService {
     private static String agentName(Integer collectionId, Map<Integer, ApiCollection> collectionsById) {
         if (collectionId == null) return null;
         ApiCollection c = collectionsById.get(collectionId);
-        return c != null ? agentDisplayName(c) : null;
-    }
-
-    // An event's apiCollectionId is not a real collection id for guardrail traffic, so attribute it by host, then actor
-    // (HostCollectionResolver.resolveEvent, same as the posture score); null when unmatched.
-    private static Integer agentIdForEvent(DashboardMaliciousEvent e, HostCollectionResolver resolver) {
-        List<Integer> ids = resolver.resolveEvent(e.getHost(), e.getActor());
-        return ids.isEmpty() ? null : ids.get(0);
+        return c != null ? c.getName() : null;
     }
 
     /** Highest-value key, or null when the map is empty. Ties keep the first key iterated. */

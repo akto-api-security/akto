@@ -116,14 +116,6 @@
         { "id": "dataExposure", "label": "Data Exposure", "count": 22, "agentCount": 19, "delta": 2, "deltaTone": "warning" },
         { "id": "protectionControls", "label": "Protection Controls", "count": 18, "agentCount": 18, "delta": -5, "deltaTone": "success" }
     ],
-    "coverageGovernance": [
-        { "id": "agentDiscovery", "label": "Agent discovery", "value": 94 },
-        { "id": "ownershipMapped", "label": "Ownership mapped", "value": 81 },
-        { "id": "identityMapped", "label": "Identity mapped", "value": 88 },
-        { "id": "permissionVisibility", "label": "Permission visibility", "status": "COMING_SOON", "illustrative": { "value": 76 } },
-        { "id": "runtimeActivityObserved", "label": "Runtime activity observed", "value": 69 },
-        { "id": "guardrailEnforcement", "label": "Guardrail enforcement", "value": 72 }
-    ],
     "changesThisWeek": [
         { "id": "newAgents", "icon": "plus", "count": 12, "label": "new agents discovered" },
         { "id": "newTools", "icon": "plus", "count": 37, "label": "new tools added", "tone": "warning" },
