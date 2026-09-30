@@ -271,8 +271,18 @@ function AgenticPosture() {
                 <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
             </Section>
 
-            <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">
-                <CoverageGovernanceSection coverageGovernance={pageData.coverageGovernance} />
+            <Section title="Top Posture Findings" description="The highest-impact gaps, with exactly what's affected and how to close them.">
+                <TopFindingsSection
+                    topFindings={(pageData.topFindings || []).filter((f) => selectedEnv === 'all' || f.environment === selectedEnv)}
+                    onOpenAgent={openAgent}
+                />
+            </Section>
+
+            <Section title="Framework Readiness" description="How much of each compliance framework your guardrails have actually exercised.">
+                <FrameworkReadinessSection
+                    frameworkReadiness={pageData.frameworkReadiness}
+                    onOpen={() => openDrill('frameworkReadiness')}
+                />
             </Section>
 
             <Section title="Changes Since Last Week" description="What's new in the environment — this is what keeps posture operational, not a static snapshot.">

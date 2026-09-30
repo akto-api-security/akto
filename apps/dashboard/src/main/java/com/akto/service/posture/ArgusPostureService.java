@@ -2,17 +2,12 @@ package com.akto.service.posture;
 
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiInfoDao;
-import com.akto.dao.context.Context;
-import com.akto.dao.insights.InsightNarrativeCacheDao;
+import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
 import com.akto.dto.AgenticPostureScoreHistory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
-import com.akto.dto.agentic_sessions.UserAnalysisData;
-import com.akto.dto.insights.InsightNarrativeCache;
-import com.akto.dto.insights.agentic.AgentFindingGroup;
-import com.akto.dto.test_editor.Info;
-import com.akto.dto.testing.AgentConversationResult;
+import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.gpt.handlers.gpt_prompts.AbstractGroundedNarrativeHandler;
 import com.akto.gpt.handlers.gpt_prompts.ArgusAttackFlowNarrativeHandler;
@@ -23,7 +18,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.*;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.crons.ToolClassificationCron;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -36,8 +30,18 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -74,6 +78,8 @@ public class ArgusPostureService {
     public static final String DRILL_PROTECTION_COVERAGE = KPI_PROTECTION_COVERAGE;
     public static final String DRILL_PRIVILEGED_TOOLS = KPI_PRIVILEGED_TOOLS;
     public static final String DRILL_SENSITIVE_DATA = KPI_SENSITIVE_DATA;
+
+    public static final String DRILL_FRAMEWORK_READINESS = "frameworkReadiness";
 
     private static final String GUARDED = "Guarded";
     private static final String PARTLY_GUARDED = "Partly guarded";
@@ -157,87 +163,120 @@ public class ArgusPostureService {
     private final ArgusAttackFlowNarrativeHandler attackFlowHandler = new ArgusAttackFlowNarrativeHandler();
 
     /**
-     * The 5 cards' Java-computed data — fast, no LLM call. `openIssueGroups` comes from
-     * TestingRunIssuesDao#openIssueGroupsForDashboard, `criticalIssueConversations` from
-     * conversationIdsForIssue/findValidatedSummaries scoped to just the 2 most critical open
-     * issues (see pickTopCriticalIssues), `maliciousEvents` from
-     * InsightService#fetchArgusMaliciousEvents, `serviceObservability`/`globalTopics` from
-     * SearchClientFactory's fetchAgenticServiceObservability/fetchAgenticGlobalTopicHierarchy —
-     * the caller (ArgusPostureAction) fetches all of these (in parallel), this method only shapes
-     * them.
+     * Framework readiness for Argus's built-in guardrail controls (prompt injection, harmful
+     * category, PII, etc.), computed live from real violations — not a port of
+     * PostureService#frameworkReadiness, since that pipeline only reads GuardrailPolicies.LLMRule's
+     * compliance map and can't see built-in controls at all.
+     *
+     * <p>Framework/clause data comes from {@link GuardrailComplianceInfosDao} (collection
+     * {@code guardrail_compliance_infos}) — the same source the violations table's own "Compliance"
+     * column reads. totalClauses per framework is the union of every clause any configured
+     * capability claims for it (not ComplianceSubClauseCatalog — its ids use a different scheme).
+     *
+     * <p>Returns the same shape PostureService.frameworkReadiness does
+     * ({@code frameworks: [{framework, value, clausesCovered, totalClauses}], dataGaps}).
      */
-    public List<BasicDBObject> buildInsightCards(InsightDataBundle bundle, List<AgentFindingGroup> openIssueGroups,
-                                                  Map<String, AgentConversationResult> criticalIssueConversations,
-                                                  Map<String, Info> testInfoByType,
-                                                  List<DashboardMaliciousEvent> maliciousEvents,
-                                                  List<UserAnalysisData> serviceObservability,
-                                                  Map<String, Map<String, Integer>> globalTopics) {
-        Map<Integer, ApiCollection> collectionsById = new HashMap<>();
-        for (ApiCollection c : bundle.collections) {
-            if (c != null) collectionsById.put(c.getId(), c);
-        }
-        Map<String, GuardrailPolicies> policiesByName = new HashMap<>();
-        for (GuardrailPolicies p : safe(bundle.policies)) {
-            if (p != null && p.getName() != null) policiesByName.put(p.getName().toLowerCase(Locale.ROOT), p);
+    public BasicDBObject frameworkReadiness(InsightDataBundle bundle, int trendStartTs, int trendEndTs) {
+        BasicDBObject panel = new BasicDBObject();
+        List<Map<String, Object>> gaps = new ArrayList<>();
+
+        Map<String, Map<String, List<String>>> complianceByCapability = loadComplianceByCapability();
+        if (complianceByCapability.isEmpty()) {
+            panel.put("frameworks", new ArrayList<>());
+            gaps.add(gapRow("COMPLIANCE_SCAN", "NOT_CONFIGURED",
+                    "No guardrail compliance mapping is configured for this account yet, so framework readiness can't be computed."));
+            panel.put("dataGaps", gaps);
+            return panel;
         }
 
-        RedTeamStats redTeam = computeRedTeamStats(openIssueGroups);
-        GuardrailStats guardrail = computeGuardrailStats(maliciousEvents, new HostCollectionResolver(bundle.collections));
-        List<AgentFindingGroup> topCritical = pickTopCriticalIssues(openIssueGroups, ATTACK_FLOW_ISSUE_COUNT);
+        Map<String, Set<String>> allClausesByFramework = new LinkedHashMap<>();
+        for (Map<String, List<String>> frameworkClauses : complianceByCapability.values()) {
+            for (Map.Entry<String, List<String>> entry : frameworkClauses.entrySet()) {
+                allClausesByFramework
+                        .computeIfAbsent(entry.getKey(), k -> new LinkedHashSet<>())
+                        .addAll(safeList(entry.getValue()));
+            }
+        }
 
-        List<BasicDBObject> cards = new ArrayList<>();
-        cards.add(redTeamBreakdownCard(redTeam, topCritical, collectionsById, criticalIssueConversations, testInfoByType));
-        cards.add(guardrailBreakdownCard(guardrail, collectionsById, policiesByName));
-        cards.add(guardrailHotspotCard(guardrail, collectionsById, policiesByName));
-        cards.add(observabilityCard(serviceObservability, bundle, globalTopics));
-        return cards;
+        List<DashboardMaliciousEvent> events =
+                bundle.fetchViolationEvents(InsightProvider.Scope.DETAIL, FRAMEWORK_READINESS_EVENT_LIMIT, null, null);
+        if (events == null) {
+            // Fetch failed — distinct from a genuine zero-match result, which isn't a gap.
+            panel.put("frameworks", new ArrayList<>());
+            gaps.add(gapRow("COMPLIANCE_SCAN", "NOT_AVAILABLE",
+                    "Guardrail violation data could not be fetched, so framework readiness could not be computed."));
+            panel.put("dataGaps", gaps);
+            return panel;
+        }
+
+        Map<String, Set<String>> coveredClausesByFramework = new LinkedHashMap<>();
+        for (String framework : allClausesByFramework.keySet()) {
+            coveredClausesByFramework.put(framework, new HashSet<>());
+        }
+
+        for (DashboardMaliciousEvent event : events) {
+            if (event == null) continue;
+            long ts = event.getTimestamp();
+            if (ts < trendStartTs || ts > trendEndTs) continue;
+
+            String ruleViolated = extractRuleViolated(event.getMetadata());
+            String capability = GuardrailControlComplianceMap.capabilityForRuleViolated(ruleViolated);
+            if (capability == null) continue;
+
+            Map<String, List<String>> frameworkClauses = complianceByCapability.get(capability);
+            if (frameworkClauses == null) continue;
+
+            for (Map.Entry<String, List<String>> entry : frameworkClauses.entrySet()) {
+                coveredClausesByFramework.get(entry.getKey()).addAll(safeList(entry.getValue()));
+            }
+        }
+
+        List<BasicDBObject> rows = new ArrayList<>();
+        for (Map.Entry<String, Set<String>> entry : allClausesByFramework.entrySet()) {
+            String framework = entry.getKey();
+            int total = entry.getValue().size();
+            if (total <= 0) continue;
+            int covered = coveredClausesByFramework.getOrDefault(framework, Collections.emptySet()).size();
+
+            BasicDBObject row = new BasicDBObject();
+            row.put("framework", framework);
+            row.put("value", (int) Math.round((covered * 100.0) / total));
+            row.put("clausesCovered", covered);
+            row.put("totalClauses", total);
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Integer.compare(b.getInt("clausesCovered"), a.getInt("clausesCovered")));
+
+        panel.put("frameworks", rows);
+        panel.put("dataGaps", gaps);
+        return panel;
     }
 
-    /**
-     * The account's most critical open issues, worst-first (severity, then count) — used both to
-     * decide which conversationIds the caller needs to fetch (attack-flow grounding) and by
-     * attackFlowCard itself. Pure/no I/O — safe to call before the caller has fetched anything
-     * else.
-     */
-    public List<AgentFindingGroup> pickTopCriticalIssues(List<AgentFindingGroup> openIssueGroups, int n) {
-        List<AgentFindingGroup> sorted = new ArrayList<>(safe(openIssueGroups));
-        sorted.sort(Comparator
-                .comparingInt((AgentFindingGroup g) -> InsightUtil.severityRank(g.getSecondary()))
-                .thenComparing(Comparator.comparingLong(AgentFindingGroup::getCount).reversed()));
-        return sorted.size() > n ? new ArrayList<>(sorted.subList(0, n)) : sorted;
+    private Map<String, Map<String, List<String>>> loadComplianceByCapability() {
+        Map<String, Map<String, List<String>>> out = new LinkedHashMap<>();
+        List<GuardrailComplianceInfo> docs = GuardrailComplianceInfosDao.instance.findAll(Filters.empty());
+        for (GuardrailComplianceInfo doc : safe(docs)) {
+            if (doc == null || doc.getId() == null) continue;
+            String capability = doc.getId().replace("guardrails/", "").replace(".conf", "");
+            if (capability.isEmpty() || doc.getMapComplianceToListClauses() == null) continue;
+            out.put(capability, doc.getMapComplianceToListClauses());
+        }
+        return out;
     }
 
-    /**
-     * One AI write-up per card, keyed by card id — meant to be fetched asynchronously, after
-     * buildInsightCards has already rendered, since a cache miss here is a real LLM round-trip
-     * (see ArgusPostureAction#fetchArgusPostureInsightSummaries). Every card generates
-     * concurrently (SUMMARY_EXECUTOR) so a cold cache doesn't serialize 5 LLM calls. Each regular
-     * card's own "facts" array (added by its builder method) is exactly what gets shown to the
-     * model; the attack-flow card instead carries an "issues" array with real conversation
-     * grounding — see attackFlowCard/generateAttackFlowSummary.
-     */
-    public Map<String, BasicDBObject> buildInsightCardSummaries(InsightContext ctx, List<BasicDBObject> cards, boolean forceRefresh) {
-        final int accountId = ctx.getAccountId();
-        final Integer userId = ctx.getUserId();
-        final CONTEXT_SOURCE contextSource = ctx.getContextSource();
+    private static List<String> safeList(List<String> list) {
+        return list != null ? list : Collections.emptyList();
+    }
 
-        Map<String, Future<BasicDBObject>> futures = new LinkedHashMap<>();
-        for (BasicDBObject card : cards) {
-            String cardId = card.getString("id");
-            if (cardId == null) continue;
-            futures.put(cardId, SUMMARY_EXECUTOR.submit(Context.withContext(accountId, userId, contextSource, () ->
-                    CARD_ATTACK_FLOW.equals(cardId)
-                            ? generateAttackFlowSummary(ctx, card, forceRefresh)
-                            : generateCardSummary(ctx, cardId, card, forceRefresh))));
-        }
-
-        Map<String, BasicDBObject> summaries = new LinkedHashMap<>();
-        for (Map.Entry<String, Future<BasicDBObject>> e : futures.entrySet()) {
-            try {
-                BasicDBObject result = e.getValue().get(SUMMARY_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                if (result != null) summaries.put(e.getKey(), result);
-            } catch (Exception ex) {
-                logger.error("Argus insight card summary timed out/failed for " + e.getKey() + ": " + ex.getMessage());
+    /** Reads rule_violated out of a violation's metadata JSON — mirrors extractRuleViolated in
+     *  pages/threat_detection/utils/formatUtils.js (checks both key spellings defensively). */
+    private static String extractRuleViolated(String metadataJson) {
+        if (metadataJson == null || metadataJson.isEmpty()) return null;
+        try {
+            JSONObject metadata = new JSONObject(metadataJson);
+            String ruleViolated = metadata.optString("rule_violated", "");
+            if (ruleViolated.isEmpty()) {
+                ruleViolated = metadata.optString("ruleViolated", "");
             }
         }
         return summaries;
@@ -844,6 +883,97 @@ public class ArgusPostureService {
 
     private static Map<String, Map<String, Integer>> safeMap(Map<String, Map<String, Integer>> map) {
         return map != null ? map : new LinkedHashMap<>();
+    }
+
+    public PostureDrillResult fetchFrameworkReadinessDrill(InsightDataBundle bundle, int trendStartTs,
+                                                             int trendEndTs, String path, int skip, int limit) {
+        int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;
+        int effectiveSkip = Math.max(skip, 0);
+        PostureDrillResult result = new PostureDrillResult();
+
+        if (path == null || path.isEmpty()) {
+            result.setTitle("Framework readiness");
+            result.setBreadcrumb(Collections.singletonList(
+                    new PostureDrillResult.BreadcrumbItem("", "Framework readiness")));
+            result.setColumns(Arrays.asList(
+                    new PostureDrillResult.ColumnDef("framework", "Framework"),
+                    new PostureDrillResult.ColumnDef("value", "Readiness %"),
+                    new PostureDrillResult.ColumnDef("clausesCovered", "Clauses covered"),
+                    new PostureDrillResult.ColumnDef("totalClauses", "Total clauses")));
+            result.setDrillable(true);
+
+            BasicDBObject panel = frameworkReadiness(bundle, trendStartTs, trendEndTs);
+            @SuppressWarnings("unchecked")
+            List<BasicDBObject> frameworkRows = (List<BasicDBObject>) panel.get("frameworks");
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (BasicDBObject frameworkRow : safe(frameworkRows)) {
+                Map<String, Object> row = new LinkedHashMap<>(frameworkRow);
+                row.put("id", frameworkRow.getString("framework"));
+                rows.add(row);
+            }
+            setPage(result, rows, effectiveSkip, effectiveLimit);
+            if (rows.isEmpty()) {
+                result.addDataGap(new InsightResult.Gap("COMPLIANCE_SCAN", "NOT_CONFIGURED",
+                        "No guardrail compliance mapping is configured for this account yet."));
+            }
+            return result;
+        }
+
+        String framework = path;
+        result.setTitle(framework + " — evidence");
+        result.setBreadcrumb(Arrays.asList(
+                new PostureDrillResult.BreadcrumbItem("", "Framework readiness"),
+                new PostureDrillResult.BreadcrumbItem(framework, framework)));
+        result.setColumns(Arrays.asList(
+                new PostureDrillResult.ColumnDef("capability", "Capability"),
+                new PostureDrillResult.ColumnDef("clauses", "Clauses demonstrated"),
+                new PostureDrillResult.ColumnDef("policy", "Policy"),
+                new PostureDrillResult.ColumnDef("refId", "Event"),
+                new PostureDrillResult.ColumnDef("detectedAt", "Detected at")));
+        result.setDrillable(false);
+
+        Map<String, Map<String, List<String>>> complianceByCapability = loadComplianceByCapability();
+        List<DashboardMaliciousEvent> events =
+                bundle.fetchViolationEvents(InsightProvider.Scope.DETAIL, FRAMEWORK_READINESS_EVENT_LIMIT, null, null);
+
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (DashboardMaliciousEvent event : safe(events)) {
+            if (event == null) continue;
+            long ts = event.getTimestamp();
+            if (ts < trendStartTs || ts > trendEndTs) continue;
+
+            String capability = GuardrailControlComplianceMap.capabilityForRuleViolated(
+                    extractRuleViolated(event.getMetadata()));
+            if (capability == null) continue;
+
+            Map<String, List<String>> frameworkClauses = complianceByCapability.get(capability);
+            List<String> clauses = frameworkClauses == null ? null : frameworkClauses.get(framework);
+            if (clauses == null || clauses.isEmpty()) continue;
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("capability", capability);
+            row.put("clauses", String.join(", ", clauses));
+            row.put("policy", event.getFilterId());
+            row.put("refId", event.getId());
+            row.put("detectedAt", (int) ts);
+            rows.add(row);
+        }
+        rows.sort((a, b) -> Integer.compare((int) b.get("detectedAt"), (int) a.get("detectedAt")));
+        setPage(result, rows, effectiveSkip, effectiveLimit);
+        if (rows.isEmpty()) {
+            result.addDataGap(new InsightResult.Gap("COMPLIANCE_SCAN", "NO_ROWS",
+                    "No guardrail activity demonstrating \"" + framework + "\" in this window."));
+        }
+        return result;
+    }
+
+    private static void setPage(PostureDrillResult result, List<Map<String, Object>> rows, int skip, int limit) {
+        result.setTotal(rows.size());
+        result.setSkip(skip);
+        result.setLimit(limit);
+        int from = Math.min(skip, rows.size());
+        int to = Math.min(from + limit, rows.size());
+        result.setRows(rows.subList(from, to));
     }
 
     private BasicDBObject assetsKpi(List<ApiCollection> assets, String environment) {
