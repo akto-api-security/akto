@@ -24,8 +24,8 @@ from constants import (
     strip_qwen_tier,
 )
 from llm_scanner import _clean_json, scan_with_model_map
+from model_map import build_arbiter
 from prompts import build_reason_prompt
-from providers import build_provider_from_config
 from remote_scanner import scan_anonymize
 from scanners import scan_local
 from settings import settings
@@ -70,13 +70,7 @@ async def _generate_reason(payload: dict) -> dict:
     if not config.get("modelConfigs"):
         default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
         config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
-    arbiter_entry = next(
-        (e for e in config.get("modelConfigs", []) if e.get("modelRole") == "FINAL_ARBITER"),
-        None,
-    )
-    if arbiter_entry is None:
-        return shape_response(scanner_name, True, 0.0, text, {"reason": ""})
-    provider = build_provider_from_config(arbiter_entry)
+    provider = build_arbiter(config.get("modelConfigs"))
     if provider is None:
         return shape_response(scanner_name, True, 0.0, text, {"reason": ""})
     reason = ""

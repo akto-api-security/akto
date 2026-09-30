@@ -18,7 +18,7 @@ import time
 from typing import Any
 
 import metrics_push
-from providers import build_provider_from_config
+from providers import FallbackProvider, build_provider_from_config
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ _DEFAULT_SAFE_THRESHOLD = 0.8
 _ROLE_TIER1 = "FAST_THREAT_FILTER"
 _ROLE_TIER2 = "FAST_FALLBACK_SAFE_FILTER"
 _ROLE_ARBITER = "FINAL_ARBITER"
+_ROLE_ARBITER_BACKUP = "FINAL_ARBITER_BACKUP"
 
 _SAFE = "SAFE"
 _UNSAFE = "UNSAFE"
@@ -36,6 +37,26 @@ _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 
 ScannerEntry = tuple[Any, dict[str, Any]]
+
+
+def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
+    return next((m for m in (model_configs or []) if m.get("modelRole") == role), None)
+
+
+def _with_backup(provider: Any, model_configs: Any) -> Any:
+    backup_entry = _role_entry(model_configs, _ROLE_ARBITER_BACKUP)
+    return FallbackProvider(provider, backup_entry) if backup_entry else provider
+
+
+def build_arbiter(model_configs: Any, model_override: str = "") -> Any | None:
+    """The FINAL_ARBITER provider of a modelConfigs list, with its FINAL_ARBITER_BACKUP entry (if any) as fallback."""
+    entry = _role_entry(model_configs, _ROLE_ARBITER)
+    if entry is None:
+        return None
+    if model_override:
+        entry = {**entry, "model": model_override}
+    provider = build_provider_from_config(entry)
+    return _with_backup(provider, model_configs) if provider is not None else None
 
 
 def _classify(result: dict[str, Any], entry: dict[str, Any]) -> bool:
@@ -78,6 +99,8 @@ class ModelMapScanner:
         for entry in model_map:
             provider = build_provider_from_config(entry)
             if provider is not None:
+                if entry.get("modelRole") == _ROLE_ARBITER:
+                    provider = _with_backup(provider, model_map)
                 scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
             else:
                 # build_provider_from_config already logged which env var was
@@ -296,6 +319,8 @@ class ModelMapScanner:
             details["decision_confidence"] = winner["decision_confidence"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
+            if entry.get("modelRole") == _ROLE_ARBITER_BACKUP:
+                continue
             stem = self._stem(entry.get("provider", ""))
             if stem:
                 details.setdefault(stem, self._summarize(completed_by_stem.get(stem)))

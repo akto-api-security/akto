@@ -741,7 +741,7 @@ class GemmaFastProvider(OpenAIProvider):
 
 
 class GemmaFastArbiterProvider(OpenAIProvider):
-    """Faster (Gemma) arbiter endpoint; falls back to the direct anthropic provider on failure."""
+    """Faster (Gemma) arbiter endpoint. No built-in fallback: a backup is a FINAL_ARBITER_BACKUP modelConfigs entry."""
 
     name = "gemma_fast_arbiter"
     include_metrics = True
@@ -751,14 +751,7 @@ class GemmaFastArbiterProvider(OpenAIProvider):
         self.name = "gemma_fast_arbiter"
 
     async def complete(self, prompt: str) -> str:
-        try:
-            return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
-        except Exception as exc:
-            logger.warning(f"[GemmaFastArbiter] fast endpoint failed ({exc!r}), falling back to anthropic")
-            fallback = _build_anthropic("")
-            if fallback is None:
-                raise
-            return await fallback.complete(prompt)
+        return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
 
 
 _FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
@@ -847,6 +840,23 @@ def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "
         logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
         return None
     return _cached_provider((provider_name, model, base_url, deployment), lambda: builder(model, base_url, deployment))
+
+
+class FallbackProvider(LLMProvider):
+    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any]):
+        self.primary = primary
+        self.backup_entry = backup_entry
+        self.name = primary.name
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await asyncio.wait_for(self.primary.complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
+        except Exception as exc:
+            backup = build_provider_from_config(self.backup_entry)
+            if backup is None:
+                raise
+            logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}")
+            return await backup.complete(prompt)
 
 
 def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:

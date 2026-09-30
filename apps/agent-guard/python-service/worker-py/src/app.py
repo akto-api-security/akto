@@ -14,6 +14,8 @@ import cascade_backpressure
 import metrics_push
 import providers
 import scan_diag
+from constants import get_default_config
+from model_map import build_arbiter
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -43,12 +45,6 @@ class ScanRequest(BaseModel):
 class GuardrailsLLMRequest(BaseModel):
     prompt: str
     model: str = ""
-
-
-# gemma_fast_arbiter's actual served model — DEFAULT_OPENAI_MODEL ("gpt-4o-mini", providers.py)
-# is the wrong default here: the gateway never sends a model, and vLLM 404s on any model name
-# it isn't serving. Matches the FINAL_ARBITER entry's "model" in DEFAULT_MODEL_CONFIG_JSON.
-_GUARDRAILS_ARBITER_MODEL = "gemma-4-26b-a4b-it"
 
 
 @asynccontextmanager
@@ -164,17 +160,18 @@ async def scan_batch(body: list[ScanRequest]):
 async def guardrails_llm(body: GuardrailsLLMRequest):
     """Single-provider prompt-in/text-out passthrough for the gateway's PII/custom-guardrail
     block+redact decisions — bypasses ModelMapScanner's cascade entirely, one provider call.
-    Backed by the same gemma_fast_arbiter settings (GEMMA_VLLM_ARBITER_BASE_URL/GEMMA_26B_VLLM_KEY)
-    the cascade's FINAL_ARBITER role already uses.
+    Primary = the FINAL_ARBITER entry of the model config (DEFAULT_MODEL_CONFIG_JSON, else the built-in default).
+    Backup = its FINAL_ARBITER_BACKUP entry, tried when the primary fails; no such entry = no backup.
     """
     start = time.perf_counter()
     logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
-    provider = providers.build_provider_from_config(
-        {"provider": "gemma_fast_arbiter", "model": body.model or _GUARDRAILS_ARBITER_MODEL}
-    )
+    provider = build_arbiter(get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"], body.model)
     if provider is None:
-        logger.warning("[GuardrailsLLM] not configured (GEMMA_VLLM_ARBITER_BASE_URL unset)")
-        raise HTTPException(status_code=503, detail="guardrails LLM not configured (GEMMA_VLLM_ARBITER_BASE_URL unset)")
+        logger.warning("[GuardrailsLLM] not configured (no usable FINAL_ARBITER entry in the model config)")
+        raise HTTPException(
+            status_code=503,
+            detail="guardrails LLM not configured (no usable FINAL_ARBITER entry in the model config)",
+        )
     try:
         content = await provider.complete(body.prompt)
     except Exception as exc:
