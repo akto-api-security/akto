@@ -52,6 +52,7 @@ One provider covers every Bedrock model through the model-agnostic Converse API
 | `BEDROCK_API_KEY` | one auth mode | Bedrock API key, sent as Bearer; **takes precedence** over IAM keys |
 | `BEDROCK_ACCESS_KEY_ID` / `BEDROCK_SECRET_ACCESS_KEY` | other auth mode | IAM user keys, SigV4-signed in pure Python (botocore can't load in the Worker) |
 | `BEDROCK_SESSION_TOKEN` | no | only for temporary STS credentials |
+| `BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC` | no | pod IAM-role mode only: refresh credentials this many seconds before they expire (default `1800` = 30 min; capped at half their lifetime) |
 | *(none)* | third auth mode | **IAM role on EKS/ECS**: with no key set, the pod's role is used via EKS Pod Identity, IRSA or an ECS task role — detected from the `AWS_*` vars EKS injects, refreshed automatically |
 
 Auth precedence: `BEDROCK_API_KEY` → `BEDROCK_ACCESS_KEY_ID`/`BEDROCK_SECRET_ACCESS_KEY` → pod IAM role.

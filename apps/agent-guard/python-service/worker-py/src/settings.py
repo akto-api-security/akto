@@ -61,6 +61,9 @@ _FIELDS = (
     "BEDROCK_ACCESS_KEY_ID",
     "BEDROCK_SECRET_ACCESS_KEY",
     "BEDROCK_SESSION_TOKEN",
+    # Seconds before expiry to refresh pod IAM-role credentials (EKS Pod
+    # Identity / IRSA). Default 1800 (30 min); capped at half their lifetime.
+    "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC",
     # Integrations
     "SLACK_WEBHOOK_URL",
     "DATABASE_ABSTRACTOR_SERVICE_URL",
@@ -143,6 +146,7 @@ class Settings:
     BEDROCK_ACCESS_KEY_ID: str
     BEDROCK_SECRET_ACCESS_KEY: str
     BEDROCK_SESSION_TOKEN: str
+    BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC: str
     SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str

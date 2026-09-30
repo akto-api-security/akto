@@ -14,7 +14,8 @@ It also resolves IAM-role credentials on EKS without any configured keys
 credentials endpoint, IRSA via STS AssumeRoleWithWebIdentity. Both are driven
 by the standard AWS_* env vars EKS injects into the pod, read from os.environ
 like every AWS SDK does (not settings — these aren't ours to name). Resolved
-credentials are cached until shortly before expiry, like gcp_auth tokens.
+credentials are cached and refreshed BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC
+(default 30 min) before they expire.
 """
 
 import hashlib
@@ -29,6 +30,7 @@ from urllib.parse import parse_qsl, quote, urlsplit
 
 import http_client
 import metrics_push
+from settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +42,9 @@ _IDENTITY = {"Accept-Encoding": "identity"}
 _ECS_CREDENTIALS_HOST = "http://169.254.170.2"
 _STS_NS = {"sts": "https://sts.amazonaws.com/doc/2011-06-15/"}
 _DEFAULT_SESSION_NAME = "akto-agent-guard"
-_REFRESH_MARGIN_S = 300
+_DEFAULT_REFRESH_MARGIN_S = 1800.0
 
-# One role per pod, so a single cache slot: (credentials, absolute_expiry_epoch).
+# One role per pod, so a single cache slot: (credentials, refresh_at_epoch).
 _ROLE_CACHE: dict[str, tuple["AwsCredentials", float]] = {}
 _ROLE_CACHE_KEY = "role"
 
@@ -121,14 +123,31 @@ async def _fetch_web_identity_credentials(region: str) -> tuple[AwsCredentials, 
     return creds, _epoch(field("Expiration"))
 
 
+def _refresh_margin_s() -> float:
+    try:
+        margin = float(settings.BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC or _DEFAULT_REFRESH_MARGIN_S)
+    except ValueError:
+        margin = _DEFAULT_REFRESH_MARGIN_S
+    return margin if margin >= 0 else _DEFAULT_REFRESH_MARGIN_S
+
+
+def _refresh_at(expiry: float, now: float) -> float:
+    """When to refetch: `margin` before expiry, but never more than half the
+    remaining lifetime early — a margin at/above the lifetime (e.g. 1h IRSA
+    credentials with a 1h margin) would otherwise refetch on every request."""
+    lifetime = max(expiry - now, 0.0)
+    return expiry - min(_refresh_margin_s(), lifetime / 2)
+
+
 async def get_role_credentials(region: str) -> AwsCredentials:
-    """Return valid credentials for the pod's IAM role, refreshing ~5 min early.
+    """Return valid credentials for the pod's IAM role, refreshed early
+    (BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC before expiry, default 30 min).
 
     `region` is the fallback STS region for IRSA when EKS didn't inject
     AWS_REGION. Raises if no role mechanism is configured or the fetch fails.
     """
     cached = _ROLE_CACHE.get(_ROLE_CACHE_KEY)
-    if cached and cached[1] - _REFRESH_MARGIN_S > time.time():
+    if cached and cached[1] > time.time():
         metrics_push.COUNTS["cache_hits"].increment("aws_role_creds")
         return cached[0]
     metrics_push.COUNTS["cache_misses"].increment("aws_role_creds")
@@ -144,9 +163,14 @@ async def get_role_credentials(region: str) -> AwsCredentials:
     except Exception as exc:
         logger.error(f"[AwsAuth] fetching IAM role credentials via {source or '-'} failed: {exc!r}")
         raise
-    _ROLE_CACHE[_ROLE_CACHE_KEY] = (creds, expiry)
+    now = time.time()
+    refresh_at = _refresh_at(expiry, now)
+    _ROLE_CACHE[_ROLE_CACHE_KEY] = (creds, refresh_at)
     metrics_push.set_cache_size("aws_role_creds", len(_ROLE_CACHE))
-    logger.info(f"[AwsAuth] IAM role credentials refreshed via {source}, expire in {expiry - time.time():.0f}s")
+    logger.info(
+        f"[AwsAuth] IAM role credentials refreshed via {source}, expire in {expiry - now:.0f}s, "
+        f"next refresh in {refresh_at - now:.0f}s"
+    )
     return creds
 
 

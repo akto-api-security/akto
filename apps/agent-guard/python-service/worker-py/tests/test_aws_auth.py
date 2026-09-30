@@ -159,6 +159,7 @@ def role_env(monkeypatch):
     }
     _FakeClient.post_text = _STS_XML.format(expiration=_LATER)
     aws_auth._ROLE_CACHE.clear()
+    monkeypatch.setattr(aws_auth.settings, "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC", "")
     monkeypatch.setattr(aws_auth.http_client, "get_client", lambda: _FakeClient())
     yield monkeypatch
     aws_auth._ROLE_CACHE.clear()
@@ -190,13 +191,43 @@ async def test_pod_identity_sends_token_file_and_caches(role_env, tmp_path):
     assert len(_FakeClient.calls) == 1  # served from cache
 
 
-async def test_refreshes_shortly_before_expiry(role_env):
+async def test_ecs_relative_uri_form(role_env):
     role_env.setenv("AWS_CONTAINER_CREDENTIALS_RELATIVE_URI", "/v2/credentials/abc")
-    _FakeClient.get_payload["Expiration"] = datetime.fromtimestamp(time.time() + 120, UTC).isoformat()
     await aws_auth.get_role_credentials("us-east-1")
+    assert _FakeClient.calls[0]["url"] == "http://169.254.170.2/v2/credentials/abc"
+
+
+async def test_refetches_once_refresh_time_passes(role_env):
+    role_env.setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://169.254.170.23/v1/credentials")
     await aws_auth.get_role_credentials("us-east-1")
-    assert len(_FakeClient.calls) == 2  # inside the 5-min margin → refetched
-    assert _FakeClient.calls[0]["url"] == "http://169.254.170.2/v2/credentials/abc"  # ECS task-role form
+    creds, _ = aws_auth._ROLE_CACHE[aws_auth._ROLE_CACHE_KEY]
+    aws_auth._ROLE_CACHE[aws_auth._ROLE_CACHE_KEY] = (creds, time.time() - 1)  # refresh time reached
+    await aws_auth.get_role_credentials("us-east-1")
+    assert len(_FakeClient.calls) == 2
+
+
+def test_refresh_margin_defaults_to_30_minutes(role_env):
+    now = 1_000_000.0
+    assert aws_auth._refresh_at(now + 6 * 3600, now) == now + 6 * 3600 - 1800  # Pod Identity: 6h credentials
+
+
+def test_refresh_margin_from_env(role_env):
+    role_env.setattr(aws_auth.settings, "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC", "600")
+    now = 1_000_000.0
+    assert aws_auth._refresh_at(now + 3600, now) == now + 3600 - 600
+
+
+def test_refresh_margin_capped_at_half_lifetime(role_env):
+    # 1h IRSA credentials with a 1h margin would otherwise refetch on every request.
+    role_env.setattr(aws_auth.settings, "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC", "3600")
+    now = 1_000_000.0
+    assert aws_auth._refresh_at(now + 3600, now) == now + 1800
+
+
+@pytest.mark.parametrize("raw", ["abc", "-5"])
+def test_invalid_refresh_margin_falls_back_to_default(role_env, raw):
+    role_env.setattr(aws_auth.settings, "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC", raw)
+    assert aws_auth._refresh_margin_s() == 1800
 
 
 async def test_irsa_exchanges_web_identity_token_at_sts(role_env, tmp_path):
