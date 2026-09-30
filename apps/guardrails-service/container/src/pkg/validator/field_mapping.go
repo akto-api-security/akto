@@ -362,6 +362,16 @@ func valueAtPath(data any, parts []string) any {
 	key := parts[0]
 	rest := parts[1:]
 	switch m := data.(type) {
+	case string:
+		// Path continues into a JSON-encoded string, e.g. {"body": "{\"messages\": [...]}"}.
+		var decoded any
+		if err := json.Unmarshal([]byte(m), &decoded); err != nil {
+			return nil
+		}
+		if _, isString := decoded.(string); isString {
+			return nil
+		}
+		return valueAtPath(decoded, parts)
 	case map[string]any:
 		next, ok := m[key]
 		if !ok {

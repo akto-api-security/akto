@@ -120,6 +120,24 @@ func TestGetValueAtPathFromJSON_singlePaths(t *testing.T) {
 			}`,
 			want: "assistant reply",
 		},
+		{
+			name:    "user content inside JSON-encoded body string",
+			path:    "body.messages.role=user.content",
+			payload: `{"body": "{\"messages\": [{\"role\": \"system\", \"content\": \"ignore me\"}, {\"role\": \"user\", \"content\": \"scan wrapped prompt\"}]}"}`,
+			want:    "scan wrapped prompt",
+		},
+		{
+			name:    "multimodal content inside JSON-encoded body string",
+			path:    "body.messages.role=user.content.0.text",
+			payload: `{"body": "{\"messages\": [{\"role\": \"user\", \"content\": [{\"type\": \"text\", \"text\": \"scan wrapped multimodal\"}]}]}"}`,
+			want:    "scan wrapped multimodal",
+		},
+		{
+			name:    "tool content inside JSON-encoded body string",
+			path:    "body.messages.role=tool.content",
+			payload: `{"body": "{\"messages\": [{\"role\": \"user\", \"content\": \"summarize\"}, {\"role\": \"tool\", \"content\": \"tool result text\"}]}"}`,
+			want:    "tool result text",
+		},
 	}
 
 	for _, tt := range tests {
@@ -367,5 +385,33 @@ func TestExtractPayloadForValidation_envExtractionFailureFallsBackToRawPayload(t
 	got := svc.extractPayloadForValidation(raw, "POST", "/v1/chat/completions", true)
 	if got != raw {
 		t.Fatalf("extractPayloadForValidation() = %q, want raw payload %q", got, raw)
+	}
+}
+
+func TestGetValueAtPathFromJSON_nonJSONStringStopsPath(t *testing.T) {
+	payload := `{"body": "plain text, not JSON"}`
+	if got, ok := GetValueAtPathFromJSON(payload, "body.messages.role=user.content"); ok {
+		t.Fatalf("GetValueAtPathFromJSON() = %q, want no match", got)
+	}
+}
+
+func TestExtractPayloadForValidation_envMappingExtractsFromWrappedBody(t *testing.T) {
+	resetGuardrailSchemaRegistry(t)
+	resetFieldMappingEnv(t)
+	t.Setenv(EnvFieldMapping, "POST:/v1/chat/completions:body.messages.role=user.content|body.messages.role=user.content.0.text|messages.role=user.content|messages.role=user.content.0.text,body.choices.0.message.content|choices.0.message.content")
+
+	svc := testValidatorService()
+	want := `{"text":"Read tenant-a/approved"}`
+	payloads := map[string]string{
+		"wrapped":   `{"body": "{\"messages\": [{\"role\": \"system\", \"content\": \"You are a synthetic tenant-a evaluator.\"}, {\"role\": \"user\", \"content\": \"Read tenant-a/approved\"}]}"}`,
+		"unwrapped": `{"messages": [{"role": "system", "content": "You are a synthetic tenant-a evaluator."}, {"role": "user", "content": "Read tenant-a/approved"}]}`,
+	}
+	for name, raw := range payloads {
+		t.Run(name, func(t *testing.T) {
+			got := svc.extractPayloadForValidation(raw, "POST", "/v1/chat/completions", true)
+			if got != want {
+				t.Fatalf("extractPayloadForValidation() = %q, want %q", got, want)
+			}
+		})
 	}
 }
