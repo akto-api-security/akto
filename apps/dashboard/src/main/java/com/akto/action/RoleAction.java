@@ -145,6 +145,30 @@ public class RoleAction extends UserAction {
         return true;
     }
 
+    @Setter
+    private List<String> assignableRoles;
+
+    // a team admin may only give scoped, non-admin custom roles, so it can never hand out access beyond its team
+    private boolean validateAssignableRoles() {
+        if (assignableRoles == null) {
+            return true;
+        }
+        for (String name : assignableRoles) {
+            CustomRole role = CustomRoleDao.instance.findRoleByName(name);
+            if (role == null) {
+                addActionError("Role " + name + " does not exist.");
+                return false;
+            }
+            boolean scoped = (role.getApiCollectionsId() != null && !role.getApiCollectionsId().isEmpty())
+                    || (role.getCollectionRules() != null && !role.getCollectionRules().isEmpty());
+            if (Role.ADMIN.name().equals(role.getBaseRole()) || !scoped) {
+                addActionError("Role " + name + " cannot be given by a team admin: it must be limited to collections and not based on Admin.");
+                return false;
+            }
+        }
+        return true;
+    }
+
     // users of a role cache their collections; clear them so a role change applies right away
     private void clearRoleCaches() {
         CustomRoleDao.clearRoleCache();
@@ -193,13 +217,14 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(!defaultInviteCheck() || !validatePermissionOverrides() || !validateCollectionRules()){
+        if(!defaultInviteCheck() || !validatePermissionOverrides() || !validateCollectionRules() || !validateAssignableRoles()){
             return ERROR.toUpperCase();
         }
 
         CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, threatProtectionEnabled, new ArrayList<>());
         role.setPermissionOverrides(permissionOverrides);
         role.setCollectionRules(collectionRules);
+        role.setAssignableRoles(assignableRoles);
         CustomRoleDao.instance.insertOne(role);
         clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
@@ -227,7 +252,7 @@ public class RoleAction extends UserAction {
         if(!defaultInviteCheck() && !existingRole.getDefaultInviteRole()){
             return ERROR.toUpperCase();
         }
-        if (!validatePermissionOverrides() || !validateCollectionRules()) {
+        if (!validatePermissionOverrides() || !validateCollectionRules() || !validateAssignableRoles()) {
             return ERROR.toUpperCase();
         }
 
@@ -237,7 +262,8 @@ public class RoleAction extends UserAction {
             Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole),
             Updates.set(CustomRole.THREAT_PROTECTION_ENABLED, threatProtectionEnabled),
             Updates.set(CustomRole.PERMISSION_OVERRIDES, permissionOverrides),
-            Updates.set(CustomRole.COLLECTION_RULES, collectionRules)
+            Updates.set(CustomRole.COLLECTION_RULES, collectionRules),
+            Updates.set(CustomRole.ASSIGNABLE_ROLES, assignableRoles)
         ));
         clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));

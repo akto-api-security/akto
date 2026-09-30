@@ -16,7 +16,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.utils.RoleAssignment;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -342,17 +342,11 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             return Action.ERROR.toUpperCase();
         }
 
-        // Caller can only edit users, and assign roles, within their own role hierarchy
-        List<Role> callerHierarchy = Arrays.asList(RBACDao.getCurrentRoleForUser(getSUser().getId(), accId).getRoleHierarchy());
-        RBAC targetRbac = RBACDao.getCurrentRBACForUser(userDetails.getId(), accId);
-        if (targetRbac != null) {
-            for (CONTEXT_SOURCE scope : CONTEXT_SOURCE.values()) {
-                Role targetRole = targetRbac.getRoleForScope(scope);
-                if (targetRole != null && !targetRole.equals(Role.NO_ACCESS) && !callerHierarchy.contains(targetRole)) {
-                    addActionError("User not allowed to update role for: " + email);
-                    return Action.ERROR.toUpperCase();
-                }
-            }
+        // Caller can only edit users, and assign roles, that they are allowed to give (role hierarchy, or a team admin's roles)
+        int callerId = getSUser().getId();
+        if (!RoleAssignment.canManage(callerId, accId, RBACDao.getCurrentRBACForUser(userDetails.getId(), accId))) {
+            addActionError("User not allowed to update role for: " + email);
+            return Action.ERROR.toUpperCase();
         }
 
         loggerMaker.debugAndAddToDb("scopeRoleMapping before init: " + scopeRoleMapping);
@@ -383,7 +377,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
                         return Action.ERROR.toUpperCase();
                     }
-                    if (!baseRole.equals(Role.NO_ACCESS) && !callerHierarchy.contains(baseRole)) {
+                    if (!baseRole.equals(Role.NO_ACCESS) && !RoleAssignment.canAssign(callerId, accId, roleStr)) {
                         addActionError("Invalid role: " + roleStr);
                         loggerMaker.errorAndAddToDb("Invalid role attempted in scope-role mapping: " + roleStr + " for user: " + email);
                         return Action.ERROR.toUpperCase();
@@ -398,7 +392,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                             loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
                             return Action.ERROR.toUpperCase();
                         }
-                        if (!baseRole.equals(Role.NO_ACCESS) && !callerHierarchy.contains(baseRole)) {
+                        if (!baseRole.equals(Role.NO_ACCESS) && !RoleAssignment.canAssign(callerId, accId, roleStr)) {
                             addActionError("Invalid role: " + roleStr);
                             return Action.ERROR.toUpperCase();
                         }
@@ -439,12 +433,21 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         }
     }
 
-    private Role[] userRoleHierarchy;
+    private List<String> userRoleHierarchy;
 
     public String getRoleHierarchy(){
         try {
+            // team admins (limited to collections) get the roles they may give instead of the hierarchy
+            Set<String> assignable = RoleAssignment.limitedAssignableRoles(getSUser().getId(), Context.accountId.get());
+            if (assignable != null) {
+                this.userRoleHierarchy = new ArrayList<>(assignable);
+                return Action.SUCCESS.toUpperCase();
+            }
             Role currentRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
-            this.userRoleHierarchy = currentRole.getRoleHierarchy();
+            this.userRoleHierarchy = new ArrayList<>();
+            for (Role role : currentRole.getRoleHierarchy()) {
+                this.userRoleHierarchy.add(role.name());
+            }
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             addActionError("User role doesn't exist.");
@@ -551,7 +554,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         this.userRole = userRole;
     }
 
-    public Role[] getUserRoleHierarchy() {
+    public List<String> getUserRoleHierarchy() {
         return userRoleHierarchy;
     }
 

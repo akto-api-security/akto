@@ -3,7 +3,6 @@ package com.akto.action;
 import com.akto.dao.CommonOrganisationMappingDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
-import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -13,6 +12,7 @@ import com.akto.notifications.email.SendgridEmail;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
+import com.akto.utils.RoleAssignment;
 import com.akto.utils.Utils;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -86,10 +86,8 @@ public class InviteUserAction extends UserAction{
             return null;
         }
 
-        // Get current user's role for hierarchy validation
-        Role currentUserRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
-
-        if (!Arrays.asList(currentUserRole.getRoleHierarchy()).contains(baseRole)) {
+        // role hierarchy, or for team admins the roles they may give
+        if (!RoleAssignment.canAssign(getSUser().getId(), Context.accountId.get(), roleStr)) {
             addActionError("User not allowed to invite for role: " + roleStr);
             return null;
         }

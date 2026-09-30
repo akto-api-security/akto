@@ -219,6 +219,18 @@ const Roles = () => {
         setRoles(prevRoles => prevRoles.map(r => r.name === role ? { ...r, collectionRules } : r))
     }
 
+    const toggleAssignableRole = (role, otherRole, checked) => {
+        setRoles(prevRoles => prevRoles.map(r => {
+            if (r.name !== role) return r
+            const current = (r.assignableRoles || []).filter(x => x !== otherRole)
+            return { ...r, assignableRoles: checked ? [...current, otherRole] : current }
+        }))
+    }
+
+    // roles a team admin may give: limited to collections and not based on Admin (the backend enforces the same)
+    const isGivableByTeamAdmin = (r) => r.baseRole !== 'ADMIN' &&
+        ((r.apiCollectionsId || []).length > 0 || (r.collectionRules || []).length > 0)
+
     const [newHostPattern, setNewHostPattern] = useState('')
     const [newTag, setNewTag] = useState('')
 
@@ -255,7 +267,7 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {}, roleData.collectionRules || [])
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {}, roleData.collectionRules || [], roleData.assignableRoles || [])
         await getRoleData();
     }
 
@@ -361,6 +373,17 @@ const Roles = () => {
                                                                 />
                                                             </Box>
                                                         </HorizontalStack>
+                                                    ))}
+                                                </VerticalStack>
+                                            </Box>
+                                            <Box>
+                                                <VerticalStack gap={2}>
+                                                    <Text variant="headingSm" as="h4">Roles this role can give</Text>
+                                                    <Text variant="bodySm" color="subdued">For team admins limited to collections: they can invite users and change roles only to these roles, and only for users who already have one of them. Needs the "Invite users" permission.</Text>
+                                                    {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).map(r => (
+                                                        <Checkbox key={r.name} label={r.name}
+                                                            checked={(item.assignableRoles || []).includes(r.name)}
+                                                            onChange={(checked) => toggleAssignableRole(name, r.name, checked)} />
                                                     ))}
                                                 </VerticalStack>
                                             </Box>

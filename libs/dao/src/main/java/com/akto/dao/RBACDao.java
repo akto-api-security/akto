@@ -63,7 +63,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
             Role.ADMIN, Role.GUEST, Role.THREAT_ENGINEER, Role.THREAT_VIEWER));
 
     /** The user's current custom role, or null for built-in roles. */
-    private static CustomRole currentCustomRole(int userId, int accountId) {
+    public static CustomRole currentCustomRole(int userId, int accountId) {
         RBAC rbac = getCurrentRBACForUser(userId, accountId);
         if (rbac == null) {
             return null;
