@@ -82,6 +82,10 @@ public class ModuleInfoAction extends UserAction {
     @Setter private List<String> hostnames;
     @Setter private List<String> deviceIds;
     @Setter private List<String> oses;
+    @Setter private List<String> browserNames;
+    @Setter private List<String> agentVersions;
+    @Setter private List<String> statuses;
+    @Setter private List<String> providers;
     @Setter private String queryValue;
     @Setter private int startTimestamp;
     @Setter private int endTimestamp;
@@ -96,6 +100,10 @@ public class ModuleInfoAction extends UserAction {
     private static final String AD_DEVICE_ID = ModuleInfo.ADDITIONAL_DATA + ".deviceId";
     private static final String AD_USERNAME = ModuleInfo.ADDITIONAL_DATA + ".username";
     private static final String AD_OS = ModuleInfo.ADDITIONAL_DATA + ".os";
+    private static final String AD_BROWSER_NAME = ModuleInfo.ADDITIONAL_DATA + ".browserName";
+    private static final String AD_PROVIDER = ModuleInfo.ADDITIONAL_DATA + ".provider";
+    private static final String AD_INSTALL_STATUS = ModuleInfo.ADDITIONAL_DATA + ".installStatus";
+    private static final String DISPLAY_STATUS_FIELD = "displayStatus";
 
     private Bson buildEndpointShieldFilter() {
         List<Bson> f = new ArrayList<>();
@@ -105,7 +113,12 @@ public class ModuleInfoAction extends UserAction {
         if (hostnames != null && !hostnames.isEmpty()) f.add(Filters.in(ModuleInfo.NAME, hostnames));
         if (usernames != null && !usernames.isEmpty()) f.add(Filters.in(AD_USERNAME, usernames));
         if (deviceIds != null && !deviceIds.isEmpty()) f.add(Filters.in(AD_DEVICE_ID, deviceIds));
-        if (oses != null && !oses.isEmpty()) f.add(Filters.in(AD_OS, oses));
+        List<Bson> osOrBrowser = new ArrayList<>();
+        if (oses != null && !oses.isEmpty()) osOrBrowser.add(Filters.in(AD_OS, oses));
+        if (browserNames != null && !browserNames.isEmpty()) osOrBrowser.add(Filters.in(AD_BROWSER_NAME, browserNames));
+        if (providers != null && !providers.isEmpty()) osOrBrowser.add(Filters.in(AD_PROVIDER, providers));
+        if (!osOrBrowser.isEmpty()) f.add(Filters.or(osOrBrowser));
+        if (agentVersions != null && !agentVersions.isEmpty()) f.add(Filters.in(ModuleInfo.CURRENT_VERSION, agentVersions));
         if (queryValue != null && !queryValue.trim().isEmpty()) {
             String q = Pattern.quote(queryValue.trim());
             f.add(Filters.or(
@@ -154,6 +167,16 @@ public class ModuleInfoAction extends UserAction {
         return new Document("$ifNull", Arrays.asList("$" + fieldPath, defaultValue));
     }
 
+    private static Document endpointShieldDisplayStatusExpr(int now) {
+        return new Document("$switch", new Document()
+                .append("branches", Arrays.asList(
+                        new Document("case", new Document("$eq", Arrays.asList("$" + AD_INSTALL_STATUS, "installing")))
+                                .append("then", "installing"),
+                        new Document("case", new Document("$eq", Arrays.asList("$" + AD_INSTALL_STATUS, "failed")))
+                                .append("then", "install_failed")))
+                .append("default", endpointShieldCurrentStatusExpr(now)));
+    }
+
     private static Document endpointShieldCurrentStatusExpr(int now) {
         return new Document("$switch", new Document()
                 .append("branches", Arrays.asList(
@@ -167,6 +190,27 @@ public class ModuleInfoAction extends UserAction {
                                 .append("then", STATUS_INACTIVE)
                 ))
                 .append("default", STATUS_ERROR));
+    }
+
+    private static List<Bson> endpointShieldGroupedStages(Bson filter, Bson groupId, int now) {
+        return new ArrayList<>(Arrays.asList(
+                Aggregates.match(filter),
+                Aggregates.sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)),
+                Aggregates.group(groupId,
+                        Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
+                        Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),
+                        Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
+                        Accumulators.first(ModuleInfo.STARTED_TS, ifNullExpr(ModuleInfo.STARTED_TS, 0)),
+                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
+                        Accumulators.first(ModuleInfo.NAME, "$" + ModuleInfo.NAME),
+                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA),
+                        Accumulators.first(ModuleInfo._REBOOT, ifNullExpr(ModuleInfo._REBOOT, false)),
+                        Accumulators.first(ModuleInfo.DELETE_TOPIC_AND_REBOOT, ifNullExpr(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)),
+                        Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
+                Aggregates.addFields(
+                        new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
+                        new Field<>(ModuleInfo.ADDITIONAL_DATA + ".currentStatus", endpointShieldCurrentStatusExpr(now)),
+                        new Field<>(DISPLAY_STATUS_FIELD, endpointShieldDisplayStatusExpr(now)))));
     }
 
     /**
@@ -188,40 +232,37 @@ public class ModuleInfoAction extends UserAction {
         Bson filter = buildEndpointShieldFilter();
         Bson groupId = endpointShieldGroupId();
 
-        Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
-                Aggregates.match(filter),
-                Aggregates.group(groupId),
-                Aggregates.count("total")
-        ), Document.class).first();
-        total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
+        boolean filterByStatus = statuses != null && !statuses.isEmpty();
+        int now = Context.now();
+        List<Bson> groupedStages = endpointShieldGroupedStages(filter, groupId, now);
+        if (filterByStatus) {
+            groupedStages.add(Aggregates.match(Filters.in(DISPLAY_STATUS_FIELD, statuses)));
+        }
+
+        if (filterByStatus) {
+            List<Bson> countStages = new ArrayList<>(groupedStages);
+            countStages.add(Aggregates.count("total"));
+            Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(countStages, Document.class).first();
+            total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
+        } else {
+            Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
+                    Aggregates.match(filter),
+                    Aggregates.group(groupId),
+                    Aggregates.count("total")
+            ), Document.class).first();
+            total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
+        }
 
         String sortField = mapEndpointShieldSortField(sortKey);
         Bson finalSort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
         int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
         int sk = Math.max(skip, 0);
 
-        List<Bson> pipeline = Arrays.asList(
-                Aggregates.match(filter),
-                Aggregates.sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)),
-                Aggregates.group(groupId,
-                        Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
-                        Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),
-                        Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
-                        Accumulators.first(ModuleInfo.STARTED_TS, ifNullExpr(ModuleInfo.STARTED_TS, 0)),
-                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
-                        Accumulators.first(ModuleInfo.NAME, "$" + ModuleInfo.NAME),
-                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA),
-                        Accumulators.first(ModuleInfo._REBOOT, ifNullExpr(ModuleInfo._REBOOT, false)),
-                        Accumulators.first(ModuleInfo.DELETE_TOPIC_AND_REBOOT, ifNullExpr(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)),
-                        Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
-                Aggregates.addFields(
-                        new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
-                        new Field<>(ModuleInfo.ADDITIONAL_DATA + ".currentStatus", endpointShieldCurrentStatusExpr(Context.now()))),
-                Aggregates.project(Projections.exclude(ORIG_ID_FIELD)),
-                Aggregates.sort(finalSort),
-                Aggregates.skip(sk),
-                Aggregates.limit(lim)
-        );
+        List<Bson> pipeline = new ArrayList<>(groupedStages);
+        pipeline.add(Aggregates.project(Projections.exclude(ORIG_ID_FIELD, DISPLAY_STATUS_FIELD)));
+        pipeline.add(Aggregates.sort(finalSort));
+        pipeline.add(Aggregates.skip(sk));
+        pipeline.add(Aggregates.limit(lim));
 
         moduleInfos = new ArrayList<>();
         MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, ModuleInfo.class).cursor();
@@ -244,12 +285,20 @@ public class ModuleInfoAction extends UserAction {
             filterOptions.put("usernames", new ArrayList<>());
             filterOptions.put("deviceIds", new ArrayList<>());
             filterOptions.put("oses", new ArrayList<>());
+            filterOptions.put("browserNames", new ArrayList<>());
+            filterOptions.put("agentVersions", new ArrayList<>());
+            filterOptions.put("providers", new ArrayList<>());
+            filterOptions.put("statuses", new ArrayList<>());
             return SUCCESS.toUpperCase();
         }
         filterOptions.put("hostnames", distinctStrings(ModuleInfo.NAME, base));
         filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
         filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
         filterOptions.put("oses", distinctStrings(AD_OS, base));
+        filterOptions.put("browserNames", distinctStrings(AD_BROWSER_NAME, base));
+        filterOptions.put("agentVersions", distinctStrings(ModuleInfo.CURRENT_VERSION, base));
+        filterOptions.put("providers", distinctStrings(AD_PROVIDER, base));
+        filterOptions.put("statuses", distinctEndpointShieldStatuses(base));
         return SUCCESS.toUpperCase();
     }
 
@@ -331,6 +380,19 @@ public class ModuleInfoAction extends UserAction {
 
         moduleInfos = infos;
         return SUCCESS.toUpperCase();
+    }
+
+    private List<String> distinctEndpointShieldStatuses(Bson base) {
+        List<String> out = new ArrayList<>();
+        try {
+            List<Bson> stages = endpointShieldGroupedStages(base, endpointShieldGroupId(), Context.now());
+            stages.add(Aggregates.group("$" + DISPLAY_STATUS_FIELD));
+            for (Document d : ModuleInfoDao.instance.getMCollection().aggregate(stages, Document.class)) {
+                Object id = d.get("_id");
+                if (id instanceof String) out.add((String) id);
+            }
+        } catch (Exception ignored) {}
+        return out;
     }
 
     private List<String> distinctStrings(String field, Bson filter) {
