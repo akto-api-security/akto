@@ -15,6 +15,18 @@
         <url-pattern>/api/*</url-pattern>
     </filter-mapping>
 
+    <!-- Records the HTTP server request-duration histogram into the Prometheus registry.
+         Mapped after AuthFilter so Context.accountId (set by AuthFilter) is available. -->
+    <filter>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <filter-class>com.akto.filters.InfraMetricsFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>InfraMetricsFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
     <filter>
         <filter-name>struts2</filter-name>
         <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
@@ -29,6 +41,10 @@
          org.eclipse.jetty.ee8.servlets.GzipFilter equivalent (jetty-ee8-servlets only ships
          CrossOriginFilter). Response compression is now handled by Jetty's server-side gzip
          module instead - see docker/jetty-start.d/gzip.ini for the equivalent mimeTypes config. -->
+
+    <listener>
+        <listener-class>com.akto.listener.InfraMetricsListener</listener-class>
+    </listener>
 
     <listener>
         <listener-class>com.akto.listener.InitializerListener</listener-class>

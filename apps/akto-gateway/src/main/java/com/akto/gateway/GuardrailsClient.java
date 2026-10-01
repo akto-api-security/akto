@@ -4,6 +4,9 @@ import com.akto.log.LoggerMaker;
 import com.akto.utils.OperationalAlerts;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.MediaType;
@@ -72,8 +75,31 @@ public class GuardrailsClient {
                 .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                // Client-level metrics: Micrometer times/counts every call automatically, so no
+                // instrumentation leaks into callValidate. Tags method/uri/status/outcome give
+                // latency (p50/p95/p99), throughput, and transport failures (status=IO_ERROR = the
+                // fail-open-on-timeout case). uri is the bounded endpoint path; recorded on the
+                // global registry, which the data-ingestion-service Prometheus registry is bound to.
+                // One shared metric name for every outbound HTTP client (akto.http.client.requests),
+                // distinguished by the "client" tag - so all external calls share dashboards/alerts
+                // instead of each client minting its own metric name.
+                //   client     - names the dependency (here "guardrails"); other clients reuse the
+                //                 same name with client="abstractor", client="http_ingest", ...
+                //   account.id - deployment account parsed once from the JWT in
+                //                DATABASE_ABSTRACTOR_SERVICE_TOKEN (OperationalAlerts.deploymentAccountId,
+                //                "unknown" if absent); a per-process constant, so cardinality 1.
+                .eventListener(OkHttpMetricsEventListener
+                        .builder(Metrics.globalRegistry, EXTERNAL_HTTP_CLIENT_METRIC)
+                        .tags(Tags.of("client", "guardrails",
+                                "account.id", OperationalAlerts.deploymentAccountId()))
+                        .uriMapper(req -> req.url().encodedPath())
+                        .includeHostTag(false)
+                        .build())
                 .build();
     }
+
+    /** Shared metric name for all outbound HTTP clients; the "client" tag names the dependency. */
+    public static final String EXTERNAL_HTTP_CLIENT_METRIC = "akto.http.client.requests";
 
     private static Dispatcher buildDispatcher() {
         Dispatcher dispatcher = new Dispatcher();
@@ -103,6 +129,9 @@ public class GuardrailsClient {
 
     @SuppressWarnings("unchecked")
     public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
+        // Single result reference assigned on every return path, so the decision counter is
+        // recorded exactly once (in finally) regardless of which branch we exit through.
+        Map<String, Object> result = null;
         try {
             String jsonRequest = objectMapper.writeValueAsString(request);
             String url = guardrailsServiceUrl + endpoint;
@@ -131,18 +160,21 @@ public class GuardrailsClient {
 
                 if (response.isSuccessful()) {
                     try {
-                        return objectMapper.readValue(responseBody, Map.class);
+                        result = objectMapper.readValue(responseBody, Map.class);
+                        return result;
                     } catch (Exception parseEx) {
                         loggerMaker.warnAndAddToDb(
                             "Guardrails response not parseable, failing open - path: {}, error: {}",
                             request.get("path"), parseEx.getMessage());
-                        return buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                        result = buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
+                        return result;
                     }
                 }
                 loggerMaker.warnAndAddToDb(
                     "Guardrails service returned error status {}, failing open - path: {}",
                     response.code(), request.get("path"));
-                return buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
+                result = buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
+                return result;
             }
 
         } catch (Exception e) {
@@ -156,8 +188,84 @@ public class GuardrailsClient {
             }
 
             alertServiceUnreachable(endpoint, e);
-            return buildFailOpenResponse(e.getMessage());
+            result = buildFailOpenResponse(e.getMessage());
+            return result;
+        } finally {
+            recordDecision(endpoint, result);
         }
+    }
+
+    /** Guardrails validation counter, tagged by decision (Prometheus: akto_guardrails_validations_total). */
+    public static final String GUARDRAILS_VALIDATIONS_METRIC = "akto.guardrails.validations";
+
+    /**
+     * Records exactly one guardrails decision per callValidate. Every verdict in the platform flows
+     * through callValidate (http-proxy, the webhooks and Gateway), so this single point covers them
+     * all. Wrapped in try/catch so a metrics failure can never break or slow the validation path.
+     */
+    private static void recordDecision(String endpoint, Map<String, Object> result) {
+        try {
+            Metrics.globalRegistry.counter(GUARDRAILS_VALIDATIONS_METRIC,
+                    "endpoint", endpoint,
+                    "decision", classifyDecision(result),
+                    "modified", Boolean.toString(isModified(result)),
+                    "account.id", OperationalAlerts.deploymentAccountId()
+            ).increment();
+        } catch (Exception ignore) {
+            // metrics must never affect the guardrails call path
+        }
+    }
+
+    /** True when guardrails changed the payload (redaction). Absent/missing -> false. */
+    private static boolean isModified(Map<String, Object> result) {
+        Object modified = field(result, "Modified", "modified");
+        return modified != null && toBool(modified);
+    }
+
+    /**
+     * fail_open wins whenever no real verdict was produced (buildFailOpenResponse sets failOpen=true,
+     * and also Allowed=true - so this must be checked first). Otherwise the verdict is read from both
+     * key casings, mirroring Gateway.isAllowed. A real response that carries no verdict field is
+     * reported as "unknown" - never assumed allowed, so an answered-but-verdictless response is not
+     * miscounted as an allow.
+     */
+    private static String classifyDecision(Map<String, Object> result) {
+        if (result == null || isFailOpen(result)) {
+            return "fail_open";
+        }
+        Object verdict = field(result, "Allowed", "allowed");
+        if (verdict == null) {
+            return "unknown";
+        }
+        return toBool(verdict) ? "allowed" : "blocked";
+    }
+
+    private static boolean isFailOpen(Map<String, Object> result) {
+        Object failOpen = field(result, "failOpen", "failOpen");
+        return failOpen != null && toBool(failOpen);
+    }
+
+    /**
+     * Single point where the guardrails response contract is read: returns the first non-null value
+     * among the given keys (handles both casings), null-safe on the map and every key. If the API
+     * response shape changes, adjust the key list here rather than across call sites.
+     */
+    private static Object field(Map<String, Object> result, String... keys) {
+        if (result == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Object value = result.get(key);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    /** Lenient boolean: a real Boolean, else parsed from its string form. Never throws. */
+    private static boolean toBool(Object value) {
+        return (value instanceof Boolean) ? (Boolean) value : Boolean.parseBoolean(String.valueOf(value));
     }
 
     /** Endpoint and exception type only: never request data, which may carry customer payloads. */

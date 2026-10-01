@@ -12,15 +12,15 @@ import metrics_push
 import scan_diag
 from constants import (
     CASCADE_SCANNERS,
-    FORCE_GEMMA_ONLY_SCANNERS,
     GEMMA_ONLY_SCANNERS,
     LOCAL_SCANNERS,
     REMOTE_SCANNERS,
+    SINGLE_MODEL_SCANNERS,
     SUPPORTED_SCANNERS,
     apply_scanner_response_format,
     canonical_scanner,
-    force_gemma_only,
     get_default_config,
+    single_model_config,
     strip_qwen_tier,
 )
 from llm_scanner import _clean_json, scan_with_model_map
@@ -133,8 +133,8 @@ async def scan_payload(
         if not config.get("modelConfigs"):
             default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
-        if scanner_name in FORCE_GEMMA_ONLY_SCANNERS:
-            config = {**config, "modelConfigs": force_gemma_only(config.get("modelConfigs"))}
+        if scanner_name in SINGLE_MODEL_SCANNERS:
+            config = {**config, "modelConfigs": single_model_config()}
         elif scanner_name in GEMMA_ONLY_SCANNERS:
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
         config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
