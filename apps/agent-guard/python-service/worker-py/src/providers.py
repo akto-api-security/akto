@@ -12,7 +12,7 @@ import math
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
- from contextlib import contextmanager
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -871,7 +871,9 @@ class FallbackProvider(LLMProvider):
             backup = build_provider_from_config(self.backup_entry)
             if backup is None:
                 raise
-            logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}")
+            logger.warning(
+                f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}"
+            )
             return await backup.complete(prompt)
 
 
