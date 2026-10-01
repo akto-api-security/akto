@@ -208,11 +208,18 @@ public class GuardrailsClient {
             Metrics.globalRegistry.counter(GUARDRAILS_VALIDATIONS_METRIC,
                     "endpoint", endpoint,
                     "decision", classifyDecision(result),
+                    "modified", Boolean.toString(isModified(result)),
                     "account.id", OperationalAlerts.deploymentAccountId()
             ).increment();
         } catch (Exception ignore) {
             // metrics must never affect the guardrails call path
         }
+    }
+
+    /** True when guardrails changed the payload (redaction). Absent/missing -> false. */
+    private static boolean isModified(Map<String, Object> result) {
+        Object modified = field(result, "Modified", "modified");
+        return modified != null && toBool(modified);
     }
 
     /**
@@ -226,25 +233,39 @@ public class GuardrailsClient {
         if (result == null || isFailOpen(result)) {
             return "fail_open";
         }
-        Object verdict = result.get("Allowed");
-        if (verdict == null) {
-            verdict = result.get("allowed");
-        }
+        Object verdict = field(result, "Allowed", "allowed");
         if (verdict == null) {
             return "unknown";
         }
-        boolean allowed = (verdict instanceof Boolean)
-                ? (Boolean) verdict
-                : Boolean.parseBoolean(verdict.toString());
-        return allowed ? "allowed" : "blocked";
+        return toBool(verdict) ? "allowed" : "blocked";
     }
 
     private static boolean isFailOpen(Map<String, Object> result) {
-        Object failOpen = result.get("failOpen");
-        if (failOpen instanceof Boolean) {
-            return (Boolean) failOpen;
+        Object failOpen = field(result, "failOpen", "failOpen");
+        return failOpen != null && toBool(failOpen);
+    }
+
+    /**
+     * Single point where the guardrails response contract is read: returns the first non-null value
+     * among the given keys (handles both casings), null-safe on the map and every key. If the API
+     * response shape changes, adjust the key list here rather than across call sites.
+     */
+    private static Object field(Map<String, Object> result, String... keys) {
+        if (result == null) {
+            return null;
         }
-        return failOpen != null && Boolean.parseBoolean(failOpen.toString());
+        for (String key : keys) {
+            Object value = result.get(key);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    /** Lenient boolean: a real Boolean, else parsed from its string form. Never throws. */
+    private static boolean toBool(Object value) {
+        return (value instanceof Boolean) ? (Boolean) value : Boolean.parseBoolean(String.valueOf(value));
     }
 
     /** Endpoint and exception type only: never request data, which may carry customer payloads. */

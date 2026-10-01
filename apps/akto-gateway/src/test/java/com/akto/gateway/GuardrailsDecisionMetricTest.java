@@ -92,4 +92,22 @@ public class GuardrailsDecisionMetricTest {
         call(200, "broken json", null);                         // unparseable body
         assertEquals(before + 3, count("fail_open"), 0.0);
     }
+
+    @Test
+    public void redactionIsCountedViaModifiedTag() {
+        double before = count("allowed", true);
+        // allowed through, but the payload was redacted
+        call(200, "{\"allowed\":true,\"Modified\":true}", null);
+        assertEquals(before + 1, count("allowed", true), 0.0);
+    }
+
+    private double count(String decision, boolean modified) {
+        try {
+            return registry.get(METRIC)
+                    .tag("endpoint", ENDPOINT).tag("decision", decision)
+                    .tag("modified", Boolean.toString(modified)).counter().count();
+        } catch (MeterNotFoundException e) {
+            return 0.0;
+        }
+    }
 }
