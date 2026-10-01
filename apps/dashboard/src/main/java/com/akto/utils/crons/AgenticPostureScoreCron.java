@@ -233,11 +233,14 @@ public class AgenticPostureScoreCron {
     }
 
     static double worstSliceMean(List<Double> composites) {
-        List<Double> slice = worstSlice(composites, Double::doubleValue);
-        if (slice.isEmpty()) return 0;
+        return mean(worstSlice(composites, Double::doubleValue));
+    }
+
+    private static double mean(List<Double> values) {
+        if (values.isEmpty()) return 0;
         double sum = 0;
-        for (double c : slice) sum += c;
-        return sum / slice.size();
+        for (double v : values) sum += v;
+        return sum / values.size();
     }
 
     // Weighted average of six 0-100 sub-scores.
