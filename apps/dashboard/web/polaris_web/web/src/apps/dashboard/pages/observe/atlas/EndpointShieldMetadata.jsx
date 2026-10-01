@@ -124,7 +124,7 @@ const getOsOrBrowserComp = (agentData) => {
 
     const os = agentData?.os;
     const osDisplayName = agentData?.osDisplayName;
-    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? os : null);
+    const displayOs = (osDisplayName && osDisplayName !== DEFAULT_VALUE) ? osDisplayName : (os && os !== DEFAULT_VALUE ? (OS_LABELS[os.toLowerCase()] || os) : null);
     if (!displayOs) return DEFAULT_VALUE;
     const osIcon = getIconFromMap(os, OS_ICON_MAP);
     return (
@@ -287,7 +287,7 @@ function EndpointShieldMetadata() {
         setLoading(true);
         let ret = [];
         let total = 0;
-        const pickOsBrowser = (type) => (filters?.osBrowser || []).filter(v => v.startsWith(`${type}:`)).flatMap(v => v.slice(type.length + 1).split(GROUP_SEPARATOR));
+        const pickOsBrowser = (type) => (filters?.osBrowser || []).filter(v => v.startsWith(`${type}:`)).map(v => v.slice(type.length + 1));
         try {
             const resp = await settingRequests.fetchEndpointShieldAgents({
                 skip, limit,
