@@ -1,5 +1,4 @@
-import { Box, Button, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
-import { DeleteMinor } from "@shopify/polaris-icons"
+import { Box, Button, Collapsible, Divider, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Tag, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import func from "@/util/func";
 import settingRequests from "../api";
@@ -231,6 +230,9 @@ const Roles = () => {
     const isGivableByTeamAdmin = (r) => r.baseRole !== 'ADMIN' &&
         ((r.apiCollectionsId || []).length > 0 || (r.collectionRules || []).length > 0)
 
+    const [permissionsOpen, setPermissionsOpen] = useState(false)
+    const changedPermissionsCount = (r) => Object.keys(r?.permissionOverrides || {}).length
+
     const [newHostPattern, setNewHostPattern] = useState('')
     const [newTag, setNewTag] = useState('')
 
@@ -276,6 +278,7 @@ const Roles = () => {
         setRoles(tempRoles)
         setNewHostPattern('')
         setNewTag('')
+        setPermissionsOpen(false)
     }
 
     const [newRoleName, setNewRoleName] = useState('')
@@ -360,56 +363,83 @@ const Roles = () => {
                                                     ) : null}
                                                 </HorizontalStack>
                                             </Box>
-                                            <Box>
-                                                <VerticalStack gap={2}>
-                                                    <Text variant="headingSm" as="h4">Permissions</Text>
-                                                    <Text variant="bodySm" color="subdued">Change what this role can do. Anything left at the default keeps the base role's access.</Text>
-                                                    {PERMISSION_FEATURES.map(({ feature, label }) => (
-                                                        <HorizontalStack key={feature} align="space-between" blockAlign="center" wrap={false} gap={4}>
-                                                            <Text variant="bodyMd">{label}</Text>
-                                                            <Box minWidth="180px">
-                                                                <Dropdown
-                                                                    id={`permission-${name}-${feature}`}
-                                                                    menuItems={accessOptions}
-                                                                    initial={item?.permissionOverrides?.[feature] || ROLE_DEFAULT}
-                                                                    selected={(access) => updatePermission(name, feature, access)}
-                                                                />
+                                            <Box padding={4}>
+                                                <VerticalStack gap="4">
+                                                    <Divider />
+                                                    <VerticalStack gap="3">
+                                                        <HorizontalStack align="space-between" blockAlign="center">
+                                                            <VerticalStack gap="1">
+                                                                <Text variant="headingSm" as="h4">Permissions</Text>
+                                                                <Text variant="bodySm" color="subdued">
+                                                                    {changedPermissionsCount(item) > 0
+                                                                        ? `${changedPermissionsCount(item)} changed from the base role`
+                                                                        : "Same as the base role"}
+                                                                </Text>
+                                                            </VerticalStack>
+                                                            <Button plain disclosure={permissionsOpen ? "up" : "down"} onClick={() => setPermissionsOpen(!permissionsOpen)}>
+                                                                {permissionsOpen ? "Hide" : "Change"}
+                                                            </Button>
+                                                        </HorizontalStack>
+                                                        <Collapsible open={permissionsOpen} id={`permissions-${name}`}>
+                                                            <Box borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="3">
+                                                                <VerticalStack gap="3">
+                                                                    {PERMISSION_FEATURES.map(({ feature, label }) => (
+                                                                        <HorizontalStack key={feature} align="space-between" blockAlign="center" wrap={false} gap="4">
+                                                                            <Text variant="bodyMd">{label}</Text>
+                                                                            <Box width="220px">
+                                                                                <Dropdown
+                                                                                    id={`permission-${name}-${feature}`}
+                                                                                    menuItems={accessOptions}
+                                                                                    initial={item?.permissionOverrides?.[feature] || ROLE_DEFAULT}
+                                                                                    selected={(access) => updatePermission(name, feature, access)}
+                                                                                />
+                                                                            </Box>
+                                                                        </HorizontalStack>
+                                                                    ))}
+                                                                </VerticalStack>
                                                             </Box>
+                                                        </Collapsible>
+                                                    </VerticalStack>
+                                                    <Divider />
+                                                    <VerticalStack gap="2">
+                                                        <Text variant="headingSm" as="h4">Roles this role can give</Text>
+                                                        <Text variant="bodySm" color="subdued">For team admins: users of this role can invite people and change roles only to these roles, and only for users who already have one of them.</Text>
+                                                        {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).length === 0 ? (
+                                                            <Text variant="bodySm" color="subdued">No other roles limited to collections yet.</Text>
+                                                        ) : (
+                                                            <HorizontalStack gap="4" wrap>
+                                                                {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).map(r => (
+                                                                    <Checkbox key={r.name} label={r.name}
+                                                                        checked={(item.assignableRoles || []).includes(r.name)}
+                                                                        onChange={(checked) => toggleAssignableRole(name, r.name, checked)} />
+                                                                ))}
+                                                            </HorizontalStack>
+                                                        )}
+                                                    </VerticalStack>
+                                                    <Divider />
+                                                    <VerticalStack gap="2">
+                                                        <Text variant="headingSm" as="h4">Also include collections matching</Text>
+                                                        <Text variant="bodySm" color="subdued">Collections added later that match a rule are included automatically.</Text>
+                                                        {(item.collectionRules || []).length > 0 ? (
+                                                            <HorizontalStack gap="2" wrap>
+                                                                {item.collectionRules.map((rule, index) => (
+                                                                    <Tag key={index} onRemove={() => updateCollectionRules(name, item.collectionRules.filter((_, i) => i !== index))}>
+                                                                        {rule.hostRegex ? `Host matches ${rule.hostRegex}` : `Tag ${rule.tagKey} = ${rule.tagValue}`}
+                                                                    </Tag>
+                                                                ))}
+                                                            </HorizontalStack>
+                                                        ) : null}
+                                                        <HorizontalStack gap="3" blockAlign="end" wrap={false}>
+                                                            <Box width="100%">
+                                                                <TextField label="Host pattern (regex)" value={newHostPattern} onChange={setNewHostPattern} placeholder="^team-a-.*" autoComplete="off" />
+                                                            </Box>
+                                                            <Box width="100%">
+                                                                <TextField label="Or tag" value={newTag} onChange={setNewTag} placeholder="team=team-a" autoComplete="off" />
+                                                            </Box>
+                                                            <Button onClick={() => addCollectionRule(name, item.collectionRules)}>Add</Button>
                                                         </HorizontalStack>
-                                                    ))}
-                                                </VerticalStack>
-                                            </Box>
-                                            <Box>
-                                                <VerticalStack gap={2}>
-                                                    <Text variant="headingSm" as="h4">Roles this role can give</Text>
-                                                    <Text variant="bodySm" color="subdued">For team admins limited to collections: they can invite users and change roles only to these roles, and only for users who already have one of them. Needs the "Invite users" permission.</Text>
-                                                    {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).map(r => (
-                                                        <Checkbox key={r.name} label={r.name}
-                                                            checked={(item.assignableRoles || []).includes(r.name)}
-                                                            onChange={(checked) => toggleAssignableRole(name, r.name, checked)} />
-                                                    ))}
-                                                </VerticalStack>
-                                            </Box>
-                                            <Box>
-                                                <VerticalStack gap={2}>
-                                                    <Text variant="headingSm" as="h4">Also include collections matching</Text>
-                                                    <Text variant="bodySm" color="subdued">Collections added later that match a rule are included automatically.</Text>
-                                                    {(item.collectionRules || []).map((rule, index) => (
-                                                        <HorizontalStack key={index} align="space-between" blockAlign="center" wrap={false}>
-                                                            <Text variant="bodyMd">{rule.hostRegex ? `Host matches ${rule.hostRegex}` : `Tag ${rule.tagKey} = ${rule.tagValue}`}</Text>
-                                                            <Button plain icon={DeleteMinor} accessibilityLabel="Remove rule"
-                                                                onClick={() => updateCollectionRules(name, item.collectionRules.filter((_, i) => i !== index))} />
-                                                        </HorizontalStack>
-                                                    ))}
-                                                    <HorizontalStack gap={3} blockAlign="end" wrap={false}>
-                                                        <Box width="100%">
-                                                            <TextField label="Host pattern (regex)" value={newHostPattern} onChange={setNewHostPattern} placeholder="^team-a-.*" autoComplete="off" />
-                                                        </Box>
-                                                        <Box width="100%">
-                                                            <TextField label="or tag" value={newTag} onChange={setNewTag} placeholder="team=team-a" autoComplete="off" />
-                                                        </Box>
-                                                        <Button onClick={() => addCollectionRule(name, item.collectionRules)}>Add</Button>
-                                                    </HorizontalStack>
+                                                    </VerticalStack>
+                                                    <Divider />
                                                 </VerticalStack>
                                             </Box>
                                             <Box>

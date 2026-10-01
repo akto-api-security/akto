@@ -1,4 +1,5 @@
 import {  Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, ResourceItem, ResourceList, Text, Modal, TextField, Checkbox, VerticalStack } from "@shopify/polaris"
+import SingleDate from "../../../components/layouts/SingleDate"
 import { DeleteMajor, PasskeyMajor } from "@shopify/polaris-icons"
 import { useEffect, useState, useRef, useMemo } from "react";
 import settingRequests from "../api";
@@ -646,28 +647,6 @@ const Users = () => {
                     ]}
                 >
                     <Modal.Section>
-                        {/* Current Configuration Display */}
-                        <Box paddingBlockEnd="400" borderBottomWidth="1" borderColor="border">
-                            <Text variant="headingSm" as="h3">Current Configuration</Text>
-                            <Box paddingBlockStart="200">
-                                {editScopeRoleModal.isSimpleRole
-                                    ? <Text variant="bodySm">{getRoleDisplayName(editScopeRoleModal.currentRole)}</Text>
-                                    : Object.entries(editScopeRoleModal.currentScopeRoleMapping).length > 0
-                                    ? (
-                                        Object.entries(editScopeRoleModal.currentScopeRoleMapping).map(([scope, role]) => {
-                                            const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
-                                            return (
-                                                <Text key={scope} variant="bodySm">
-                                                    {getRoleDisplayName(role)} for {scopeLabel}
-                                                </Text>
-                                            )
-                                        })
-                                    )
-                                    : <Text variant="bodySm">No access configured</Text>
-                                }
-                            </Box>
-                        </Box>
-
                         {/* Edit Configuration */}
                         <Box paddingBlockStart="400">
                             <Text variant="headingSm" as="h3">Configure Access by Scope</Text>
@@ -715,18 +694,23 @@ const Users = () => {
                                 })}
                             </Box>
                         </Box>
-                        {window.USER_ROLE === 'ADMIN' ? <Box paddingBlockStart="400">
-                            <TextField
-                                type="date"
-                                label="Access expires on (optional)"
-                                helpText="After this date the user has no access in any product until it is extended. Leave empty for no expiry."
-                                value={editScopeRoleModal.accessExpiresOn}
-                                onChange={(value) => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: value }))}
-                                autoComplete="off"
-                                clearButton
-                                onClearButtonClick={() => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: "" }))}
-                            />
-                        </Box> : null}
+                        {window.USER_ROLE === 'ADMIN' ? (
+                            <VerticalStack gap="2">
+                                <SingleDate
+                                    label="Access expires on (optional)"
+                                    dataKey="No expiry"
+                                    data={editScopeRoleModal.accessExpiresOn ? new Date(`${editScopeRoleModal.accessExpiresOn}T00:00:00`) : null}
+                                    dispatch={(action) => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: toDateInput(Object.values(action.obj)[0].getTime() / 1000) }))}
+                                    disableDatesBefore={new Date()}
+                                />
+                                <HorizontalStack align="space-between" blockAlign="center">
+                                    <Text variant="bodySm" color="subdued">After this date the user has no access in any product until it is extended.</Text>
+                                    {editScopeRoleModal.accessExpiresOn ? (
+                                        <Button plain destructive onClick={() => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: "" }))}>Remove expiry</Button>
+                                    ) : null}
+                                </HorizontalStack>
+                            </VerticalStack>
+                        ) : null}
                     </Modal.Section>
                 </Modal>
 
