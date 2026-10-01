@@ -42,6 +42,8 @@ def relaxed_limits(enabled: bool = True):
 
 def _max_tokens() -> int:
     return _ASYNC_MAX_TOKENS if _relaxed_limits.get() else _DEFAULT_MAX_TOKENS
+
+
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 _IDENTITY = {"Accept-Encoding": "identity"}
