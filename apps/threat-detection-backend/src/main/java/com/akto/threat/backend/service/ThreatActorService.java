@@ -594,10 +594,11 @@ public class ThreatActorService {
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
     }
 
-  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
+  // hostScopeMatch: only some agents' events (users limited to specific collections); null for the whole account
+  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource, Document hostScopeMatch) {
 
-    // Use optimized actor_info table if feature flag is enabled
-    if (USE_ACTOR_INFO_TABLE) {
+    // Use optimized actor_info table if feature flag is enabled (it has no host, so not for host-scoped requests)
+    if (USE_ACTOR_INFO_TABLE && hostScopeMatch == null) {
       return getDailyActorCountsFromActorInfo(accountId, startTs, endTs, latestAttackList, contextSource);
     }
 
@@ -622,6 +623,7 @@ public class ThreatActorService {
         matchConditions.putAll(contextFilter);
     }
     matchConditions.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+    ThreatUtils.andHostScope(matchConditions, hostScopeMatch);
 
         pipeline.add(new Document("$match", matchConditions));
     
@@ -934,7 +936,7 @@ public class ThreatActorService {
         .build();
   }
 
-  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource) {
+  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList, String contextSource, Document hostScopeMatch) {
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
@@ -957,6 +959,7 @@ public class ThreatActorService {
         match.putAll(contextFilter);
     }
     match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+    ThreatUtils.andHostScope(match, hostScopeMatch);
 
       List<Document> pipeline = Arrays.asList(
         new Document("$match", match),
@@ -1073,8 +1076,8 @@ public class ThreatActorService {
   public ThreatActorByCountryResponse getThreatActorByCountry(
       String accountId, ThreatActorByCountryRequest request, String contextSource) {
 
-    // Use optimized actor_info table if feature flag is enabled
-    if (USE_ACTOR_INFO_TABLE) {
+    // Use optimized actor_info table if feature flag is enabled (it has no host, so not for host-scoped requests)
+    if (USE_ACTOR_INFO_TABLE && !request.hasHostScope()) {
       return getThreatActorByCountryFromActorInfo(accountId, request, contextSource);
     } else {
       return getThreatActorByCountryFromMaliciousEvents(accountId, request, contextSource);
@@ -1186,6 +1189,7 @@ public class ThreatActorService {
         match.putAll(contextFilter);
     }
     match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+    ThreatUtils.andHostScope(match, request.hasHostScope() ? ThreatUtils.hostScopeMatch(request.getHostScope()) : null);
 
   pipeline.add(new Document("$match", match));
 
@@ -1350,7 +1354,7 @@ public class ThreatActorService {
   // All three are optional; without them this counts every event (the Guardrails Dashboard view).
   public FetchTopNDataResponse fetchTopNData(
       String accountId, long startTs, long endTs, List<String> latestAttackList, int limit, String contextSource,
-      String status, String skillEvalMode, String configEvalMode) {
+      String status, String skillEvalMode, String configEvalMode, Document hostScopeMatch) {
 
     List<Document> pipeline = new ArrayList<>();
 
@@ -1374,6 +1378,7 @@ public class ThreatActorService {
             match.putAll(contextFilter);
         }
         match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+        ThreatUtils.andHostScope(match, hostScopeMatch);
 
         if (!match.isEmpty()) {
             pipeline.add(new Document("$match", match));
@@ -1591,7 +1596,7 @@ public class ThreatActorService {
   // ENDPOINT (Atlas) context only, matching that same existing convention - empty for other
   // contexts, since skill invocations only exist there.
   public FetchSkillSeverityCountsResponse fetchSkillSeverityCounts(
-      String accountId, long startTs, long endTs, String contextSource) {
+      String accountId, long startTs, long endTs, String contextSource, Document hostScopeMatch) {
 
     FetchSkillSeverityCountsResponse.Builder resp = FetchSkillSeverityCountsResponse.newBuilder();
     if (!ThreatUtils.isAgenticOrEndpointContext(contextSource)) {
@@ -1610,6 +1615,7 @@ public class ThreatActorService {
       match.putAll(contextFilter);
     }
     match.append("latestApiEndpoint", ThreatUtils.SKILLS_ENDPOINT_PATTERN);
+    ThreatUtils.andHostScope(match, hostScopeMatch);
 
     List<Document> pipeline = new ArrayList<>();
     pipeline.add(new Document("$match", match));
@@ -1656,7 +1662,7 @@ public class ThreatActorService {
   }
 
   public FetchDashboardTopDataResponse fetchDashboardTopData(
-      String accountId, long startTs, long endTs, int limit, String contextSource) {
+      String accountId, long startTs, long endTs, int limit, String contextSource, Document hostScopeMatch) {
 
     if (limit <= 0) limit = 5;
 
@@ -1673,6 +1679,7 @@ public class ThreatActorService {
       match.putAll(contextFilter);
     }
     match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+    ThreatUtils.andHostScope(match, hostScopeMatch);
 
     // --- Top Actors (use malicious_events for accurate time-range filtering) ---
     List<FetchDashboardTopDataResponse.TopActorData> topActors = new ArrayList<>();
@@ -1737,6 +1744,7 @@ public class ThreatActorService {
     if (!contextFilter.isEmpty()) {
       recentMatch.putAll(contextFilter);
     }
+    ThreatUtils.andHostScope(recentMatch, hostScopeMatch);
     long recentMaliciousCount = maliciousEventDao.countDocuments(accountId, recentMatch);
 
     return FetchDashboardTopDataResponse.newBuilder()

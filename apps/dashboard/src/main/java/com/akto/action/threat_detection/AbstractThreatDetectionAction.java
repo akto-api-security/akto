@@ -191,6 +191,32 @@ public class AbstractThreatDetectionAction extends UserAction {
 
   protected static final int OWN_EVENTS_LIMIT = 100_000;
 
+  // false once an older threat backend rejected the host scope field (400); limited users then use their own events
+  private static volatile boolean backendAcceptsHostScope = true;
+
+  /*
+   * Host scope sent with the threat backend's aggregations for a user limited to specific collections, so the
+   * backend counts only the user's agents (matched like the activity list) instead of the dashboard pulling
+   * their events. Null when the user is not limited, or when their own events must be used instead: nothing
+   * is visible to them (empty results) or the backend does not accept the field yet.
+   */
+  protected Map<String, Object> backendHostScope() {
+    if (!backendAcceptsHostScope || !isLimitedToOwnAgents()) {
+      return null;
+    }
+    Map<String, Object> scope = new HashMap<>();
+    return ArgusCollectionScope.scopeActivityFilters(getSUser(), scope) ? scope : null;
+  }
+
+  /** True when an older threat backend rejected the host scope; remembered, so the caller (and later requests) use own events. */
+  protected static boolean hostScopeRejected(Map<String, Object> hostScope, int statusCode) {
+    if (hostScope != null && statusCode == 400) {
+      backendAcceptsHostScope = false;
+      return true;
+    }
+    return false;
+  }
+
   /**
    * All-time events of the user's own agents (host-scoped, minimal fields, cached), or null if the
    * user is not limited to specific collections. Used to check that an event opened or changed by id
@@ -387,6 +413,12 @@ public class AbstractThreatDetectionAction extends UserAction {
    */
   protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
       int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter) {
+    return fetchSubcategoryWiseCounts(startTimestamp, endTimestamp, latestAttack, statusFilter, null);
+  }
+
+  // hostScope: see backendHostScope(); null counts the whole account. Null result when the backend rejected the host scope.
+  protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
+      int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter, Map<String, Object> hostScope) {
     try {
       String url = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
       MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -397,6 +429,7 @@ public class AbstractThreatDetectionAction extends UserAction {
           put("end_ts", endTimestamp);
           put("latestAttack", latestAttack);
           if (statusFilter != null && !statusFilter.isEmpty()) put("status", statusFilter);
+          if (hostScope != null) put("hostScope", hostScope);
         }
       };
       String msg = objectMapper.valueToTree(body).toString();
@@ -412,6 +445,9 @@ public class AbstractThreatDetectionAction extends UserAction {
           .build();
 
       try (Response resp = httpClient.newCall(request).execute()) {
+        if (hostScopeRejected(hostScope, resp.code())) {
+          return null;
+        }
         String responseBody = resp.body() != null ? resp.body().string() : "";
         return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse>toProtoMessage(
             com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.class,
