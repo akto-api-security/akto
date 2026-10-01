@@ -85,7 +85,7 @@ function PostureScoreCard({ postureScore, onOpenBreakdown }) {
                     {hasValue && agentsScored > 0 && (
                         <HorizontalStack align="space-between" blockAlign="center">
                             <Text variant="bodySm" color="subdued">
-                                Based on assets with highest scores
+                                Based on agents with highest scores
                             </Text>
                             {clickable && <Button plain>How is this calculated?</Button>}
                         </HorizontalStack>

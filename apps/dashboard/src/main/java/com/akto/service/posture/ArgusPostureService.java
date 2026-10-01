@@ -1535,7 +1535,7 @@ public class ArgusPostureService {
             gaps.add(gapRow("AGENTIC_ASSETS", "NO_ROWS", "No AI agents have been discovered yet, so the posture score can't be computed."));
         } else if (latest.getAgentsWithNoSignal() > 0) {
             gaps.add(gapRow("AGENTIC_ASSETS", "PARTIAL_COVERAGE",
-                    latest.getAgentsWithNoSignal() + " of " + latest.getAgentsScored() + " asset(s) haven't been scored yet and are excluded from the score."));
+                    latest.getAgentsWithNoSignal() + " of " + latest.getAgentsScored() + " agent(s) haven't been scored yet and are excluded from the score."));
         }
         return gaps;
     }
