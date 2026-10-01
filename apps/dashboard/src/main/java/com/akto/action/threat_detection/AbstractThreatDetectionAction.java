@@ -176,6 +176,10 @@ public class AbstractThreatDetectionAction extends UserAction {
       return cached.response;
     }
     MaliciousEventResponse fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    if (fresh == null) {
+      // a failed fetch is not "no events": don't cache it, so the next request tries again
+      return new MaliciousEventResponse(new ArrayList<>(), 0);
+    }
     maliciousEventsCache.put(cacheKey, new CachedMaliciousEventResponse(fresh, System.currentTimeMillis()));
     return fresh;
   }
@@ -265,7 +269,8 @@ public class AbstractThreatDetectionAction extends UserAction {
         );
       }
     } catch (Exception e) {
-      // Error handling is left to the caller - return empty list on error
+      // null tells the caller the fetch failed, so the failure is not cached as "no events"
+      return null;
     }
     return new MaliciousEventResponse(result, total);
   }
