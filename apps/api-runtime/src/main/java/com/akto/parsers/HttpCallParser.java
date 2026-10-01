@@ -558,12 +558,17 @@ public class HttpCallParser {
 
             boolean isEndpointSource = Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(
                     parsedTags != null ? parsedTags.getString(Constants.AKTO_ENDPOINT_SOURCE_TAG) : null);
+            boolean incomingHasMcpServerTag = parsedTags != null
+                    && parsedTags.containsField(Constants.AKTO_MCP_SERVER_TAG);
 
             Integer realHostCollectionId = hostNameToIdMap.get(hostName);
             ApiCollection realHostCollection = realHostCollectionId != null ? apiCollectionMap.get(realHostCollectionId) : null;
 
+            // A plain collection (e.g. gateway discovery via mini-runtime, which does not
+            // persist collection tags) must not fork to host-agentic when the incoming record
+            // already declares itself as MCP — connectors like AgentCore always send mcp-server.
             if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
-                    && isMcpRequest && !isEndpointSource) {
+                    && isMcpRequest && !isEndpointSource && !incomingHasMcpServerTag) {
                 hostName = hostName + AGENTIC_COLLECTION_PREFIX;
             }
 

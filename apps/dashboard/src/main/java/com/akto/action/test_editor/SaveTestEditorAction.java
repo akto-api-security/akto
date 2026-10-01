@@ -13,6 +13,7 @@ import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.test_editor.YamlTemplateOverrideDao;
 import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
@@ -104,6 +105,7 @@ public class SaveTestEditorAction extends UserAction {
     private Map<String, BasicDBObject> subCategoryMap;
     private boolean inactive;
     private String repositoryUrl;
+    private boolean overrideSystemTemplates;
     private HashMap<String, Integer> testCountMap;
     private String testingRunPlaygroundHexId;
     private State testingRunPlaygroundStatus;
@@ -597,6 +599,7 @@ public class SaveTestEditorAction extends UserAction {
     }
 
     private void updateTemplates(int accountId, String author, String repositoryUrl) {
+        final boolean override = this.overrideSystemTemplates;
     executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
@@ -604,7 +607,7 @@ public class SaveTestEditorAction extends UserAction {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo(repositoryUrl);
                     logger.debugAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
-                    InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
+                    InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl, override);
                 } catch (Exception e) {
                     logger.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
                 }
@@ -613,7 +616,36 @@ public class SaveTestEditorAction extends UserAction {
     }
 
     private boolean checkEmptyRepoString() {
-        return repositoryUrl == null && !repositoryUrl.isEmpty() ;
+        return repositoryUrl == null || repositoryUrl.isEmpty() ;
+    }
+
+    private boolean rejectIfOverrideNotAllowed() {
+        if (overrideSystemTemplates && !YamlTemplateDao.accountAllowsSystemTemplateOverrides()) {
+            addActionError("System template overrides are only available for active accounts");
+            return true;
+        }
+        return false;
+    }
+
+    private String testLibrariesField() {
+        return overrideSystemTemplates ? AccountSettings.OVERRIDE_TEST_LIBRARIES : AccountSettings.TEST_LIBRARIES;
+    }
+
+    private List<TestLibrary> librariesFromSettings(AccountSettings accountSettings) {
+        List<TestLibrary> libraries = overrideSystemTemplates
+                ? accountSettings.getOverrideTestLibraries()
+                : accountSettings.getTestLibraries();
+        return libraries;
+    }
+
+    private boolean repositoryUrlAlreadyAdded(AccountSettings accountSettings) {
+        return containsRepositoryUrl(accountSettings.getTestLibraries())
+                || containsRepositoryUrl(accountSettings.getOverrideTestLibraries());
+    }
+
+    private boolean containsRepositoryUrl(List<TestLibrary> libraries) {
+        return libraries != null &&
+                libraries.stream().anyMatch(testLibrary -> testLibrary.getRepositoryUrl().equals(repositoryUrl));
     }
 
     public String syncCustomLibrary(){
@@ -623,9 +655,13 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        if (rejectIfOverrideNotAllowed()) {
+            return ERROR.toUpperCase();
+        }
+
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
-        List<TestLibrary> testLibraries = accountSettings.getTestLibraries();
+        List<TestLibrary> testLibraries = librariesFromSettings(accountSettings);
         TestLibrary testLibrary = null;
 
         if(testLibraries != null){
@@ -668,13 +704,13 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        if (rejectIfOverrideNotAllowed()) {
+            return ERROR.toUpperCase();
+        }
+
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
-        List<TestLibrary> testLibraries = accountSettings.getTestLibraries();
-
-        if (testLibraries != null &&
-                testLibraries.stream()
-                        .anyMatch(testLibrary -> testLibrary.getRepositoryUrl().equals(repositoryUrl))) {
+        if (repositoryUrlAlreadyAdded(accountSettings)) {
             addActionError("Test library already exists");
             return ERROR.toUpperCase();
         }
@@ -686,7 +722,7 @@ public class SaveTestEditorAction extends UserAction {
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), 
-                Updates.addToSet(AccountSettings.TEST_LIBRARIES, testLibrary));
+                Updates.addToSet(testLibrariesField(), testLibrary));
 
         updateTemplates(accountId, author, repositoryUrl);
 
@@ -700,6 +736,10 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        if (rejectIfOverrideNotAllowed()) {
+            return ERROR.toUpperCase();
+        }
+
         String author = getSUser().getLogin();
         
         BasicDBObject repoPullObj = new BasicDBObject();
@@ -707,13 +747,18 @@ public class SaveTestEditorAction extends UserAction {
 
         AccountSettingsDao.instance.updateOne(
                 AccountSettingsDao.generateFilter(), 
-                Updates.pull(AccountSettings.TEST_LIBRARIES, repoPullObj ));
-        
-        YamlTemplateDao.instance.deleteAll(
-                Filters.and(
-                    Filters.eq(YamlTemplate.AUTHOR, author),
-                    Filters.eq(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM),
-                    Filters.eq(YamlTemplate.REPOSITORY_URL, repositoryUrl)));
+                Updates.pull(testLibrariesField(), repoPullObj ));
+
+        if (overrideSystemTemplates) {
+            YamlTemplateOverrideDao.instance.deleteAll(
+                    Filters.eq(YamlTemplate.REPOSITORY_URL, repositoryUrl));
+        } else {
+            YamlTemplateDao.instance.deleteAll(
+                    Filters.and(
+                        Filters.eq(YamlTemplate.AUTHOR, author),
+                        Filters.eq(YamlTemplate.SOURCE, YamlTemplateSource.CUSTOM),
+                        Filters.eq(YamlTemplate.REPOSITORY_URL, repositoryUrl)));
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -723,6 +768,9 @@ public class SaveTestEditorAction extends UserAction {
         List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
             Filters.exists(YamlTemplate.REPOSITORY_URL),
             Projections.include(YamlTemplate.REPOSITORY_URL));
+        templates.addAll(YamlTemplateOverrideDao.instance.findAll(
+            Filters.exists(YamlTemplate.REPOSITORY_URL),
+            Projections.include(YamlTemplate.REPOSITORY_URL)));
         
         if(testCountMap == null){
             testCountMap = new HashMap<>();
@@ -745,7 +793,7 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        YamlTemplate template =  YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, originalTestId), Projections.include(YamlTemplate.CONTENT));
+        YamlTemplate template =  YamlTemplateDao.instance.findEffectiveOne(originalTestId, Projections.include(YamlTemplate.CONTENT));
         if (template == null) {
             addActionError("test not found");
             return ERROR.toUpperCase();
@@ -884,6 +932,14 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setRepositoryUrl(String repositoryUrl) {
         this.repositoryUrl = repositoryUrl;
+    }
+
+    public boolean getOverrideSystemTemplates() {
+        return overrideSystemTemplates;
+    }
+
+    public void setOverrideSystemTemplates(boolean overrideSystemTemplates) {
+        this.overrideSystemTemplates = overrideSystemTemplates;
     }
 
     public HashMap<String, Integer> getTestCountMap() {

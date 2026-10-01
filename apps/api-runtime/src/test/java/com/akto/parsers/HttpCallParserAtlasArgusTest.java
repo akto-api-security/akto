@@ -249,6 +249,20 @@ class HttpCallParserAtlasArgusTest {
     }
 
     @Test
+    public void case6_plainCollection_incomingMcpServerTag_staysPut() throws Exception {
+        grantSecurityTypeAgentic();
+        HttpCallParser parser = newParser();
+        String host = "case6-incoming-mcp-tag.akto.internal";
+
+        int normalId = parser.createApiCollectionId(normalRequest(host, "/api/users/1"));
+        int mcpId = parser.createApiCollectionId(
+                mcpRequest(host, "/mcp", "{\"" + Constants.AKTO_MCP_SERVER_TAG + "\":\"MCP Server\"}"));
+
+        assertEquals(normalId, mcpId, "incoming mcp-server tag must reuse the plain collection");
+        assertFalse(getHostNameToIdMap(parser).containsKey(host + "-agentic"));
+    }
+
+    @Test
     public void case5_alreadyTaggedCollection_neverReForks() throws Exception {
         HttpCallParser parser = newParser();
         String host = "case5-already-tagged.akto.internal";

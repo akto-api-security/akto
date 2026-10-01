@@ -1,25 +1,25 @@
 import request from "@/util/request"
 
 const testLibraryRequests = {
-    addTestLibrary(repositoryUrl) {
+    addTestLibrary(repositoryUrl, overrideSystemTemplates) {
         return request({
             url: '/api/addTestLibrary',
             method: 'post',
-            data: {repositoryUrl: repositoryUrl}
+            data: {repositoryUrl: repositoryUrl, overrideSystemTemplates: overrideSystemTemplates}
         })
     },
-    removeTestLibrary(repositoryUrl) {
+    removeTestLibrary(repositoryUrl, overrideSystemTemplates) {
         return request({
             url: '/api/removeTestLibrary',
             method: 'post',
-            data: {repositoryUrl: repositoryUrl}
+            data: {repositoryUrl: repositoryUrl, overrideSystemTemplates: overrideSystemTemplates}
         })
     },
-    syncCustomLibrary(repositoryUrl) {
+    syncCustomLibrary(repositoryUrl, overrideSystemTemplates) {
         return request({
             url: '/api/syncCustomLibrary',
             method: 'post',
-            data: {repositoryUrl: repositoryUrl}
+            data: {repositoryUrl: repositoryUrl, overrideSystemTemplates: overrideSystemTemplates}
         })
     },
     syncAllDefaultTestLibraries() {

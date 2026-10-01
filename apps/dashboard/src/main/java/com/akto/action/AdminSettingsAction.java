@@ -10,6 +10,7 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.TelemetrySettings;
@@ -65,6 +66,7 @@ public class AdminSettingsAction extends UserAction {
     private static final Pattern CIDR_PATTERN = Pattern.compile(CIDR_REGEX);
 
     Account currentAccount;
+    private boolean canOverrideSystemTemplates;
 
     @Override
     public String execute() throws Exception {
@@ -76,6 +78,7 @@ public class AdminSettingsAction extends UserAction {
                 Projections.include("name", "timezone", Account.HYBRID_SAAS_ACCOUNT, Account.HYBRID_TESTING_ENABLED)
             );
         }
+        canOverrideSystemTemplates = YamlTemplateDao.accountAllowsSystemTemplateOverrides();
         return SUCCESS.toUpperCase();
     }
 
@@ -842,6 +845,10 @@ public class AdminSettingsAction extends UserAction {
 
     public void setCurrentAccount(Account currentAccount) {
         this.currentAccount = currentAccount;
+    }
+
+    public boolean getCanOverrideSystemTemplates() {
+        return canOverrideSystemTemplates;
     }
 
     public void setDeltaTimeForScheduledSummaries(int deltaTimeForScheduledSummaries) {

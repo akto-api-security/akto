@@ -1134,7 +1134,9 @@ public class Main {
         );
         // get yaml templates for issues
         Set<String> testSubCategoryList = apisAffectedCount.keySet();
-        Map<String, YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(Filters.in(Constants.ID, testSubCategoryList), Projections.include(YamlTemplate.INFO)).stream().collect(Collectors.toMap(YamlTemplate::getId, Function.identity()));
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.in(Constants.ID, testSubCategoryList), Projections.include(YamlTemplate.INFO));
+        YamlTemplateDao.instance.applySystemTemplateOverrides(yamlTemplateList);
+        Map<String, YamlTemplate> yamlTemplates = yamlTemplateList.stream().collect(Collectors.toMap(YamlTemplate::getId, Function.identity()));
 
         SlackAlerts apiTestStatusAlert = new APITestStatusAlert(alertData);
 
