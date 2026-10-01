@@ -223,8 +223,10 @@ public class RBACDao extends CommonContextDao<RBAC> {
             apiCollectionsId.addAll(rbac.getApiCollectionsId());
         }
 
-        // an empty list means all collections, so a role limited by rules that match nothing yet must still see nothing
-        if (hasRules && apiCollectionsId.isEmpty()) {
+        // an empty list means all collections, so a role limited by rules that match nothing yet must still see nothing,
+        // and so must a custom role that no longer exists (e.g. deleted while still named in an SSO group mapping)
+        boolean unknownRole = customRole == null && currentRole != null && Role.fromName(currentRole) == null;
+        if ((hasRules || unknownRole) && apiCollectionsId.isEmpty()) {
             apiCollectionsId.add(NO_COLLECTION_ID);
         }
 

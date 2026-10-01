@@ -139,6 +139,9 @@ public class TestRbacGuards extends MongoBasedTest {
         assertEquals(Role.MEMBER, storedRole(202, "SECURITY ENGINEER")); // display name stored by older signups
         assertEquals(Role.THREAT_ENGINEER, storedRole(203, "TEAM_ROLE"));
         assertEquals(Role.GUEST, storedRole(204, "SOME_DELETED_ROLE")); // least privilege, not an exception
+        // and it sees no collections (an empty list would mean all of them)
+        assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), RBACDao.instance.getUserCollectionsById(204, ACCOUNT_ID));
+        assertEquals(new ArrayList<>(), RBACDao.instance.getUserCollectionsById(202, ACCOUNT_ID)); // built-in role: all, as before
     }
 
     private static void insertRole(String name, Role baseRole, boolean threatToggle, Map<String, String> overrides) {
