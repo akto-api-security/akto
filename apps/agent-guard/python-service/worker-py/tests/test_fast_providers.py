@@ -1,5 +1,5 @@
 """qwen3guard_fast / gemma_fast fall back to their original provider on failure; gemma_fast_arbiter
-has no built-in fallback (FINAL_ARBITER_BACKUP). Network mocked.
+has no built-in fallback (FINAL_ARBITER_BACKUP) and no time bound. Network mocked.
 
 No new schema, no new env var: these are plain modelConfigs entries selected
 by "provider" like any other, reading "model"/"baseUrl" the same way
@@ -35,6 +35,14 @@ class _Hang:
         self.seconds = seconds
 
 
+class _Slow:
+    """Sentinel response: post() answers, but only after `seconds`."""
+
+    def __init__(self, seconds: float, payload):
+        self.seconds = seconds
+        self.payload = payload
+
+
 class _FakeClient:
     """Stand-in for the shared http_client.get_client() AsyncClient.
 
@@ -49,6 +57,9 @@ class _FakeClient:
         _FakeClient.posts.append({"url": url, "headers": headers, "json": json})
         for substr, resp in _FakeClient.responses.items():
             if substr in url:
+                if isinstance(resp, _Slow):
+                    await asyncio.sleep(resp.seconds)
+                    return _FakeResponse(resp.payload)
                 if isinstance(resp, _Hang):
                     await asyncio.sleep(resp.seconds)
                     raise AssertionError("_Hang should have been cancelled by the caller's own timeout first")
@@ -187,7 +198,7 @@ async def test_gemma_fast_falls_back_when_fast_leg_hangs_not_just_errors(monkeyp
     assert out == "from foundry"
 
 
-# ── gemma_fast_arbiter has NO built-in fallback (backup is opt-in via FINAL_ARBITER_BACKUP) ─────
+# ── gemma_fast_arbiter has NO built-in fallback and NO time bound (backup is opt-in via FINAL_ARBITER_BACKUP) ─────
 
 
 async def test_gemma_fast_arbiter_does_not_fall_back_to_anthropic_on_failure(monkeypatch):
@@ -202,16 +213,15 @@ async def test_gemma_fast_arbiter_does_not_fall_back_to_anthropic_on_failure(mon
     assert not any("api.anthropic.com" in post["url"] for post in _FakeClient.posts)
 
 
-async def test_gemma_fast_arbiter_hung_fast_leg_fails_within_its_own_bound_without_fallback(monkeypatch):
+async def test_gemma_fast_arbiter_waits_for_a_slow_answer_instead_of_cutting_it_off(monkeypatch):
     monkeypatch.setattr(providers, "_FAST_LEG_TIMEOUT_S", 0.05)
     monkeypatch.setattr(providers.settings, "ANTHROPIC_API_KEY", "key-123")
     _FakeClient.responses = {
-        _HOST: _Hang(),
+        _HOST: _Slow(0.2, {"choices": [{"message": {"content": "slow but ok"}}]}),
         "api.anthropic.com": {"content": [{"text": "from anthropic"}]},
     }
     p = build_provider_from_config({"provider": "gemma_fast_arbiter", "model": "gemma-fast-arbiter", "baseUrl": _HOST})
-    with pytest.raises(asyncio.TimeoutError):
-        await asyncio.wait_for(p.complete("hi"), timeout=2.0)
+    assert await p.complete("hi") == "slow but ok"
     assert not any("api.anthropic.com" in post["url"] for post in _FakeClient.posts)
 
 
