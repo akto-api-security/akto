@@ -1,11 +1,14 @@
 """scan_payload request-boundary rules — fake providers, no network.
 
-Pins the Password gemma-only invariant at the worker boundary: whatever
-modelConfigs a caller supplies (guardrail policy, the Go gateway, or the
-DEFAULT_MODEL_CONFIG_JSON env), Password must run on a Gemma backend only —
-never the Qwen tier or another arbiter. The Go gateway used to hardcode this
-client-side; the worker is the enforcement point.
+Pins the Password single-model invariant at the worker boundary: whatever
+modelConfigs a caller supplies (guardrail policy, the Go gateway), Password
+runs on exactly one model from the deployment's own DEFAULT_MODEL_CONFIG_JSON
+(its fallback filter, else its arbiter, else a Gemma backend) — never the
+caller's models, the Qwen tier, or a second-opinion arbiter. The Go gateway
+used to hardcode this client-side; the worker is the enforcement point.
 """
+
+import json
 
 import pytest
 
@@ -53,12 +56,15 @@ HOSTILE_CONFIG = {
 
 
 async def _scan_password():
+    # Close the fire-and-forget Slack alert instead of dropping it un-awaited.
     return await scan_handler.scan_payload(
-        {"scanner_name": "Password", "scanner_type": "prompt", "text": "pwd=hunter2", "config": HOSTILE_CONFIG}
+        {"scanner_name": "Password", "scanner_type": "prompt", "text": "pwd=hunter2", "config": HOSTILE_CONFIG},
+        schedule_fn=lambda coro: coro.close(),
     )
 
 
 async def test_password_ignores_caller_models_and_runs_vertex_gemma(monkeypatch):
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
     monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
     monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "")
     r = await _scan_password()
@@ -68,10 +74,29 @@ async def test_password_ignores_caller_models_and_runs_vertex_gemma(monkeypatch)
 
 async def test_password_ignores_caller_models_and_runs_foundry_gemma(monkeypatch):
     # Foundry by default — a leftover GEMMA_VERTEX_* block must not divert Password off Azure.
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
     monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
     monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "https://ep.eastus2.inference.ml.azure.com/v1")
     r = await _scan_password()
     assert FakeScanner.calls == ["gemma_foundry"]
+    assert r["is_valid"] is False
+
+
+async def test_password_runs_on_deployment_model_not_caller_models(monkeypatch):
+    deployment = {
+        "modelConfigs": [
+            {"provider": "bedrock", "model": "fast", "modelRole": "FAST_THREAT_FILTER"},
+            {"provider": "bedrock", "model": "arbiter", "modelRole": "FINAL_ARBITER"},
+        ]
+    }
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", json.dumps(deployment))
+    built = []
+    monkeypatch.setattr(
+        model_map, "build_provider_from_config", lambda entry: built.append(entry) or FakeProvider(entry["provider"])
+    )
+    r = await _scan_password()
+    assert FakeScanner.calls == ["bedrock"]  # one call, and not the caller's qwen3guard/anthropic
+    assert [e["model"] for e in built] == ["arbiter"]
     assert r["is_valid"] is False
 
 
