@@ -39,6 +39,22 @@ BUILTIN_DEFAULT_CONFIG: dict[str, Any] = {
 }
 
 
+def _parse_deployment_config(raw_json: str) -> dict[str, Any] | None:
+    """The per-deployment DEFAULT_MODEL_CONFIG_JSON, or None when it's unset,
+    unparseable, or doesn't carry a modelConfigs list."""
+    if not raw_json or not raw_json.strip():
+        return None
+    try:
+        cfg = json.loads(raw_json)
+    except Exception as exc:
+        logger.warning(f"[constants] DEFAULT_MODEL_CONFIG_JSON parse failed ({exc}); using built-in")
+        return None
+    if isinstance(cfg, dict) and cfg.get("modelConfigs"):
+        return cfg
+    logger.warning("[constants] DEFAULT_MODEL_CONFIG_JSON has no modelConfigs; using built-in")
+    return None
+
+
 def get_default_config(raw_json: str = "") -> dict[str, Any]:
     """Resolve the fallback modelMap for a request with no modelConfigs.
 
@@ -46,15 +62,7 @@ def get_default_config(raw_json: str = "") -> dict[str, Any]:
     raw_json); falls back to BUILTIN_DEFAULT_CONFIG when it's unset, unparseable,
     or doesn't carry a modelConfigs list.
     """
-    if raw_json and raw_json.strip():
-        try:
-            cfg = json.loads(raw_json)
-            if isinstance(cfg, dict) and cfg.get("modelConfigs"):
-                return cfg
-            logger.warning("[constants] DEFAULT_MODEL_CONFIG_JSON has no modelConfigs; using built-in")
-        except Exception as exc:
-            logger.warning(f"[constants] DEFAULT_MODEL_CONFIG_JSON parse failed ({exc}); using built-in")
-    return BUILTIN_DEFAULT_CONFIG
+    return _parse_deployment_config(raw_json) or BUILTIN_DEFAULT_CONFIG
 
 
 # Routing tables — the single source of truth for which backend handles a scan.
@@ -67,10 +75,12 @@ LOCAL_SCANNERS = {"BanSubstrings", "TokenLimit", "Secrets"}
 # from modelConfigs so only the arbiter LLM (Gemma) decides — otherwise Qwen
 # would fast-pass benign-but-flaggable input as "safe".
 GEMMA_ONLY_SCANNERS = {"BanCode", "Password"}
-# Password never uses a second-opinion arbiter (cost/latency) — enforced here so
-# it holds regardless of caller (policy modelConfigs, DEFAULT_MODEL_CONFIG_JSON,
-# or a direct /scan hit with no config at all), not just the Go gateway's own hardcode.
-FORCE_GEMMA_ONLY_SCANNERS = {"Password"}
+# Password runs on exactly ONE model — no fast tiers, no second-opinion arbiter
+# (cost/latency) — and never one the caller picks: the deployment's own
+# DEFAULT_MODEL_CONFIG_JSON decides (see single_model_config). Enforced here so it
+# holds regardless of caller (policy modelConfigs, or a direct /scan hit with no
+# config at all), not just the Go gateway's own hardcode.
+SINGLE_MODEL_SCANNERS = {"Password"}
 
 
 def _gemma_arbiter_provider() -> str:
@@ -89,9 +99,40 @@ def strip_qwen_tier(model_configs):
     return filtered or list(model_configs or [])
 
 
-def force_gemma_only(_model_configs):
-    """Replace whatever modelConfigs was supplied with the fixed Gemma-only map."""
-    return [{"provider": _gemma_arbiter_provider(), "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
+def _is_qwen(entry: dict[str, Any]) -> bool:
+    return str(entry.get("provider", "")).lower().startswith("qwen")
+
+
+# Roles a single-model scanner draws its one model from, in preference order.
+_SINGLE_MODEL_ROLE_PREFERENCE = ("FAST_FALLBACK_SAFE_FILTER", "FINAL_ARBITER")
+
+
+def _pick_single_model(model_configs: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Choose the one entry a single-model scanner runs on: the first
+    FAST_FALLBACK_SAFE_FILTER entry, else the first FINAL_ARBITER entry.
+    Qwen3Guard is never eligible — it emits a safety verdict, not a
+    secret-value judgement (see GEMMA_ONLY_SCANNERS)."""
+    candidates = [m for m in model_configs if not _is_qwen(m)]
+    for role in _SINGLE_MODEL_ROLE_PREFERENCE:
+        for entry in candidates:
+            if entry.get("modelRole") == role:
+                return entry
+    return None
+
+
+def single_model_config() -> list[dict[str, Any]]:
+    """The fixed one-entry modelMap for SINGLE_MODEL_SCANNERS.
+
+    Picked from the deployment's DEFAULT_MODEL_CONFIG_JSON — its
+    FAST_FALLBACK_SAFE_FILTER, else its FINAL_ARBITER, with that entry's
+    model/baseUrl — and when that's unset or has neither, the configured Gemma
+    backend. Caller-supplied modelConfigs are deliberately not consulted.
+    """
+    deployment = _parse_deployment_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+    chosen = _pick_single_model(deployment["modelConfigs"]) if deployment else None
+    if chosen is None:
+        return [{"provider": _gemma_arbiter_provider(), "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}]
+    return [{**chosen, "modelRole": "FINAL_ARBITER", "timeoutMs": chosen.get("timeoutMs") or 30000}]
 
 
 # Scanners that proxy to a sibling Worker which in turn owns a Cloudflare
