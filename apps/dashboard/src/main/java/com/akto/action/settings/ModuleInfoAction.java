@@ -201,6 +201,13 @@ public class ModuleInfoAction extends UserAction {
         Bson filter = buildEndpointShieldFilter();
         Bson groupId = endpointShieldGroupId();
 
+        Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
+                Aggregates.match(filter),
+                Aggregates.group(groupId),
+                Aggregates.count("total")
+        ), Document.class).first();
+        total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
+
         String sortField = mapEndpointShieldSortField(sortKey);
         Bson finalSort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
         int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
@@ -230,10 +237,12 @@ public class ModuleInfoAction extends UserAction {
                 Aggregates.limit(lim)
         );
 
-        List<Bson> countPipeline = new ArrayList<>(pipeline.subList(0, pipeline.size() - 3));
-        countPipeline.add(Aggregates.count("total"));
-        Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(countPipeline, Document.class).first();
-        total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
+        if (statuses != null && !statuses.isEmpty()) {
+            List<Bson> countPipeline = new ArrayList<>(pipeline.subList(0, pipeline.size() - 3));
+            countPipeline.add(Aggregates.count("total"));
+            Document statusCount = ModuleInfoDao.instance.getMCollection().aggregate(countPipeline, Document.class).first();
+            total = statusCount == null ? 0 : ((Number) statusCount.get("total")).longValue();
+        }
 
         moduleInfos = new ArrayList<>();
         MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, ModuleInfo.class).cursor();
