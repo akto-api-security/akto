@@ -348,7 +348,7 @@ public class ArgusPostureAction extends UserAction {
     }
 
     public String triggerArgusPostureRegenerate() {
-        boolean started = ArgusPostureRegenerator.trigger(Context.accountId.get());
+        boolean started = ArgusPostureRegenerator.trigger();
         this.response = new BasicDBObject("status", started ? "STARTED" : "ALREADY_RUNNING");
         return SUCCESS.toUpperCase();
     }

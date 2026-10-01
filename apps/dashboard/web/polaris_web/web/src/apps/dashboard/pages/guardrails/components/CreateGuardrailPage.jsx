@@ -216,6 +216,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         custom: []
     });
     const [newCustomWord, setNewCustomWord] = useState("");
+    const [enableMultiLingualBlock, setEnableMultiLingualBlock] = useState(false);
 
     // Step 4: Sensitive Information Guardrails
     const [enablePiiTypes, setEnablePiiTypes] = useState(false);
@@ -462,6 +463,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableSentiment,
         sentimentConfidenceScore,
         wordFilters,
+        enableMultiLingualBlock,
         // Step 4
         enablePiiTypes,
         piiTypes,
@@ -788,6 +790,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             custom: []
         });
         setNewCustomWord("");
+        setEnableMultiLingualBlock(false);
         setEnablePiiTypes(false);
         setPiiTypes([]);
         setEnableRegexPatterns(false);
@@ -1257,6 +1260,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setWordFilters={setWordFilters}
                         newCustomWord={newCustomWord}
                         setNewCustomWord={setNewCustomWord}
+                        enableMultiLingualBlock={enableMultiLingualBlock}
+                        setEnableMultiLingualBlock={setEnableMultiLingualBlock}
                     />
                 );
             case 4:
