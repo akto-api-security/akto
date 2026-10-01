@@ -163,6 +163,17 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
     Primary = the FINAL_ARBITER entry of the model config (DEFAULT_MODEL_CONFIG_JSON, else the built-in default).
     Backup = its FINAL_ARBITER_BACKUP entry, tried when the primary fails; no such entry = no backup.
     """
+    return await _run_guardrails_llm(body, relaxed=False)
+
+
+@app.post("/guardrails/llm/async")
+async def guardrails_llm_async(body: GuardrailsLLMRequest):
+    """Same as /guardrails/llm for the calls that run after the block has been returned (reason, evidence,
+    remediation): a larger reply ceiling, since nobody is waiting on them."""
+    return await _run_guardrails_llm(body, relaxed=True)
+
+
+async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool):
     start = time.perf_counter()
     logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
     provider = build_arbiter(get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"], body.model)
@@ -173,7 +184,8 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
             detail="guardrails LLM not configured (no usable FINAL_ARBITER entry in the model config)",
         )
     try:
-        content = await provider.complete(body.prompt)
+        with providers.relaxed_limits(relaxed):
+            content = await provider.complete(body.prompt)
     except Exception as exc:
         failed_ms = (time.perf_counter() - start) * 1000
         logger.warning(f"[GuardrailsLLM] call failed: {exc!r} ms={failed_ms:.0f}")
@@ -182,6 +194,6 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
     logger.debug(f"[GuardrailsLLM] response: {content!r}")
     logger.info(
         f"[GuardrailsLLM] provider={provider.name} prompt_len={len(body.prompt)} "
-        f"response_len={len(content)} ms={elapsed_ms:.0f}"
+        f"relaxed={relaxed} response_len={len(content)} ms={elapsed_ms:.0f}"
     )
     return {"content": content}

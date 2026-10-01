@@ -12,6 +12,8 @@ import math
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -24,6 +26,24 @@ from settings import settings
 logger = logging.getLogger(__name__)
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+_DEFAULT_MAX_TOKENS = 256
+_ASYNC_MAX_TOKENS = 4096
+_relaxed_limits: ContextVar[bool] = ContextVar("relaxed_limits", default=False)
+
+
+@contextmanager
+def relaxed_limits(enabled: bool = True):
+    token = _relaxed_limits.set(enabled)
+    try:
+        yield
+    finally:
+        _relaxed_limits.reset(token)
+
+
+def _max_tokens() -> int:
+    return _ASYNC_MAX_TOKENS if _relaxed_limits.get() else _DEFAULT_MAX_TOKENS
+
+
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 _IDENTITY = {"Accept-Encoding": "identity"}
@@ -144,7 +164,7 @@ class OpenAIProvider(LLMProvider):
         payload = {
             "model": self.model,
             "temperature": 0.1,
-            "max_tokens": 256,
+            "max_tokens": _max_tokens(),
             "messages": [{"role": "user", "content": prompt}],
         }
         if self.include_metrics:
@@ -203,7 +223,7 @@ class AnthropicProvider(LLMProvider):
             self._headers(),
             {
                 "model": self.model,
-                "max_tokens": 256,
+                "max_tokens": _max_tokens(),
                 "messages": [{"role": "user", "content": prompt}],
             },
             self._log_tag,
@@ -741,7 +761,8 @@ class GemmaFastProvider(OpenAIProvider):
 
 
 class GemmaFastArbiterProvider(OpenAIProvider):
-    """Faster (Gemma) arbiter endpoint. No built-in fallback: a backup is a FINAL_ARBITER_BACKUP modelConfigs entry."""
+    """Faster (Gemma) arbiter endpoint. No built-in fallback and no time bound of its own: a slow answer is
+    waited for, and a backup is a FINAL_ARBITER_BACKUP modelConfigs entry."""
 
     name = "gemma_fast_arbiter"
     include_metrics = True
@@ -749,9 +770,6 @@ class GemmaFastArbiterProvider(OpenAIProvider):
     def __init__(self, api_key: str, model: str, base_url: str = ""):
         super().__init__(api_key, model, base_url=base_url)
         self.name = "gemma_fast_arbiter"
-
-    async def complete(self, prompt: str) -> str:
-        return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
 
 
 _FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
@@ -850,12 +868,14 @@ class FallbackProvider(LLMProvider):
 
     async def complete(self, prompt: str) -> str:
         try:
-            return await asyncio.wait_for(self.primary.complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
+            return await self.primary.complete(prompt)
         except Exception as exc:
             backup = build_provider_from_config(self.backup_entry)
             if backup is None:
                 raise
-            logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}")
+            logger.warning(
+                f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}"
+            )
             return await backup.complete(prompt)
 
 
