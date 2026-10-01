@@ -103,7 +103,10 @@ const getOsOrBrowserComp = (agentData) => {
         );
     }
 
-    if (isExtensionAgent(agentData?.deviceId, agentData?.agentVersion)) {
+    const reportedBrowser = agentData?.browserName;
+    const hasReportedBrowser = reportedBrowser && reportedBrowser !== DEFAULT_VALUE && reportedBrowser.toLowerCase() !== 'unknown';
+    const hasReportedOs = agentData?.os && agentData.os !== DEFAULT_VALUE;
+    if (hasReportedBrowser || (!hasReportedOs && isExtensionAgent(agentData?.deviceId, agentData?.agentVersion))) {
         const browserName = agentData?.browserName;
         const browserVersion = agentData?.browserVersion;
         const hasBrowserName = browserName && browserName !== DEFAULT_VALUE && browserName.toLowerCase() !== 'unknown';
@@ -174,6 +177,9 @@ const convertDataIntoTableFormat = (agentData) => ({
     statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus),
 });
 
+const knownOrDefault = (value) => (value && String(value).toLowerCase() !== 'unknown') ? value : DEFAULT_VALUE;
+const hideUnknownLabel = (text, fallback) => String(text).toLowerCase() === 'unknown' ? fallback : text;
+
 const mapModuleToAgent = (module) => ({
     agentId: module.id,
     hostname: module.name,
@@ -185,10 +191,10 @@ const mapModuleToAgent = (module) => ({
     currentStatus: module.additionalData?.currentStatus || null,
     provider: module.additionalData?.provider || null,
     orgName: module.additionalData?.orgName || null,
-    os: module.additionalData?.os || DEFAULT_VALUE,
-    osDisplayName: module.additionalData?.osDisplayName || DEFAULT_VALUE,
-    browserName: module.additionalData?.browserName || DEFAULT_VALUE,
-    browserVersion: module.additionalData?.browserVersion || DEFAULT_VALUE,
+    os: knownOrDefault(module.additionalData?.os),
+    osDisplayName: knownOrDefault(module.additionalData?.osDisplayName),
+    browserName: knownOrDefault(module.additionalData?.browserName),
+    browserVersion: knownOrDefault(module.additionalData?.browserVersion),
     osVersion: module.additionalData?.osVersion || DEFAULT_VALUE,
     arch: module.additionalData?.arch || DEFAULT_VALUE,
     kernelVersion: module.additionalData?.kernelVersion || DEFAULT_VALUE,
@@ -253,11 +259,11 @@ function EndpointShieldMetadata() {
                     { ...createFilter('hostname', 'Hostname'), choices: (opts.hostnames || []).map(h => ({ label: h, value: h })) },
                     { ...createFilter('deviceId', 'Device ID'), choices: (opts.deviceIds || []).map(d => ({ label: d, value: d })) },
                     { ...createFilter('osBrowser', 'OS/Browser'), choices: [
-                        ...(opts.oses || []).map(o => ({ label: OS_LABELS[o.toLowerCase()] || o, value: `os:${o}` })),
-                        ...(opts.browserNames || []).map(b => ({ label: b.toLowerCase() === 'unknown' ? 'Browser' : b, value: `browser:${b}` })),
+                        ...(opts.oses || []).map(o => ({ label: hideUnknownLabel(OS_LABELS[o.toLowerCase()] || o, 'OS'), value: `os:${o}` })),
+                        ...(opts.browserNames || []).map(b => ({ label: hideUnknownLabel(b, 'Browser'), value: `browser:${b}` })),
                         ...((opts.providers || []).includes('claude') ? [{ label: CLAUDE_COMPLIANCE_LABEL, value: 'provider:claude' }] : [])
                     ] },
-                    { ...createFilter('agentVersion', 'Agent Version'), choices: (opts.agentVersions || []).map(v => ({ label: v, value: v })) },
+                    { ...createFilter('agentVersion', 'Agent Version'), choices: (opts.agentVersions || []).map(v => ({ label: hideUnknownLabel(v, 'Version'), value: v })) },
                     { ...createFilter('status', 'Status'), choices: (opts.statuses || []).map(st => ({ label: STATUS_LABELS[st] || st, value: st })) },
                 ]);
             } catch (e) { /* ignore */ }
@@ -281,7 +287,7 @@ function EndpointShieldMetadata() {
         setLoading(true);
         let ret = [];
         let total = 0;
-        const pickOsBrowser = (type) => (filters?.osBrowser || []).filter(v => v.startsWith(`${type}:`)).map(v => v.slice(type.length + 1));
+        const pickOsBrowser = (type) => (filters?.osBrowser || []).filter(v => v.startsWith(`${type}:`)).flatMap(v => v.slice(type.length + 1).split(GROUP_SEPARATOR));
         try {
             const resp = await settingRequests.fetchEndpointShieldAgents({
                 skip, limit,
