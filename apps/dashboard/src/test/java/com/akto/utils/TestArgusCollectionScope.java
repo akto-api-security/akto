@@ -25,6 +25,7 @@ import com.akto.action.GuardrailPoliciesAction;
 import com.akto.action.user.AzureSsoAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.CustomRoleDao;
+import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.SSOConfigsDao;
@@ -226,6 +227,46 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
 
         // unlimited Threat Engineer and admin: no collection rule
         assertNull(policyAccessError(THREAT_ENGINEER_ALL, CONTEXT_SOURCE.AGENTIC, policy(false, OTHER_HOST)));
+    }
+
+    private static List<String> visiblePolicies(int userId, int skip, int limit, long expectedTotal) {
+        as(userId, CONTEXT_SOURCE.AGENTIC);
+        GuardrailPoliciesAction action = new GuardrailPoliciesAction();
+        action.setSession(session(userId));
+        action.setSkip(skip);
+        action.setLimit(limit);
+        assertEquals("SUCCESS", action.fetchGuardrailPolicies());
+        assertEquals(expectedTotal, action.getTotal());
+        List<String> names = new ArrayList<>();
+        for (GuardrailPolicies p : action.getGuardrailPolicies()) names.add(p.getName());
+        return names;
+    }
+
+    @Test
+    public void testPolicyListHidesOtherTeamsPolicies() {
+        GuardrailPoliciesDao.instance.getMCollection().drop();
+        GuardrailPolicies own = policy(false, OWN_HOST), other = policy(false, OTHER_HOST), global = policy(true),
+                mixed = policy(false, OWN_HOST, OTHER_HOST), excludeOther = policy(false, OTHER_HOST);
+        excludeOther.setNegatedAgentServers(true);
+        GuardrailPolicies legacyOther = new GuardrailPolicies();
+        legacyOther.setSelectedMcpServers(Collections.singletonList(OTHER_HOST));
+        GuardrailPolicies[] all = {own, other, global, mixed, excludeOther, legacyOther};
+        String[] names = {"own", "other", "global", "mixed", "excludeOther", "legacyOther"};
+        for (int i = 0; i < all.length; i++) {
+            all[i].setName(names[i]);
+            all[i].setCreatedTimestamp(100 - i);
+            GuardrailPoliciesDao.instance.insertOne(all[i]);
+        }
+
+        // limited user: own, global and exclude-mode policies, plus ones that also cover an own agent
+        assertEquals(Arrays.asList("own", "global", "mixed", "excludeOther"), visiblePolicies(TEAM_A, 0, 20, 4));
+        assertEquals(Arrays.asList("mixed", "excludeOther"), visiblePolicies(TEAM_A, 2, 2, 4));
+        assertTrue(visiblePolicies(TEAM_A, 10, 20, 4).isEmpty());
+
+        // admin and unlimited users: everything, unchanged
+        assertEquals(Arrays.asList(names), visiblePolicies(ADMIN, 0, 20, 6));
+        assertEquals(Arrays.asList(names), visiblePolicies(THREAT_ENGINEER_ALL, 0, 20, 6));
+        GuardrailPoliciesDao.instance.getMCollection().drop();
     }
 
     // ── Account-wide settings ──────────────────────────────────────────────────
