@@ -235,11 +235,15 @@ public class AgenticPostureScoreCron {
     private static int severityWeight(String severity) {
         if (severity == null) return 0;
         switch (severity) {
-            case "CRITICAL": return 100;
-            case "HIGH": return 70;
-            case "MEDIUM": return 40;
-            case "LOW": return 15;
-            default: return 0;
+            case "CRITICAL":
+            case "HIGH":
+                return 100;
+            case "MEDIUM":
+                return 50;
+            case "LOW":
+                return 25;
+            default:
+                return 0;
         }
     }
 
