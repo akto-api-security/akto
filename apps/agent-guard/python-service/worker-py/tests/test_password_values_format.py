@@ -9,7 +9,7 @@ the reason that the JSON contract required to quote every secret verbatim.
 
 import pytest
 
-from constants import apply_scanner_response_format, force_gemma_only
+from constants import apply_scanner_response_format, single_model_config
 from llm_scanner import _FORMAT_PARSERS, parse_values_result
 from prompts import build_scan_prompt, known_formats, password, resolve_response_format
 from settings import settings
@@ -152,10 +152,10 @@ def test_every_known_format_has_a_parser():
 
 
 def test_values_reaches_password_despite_it_being_arbiter_only(monkeypatch):
-    """force_gemma_only strips the fast tiers, so a fast-tiers-only override
+    """single_model_config strips the fast tiers, so a fast-tiers-only override
     would never apply to Password at all."""
     monkeypatch.setattr(settings, "SCANNER_RESPONSE_FORMAT", "values")
-    configs = apply_scanner_response_format(force_gemma_only(None))
+    configs = apply_scanner_response_format(single_model_config())
     assert [e["modelRole"] for e in configs] == ["FINAL_ARBITER"]
     assert configs[0]["responseFormat"] == "values"
 
@@ -165,7 +165,7 @@ def test_abcd_on_an_arbiter_still_leaves_password_on_json(monkeypatch):
     template — so it falls back to JSON rather than answering a letter and
     losing the substrings the gateway masks."""
     monkeypatch.setattr(settings, "SCANNER_RESPONSE_FORMAT", "abcd")
-    configs = apply_scanner_response_format(force_gemma_only(None))
+    configs = apply_scanner_response_format(single_model_config())
     assert configs[0]["responseFormat"] == "abcd"
     assert resolve_response_format("Password", "prompt", configs[0]["responseFormat"]) == ""
 

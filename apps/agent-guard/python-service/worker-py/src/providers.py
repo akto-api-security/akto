@@ -17,8 +17,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Optional
-from urllib.parse import urlparse
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 
