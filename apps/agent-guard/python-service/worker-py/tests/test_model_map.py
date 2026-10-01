@@ -153,6 +153,15 @@ async def test_foundry_providers_share_stems_with_vertex():
     assert r["details"]["gemma"]["completed"] is True
 
 
+async def test_bedrock_arbiter_gets_its_own_stem():
+    cfg = [_entry("qwen3guard", "FAST_THREAT_FILTER"), _entry("bedrock", "FINAL_ARBITER")]
+    r = await _run(cfg, {"qwen3guard": UNSAFE, "bedrock": UNSAFE})
+    assert r["is_valid"] is False
+    assert r["details"]["llm_provider"] == "bedrock"
+    assert r["details"]["cascade_decision"] == "bedrock_authority"
+    assert r["details"]["bedrock"]["completed"] is True
+
+
 async def test_winner_values_forwarded_for_password_redaction():
     # details.values carries the exact secret substrings the gateway redacts;
     # dropping it silently disables Password redaction (regressed once in a merge).
