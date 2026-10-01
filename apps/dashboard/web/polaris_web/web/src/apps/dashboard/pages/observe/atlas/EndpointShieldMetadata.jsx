@@ -63,11 +63,21 @@ const createFilter = (key, label) => ({
     choices: []
 });
 
+const STATUS_LABELS = {
+    active: 'Running',
+    inactive: 'Inactive',
+    error: 'Stale',
+    failed: 'Never connected',
+    installing: 'Installing',
+    install_failed: 'Install failed'
+};
+
 const resourceName = {
     singular: 'agent',
     plural: 'agents',
 };
 
+const OS_LABELS = { mac: 'macOS', darwin: 'macOS', windows: 'Windows', linux: 'Linux' };
 const OS_ICON_MAP = { darwin: '/public/os-mac.svg', mac: '/public/os-mac.svg', windows: '/public/os-windows.svg', linux: '/public/linux.svg' };
 const BROWSER_ICON_MAP = { chrome: '/public/chrome.svg', firefox: '/public/firefox.svg', safari: '/public/safari.svg', brave: '/public/brave.svg', edge: '/public/edge.svg' };
 const GENERIC_BROWSER_ICON = '/public/Globe_icon.svg';
@@ -217,7 +227,9 @@ function EndpointShieldMetadata() {
         createFilter('username', 'Username'),
         createFilter('hostname', 'Hostname'),
         createFilter('deviceId', 'Device ID'),
-        createFilter('os', 'OS')
+        createFilter('osBrowser', 'OS/Browser'),
+        createFilter('agentVersion', 'Agent Version'),
+        createFilter('status', 'Status')
     ]);
 
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -225,7 +237,9 @@ function EndpointShieldMetadata() {
     const endTimestamp = getTimeEpoch("until");
 
     function disambiguateLabel(key, value) {
-        return func.convertToDisambiguateLabelObj(value, null, 2);
+        const choices = filters.find(f => f.key === key)?.choices || [];
+        const labels = Array.isArray(value) ? value.map(v => choices.find(c => c.value === v)?.label || v) : value;
+        return func.convertToDisambiguateLabelObj(labels, null, 2);
     }
 
     // Filter dropdown options (distinct values across ALL agents) — fetched ONCE, server-side.
@@ -238,7 +252,13 @@ function EndpointShieldMetadata() {
                     { ...createFilter('username', 'Username'), choices: (opts.usernames || []).map(u => ({ label: u, value: u })) },
                     { ...createFilter('hostname', 'Hostname'), choices: (opts.hostnames || []).map(h => ({ label: h, value: h })) },
                     { ...createFilter('deviceId', 'Device ID'), choices: (opts.deviceIds || []).map(d => ({ label: d, value: d })) },
-                    { ...createFilter('os', 'OS'), choices: (opts.oses || []).map(o => ({ label: o, value: o })) }
+                    { ...createFilter('osBrowser', 'OS/Browser'), choices: [
+                        ...(opts.oses || []).map(o => ({ label: OS_LABELS[o.toLowerCase()] || o, value: `os:${o}` })),
+                        ...(opts.browserNames || []).map(b => ({ label: b.toLowerCase() === 'unknown' ? 'Browser' : b, value: `browser:${b}` })),
+                        ...((opts.providers || []).includes('claude') ? [{ label: CLAUDE_COMPLIANCE_LABEL, value: 'provider:claude' }] : [])
+                    ] },
+                    { ...createFilter('agentVersion', 'Agent Version'), choices: (opts.agentVersions || []).map(v => ({ label: v, value: v })) },
+                    { ...createFilter('status', 'Status'), choices: (opts.statuses || []).map(st => ({ label: STATUS_LABELS[st] || st, value: st })) },
                 ]);
             } catch (e) { /* ignore */ }
         })();
@@ -261,6 +281,7 @@ function EndpointShieldMetadata() {
         setLoading(true);
         let ret = [];
         let total = 0;
+        const pickOsBrowser = (type) => (filters?.osBrowser || []).filter(v => v.startsWith(`${type}:`)).map(v => v.slice(type.length + 1));
         try {
             const resp = await settingRequests.fetchEndpointShieldAgents({
                 skip, limit,
@@ -269,7 +290,11 @@ function EndpointShieldMetadata() {
                 usernames: filters?.username || [],
                 hostnames: filters?.hostname || [],
                 deviceIds: filters?.deviceId || [],
-                oses: filters?.os || [],
+                oses: pickOsBrowser('os'),
+                browserNames: pickOsBrowser('browser'),
+                agentVersions: filters?.agentVersion || [],
+                statuses: filters?.status || [],
+                providers: pickOsBrowser('provider'),
                 queryValue: queryValue || "",
                 startTimestamp, endTimestamp,
             });
