@@ -26,6 +26,7 @@ import com.akto.threat.backend.cron.AtlasRiskScoreSyncCron;
 import com.akto.threat.backend.cron.CloudflareWafSyncCron;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.AccountTask;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -70,6 +71,11 @@ public class Main {
     }
 
     ThreatDetectionDaoInit.init(threatProtectionMongo);
+
+    // Populate the CustomDataType/AktoDataType "redacted" classification cache (per account,
+    // refreshed every 5 minutes) that MaliciousEventRedactor relies on to redact sensitive
+    // fields out of malicious-event payloads before they're persisted.
+    SingleTypeInfo.init();
 
     KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()
