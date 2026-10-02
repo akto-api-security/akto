@@ -7,7 +7,9 @@ on:
 
 jobs:
   coverage-check:
-    runs-on: ubuntu-latest
+    # ubuntu-latest (24.04) dropped libssl1.1, which the flapdoodle-embedded MongoDB 4.4.x
+    # binary in libs/dao's tests needs - matches the runner prod.yml already uses successfully.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
