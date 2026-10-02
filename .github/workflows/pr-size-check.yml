@@ -1,0 +1,44 @@
+name: PR size check
+
+on:
+  pull_request:
+    branches: [ feature/mini-runtime-release ]
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  size-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure base ref is fetched
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - name: Count changed lines (excluding generated/vendor paths)
+        run: |
+          CHANGED_LINES=$(git diff --numstat "origin/${{ github.base_ref }}...${{ github.event.pull_request.head.sha }}" -- \
+            . \
+            ':(exclude)**/target/**' \
+            ':(exclude)**/node_modules/**' \
+            ':(exclude)**/dist/**' \
+            ':(exclude)**/build/**' \
+            ':(exclude)**/package-lock.json' \
+            ':(exclude)**/yarn.lock' \
+            ':(exclude)**/pnpm-lock.yaml' \
+            ':(exclude)**/*.min.js' \
+            | awk '{ a = ($1 == "-") ? 0 : $1; d = ($2 == "-") ? 0 : $2; sum += a + d } END { print sum+0 }')
+
+          echo "Changed lines (excluding generated/vendor paths): $CHANGED_LINES"
+          echo "CHANGED_LINES=$CHANGED_LINES" >> "$GITHUB_ENV"
+
+          if [ "$CHANGED_LINES" -gt 1000 ]; then
+            echo "::error::PR changes $CHANGED_LINES lines, which exceeds the 1000 line limit. Please split this PR into smaller ones."
+            exit 1
+          fi
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "PR size OK - $CHANGED_LINES lines changed (limit 1000)." >> "$GITHUB_STEP_SUMMARY"

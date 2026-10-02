@@ -1,0 +1,57 @@
+name: PR coverage check
+
+on:
+  pull_request:
+    branches: [ feature/mini-runtime-release ]
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  coverage-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure base ref is fetched
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install diff-cover
+        run: pip install diff-cover
+
+      - name: Run tests with coverage (mini-testing + mini-runtime + deps)
+        run: mvn -B package -pl apps/mini-testing,apps/mini-runtime -am
+
+      - name: Check patch coverage with diff-cover (fail under 50%)
+        run: |
+          JACOCO_REPORTS=$(find apps/mini-testing apps/mini-runtime libs -path '*/target/site/jacoco/jacoco.xml' 2>/dev/null)
+
+          if [ -z "$JACOCO_REPORTS" ]; then
+            echo "::error::No JaCoCo XML reports found under apps/mini-testing, apps/mini-runtime or libs after the build."
+            exit 1
+          fi
+
+          echo "Found JaCoCo reports:"
+          echo "$JACOCO_REPORTS"
+
+          diff-cover $JACOCO_REPORTS \
+            --compare-branch="origin/${{ github.base_ref }}" \
+            --fail-under=50 \
+            --html-report=diff-coverage-report.html
+
+      - name: Upload diff coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diff-coverage-report
+          path: diff-coverage-report.html
+          if-no-files-found: ignore

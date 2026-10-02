@@ -1,0 +1,33 @@
+name: PR description check
+
+on:
+  pull_request:
+    branches: [ feature/mini-runtime-release ]
+    types: [ opened, edited, synchronize, reopened ]
+
+jobs:
+  description-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR description has at least 10 non-empty lines
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 - <<'EOF'
+          import os
+          import re
+
+          body = os.environ.get("PR_BODY") or ""
+          # Strip HTML comments (e.g. PR template boilerplate like "<!-- describe your change -->")
+          body = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
+
+          non_empty_lines = [line for line in body.splitlines() if line.strip()]
+          count = len(non_empty_lines)
+
+          print(f"Non-empty description lines: {count}")
+
+          if count < 10:
+              print(f"::error::PR description has only {count} non-empty line(s); at least 10 are required. "
+                    "Please describe what changed, why, and how it was tested.")
+              raise SystemExit(1)
+          EOF
