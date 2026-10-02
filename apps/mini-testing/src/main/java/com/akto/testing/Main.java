@@ -749,7 +749,8 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     continue;
                                 }
-                                GithubUtils.publishGithubComments(runResultSummary);
+                                // TODO: Delete completely, disabled feature not used anymore
+                                // GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
                             loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
@@ -801,7 +802,8 @@ public class Main {
                 if (trrs.getState() == State.SCHEDULED) {
                     if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                         //case of github status push
-                        GithubUtils.publishGithubStatus(trrs);
+                        // TODO: Delete completely, disabled feature not used anymore
+                        // GithubUtils.publishGithubStatus(trrs);
 
                     }
                 }
