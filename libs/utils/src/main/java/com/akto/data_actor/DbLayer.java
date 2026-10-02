@@ -2116,6 +2116,108 @@ public class DbLayer {
         return claimed;
     }
 
+    public static final String VERDICT_FRESH_RUN = "FRESH_RUN";
+    public static final String VERDICT_CICD = "CICD";
+    public static final String VERDICT_RERUN_SPECIFIC_TESTCASES = "RERUN_SPECIFIC_TESTCASES";
+    public static final String VERDICT_RECLAIMED_ABANDONED = "RECLAIMED_ABANDONED";
+    public static final String VERDICT_NO_WORK_FOUND = "NO_WORK_FOUND";
+
+    public static class ClaimResult {
+        public final String verdict;
+        public final TestingRunResultSummary trrs;
+        public final TestingRun testingRun;
+        public ClaimResult(String verdict, TestingRunResultSummary trrs, TestingRun testingRun) {
+            this.verdict = verdict;
+            this.trrs = trrs;
+            this.testingRun = testingRun;
+        }
+    }
+
+    private static final FindOneAndUpdateOptions RETURN_AFTER = new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER);
+
+    public static ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds) {
+        
+        List<ObjectId> eligibleRunIds = TestingRunDao.instance.findActiveRunIdsForModule(miniTestingName);
+        if (eligibleRunIds.isEmpty()) {
+            return new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
+        }
+
+        int now = Context.now();
+        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+
+        // For pre-created TRRS in case CI/CD or rerun specific
+        ClaimResult result = claimScheduledTrrs(eligibleRunIds, leaseToken, now, ttl);
+        if (result == null) {
+            result = claimExpiredOrOwnLease(eligibleRunIds, leaseToken, now, ttl);
+        }
+        if (result == null) {
+            result = claimFreshRun(eligibleRunIds, leaseToken, now, ttl);
+        }
+        return result != null ? result : new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
+    }
+
+    private static ClaimResult claimScheduledTrrs(List<ObjectId> eligibleRunIds, String leaseToken, int now, int ttl) {
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.in(TestingRunResultSummary.TESTING_RUN_ID, eligibleRunIds),
+                        Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.SCHEDULED)),
+                leaseUpdate(leaseToken, now, ttl), RETURN_AFTER);
+        if (trrs == null) {
+            return null;
+        }
+
+        String verdict;
+        if (trrs.getOriginalTestingRunResultSummaryId() != null) {
+            verdict = VERDICT_RERUN_SPECIFIC_TESTCASES;
+        } else if (trrs.getMetadata() != null && !trrs.getMetadata().isEmpty()) {
+            verdict = VERDICT_CICD;
+        } else {
+            loggerMaker.errorAndAddToDb("claimNextTestWork: claimed a SCHEDULED TRRS "
+                    + trrs.getId() + " with neither metadata nor originalTestingRunResultSummaryId set"
+                    + " - unknown creation path");
+            verdict = VERDICT_CICD;
+        }
+        return new ClaimResult(verdict, trrs, fetchOwningRun(trrs));
+    }
+
+    private static ClaimResult claimExpiredOrOwnLease(List<ObjectId> eligibleRunIds, String leaseToken, int now, int ttl) {
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.in(TestingRunResultSummary.TESTING_RUN_ID, eligibleRunIds),
+                        Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                        Filters.or(
+                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now),
+                                Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken))),
+                leaseUpdate(leaseToken, now, ttl), RETURN_AFTER);
+        return trrs == null ? null : new ClaimResult(VERDICT_RECLAIMED_ABANDONED, trrs, fetchOwningRun(trrs));
+    }
+
+    private static ClaimResult claimFreshRun(List<ObjectId> eligibleRunIds, String leaseToken, int now, int ttl) {
+        TestingRun run = TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.in(ID, eligibleRunIds),
+                        Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, now)),
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING), RETURN_AFTER);
+        if (run == null) {
+            return null;
+        }
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance
+                .createFreshSummaryForClaim(run.getId(), leaseToken, now, ttl);
+        return new ClaimResult(VERDICT_FRESH_RUN, trrs, run);
+    }
+
+    private static Bson leaseUpdate(String leaseToken, int now, int ttl) {
+        return Updates.combine(
+                Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, now + ttl));
+    }
+
+    private static TestingRun fetchOwningRun(TestingRunResultSummary trrs) {
+        return TestingRunDao.instance.findOne(Filters.eq(ID, trrs.getTestingRunId()), null);
+    }
+
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         return findPendingTestingRunResultSummary(now, delta, miniTestingName, null, 0);
     }
