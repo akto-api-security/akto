@@ -3,51 +3,96 @@ package com.akto.action.settings;
 import com.akto.action.UserAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.EndpointShieldSettings;
 import com.akto.dto.PlatformShieldConfig;
+import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.monitoring.ModuleInfo.ModuleType;
+import com.akto.utils.ArgusCollectionScope;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import lombok.Getter;
 import lombok.Setter;
+import org.bson.conversions.Bson;
 import org.json.JSONObject;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CommonPrefix;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
+import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
+import software.amazon.awssdk.services.s3.model.ObjectCannedACL;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Object;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class EndpointShieldSettingsAction extends UserAction {
 
     private static final long MANIFEST_CACHE_TTL_MS = 60 * 60 * 1000L; // 1 hour
+    // Match ModuleInfoAction Endpoint Shield inactive threshold (post #6575/#6576).
+    private static final long STALE_HEARTBEAT_SEC = 2L * 24 * 60 * 60;
 
     // Dot-notation prefix for nested fields: endpointShieldSettings.platforms.<platformKey>.<field>
     private static final String PLATFORMS_PREFIX =
         AccountSettings.ENDPOINT_SHIELD_SETTINGS + "." + EndpointShieldSettings.PLATFORMS + ".";
 
     private static final String S3_BASE = "https://akto-endpoint-agents.s3.us-east-1.amazonaws.com/atlas-installers";
+    private static final String S3_BUCKET = System.getenv().getOrDefault("AKTO_ENDPOINT_AGENTS_BUCKET", "akto-endpoint-agents");
+    private static final String S3_REGION = System.getenv().getOrDefault("AKTO_ENDPOINT_AGENTS_REGION", "us-east-1");
 
-    // MDM URLs are shared across all accounts; direct installer URLs are per-account
-    private static String defaultManifestUrl(String platformKey) {
-        int accountId = Context.accountId.get();
+    private static final Pattern S3_HTTPS = Pattern.compile(
+        "^https://([^.]+)\\.s3[.-][^/]+\\.amazonaws\\.com/(.+)$");
+
+    /** S3 folder name under atlas-installers/<accountId>/ for each platform tab. */
+    public static String platformFolder(String platformKey) {
         switch (platformKey) {
             case EndpointShieldSettings.PLATFORM_MACOS_MDM:
-                return S3_BASE + "/jamf-releases/latest.json";
+                return "macos-mdm";
             case EndpointShieldSettings.PLATFORM_WINDOWS_MDM:
-                return S3_BASE + "/windows-mdm-releases/latest.json";
+                return "windows-mdm";
             case EndpointShieldSettings.PLATFORM_MACOS_DIRECT:
-                return S3_BASE + "/" + accountId + "/macos-direct-releases/latest.json";
+                return "macos-standalone";
             case EndpointShieldSettings.PLATFORM_WINDOWS_DIRECT:
-                return S3_BASE + "/" + accountId + "/windows-direct-releases/latest.json";
+                return "windows-standalone";
             default:
                 return null;
         }
     }
 
+    // Account-scoped feeds: atlas-installers/<accountId>/<type>/latest.json
+    private static String defaultManifestUrl(String platformKey) {
+        int accountId = Context.accountId.get();
+        String folder = platformFolder(platformKey);
+        if (folder == null) return null;
+        return S3_BASE + "/" + accountId + "/" + folder + "/latest.json";
+    }
+
     @Getter @Setter private EndpointShieldSettings endpointShieldSettings;
     @Getter @Setter private String platformKey;
     @Getter @Setter private PlatformShieldConfig platformConfig;
+    @Getter @Setter private String version;
+    @Getter @Setter private List<Map<String, Object>> releases;
+    @Getter @Setter private Map<String, Object> versionControl;
+    @Getter @Setter private String newestPublishedVersion;
+    @Getter @Setter private String targetVersionLive;
 
     public String fetchEndpointShieldSettings() {
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
@@ -161,22 +206,392 @@ public class EndpointShieldSettingsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private boolean refreshPlatformFromManifest(String key, String manifestUrl) {
+    /**
+     * Lists published releases under atlas-installers/&lt;accountId&gt;/&lt;type&gt;/releases/
+     * and returns Target / Newest / Fleet visibility for the platform tab.
+     */
+    public String listEndpointShieldReleases() {
+        if (platformKey == null || !EndpointShieldSettings.ALL_PLATFORMS.contains(platformKey)) {
+            addActionError("Invalid platformKey");
+            return ERROR.toUpperCase();
+        }
+
+        String manifestUrl = resolveManifestUrl(platformKey);
+        if (manifestUrl == null) {
+            addActionError("No manifest URL configured for platform: " + platformKey);
+            return ERROR.toUpperCase();
+        }
+
+        String prefix = prefixFromManifestUrl(manifestUrl);
+        if (prefix == null) {
+            prefix = "atlas-installers/" + Context.accountId.get() + "/" + platformFolder(platformKey);
+        }
+
+        releases = new ArrayList<>();
+        try (S3Client s3 = s3Client()) {
+            String releasesPrefix = trimSlash(prefix) + "/releases/";
+            ListObjectsV2Request req = ListObjectsV2Request.builder()
+                .bucket(S3_BUCKET)
+                .prefix(releasesPrefix)
+                .delimiter("/")
+                .build();
+            ListObjectsV2Response resp;
+            do {
+                resp = s3.listObjectsV2(req);
+                for (CommonPrefix cp : resp.commonPrefixes()) {
+                    String folder = cp.prefix();
+                    String ver = folder.substring(releasesPrefix.length()).replaceAll("/$", "");
+                    if (ver.isEmpty()) continue;
+                    Map<String, Object> entry = new LinkedHashMap<>();
+                    entry.put("version", ver);
+                    JSONObject releaseMeta = readReleaseJson(s3, trimSlash(prefix) + "/releases/" + ver + "/release.json");
+                    if (releaseMeta != null) {
+                        entry.put("sha256", releaseMeta.optString("sha256", null));
+                        entry.put("artifactUrl", firstArtifactUrl(releaseMeta));
+                        entry.put("releasedAt", releaseMeta.optString("released_at", null));
+                    } else {
+                        String artifactKey = findArtifactKey(s3, folder);
+                        if (artifactKey != null) {
+                            entry.put("artifactUrl", "https://" + S3_BUCKET + ".s3." + S3_REGION + ".amazonaws.com/" + artifactKey);
+                        }
+                    }
+                    releases.add(entry);
+                }
+                req = req.toBuilder().continuationToken(resp.nextContinuationToken()).build();
+            } while (Boolean.TRUE.equals(resp.isTruncated()));
+        } catch (Exception e) {
+            addActionError("Failed to list releases from S3: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        releases.sort(Comparator.comparing((Map<String, Object> m) -> String.valueOf(m.get("version"))).reversed());
+        newestPublishedVersion = releases.isEmpty() ? null : String.valueOf(releases.get(0).get("version"));
+
+        JSONObject live = fetchManifestJson(manifestUrl);
+        targetVersionLive = live != null ? live.optString("version", null) : null;
+        if (targetVersionLive != null && !targetVersionLive.isEmpty()) {
+            refreshPlatformFromManifest(platformKey, manifestUrl);
+        }
+
+        versionControl = buildVersionControl(platformKey, targetVersionLive, newestPublishedVersion);
+
+        endpointShieldSettings = AccountSettingsDao.instance
+            .findOne(AccountSettingsDao.generateFilter())
+            .getEndpointShieldSettings();
+        return SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Rewrites the platform's latest.json to point at a published release under releases/&lt;version&gt;/.
+     */
+    public String deployEndpointShieldVersion() {
+        if (platformKey == null || !EndpointShieldSettings.ALL_PLATFORMS.contains(platformKey)) {
+            addActionError("Invalid platformKey");
+            return ERROR.toUpperCase();
+        }
+        if (version == null || version.trim().isEmpty()) {
+            addActionError("version is required");
+            return ERROR.toUpperCase();
+        }
+        String deployVersion = version.trim();
+
+        String manifestUrl = resolveManifestUrl(platformKey);
+        if (manifestUrl == null) {
+            addActionError("No manifest URL configured");
+            return ERROR.toUpperCase();
+        }
+        String prefix = prefixFromManifestUrl(manifestUrl);
+        if (prefix == null) {
+            prefix = "atlas-installers/" + Context.accountId.get() + "/" + platformFolder(platformKey);
+        }
+        prefix = trimSlash(prefix);
+
+        try (S3Client s3 = s3Client()) {
+            JSONObject releaseMeta = readReleaseJson(s3, prefix + "/releases/" + deployVersion + "/release.json");
+            if (releaseMeta == null) {
+                releaseMeta = synthesizeReleaseJson(s3, prefix, deployVersion, platformKey);
+            }
+            if (releaseMeta == null) {
+                addActionError("No release artifacts found for version: " + deployVersion);
+                return ERROR.toUpperCase();
+            }
+
+            JSONObject current = fetchManifestJson(manifestUrl);
+            if (current != null && current.has("version")) {
+                JSONObject previous = new JSONObject();
+                previous.put("version", current.optString("version", ""));
+                String art = firstArtifactUrl(current);
+                if (art != null) previous.put(artifactField(platformKey), art);
+                if (current.has("sha256")) previous.put("sha256", current.optString("sha256", ""));
+                releaseMeta.put("previous", previous);
+            }
+            releaseMeta.put("version", releaseMeta.optString("version", deployVersion));
+            if (!releaseMeta.has("customer")) {
+                releaseMeta.put("customer", String.valueOf(Context.accountId.get()));
+            }
+            if (!releaseMeta.has("released_at")) {
+                releaseMeta.put("released_at",
+                    java.time.Instant.now().toString().replaceAll("\\.\\d+Z$", "Z"));
+            }
+
+            String body = releaseMeta.toString(2) + "\n";
+            String key = prefix + "/latest.json";
+            RequestBody requestBody = RequestBody.fromString(body, StandardCharsets.UTF_8);
+            try {
+                s3.putObject(
+                    PutObjectRequest.builder()
+                        .bucket(S3_BUCKET)
+                        .key(key)
+                        .contentType("application/json")
+                        .acl(ObjectCannedACL.PUBLIC_READ)
+                        .build(),
+                    requestBody
+                );
+            } catch (Exception aclErr) {
+                // Bucket may enforce owner-controlled ACLs; retry without canned ACL.
+                s3.putObject(
+                    PutObjectRequest.builder()
+                        .bucket(S3_BUCKET)
+                        .key(key)
+                        .contentType("application/json")
+                        .build(),
+                    RequestBody.fromString(body, StandardCharsets.UTF_8)
+                );
+            }
+
+            AccountSettingsDao.instance.updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.combine(
+                    Updates.set(PLATFORMS_PREFIX + platformKey + "." + PlatformShieldConfig.TARGET_VERSION, deployVersion),
+                    Updates.set(PLATFORMS_PREFIX + platformKey + "." + PlatformShieldConfig.LATEST_VERSION, deployVersion),
+                    Updates.set(PLATFORMS_PREFIX + platformKey + "." + PlatformShieldConfig.LATEST_VERSION_FETCHED_AT, System.currentTimeMillis())
+                )
+            );
+        } catch (Exception e) {
+            addActionError("Failed to deploy version: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+
+        targetVersionLive = deployVersion;
+        versionControl = buildVersionControl(platformKey, deployVersion, newestPublishedVersion);
+        endpointShieldSettings = AccountSettingsDao.instance
+            .findOne(AccountSettingsDao.generateFilter())
+            .getEndpointShieldSettings();
+        return SUCCESS.toUpperCase();
+    }
+
+    private Map<String, Object> buildVersionControl(String key, String target, String newest) {
+        Map<String, Object> vc = new LinkedHashMap<>();
+        vc.put("targetVersion", target);
+        vc.put("newestPublishedVersion", newest);
+        vc.put("pinnedToOlder", target != null && newest != null && !target.equals(newest));
+
+        Map<String, Integer> fleetCounts = new LinkedHashMap<>();
+        fleetCounts.put("onTarget", 0);
+        fleetCounts.put("behind", 0);
+        fleetCounts.put("ahead", 0);
+        fleetCounts.put("staleHeartbeat", 0);
+        fleetCounts.put("unknown", 0);
+        fleetCounts.put("total", 0);
+
+        Map<String, Integer> byVersion = new LinkedHashMap<>();
+        // Argus collection-scoped users cannot attribute devices — same empty set as ModuleInfoAction.
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            vc.put("fleetCounts", fleetCounts);
+            vc.put("fleetByVersion", byVersion);
+            return vc;
+        }
+
+        String osFilter = key.startsWith("windows") ? "windows" : "mac";
+        int now = Context.now();
+
+        Bson filter = Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString());
+        Bson projection = Projections.include(
+            ModuleInfo.NAME,
+            ModuleInfo.CURRENT_VERSION,
+            ModuleInfo.LAST_HEARTBEAT_RECEIVED,
+            ModuleInfo.ADDITIONAL_DATA + ".os"
+        );
+        // Dedupe by {name, os} keeping the freshest heartbeat — mirrors ModuleInfoAction #6575/#6576.
+        Map<String, ModuleInfo> deduped = new LinkedHashMap<>();
+        for (ModuleInfo m : ModuleInfoDao.instance.findAll(filter, projection)) {
+            String os = null;
+            if (m.getAdditionalData() != null && m.getAdditionalData().get("os") != null) {
+                os = String.valueOf(m.getAdditionalData().get("os")).toLowerCase(Locale.ROOT);
+            }
+            if (os != null) {
+                boolean isWin = os.contains("win");
+                boolean isMac = os.contains("mac") || os.contains("darwin");
+                if (osFilter.equals("windows") && !isWin) continue;
+                if (osFilter.equals("mac") && !isMac) continue;
+            }
+            String host = m.getName() == null ? "" : m.getName();
+            String dedupeKey = host + "\0" + (os == null ? "" : os);
+            ModuleInfo prev = deduped.get(dedupeKey);
+            if (prev == null || m.getLastHeartbeatReceived() >= prev.getLastHeartbeatReceived()) {
+                deduped.put(dedupeKey, m);
+            }
+        }
+
+        for (ModuleInfo m : deduped.values()) {
+            fleetCounts.put("total", fleetCounts.get("total") + 1);
+            String cv = m.getCurrentVersion();
+            if (cv == null || cv.isEmpty()) {
+                fleetCounts.put("unknown", fleetCounts.get("unknown") + 1);
+            } else {
+                byVersion.merge(cv, 1, Integer::sum);
+                if (target != null && !target.isEmpty()) {
+                    int cmp = compareLooseVersions(cv, target);
+                    if (cmp == 0) fleetCounts.put("onTarget", fleetCounts.get("onTarget") + 1);
+                    else if (cmp < 0) fleetCounts.put("behind", fleetCounts.get("behind") + 1);
+                    else fleetCounts.put("ahead", fleetCounts.get("ahead") + 1);
+                } else {
+                    fleetCounts.put("unknown", fleetCounts.get("unknown") + 1);
+                }
+            }
+            if (m.getLastHeartbeatReceived() <= 0
+                    || (now - m.getLastHeartbeatReceived()) > STALE_HEARTBEAT_SEC) {
+                fleetCounts.put("staleHeartbeat", fleetCounts.get("staleHeartbeat") + 1);
+            }
+        }
+
+        vc.put("fleetCounts", fleetCounts);
+        vc.put("fleetByVersion", byVersion);
+        return vc;
+    }
+
+    private static int compareLooseVersions(String a, String b) {
+        if (a == null || b == null) return 0;
+        if (a.equals(b)) return 0;
+        String[] as = a.replaceAll("[^0-9A-Za-z._-]", "").split("[._-]");
+        String[] bs = b.replaceAll("[^0-9A-Za-z._-]", "").split("[._-]");
+        int n = Math.max(as.length, bs.length);
+        for (int i = 0; i < n; i++) {
+            String x = i < as.length ? as[i] : "0";
+            String y = i < bs.length ? bs[i] : "0";
+            boolean xn = x.matches("\\d+");
+            boolean yn = y.matches("\\d+");
+            if (xn && yn) {
+                int c = Integer.compare(Integer.parseInt(x), Integer.parseInt(y));
+                if (c != 0) return c;
+            } else {
+                int c = x.compareToIgnoreCase(y);
+                if (c != 0) return c;
+            }
+        }
+        return 0;
+    }
+
+    private String resolveManifestUrl(String key) {
+        AccountSettings account = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        EndpointShieldSettings existing = account != null ? account.getEndpointShieldSettings() : null;
+        PlatformShieldConfig cfg = (existing != null && existing.getPlatforms() != null)
+            ? existing.getPlatforms().get(key) : null;
+        if (cfg != null && cfg.getManifestUrl() != null && !cfg.getManifestUrl().isEmpty()) {
+            return cfg.getManifestUrl();
+        }
+        return defaultManifestUrl(key);
+    }
+
+    private static String prefixFromManifestUrl(String manifestUrl) {
+        if (manifestUrl == null) return null;
+        Matcher m = S3_HTTPS.matcher(manifestUrl.trim());
+        if (!m.matches()) return null;
+        String key = m.group(2);
+        if (key.endsWith("/latest.json")) {
+            return key.substring(0, key.length() - "/latest.json".length());
+        }
+        if (key.endsWith("latest.json")) {
+            return key.substring(0, key.length() - "latest.json".length()).replaceAll("/$", "");
+        }
+        return null;
+    }
+
+    private static String trimSlash(String s) {
+        if (s == null) return "";
+        while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        return s;
+    }
+
+    private static S3Client s3Client() {
+        return S3Client.builder()
+            .region(Region.of(S3_REGION))
+            .credentialsProvider(DefaultCredentialsProvider.create())
+            .build();
+    }
+
+    private static JSONObject readReleaseJson(S3Client s3, String key) {
+        try {
+            String body = s3.getObjectAsBytes(GetObjectRequest.builder().bucket(S3_BUCKET).key(key).build())
+                .asString(StandardCharsets.UTF_8);
+            return new JSONObject(body);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String findArtifactKey(S3Client s3, String prefix) {
+        ListObjectsV2Response resp = s3.listObjectsV2(ListObjectsV2Request.builder()
+            .bucket(S3_BUCKET).prefix(prefix).maxKeys(50).build());
+        for (S3Object obj : resp.contents()) {
+            String k = obj.key();
+            String leaf = k.substring(k.lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
+            if (leaf.endsWith(".exe") || leaf.endsWith(".zip") || leaf.endsWith(".pkg")) {
+                return k;
+            }
+        }
+        return null;
+    }
+
+    private JSONObject synthesizeReleaseJson(S3Client s3, String prefix, String ver, String key) {
+        String folder = prefix + "/releases/" + ver + "/";
+        String artifactKey = findArtifactKey(s3, folder);
+        if (artifactKey == null) return null;
+        String url = "https://" + S3_BUCKET + ".s3." + S3_REGION + ".amazonaws.com/" + artifactKey;
+        JSONObject o = new JSONObject();
+        o.put("version", ver);
+        o.put(artifactField(key), url);
+        o.put("customer", String.valueOf(Context.accountId.get()));
+        return o;
+    }
+
+    private static String artifactField(String platformKey) {
+        if (EndpointShieldSettings.PLATFORM_WINDOWS_DIRECT.equals(platformKey)) return "setup_url";
+        if (EndpointShieldSettings.PLATFORM_WINDOWS_MDM.equals(platformKey)) return "zip_url";
+        return "pkg_url";
+    }
+
+    private static String firstArtifactUrl(JSONObject o) {
+        if (o == null) return null;
+        for (String f : new String[]{"setup_url", "zip_url", "pkg_url"}) {
+            if (o.has(f) && !o.optString(f).isEmpty()) return o.optString(f);
+        }
+        return null;
+    }
+
+    private static JSONObject fetchManifestJson(String manifestUrl) {
         try {
             HttpURLConnection conn = (HttpURLConnection) new URL(manifestUrl).openConnection();
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
             conn.setRequestMethod("GET");
-
-            if (conn.getResponseCode() != 200) return false;
-
+            if (conn.getResponseCode() != 200) return null;
             StringBuilder sb = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) sb.append(line);
             }
+            return new JSONObject(sb.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
-            String latest = new JSONObject(sb.toString()).optString("version", null);
+    private boolean refreshPlatformFromManifest(String key, String manifestUrl) {
+        try {
+            JSONObject json = fetchManifestJson(manifestUrl);
+            if (json == null) return false;
+            String latest = json.optString("version", null);
             if (latest == null) return false;
 
             AccountSettingsDao.instance.updateOne(
