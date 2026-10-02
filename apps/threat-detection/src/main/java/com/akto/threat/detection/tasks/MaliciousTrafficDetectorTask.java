@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import com.akto.dto.*;
-import com.akto.dto.api_protection_parse_layer.Condition.DistinctIdentifier;
 import com.akto.enums.RedactionType;
 import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
@@ -21,6 +20,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
+import com.akto.dto.api_protection_parse_layer.Condition.DistinctIdentifier;
+import com.akto.dto.api_protection_parse_layer.Condition.ValueSource;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
@@ -486,21 +487,36 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
             continue;
           }
 
-          // Extract identity for distinct count rules
-          String identity = null;
-          if (rule.getCondition().getDistinctIdentifier() != null) {
-            identity = extractIdentity(responseParam, rule.getCondition().getDistinctIdentifier());
+          // Aggregate per identity when groupBy is set; requests without that identity are ignored
+          String ruleAggKey = Utils.buildAggKey(aggKey, rule.getCondition().getGroupBy(), responseParam, groupKey);
+          if (ruleAggKey == null) {
+            continue;
           }
 
-          shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed, identity);
+          DistinctIdentifier distinct = rule.getCondition().getDistinctIdentifier();
+          Set<String> distinctMembers = null;
+          if (distinct != null) {
+            String identity = Utils.extractDistinctValue(responseParam, metadata, distinct);
+            distinctMembers = this.windowBasedThresholdNotifier.checkDistinct(ruleAggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed, identity);
+            shouldNotify = distinctMembers != null;
+          } else {
+            shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(ruleAggKey, maliciousReq, rule, shouldIncrement, breachFilterPassed);
+          }
 
           if (shouldNotify) {
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+            SampleMaliciousRequest eventReq = maliciousReq;
+            if (distinctMembers != null) {
+              ValueSource groupBy = rule.getCondition().getGroupBy();
+              String groupLabel = groupBy != null ? groupBy.getKey() + "=" + Utils.extractIdentity(responseParam, groupBy) : "ip=" + actor;
+              eventReq = Utils.withReason(maliciousReq,
+                  Utils.buildDistinctReason(groupLabel, distinct, distinctMembers, rule.getCondition().getWindowThreshold()));
+            }
             generateAndPushMaliciousEventRequest(
                 apiFilter,
                 actor,
                 responseParam,
-                maliciousReq,
+                eventReq,
                 EventType.EVENT_TYPE_AGGREGATED);
           }
         }
@@ -508,29 +524,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     }
     }
     }
-
-  private String extractIdentity(HttpResponseParams responseParam, DistinctIdentifier identifier) {
-    if (identifier == null || identifier.getKey() == null) return null;
-    try {
-      String payload;
-      switch (identifier.getSource()) {
-        case "request_payload":
-          payload = responseParam.getRequestParams().getPayload();
-          break;
-        case "response_payload":
-          payload = responseParam.getPayload();
-          break;
-        case "request_headers":
-          List<String> headerVals = responseParam.getRequestParams().getHeaders().get(identifier.getKey());
-          return (headerVals != null && !headerVals.isEmpty()) ? headerVals.get(0) : null;
-        default:
-          return null;
-      }
-      return com.akto.util.JSONUtils.extractValueForKey(payload, identifier.getKey());
-    } catch (Exception e) {
-      return null;
-    }
-  }
 
   private void checkSequenceAnomaly(String actor, int apiCollectionId, String urlForAggregation,
       URLMethods.Method method, HttpResponseParams responseParam) {
