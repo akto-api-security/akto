@@ -122,6 +122,11 @@ public class AzureSsoAction extends UserAction{
             }
         }
 
+        if (this.groupRoleMapping != null) {
+            java.util.Map<String, String> normalized = new java.util.HashMap<>();
+            this.groupRoleMapping.forEach((group, role) -> normalized.put(group.trim(), com.akto.utils.RoleAssignment.normalizeRoleName(role)));
+            this.groupRoleMapping = normalized;
+        }
         if (findSamlConfig() == null) {
             addActionError("Set up SSO first, then map groups to roles.");
             return ERROR.toUpperCase();

@@ -139,7 +139,10 @@ public class OktaSsoAction extends UserAction {
             return ERROR.toUpperCase();
         }
         String incomingToken = this.managementApiToken;
-        Map<String, String> activeMapping = oktaGroupToAktoUserRoleMap != null ? oktaGroupToAktoUserRoleMap : Collections.<String, String>emptyMap();
+        Map<String, String> activeMapping = new java.util.HashMap<>();
+        if (oktaGroupToAktoUserRoleMap != null) {
+            oktaGroupToAktoUserRoleMap.forEach((group, role) -> activeMapping.put(group, com.akto.utils.RoleAssignment.normalizeRoleName(role)));
+        }
         String validationError = validateRoleMappingValues(activeMapping);
         if (validationError != null) {
             addActionError(validationError);

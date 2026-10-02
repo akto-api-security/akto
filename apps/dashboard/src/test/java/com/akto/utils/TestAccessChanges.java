@@ -342,6 +342,67 @@ public class TestAccessChanges extends MongoBasedTest {
         }
     }
 
+    @Test
+    public void testAdminBasedRoleWithAllCollectionsIsAnAdmin() {
+        TestRoleAssignment.insertRole("SUPER_ADMIN", "ADMIN", new ArrayList<>(), null);
+        TestRoleAssignment.insertUser(SECOND_ADMIN, "SUPER_ADMIN");
+        clearCaches();
+        assertTrue(RoleAssignment.isUnlimitedAdmin(SECOND_ADMIN, ACCOUNT_ID));
+        // so they can set when a user's access ends
+        assertEquals("SUCCESS", change(SECOND_ADMIN, MEMBER, Collections.singletonMap("API", "MEMBER"), Context.now() + 3600));
+        assertTrue(RBACDao.instance.findOne(Filters.eq(RBAC.USER_ID, MEMBER)).getAccessExpiresAt() > 0);
+    }
+
+    @Test
+    public void testProductTheAccountNoLongerHasDoesNotBlock() {
+        // the account is licensed for API only (and Atlas, which defaults to on); someone still has an Argus admin role from a trial
+        java.util.HashMap<String, com.akto.dto.billing.FeatureAccess> features = new java.util.HashMap<>();
+        features.put("RBAC_FEATURE", new com.akto.dto.billing.FeatureAccess(true));
+        com.akto.dto.billing.Organization org = new com.akto.dto.billing.Organization("org-products", "org", "admin@example.com",
+                new java.util.HashSet<>(Collections.singletonList(ACCOUNT_ID)), false);
+        org.setFeatureWiseAllowed(features);
+        com.akto.dao.billing.OrganizationsDao.instance.insertOne(org);
+        try {
+            Map<String, String> trial = new HashMap<>();
+            trial.put("API", "MEMBER");
+            trial.put("AGENTIC", "ADMIN");
+            TestRoleAssignment.insertUser(SECOND_ADMIN, "MEMBER");
+            setMapping(SECOND_ADMIN, trial, null);
+            // editing their API role keeps the old Argus role as it is
+            Map<String, String> edited = new HashMap<>(trial);
+            edited.put("API", "GUEST");
+            assertEquals("SUCCESS", change(ADMIN, SECOND_ADMIN, edited, null));
+            // and they can be removed although they are the only Argus admin
+            assertEquals("SUCCESS", teamAction(ADMIN, SECOND_ADMIN).removeUser());
+            // a new Argus role can't be given: the account doesn't have Argus
+            assertEquals("ERROR", change(ADMIN, MEMBER, Collections.singletonMap("AGENTIC", "MEMBER"), null));
+        } finally {
+            com.akto.dao.billing.OrganizationsDao.instance.getMCollection().deleteMany(new org.bson.Document("_id", "org-products"));
+        }
+    }
+
+    @Test
+    public void testBuiltInRoleNamesSavedInStandardForm() {
+        assertEquals("SUCCESS", change(ADMIN, GUEST, "member"));
+        assertEquals("MEMBER", RBACDao.instance.findOne(Filters.eq(RBAC.USER_ID, GUEST)).getScopeRoleMapping().get("API"));
+        assertEquals("ADMIN", RoleAssignment.normalizeRoleName("Admin"));
+        assertEquals("TEAM_A_USER", RoleAssignment.normalizeRoleName("TEAM_A_USER"));
+    }
+
+    @Test
+    public void testAdminBasedTeamAdminCannotGiveMoreThanItHas() {
+        CustomRole limitedAdmin = CustomRoleDao.instance.findRoleByName("LIMITED_ADMIN_ROLE");
+        CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, limitedAdmin.getName()), Updates.combine(
+                Updates.set(CustomRole.PERMISSION_OVERRIDES, Collections.singletonMap("SENSITIVE_DATA", "NO_ACCESS")),
+                Updates.set(CustomRole.ASSIGNABLE_ROLES, Arrays.asList("TEAM_A_USER", "PII_TEAM"))));
+        CustomRole piiTeam = new CustomRole("PII_TEAM", "GUEST", Arrays.asList(11), false, false, new ArrayList<>());
+        piiTeam.setPermissionOverrides(Collections.singletonMap("SENSITIVE_DATA", "READ_WRITE"));
+        CustomRoleDao.instance.insertOne(piiTeam);
+        clearCaches();
+        assertTrue(RoleAssignment.canAssign(LIMITED_ADMIN, ACCOUNT_ID, "API", "TEAM_A_USER"));
+        assertFalse(RoleAssignment.canAssign(LIMITED_ADMIN, ACCOUNT_ID, "API", "PII_TEAM"));
+    }
+
     // ── Custom roles ──────────────────────────────────────────────────────────
 
     static RoleAction roleAction(int caller, String name) {

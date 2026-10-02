@@ -237,7 +237,7 @@ public class InviteUserAction extends UserAction{
                 // Save the role name (custom or standard) to scopeRoleMapping.
                 // Custom roles will be resolved to their baseRole at access time via RBAC.getRoleForScope()
                 // This preserves the custom role assignment for auditing and future enhancements.
-                scopeRoleToSave.put(scope, roleStr);
+                scopeRoleToSave.put(scope, RoleAssignment.normalizeRoleName(roleStr));
             }
 
             if (scopeRoleToSave.values().stream().allMatch(r -> Role.fromName(r) == Role.NO_ACCESS)) {
@@ -253,7 +253,7 @@ public class InviteUserAction extends UserAction{
             }
 
             // If any case only invitee role is present and no scope then map it to "API"
-            scopeRoleToSave.put("API", this.inviteeRole);
+            scopeRoleToSave.put("API", RoleAssignment.normalizeRoleName(this.inviteeRole));
 
         } else {
             addActionError("Pick a product and a role.");

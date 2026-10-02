@@ -216,7 +216,12 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             return "You can't change access for " + email + ": they have a role you can't give.";
         }
         if (newScopeRoleMapping != null) {
+            Map<String, String> currentRoles = targetRbac == null ? null : targetRbac.getScopeRoleMapping();
             for (Map.Entry<String, String> entry : newScopeRoleMapping.entrySet()) {
+                // roles left as they are need no new check (e.g. in a product the account no longer has)
+                if (currentRoles != null && entry.getValue() != null && entry.getValue().equals(currentRoles.get(entry.getKey()))) {
+                    continue;
+                }
                 String error = validateGivenRole(callerId, accountId, entry.getKey(), entry.getValue());
                 if (error != null) {
                     return error;
@@ -244,6 +249,15 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             return "You can't give the " + role + " role.";
         }
         return null;
+    }
+
+    // built-in roles in their stored form, so every check that compares names sees them
+    private static Map<String, String> normalized(Map<String, String> scopeRoleMapping) {
+        Map<String, String> result = new HashMap<>();
+        for (Map.Entry<String, String> entry : scopeRoleMapping.entrySet()) {
+            result.put(entry.getKey(), RoleAssignment.normalizeRoleName(entry.getValue()));
+        }
+        return result;
     }
 
     private void accessChanged(int userId, int accountId) {
@@ -291,10 +305,11 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         }
         Map<String, String> newMapping = new HashMap<>();
         if (perProduct) {
+            this.scopeRoleMapping = normalized(this.scopeRoleMapping);
             newMapping.putAll(this.scopeRoleMapping);
         } else {
             for (String scope : RoleAssignment.productScopes(accountId)) {
-                newMapping.put(scope, this.userRole.toUpperCase());
+                newMapping.put(scope, RoleAssignment.normalizeRoleName(this.userRole.toUpperCase()));
             }
         }
         RBAC current = target == null ? null : RBACDao.instance.findOne(rbacFilter(target.getId(), accountId));
@@ -307,7 +322,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         boolean hasPerProductRoles = current != null && current.getScopeRoleMapping() != null && !current.getScopeRoleMapping().isEmpty();
         RBACDao.instance.updateOneNoUpsert(rbacFilter(target.getId(), accountId), perProduct || hasPerProductRoles
                 ? Updates.set(RBAC.SCOPE_ROLE_MAPPING, newMapping)
-                : Updates.set(RBAC.ROLE, this.userRole.toUpperCase()));
+                : Updates.set(RBAC.ROLE, RoleAssignment.normalizeRoleName(this.userRole.toUpperCase())));
         accessChanged(target.getId(), accountId);
         return Action.SUCCESS.toUpperCase();
     }
@@ -344,6 +359,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             addActionError("Pick at least one product, or remove the user.");
             return Action.ERROR.toUpperCase();
         }
+        this.scopeRoleMapping = normalized(this.scopeRoleMapping);
 
         RBAC current = userDetails == null ? null : RBACDao.instance.findOne(rbacFilter(userDetails.getId(), accId));
         // null keeps the current expiry, 0 removes it; only admins of all collections set or remove it

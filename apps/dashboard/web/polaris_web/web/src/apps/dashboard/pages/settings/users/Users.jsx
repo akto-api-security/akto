@@ -306,6 +306,7 @@ const Users = () => {
                 user={editing}
                 productScopes={manageableScopes}
                 roleOptions={roleOptions}
+                defaultRole={defaultInviteRole}
                 isAdmin={isAdmin}
                 canRemove={isAdmin}
                 isOnPrem={isOnPrem}

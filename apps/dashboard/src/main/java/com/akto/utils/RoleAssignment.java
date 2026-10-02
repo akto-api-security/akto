@@ -35,6 +35,10 @@ public class RoleAssignment {
 
     /** Roles a user limited to collections may give in the current product (empty: none), or null when the role hierarchy applies. */
     public static Set<String> limitedAssignableRoles(int callerId, int accountId) {
+        // collection limits apply only with the RBAC feature, the same as everywhere else
+        if (!UsageMetricCalculator.isRbacFeatureAvailable(accountId)) {
+            return null;
+        }
         List<Integer> callerCollections = RBACDao.instance.getUserCollectionsById(callerId, accountId);
         if (callerCollections == null || callerCollections.isEmpty()) {
             return null;
@@ -126,10 +130,19 @@ public class RoleAssignment {
         return access == ReadWriteAccess.READ_WRITE;
     }
 
-    /** True for an admin of the current product who is not limited to specific collections. */
+    /** True for an admin of the current product who is not limited to specific collections (built-in Admin, or a custom role on it with none). */
     public static boolean isUnlimitedAdmin(int userId, int accountId) {
-        return RBACDao.getCurrentRoleForUser(userId, accountId) == Role.ADMIN
-                && RBACDao.instance.getUserCollectionsById(userId, accountId) == null;
+        if (RBACDao.getCurrentRoleForUser(userId, accountId) != Role.ADMIN) {
+            return false;
+        }
+        List<Integer> collections = RBACDao.instance.getUserCollectionsById(userId, accountId);
+        return collections == null || collections.isEmpty();
+    }
+
+    /** Built-in roles in their stored form (e.g. "admin" -> "ADMIN"); custom role names as they are. */
+    public static String normalizeRoleName(String roleName) {
+        Role role = Role.fromName(roleName);
+        return role != null ? role.name() : roleName;
     }
 
     /*
@@ -139,12 +152,8 @@ public class RoleAssignment {
      */
     public static List<String> productsLosingLastAdmin(int accountId, int targetUserId, Map<String, String> newScopeRoleMapping, int newExpiresAt) {
         List<RBAC> rbacs = RBACDao.instance.findAll(Filters.eq(RBAC.ACCOUNT_ID, accountId));
+        // only products the account still has: an admin of a product that is gone must stay removable
         Set<String> scopes = new LinkedHashSet<>(productScopes(accountId));
-        for (RBAC rbac : rbacs) {
-            if (rbac.getScopeRoleMapping() != null) {
-                scopes.addAll(rbac.getScopeRoleMapping().keySet());
-            }
-        }
         List<String> losing = new ArrayList<>();
         for (String scope : scopes) {
             boolean hasPermanentAdmin = false;
@@ -201,8 +210,12 @@ public class RoleAssignment {
      * changes from its base role are compared; the role hierarchy already covers the base role itself.
      */
     private static boolean exceedsCaller(int callerId, int accountId, Role callerRole, CustomRole role) {
-        if (role == null || callerRole == Role.ADMIN) {
-            return role == null;
+        if (role == null) {
+            return true;
+        }
+        // the built-in Admin has everything; a custom role on Admin may have had some of it taken away
+        if (callerRole == Role.ADMIN && RBACDao.currentCustomRole(callerId, accountId) == null) {
+            return false;
         }
         Role baseRole = Role.fromName(role.getBaseRole());
         if (baseRole == null) {

@@ -16,7 +16,7 @@ const endOfDay = (date) => date ? Math.floor(new Date(date.getFullYear(), date.g
  * Edit a user's role in each product, and (admins only) when their access ends.
  * Products left unticked get no access. Users with only the older single role start with it in every product.
  */
-function EditAccessModal({ user, productScopes, roleOptions, isAdmin, canRemove, isOnPrem, onClose, onSaved, onRemoved }) {
+function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmin, canRemove, isOnPrem, onClose, onSaved, onRemoved }) {
     const [mapping, setMapping] = useState({})
     const [expiresOn, setExpiresOn] = useState(null)
     const [saving, setSaving] = useState(false)
@@ -49,7 +49,8 @@ function EditAccessModal({ user, productScopes, roleOptions, isAdmin, canRemove,
         if (!current || givable.some(option => option.value === current)) return givable
         return [...givable, { label: `${current} (you can't give this role)`, value: current, disabled: true }]
     }
-    const firstGivable = givable[0]?.value
+    // a newly ticked product starts with the default invite role, never Admin by accident
+    const firstGivable = (givable.find(option => option.value === defaultRole) || givable.find(option => option.value !== 'ADMIN') || givable[0])?.value
 
     const toggleScope = (scope, checked) => {
         setMapping(prev => {
