@@ -17,8 +17,8 @@ import { LegendDot } from "./AgenticStatsCard";
 export { TypeBadge };
 
 export function RiskPill({ score }) {
-    if (!score) return null;
-    return <Badge size="small" status={getRiskStatus(score)}>{score}</Badge>;
+    if (score == null) return null;
+    return <Badge size="small" status={getRiskStatus(score)}>{score.toString()}</Badge>;
 }
 
 // Severity badge — same pattern as TestRunResultFlyout: a .badge-wrapper-<SEVERITY>

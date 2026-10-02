@@ -244,7 +244,7 @@ export function ViolationCountCellRenderer({ value }) {
 function McpRiskScoreCellRenderer({ data }) {
     if (!data) return null;
     const score = data.riskScore;
-    if (!score) return <Text variant="bodyMd" color="subdued">-</Text>;
+    if (score == null) return <Text variant="bodyMd" color="subdued">-</Text>;
     return <RiskPill score={score} />;
 }
 

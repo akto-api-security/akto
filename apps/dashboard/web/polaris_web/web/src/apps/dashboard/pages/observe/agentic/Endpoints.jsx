@@ -24,6 +24,7 @@ import {
 } from "./constants";
 import { CLIENT_TYPES, ROW_TYPES } from "./mcpClientHelper";
 import MisconfiguredBadge from "./MisconfiguredBadge";
+import { RiskPill } from "./AgenticCellRenderers";
 
 const definedTableTabs = ['All', 'AI Agents', 'SaaS Agents', 'MCP Servers', 'LLMs', 'Skills', 'Plugins'];
 
@@ -79,14 +80,6 @@ const tagFilterHeader = {
     filterKey: "assetTags", filterLabel: "Tag", showFilter: true,
 };
 
-function getRiskScoreStatus(riskScore) {
-    if (riskScore >= 4.5) return "critical";
-    if (riskScore >= 4) return "attention";
-    if (riskScore >= 2.5) return "warning";
-    if (riskScore > 0) return "info";
-    return "success";
-}
-
 // Turns one server-computed row (AgenticObserveAction.fetchAgenticAssetsSummary) into the shape
 // this page's headers/cell-renderers expect — mirrors AgenticAssetsPage.jsx's own shapeRow (the
 // new layout). Skill rows' risk score and misconfigured badge come from a separate, skill-name-
@@ -126,7 +119,7 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
         groupName: row.name,
         groupNameDisplay,
         riskScore,
-        riskScoreComp: riskScore ? <Badge status={getRiskScoreStatus(riskScore)} size="small">{riskScore}</Badge> : "-",
+        riskScoreComp: <RiskPill score={riskScore} />,
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || [], false),
         lastTraffic: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "-",
         detectedTimestamp: row.lastSeenEpoch,

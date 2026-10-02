@@ -49,6 +49,7 @@ function DevicesTab({ asset, enrichMaps = {}, startTimestamp, endTimestamp }) {
         }).then((res) => ({
             value: (res.devices || []).map((d) => ({
                 ...d,
+                riskScore: d.riskScore || 0,
                 lastSeen: d.lastSeenEpoch > 0 ? func.prettifyEpoch(d.lastSeenEpoch) : "-",
             })),
             total: res.total || 0,
