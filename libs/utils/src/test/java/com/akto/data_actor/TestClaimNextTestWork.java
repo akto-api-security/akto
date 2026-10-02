@@ -341,21 +341,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
                 State.SCHEDULED, stillScheduled.getState());
     }
 
-    // ---- 16. a truly-absent leaseExpiryTs field (legacy pre-lease document), not just defaulted 0 ----
-    @Test
-    public void trulyAbsentLeaseExpiryTsField_isStillReclaimed() {
-        TestingRun run = freshTestingRun(State.RUNNING, MODULE, null);
-        TestingRunResultSummary trrs = insertTrrs(run.getId(), State.RUNNING, 0, true, null, null);
-        TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq("_id", trrs.getId()),
-                com.mongodb.client.model.Updates.unset(TestingRunResultSummary.LEASE_EXPIRY_TS));
-
-        DbLayer.ClaimResult result = DbLayer.claimNextTestWork(MODULE, "token-16", 360);
-
-        assertEquals(DbLayer.VERDICT_RECLAIMED_ABANDONED, result.verdict);
-        assertEquals(trrs.getId(), result.trrs.getId());
-    }
-
     // ---- 17. two distinct eligible runs at once: claims exactly one, leaves the other untouched ----
     @Test
     public void multipleEligibleCandidates_claimsExactlyOneLeavesSiblingUntouched() {

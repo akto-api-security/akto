@@ -25,10 +25,11 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
     public List<ObjectId> findActiveRunIdsForModule(String miniTestingName) {
         return findAll(
                 Filters.and(
+                        Filters.in(TestingRun.STATE, TestingRun.State.SCHEDULED, TestingRun.State.RUNNING),
                         Filters.or(
-                                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
-                                Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)),
-                        Filters.in(TestingRun.STATE, TestingRun.State.SCHEDULED, TestingRun.State.RUNNING)),
+                            Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
+                            Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName))
+                ),
                 Projections.include(ID)
         ).stream().map(TestingRun::getId).collect(Collectors.toList());
     }

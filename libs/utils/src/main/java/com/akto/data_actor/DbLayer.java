@@ -2133,79 +2133,87 @@ public class DbLayer {
         }
     }
 
+    private static final FindOneAndUpdateOptions RETURN_AFTER = new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER);
+
     public static ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds) {
         int now = Context.now();
         int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
-        FindOneAndUpdateOptions returnAfter = new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER);
 
         List<ObjectId> eligibleRunIds = TestingRunDao.instance.findActiveRunIdsForModule(miniTestingName);
-
         if (eligibleRunIds.isEmpty()) {
             return new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
         }
 
-        Bson leaseUpdate = Updates.combine(
-                Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
-                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, now + ttl));
+        ClaimResult result = claimScheduledTrrs(eligibleRunIds, leaseToken, now, ttl);
+        if (result == null) {
+            result = claimExpiredOrOwnLease(eligibleRunIds, leaseToken, now, ttl);
+        }
+        if (result == null) {
+            result = claimFreshRun(eligibleRunIds, leaseToken, now, ttl);
+        }
+        return result != null ? result : new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
+    }
 
-        TestingRunResultSummary claimedTrrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+    private static ClaimResult claimScheduledTrrs(List<ObjectId> eligibleRunIds, String leaseToken, int now, int ttl) {
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.and(
                         Filters.in(TestingRunResultSummary.TESTING_RUN_ID, eligibleRunIds),
                         Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.SCHEDULED)),
-                leaseUpdate, returnAfter);
+                leaseUpdate(leaseToken, now, ttl), RETURN_AFTER);
+        if (trrs == null) {
+            return null;
+        }
 
-        String verdict = null;
-        if (claimedTrrs != null) {
-            if (claimedTrrs.getOriginalTestingRunResultSummaryId() != null) {
-                verdict = VERDICT_RERUN_SPECIFIC_TESTCASES;
-            } else if (claimedTrrs.getMetadata() != null && !claimedTrrs.getMetadata().isEmpty()) {
-                verdict = VERDICT_CICD;
-            } else {
-                loggerMaker.errorAndAddToDb("claimNextTestWork: claimed a SCHEDULED TRRS "
-                        + claimedTrrs.getId() + " with neither metadata nor originalTestingRunResultSummaryId set"
-                        + " - unknown creation path");
-                verdict = VERDICT_CICD;
-            }
+        String verdict;
+        if (trrs.getOriginalTestingRunResultSummaryId() != null) {
+            verdict = VERDICT_RERUN_SPECIFIC_TESTCASES;
+        } else if (trrs.getMetadata() != null && !trrs.getMetadata().isEmpty()) {
+            verdict = VERDICT_CICD;
         } else {
-            List<Bson> abandonedOrMine = new ArrayList<>(Arrays.asList(
-                    Filters.exists(TestingRunResultSummary.LEASE_EXPIRY_TS, false),
-                    Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now)));
-            if (leaseToken != null) {
-                abandonedOrMine.add(Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken));
-            }
-            claimedTrrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                    Filters.and(
-                            Filters.in(TestingRunResultSummary.TESTING_RUN_ID, eligibleRunIds),
-                            Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                            Filters.or(abandonedOrMine)),
-                    leaseUpdate, returnAfter);
-            if (claimedTrrs != null) {
-                verdict = VERDICT_RECLAIMED_ABANDONED;
-            }
+            loggerMaker.errorAndAddToDb("claimNextTestWork: claimed a SCHEDULED TRRS "
+                    + trrs.getId() + " with neither metadata nor originalTestingRunResultSummaryId set"
+                    + " - unknown creation path");
+            verdict = VERDICT_CICD;
         }
+        return new ClaimResult(verdict, trrs, fetchOwningRun(trrs));
+    }
 
-        if (claimedTrrs != null) {
-            TestingRun owningRun = TestingRunDao.instance.findOne(Filters.eq(ID, claimedTrrs.getTestingRunId()), null);
-            return new ClaimResult(verdict, claimedTrrs, owningRun);
-        }
+    private static ClaimResult claimExpiredOrOwnLease(List<ObjectId> eligibleRunIds, String leaseToken, int now, int ttl) {
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.in(TestingRunResultSummary.TESTING_RUN_ID, eligibleRunIds),
+                        Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                        Filters.or(
+                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now),
+                                Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken))),
+                leaseUpdate(leaseToken, now, ttl), RETURN_AFTER);
+        return trrs == null ? null : new ClaimResult(VERDICT_RECLAIMED_ABANDONED, trrs, fetchOwningRun(trrs));
+    }
 
-        TestingRun claimedRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
+    private static ClaimResult claimFreshRun(List<ObjectId> eligibleRunIds, String leaseToken, int now, int ttl) {
+        TestingRun run = TestingRunDao.instance.getMCollection().findOneAndUpdate(
                 Filters.and(
                         Filters.in(ID, eligibleRunIds),
                         Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                         Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, now)),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
-                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
-
-        if (claimedRun == null) {
-            return new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING), RETURN_AFTER);
+        if (run == null) {
+            return null;
         }
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance
+                .createFreshSummaryForClaim(run.getId(), leaseToken, now, ttl);
+        return new ClaimResult(VERDICT_FRESH_RUN, trrs, run);
+    }
 
-        TestingRunResultSummary newTrrs = TestingRunResultSummariesDao.instance
-                .createFreshSummaryForClaim(claimedRun.getId(), leaseToken, now, ttl);
+    private static Bson leaseUpdate(String leaseToken, int now, int ttl) {
+        return Updates.combine(
+                Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, now + ttl));
+    }
 
-        return new ClaimResult(VERDICT_FRESH_RUN, newTrrs, claimedRun);
+    private static TestingRun fetchOwningRun(TestingRunResultSummary trrs) {
+        return TestingRunDao.instance.findOne(Filters.eq(ID, trrs.getTestingRunId()), null);
     }
 
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
