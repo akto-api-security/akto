@@ -6,6 +6,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -1683,10 +1685,16 @@ public class ClientActor extends DataActor {
     }
 
     public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
+        return createTRRSummaryIfAbsent(testingRunHexId, start, null, 0);
+    }
+
+    public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunHexId", testingRunHexId);
         obj.put("start", start);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createTRRSummaryIfAbsent", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1797,12 +1805,14 @@ public class ClientActor extends DataActor {
         return codec.decode(bsonReader, DecoderContext.builder().build());
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("now", now);
         obj.put("delta", delta);
         obj.put("miniTestingName", miniTestingName);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1866,24 +1876,55 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findTestingRun", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            Document testingRun = null;
-            try {
-                Document doc = Document.parse(responsePayload);
-                testingRun = (Document) doc.get("testingRun");
-                Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
-                String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-                fillTestingEndpointsType(type, testingRun);
-                String hexId = testingRun.getString("hexId");
-                testingRun.put("id", hexId);
-                TestingRun res = decode(apiInfoKeyCodec, testingRun);
-                res.setId(new ObjectId(hexId));
-                return res;
-            } catch(Exception e) {
-                logTestingRunDecodeFailure("findTestingRun", testingRun, e);
-                return null;
-            }
+            return parseTestingRunFromResponsePayload(responsePayload, "findTestingRun");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in findTestingRun" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    private TestingRun parseTestingRunFromResponsePayload(String responsePayload, String apiName) {
+        Document testingRun = null;
+        try {
+            Document doc = Document.parse(responsePayload);
+            testingRun = (Document) doc.get("testingRun");
+            if (testingRun == null) {
+                return null;
+            }
+            Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
+            String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
+            fillTestingEndpointsType(type, testingRun);
+            String hexId = testingRun.getString("hexId");
+            testingRun.put("id", hexId);
+            TestingRun res = decode(apiInfoKeyCodec, testingRun);
+            res.setId(new ObjectId(hexId));
+            return res;
+        } catch(Exception e) {
+            logTestingRunDecodeFailure(apiName, testingRun, e);
+            return null;
+        }
+    }
+
+    public ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("miniTestingName", miniTestingName);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/claimNextTestWork", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in claimNextTestWork", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            String verdict = BasicDBObject.parse(responsePayload).getString("verdict");
+            TestingRunResultSummary trrs = parseTestingRunResultSummaryFromResponsePayload(responsePayload);
+            TestingRun testingRun = parseTestingRunFromResponsePayload(responsePayload, "claimNextTestWork");
+            return new ClaimResult(verdict, trrs, testingRun);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in claimNextTestWork" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
@@ -1960,9 +2001,17 @@ public class ClientActor extends DataActor {
 
     @Override
     public void updateStartTsTestRunResultSummary(String summaryId) {
+        updateStartTsTestRunResultSummary(summaryId, null);
+    }
+
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId, String leaseToken) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultSummaryId", summaryId);
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            obj.put("leaseToken", leaseToken);
+        }
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateStartTsTestRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2147,9 +2196,16 @@ public class ClientActor extends DataActor {
     }
 
     public TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId) {
+        return markTestRunResultSummaryFailed(testingRunResultSummaryId, null);
+    }
+
+    public TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            obj.put("leaseToken", leaseToken);
+        }
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/markTestRunResultSummaryFailed", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2553,22 +2609,73 @@ public class ClientActor extends DataActor {
         return templates;
     }
 
-    public void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
+    /**
+     * Doubles as the lease renewal - the server extends leaseExpiryTs in the same write that
+     * increments the count, which is why leasing needs no separate heartbeat.
+     */
+    public LeaseStatus updateTestResultsCountInTestSummary(String summaryId, int testResultsCount, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("summaryId", summaryId);
         obj.put("testResultsCount", testResultsCount);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestResultsCountInTestSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
+            String responsePayload = response == null ? null : response.getBody();
+            if (response == null || response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateTestResultsCountInTestSummary", LoggerMaker.LogDb.RUNTIME);
-                return;
+                return LeaseStatus.UNKNOWN;
             }
+            return parseLeaseStatus(responsePayload, "updateTestResultsCountInTestSummary");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateTestResultsCountInTestSummary" + e, LoggerMaker.LogDb.RUNTIME);
-            return;
+            return LeaseStatus.UNKNOWN;
+        }
+    }
+
+    /**
+     * Reads the domain outcome (APPLIED/REJECTED) the abstractor names directly in the response
+     * body. Deliberately not an HTTP status: a lost lease is a domain outcome, and treating a
+     * non-2xx as one would make a sick abstractor indistinguishable from a real takeover.
+     *
+     * No older-server fallback: this contract and its only client ship together, unreleased, so a
+     * missing/unrecognized leaseStatus means something is actually wrong, not an old-abstractor
+     * compatibility case to paper over - treated as UNKNOWN like any other parse failure.
+     */
+    private LeaseStatus parseLeaseStatus(String responsePayload, String caller) {
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            Object leaseStatus = payloadObj.get("leaseStatus");
+            if (leaseStatus == null) {
+                loggerMaker.errorAndAddToDb("no leaseStatus in response for " + caller, LoggerMaker.LogDb.RUNTIME);
+                return LeaseStatus.UNKNOWN;
+            }
+            return LeaseStatus.valueOf(leaseStatus.toString());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error parsing leaseStatus in " + caller + ": " + e, LoggerMaker.LogDb.RUNTIME);
+            return LeaseStatus.UNKNOWN;
+        }
+    }
+
+    public LeaseStatus markProducerDone(String summaryId, String leaseToken) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("summaryId", summaryId);
+        obj.put("leaseToken", leaseToken);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/markProducerDone", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response == null ? null : response.getBody();
+            if (response == null || response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in markProducerDone", LoggerMaker.LogDb.TESTING);
+                return LeaseStatus.UNKNOWN;
+            }
+            return parseLeaseStatus(responsePayload, "markProducerDone");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in markProducerDone" + e, LoggerMaker.LogDb.TESTING);
+            return LeaseStatus.UNKNOWN;
         }
     }
 
@@ -2639,28 +2746,31 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+    public LeaseStatus bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultsForRecord", testingRunResults);
         obj.put("rerunDeleteIds", rerunDeleteIds);
         obj.put("doNotMarkIssuesAsFixed", doNotMarkIssuesAsFixed);
+        obj.put("leaseToken", leaseToken);
+        obj.put("leaseSeconds", leaseSeconds);
         String objString = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkRecordTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             if (response == null) {
                 loggerMaker.errorAndAddToDb("null response (all retries failed) in bulkRecordTestingRunResults", LoggerMaker.LogDb.TESTING);
-                return;
+                return LeaseStatus.UNKNOWN;
             }
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in bulkRecordTestingRunResults: status=" + response.getStatusCode() + " body=" + responsePayload, LoggerMaker.LogDb.TESTING);
-                return;
+                return LeaseStatus.UNKNOWN;
             }
+            return parseLeaseStatus(responsePayload, "bulkRecordTestingRunResults");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in bulkRecordTestingRunResults" + e, LoggerMaker.LogDb.TESTING);
-            return;
+            return LeaseStatus.UNKNOWN;
         }
     }
 
@@ -2723,12 +2833,19 @@ public class ClientActor extends DataActor {
     }
 
     private  TestingRunResultSummary getUpdatedSummaryAfterCount(String summaryId, Map<String, Integer> totalCountIssues, String operator){
+        return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, operator, null);
+    }
+
+    private  TestingRunResultSummary getUpdatedSummaryAfterCount(String summaryId, Map<String, Integer> totalCountIssues, String operator, String leaseToken){
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("summaryId", summaryId);
         obj.put("totalCountIssues", totalCountIssues);
         if(operator != null && !operator.isEmpty()){
             obj.put("operator", operator);
+        }
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            obj.put("leaseToken", leaseToken);
         }
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountInSummary", "", "POST", obj.toString(), headers, "");
         try {
@@ -2747,6 +2864,10 @@ public class ClientActor extends DataActor {
 
     public TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues, String operator) {
         return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, operator);
+    }
+
+    public TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken) {
+        return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, null, leaseToken);
     }
 
     public TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues) {
@@ -4329,12 +4450,21 @@ public class ClientActor extends DataActor {
         return nodeList;
     }
 
-    public long countTestingRunResultSummaries(Bson filter) {
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("filter", filter);
-        Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
+    /**
+     * Was Bson filter - never actually worked for any caller. Handing a raw Bson query-builder
+     * object (e.g. Filters$AndFilter) to BasicDBObject.toString() crashes with
+     * CodecConfigurationException before the request is even built - confirmed root cause of a
+     * real production incident (23 Sep). Primitives round-trip over JSON with no codec involved on
+     * either side.
+     */
+    public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state) {
         try {
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("testingRunHexId", testingRunHexId);
+            obj.put("sinceTimestamp", sinceTimestamp);
+            obj.put("state", state.toString());
+            Map<String, List<String>> headers = buildHeaders();
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {

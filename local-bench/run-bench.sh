@@ -21,23 +21,31 @@ cd "$REPO"
 
 JAR_NAME="mini-testing-1.0-SNAPSHOT-jar-with-dependencies.jar"
 
-# TERM, then (after a grace period) KILL any mini-testing JVM matching the jar.
+# TERM, then (after a grace period) KILL only THIS script's own JVM ($PID, set by launch_java) -
+# not a broad name-based sweep. A pgrep-by-jar-name kill (the original version of this function)
+# kills every mini-testing JVM on the machine regardless of which script started it, which is
+# wrong the moment more than one run-bench.sh instance is running concurrently (CONCURRENT_TESTING
+# testing, or just two labels started in different terminals) - one script's Ctrl-C or startup
+# sweep would silently kill another script's still-live run. Scoping to $PID fixes both call
+# sites (the INT trap and the startup sweep below) at once.
 # The app catches SIGTERM (shutdown hook) and can linger, so we escalate to -9.
-kill_jvms() {
-  local pids; pids=$(pgrep -f "$JAR_NAME" 2>/dev/null || true)
-  [[ -z "$pids" ]] && return 0
-  echo ">> stopping mini-testing JVM(s): $pids"
-  kill $pids 2>/dev/null || true
-  for _ in $(seq 1 12); do pgrep -f "$JAR_NAME" >/dev/null 2>&1 || return 0; sleep 1; done
-  pids=$(pgrep -f "$JAR_NAME" 2>/dev/null || true)
-  [[ -n "$pids" ]] && { echo ">> forcing SIGKILL: $pids"; kill -9 $pids 2>/dev/null || true; }
+kill_own_jvm() {
+  local pid="${PID:-}"
+  [[ -z "$pid" ]] && return 0
+  kill -0 "$pid" 2>/dev/null || return 0
+  echo ">> stopping this script's mini-testing JVM: $pid"
+  kill "$pid" 2>/dev/null || true
+  for _ in $(seq 1 12); do kill -0 "$pid" 2>/dev/null || return 0; sleep 1; done
+  kill -0 "$pid" 2>/dev/null && { echo ">> forcing SIGKILL: $pid"; kill -9 "$pid" 2>/dev/null || true; }
   return 0
 }
-# Never leave an orphaned JVM behind (covers Ctrl-C, errors, and normal exit).
-trap kill_jvms EXIT INT TERM
+# Ctrl-C is a hard stop of the whole script, not just the current JVM attempt - without also
+# exiting here, the restart loop below would just relaunch a fresh JVM right after kill_own_jvm
+# killed this one.
+trap 'kill_own_jvm; kill "${DIAG_PID:-}" 2>/dev/null || true; exit 130' INT
 
-echo ">> killing any stray mini-testing instances before starting"
-kill_jvms
+echo ">> killing this script's own stray mini-testing instance, if any, before starting"
+kill_own_jvm
 
 if [[ ! -f local-bench/bench.env ]]; then
   echo "!! create local-bench/bench.env from bench.env.template first"; exit 1
@@ -75,10 +83,20 @@ if [[ "$RUN_MAJOR" != "$BUILD_TARGET" ]]; then
 fi
 echo ">> verified: building AND running on Java $RUN_MAJOR"
 
-echo ">> mvn package (this can take a few minutes)"
-MAVEN_OPTS="" mvn -am -pl apps/mini-testing clean package -DskipTests=true -q
-
 JAR=apps/mini-testing/target/mini-testing-1.0-SNAPSHOT-jar-with-dependencies.jar
+# SKIP_BUILD=true reuses the jar already on disk instead of rebuilding - required for starting a
+# second concurrent instance safely, since `mvn clean package`'s target/ output is not safe for
+# two builds writing to it at once (confirmed live: a second concurrent build produced
+# "bad class file ... NoSuchFileException" from the first build's `clean` racing this one's
+# compile). Only skip when nothing in the source has changed since the jar was last built.
+if [[ "${SKIP_BUILD:-false}" == "true" ]]; then
+  [[ -f "$JAR" ]] || { echo "!! SKIP_BUILD=true but jar not found: $JAR"; exit 1; }
+  echo ">> SKIP_BUILD=true - reusing existing jar: $JAR"
+else
+  echo ">> mvn package (this can take a few minutes)"
+  MAVEN_OPTS="" mvn -am -pl apps/mini-testing clean package -DskipTests=true -q
+fi
+
 [[ -f "$JAR" ]] || { echo "!! jar not found: $JAR"; exit 1; }
 
 TS=$(date +%Y%m%d-%H%M%S)
@@ -99,33 +117,74 @@ if [[ "${ENABLE_JFR:-false}" == "true" ]]; then
 fi
 
 echo ">> RUN jvm: $("$JAVA_BIN" -version 2>&1 | head -1)"
-echo ">> running -> $LOG   (auto-stop on TESTRUN END or ${MAX_MIN}m)"
-"$JAVA_BIN" -Xmx"${XMX:-6g}" -Xms"${XMS:-2g}" $JFR_OPTS -jar "$JAR" > "$LOG" 2>&1 &
-PID=$!
+echo ">> running -> $LOG   (auto-restart on exit, same as apps/mini-testing/start.sh in prod; hard stop at ${MAX_MIN}m or Ctrl-C)"
 
-# auto-start the live bottleneck sampler; stream it to the console AND a file (self-exits when JVM dies)
 DIAG_LOG="local-bench/diag-${LABEL}-${TS}.log"
 echo ">> live diagnostics (also saved to $DIAG_LOG):"
-( local-bench/diagnose.sh "${DIAG_INTERVAL:-20}" 2>&1 | tee "$DIAG_LOG" ) &
-DIAG_PID=$!
 
+attempt=0
+launch_java() {
+  attempt=$((attempt + 1))
+  echo ">> [attempt $attempt] starting mini-testing JVM"
+  # Appended (>>), not truncated, from the second attempt on - one continuous log across every
+  # internal restart, same as production's single runtime log rather than a new file per attempt.
+  "$JAVA_BIN" -Xmx"${XMX:-6g}" -Xms"${XMS:-2g}" $JFR_OPTS -jar "$JAR" >> "$LOG" 2>&1 &
+  PID=$!
+  # diagnose.sh self-exits when its target PID dies, so it's relaunched alongside every attempt
+  # rather than made PID-agnostic - same tracking behavior as before, just repeated per attempt.
+  # $PID/$LOG passed explicitly so diagnose.sh watches THIS attempt specifically, not whichever
+  # mini-testing JVM/log happens to match a broad, unscoped auto-discovery - required for correct
+  # behavior when more than one run-bench.sh instance is running concurrently.
+  ( local-bench/diagnose.sh "${DIAG_INTERVAL:-20}" "$PID" "$LOG" 2>&1 | tee -a "$DIAG_LOG" ) &
+  DIAG_PID=$!
+}
+
+# Restarts the JVM whenever it exits - deliberately, not a bug to work around. Self-fencing
+# (TestingLease.isLost()) now ends a stuck attempt by exiting the process rather than trying to
+# recover in place, on the theory that only a real process exit makes Kafka's view of group
+# membership match reality. That theory is only actually exercised locally if something restarts
+# the process afterward - mirroring the supervisor loop apps/mini-testing/start.sh runs in
+# production. Without this, a self-fenced local run just stops here forever, unresumed.
 deadline=$(( $(date +%s) + MAX_MIN * 60 ))
-saw_start=0
-while kill -0 "$PID" 2>/dev/null; do
-  grep -q "TESTRUN START" "$LOG" 2>/dev/null && saw_start=1
-  if [[ $saw_start -eq 1 ]] && grep -q "TESTRUN END" "$LOG" 2>/dev/null; then
-    echo ">> TESTRUN END seen — stopping"; break
+launch_java
+while true; do
+  # Poll rather than a blocking `wait`, so the max-wall-clock deadline can still cut in even
+  # while the current attempt is alive and well.
+  while kill -0 "$PID" 2>/dev/null && [[ "$(date +%s)" -lt "$deadline" ]]; do
+    sleep 5
+  done
+
+  if kill -0 "$PID" 2>/dev/null; then
+    echo ">> max ${MAX_MIN}m reached — stopping"
+    kill "${DIAG_PID:-}" 2>/dev/null || true
+    kill_own_jvm
+    break
   fi
-  if [[ "$(date +%s)" -ge "$deadline" ]]; then echo ">> max ${MAX_MIN}m reached — stopping"; break; fi
-  sleep 5
+
+  # `|| EXIT_CODE=$?`, not a bare `wait; EXIT_CODE=$?` - under set -e, a nonzero exit from wait
+  # itself (java's own exit code, e.g. 1 from our new self-fencing path) would abort the script
+  # right here, before the next statement ever captured it.
+  EXIT_CODE=0
+  wait "$PID" 2>/dev/null || EXIT_CODE=$?
+  kill "${DIAG_PID:-}" 2>/dev/null || true
+  echo ">> mini-testing JVM exited (code=$EXIT_CODE) after attempt $attempt"
+
+  if [[ "$(date +%s)" -ge "$deadline" ]]; then
+    echo ">> max ${MAX_MIN}m reached — not restarting"
+    break
+  fi
+
+  echo ">> restarting in 2s"
+  sleep 2
+  launch_java
 done
 
-kill_jvms
+# Scoped to this script's own diagnose.sh instance, not a broad pkill-by-name - that would kill
+# another concurrently-running script's diagnostics too.
 kill "${DIAG_PID:-}" 2>/dev/null || true
-pkill -f 'local-bench/diagnose.sh' 2>/dev/null || true
 
 echo ">> finished. log: $LOG"
-echo ">> TESTRUN lines:"; grep "TESTRUN" "$LOG" | tail -3
+echo ">> TESTRUN lines:"; grep "TESTRUN" "$LOG" | tail -6
 echo ">> diagnostics summary (bucket table): $DIAG_LOG"
 tail -8 "$DIAG_LOG" 2>/dev/null
 echo "$LOG"

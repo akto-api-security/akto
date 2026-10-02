@@ -726,6 +726,16 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
         );
     }
 
+    /**
+     * DbActor/DbLayer is an unsupported stub path for mini-testing (which always runs hybrid, via
+     * ClientActor) - this file has no lease concept at all. leaseToken is accepted only for
+     * interface parity with DataActor; the real fencing lives in the cyborg-side DbLayer that
+     * actually serves ClientActor's HTTP calls.
+     */
+    public static TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken) {
+        return markTestRunResultSummaryFailed(testingRunResultSummaryId);
+    }
+
     public static void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
         TestingRunResultSummariesDao.instance.insertOne(trrs);
     }
@@ -959,6 +969,11 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)),
                 options);
+    }
+
+    /** See markTestRunResultSummaryFailed(id, leaseToken) - same stub-path reasoning. */
+    public static TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken) {
+        return updateIssueCountInSummary(summaryId, totalCountIssues);
     }
 
     public static TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
@@ -1344,7 +1359,15 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
                 NODE_LIMIT);
     }
 
-    public static long countTestingRunResultSummaries(Bson filter){
+    /** Was Bson filter - see the cyborg-side DbLayer for why (never worked, no codec for a raw
+     *  Bson query-builder object over HTTP). This stub path just rebuilds the equivalent filter. */
+    public static long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, State state){
+        ObjectId testingRunId = new ObjectId(testingRunHexId);
+        Bson filter = Filters.and(
+                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, sinceTimestamp),
+                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+                Filters.eq(TestingRunResultSummary.STATE, state)
+        );
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 

@@ -16,25 +16,54 @@
 # active, it writes a hang-<ts>.txt bundle (3 stack dumps 4s apart + thread-state histogram +
 # BLOCKED lock-owner chain + kafka offsets) — the reproducible RCA artifact for the 40% stall.
 #
-# Usage: local-bench/diagnose.sh [interval_sec]   (default 20; runs until the JVM exits)
+# Usage: local-bench/diagnose.sh [interval_sec] [target_pid] [target_log]
+#   target_pid/target_log: pin this instance to one specific JVM/log rather than
+#   auto-discovering "the" mini-testing process - required for correct behavior when more than
+#   one mini-testing JVM is running concurrently (CONCURRENT_TESTING=true, multiple run-bench.sh
+#   instances). Without them, PID falls back to `pgrep -f $JAR_NAME | head -1` (whichever JVM
+#   happens to sort first - arbitrary and wrong with >1 running) and LOG falls back to the
+#   most-recently-modified run-*.log (can flip between instances mid-run). run-bench.sh passes
+#   both explicitly since it already knows its own $PID/$LOG.
 set -uo pipefail
 INTERVAL="${1:-20}"
+TARGET_PID="${2:-}"
+TARGET_LOG="${3:-}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 JSTACK="$(/usr/libexec/java_home -v 17 2>/dev/null)/bin/jstack"
 JAR_NAME="mini-testing-1.0-SNAPSHOT-jar"
 KAFKA_CTR="${KAFKA_CTR:-kafka-internal}"
-KAFKA_GROUP="${KAFKA_GROUP:-testing-group}"
+# Legacy/fallback group name for a non-concurrent run. Under CONCURRENT_TESTING, the real group
+# is "<summaryId>.testing-group" (Constants.getKafkaGroupIdConfig) - kafka_lag() below derives
+# that dynamically per-tick from whichever summary the target log is currently draining, since
+# the summaryId isn't known until the JVM claims one and isn't fixed for the life of the process
+# (it drains a new summary each time it loops).
+KAFKA_GROUP_FALLBACK="${KAFKA_GROUP:-testing-group}"
 # done must be flat for this many consecutive intervals (while active) before we grab a hang bundle.
 STALL_TICKS="${STALL_TICKS:-3}"
 
 hdr() { printf "%-8s %6s | %6s %5s %7s %5s %5s %6s | %-22s | %-13s | %s\n" \
   time cpu% rate done avgMs stuck tmout err "workers io/cl/cpu/pk/ot" "states R/W/T/B" kafkaLag; }
 
+# Which consumer group the target JVM is actually draining right now. Under CONCURRENT_TESTING
+# this changes every time the loop claims a new summary, so it's re-derived every tick from the
+# log's own most recent "TESTRUN START summaryId=..." line rather than cached once.
+current_kafka_group() {
+  local log="$1"
+  local summary_id
+  summary_id=$(grep -a 'TESTRUN START' "$log" 2>/dev/null | tail -1 | grep -oE 'summaryId=[a-f0-9]+' | cut -d= -f2)
+  if [ -n "$summary_id" ]; then
+    echo "${summary_id}.testing-group"
+  else
+    echo "$KAFKA_GROUP_FALLBACK"
+  fi
+}
+
 # committed-offset lag on the topic the consumer group is draining (sum over partitions)
 kafka_lag() {
+  local group="$1"
   docker exec "$KAFKA_CTR" kafka-consumer-groups --bootstrap-server localhost:9092 \
-      --describe --group "$KAFKA_GROUP" 2>/dev/null \
+      --describe --group "$group" 2>/dev/null \
     | awk 'NR>1 && $6 ~ /^[0-9-]+$/ {cur+=$4; end+=$5; lag+=$6}
            END{ if(end>0) printf "cur=%d/end=%d lag=%d", cur, end, lag; else printf "n/a"; }'
 }
@@ -61,11 +90,12 @@ err_breakdown() {
 # Full RCA bundle grabbed once when the run stalls: 3 dumps to see if threads are genuinely
 # stuck (same frame across all 3) vs merely slow, plus who owns the monitor everyone waits on.
 hang_capture() {
-  local pid="$1"; local out; out="local-bench/hang-$(date +%Y%m%d-%H%M%S).txt"
+  local pid="$1"; local log="$2"; local out; out="local-bench/hang-$(date +%Y%m%d-%H%M%S).txt"
+  local group; group="$(current_kafka_group "$log")"
   echo ">> STALL detected — capturing hang bundle to $out" | tee -a "$out"
   {
     echo "=== HANG CAPTURE pid=$pid $(date) ==="
-    echo "=== kafka: $(kafka_lag) (group=$KAFKA_GROUP) ==="
+    echo "=== kafka: $(kafka_lag "$group") (group=$group) ==="
     for k in 1 2 3; do
       "$JSTACK" "$pid" 2>/dev/null > "/tmp/hang.$$.$k.txt"
       echo; echo "--- dump $k: worker+pc thread-state histogram ---"
@@ -100,10 +130,19 @@ hang_capture() {
 hdr
 i=0; prev_done=""; flat=0; captured=0
 while true; do
-  PID=$(pgrep -f "$JAR_NAME" | head -1)
-  [ -z "$PID" ] && { echo ">> no running mini-testing JVM — done"; break; }
+  if [ -n "$TARGET_PID" ]; then
+    PID="$TARGET_PID"
+    kill -0 "$PID" 2>/dev/null || { echo ">> target PID $PID no longer running — done"; break; }
+  else
+    PID=$(pgrep -f "$JAR_NAME" | head -1)
+    [ -z "$PID" ] && { echo ">> no running mini-testing JVM — done"; break; }
+  fi
   CPU=$(ps -o %cpu= -p "$PID" 2>/dev/null | tr -d ' ')
-  LOG=$(ls -t local-bench/run-*.log 2>/dev/null | head -1)
+  if [ -n "$TARGET_LOG" ]; then
+    LOG="$TARGET_LOG"
+  else
+    LOG=$(ls -t local-bench/run-*.log 2>/dev/null | head -1)
+  fi
   P=$(grep -a 'TESTRUN PROGRESS' "$LOG" 2>/dev/null | tail -1)
   rate=$(echo "$P"  | grep -oE 'rate=[0-9.]+'        | cut -d= -f2)
   donep=$(echo "$P" | grep -oE '\([0-9]+%\)'         | tr -d '()' | head -1)
@@ -131,7 +170,7 @@ while true; do
       st=a[1]; if(st=="RUNNABLE")r++; else if(st=="WAITING")w++; else if(st=="TIMED_WAITING")t++; else if(st=="BLOCKED")b++}}
     END{printf "%d/%d/%d/%d", r+0, w+0, t+0, b+0}' /tmp/diag.$$.txt)
   rm -f /tmp/diag.$$.txt
-  lag=$(kafka_lag)
+  lag=$(kafka_lag "$(current_kafka_group "$LOG")")
 
   printf "%-8s %6s | %6s %5s %7s %5s %5s %6s | %-22s | %-13s | %s\n" \
     "$(date +%H:%M:%S)" "${CPU:-?}" "${rate:-?}" "${donep:-?}" "${avg:-?}" "${stuck:-?}" "${tmout:-?}" "${err:-?}" \
@@ -142,7 +181,7 @@ while true; do
     if [ "$donecnt" = "$prev_done" ]; then flat=$((flat+1)); else flat=0; captured=0; fi
     prev_done="$donecnt"
     if [ "$flat" -ge "$STALL_TICKS" ] && [ "$captured" -eq 0 ]; then
-      hang_capture "$PID"; captured=1
+      hang_capture "$PID" "$LOG"; captured=1
     fi
   fi
 

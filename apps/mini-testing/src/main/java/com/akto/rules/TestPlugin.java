@@ -11,7 +11,7 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.RelationshipSync;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.filter.Filter;
 import com.akto.testing.StatusCodeAnalyser;
@@ -46,7 +46,7 @@ public abstract class TestPlugin {
     public static void extractAllValuesFromPayload(String payload, Map<String,Set<String>> payloadMap) throws Exception{
         JsonParser jp = factory.createParser(payload);
         JsonNode node = mapper.readTree(jp);
-        RelationshipSync.extractAllValuesFromPayload(node,new ArrayList<>(),payloadMap);
+        RuntimeUtil.extractAllValuesFromPayload(node,new ArrayList<>(),payloadMap);
     }
 
     public String decrementUrlVersion(String url, int decrementValue, int limit) {

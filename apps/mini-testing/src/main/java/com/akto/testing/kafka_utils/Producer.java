@@ -2,7 +2,7 @@ package com.akto.testing.kafka_utils;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -145,21 +145,15 @@ public class Producer {
         throw new RuntimeException("Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
-    private static Properties buildAdminProperties(String bootstrapServers) throws ExecutionException {
-        Properties adminProps = KafkaConfig.createAdminProperties(bootstrapServers,
-                KafkaConfig.isKafkaAuthenticationEnabled(), KafkaConfig.getKafkaUsername(), KafkaConfig.getKafkaPassword());
-        if (adminProps == null) {
-            throw new ExecutionException("Kafka authentication is enabled but credentials are missing",
-                    new IllegalStateException("Missing Kafka username/password"));
-        }
-        return adminProps;
-    }
-
-    private static void deleteTopic(String bootstrapServers, String topicName) 
+    private static void deleteTopic(String bootstrapServers, String topicName)
             throws ExecutionException, InterruptedException {
 
-        Properties adminProps = buildAdminProperties(bootstrapServers);
-        try (AdminClient adminClient = AdminClient.create(adminProps)) {
+        AdminClient adminClient = KafkaAdminClient.get();
+        if (adminClient == null) {
+            loggerMaker.errorAndAddToDb("No shared Kafka AdminClient available; skipping topic deletion for " + topicName);
+            return;
+        }
+        try {
             try {
                 ListTopicsResult listTopicsResult = adminClient.listTopics();
                 if (!listTopicsResult.names().get(10, java.util.concurrent.TimeUnit.SECONDS).contains(topicName)) {
@@ -220,12 +214,15 @@ public class Producer {
         }
     }
 
-    public static void createTopic(String bootstrapServers, String topicName) 
+    public static void createTopic(String bootstrapServers, String topicName)
         throws ExecutionException, InterruptedException, java.util.concurrent.TimeoutException {
-        Properties adminProps = buildAdminProperties(bootstrapServers);
+        AdminClient adminClient = KafkaAdminClient.get();
+        if (adminClient == null) {
+            throw new ExecutionException("No shared Kafka AdminClient available", new IllegalStateException());
+        }
 
-        try (AdminClient adminClient = AdminClient.create(adminProps)) {
-            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1); 
+        try {
+            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1);
             
             try {
                 adminClient.createTopics(Collections.singletonList(newTopic)).all().get(10, java.util.concurrent.TimeUnit.SECONDS);
@@ -262,8 +259,8 @@ public class Producer {
 
             throw new RuntimeException("Topic creation not confirmed after retries.");
         } catch (Exception e) {
-            loggerMaker.insertImportantTestingLog("AdminClient creation failed: Socket error - cannot connect to Kafka broker");
-            throw new ExecutionException("AdminClient socket error", e);
+            loggerMaker.insertImportantTestingLog("Unexpected error in createTopic operation: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+            throw new ExecutionException("Unexpected error in topic creation operation", e);
         }
     }
     public static String getProducerStatus() {
