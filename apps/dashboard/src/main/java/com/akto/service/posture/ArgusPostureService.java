@@ -44,6 +44,8 @@ import java.util.stream.Collectors;
 
 public class ArgusPostureService {
 
+    private static final String UNKNOWN_AGENT = "Unknown agent";
+
     private static final String KEY_KPIS = "kpis";
     private static final String KEY_ENVIRONMENTS = "environments";
 
@@ -788,9 +790,9 @@ public class ArgusPostureService {
     }
 
     private static String agentName(Integer collectionId, Map<Integer, ApiCollection> collectionsById) {
-        if (collectionId == null) return null;
+        if (collectionId == null) return UNKNOWN_AGENT;
         ApiCollection c = collectionsById.get(collectionId);
-        return c != null ? agentDisplayName(c) : null;
+        return c != null ? agentDisplayName(c) : UNKNOWN_AGENT;
     }
 
     // An event's apiCollectionId is not a real collection id for guardrail traffic, so attribute it by host, then actor
@@ -1581,7 +1583,7 @@ public class ArgusPostureService {
         String assetValue = AgenticObserveUtil.getAssetTagValue(c);
         if (assetValue != null && !assetValue.trim().isEmpty()) return AgenticObserveUtil.formatDisplayName(assetValue);
         if (c.getName() != null && !c.getName().trim().isEmpty()) return c.getName();
-        return c.getHostName() != null ? c.getHostName() : "Unknown agent";
+        return c.getHostName() != null ? c.getHostName() : UNKNOWN_AGENT;
     }
 
     // Category contributing the most weighted points, not the highest raw sub-score.
