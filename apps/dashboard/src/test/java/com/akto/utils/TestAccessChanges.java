@@ -322,6 +322,26 @@ public class TestAccessChanges extends MongoBasedTest {
         assertTrue(RoleAssignment.isUnlimitedAdmin(ADMIN, ACCOUNT_ID));
     }
 
+    @Test
+    public void testSessionWithoutAccountStillChecksRoles() throws Exception {
+        // a session used straight from the API has no account yet; the request's account (chosen by UserDetailsFilter) is used
+        Method method = RoleAccessInterceptor.class.getDeclaredMethod("getUserAccountId", Map.class);
+        method.setAccessible(true);
+        Context.accountId.set(ACCOUNT_ID);
+        assertEquals(ACCOUNT_ID, method.invoke(new RoleAccessInterceptor(), new HashMap<String, Object>()));
+        Map<String, Object> withAccount = new HashMap<>();
+        withAccount.put("accountId", "999");
+        assertEquals(999, method.invoke(new RoleAccessInterceptor(), withAccount));
+        Context.accountId.remove();
+        try {
+            method.invoke(new RoleAccessInterceptor(), new HashMap<String, Object>());
+            assertTrue("no account at all must fail", false);
+        } catch (java.lang.reflect.InvocationTargetException expected) {
+        } finally {
+            Context.accountId.set(ACCOUNT_ID);
+        }
+    }
+
     // ── Custom roles ──────────────────────────────────────────────────────────
 
     static RoleAction roleAction(int caller, String name) {

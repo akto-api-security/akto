@@ -127,6 +127,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         try {
             Object accountIdObj = session.get(UserDetailsFilter.ACCOUNT_ID);
             String accountIdStr = accountIdObj == null ? null : accountIdObj+"";
+            if(accountIdStr == null && Context.accountId.get() != null){
+                // sessions used straight from the API (no page load) have no account yet; UserDetailsFilter already
+                // picked one of the user's own accounts for this request. Without this the checks below were skipped.
+                accountIdStr = String.valueOf(Context.accountId.get());
+            }
             if(accountIdStr == null){
                 throw new Exception("found account id as null in interceptor");
             }
