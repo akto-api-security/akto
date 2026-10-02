@@ -2136,14 +2136,16 @@ public class DbLayer {
     private static final FindOneAndUpdateOptions RETURN_AFTER = new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER);
 
     public static ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds) {
-        int now = Context.now();
-        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
-
+        
         List<ObjectId> eligibleRunIds = TestingRunDao.instance.findActiveRunIdsForModule(miniTestingName);
         if (eligibleRunIds.isEmpty()) {
             return new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
         }
 
+        int now = Context.now();
+        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+
+        // For pre-created TRRS in case CI/CD or rerun specific
         ClaimResult result = claimScheduledTrrs(eligibleRunIds, leaseToken, now, ttl);
         if (result == null) {
             result = claimExpiredOrOwnLease(eligibleRunIds, leaseToken, now, ttl);
