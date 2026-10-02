@@ -100,6 +100,24 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         return ret;
     }
 
+    /**
+     * Fresh TRRS for a TestingRun that has never had one - the mint step of claimNextTestWork's
+     * fresh-pickup path (plain UI run / whole-test rerun, neither of which StartTestAction
+     * pre-creates a summary for).
+     */
+    public TestingRunResultSummary createFreshSummaryForClaim(ObjectId testingRunId, String leaseToken, int now, int ttl) {
+        TestingRunResultSummary trrs = new TestingRunResultSummary();
+        trrs.setId(new ObjectId());
+        trrs.setTestingRunId(testingRunId);
+        trrs.setState(TestingRun.State.RUNNING);
+        trrs.setStartTimestamp(now);
+        trrs.setLeaseToken(leaseToken);
+        trrs.setLeaseExpiryTs(now + ttl);
+        trrs.setProducerDone(false);
+        insertOne(trrs);
+        return trrs;
+    }
+
     public void createIndicesIfAbsent() {
 
         String dbName = Context.accountId.get()+"";

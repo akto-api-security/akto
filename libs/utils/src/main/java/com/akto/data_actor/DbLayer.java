@@ -2252,15 +2252,8 @@ public class DbLayer {
             return new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
         }
 
-        TestingRunResultSummary newTrrs = new TestingRunResultSummary();
-        newTrrs.setId(new ObjectId());
-        newTrrs.setTestingRunId(claimedRun.getId());
-        newTrrs.setState(TestingRun.State.RUNNING);
-        newTrrs.setStartTimestamp(now);
-        newTrrs.setLeaseToken(leaseToken);
-        newTrrs.setLeaseExpiryTs(now + ttl);
-        newTrrs.setProducerDone(false);
-        TestingRunResultSummariesDao.instance.insertOne(newTrrs);
+        TestingRunResultSummary newTrrs = TestingRunResultSummariesDao.instance
+                .createFreshSummaryForClaim(claimedRun.getId(), leaseToken, now, ttl);
 
         return new ClaimResult(VERDICT_FRESH_RUN, newTrrs, claimedRun);
     }
