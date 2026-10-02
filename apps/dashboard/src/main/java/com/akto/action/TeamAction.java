@@ -16,6 +16,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -328,12 +329,30 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
     public String updateUserScopeRoleMapping() {
         int accId = Context.accountId.get();
-        Bson findQ = Filters.eq(User.LOGIN, email);
+        Bson findQ = Filters.and(Filters.eq(User.LOGIN, email), Filters.exists(User.ACCOUNTS + "." + accId));
         User userDetails = UsersDao.instance.findOne(findQ);
 
         if (userDetails == null) {
             addActionError("User not found");
             return Action.ERROR.toUpperCase();
+        }
+
+        if (userDetails.getId() == getSUser().getId()) {
+            addActionError("You cannot perform this action on yourself");
+            return Action.ERROR.toUpperCase();
+        }
+
+        // Caller can only edit users, and assign roles, within their own role hierarchy
+        List<Role> callerHierarchy = Arrays.asList(RBACDao.getCurrentRoleForUser(getSUser().getId(), accId).getRoleHierarchy());
+        RBAC targetRbac = RBACDao.getCurrentRBACForUser(userDetails.getId(), accId);
+        if (targetRbac != null) {
+            for (CONTEXT_SOURCE scope : CONTEXT_SOURCE.values()) {
+                Role targetRole = targetRbac.getRoleForScope(scope);
+                if (targetRole != null && !targetRole.equals(Role.NO_ACCESS) && !callerHierarchy.contains(targetRole)) {
+                    addActionError("User not allowed to update role for: " + email);
+                    return Action.ERROR.toUpperCase();
+                }
+            }
         }
 
         loggerMaker.debugAndAddToDb("scopeRoleMapping before init: " + scopeRoleMapping);
@@ -364,7 +383,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
                         return Action.ERROR.toUpperCase();
                     }
-                    if (!baseRole.equals(Role.NO_ACCESS) && !Arrays.asList(Role.ADMIN.getRoleHierarchy()).contains(baseRole)) {
+                    if (!baseRole.equals(Role.NO_ACCESS) && !callerHierarchy.contains(baseRole)) {
                         addActionError("Invalid role: " + roleStr);
                         loggerMaker.errorAndAddToDb("Invalid role attempted in scope-role mapping: " + roleStr + " for user: " + email);
                         return Action.ERROR.toUpperCase();
@@ -377,6 +396,10 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
                         if (!baseRole.equals(RBAC.Role.NO_ACCESS) && !isValidProductScope(scope)) {
                             addActionError(INVALID_PRODUCT_SCOPE + scope);
                             loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
+                            return Action.ERROR.toUpperCase();
+                        }
+                        if (!baseRole.equals(Role.NO_ACCESS) && !callerHierarchy.contains(baseRole)) {
+                            addActionError("Invalid role: " + roleStr);
                             return Action.ERROR.toUpperCase();
                         }
                     } else {
@@ -443,7 +466,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             return Action.ERROR.toUpperCase();
         }
 
-        User forgotPasswordUser = UsersDao.instance.findOne(Filters.eq(User.LOGIN, userEmail));
+        User forgotPasswordUser = UsersDao.instance.findOne(Filters.and(Filters.eq(User.LOGIN, userEmail), Filters.exists(User.ACCOUNTS + "." + Context.accountId.get())));
         if(forgotPasswordUser == null) {
             addActionError("User not found.");
             return Action.ERROR.toUpperCase();
