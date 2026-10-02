@@ -49,10 +49,11 @@ const err = async (error) => {
       func.setToast(true, true, "Connection error. Please try again later.")
       break;
     case 400:
-      func.setToast(true, true, 'Bad Request ' + data.message);
+      func.setToast(true, true, message !== standardMessage ? message
+        : data?.message ? 'Bad Request ' + data.message : "This request isn't valid. Refresh the page and try again.");
       break;
     case 422:
-      func.setToast(true, true, message);
+      func.setToast(true, true, message !== standardMessage ? message : "Couldn't complete that. Please try again.");
       break;
     case 401:
       if (history.location.pathname !== "/login") {
@@ -109,7 +110,12 @@ const err = async (error) => {
 
       return service(originalRequest)
     case 500:
-      func.setToast(true, true, "Server Error");
+      func.setToast(true, true, message !== standardMessage ? message : "Something went wrong on our side. Please try again.");
+      break
+    case 502:
+    case 503:
+    case 504:
+      func.setToast(true, true, "The server is busy or restarting. Please try again in a minute.");
       break
 
     default:

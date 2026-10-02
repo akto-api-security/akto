@@ -1,289 +1,136 @@
-import { Modal, Text, TextField, Box, Checkbox, HorizontalStack } from "@shopify/polaris"
-import { useState, useRef, useCallback, useEffect, useMemo } from "react"
+import { Banner, Box, Checkbox, Divider, Form, HorizontalStack, InlineError, Modal, Select, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { useEffect, useRef, useState } from "react"
 import func from "@/util/func"
-import Store from "../../../store"
 import settingRequests from "../api"
-import Dropdown from "../../../components/layouts/Dropdown"
+import CopyCommand from "../../../components/shared/CopyCommand"
 
-/**
- * Gets available product scopes based on user's feature access.
- * Maps feature flags to product scopes:
- * - API Security: always available (default)
- * - Akto ARGUS: requires SECURITY_TYPE_AGENTIC feature
- * - Akto ATLAS: requires ENDPOINT_SECURITY feature
- * - DAST: requires AKTO_DAST feature
+const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+
+/*
+ * Invite someone with a role in each product. The current product is picked for them with the default invite role,
+ * when the inviter can give it.
  */
-const getAvailableProductScopes = () => {
-    const { agenticSecurityGranted, endpointSecurityGranted, dastGranted } = func.getStiggFeatureGrants()
-
-    const scopes = [
-        { label: 'API Security', value: 'API' } // Always available
-    ]
-
-    // Add scopes based on feature access
-    if (agenticSecurityGranted) {
-        scopes.push({ label: 'Akto ARGUS', value: 'AGENTIC' })
-    }
-
-    if (endpointSecurityGranted) {
-        scopes.push({ label: 'Akto ATLAS', value: 'ENDPOINT' })
-    }
-
-    if (dastGranted) {
-        scopes.push({ label: 'DAST', value: 'DAST' })
-    }
-
-    return scopes
-}
-
-const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, roleHierarchy, rolesOptions, defaultInviteRole, accessibleProductScopes, filteredRoleOptions}) => {
-
-    // Use accessible scopes passed from parent, fallback to all available scopes if not provided (backward compatibility)
-    const availableScopes = useMemo(() => {
-        if (accessibleProductScopes && accessibleProductScopes.length > 0) {
-            return accessibleProductScopes
-        }
-        return getAvailableProductScopes()
-    }, [accessibleProductScopes])
-
-    const setToastConfig = Store(state => state.setToastConfig)
+const InviteUserModal = ({ open, onClose, productScopes, roleOptions, defaultInviteRole, currentProduct, onInvited }) => {
     const ref = useRef(null)
-    const [inviteEmail, setInviteEmail] = useState()
-    const [scopeRoleMapping, setScopeRoleMapping] = useState({})
+    const [email, setEmail] = useState('')
+    const [mapping, setMapping] = useState({})
+    const [triedSend, setTriedSend] = useState(false)
+    const [sending, setSending] = useState(false)
+    const [inviteLink, setInviteLink] = useState('')
+
+    const givable = roleOptions.filter(option => option.value !== 'NO_ACCESS')
+    const startingRole = givable.some(option => option.value === defaultInviteRole) ? defaultInviteRole : givable[0]?.value
 
     useEffect(() => {
-        // Reset when modal opens/modal state changes
-        if (inviteUser.isActive) {
-            setScopeRoleMapping({})
+        if (open) {
+            setEmail('')
+            setTriedSend(false)
+            setInviteLink('')
+            const product = productScopes.find(scope => scope.value === currentProduct) || productScopes[0]
+            setMapping(product && startingRole ? { [product.value]: startingRole } : {})
         }
-    }, [inviteUser.isActive])
+    }, [open])
 
-    const handleScopeToggle = (scope) => {
-        setScopeRoleMapping(prevMapping => {
-            const newMapping = { ...prevMapping }
-            if (newMapping[scope]) {
-                delete newMapping[scope]
-            } else {
-                newMapping[scope] = defaultInviteRole
-            }
-            return newMapping
-        })
-    }
+    const emailError = email.trim().length === 0 ? 'Enter an email address.' : !EMAIL_PATTERN.test(email.trim()) ? 'Enter a valid email address.' : ''
+    const noProduct = Object.keys(mapping).length === 0
 
-    const handleScopeRoleChange = (scope, role) => {
-        setScopeRoleMapping(prevMapping => {
-            const updated = {
-                ...prevMapping,
-                [scope]: role
-            }
-            return updated
-        })
-    }
-
-    const handleSendInvitation = async () => {
-        // Ensure we have at least one scope selected with a role
-        const selectedScopes = Object.keys(scopeRoleMapping || {})
-
-        if (selectedScopes.length === 0) {
-            setToastConfig({
-                isActive: true,
-                isError: true,
-                message: "Please select at least one product scope and assign a role"
-            })
-            return
-        }
-
-        // Verify all selected scopes have roles
-        const allHaveRoles = selectedScopes.every(scope => scopeRoleMapping[scope] && scopeRoleMapping[scope].trim())
-        if (!allHaveRoles) {
-            setToastConfig({
-                isActive: true,
-                isError: true,
-                message: "Please assign a role to each selected scope"
-            })
-            return
-        }
-
-        if (!inviteEmail) {
-            setToastConfig({
-                isActive: true,
-                isError: true,
-                message: "Please enter an email address"
-            })
-            return
-        }
-
-        setInviteUser(previousState => ({
-            ...previousState,
-            state: "loading",
-            email: inviteEmail
-        }))
-
-        const spec = {
-            inviteeName: "there",
-            inviteeEmail: inviteEmail.toLowerCase(),
-            websiteHostName: window.location.origin,
-            scopeRoleMapping: scopeRoleMapping
-        }
-
+    const send = async () => {
+        setTriedSend(true)
+        if (emailError || noProduct) return
+        setSending(true)
         try {
-            const inviteUsersResponse = await settingRequests.inviteUsers(spec)
-
-            setInviteUser(previousState => ({
-                ...previousState,
-                state: "success",
-                inviteLink: inviteUsersResponse.finalInviteCode
-            }))
-
-            setToastConfig({
-                isActive: true,
-                isError: false,
-                message: "User invitation sent successfully"
+            const response = await settingRequests.inviteUsers({
+                inviteeName: "there",
+                inviteeEmail: email.trim().toLowerCase(),
+                websiteHostName: window.location.origin,
+                scopeRoleMapping: mapping
             })
-
-            setInviteEmail("")
-            setScopeRoleMapping({})
-        } catch (error) {
-            setInviteUser(previousState => ({
-                ...previousState,
-                state: "initial",
-                email: inviteEmail
-            }))
-
-            setToastConfig({
-                isActive: true,
-                isError: true,
-                message: error.response?.data?.actionErrors?.[0] || "Failed to send invitation"
-            })
-            throw error
+            setInviteLink(response?.finalInviteCode || '')
+            func.setToast(true, false, `Invite sent to ${email.trim().toLowerCase()}`)
+            onInvited()
+        } catch (e) {
+            // the server's message is already shown
+        } finally {
+            setSending(false)
         }
     }
 
-    const handleCopyInvitation = () => {
-        func.copyToClipboard(inviteUser.inviteLink, ref, "Invitation link copied to clipboard")
-    }
-
-    // Use filtered role options passed from parent, or create locally (backward compatibility)
-    const displayedRoleOptions = useMemo(() => {
-        if (filteredRoleOptions && filteredRoleOptions.length > 0) {
-            return filteredRoleOptions
-        }
-        // Fallback: create locally
-        return rolesOptions[0].items.map((c) => {
-            return{
-                label: c?.content,
-                value: c?.role,
-            }
-        }).filter((c) => roleHierarchy.includes(c.value))
-    }, [filteredRoleOptions, rolesOptions, roleHierarchy])
-    if (inviteUser.state !== "success") {
+    if (inviteLink) {
         return (
-            <Modal
-                small
-                open={inviteUser.isActive}
-                onClose={toggleInviteUserModal}
-                title="Add team member"
-                primaryAction={{
-                    loading: inviteUser.state === "loading",
-                    content: 'Send invitation',
-                    onAction: handleSendInvitation,
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: toggleInviteUserModal,
-                    },
-                ]}
-            >
+            <Modal open={open} onClose={onClose} title="Invite sent"
+                primaryAction={{ content: 'Copy link', onAction: () => func.copyToClipboard(inviteLink, ref, "Invite link copied") }}
+                secondaryActions={[{ content: 'Done', onAction: onClose }]}>
                 <Modal.Section>
-                    <TextField
-                        label="Account email"
-                        value={inviteEmail}
-                        placeholder="name@workemail.com"
-                        onChange={(email) => setInviteEmail(email)}
-                        autoComplete="off"
-                    />
-                    <Text variant="bodyMd" color="subdued">
-                        We'll use this address if we need to contact you about your account.
-                    </Text>
-
-                    <Text variant="bodyMd" color="subdued" as="p" style={{ marginTop: "20px" }}>
-                        Product Scope Access
-                    </Text>
-                    <Text variant="bodySm" color="subdued" as="p" style={{ marginBottom: "15px" }}>
-                        Select product scopes and assign a role for each. Different roles can be assigned to different scopes.
-                    </Text>
-                    <Box padding="400">
-                        {availableScopes.map((scope) => (
-                            <Box
-                                key={scope.value}
-                                style={{
-                                    marginBottom: "12px",
-                                    borderBottom: "1px solid #e5e5e5",
-                                    paddingBottom: "12px",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "16px"
-                                }}
-                            >
-                                <Checkbox
-                                    label=""
-                                    checked={Object.keys(scopeRoleMapping).includes(scope.value)}
-                                    onChange={() => handleScopeToggle(scope.value)}
-                                />
-                                <Text variant="bodyMd" style={{ minWidth: "120px", flexShrink: 0 }}>
-                                    {scope.label}
-                                </Text>
-                                {Object.keys(scopeRoleMapping).includes(scope.value) && (
-                                    <Box style={{ marginLeft: "80px" }}>
-                                        <Dropdown
-                                            id={`role-${scope.value}`}
-                                            selected={(value) => handleScopeRoleChange(scope.value, value)}
-                                            menuItems={displayedRoleOptions}
-                                            initial={scopeRoleMapping[scope.value]}
-                                        />
-                                    </Box>
-                                )}
-                            </Box>
-                        ))}
-                    </Box>
-
-                </Modal.Section>
-            </Modal>
-        )
-    } else {
-        return (
-            <Modal
-                small
-                open={inviteUser.isActive}
-                onClose={toggleInviteUserModal}
-                title="Add team member"
-                primaryAction={{
-                    content: 'Copy invitation',
-                    onAction: handleCopyInvitation,
-                }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: toggleInviteUserModal,
-                    },
-                ]}
-            >
-
-                <Modal.Section>
-                    <TextField
-                        label="Invite link"
-                        disabled={true}
-                        value={inviteUser.inviteLink}
-                    />
-                     <Text variant="bodyMd" color="subdued">
-                        Alternatively, you can copy the invite link and share it with your invitee directly.
-                    </Text>
-                    <div ref={ref} />
+                    <VerticalStack gap="3">
+                        <Text>We emailed the invite. You can also share this link with them directly. It works for one week.</Text>
+                        <CopyCommand command={inviteLink} />
+                        <div ref={ref} />
+                    </VerticalStack>
                 </Modal.Section>
             </Modal>
         )
     }
+
+    return (
+        <Modal
+            open={open}
+            onClose={onClose}
+            title="Invite user"
+            primaryAction={{ content: 'Send invite', onAction: send, loading: sending, disabled: givable.length === 0 }}
+            secondaryActions={[{ content: 'Cancel', onAction: onClose }]}
+        >
+            <Modal.Section>
+                <Form onSubmit={send}>
+                    <VerticalStack gap="4">
+                        {givable.length === 0 ? (
+                            <Banner status="warning"><p>Your role can't give any roles yet. Ask an admin.</p></Banner>
+                        ) : null}
+                        <TextField
+                            label="Email"
+                            type="email"
+                            value={email}
+                            placeholder="name@company.com"
+                            onChange={setEmail}
+                            helpText="We'll send the invite to this address."
+                            error={triedSend && emailError ? emailError : undefined}
+                            autoComplete="off"
+                            autoFocus
+                        />
+                        <VerticalStack gap="2">
+                            <Text variant="headingSm" as="h3">Products</Text>
+                            <Text variant="bodySm" color="subdued">Pick a role for each product they need. Other products have no access.</Text>
+                        </VerticalStack>
+                        <VerticalStack gap="3">
+                            {productScopes.map((scope, index) => {
+                                const checked = scope.value in mapping
+                                return (
+                                    <VerticalStack gap="3" key={scope.value}>
+                                        {index > 0 ? <Divider /> : null}
+                                        <HorizontalStack align="space-between" blockAlign="center" gap="4" wrap={false}>
+                                            <Checkbox label={scope.label} checked={checked} disabled={givable.length === 0}
+                                                onChange={(value) => setMapping(prev => {
+                                                    const next = { ...prev }
+                                                    if (value) next[scope.value] = startingRole
+                                                    else delete next[scope.value]
+                                                    return next
+                                                })} />
+                                            {checked ? (
+                                                <Box minWidth="240px">
+                                                    <Select label={`Role in ${scope.label}`} labelHidden options={givable} value={mapping[scope.value]}
+                                                        onChange={(role) => setMapping(prev => ({ ...prev, [scope.value]: role }))} />
+                                                </Box>
+                                            ) : <Text color="subdued">No access</Text>}
+                                        </HorizontalStack>
+                                    </VerticalStack>
+                                )
+                            })}
+                        </VerticalStack>
+                        {triedSend && noProduct ? <InlineError message="Pick at least one product." fieldID="invite-products" /> : null}
+                    </VerticalStack>
+                </Form>
+            </Modal.Section>
+        </Modal>
+    )
 }
 
 export default InviteUserModal

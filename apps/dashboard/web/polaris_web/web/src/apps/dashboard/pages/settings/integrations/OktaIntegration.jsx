@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import CopyCommand from '../../../components/shared/CopyCommand';
 import IntegrationsLayout from './IntegrationsLayout';
-import { Autocomplete, Badge, Box, Button, Checkbox, Divider, Form, FormLayout, HorizontalStack, LegacyCard, Link, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Autocomplete, Badge, Banner, Box, Button, Checkbox, Divider, Form, FormLayout, HorizontalStack, LegacyCard, Link, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor, EditMinor, PlusMinor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../api';
@@ -57,6 +57,8 @@ function OktaIntegration() {
      * every org user. Disabled until a Management API token exists, since the sync needs one. */
     const [syncGroupsToUserTags, setSyncGroupsToUserTags] = useState(false)
     const [removeAccessWithoutGroup, setRemoveAccessWithoutGroup] = useState(false)
+    // saved values, so Cancel puts the checkboxes back
+    const [savedToggles, setSavedToggles] = useState({ syncGroupsToUserTags: false, removeAccessWithoutGroup: false })
     /** Fetched from Okta Management API (all groups) when Edit + API token; used to autosuggest group name. */
     const [oktaGroupNames, setOktaGroupNames] = useState([])
     const [loadingOktaGroups, setLoadingOktaGroups] = useState(false)
@@ -144,6 +146,7 @@ function OktaIntegration() {
                 setSavedOktaGroupToAktoUserRoleMap(grpMap)
                 setSyncGroupsToUserTags(resp.syncGroupsToUserTags === true)
                 setRemoveAccessWithoutGroup(resp.removeAccessWithoutGroup === true)
+                setSavedToggles({ syncGroupsToUserTags: resp.syncGroupsToUserTags === true, removeAccessWithoutGroup: resp.removeAccessWithoutGroup === true })
                 setComponentType(2)
             }
         } catch {
@@ -190,7 +193,8 @@ function OktaIntegration() {
         try {
             let toastMsg = 'Group mappings saved successfully!'
             let resp
-            const baseOpts = { syncGroupsToUserTags, removeAccessWithoutGroup }
+            const removeAccess = removeAccessWithoutGroup && Object.keys(oktaGroupToAktoUserRoleMap).length > 0
+            const baseOpts = { syncGroupsToUserTags, removeAccessWithoutGroup: removeAccess }
             if (!hasSavedManagementToken) {
                 const t = editApiToken.trim()
                 resp = await settingRequests.saveOktaGroupRoleMapping(
@@ -213,6 +217,8 @@ function OktaIntegration() {
             }
             setManagementApiTokenMasked(managementApiTokenMaskedFromResponse(resp))
             setSavedOktaGroupToAktoUserRoleMap({ ...oktaGroupToAktoUserRoleMap })
+            setRemoveAccessWithoutGroup(removeAccess)
+            setSavedToggles({ syncGroupsToUserTags, removeAccessWithoutGroup: removeAccess })
             setEditMode(false)
             resetMappingDraft()
             setEditApiToken('')
@@ -226,6 +232,8 @@ function OktaIntegration() {
 
     const handleCancelEdit = () => {
         setOktaGroupToAktoUserRoleMap({ ...savedOktaGroupToAktoUserRoleMap })
+        setSyncGroupsToUserTags(savedToggles.syncGroupsToUserTags)
+        setRemoveAccessWithoutGroup(savedToggles.removeAccessWithoutGroup)
         setEditMode(false)
         setEditApiToken('')
         setOktaGroupNames([])
@@ -341,6 +349,17 @@ function OktaIntegration() {
                     {hasSavedManagementToken
                         ? 'Required for the group sync setting below.'
                         : 'Set a token to unlock the group sync setting below.'}
+                </Text>
+            </HorizontalStack>
+            <HorizontalStack gap="2" blockAlign="center" wrap>
+                <Text variant="bodySm" fontWeight="semibold" color="subdued">Roles from Okta groups</Text>
+                <Badge status={savedToggles.removeAccessWithoutGroup ? 'success' : 'info'}>
+                    {savedToggles.removeAccessWithoutGroup ? 'On' : 'Off'}
+                </Badge>
+                <Text variant="bodySm" color="subdued">
+                    {savedToggles.removeAccessWithoutGroup
+                        ? 'Roles are set from the mapped groups on every login.'
+                        : 'Off — logins keep users\' roles as they are.'}
                 </Text>
             </HorizontalStack>
             {hasSavedManagementToken && (
@@ -476,10 +495,18 @@ function OktaIntegration() {
             />
             <Checkbox
                 label="Manage roles from Okta groups on every login"
-                checked={removeAccessWithoutGroup}
+                checked={removeAccessWithoutGroup && Object.keys(oktaGroupToAktoUserRoleMap).length > 0}
                 onChange={setRemoveAccessWithoutGroup}
-                helpText="On each Okta login, users get the mapped role for every product (the most privileged if they are in several groups), and users in none of the mapped groups get no access. Admins are never changed. Off: logins work as before."
+                disabled={Object.keys(oktaGroupToAktoUserRoleMap).length === 0}
+                helpText={Object.keys(oktaGroupToAktoUserRoleMap).length === 0
+                    ? "Map at least one Okta group to a role first."
+                    : "On each Okta login, users get the mapped role for every product (the most privileged if they are in several groups), and users in none of the mapped groups get no access. Admins are never changed. Off: logins work as before."}
             />
+            {removeAccessWithoutGroup && Object.keys(oktaGroupToAktoUserRoleMap).length > 0 ? (
+                <Banner status="warning">
+                    <p>Users who are in none of the mapped Okta groups lose access at their next login.</p>
+                </Banner>
+            ) : null}
             <HorizontalStack align="end" gap="2">
                 <Button onClick={handleCancelEdit}>Cancel</Button>
                 <Button primary loading={savingSettings} onClick={handleSaveSettings}>Save</Button>

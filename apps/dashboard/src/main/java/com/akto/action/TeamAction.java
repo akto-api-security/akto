@@ -456,6 +456,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         passwordResetToken = PasswordResetUtils.insertPasswordResetToken(userEmail, websiteHostName);
 
         if(passwordResetToken == null || passwordResetToken.isEmpty()) {
+            addActionError("Couldn't create the reset link. Please try again.");
             return Action.ERROR.toUpperCase();
         }
 

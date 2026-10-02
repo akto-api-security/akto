@@ -1,487 +1,205 @@
-import { Box, Button, Collapsible, Divider, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Tag, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
+import { Badge, Banner, Box, EmptyState, Form, FormLayout, HorizontalStack, LegacyCard, Modal, Page, ResourceItem, ResourceList, Select, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import func from "@/util/func";
 import settingRequests from "../api";
-import ResourceListModal from "../../../components/shared/ResourceListModal";
-import { usersCollectionRenderItem } from "../rbac/utils";
-import PersistStore from "../../../../main/PersistStore";
-import SearchableResourceList from "../../../components/shared/SearchableResourceList";
-import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import Dropdown from "../../../components/layouts/Dropdown";
-
-const rolesOptions = [
-    {
-        label: 'Admin',
-        value: 'ADMIN',
-    },
-    {
-        label: 'Security Engineer',
-        value: 'MEMBER',
-    },
-    {
-        label: 'Developer',
-        value: 'DEVELOPER',
-    },
-    {
-        label: 'Guest',
-        value: 'GUEST',
-    },
-    {
-        label: 'Threat Engineer',
-        value: 'THREAT_ENGINEER',
-    },
-    {
-        label: 'Threat Viewer',
-        value: 'THREAT_VIEWER',
-    }]
-
-function getRoleDisplayName(role) {
-    for (const item of rolesOptions) {
-        if (item.value === role) {
-            return item.label
-        }
-    }
-    return role
-}
+import { rolesOptions, getRoleDisplayName, collectionsSummary, usageSummary, roleNameError } from "./roleUtils";
 
 export { rolesOptions, getRoleDisplayName }
 
+export const roleDetailsUrl = (name) => `/dashboard/settings/roles/details?name=${encodeURIComponent(name)}`
+
 /*
- * Base roles that decide threat access themselves - admin and the threat roles always
- * have it, guest never does. The backend ignores the toggle for these too, so showing
- * it would imply a control that does not exist.
+ * New role, or a copy of an existing one. A copy keeps everything except the name and "default for invites".
  */
-const FIXED_THREAT_BASE_ROLES = ['ADMIN', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER']
+export function CreateRoleModal({ open, onClose, source, existingNames, onCreated }) {
+    const [name, setName] = useState('')
+    const [baseRole, setBaseRole] = useState('GUEST')
+    const [touched, setTouched] = useState(false)
+    const [saving, setSaving] = useState(false)
 
-function showThreatToggle(role) {
-    return !FIXED_THREAT_BASE_ROLES.includes(role?.baseRole)
-}
+    useEffect(() => {
+        if (open) {
+            setName(source ? `${source.name}_COPY` : '')
+            setBaseRole(source?.baseRole || 'GUEST')
+            setTouched(false)
+        }
+    }, [open, source])
 
-function threatEnabledFor(role) {
-    return role?.threatProtectionEnabled === true
-}
+    const error = roleNameError(name, existingNames)
 
-// never persist a choice for a base role that decides on its own
-function threatValueToSave(role) {
-    return showThreatToggle(role) && threatEnabledFor(role)
-}
-
-// an empty feature map means a self-hosted deployment, where everything is granted
-function isThreatFeatureGranted() {
-    const stiggFeatures = window?.STIGG_FEATURE_WISE_ALLOWED
-    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
-        return true
-    }
-    return stiggFeatures?.THREAT_DETECTION?.isGranted === true
-}
-
-// Permissions an admin can change per custom role; anything not changed keeps the base role's access
-const PERMISSION_FEATURES = [
-    { feature: 'INVITE_MEMBERS', label: 'Invite users and change their roles' },
-    { feature: 'THREAT_PROTECTION', label: 'Threat protection and guardrail activity' },
-    { feature: 'THREAT_SETTINGS', label: 'Threat settings and data retention' },
-    { feature: 'AI_AGENTS', label: 'AI agents' },
-    { feature: 'API_COLLECTIONS', label: 'API collections and inventory' },
-    { feature: 'SENSITIVE_DATA', label: 'Sensitive data' },
-    { feature: 'SAMPLE_DATA', label: 'Request and response samples' },
-    { feature: 'START_TEST_RUN', label: 'Run tests' },
-    { feature: 'TEST_RESULTS', label: 'Test results' },
-    { feature: 'ISSUES', label: 'Issues' },
-    { feature: 'INTEGRATIONS', label: 'Integrations' },
-    { feature: 'API_TOKENS', label: 'API tokens' },
-]
-
-const ROLE_DEFAULT = 'ROLE_DEFAULT'
-const accessOptions = [
-    { label: 'Base role default', value: ROLE_DEFAULT },
-    { label: 'No access', value: 'NO_ACCESS' },
-    { label: 'Read', value: 'READ' },
-    { label: 'Read and write', value: 'READ_WRITE' },
-]
-
-const Roles = () => {
-
-    const threatFeatureGranted = isThreatFeatureGranted()
-
-    const userRole = window.USER_ROLE
-    const isLocalDeploy = func.checkLocal();
-    const [roles, setRoles] = useState([])
-    const [tempRoles, setTempRoles] = useState([])
-    const [allCollections, setAllCollections] = useState([])
-    const [loading, setLoading] = useState(false)
-    const collectionsMap = PersistStore(state => state.collectionsMap)
-    const [createNewRoleModalActive, setCreateNewRoleModalActive] = useState(false)
-
-    const toggleInviteUserModal = () => {
-        setCreateNewRoleModalActive(!createNewRoleModalActive)
-    }
-
-    const getRoleData = async () => {
+    const create = async () => {
+        setTouched(true)
+        if (error) return
+        setSaving(true)
         try {
-            setLoading(true);
-            const roleResponse = await settingRequests.getCustomRoles()
-            if (roleResponse && roleResponse.roles) {
-                setRoles(roleResponse.roles)
-                setTempRoles(roleResponse.roles)
-            }
-            setLoading(false)
-        } catch (error) {
-            setLoading(false)
+            const roleName = name.trim().toUpperCase()
+            await settingRequests.createCustomRole(source?.apiCollectionsId || [], roleName, baseRole, false, false, source ? {
+                permissionOverrides: source.permissionOverrides || {},
+                collectionRules: source.collectionRules || [],
+                assignableRoles: source.assignableRoles || [],
+                threatProtectionEnabled: source.threatProtectionEnabled === true,
+            } : {})
+            func.setToast(true, false, source ? `${roleName} created from ${source.name}` : `${roleName} created`)
+            onCreated(roleName)
+        } catch (e) {
+            // the server's message is already shown
+        } finally {
+            setSaving(false)
         }
-    };
-
-    useEffect(() => {
-        if (userRole !== 'GUEST') {
-            getRoleData();
-        }
-
-    }, [])
-
-    // collectionsMap loads asynchronously, so this cannot be a mount-only effect
-    useEffect(() => {
-        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
-            id: parseInt(id, 10),
-            collectionName
-        })));
-    }, [collectionsMap])
-
-    const getRoleItems = (role, key) => {
-        return roles.filter(r => r.name === role)[0][key] || []
-    };
-
-    // drop ids for collections that are deleted or deactivated; the picker cannot list them
-    const selectable = (ids) => ids.filter((id) => id in collectionsMap);
-
-    const handleSelectedItemsChange = (role, items, key) => {
-        setRoles(prevRoles => {
-            return prevRoles.map(r => {
-                if (r.name === role) {
-                    return {
-                        ...r,
-                        [key]: items
-                    }
-                }
-                return r;
-            })
-        })
-    }
-
-    const updateBaseRole = (role, baseRole) => {
-        setRoles(prevRoles => {
-            return prevRoles.map(r => {
-                if (r.name === role) {
-                    return {
-                        ...r,
-                        baseRole: baseRole
-                    }
-                }
-                return r;
-            })
-        })
-    }
-
-    const updateThreatProtection = (role, value) => {
-        setRoles(prevRoles => {
-            return prevRoles.map(r => {
-                if (r.name === role) {
-                    return {
-                        ...r,
-                        threatProtectionEnabled: value
-                    }
-                }
-                return r;
-            })
-        })
-    }
-
-    const updatePermission = (role, feature, access) => {
-        setRoles(prevRoles => {
-            return prevRoles.map(r => {
-                if (r.name === role) {
-                    const permissionOverrides = { ...(r.permissionOverrides || {}) }
-                    if (access === ROLE_DEFAULT) {
-                        delete permissionOverrides[feature]
-                    } else {
-                        permissionOverrides[feature] = access
-                    }
-                    return {
-                        ...r,
-                        permissionOverrides
-                    }
-                }
-                return r;
-            })
-        })
-    }
-
-    const updateCollectionRules = (role, collectionRules) => {
-        setRoles(prevRoles => prevRoles.map(r => r.name === role ? { ...r, collectionRules } : r))
-    }
-
-    const toggleAssignableRole = (role, otherRole, checked) => {
-        setRoles(prevRoles => prevRoles.map(r => {
-            if (r.name !== role) return r
-            const current = (r.assignableRoles || []).filter(x => x !== otherRole)
-            return { ...r, assignableRoles: checked ? [...current, otherRole] : current }
-        }))
-    }
-
-    // roles a team admin may give: limited to collections and not based on Admin (the backend enforces the same)
-    const isGivableByTeamAdmin = (r) => r.baseRole !== 'ADMIN' &&
-        ((r.apiCollectionsId || []).length > 0 || (r.collectionRules || []).length > 0)
-
-    const [permissionsOpen, setPermissionsOpen] = useState(false)
-    const changedPermissionsCount = (r) => Object.keys(r?.permissionOverrides || {}).length
-
-    const [newHostPattern, setNewHostPattern] = useState('')
-    const [newTag, setNewTag] = useState('')
-
-    const addCollectionRule = (role, currentRules) => {
-        const host = newHostPattern.trim()
-        const tag = newTag.trim()
-        if ((host.length > 0) === (tag.length > 0)) {
-            func.setToast(true, true, "Enter either a host pattern or a tag")
-            return
-        }
-        let rule = { hostRegex: host }
-        if (tag.length > 0) {
-            const [tagKey, ...rest] = tag.split('=')
-            rule = { tagKey: tagKey.trim(), tagValue: rest.join('=').trim() }
-        }
-        updateCollectionRules(role, [...(currentRules || []), rule])
-        setNewHostPattern('')
-        setNewTag('')
-    }
-
-    const updateDefaultInviteRole = (role, value) => {
-        setRoles(prevRoles => {
-            return prevRoles.map(r => {
-                if (r.name === role) {
-                    return {
-                        ...r,
-                        defaultInviteRole: value
-                    }
-                }
-                return r;
-            })
-        })
-    }
-
-    const handleUpdate = async (role) => {
-        const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {}, roleData.collectionRules || [],
-            (roleData.assignableRoles || []).filter(r => tempRoles.some(t => t.name === r && isGivableByTeamAdmin(t))))
-        await getRoleData();
-    }
-
-    const handleClose = () => {
-        setRoles(tempRoles)
-        setNewHostPattern('')
-        setNewTag('')
-        setPermissionsOpen(false)
-    }
-
-    const [newRoleName, setNewRoleName] = useState('')
-
-    const handleNewRoleNameUpdate = (val) => {
-        setNewRoleName(val)
-    }
-
-    const handleCreateNewRole = async () => {
-        await settingRequests.createCustomRole([], newRoleName, "GUEST")
-        setNewRoleName('')
-        toggleInviteUserModal();
-        await getRoleData();
     }
 
     return (
+        <Modal
+            open={open}
+            onClose={onClose}
+            title={source ? `Copy ${source.name}` : "Create role"}
+            primaryAction={{ content: source ? 'Create copy' : 'Create', onAction: create, loading: saving }}
+            secondaryActions={[{ content: 'Cancel', onAction: onClose }]}
+        >
+            <Modal.Section>
+                <Form onSubmit={create}>
+                    <FormLayout>
+                        <TextField
+                            label="Role name"
+                            value={name}
+                            onChange={(value) => { setName(value); setTouched(true) }}
+                            helpText="Letters, numbers, - and _. Saved in capitals."
+                            error={touched && error ? error : undefined}
+                            autoComplete="off"
+                            autoFocus
+                        />
+                        <Select
+                            label="Start from"
+                            options={rolesOptions}
+                            value={baseRole}
+                            onChange={setBaseRole}
+                            helpText={source ? "Collections, rules and permission changes are copied too." : "The role gets this built-in role's permissions. You can change them next."}
+                        />
+                    </FormLayout>
+                </Form>
+            </Modal.Section>
+        </Modal>
+    )
+}
+
+const Roles = () => {
+    const navigate = useNavigate()
+    const userRole = window.USER_ROLE
+    const isLocalDeploy = func.checkLocal()
+    const canEdit = userRole === 'ADMIN' && !isLocalDeploy
+
+    const [roles, setRoles] = useState([])
+    const [roleUsage, setRoleUsage] = useState({})
+    const [loading, setLoading] = useState(false)
+    const [loadFailed, setLoadFailed] = useState(null) // null, or why loading failed
+    const [createModal, setCreateModal] = useState({ open: false, source: null })
+
+    const loadRoles = async () => {
+        setLoading(true)
+        setLoadFailed(null)
+        try {
+            const response = await settingRequests.getCustomRoles()
+            setRoles(response?.roles || [])
+            setRoleUsage(response?.roleUsage || {})
+        } catch (e) {
+            setLoadFailed(e?.response?.status === 403 ? "You don't have access to roles in this product." : "Check your connection and try again.")
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect(() => {
+        if (userRole !== 'GUEST') {
+            loadRoles()
+        }
+    }, [])
+
+    const existingNames = roles.map(r => r.name)
+
+    const createDisabledReason = isLocalDeploy ? "Custom roles aren't available on local deployments."
+        : userRole !== 'ADMIN' ? "Only admins can create roles." : null
+
+    const renderItem = (role) => {
+        const changes = Object.keys(role.permissionOverrides || {}).length
+        return (
+            <ResourceItem
+                id={role.name}
+                onClick={() => navigate(roleDetailsUrl(role.name))}
+                accessibilityLabel={`Open ${role.name}`}
+                shortcutActions={canEdit ? [{ content: 'Copy', accessibilityLabel: `Copy ${role.name}`, onAction: () => setCreateModal({ open: true, source: role }) }] : []}
+                persistActions
+            >
+                <HorizontalStack align="space-between" blockAlign="center" gap="4">
+                    <VerticalStack gap="2">
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <Text variant="bodyMd" fontWeight="semibold" as="h3">{role.name}</Text>
+                            {role.defaultInviteRole ? <Badge status="info">Default for invites</Badge> : null}
+                        </HorizontalStack>
+                        <HorizontalStack gap="2">
+                            <Badge>{`Based on ${getRoleDisplayName(role.baseRole)}`}</Badge>
+                            <Badge>{collectionsSummary(role)}</Badge>
+                            {changes > 0 ? <Badge status="attention">{`${changes} permission change${changes === 1 ? '' : 's'}`}</Badge> : null}
+                        </HorizontalStack>
+                    </VerticalStack>
+                    <Box paddingInlineEnd="4">
+                        <Text variant="bodySm" color="subdued">{usageSummary(roleUsage[role.name])}</Text>
+                    </Box>
+                </HorizontalStack>
+            </ResourceItem>
+        )
+    }
+
+    const emptyState = (
+        <EmptyState
+            heading="No custom roles yet"
+            action={canEdit ? { content: 'Create role', onAction: () => setCreateModal({ open: true, source: null }) } : undefined}
+            image="/public/images/emptystate-files.png"
+        >
+            <p>Custom roles start from a built-in role. You can change what they can do and limit them to some collections.</p>
+        </EmptyState>
+    )
+
+    return (
         <Page
-            title="Custom roles"
+            title="Roles"
+            subtitle="Custom roles start from a built-in role. Change what they can do and which collections they see."
             primaryAction={{
-                content: 'Create new role',
-                onAction: () => toggleInviteUserModal(),
-                'disabled': (isLocalDeploy || userRole !== 'ADMIN')
+                content: 'Create role',
+                onAction: () => setCreateModal({ open: true, source: null }),
+                disabled: createDisabledReason !== null,
+                helpText: createDisabledReason || undefined,
             }}
             divider
         >
-            <Modal
-                open={createNewRoleModalActive}
-                onClose={toggleInviteUserModal}
-                title="Create new role"
-                primaryAction={{
-                    content: 'Create',
-                    onAction: () => { handleCreateNewRole() },
-                    'disabled': newRoleName.length === 0
+            <VerticalStack gap="4">
+                {loadFailed ? (
+                    <Banner status="critical" title="Couldn't load roles" action={{ content: 'Try again', onAction: loadRoles }}>
+                        <p>{loadFailed}</p>
+                    </Banner>
+                ) : null}
+                <LegacyCard>
+                    <ResourceList
+                        resourceName={{ singular: 'role', plural: 'roles' }}
+                        items={roles}
+                        renderItem={renderItem}
+                        loading={loading}
+                        emptyState={!loading && !loadFailed ? emptyState : undefined}
+                        showHeader={roles.length > 0}
+                        headerContent={`${roles.length} role${roles.length === 1 ? '' : 's'}`}
+                    />
+                </LegacyCard>
+            </VerticalStack>
+            <CreateRoleModal
+                open={createModal.open}
+                source={createModal.source}
+                existingNames={existingNames}
+                onClose={() => setCreateModal({ open: false, source: null })}
+                onCreated={(roleName) => {
+                    setCreateModal({ open: false, source: null })
+                    navigate(roleDetailsUrl(roleName))
                 }}
-                secondaryActions={[
-                    {
-                        content: 'Cancel',
-                        onAction: toggleInviteUserModal
-                    }
-                ]}
-            >
-                <Box padding={8}>
-                    <TextField onChange={val => handleNewRoleNameUpdate(val)} value={newRoleName} />
-                </Box>
-            </Modal>
-            <LegacyCard>
-                <ResourceList
-                    resourceName={{ singular: 'role', plural: 'roles' }}
-                    items={roles}
-                    renderItem={(item) => {
-                        const { name, baseRole, defaultInviteRole } = item;
-                        const shortcutActions = [
-                            {
-                                content: (
-                                    <ResourceListModal
-                                        title={`Update ${name} role`}
-                                        activatorPlaceaholder={`${selectable(getRoleItems(name, "apiCollectionsId")).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
-                                        isColoredActivator={true}
-                                        component={<VerticalStack gap={4}>
-                                            <Box paddingBlockStart={4}>
-                                                <HorizontalStack gap={6} align="center" blockAlign="center">
-                                                    <OperatorDropdown
-                                                        items={rolesOptions}
-                                                        label={getRoleDisplayName(baseRole)}
-                                                        designer={true}
-                                                        selected={(value) => {
-                                                            updateBaseRole(name, value)
-                                                        }}
-                                                    />
-                                                    <Checkbox
-                                                        label={"Default invite role"}
-                                                        checked={defaultInviteRole}
-                                                        onChange={(checked) => { updateDefaultInviteRole(name, checked) }}
-                                                    />
-                                                    {showThreatToggle(item) ? (
-                                                        <Checkbox
-                                                            label={"Enable threat protection"}
-                                                            checked={threatEnabledFor(item)}
-                                                            disabled={!threatFeatureGranted}
-                                                            onChange={(checked) => { updateThreatProtection(name, checked) }}
-                                                        />
-                                                    ) : null}
-                                                </HorizontalStack>
-                                            </Box>
-                                            <Box padding={4}>
-                                                <VerticalStack gap="4">
-                                                    <Divider />
-                                                    <VerticalStack gap="3">
-                                                        <HorizontalStack align="space-between" blockAlign="center">
-                                                            <VerticalStack gap="1">
-                                                                <Text variant="headingSm" as="h4">Permissions</Text>
-                                                                <Text variant="bodySm" color="subdued">
-                                                                    {changedPermissionsCount(item) > 0
-                                                                        ? `${changedPermissionsCount(item)} changed from the base role`
-                                                                        : "Same as the base role"}
-                                                                </Text>
-                                                            </VerticalStack>
-                                                            <Button plain disclosure={permissionsOpen ? "up" : "down"} onClick={() => setPermissionsOpen(!permissionsOpen)}>
-                                                                {permissionsOpen ? "Hide" : "Change"}
-                                                            </Button>
-                                                        </HorizontalStack>
-                                                        <Collapsible open={permissionsOpen} id={`permissions-${name}`}>
-                                                            <Box borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="3">
-                                                                <VerticalStack gap="3">
-                                                                    {PERMISSION_FEATURES.map(({ feature, label }) => (
-                                                                        <HorizontalStack key={feature} align="space-between" blockAlign="center" wrap={false} gap="4">
-                                                                            <Text variant="bodyMd">{label}</Text>
-                                                                            <Box width="220px">
-                                                                                <Dropdown
-                                                                                    id={`permission-${name}-${feature}`}
-                                                                                    menuItems={accessOptions}
-                                                                                    initial={item?.permissionOverrides?.[feature] || ROLE_DEFAULT}
-                                                                                    selected={(access) => updatePermission(name, feature, access)}
-                                                                                />
-                                                                            </Box>
-                                                                        </HorizontalStack>
-                                                                    ))}
-                                                                </VerticalStack>
-                                                            </Box>
-                                                        </Collapsible>
-                                                    </VerticalStack>
-                                                    <Divider />
-                                                    <VerticalStack gap="2">
-                                                        <Text variant="headingSm" as="h4">Roles this role can give</Text>
-                                                        <Text variant="bodySm" color="subdued">For team admins: users of this role can invite people and change roles only to these roles, and only for users who already have one of them.</Text>
-                                                        {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).length === 0 ? (
-                                                            <Text variant="bodySm" color="subdued">No other roles limited to collections yet.</Text>
-                                                        ) : (
-                                                            <HorizontalStack gap="4" wrap>
-                                                                {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).map(r => (
-                                                                    <Checkbox key={r.name} label={r.name}
-                                                                        checked={(item.assignableRoles || []).includes(r.name)}
-                                                                        onChange={(checked) => toggleAssignableRole(name, r.name, checked)} />
-                                                                ))}
-                                                            </HorizontalStack>
-                                                        )}
-                                                    </VerticalStack>
-                                                    <Divider />
-                                                    <VerticalStack gap="2">
-                                                        <Text variant="headingSm" as="h4">Also include collections matching</Text>
-                                                        <Text variant="bodySm" color="subdued">Collections added later that match a rule are included automatically.</Text>
-                                                        {(item.collectionRules || []).length > 0 ? (
-                                                            <HorizontalStack gap="2" wrap>
-                                                                {item.collectionRules.map((rule, index) => (
-                                                                    <Tag key={index} onRemove={() => updateCollectionRules(name, item.collectionRules.filter((_, i) => i !== index))}>
-                                                                        {rule.hostRegex ? `Host matches ${rule.hostRegex}` : `Tag ${rule.tagKey} = ${rule.tagValue}`}
-                                                                    </Tag>
-                                                                ))}
-                                                            </HorizontalStack>
-                                                        ) : null}
-                                                        <HorizontalStack gap="3" blockAlign="end" wrap={false}>
-                                                            <Box width="100%">
-                                                                <TextField label="Host pattern (regex)" value={newHostPattern} onChange={setNewHostPattern} placeholder="^team-a-.*" autoComplete="off" />
-                                                            </Box>
-                                                            <Box width="100%">
-                                                                <TextField label="Or tag" value={newTag} onChange={setNewTag} placeholder="team=team-a" autoComplete="off" />
-                                                            </Box>
-                                                            <Button onClick={() => addCollectionRule(name, item.collectionRules)}>Add</Button>
-                                                        </HorizontalStack>
-                                                    </VerticalStack>
-                                                    <Divider />
-                                                </VerticalStack>
-                                            </Box>
-                                            <Box>
-                                                <SearchableResourceList
-                                                    resourceName={'collection'}
-                                                    items={allCollections}
-                                                    renderItem={usersCollectionRenderItem}
-                                                    isFilterControlEnabale={userRole === 'ADMIN'}
-                                                    selectable={userRole === 'ADMIN'}
-                                                    onSelectedItemsChange={(items) => handleSelectedItemsChange(name, items, 'apiCollectionsId')}
-                                                    alreadySelectedItems={selectable(getRoleItems(name, "apiCollectionsId"))}
-                                                />
-                                            </Box>
-                                        </VerticalStack>}
-                                        primaryAction={() => { handleUpdate(name) }}
-                                        secondaryAction={() => { handleClose() }}
-                                        showDeleteAction={true}
-                                        deleteAction={async () => { await settingRequests.deleteCustomRole(name); await getRoleData() }}
-                                    />
-
-                                )
-                            }
-                        ]
-
-                        return (
-                            <ResourceItem
-                                id={name}
-                                shortcutActions={shortcutActions}
-                                persistActions
-                            >
-                                <Text variant="bodyMd" fontWeight="bold" as="h3">
-                                    {name}
-                                </Text>
-                            </ResourceItem>
-                        );
-                    }}
-                    headerContent={`Showing ${roles.length} role${roles.length > 1 ? 's' : ''}`}
-                    showHeader
-                    loading={loading}
-                />
-            </LegacyCard>
-
+            />
         </Page>
     )
 }

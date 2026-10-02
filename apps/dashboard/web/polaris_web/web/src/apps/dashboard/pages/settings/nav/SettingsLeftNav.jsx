@@ -29,7 +29,7 @@ const SettingsLeftNav = () => {
     const roleArr = window.USER_ROLE === 'ADMIN' && rbacAccess && rbacAccessAdvanced ? [{
         label: 'Roles',
         icon: ProfileMajor,
-        selected: page === "roles",
+        selected: page === "roles" || path.includes("/settings/roles/"),
         onClick: () => navigate("/dashboard/settings/roles")
     }] : []
 

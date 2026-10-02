@@ -1,17 +1,17 @@
-import {  Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, ResourceItem, ResourceList, Text, Modal, TextField, Checkbox, VerticalStack } from "@shopify/polaris"
-import SingleDate from "../../../components/layouts/SingleDate"
-import { DeleteMajor, PasskeyMajor } from "@shopify/polaris-icons"
-import { useEffect, useState, useRef, useMemo } from "react";
+import { Avatar, Badge, Banner, HorizontalStack, LegacyCard, Link, Modal, Page, ResourceItem, ResourceList, Text, VerticalStack } from "@shopify/polaris"
+import { useEffect, useMemo, useState } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import InviteUserModal from "./InviteUserModal";
-import Dropdown from "../../../components/layouts/Dropdown";
+import EditAccessModal from "./EditAccessModal";
 import PersistStore from "../../../../main/PersistStore";
 import { categoryToShortName, getDashboardCategory } from "../../../../main/labelHelper";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
-import ResourceListModal from "../../../components/shared/ResourceListModal";
 import observeApi from "../../observe/api";
 import { usersCollectionRenderItem } from "../rbac/utils";
+import { getRoleDisplayName } from "../roles/roleUtils";
+
+const NO_COLLECTION_ID = -2147483648 // placeholder the server uses for "no collections"; never a real grant
 
 /**
  * Gets available product scopes based on user's feature access.
@@ -44,726 +44,302 @@ const getAvailableProductScopes = () => {
     return scopes
 }
 
+const BUILT_IN_ROLES = ['ADMIN', 'MEMBER', 'DEVELOPER', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER', 'NO_ACCESS']
+const PAID_ROLES = ['DEVELOPER', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER']
+const roleLabel = (role) => role === 'NO_ACCESS' ? 'No access' : getRoleDisplayName(role === 'SECURITY ENGINEER' ? 'MEMBER' : role)
+
 const Users = () => {
-    // Get available scopes based on user's feature access
     const PRODUCT_SCOPES = useMemo(() => getAvailableProductScopes(), [])
     const username = window.USER_NAME
     const userRole = window.USER_ROLE
-
-    const [inviteUser, setInviteUser] = useState({
-        isActive: false,
-        state: "initial", // initial, loading, success
-        email: "",
-        inviteLink: "",
-    })
-
-    const [loading, setLoading] = useState(false)
-    const [users, setUsers] = useState([])
-    const [usersCollection, setUsersCollection] = useState([])
-    const [roleHierarchy, setRoleHierarchy] = useState([])
-    const [allCollections, setAllCollections] = useState([])
-    let rbacAccess = func.checkForRbacFeatureBasic();
-    let rbacAccessAdvanced =  func.checkForRbacFeature()
+    const isAdmin = userRole === 'ADMIN'
+    const isLocalDeploy = func.checkLocal()
+    const rbacAccess = func.checkForRbacFeatureBasic()
+    const rbacAccessAdvanced = func.checkForRbacFeature()
+    const currentProduct = categoryToShortName[getDashboardCategory()] || "API"
+    const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
+    const isOnPrem = !notOnPremHostnames.includes(window.location.hostname)
 
     const collectionsMap = PersistStore(state => state.collectionsMap)
-
-    const [selectedItems, setSelectedItems] = useState({})
-
-    const handleSelectedItems = (id, items) => {
-        setSelectedItems(prevSelectedItems => ({
-            ...prevSelectedItems,
-            [id]: items
-        }));
-    }
-    const [passwordResetState, setPasswordResetState] = useState({
-        passwordResetLogin: "",
-        confirmPasswordResetActive: false,
-        passwordResetLinkActive: false,
-        passwordResetLink: ""
-    })
-
-    const setPasswordResetStateHelper = (field, value) => {
-        setPasswordResetState(prevState => ({
-            ...prevState,
-            [field]: value
-        }))
-    }
-
-    const [editScopeRoleModal, setEditScopeRoleModal] = useState({
-        isActive: false,
-        userId: null,
-        email: "",
-        name: "",
-        currentRole: "",
-        currentScopeRoleMapping: {},
-        editingScopeRoleMapping: {},
-        accessExpiresOn: "", // YYYY-MM-DD, empty = never
-        isSimpleRole: false // true if user only has simple role, false if has scopeRoleMapping
-    })
-
-    const ref = useRef(null)
-
-    const resetPassword = async () => {
-        await settingRequests.resetUserPassword(passwordResetState.passwordResetLogin).then((resetPasswordLink) => {
-            setPasswordResetStateHelper("passwordResetLinkActive", true)
-            setPasswordResetStateHelper("passwordResetLink", resetPasswordLink)
-        })
-    }
-
-    const closePasswordResetToggle = () => {
-        setPasswordResetStateHelper("passwordResetLinkActive", false)
-        setPasswordResetStateHelper("confirmPasswordResetActive", false)
-        setPasswordResetStateHelper("passwordResetLink", "")
-    }
-
-    const handleCopyPasswordResetLink = () => {
-        func.copyToClipboard(passwordResetState.passwordResetLink, ref, "Password reset link copied to clipboard")
-    }
-
-    // Get the current user's accessible scopes from their scopeRoleMapping
-    const getCurrentUserAccessibleScopes = useMemo(() => {
-        if (!users || users.length === 0) {
-            return PRODUCT_SCOPES
-        }
-
-        // Find the current user from the users list
-        const currentUser = users.find(user => user.login === username)
-
-        // If current user doesn't have scopeRoleMapping, return all PRODUCT_SCOPES
-        if (!currentUser || !currentUser.scopeRoleMapping || Object.keys(currentUser.scopeRoleMapping).length === 0) {
-            return PRODUCT_SCOPES
-        }
-
-        // Filter PRODUCT_SCOPES to only include scopes the current user has access to
-        const userScopeValues = Object.keys(currentUser.scopeRoleMapping)
-        return PRODUCT_SCOPES.filter(scope => userScopeValues.includes(scope.value))
-    }, [users, PRODUCT_SCOPES, username])
-
+    const [loading, setLoading] = useState(false)
+    const [loadFailed, setLoadFailed] = useState(null) // null, or why loading failed
+    const [users, setUsers] = useState([])
+    const [usersCollection, setUsersCollection] = useState({})
+    const [allowedRoles, setAllowedRoles] = useState([]) // roles the caller may give, from the server
     const [customRoles, setCustomRoles] = useState([])
     const [defaultInviteRole, setDefaultInviteRole] = useState('MEMBER')
+    const [inviteOpen, setInviteOpen] = useState(false)
+    const [editing, setEditing] = useState(null)
+    const [collectionsFor, setCollectionsFor] = useState(null) // { user, selected }
 
-    let paidFeatureRoleOptions =  rbacAccess ? [
-        {
-            content: 'Developer',
-            role: 'DEVELOPER',
-        },
-        {
-            content: 'Guest',
-            role: 'GUEST',
-        },
-        {
-            content: 'Threat Engineer',
-            role: 'THREAT_ENGINEER',
-        },
-        {
-            content: 'Threat Viewer',
-            role: 'THREAT_VIEWER',
-        }, ...customRoles
-    ] : []
-
-    const websiteHostName = window.location.origin
-    const notOnPremHostnames = ["app.akto.io", "localhost", "127.0.0.1", "[::1]"]
-    const isOnPrem = websiteHostName && !notOnPremHostnames.includes(window.location.hostname)
-
-    let rolesOptions = [
-        {
-            items: [
-            {
-                content: 'Admin',
-                role: 'ADMIN',
-            },
-            {
-                content: 'Member',
-                role: 'MEMBER',
-            }, ...paidFeatureRoleOptions,
-            {
-                content: 'No Access',
-                role: 'NO_ACCESS',
-            }]
-        },
-        {
-            items: [
-                isOnPrem && {
-                    destructive: false,
-                    content: 'Reset Password',
-                    role: 'RESET_PASSWORD',
-                    icon: PasskeyMajor
-                },
-                {
-                    destructive: true,
-                    content: 'Remove',
-                    role: 'REMOVE',
-                    icon: DeleteMajor
-                }
-            ]
+    const loadRoles = async () => {
+        try {
+            let hierarchy = await settingRequests.getRoleHierarchy() || []
+            // team admins (users limited to collections) can only give the roles their custom role lists
+            const assignable = await settingRequests.fetchAssignableRoles().catch(() => ({}))
+            const teamAdminRoles = assignable?.assignableRoles
+            const rolesResponse = await settingRequests.getCustomRoles().catch(() => ({}))
+            const roles = rolesResponse?.roles || []
+            setCustomRoles(roles)
+            const defaultRole = roles.find(r => r.defaultInviteRole)
+            if (defaultRole) setDefaultInviteRole(defaultRole.name)
+            if (Array.isArray(teamAdminRoles)) {
+                setAllowedRoles([...teamAdminRoles, 'NO_ACCESS'])
+            } else {
+                const customAllowed = roles.filter(r => hierarchy.includes(r.baseRole)).map(r => r.name)
+                setAllowedRoles([...hierarchy, ...customAllowed, 'NO_ACCESS'])
+            }
+        } catch (e) {
+            setAllowedRoles(['NO_ACCESS'])
         }
-    ]
+    }
 
-    // Filtered role options based on roleHierarchy - for use in both Edit Access and Invite modals
-    const filteredRoleOptions = useMemo(() => {
-        return rolesOptions[0]?.items?.map((item) => ({
-            label: item?.content,
-            value: item?.role,
-        })).filter((item) => roleHierarchy.includes(item.value)) || []
-    }, [roleHierarchy, rolesOptions])
-
-    const getRoleHierarchy = async() => {
-        let roleHierarchyResp = await settingRequests.getRoleHierarchy()
-        if(roleHierarchyResp.includes("MEMBER")){
-            roleHierarchyResp.push("SECURITY ENGINEER")
+    const loadUsers = async () => {
+        setLoading(true)
+        setLoadFailed(null)
+        try {
+            const team = await settingRequests.getTeamData()
+            setUsers(team || [])
+            if (isAdmin && rbacAccessAdvanced) {
+                const collections = await observeApi.getAllUsersCollections().catch(() => ({}))
+                setUsersCollection(collections || {})
+            }
+        } catch (e) {
+            setLoadFailed(e?.response?.status === 403 ? "You don't have access to users in this product." : "Check your connection and try again.")
+        } finally {
+            setLoading(false)
         }
-        if(window.USER_ROLE === 'ADMIN'){
-            roleHierarchyResp.push('REMOVE')
-            roleHierarchyResp.push('RESET_PASSWORD')
-        }
-
-        // team admins can only give the roles set on their custom role
-        const assignableResp = await settingRequests.fetchAssignableRoles().catch(() => ({}))
-        const teamAdminRoles = assignableResp?.assignableRoles
-        if (teamAdminRoles) {
-            roleHierarchyResp = [...teamAdminRoles]
-        }
-
-        const customRolesResponse = await settingRequests.getCustomRoles()
-        if(customRolesResponse.roles){
-            setCustomRoles(customRolesResponse.roles.map(x => {
-
-                if(!teamAdminRoles && roleHierarchyResp.includes(x.baseRole)){
-                    roleHierarchyResp.push(x.name)
-                }
-                if(x.defaultInviteRole){
-                    setDefaultInviteRole(x.name)
-                }
-
-                return {
-                    content: x.name,
-                    role: x.name
-                }
-            }))
-        }
-
-        setRoleHierarchy(roleHierarchyResp)
-
     }
 
     useEffect(() => {
-        if(userRole !== 'GUEST') {
-            getTeamData();
+        if (userRole !== 'GUEST') {
+            loadUsers()
         }
-        getRoleHierarchy()
+        loadRoles()
     }, [])
 
-    // collectionsMap loads asynchronously, so this cannot be a mount-only effect
-    useEffect(() => {
-        setAllCollections(Object.entries(collectionsMap).map(([id, collectionName]) => ({
-            id: parseInt(id, 10),
-            collectionName
-        })));
-    }, [collectionsMap])
+    // products the caller can give roles in: admins manage every product, others only products they have a role in
+    const manageableScopes = useMemo(() => {
+        if (isAdmin) return PRODUCT_SCOPES
+        const me = users.find(user => user.login === username)
+        const mine = Object.entries(me?.scopeRoleMapping || {}).filter(([, role]) => role !== 'NO_ACCESS').map(([scope]) => scope)
+        return mine.length > 0 ? PRODUCT_SCOPES.filter(scope => mine.includes(scope.value)) : PRODUCT_SCOPES
+    }, [users, PRODUCT_SCOPES, username, isAdmin])
 
-    const getRoleDisplayName = (role) => {
-        for(let section of rolesOptions) {
-            for(let item of section.items) {
-                if(item.role === role) {
-                    return item.content;
-                }
-            }
-        }
-        return role;
+    const roleOptions = useMemo(() => {
+        const builtIn = BUILT_IN_ROLES.filter(role => rbacAccess || !PAID_ROLES.includes(role))
+        const all = [...builtIn.filter(r => r !== 'NO_ACCESS'), ...(rbacAccess ? customRoles.map(r => r.name) : []), 'NO_ACCESS']
+        return all.filter(role => allowedRoles.includes(role)).map(role => ({ label: roleLabel(role), value: role }))
+    }, [allowedRoles, customRoles, rbacAccess])
+
+    const knownRoles = new Set([...BUILT_IN_ROLES, 'SECURITY ENGINEER', ...customRoles.map(r => r.name)])
+    const canManageUser = (user) => {
+        if (user.login === username || user.isInvitation) return false
+        const mapping = user.scopeRoleMapping
+        const held = mapping && Object.keys(mapping).length > 0 ? Object.values(mapping) : [user.role]
+        // roles that no longer exist give no access, so they can be replaced
+        return held.every(role => !role || role === 'NO_ACCESS' || !knownRoles.has(role) || allowedRoles.includes(role === 'SECURITY ENGINEER' ? 'MEMBER' : role))
     }
 
-    const getTeamData = async () => {
-        setLoading(true);
-        const usersResponse = await settingRequests.getTeamData()
-        if(userRole === 'ADMIN') {
-            const usersCollectionList = await observeApi.getAllUsersCollections()
-            setUsersCollection(usersCollectionList)
-        }
-        setUsers(usersResponse)
-        setLoading(false)
-    };
+    const isAdminInCurrentProduct = (user) => {
+        const mapping = user?.scopeRoleMapping
+        return mapping && Object.keys(mapping).length > 0 ? mapping[currentProduct] === 'ADMIN' : user?.role === 'ADMIN'
+    }
 
-    const isLocalDeploy = func.checkLocal();
+    const savedCollections = (user) => (usersCollection[user.id] || []).filter(id => id !== NO_COLLECTION_ID)
 
-    const toggleInviteUserModal = () => {
-        setInviteUser({
-            isActive: !inviteUser.isActive,
-            state: "initial",
-            email: "",
-            inviteLink: ""
+    const revokeInvite = (user) => {
+        func.showConfirmationModal(`Revoke the invite for ${user.login}? The invite link stops working.`, "Revoke invite", async () => {
+            try {
+                await settingRequests.removeInvitation(user.login)
+                func.setToast(true, false, `Invite for ${user.login} revoked`)
+                loadUsers()
+            } catch (e) {
+                // the server's message is already shown
+            }
         })
     }
 
-    const handleRemoveUser = async (login) => {
-        await settingRequests.removeUser(login)
-        func.setToast(true, false, "User removed successfully")
-    }
-
-    const getRoleDisplayForSidebar = (scopeRoleMapping, oldRole) => {
-        // If scopeRoleMapping exists, show all scopes with their roles (same as left side)
-        if (scopeRoleMapping && Object.keys(scopeRoleMapping).length > 0) {
-            const rolesWithScopes = []
-            Object.entries(scopeRoleMapping).forEach(([scope, role]) => {
-                // Skip NO_ACCESS roles
-                if (role !== 'NO_ACCESS') {
-                    const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
-                    rolesWithScopes.push(`${getRoleDisplayName(role)} (${scopeLabel})`)
-                }
-            })
-            // If all are NO_ACCESS, show first one
-            if (rolesWithScopes.length === 0) {
-                const firstScope = Object.keys(scopeRoleMapping)[0]
-                const firstRole = scopeRoleMapping[firstScope]
-                const scopeLabel = PRODUCT_SCOPES.find(s => s.value === firstScope)?.label || firstScope
-                return `${getRoleDisplayName(firstRole)} (${scopeLabel})`
-            }
-            return rolesWithScopes.join(', ')
-        }
-        // Fallback to old role
-        return getRoleDisplayName(oldRole)
-    }
-
-    // access expiry is stored as epoch seconds; the modal edits it as a local date
-    const toDateInput = (epochSeconds) => {
-        if (!epochSeconds) return ""
-        const d = new Date(epochSeconds * 1000)
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-    }
-    const toEpochEndOfDay = (dateInput) => dateInput ? Math.floor(new Date(`${dateInput}T23:59:59`).getTime() / 1000) : 0
-
-    const openEditScopeRoleModal = (userId, email, name, currentRole, currentScopeRoleMapping, accessExpiresAt) => {
-        const isSimpleRole = !currentScopeRoleMapping || Object.keys(currentScopeRoleMapping).length === 0
-        setEditScopeRoleModal({
-            isActive: true,
-            userId,
-            email,
-            name,
-            currentRole,
-            currentScopeRoleMapping: currentScopeRoleMapping || {},
-            editingScopeRoleMapping: currentScopeRoleMapping ? { ...currentScopeRoleMapping } : {},
-            accessExpiresOn: toDateInput(accessExpiresAt),
-            isSimpleRole
-        })
-    }
-
-    const closeEditScopeRoleModal = () => {
-        setEditScopeRoleModal({
-            isActive: false,
-            userId: null,
-            email: "",
-            name: "",
-            currentRole: "",
-            currentScopeRoleMapping: {},
-            editingScopeRoleMapping: {},
-            accessExpiresOn: "",
-            isSimpleRole: false
-        })
-    }
-
-    const handleScopesToggleInModal = (scope) => {
-        setEditScopeRoleModal(prev => {
-            const newMapping = { ...prev.editingScopeRoleMapping }
-            if (newMapping[scope]) {
-                delete newMapping[scope]
-            } else {
-                // Add scope with current role or default role
-                newMapping[scope] = prev.currentRole || "MEMBER"
-            }
-            return { ...prev, editingScopeRoleMapping: newMapping }
-        })
-    }
-
-    const handleScopeRoleChangeInModal = (scope, role) => {
-        setEditScopeRoleModal(prev => ({
-            ...prev,
-            editingScopeRoleMapping: {
-                ...prev.editingScopeRoleMapping,
-                [scope]: role
-            }
-        }))
-    }
-
-    const saveEditedScopeRoleMapping = async () => {
-        const { email, editingScopeRoleMapping, accessExpiresOn } = editScopeRoleModal
-        const accessExpiresAt = toEpochEndOfDay(accessExpiresOn)
-
+    const saveCollections = async () => {
+        const { user, selected } = collectionsFor
+        // collections of other products (not shown here) stay as they are
+        const hidden = savedCollections(user).filter(id => !(id in (collectionsMap || {})))
         try {
-            // Call backend to update scope-role mapping
-            // only admins set the expiry; the backend ignores it from anyone else
-            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping, window.USER_ROLE === 'ADMIN' ? accessExpiresAt : undefined)
-
-            // Update UI
-            const scopes = Object.keys(editingScopeRoleMapping)
-            setUsers(users.map(user =>
-                user.login === email
-                    ? { ...user, scopeRoleMapping: editingScopeRoleMapping, productScopes: scopes, accessExpiresAt }
-                    : user
-            ))
-            func.setToast(true, false, "User access updated successfully")
-            closeEditScopeRoleModal()
-        } catch (error) {
-            func.setToast(true, true, "Failed to update user access")
-            console.error(error)
+            await observeApi.updateUserCollections({ [user.id]: [...hidden, ...selected] })
+            func.setToast(true, false, `Collections updated for ${user.login}`)
+            setCollectionsFor(null)
+            loadUsers()
+        } catch (e) {
+            // the server's message is already shown
         }
     }
 
-   
-    const getUserApiCollectionIds = (userId) => {
-        return usersCollection[userId] || [];
-    };
-
-    const isAdminForCurrentProduct = (item) => {
-        const mapping = item?.scopeRoleMapping
-        if (mapping && Object.keys(mapping).length > 0) {
-            const currentScope = categoryToShortName[getDashboardCategory()] || "API"
-            return mapping[currentScope] === "ADMIN"
+    const accessBadges = (user) => {
+        const mapping = user.scopeRoleMapping
+        if (!mapping || Object.keys(mapping).length === 0) {
+            return [<Badge key="all">{`All products: ${roleLabel(user.role)}`}</Badge>]
         }
-        return item?.role === "ADMIN"
+        const order = (scope) => { const i = PRODUCT_SCOPES.findIndex(s => s.value === scope); return i < 0 ? 99 : i }
+        const granted = Object.entries(mapping).filter(([, role]) => role !== 'NO_ACCESS').sort(([a], [b]) => order(a) - order(b))
+        if (granted.length === 0) return [<Badge key="none" status="critical">No access</Badge>]
+        return granted.map(([scope, role]) => {
+            const product = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
+            const missing = !knownRoles.has(role)
+            return <Badge key={scope} status={missing ? "critical" : undefined}>{`${product}: ${missing ? `${role} (deleted)` : roleLabel(role)}`}</Badge>
+        })
     }
 
-    // drop ids for collections that are deleted or deactivated; the picker cannot list them
-    const selectable = (ids) => ids.filter((id) => id in collectionsMap);
-
-    const handleRemoveInvitations = async (data) => {
-        await settingRequests.removeInvitation(data.login)
-        func.setToast(true, false, "Invitation removed successfully")
-        await getTeamData();
+    const expiryBadge = (user) => {
+        if (!user.accessExpiresAt) return null
+        const date = new Date(user.accessExpiresAt * 1000)
+        return user.accessExpiresAt * 1000 <= Date.now()
+            ? <Badge status="critical">Access ended</Badge>
+            : <Badge status="attention">{`Access ends ${date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`}</Badge>
     }
+
+    // an invite carries its issuer's id; issuers may revoke their own invites
+    const myId = users.find(user => user.login === username && !user.isInvitation)?.id
+
+    const renderItem = (user) => {
+        const { id, name, login } = user
+        const isSelf = login === username
+        const shortcutActions = []
+        if (canManageUser(user)) {
+            if (isAdmin && rbacAccessAdvanced && !isAdminInCurrentProduct(user)) {
+                const count = savedCollections(user).length
+                // the list holds chosen collections only; a role limited by rules still limits the user
+                const roleInProduct = (user.scopeRoleMapping && Object.keys(user.scopeRoleMapping).length > 0) ? user.scopeRoleMapping[currentProduct] : user.role
+                const roleRules = (customRoles.find(r => r.name === roleInProduct)?.collectionRules || []).length > 0
+                shortcutActions.push({
+                    content: count > 0 ? `${count} collection${count === 1 ? '' : 's'}${roleRules ? ' + rules' : ''}` : roleRules ? 'Collections by rules' : 'All collections',
+                    accessibilityLabel: `Collections for ${login}`,
+                    onAction: () => setCollectionsFor({ user, selected: savedCollections(user).filter(cid => cid in (collectionsMap || {})) })
+                })
+            }
+            shortcutActions.push({ content: 'Edit access', accessibilityLabel: `Edit access for ${login}`, onAction: () => setEditing(user) })
+        } else if (user.isInvitation && (isAdmin || user.id === myId)) {
+            shortcutActions.push({ content: 'Revoke invite', accessibilityLabel: `Revoke invite for ${login}`, onAction: () => revokeInvite(user) })
+        }
+
+        return (
+            <ResourceItem
+                id={`${id}-${login}`}
+                media={<Avatar customer size="medium" name={login} initials={func.initials(login)} />}
+                shortcutActions={shortcutActions}
+                persistActions
+                accessibilityLabel={login}
+            >
+                <VerticalStack gap="1">
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Text variant="bodyMd" fontWeight="semibold" as="h3">{name && name !== '-' ? name : login}</Text>
+                        {isSelf ? <Badge>You</Badge> : null}
+                        {user.isInvitation ? <Badge status="attention">Invite pending</Badge> : null}
+                        {expiryBadge(user)}
+                    </HorizontalStack>
+                    <Text variant="bodySm" color="subdued">{login}</Text>
+                    {user.isInvitation
+                        ? <Text variant="bodySm" color="subdued">{user.role}</Text>
+                        : <HorizontalStack gap="1">{accessBadges(user)}</HorizontalStack>}
+                </VerticalStack>
+            </ResourceItem>
+        )
+    }
+
+    const inviteDisabledReason = isLocalDeploy ? "Inviting is off on local deployments."
+        : (userRole === 'GUEST' || userRole === 'DEVELOPER') ? "Your role can't invite users."
+            : window.INVITE_DISABLED_FOR_SSO ? "Users are added through your SSO provider." : null
 
     return (
         <Page
             title="Users"
             primaryAction={{
                 content: 'Invite user',
-                onAction: () => toggleInviteUserModal(),
-                'disabled': (isLocalDeploy || userRole === 'GUEST' || userRole === 'DEVELOPER' || window.INVITE_DISABLED_FOR_SSO)
+                onAction: () => setInviteOpen(true),
+                disabled: inviteDisabledReason !== null,
+                helpText: inviteDisabledReason || undefined,
             }}
             divider
         >
-            {isLocalDeploy &&
-                <Banner
-                    title="Invite new members"
-                    action={{
-                        content: 'Go to docs',
-                        url: 'https://docs.akto.io/getting-started/quick-start-with-akto-cloud',
-                        target: "_blank"
-                    }}
-                    status="info"
-                >
-                    <p>Inviting team members is disabled in local. Collaborate with your team by using Akto cloud or AWS/GCP deploy.</p>
+            <VerticalStack gap="4">
+                {isLocalDeploy ? (
+                    <Banner
+                        title="Invite new members"
+                        action={{ content: 'Go to docs', url: 'https://docs.akto.io/getting-started/quick-start-with-akto-cloud', target: "_blank" }}
+                        status="info"
+                    >
+                        <p>Inviting team members is disabled in local. Collaborate with your team by using Akto cloud or AWS/GCP deploy.</p>
+                    </Banner>
+                ) : null}
+                <Banner title="Role permissions">
+                    <p>Each role has different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></p>
                 </Banner>
-            }
-            <br />
-            
-            <Banner>
-                <Text variant="headingMd">Role permissions</Text>
-                <Text variant="bodyMd">Each role has different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
-            </Banner>
-
-            {userRole !== 'GUEST' && <div style={{ paddingTop: "20px" }}>
-                <LegacyCard>
-                    <ResourceList
-                        resourceName={{ singular: 'user', plural: 'users' }}
-                        items={users}
-                        renderItem={(item) => {
-                            const { id, name, login, role } = item;
-                            const initials = func.initials(login)
-                            const media = <Avatar user size="medium" name={login} initials={initials} />
-
-                            // Helper function to check if current user can edit this user based on roleHierarchy
-                            const canEditUserByRoleHierarchy = () => {
-                                // Safety check: roleHierarchy should be an array
-                                if (!roleHierarchy || !Array.isArray(roleHierarchy)) {
-                                    return false
-                                }
-
-                                // If user has scopeRoleMapping, check if any scope role is in roleHierarchy
-                                if (item?.scopeRoleMapping && Object.keys(item.scopeRoleMapping).length > 0) {
-                                    return Object.values(item.scopeRoleMapping).some(scopeRole =>
-                                        roleHierarchy.includes(scopeRole)
-                                    )
-                                }
-                                // Fallback: check old role field (backward compatibility)
-                                return role && roleHierarchy.includes(role.toUpperCase())
-                            }
-
-                            const updateUsersCollection = async () => {
-                                const collectionIdList = selectedItems[id];
-                                const userCollectionMap = {
-                                    [id]: collectionIdList
-                                };
-                                await observeApi.updateUserCollections(userCollectionMap)
-                                func.setToast(true, false, `User's ${selectedItems[id].length} collection${func.addPlurality(selectedItems[id].length)} have been updated!`)
-                                await getTeamData()
-                            }
-
-                            const userCollectionsHandler = () => {
-                                updateUsersCollection()
-                                return true
-                            }
-
-                            const handleSelectedItemsChange = (items) => {
-                                handleSelectedItems(id, items)
-                            }
-
-                            const userCollectionsModalComp = (
-                                <Box>
-                                    <SearchableResourceList
-                                        resourceName={'collection'}
-                                        items={allCollections}
-                                        renderItem={usersCollectionRenderItem}
-                                        isFilterControlEnabale={userRole === 'ADMIN'}
-                                        selectable={userRole === 'ADMIN'}
-                                        onSelectedItemsChange={handleSelectedItemsChange}
-                                        alreadySelectedItems={selectable(getUserApiCollectionIds(id))}
-                                    />
-                                </Box>
-                            )
-
-                            const shortcutActions = (username !== login && canEditUserByRoleHierarchy()) ?
-                                [
-                                    {
-                                        content: (
-                                            <HorizontalStack gap={4}>
-                                                { (isAdminForCurrentProduct(item) || role === 'ADMIN' || userRole !== 'ADMIN' || !rbacAccessAdvanced) ? undefined :
-                                                    <ResourceListModal
-                                                        title={"Collection list"}
-                                                        activatorPlaceaholder={`${selectable(getUserApiCollectionIds(id)).length} collections accessible`}
-                                                        isColoredActivator={true}
-                                                        component={userCollectionsModalComp}
-                                                        primaryAction={userCollectionsHandler}
-                                                    />
-                                                }
-
-                                                <Button
-                                                    onClick={() => openEditScopeRoleModal(id, login, name, role, item?.scopeRoleMapping, item?.accessExpiresAt)}
-                                                >
-                                                    Edit Access
-                                                </Button>
-                                            </HorizontalStack>
-                                        )
-                                    }
-                                ] : item?.isInvitation ? [
-                                    {
-                                        content: (
-                                            <HorizontalStack gap={4}>
-                                                <Text color="subdued">{func.toSentenceCase(getRoleDisplayForSidebar(item?.scopeRoleMapping, role))}</Text>
-                                                <div onClick={() => handleRemoveInvitations(item)}><Icon source={DeleteMajor}/></div>
-                                            </HorizontalStack>
-                                        )
-                                    }
-                                ] : [
-                                    {
-                                        content: <Text color="subdued">{func.toSentenceCase(getRoleDisplayForSidebar(item?.scopeRoleMapping, role))}</Text>,
-                                        url: '#',
-                                    }
-                                ]
-
-                            // Display current configuration
-                            const currentConfigDisplay = item?.scopeRoleMapping && Object.keys(item.scopeRoleMapping).length > 0
-                                ? (
-                                    <Box>
-                                        <Text variant="bodySm" color="subdued">
-                                            {item?.isInvitation ? "Invitation sent for " : "Scope-based access:"}
-                                        </Text>
-                                        <Box paddingBlockStart="100">
-                                            {Object.entries(item.scopeRoleMapping).map(([scope, roleValue]) => {
-                                                const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
-                                                // Skip NO_ACCESS roles for display purposes
-                                                if (roleValue === 'NO_ACCESS') return null;
-                                                return (
-                                                    <Text key={scope} variant="bodySm">
-                                                        {getRoleDisplayName(roleValue)} ({scopeLabel}){item?.isInvitation && Object.entries(item.scopeRoleMapping).filter(([,r]) => r !== 'NO_ACCESS').length > 1 ? ',' : ''}
-                                                    </Text>
-                                                )
-                                            })}
-                                        </Box>
-                                    </Box>
-                                )
-                                : (
-                                    <Text variant="bodySm" color="subdued">
-                                        Role: {getRoleDisplayName(role)}
-                                    </Text>
-                                )
-
-                            return (
-                                <ResourceItem
-                                    id={id}
-                                    media={media}
-                                    shortcutActions={shortcutActions}
-                                    persistActions
-                                >
-                                    <Text variant="bodyMd" fontWeight="bold" as="h3">
-                                        {name}
-                                    </Text>
-                                    <Text variant="bodyMd">
-                                        {login}
-                                    </Text>
-                                    <Box paddingBlockStart="100">
-                                        {currentConfigDisplay}
-                                    </Box>
-                                </ResourceItem>
-                            );
-                        }}
-                        headerContent={`Showing ${users.length} team member${users.length > 1 ? 's': ''}`}
-                        showHeader
-                        loading={loading}
-                    />
-                </LegacyCard>
-                <InviteUserModal
-                    inviteUser={inviteUser}
-                    setInviteUser={setInviteUser}
-                    toggleInviteUserModal={toggleInviteUserModal}
-                    roleHierarchy={roleHierarchy}
-                    rolesOptions={rolesOptions}
-                    defaultInviteRole={defaultInviteRole}
-                    accessibleProductScopes={getCurrentUserAccessibleScopes}
-                    filteredRoleOptions={filteredRoleOptions}
-                />
-
-                {/* Edit Scope-Role Mapping Modal */}
-                <Modal
-                    open={editScopeRoleModal.isActive}
-                    onClose={closeEditScopeRoleModal}
-                    title={`Edit access for ${editScopeRoleModal.name}`}
-                    primaryAction={{
-                        loading: false,
-                        content: 'Save',
-                        onAction: saveEditedScopeRoleMapping,
-                    }}
-                    secondaryActions={[
-                        {
-                            content: 'Remove User',
-                            destructive: true,
-                            onAction: async () => {
-                                await handleRemoveUser(editScopeRoleModal.email)
-                                closeEditScopeRoleModal()
-                            },
-                        },
-                        {
-                            content: 'Cancel',
-                            onAction: closeEditScopeRoleModal,
-                        },
-                    ]}
-                >
-                    <Modal.Section>
-                        {/* Edit Configuration */}
-                        <Box paddingBlockStart="400">
-                            <Text variant="headingSm" as="h3">Configure Access by Scope</Text>
-                            <Text variant="bodySm" color="subdued" as="p" style={{ marginBottom: "20px", marginTop: "10px" }}>
-                                Select scopes and assign a role for each. Unselected scopes will have no access.
-                            </Text>
-
-                            <Box padding="400">
-                                {getCurrentUserAccessibleScopes.map((scope) => {
-                                    const isSelected = scope.value in editScopeRoleModal.editingScopeRoleMapping
-                                    const selectedRole = editScopeRoleModal.editingScopeRoleMapping[scope.value]
-
-                                    return (
-                                        <Box
-                                            key={scope.value}
-                                            style={{
-                                                marginBottom: "12px",
-                                                borderBottom: "1px solid #e5e5e5",
-                                                paddingBottom: "12px",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "16px"
-                                            }}
-                                        >
-                                            <Checkbox
-                                                label=""
-                                                checked={isSelected}
-                                                onChange={() => handleScopesToggleInModal(scope.value)}
-                                            />
-                                            <Text variant="bodyMd" style={{ minWidth: "120px", flexShrink: 0 }}>
-                                                {scope.label}
-                                            </Text>
-                                            {isSelected && (
-                                                <Box style={{ marginLeft: "80px" }}>
-                                                    <Dropdown
-                                                        id={`edit-role-${scope.value}`}
-                                                        selected={(value) => handleScopeRoleChangeInModal(scope.value, value)}
-                                                        menuItems={filteredRoleOptions}
-                                                        initial={selectedRole || "MEMBER"}
-                                                    />
-                                                </Box>
-                                            )}
-                                        </Box>
-                                    )
-                                })}
-                            </Box>
-                        </Box>
-                        {window.USER_ROLE === 'ADMIN' ? (
-                            <VerticalStack gap="2">
-                                <SingleDate
-                                    label="Access expires on (optional)"
-                                    dataKey="No expiry"
-                                    data={editScopeRoleModal.accessExpiresOn ? new Date(`${editScopeRoleModal.accessExpiresOn}T00:00:00`) : null}
-                                    dispatch={(action) => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: toDateInput(Object.values(action.obj)[0].getTime() / 1000) }))}
-                                    disableDatesBefore={new Date()}
-                                />
-                                <HorizontalStack align="space-between" blockAlign="center">
-                                    <Text variant="bodySm" color="subdued">After this date the user has no access in any product until it is extended.</Text>
-                                    {editScopeRoleModal.accessExpiresOn ? (
-                                        <Button plain destructive onClick={() => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: "" }))}>Remove expiry</Button>
-                                    ) : null}
-                                </HorizontalStack>
-                            </VerticalStack>
-                        ) : null}
-                    </Modal.Section>
-                </Modal>
-
-                <Modal
-                    small
-                    open={passwordResetState.confirmPasswordResetActive}
-                    onClose={() => setPasswordResetStateHelper("confirmPasswordResetActive", false)}
-                    title="Password Reset"
-                    primaryAction={{
-                        content: 'Generate',
-                        onAction: resetPassword,
-                    }}
-                    secondaryActions={[
-                        {
-                        content: 'Cancel',
-                        onAction: () => setPasswordResetStateHelper("confirmPasswordResetActive", false),
-                        },
-                    ]}
-                >
-                    <Modal.Section>
-                        <Text>Are you sure you want to generate a link to reset the password for <b>{passwordResetState.passwordResetLogin}</b>?</Text>
-                    </Modal.Section>
-                </Modal>
-
-                <Modal
-                    small
-                    open={passwordResetState.passwordResetLinkActive}
-                    onClose={closePasswordResetToggle}
-                    title="Password Reset"
-                    primaryAction={{
-                        content: 'Copy link',
-                        onAction: handleCopyPasswordResetLink,
-                    }}
-                    secondaryActions={[
-                        {
-                        content: 'Cancel',
-                        onAction: closePasswordResetToggle,
-                        },
-                    ]}
-                >
-                    <Modal.Section>
-                        <TextField
-                            label="Password reset link"
-                            disabled={true}
-                            value={passwordResetState.passwordResetLink}
+                {loadFailed ? (
+                    <Banner status="critical" title="Couldn't load users" action={{ content: 'Try again', onAction: loadUsers }}>
+                        <p>{loadFailed}</p>
+                    </Banner>
+                ) : null}
+                {userRole !== 'GUEST' ? (
+                    <LegacyCard>
+                        <ResourceList
+                            resourceName={{ singular: 'user', plural: 'users' }}
+                            items={users}
+                            renderItem={renderItem}
+                            headerContent={`${users.length} team member${users.length === 1 ? '' : 's'}`}
+                            showHeader
+                            loading={loading}
                         />
-                        <div ref={ref} />
-                    </Modal.Section>
-                </Modal>
-            </div>}
+                    </LegacyCard>
+                ) : null}
+            </VerticalStack>
 
+            <InviteUserModal
+                open={inviteOpen}
+                onClose={() => setInviteOpen(false)}
+                productScopes={manageableScopes}
+                roleOptions={roleOptions}
+                defaultInviteRole={defaultInviteRole}
+                currentProduct={currentProduct}
+                onInvited={loadUsers}
+            />
+
+            <EditAccessModal
+                user={editing}
+                productScopes={manageableScopes}
+                roleOptions={roleOptions}
+                isAdmin={isAdmin}
+                canRemove={isAdmin}
+                isOnPrem={isOnPrem}
+                onClose={() => setEditing(null)}
+                onSaved={() => { setEditing(null); loadUsers() }}
+                onRemoved={() => { setEditing(null); loadUsers() }}
+            />
+
+            <Modal
+                open={!!collectionsFor}
+                onClose={() => setCollectionsFor(null)}
+                title={collectionsFor ? `Collections for ${collectionsFor.user.login}` : ''}
+                large
+                primaryAction={{ content: 'Save', onAction: saveCollections }}
+                secondaryActions={[{ content: 'Cancel', onAction: () => setCollectionsFor(null) }]}
+            >
+                <Modal.Section>
+                    <VerticalStack gap="3">
+                        <Text color="subdued">These are added to the collections the user's role gives. Leave all unticked for no extra collections.</Text>
+                        {collectionsFor ? (
+                            <SearchableResourceList
+                                resourceName={'collection'}
+                                items={Object.entries(collectionsMap || {}).map(([cid, collectionName]) => ({ id: parseInt(cid, 10), collectionName }))}
+                                renderItem={usersCollectionRenderItem}
+                                isFilterControlEnabale={true}
+                                selectable={true}
+                                onSelectedItemsChange={(selected) => setCollectionsFor(prev => prev ? ({ ...prev, selected: (selected || []).map(cid => parseInt(cid, 10)) }) : prev)}
+                                alreadySelectedItems={collectionsFor.selected}
+                            />
+                        ) : null}
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
         </Page>
-
     )
 }
 

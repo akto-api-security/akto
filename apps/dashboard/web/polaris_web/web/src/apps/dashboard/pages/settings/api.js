@@ -677,11 +677,12 @@ const settingRequests = {
             data: {}
         })
     },
-    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
+    // opts: permissionOverrides, collectionRules, assignableRoles (and threatProtectionEnabled) when copying a role
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, opts = {}) {
         return request({
             url: '/api/createCustomRole',
             method: 'post',
-            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, ...opts }
         })
     },
     updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules, assignableRoles) {

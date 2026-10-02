@@ -2316,6 +2316,11 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return window.SCOPE_BASE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]] || window.USER_ROLE
   },
   hasThreatAccess(){
+    // threat access with custom role changes applied, when the server sent it; otherwise from the base role
+    const threatAccess = window.SCOPE_THREAT_ACCESS?.[categoryToShortName[getDashboardCategory()]]
+    if (threatAccess) {
+      return threatAccess !== 'NO_ACCESS'
+    }
     return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(this.currentProductBaseRole())
   },
   // Argus only: only Admin and Threat Engineer can create, edit, delete or approve guardrail policies (when RBAC is enabled)
