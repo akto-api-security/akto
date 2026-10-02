@@ -2239,12 +2239,6 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    /**
-     * Replaces findPendingTestingRunResultSummary + findPendingTestingRun + createTRRSummaryIfAbsent +
-     * claimTestingRunResultSummary with one call - see DbLayer.claimNextTestWork for why. Returns the
-     * whole trrs and testingRun documents (not a curated field list) plus the verdict naming which of
-     * the four real trigger shapes this claim was.
-     */
     public String claimNextTestWork() {
         try {
             DbLayer.ClaimResult result = DbLayer.claimNextTestWork(miniTestingName, leaseToken, leaseSeconds);

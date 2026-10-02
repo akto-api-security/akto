@@ -15,13 +15,6 @@ import org.junit.Test;
 
 import static org.junit.Assert.*;
 
-/**
- * HTTP-layer smoke test for the claimNextTestWork action - DbLayer.claimNextTestWork itself has a
- * thorough suite (TestClaimNextTestWork in libs/utils), but nothing there exercises the action
- * wrapper: request-field binding, the testingRunHexId conversion done only in this class, or that
- * the action returns SUCCESS/ERROR correctly. This is the only layer mini-testing (a separate
- * codebase, talking to this one solely over HTTP) actually depends on.
- */
 public class TestClaimNextTestWorkAction extends MongoBasedTest {
 
     private static final String MODULE = "akto-testing-module";
@@ -54,8 +47,6 @@ public class TestClaimNextTestWorkAction extends MongoBasedTest {
         assertNotNull(action.getTrrs());
         assertNotNull(action.getTestingRun());
         assertEquals(run.getId(), action.getTestingRun().getId());
-        // the one conversion step that lives only in the action, not in DbLayer - a JSON consumer
-        // gets a hex string, never a raw ObjectId.
         assertEquals(run.getId().toHexString(), action.getTrrs().getTestingRunHexId());
     }
 

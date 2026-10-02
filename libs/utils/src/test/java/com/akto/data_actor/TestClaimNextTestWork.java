@@ -25,14 +25,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
 
-/**
- * Covers every verdict claimNextTestWork can produce, plus the two gaps caught by inspection
- * before any test existed: the RECLAIMED_ABANDONED/CICD conflation (producerDone must not decide
- * the verdict) and the orphaned-TRRS-with-terminal-parent exclusion (the exact pattern found at
- * scale in this session's ABA account census). Real embedded Mongo throughout, not mocks - several
- * of these tests exist specifically to prove Mongo's own atomicity guarantees hold for this code,
- * which a mock cannot stand in for.
- */
 public class TestClaimNextTestWork extends MongoBasedTest {
 
     private static final String MODULE = "akto-testing-module";
@@ -162,9 +154,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
     @Test
     public void liveLeaseIsNeverReclaimed() {
         TestingRun run = freshTestingRun(State.RUNNING, MODULE, null);
-        // Must be in the future relative to the real wall clock claimNextTestWork reads
-        // (Context.now()), not relative to the test's fixed NOW constant - unlike every
-        // other case here, this one specifically needs a lease that has NOT expired yet.
         TestingRunResultSummary live = insertTrrs(run.getId(), State.RUNNING, Context.now() + 1000, true, null, null);
         live.setLeaseToken("someone-elses-token");
         TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
@@ -182,8 +171,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
     @Test
     public void orphanedTrrsWithTerminalParent_isNeverResurrected() {
         TestingRun completedRun = freshTestingRun(State.COMPLETED, MODULE, null);
-        // left RUNNING by mistake after its parent already completed - the exact pattern found
-        // at scale in the account-wide census this session.
         insertTrrs(completedRun.getId(), State.RUNNING, NOW - 500, true, null, null);
 
         DbLayer.ClaimResult result = DbLayer.claimNextTestWork(MODULE, "token-8", 360);
@@ -308,9 +295,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
     }
 
     // ---- 13. a dead rerun-specific-testcases job must report abandonment, not its origin ----
-    // Regression test for a real bug: originalTestingRunResultSummaryId was checked before state,
-    // so a rerun-job TRRS that died mid-run (lease expired) was mislabeled RERUN_SPECIFIC_TESTCASES
-    // instead of RECLAIMED_ABANDONED, hiding exactly the signal this API exists to surface.
     @Test
     public void deadRerunJob_isReclaimedAbandonedNotRerunSpecific() {
         TestingRun run = freshTestingRun(State.RUNNING, MODULE, null);
@@ -325,9 +309,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
     }
 
     // ---- 14. retrying with the same leaseToken re-affirms your own still-valid claim ----
-    // Regression test for a real bug: the claim filter had no "this lease is already mine" branch,
-    // so a client retrying after losing the HTTP response to its own successful claim would fail to
-    // re-affirm it and fall through to other work (or NO_WORK_FOUND) instead.
     @Test
     public void retryWithSameLeaseToken_reAffirmsOwnStillLiveClaim() {
         TestingRun run = freshTestingRun(State.RUNNING, MODULE, null);
@@ -345,9 +326,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
     }
 
     // ---- 15. the actual incident shape: an unrelated due SCHEDULED run must never block reclaim ----
-    // This is the production bug claimNextTestWork exists to fix: the old code's findPendingTestingRun
-    // check unconditionally blocked reclaim whenever ANY due SCHEDULED run existed in the account,
-    // regardless of which run it was. Proves that no longer happens.
     @Test
     public void unrelatedScheduledRun_doesNotBlockReclaimOfAbandonedRun() {
         TestingRun unrelatedDueRun = freshTestingRun(State.SCHEDULED, MODULE, null);
@@ -368,8 +346,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
     public void trulyAbsentLeaseExpiryTsField_isStillReclaimed() {
         TestingRun run = freshTestingRun(State.RUNNING, MODULE, null);
         TestingRunResultSummary trrs = insertTrrs(run.getId(), State.RUNNING, 0, true, null, null);
-        // insertTrrs always persists some leaseExpiryTs value via the POJO codec; unset it so the
-        // field is genuinely absent from the stored BSON, matching documents older than this field.
         TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq("_id", trrs.getId()),
                 com.mongodb.client.model.Updates.unset(TestingRunResultSummary.LEASE_EXPIRY_TS));
@@ -389,7 +365,6 @@ public class TestClaimNextTestWork extends MongoBasedTest {
 
         DbLayer.ClaimResult result = DbLayer.claimNextTestWork(MODULE, "token-17", 360);
 
-        // Step 1 (claim existing) runs before step 2 (mint new) - runA's abandoned TRRS must win.
         assertEquals(DbLayer.VERDICT_RECLAIMED_ABANDONED, result.verdict);
         assertEquals(trrsA.getId(), result.trrs.getId());
         TestingRun stillScheduledB = TestingRunDao.instance.findOne(Filters.eq("_id", runB.getId()));

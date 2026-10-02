@@ -100,11 +100,6 @@ public class TestingRunResultSummariesDao extends AccountsContextDao<TestingRunR
         return ret;
     }
 
-    /**
-     * Fresh TRRS for a TestingRun that has never had one - the mint step of claimNextTestWork's
-     * fresh-pickup path (plain UI run / whole-test rerun, neither of which StartTestAction
-     * pre-creates a summary for).
-     */
     public TestingRunResultSummary createFreshSummaryForClaim(ObjectId testingRunId, String leaseToken, int now, int ttl) {
         TestingRunResultSummary trrs = new TestingRunResultSummary();
         trrs.setId(new ObjectId());
