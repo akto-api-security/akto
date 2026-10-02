@@ -445,6 +445,7 @@ public class DbAction extends ActionSupport {
     boolean isHeader;
     boolean isUrlParam;
     TestingRunResultSummary trrs;
+    String verdict;
     List<TestingRunResult> testingRunResults;
     WorkflowTestResult workflowTestResult;
     String taskId;
@@ -2233,6 +2234,28 @@ public class DbAction extends ActionSupport {
             updateTestingRunApisList(testingRun);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findPendingTestingRun " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Replaces findPendingTestingRunResultSummary + findPendingTestingRun + createTRRSummaryIfAbsent +
+     * claimTestingRunResultSummary with one call - see DbLayer.claimNextTestWork for why. Returns the
+     * whole trrs and testingRun documents (not a curated field list) plus the verdict naming which of
+     * the four real trigger shapes this claim was.
+     */
+    public String claimNextTestWork() {
+        try {
+            DbLayer.ClaimResult result = DbLayer.claimNextTestWork(miniTestingName, leaseToken, leaseSeconds);
+            verdict = result.verdict;
+            trrs = result.trrs;
+            testingRun = result.testingRun;
+            if (trrs != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in claimNextTestWork " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -5370,6 +5393,14 @@ public class DbAction extends ActionSupport {
 
     public void setTrrs(TestingRunResultSummary trrs) {
         this.trrs = trrs;
+    }
+
+    public String getVerdict() {
+        return verdict;
+    }
+
+    public void setVerdict(String verdict) {
+        this.verdict = verdict;
     }
 
     public List<TestingRunResult> getTestingRunResults() {

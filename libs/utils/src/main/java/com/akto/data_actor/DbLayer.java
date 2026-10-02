@@ -2116,6 +2116,155 @@ public class DbLayer {
         return claimed;
     }
 
+    /** Diagnostic label for which of the four real trigger shapes a claim turned out to be -
+     *  the whole point of this API: a future incident shows this directly in a log line instead
+     *  of needing the kind of multi-hour log/Mongo reconstruction this was designed after. */
+    public static final String VERDICT_FRESH_RUN = "FRESH_RUN";
+    public static final String VERDICT_CICD = "CICD";
+    public static final String VERDICT_RERUN_SPECIFIC_TESTCASES = "RERUN_SPECIFIC_TESTCASES";
+    public static final String VERDICT_RECLAIMED_ABANDONED = "RECLAIMED_ABANDONED";
+    public static final String VERDICT_NO_WORK_FOUND = "NO_WORK_FOUND";
+
+    public static class ClaimResult {
+        public final String verdict;
+        public final TestingRunResultSummary trrs;
+        public final TestingRun testingRun;
+        public ClaimResult(String verdict, TestingRunResultSummary trrs, TestingRun testingRun) {
+            this.verdict = verdict;
+            this.trrs = trrs;
+            this.testingRun = testingRun;
+        }
+    }
+
+    /**
+     * Replaces findPendingTestingRunResultSummary + findPendingTestingRun + createTRRSummaryIfAbsent +
+     * claimTestingRunResultSummary with one call. No lease-blind fallback path exists here at all -
+     * that is deliberate, not an oversight: the old fallback's "Test run was executed long ago"
+     * staleness check (and the starvation gate and GithubUtils crash it could reach) is a second,
+     * uncoordinated way to decide abandonment, which is exactly the shape of bug this API exists to
+     * make structurally impossible rather than patch again. See 23sep-new-api-rationale.md / this
+     * session's ABA incident writeups for why.
+     *
+     * Step 1 tries to claim an EXISTING TRRS - either pre-created and due (SCHEDULED, from
+     * StartTestAction's CI/CD or rerun-specific-tests branches) or abandoned (RUNNING, lease dead).
+     * Step 2, only if step 1 found nothing, tries to claim a bare due TestingRun that has never had
+     * any TRRS at all (plain UI run / whole-test rerun - StartTestAction creates no TRRS for either).
+     * Both steps are single atomic findOneAndUpdate calls whose own filter re-asserts the precondition,
+     * so the mint in step 2 is race-free: only the caller that wins the TestingRun's own
+     * SCHEDULED->RUNNING flip ever inserts a TRRS for it.
+     */
+    public static ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds) {
+        int now = Context.now();
+        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+        FindOneAndUpdateOptions returnAfter = new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER);
+
+        // Scoped to SCHEDULED/RUNNING runs only - deliberately excludes COMPLETED/FAILED/STOPPED ones.
+        // Without this, a TRRS left SCHEDULED/RUNNING by mistake after its parent TestingRun already
+        // reached a terminal state (exactly the orphaned-summary pattern this session's ABA incident
+        // investigation found at scale) would still be found and re-executed here. The parent's own
+        // state is the only thing that tells you the run itself is still alive; the TRRS's state alone
+        // is not enough, since it's exactly the field that can drift stale. Also keeps this list bounded
+        // to currently-active runs instead of the module's entire historical volume.
+        List<ObjectId> eligibleRunIds = TestingRunDao.instance.findAll(
+                Filters.and(
+                        Filters.or(
+                                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
+                                Filters.in(TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, miniTestingName)),
+                        Filters.in(TestingRun.STATE, TestingRun.State.SCHEDULED, TestingRun.State.RUNNING)),
+                Projections.include(ID)
+        ).stream().map(TestingRun::getId).collect(Collectors.toList());
+
+        if (eligibleRunIds.isEmpty()) {
+            return new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
+        }
+
+        Bson leaseUpdate = Updates.combine(
+                Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, now + ttl));
+
+        // Step 1a: claim a pre-created, due SCHEDULED TRRS (CI/CD or rerun-specific-testcases).
+        // Tried as its own atomic call, separately from 1b below, so the verdict is known from WHICH
+        // call matched rather than by inspecting the claimed document's pre-image state - which in
+        // turn is what lets this use returnDocument(AFTER) everywhere: the caller gets back the real,
+        // persisted document (lease fields included) instead of a Java-side guess at what the update
+        // did, with no extra read and no new race (each step is still its own single atomic CAS).
+        TestingRunResultSummary claimedTrrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.in(TestingRunResultSummary.TESTING_RUN_ID, eligibleRunIds),
+                        Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.SCHEDULED)),
+                leaseUpdate, returnAfter);
+
+        String verdict = null;
+        if (claimedTrrs != null) {
+            if (claimedTrrs.getOriginalTestingRunResultSummaryId() != null) {
+                verdict = VERDICT_RERUN_SPECIFIC_TESTCASES;
+            } else if (claimedTrrs.getMetadata() != null && !claimedTrrs.getMetadata().isEmpty()) {
+                verdict = VERDICT_CICD;
+            } else {
+                // a pre-created SCHEDULED TRRS with neither signal set - today's only two creation
+                // paths always set one or the other, so this means an unaccounted-for trigger site
+                // exists. Log loudly rather than silently mislabel it.
+                loggerMaker.errorAndAddToDb("claimNextTestWork: claimed a SCHEDULED TRRS "
+                        + claimedTrrs.getId() + " with neither metadata nor originalTestingRunResultSummaryId set"
+                        + " - unknown creation path");
+                verdict = VERDICT_CICD;
+            }
+        } else {
+            // Step 1b: nothing pre-created was due - try an abandoned TRRS instead (RUNNING, lease
+            // dead - or, so a caller can safely retry after losing the HTTP response to its own
+            // still-live claim without being told someone else grabbed it, RUNNING with a live lease
+            // that is already this exact caller's own token).
+            List<Bson> abandonedOrMine = new ArrayList<>(Arrays.asList(
+                    Filters.exists(TestingRunResultSummary.LEASE_EXPIRY_TS, false),
+                    Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now)));
+            if (leaseToken != null) {
+                abandonedOrMine.add(Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken));
+            }
+            claimedTrrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.and(
+                            Filters.in(TestingRunResultSummary.TESTING_RUN_ID, eligibleRunIds),
+                            Filters.eq(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                            Filters.or(abandonedOrMine)),
+                    leaseUpdate, returnAfter);
+            if (claimedTrrs != null) {
+                verdict = VERDICT_RECLAIMED_ABANDONED;
+            }
+        }
+
+        if (claimedTrrs != null) {
+            TestingRun owningRun = TestingRunDao.instance.findOne(Filters.eq(ID, claimedTrrs.getTestingRunId()), null);
+            return new ClaimResult(verdict, claimedTrrs, owningRun);
+        }
+
+        // Step 2: nothing existing was claimable - try a bare due TestingRun with no TRRS at all yet.
+        // The CAS here (state re-asserted in the filter) is what makes the mint below race-free: only
+        // the caller that wins this exact write ever reaches insertOne.
+        TestingRun claimedRun = TestingRunDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.in(ID, eligibleRunIds),
+                        Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+                        Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, now)),
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
+
+        if (claimedRun == null) {
+            return new ClaimResult(VERDICT_NO_WORK_FOUND, null, null);
+        }
+
+        TestingRunResultSummary newTrrs = new TestingRunResultSummary();
+        newTrrs.setId(new ObjectId());
+        newTrrs.setTestingRunId(claimedRun.getId());
+        newTrrs.setState(TestingRun.State.RUNNING);
+        newTrrs.setStartTimestamp(now);
+        newTrrs.setLeaseToken(leaseToken);
+        newTrrs.setLeaseExpiryTs(now + ttl);
+        newTrrs.setProducerDone(false);
+        TestingRunResultSummariesDao.instance.insertOne(newTrrs);
+
+        return new ClaimResult(VERDICT_FRESH_RUN, newTrrs, claimedRun);
+    }
+
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         return findPendingTestingRunResultSummary(now, delta, miniTestingName, null, 0);
     }
