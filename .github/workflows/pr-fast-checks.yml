@@ -1,0 +1,116 @@
+name: PR fast checks
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened, edited ]
+  pull_request_review:
+    types: [ submitted, edited, dismissed ]
+  pull_request_review_comment:
+    types: [ created, edited ]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  fast-checks:
+    # pull_request_review / pull_request_review_comment payloads don't support a `branches:`
+    # trigger filter, so gate on the PR's actual base ref here instead.
+    if: github.event.pull_request.base.ref == 'feature/mini-runtime-release'
+    runs-on: ubuntu-latest
+    # No checkout, no build - every check below reads straight from the GitHub API,
+    # so the whole job finishes in a few seconds.
+    steps:
+      - name: PR size check (<=1000 changed lines, excluding generated/vendor paths)
+        id: size
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate \
+            --jq '.[] | select(.filename |
+              test("(^|/)target/|(^|/)node_modules/|(^|/)dist/|(^|/)build/|package-lock\\.json$|yarn\\.lock$|pnpm-lock\\.yaml$|\\.min\\.js$") | not
+            ) | (.additions + .deletions)' > line_counts.txt
+
+          CHANGED_LINES=$(awk '{ sum += $1 } END { print sum+0 }' line_counts.txt)
+          echo "Changed lines (excluding generated/vendor paths): $CHANGED_LINES"
+
+          if [ "$CHANGED_LINES" -gt 1000 ]; then
+            echo "::error::PR changes $CHANGED_LINES lines, which exceeds the 1000 line limit. Please split this PR into smaller ones."
+            exit 1
+          fi
+
+      - name: PR description check (>=10 non-empty lines)
+        id: description
+        continue-on-error: true
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 - <<'EOF'
+          import os
+          import re
+
+          body = os.environ.get("PR_BODY") or ""
+          body = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
+          count = len([line for line in body.splitlines() if line.strip()])
+
+          print(f"Non-empty description lines: {count}")
+
+          if count < 10:
+              print(f"::error::PR description has only {count} non-empty line(s); at least 10 are required. "
+                    "Please describe what changed, why, and how it was tested.")
+              raise SystemExit(1)
+          EOF
+
+      - name: Reviewer comment check (>=1 real comment from a reviewer)
+        id: reviewer_comment
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+
+          reviews_json=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate)
+          comments_json=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments" --paginate)
+
+          COUNT=$(echo "$reviews_json" "$comments_json" | jq -s \
+            --arg author "$PR_AUTHOR" '
+            (.[0] // []) as $reviews
+            | (.[1] // []) as $comments
+            | ([$reviews[] | select(.user.login != $author and (.user.type // "") != "Bot" and ((.body // "") | gsub("\\s"; "") | length) > 0)]
+               + [$comments[] | select(.user.login != $author and (.user.type // "") != "Bot" and ((.body // "") | gsub("\\s"; "") | length) > 0)])
+            | length
+          ')
+
+          echo "Real reviewer comments (excluding author/bots, non-empty): $COUNT"
+
+          if [ "$COUNT" -lt 1 ]; then
+            echo "::error::No reviewer has left an actual comment on this PR yet. An approval/request-changes with no comment text does not count."
+            exit 1
+          fi
+
+      - name: Fail if any check failed
+        if: always()
+        run: |
+          size='${{ steps.size.outcome }}'
+          description='${{ steps.description.outcome }}'
+          reviewer_comment='${{ steps.reviewer_comment.outcome }}'
+
+          {
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| PR size | $size |"
+            echo "| PR description | $description |"
+            echo "| Reviewer comment | $reviewer_comment |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$size" != "success" ] || [ "$description" != "success" ] || [ "$reviewer_comment" != "success" ]; then
+            echo "::error::One or more PR quality gates failed - see the step logs/summary above."
+            exit 1
+          fi
