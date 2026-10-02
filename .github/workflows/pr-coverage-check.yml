@@ -5,6 +5,10 @@ on:
     branches: [ feature/mini-runtime-release ]
     types: [ opened, synchronize, reopened ]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   coverage-check:
     # ubuntu-latest (24.04) dropped libssl1.1, which the flapdoodle-embedded MongoDB 4.4.x
@@ -23,37 +27,35 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install diff-cover
-        run: pip install diff-cover
-
       - name: Run tests with coverage (mini-testing + mini-runtime + deps)
         run: mvn -B package -pl apps/mini-testing,apps/mini-runtime -am
 
-      - name: Check patch coverage with diff-cover (fail under 50%)
-        run: |
-          JACOCO_REPORTS=$(find apps/mini-testing apps/mini-runtime libs -path '*/target/site/jacoco/jacoco.xml' 2>/dev/null)
+      # Pinned to the v1.8.0 release commit (not a mutable tag) for supply-chain safety.
+      - name: Post coverage report on the PR
+        id: jacoco
+        uses: Madrapps/jacoco-report@e51ce1f46f7f8b5331593f935e59cbaf44b84920 # v1.8.0
+        with:
+          paths: |
+            ${{ github.workspace }}/apps/mini-testing/target/site/jacoco/jacoco.xml
+            ${{ github.workspace }}/apps/mini-runtime/target/site/jacoco/jacoco.xml
+            ${{ github.workspace }}/libs/*/target/site/jacoco/jacoco.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: Coverage Report
+          update-comment: true
+          comment-type: both
+          skip-if-no-changes: true
+          min-coverage-overall: 50
+          min-coverage-changed-files: 50
 
-          if [ -z "$JACOCO_REPORTS" ]; then
-            echo "::error::No JaCoCo XML reports found under apps/mini-testing, apps/mini-runtime or libs after the build."
-            exit 1
+      - name: Fail if changed-lines coverage is below 50%
+        run: |
+          COVERAGE="${{ steps.jacoco.outputs.coverage-changed-files }}"
+
+          if [ -z "$COVERAGE" ]; then
+            echo "No changed-files coverage reported (no coverable lines in this diff) - nothing to gate on."
+            exit 0
           fi
 
-          echo "Found JaCoCo reports:"
-          echo "$JACOCO_REPORTS"
-
-          diff-cover $JACOCO_REPORTS \
-            --compare-branch="origin/${{ github.base_ref }}" \
-            --fail-under=50 \
-            --html-report=diff-coverage-report.html
-
-      - name: Upload diff coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: diff-coverage-report
-          path: diff-coverage-report.html
-          if-no-files-found: ignore
+          echo "Changed-files coverage: ${COVERAGE}%"
+          awk -v c="$COVERAGE" 'BEGIN { exit !(c + 0 >= 50) }' \
+            || { echo "::error::Patch coverage on changed lines is ${COVERAGE}%, below the 50% minimum."; exit 1; }
