@@ -33,6 +33,16 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- Needed directly: dao's test-jar brings MongoBasedTest, but scope=test
+                 dependencies (this one, declared in dao's own pom) are never transitive -
+                 not even through a test-jar edge. Without this, any test extending
+                 MongoBasedTest fails with NoClassDefFoundError: IFeatureAwareVersion. -->
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo</artifactId>
+            <version>3.2.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
             <version>${project.version}</version>
@@ -51,7 +61,12 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.4.2</version>
+            <!-- Was 5.4.2: conflicted with junit-vintage-engine:5.9.3 (root pom.xml) on
+                 junit-platform-commons (1.4.2 vs 1.9.3), crashing the forked test JVM. api-runtime
+                 is a real reactor dependency of database-abstractor (CI builds+tests it via -am),
+                 not an unrelated app - this fix is load-bearing for this PR's CI, confirmed via a
+                 failed run. -->
+            <version>5.9.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
