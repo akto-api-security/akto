@@ -169,8 +169,14 @@ public class OktaSsoAction extends UserAction {
         bsonUpdates.add(Updates.unset("groupRoleMapping"));
         bsonUpdates.add(Updates.unset("oktaRoleMapping"));
         bsonUpdates.add(Updates.set(OktaConfig.SYNC_GROUPS_TO_USER_TAGS, syncGroupsToUserTags));
+        if (Boolean.TRUE.equals(removeAccessWithoutGroup) && activeMapping.isEmpty()) {
+            addActionError("Map at least one Okta group to a role before managing roles from Okta.");
+            return ERROR.toUpperCase();
+        }
         if (removeAccessWithoutGroup != null) {
             bsonUpdates.add(Updates.set(OktaConfig.REMOVE_ACCESS_WITHOUT_GROUP, removeAccessWithoutGroup));
+        } else if (activeMapping.isEmpty()) {
+            bsonUpdates.add(Updates.set(OktaConfig.REMOVE_ACCESS_WITHOUT_GROUP, false));
         }
         if (incomingToken != null) {
             if (incomingToken.trim().isEmpty()) {
@@ -193,20 +199,15 @@ public class OktaSsoAction extends UserAction {
         Set<String> rolesSeen = new HashSet<>();
         for (Map.Entry<String, String> e : mapping.entrySet()) {
             String role = e.getValue();
-            boolean isStandardRole = true;
-            try {
-                RBAC.Role.valueOf(role);
-            } catch (IllegalArgumentException ex) {
-                isStandardRole = false;
-            }
+            boolean isStandardRole = RBAC.Role.fromName(role) != null;
             if (!isStandardRole) {
                 CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
                 if (customRole == null) {
-                    return "Invalid Akto role: " + role + ". Value must be a valid standard role (ADMIN, MEMBER, DEVELOPER, GUEST) or an existing custom role name.";
+                    return "The role " + role + " doesn't exist anymore. Pick another role for " + e.getKey() + ".";
                 }
             }
             if (!rolesSeen.add(role)) {
-                return "One-to-one mapping required: each Akto role can be assigned to only one Okta group. Role " + role + " is mapped more than once.";
+                return "Each Akto role can be mapped to only one Okta group. " + role + " is mapped more than once.";
             }
         }
         return null;

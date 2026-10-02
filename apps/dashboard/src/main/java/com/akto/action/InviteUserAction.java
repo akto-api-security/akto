@@ -39,8 +39,8 @@ public class InviteUserAction extends UserAction{
     private String inviteeEmail;
     private String websiteHostName;
 
-    public static final String INVALID_EMAIL_ERROR = "Invalid email";
-    public static final String DIFFERENT_ORG_EMAIL_ERROR = "Email must belong to same organisation";
+    public static final String INVALID_EMAIL_ERROR = "Enter a valid email address.";
+    public static final String DIFFERENT_ORG_EMAIL_ERROR = "You can only invite people with your company's email domain.";
     public static final String NOT_ALLOWED_TO_INVITE = "you're not authorised to invite for this role";
     public static final String AKTO_DOMAIN = "akto.io";
     public static final String INVALID_PRODUCT_SCOPE = "Invalid product scope: user account does not have access to this scope";
@@ -73,23 +73,16 @@ public class InviteUserAction extends UserAction{
      * @return the base Role if valid, null if invalid
      */
     private Role validateAndGetBaseRole(String scope, String roleStr) {
-        Role baseRole = null;
-        CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
-
-        try {
-            if (customRole != null) {
-                baseRole = Role.valueOf(customRole.getBaseRole());
-            } else {
-                baseRole = Role.valueOf(roleStr);
-            }
-        } catch (Exception e) {
-            addActionError("Invalid role: " + roleStr);
+        CustomRole customRole = roleStr == null ? null : CustomRoleDao.instance.findRoleByName(roleStr);
+        Role baseRole = customRole != null ? Role.fromName(customRole.getBaseRole()) : Role.fromName(roleStr);
+        if (baseRole == null) {
+            addActionError("The role " + roleStr + " doesn't exist anymore. Pick another role.");
             return null;
         }
 
         // role hierarchy, or for team admins the roles they may give
         if (!RoleAssignment.canAssign(getSUser().getId(), Context.accountId.get(), scope, roleStr)) {
-            addActionError("User not allowed to invite for role: " + roleStr);
+            addActionError("You can't invite people with the " + roleStr + " role.");
             return null;
         }
 
@@ -178,10 +171,11 @@ public class InviteUserAction extends UserAction{
     public String execute() {
         inviteeEmail = inviteeEmail != null ? inviteeEmail.toLowerCase() : null;
 
-        if(inviteeEmail == null) {
-            addActionError("Invalid email");
+        if(inviteeEmail == null || inviteeEmail.trim().isEmpty()) {
+            addActionError("Enter an email address.");
             return ERROR.toUpperCase();
         }
+        inviteeEmail = inviteeEmail.trim();
 
         Integer accountId = Context.accountId.get();
         if (Utils.allowNewUserInviteViaDashboard(accountId, getSUser())) {
@@ -197,7 +191,7 @@ public class InviteUserAction extends UserAction{
                 Filters.eq(User.ACCOUNTS+"."+accountId+".accountId", accountId)
         ));
         if(user != null) {
-            addActionError("User already exists");
+            addActionError(inviteeEmail + " is already in your account.");
             return ERROR.toUpperCase();
         }
 
@@ -205,6 +199,7 @@ public class InviteUserAction extends UserAction{
         User admin = UsersDao.instance.getFirstUser(Context.accountId.get());
         if (admin == null) {
             loggerMaker.debugAndAddToDb("admin not found for organization");
+            addActionError("Couldn't create the invite. Please try again.");
             return ERROR.toUpperCase();
         }
 
@@ -234,7 +229,7 @@ public class InviteUserAction extends UserAction{
                 // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
                 // Only validate scope accessibility for actual role assignments (non-NO_ACCESS)
                 if (!baseRole.equals(Role.NO_ACCESS) && !isValidProductScope(scope)) {
-                    addActionError(INVALID_PRODUCT_SCOPE + scope);
+                    addActionError("Your account doesn't include this product (" + scope + ").");
                     loggerMaker.errorAndAddToDb("Invalid product scope attempted: " + scope + " for user invitation");
                     return ERROR.toUpperCase();
                 }
@@ -245,10 +240,9 @@ public class InviteUserAction extends UserAction{
                 scopeRoleToSave.put(scope, roleStr);
             }
 
-            if (scopeRoleToSave.isEmpty()) {
-                // Default to API + NO_ACCESS if no scopes selected
-                loggerMaker.debugAndAddToDb("scopeRoleMapping is empty, defaulting to API + NO_ACCESS");
-                scopeRoleToSave.put("API", RBAC.Role.NO_ACCESS.name());
+            if (scopeRoleToSave.values().stream().allMatch(r -> Role.fromName(r) == Role.NO_ACCESS)) {
+                addActionError("Give access to at least one product.");
+                return ERROR.toUpperCase();
             }
             loggerMaker.debugAndAddToDb("After ensuring complete mapping: " + scopeRoleToSave);
         } else if (this.inviteeRole != null && !this.inviteeRole.isEmpty()) {
@@ -262,7 +256,7 @@ public class InviteUserAction extends UserAction{
             scopeRoleToSave.put("API", this.inviteeRole);
 
         } else {
-            addActionError("Either scopeRoleMapping or inviteeRole must be provided");
+            addActionError("Pick a product and a role.");
             return ERROR.toUpperCase();
         }
 
@@ -281,7 +275,8 @@ public class InviteUserAction extends UserAction{
                     1
             );
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
-            // TODO: find better error
+            loggerMaker.errorAndAddToDb(e, "Error creating invite code: " + e.getMessage());
+            addActionError("Couldn't create the invite. Please try again.");
             return Action.ERROR.toUpperCase();
         }
 
@@ -300,7 +295,7 @@ public class InviteUserAction extends UserAction{
             PendingInviteCode existingInvite = PendingInviteCodesDao.instance.findOne(inviteFilter);
             if (existingInvite != null && !RoleAssignment.canManage(user_id, Context.accountId.get(),
                     existingInvite.getScopeRoleMapping(), existingInvite.getInviteeRole())) {
-                addActionError("User not allowed to change the pending invite for: " + inviteeEmail);
+                addActionError(inviteeEmail + " already has a pending invite with a role you can't give.");
                 return ERROR.toUpperCase();
             }
             PendingInviteCodesDao.instance.updateOne(
@@ -315,7 +310,8 @@ public class InviteUserAction extends UserAction{
 
             loggerMaker.infoAndAddToDb("Invitation sent with scopeRoleMapping: " + scopeRoleToSave);
         } catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error saving invite: " + e.getMessage());
+            addActionError("Couldn't create the invite. Please try again.");
             return ERROR.toUpperCase();
         }
 

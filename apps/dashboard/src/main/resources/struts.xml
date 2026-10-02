@@ -324,6 +324,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Create a custom role</param>
@@ -348,6 +349,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Update a custom role</param>
@@ -372,6 +374,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Delete a custom role</param>
@@ -396,6 +399,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Removed a user from Akto</param>
@@ -417,6 +421,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Admin changed the role of the user in Akto dashboard</param>
@@ -1282,6 +1287,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted Github SSO settings</param>
@@ -1312,6 +1318,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added Github SSO settings</param>
@@ -1363,6 +1370,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added Okta SSO settings</param>
@@ -1393,6 +1401,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted Okta SSO settings</param>
@@ -1471,6 +1480,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User saved Okta group role mapping</param>
@@ -1501,6 +1511,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added Azure SSO settings</param>
@@ -1530,6 +1541,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted Azure SSO settings</param>
@@ -1560,6 +1572,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated SAML SSO group to role mapping</param>
@@ -5533,6 +5546,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated collection access for a user</param>
@@ -14907,6 +14921,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User reset another user's password</param>

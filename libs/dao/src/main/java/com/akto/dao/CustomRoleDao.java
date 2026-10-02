@@ -33,6 +33,11 @@ public class CustomRoleDao extends AccountsContextDao<CustomRole> {
         roleCache.clear();
     }
 
+    public static void clearRoleCache(int accountId) {
+        String accountPrefix = accountId + "|";
+        roleCache.keySet().removeIf(key -> key.startsWith(accountPrefix));
+    }
+
     public void createIndicesIfAbsent() {
         boolean exists = false;
         String dbName = Context.accountId.get()+"";

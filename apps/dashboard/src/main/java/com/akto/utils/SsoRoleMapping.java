@@ -12,6 +12,7 @@ import javax.servlet.http.HttpServletRequest;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
@@ -62,24 +63,33 @@ public class SsoRoleMapping {
         return removeAccessWithoutGroup && groupsComplete ? sameRoleEverywhere(accountId, Role.NO_ACCESS.name()) : null;
     }
 
-    /** The most privileged role mapped to any of the groups (built-in or custom role name), or null. */
+    /*
+     * The most privileged role mapped to any of the groups (built-in or custom role name), or null.
+     * Same base role: a role with access to all collections wins over one limited to some, then the name decides,
+     * so the result never depends on the order the IdP sends groups in.
+     */
     public static String highestPriorityRole(Map<String, String> groupRoleMapping, Collection<String> groups) {
         if (groupRoleMapping == null || groups == null) {
             return null;
         }
         String bestRole = null;
-        int bestPriority = Integer.MAX_VALUE;
+        int bestRank = Integer.MAX_VALUE;
         for (String group : groups) {
             String mappedRole = groupRoleMapping.get(group);
             if (mappedRole == null) continue;
             Role baseRole = Role.fromName(mappedRole);
+            boolean limited = false;
             if (baseRole == null) {
                 CustomRole customRole = CustomRoleDao.instance.findRoleByName(mappedRole);
                 baseRole = customRole == null ? null : Role.fromName(customRole.getBaseRole());
+                limited = customRole != null && ((customRole.getApiCollectionsId() != null && !customRole.getApiCollectionsId().isEmpty())
+                        || (customRole.getCollectionRules() != null && !customRole.getCollectionRules().isEmpty()));
             }
             int priority = ROLE_PRIORITY.indexOf(baseRole);
-            if (priority >= 0 && priority < bestPriority) {
-                bestPriority = priority;
+            if (priority < 0) continue;
+            int rank = priority * 2 + (limited ? 1 : 0);
+            if (rank < bestRank || (rank == bestRank && mappedRole.compareTo(bestRole) < 0)) {
+                bestRank = rank;
                 bestRole = mappedRole;
             }
         }
@@ -111,13 +121,13 @@ public class SsoRoleMapping {
         return Role.ADMIN.name().equals(rbac.getRole());
     }
 
-    /** Audit log for roles set from SSO groups at login; nothing is written when the roles do not change. */
-    public static void auditRoleChange(String userEmail, int accountId, Map<String, String> newScopeRoleMapping, String loginEndpoint, HttpServletRequest request) {
+    /** Audit log for roles set from SSO groups at login; nothing is written when the roles do not change. Returns true if they change. */
+    public static boolean auditRoleChange(String userEmail, int accountId, Map<String, String> newScopeRoleMapping, String loginEndpoint, HttpServletRequest request) {
         try {
             RBAC rbac = findRbac(userEmail, accountId);
             Map<String, String> before = rbac == null || rbac.getScopeRoleMapping() == null ? null : new TreeMap<>(rbac.getScopeRoleMapping());
             if (new TreeMap<>(newScopeRoleMapping).equals(before)) {
-                return;
+                return false;
             }
             Context.accountId.set(accountId);
             List<String> ipAddresses = AuditLogsUtil.getClientIpAddresses(request);
@@ -129,6 +139,7 @@ public class SsoRoleMapping {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error writing SSO role change audit log: " + e.getMessage());
         }
+        return true;
     }
 
     public static void clearUserCache(String userEmail, int accountId) {
@@ -137,5 +148,6 @@ public class SsoRoleMapping {
             RBACDao.instance.deleteUserEntryFromCache(new Pair<>(user.getId(), accountId));
             UsersCollectionsList.deleteCollectionIdsFromCache(user.getId(), accountId);
         }
+        RbacCacheVersionDao.accessChanged(accountId);
     }
 }

@@ -115,9 +115,11 @@ public class TestRoleAssignment extends MongoBasedTest {
         assertFalse(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(THREAT_ENGINEER)));
         assertFalse(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(ADMIN)));
 
-        // a scoped role without a list keeps the role hierarchy, exactly as before
-        assertEquals(null, RoleAssignment.limitedAssignableRoles(SCOPED_NO_LIST, ACCOUNT_ID));
-        assertTrue(RoleAssignment.canAssign(SCOPED_NO_LIST, ACCOUNT_ID, "API", "THREAT_ENGINEER"));
+        // a role limited to collections without a list can give nothing but no access, so it never hands out more than its team
+        assertEquals(Collections.emptySet(), RoleAssignment.limitedAssignableRoles(SCOPED_NO_LIST, ACCOUNT_ID));
+        assertFalse(RoleAssignment.canAssign(SCOPED_NO_LIST, ACCOUNT_ID, "API", "THREAT_ENGINEER"));
+        assertFalse(RoleAssignment.canAssign(SCOPED_NO_LIST, ACCOUNT_ID, "API", "TEAM_A_USER"));
+        assertTrue(RoleAssignment.canAssign(SCOPED_NO_LIST, ACCOUNT_ID, "API", "NO_ACCESS"));
         assertEquals(null, RoleAssignment.limitedAssignableRoles(THREAT_ENGINEER, ACCOUNT_ID));
     }
 
@@ -201,11 +203,15 @@ public class TestRoleAssignment extends MongoBasedTest {
     }
 
     @Test
-    public void testAdminCanFixUserWithUnknownRole() {
+    public void testUserWithDeletedRoleCanBeGivenANewRole() {
         insertUser(8, "SOME_DELETED_ROLE");
         clearCaches();
+        // a deleted role gives no access, so anyone who may change access can replace it
+        assertEquals(RBAC.Role.NO_ACCESS, RBACDao.getCurrentRoleForUser(8, ACCOUNT_ID));
         assertTrue(RoleAssignment.canManage(ADMIN, ACCOUNT_ID, rbac(8)));
-        assertFalse(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(8)));
+        assertTrue(RoleAssignment.canManage(TEAM_ADMIN, ACCOUNT_ID, rbac(8)));
+        // but nobody can give a role that doesn't exist
+        assertFalse(RoleAssignment.canAssign(ADMIN, ACCOUNT_ID, "API", "SOME_DELETED_ROLE"));
     }
 
     @Test
@@ -266,7 +272,11 @@ public class TestRoleAssignment extends MongoBasedTest {
         assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", null)); // unchanged
         assertEquals(now + 3600, rbac(MEMBER).getAccessExpiresAt());
 
-        assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", now - 1));
+        // a date in the past is refused; an expiry that has passed means no access
+        assertEquals("ERROR", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", now - 1));
+        RBACDao.instance.updateOne(Filters.and(Filters.eq(RBAC.USER_ID, MEMBER), Filters.eq(RBAC.ACCOUNT_ID, ACCOUNT_ID)),
+                com.mongodb.client.model.Updates.set(RBAC.ACCESS_EXPIRES_AT, now - 1));
+        clearCaches();
         assertEquals(RBAC.Role.NO_ACCESS, RBACDao.getCurrentRoleForUser(MEMBER, ACCOUNT_ID));
 
         assertEquals("SUCCESS", updateRoleWithExpiry(ADMIN, MEMBER, "MEMBER", 0)); // cleared

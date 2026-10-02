@@ -54,6 +54,13 @@ public class RBACDao extends CommonContextDao<RBAC> {
         rbacEntryCache.remove(key);
     }
 
+    /** Drops every cached RBAC entry and rule match of the account (see RbacCacheVersionDao). */
+    public static void clearAccountCache(int accountId) {
+        rbacEntryCache.keySet().removeIf(key -> key.getSecond() != null && key.getSecond() == accountId);
+        String accountPrefix = accountId + "|";
+        ruleCollectionsCache.keySet().removeIf(key -> key.startsWith(accountPrefix));
+    }
+
     /*
      * Base roles whose threat access is decided by the role itself. Admin and the threat
      * roles always keep it, guest never gets it, and a custom role built on any of them
@@ -86,31 +93,46 @@ public class RBACDao extends CommonContextDao<RBAC> {
      */
     public static ReadWriteAccess resolveFeatureAccess(int userId, int accountId, Feature feature, ReadWriteAccess baseRoleAccess) {
         try {
-            CustomRole customRole = currentCustomRole(userId, accountId);
-            if (customRole == null || customRole.getBaseRole() == null) {
-                return baseRoleAccess;
-            }
-
-            ReadWriteAccess override = customRole.overrideFor(feature);
-            if (override == null && feature == Feature.THREAT_SETTINGS) {
-                // threat settings follow threat protection unless changed on their own
-                override = customRole.overrideFor(Feature.THREAT_PROTECTION);
-            }
-            if (override != null) {
-                return override;
-            }
-
-            boolean threatFeature = feature == Feature.THREAT_PROTECTION || feature == Feature.THREAT_SETTINGS;
-            // the base role decides on its own; the toggle is not consulted
-            if (!threatFeature || FIXED_THREAT_ACCESS_ROLES.contains(Role.fromName(customRole.getBaseRole()))) {
-                return baseRoleAccess;
-            }
-
-            return Boolean.TRUE.equals(customRole.getThreatProtectionEnabled())
-                    ? ReadWriteAccess.READ_WRITE : baseRoleAccess;
+            return accessFor(currentCustomRole(userId, accountId), feature, baseRoleAccess);
         } catch (Exception e) {
             return baseRoleAccess;
         }
+    }
+
+    /** Access a custom role gives to a feature, given its base role's access (null role: the base role's access). */
+    public static ReadWriteAccess accessFor(CustomRole customRole, Feature feature, ReadWriteAccess baseRoleAccess) {
+        if (customRole == null || customRole.getBaseRole() == null) {
+            return baseRoleAccess;
+        }
+
+        ReadWriteAccess override = customRole.overrideFor(feature);
+        if (override == null && feature == Feature.THREAT_SETTINGS) {
+            // threat settings follow threat protection unless changed on their own
+            override = customRole.overrideFor(Feature.THREAT_PROTECTION);
+        }
+        if (override != null) {
+            return override;
+        }
+
+        boolean threatFeature = feature == Feature.THREAT_PROTECTION || feature == Feature.THREAT_SETTINGS;
+        // the base role decides on its own; the toggle is not consulted
+        if (!threatFeature || FIXED_THREAT_ACCESS_ROLES.contains(Role.fromName(customRole.getBaseRole()))) {
+            return baseRoleAccess;
+        }
+
+        return Boolean.TRUE.equals(customRole.getThreatProtectionEnabled())
+                ? ReadWriteAccess.READ_WRITE : baseRoleAccess;
+    }
+
+    /** Access a built-in or custom role gives to a feature; unknown roles give none. */
+    public static ReadWriteAccess accessFor(String roleName, Feature feature, boolean fresh) {
+        Role role = Role.fromName(roleName);
+        if (role != null) {
+            return role.getReadWriteAccessForFeature(feature);
+        }
+        CustomRole customRole = fresh ? CustomRoleDao.instance.findRoleByName(roleName) : CustomRoleDao.instance.findRoleByNameCached(roleName);
+        Role baseRole = customRole == null ? null : Role.fromName(customRole.getBaseRole());
+        return baseRole == null ? ReadWriteAccess.NO_ACCESS : accessFor(customRole, feature, baseRole.getReadWriteAccessForFeature(feature));
     }
 
     public static Role getCurrentRoleForUser(int userId, int accountId){
@@ -128,13 +150,24 @@ public class RBACDao extends CommonContextDao<RBAC> {
                 resolvedRole = customRole == null ? null : Role.fromName(customRole.getBaseRole());
             }
             if (resolvedRole == null) {
-                // unknown or deleted role: least privilege instead of an exception (which callers treated as full access)
+                // unknown or deleted role: no access instead of an exception (which callers treated as full access)
                 logger.error(String.format("Unknown role %s for userId: %d accountId: %d", currentRole, userId, accountId));
-                resolvedRole = Role.GUEST;
+                resolvedRole = Role.NO_ACCESS;
             }
             actualRole = resolvedRole;
         }
         return actualRole;
+    }
+
+    /** True when the user's role in the current product is a custom role that no longer exists (e.g. deleted while still in an SSO mapping). */
+    public static boolean hasMissingRole(int userId, int accountId) {
+        RBAC rbac = getCurrentRBACForUser(userId, accountId);
+        if (rbac == null || rbac.hasAccessExpired()) {
+            return false;
+        }
+        String currentRole = instance.fetchRole(rbac);
+        return currentRole != null && !currentRole.isEmpty() && Role.fromName(currentRole) == null
+                && CustomRoleDao.instance.findRoleByNameCached(currentRole) == null;
     }
 
     public String fetchRole (RBAC userRbac) {
@@ -183,14 +216,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return new ArrayList<>();
         }
 
+        // the role in the current product decides; the older single role field is used by fetchRole only when there is no per-product mapping
         String currentRole = fetchRole(rbac);
-        if(currentRole != null && !currentRole.isEmpty()){
-            if(currentRole.equals(Role.ADMIN.getName())){
-                logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
-                return null;
-            }
-        }
-         if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
+        if (currentRole != null && Role.fromName(currentRole) == Role.ADMIN) {
             logger.debug(String.format("Rbac is admin userId: %d accountId: %d", userId, accountId));
             return null;
         }

@@ -37,6 +37,7 @@ import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dto.RBAC;
 import com.akto.dto.CustomRole;
@@ -638,6 +639,7 @@ public class ApiCollectionsAction extends UserAction {
                         Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                         new UpdateOptions().upsert(false)
                 );
+                RbacCacheVersionDao.accessChanged(accountId);
             }
 
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
@@ -758,6 +760,7 @@ public class ApiCollectionsAction extends UserAction {
             }
             CustomRoleDao.clearRoleCache();
             UsersCollectionsList.deleteAccountCollectionIdsFromCache(accountIdForRbac);
+            RbacCacheVersionDao.accessChanged(accountIdForRbac);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error pruning deleted collections from access grants");
         }
@@ -1620,10 +1623,22 @@ public class ApiCollectionsAction extends UserAction {
 
     public String updateUserCollections() {
         int accountId = Context.accountId.get();
+        int callerId = getSUser().getId();
+        if (userCollectionMap == null) {
+            return SUCCESS.toUpperCase();
+        }
+        for (String userIdStr : userCollectionMap.keySet()) {
+            if (String.valueOf(callerId).equals(userIdStr)) {
+                addActionError("You can't change your own collections. Ask another admin.");
+                return ERROR.toUpperCase();
+            }
+        }
 
         for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
             int userId = Integer.parseInt(entry.getKey());
-            Set<Integer> apiCollections = new HashSet<>(entry.getValue());
+            Set<Integer> apiCollections = new HashSet<>(entry.getValue() == null ? Collections.emptyList() : entry.getValue());
+            // "no collections" placeholder from the users list, never a real grant
+            apiCollections.remove(RBACDao.NO_COLLECTION_ID);
 
             /*
              * Need actual role, not base role,
@@ -1633,18 +1648,8 @@ public class ApiCollectionsAction extends UserAction {
                     Filters.eq(RBAC.USER_ID, userId),
                     Filters.eq(RBAC.ACCOUNT_ID, accountId)));
 
-            // Get scope-specific role if scopeRoleMapping exists, otherwise use primary role
-            String role = null;
-            if (rbac != null) {
-                RBAC.Role scopeAwareRole = rbac.getRoleForScope(
-                        Context.contextSource.get()
-                );
-                if (scopeAwareRole != null) {
-                    role = scopeAwareRole.name();
-                } else {
-                    role = rbac.getRole();
-                }
-            }
+            // the role name in the current product (custom or built-in), not its base role
+            String role = rbac == null ? null : RBACDao.instance.fetchRole(rbac);
 
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
             /*
@@ -1664,6 +1669,7 @@ public class ApiCollectionsAction extends UserAction {
              */
             RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userId, accountId));
         }
+        RbacCacheVersionDao.accessChanged(accountId);
 
         return SUCCESS.toUpperCase();
     }

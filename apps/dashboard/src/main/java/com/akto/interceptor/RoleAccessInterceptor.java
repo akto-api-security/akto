@@ -8,6 +8,7 @@ import com.mongodb.client.model.Filters;
 import com.akto.audit_logs_util.Audit;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
@@ -71,12 +72,21 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         this.collectionScope = collectionScope;
     }
 
-    // Error for Argus users limited to specific collections, or null if the request is allowed
-    private String checkCollectionScope(Object action, User user) {
+    // Error for users limited to specific collections, or null if the request is allowed
+    private String checkCollectionScope(Object action, User user, int accountId) {
         if (collectionScope == null) return null;
+        RbacEnums.CollectionScope scope = RbacEnums.CollectionScope.valueOf(collectionScope.toUpperCase());
+        if (scope == RbacEnums.CollectionScope.ALL_COLLECTIONS) {
+            // users, roles and SSO change access to every collection, so they are for admins of all collections only.
+            // Collection limits apply only with the RBAC feature.
+            if (!UsageMetricCalculator.isRbacFeatureAvailable(accountId)) return null;
+            List<Integer> userCollections = UsersCollectionsList.getAssignedCollectionIds(user.getId(), accountId);
+            return userCollections == null || userCollections.isEmpty() ? null
+                    : "Only admins with access to all collections can manage users, roles and SSO.";
+        }
         List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(user);
         if (restrictedIds == null) return null;
-        switch (RbacEnums.CollectionScope.valueOf(collectionScope.toUpperCase())) {
+        switch (scope) {
             case ACCOUNT_WIDE:
                 return "Users limited to specific collections cannot change account-wide settings.";
             case OWN_COLLECTION:
@@ -162,6 +172,8 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             timeNow = Context.now();
             int userId = user.getId();
+            // drop cached access if it was changed on another dashboard instance
+            RbacCacheVersionDao.syncIfChanged(sessionAccId);
 
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
 
@@ -189,7 +201,9 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             if (!isOnboardingRequest && userRoleRecord.equals(Role.NO_ACCESS)) {
                 HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
                 response.setHeader("X-No-Access-Error", "true");
-                ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
+                ((ActionSupport) invocation.getAction()).addActionError(RBACDao.hasMissingRole(userId, sessionAccId)
+                        ? "Your role was removed. Ask an admin to give you a new role."
+                        : "You don't have access to this product. Ask an admin for access, or switch to another product.");
 
                 String contextSourceStr = contextSource.toString();
                 logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
@@ -264,11 +278,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             if(!hasRequiredAccess) {
                 // app log only (no DB write), so a page repeatedly calling an API it cannot use adds no load
                 logger.info("RBAC denied api: " + invocation.getProxy().getActionName() + " userId: " + userId + " role: " + userRole + " feature: " + featureLabel + " " + accessType);
-                ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
+                ((ActionSupport) invocation.getAction()).addActionError("Your role does not have access to this. Ask an admin if you need it.");
                 return FORBIDDEN;
             }
 
-            String collectionScopeError = checkCollectionScope(invocation.getAction(), user);
+            String collectionScopeError = checkCollectionScope(invocation.getAction(), user, sessionAccId);
             if (collectionScopeError != null) {
                 ((ActionSupport) invocation.getAction()).addActionError(collectionScopeError);
                 return FORBIDDEN;

@@ -73,10 +73,11 @@ public class RbacEnums {
         }
     }
 
-    /* Extra check for Argus users limited to specific collections (Advanced RBAC), set per action in struts.xml */
+    /* Extra check for users limited to specific collections (Advanced RBAC), set per action in struts.xml */
     public enum CollectionScope {
-        ACCOUNT_WIDE,   // account-wide setting: blocked for them
-        OWN_COLLECTION  // the requested collection / trace must be one of theirs
+        ACCOUNT_WIDE,   // Argus account-wide setting: blocked for them
+        OWN_COLLECTION, // Argus: the requested collection / trace must be one of theirs
+        ALL_COLLECTIONS // any product: users, roles and SSO, only for users with access to all collections
     }
 
     public enum ReadWriteAccess {

@@ -138,7 +138,8 @@ public class TestRbacGuards extends MongoBasedTest {
         assertEquals(Role.ADMIN, storedRole(201, "ADMIN"));
         assertEquals(Role.MEMBER, storedRole(202, "SECURITY ENGINEER")); // display name stored by older signups
         assertEquals(Role.THREAT_ENGINEER, storedRole(203, "TEAM_ROLE"));
-        assertEquals(Role.GUEST, storedRole(204, "SOME_DELETED_ROLE")); // least privilege, not an exception
+        assertEquals(Role.NO_ACCESS, storedRole(204, "SOME_DELETED_ROLE")); // no access, not an exception
+        assertEquals(Role.ADMIN, storedRole(205, "admin")); // any case
         // and it sees no collections (an empty list would mean all of them)
         assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), RBACDao.instance.getUserCollectionsById(204, ACCOUNT_ID));
         assertEquals(new ArrayList<>(), RBACDao.instance.getUserCollectionsById(202, ACCOUNT_ID)); // built-in role: all, as before
@@ -318,6 +319,14 @@ public class TestRbacGuards extends MongoBasedTest {
             Map<String, String> params = actions.get(entry.getKey());
             assertTrue(entry.getKey() + " has no role check", params != null);
             assertEquals(entry.getKey(), entry.getValue(), rolesAllowed(params));
+        }
+
+        // users, roles and SSO change access to every collection: admins limited to some collections can't
+        for (String action : Arrays.asList("api/createCustomRole", "api/updateCustomRole", "api/deleteCustomRole", "api/removeUser",
+                "api/makeAdmin", "api/updateUserCollections", "api/resetUserPassword", "api/addSAMLSso", "api/deleteSamlSso",
+                "api/saveSamlGroupRoleMapping", "api/addOktaSso", "api/deleteOktaSso", "api/saveOktaGroupRoleMapping",
+                "api/addGithubSso", "api/deleteGithubSso")) {
+            assertEquals(action, "ALL_COLLECTIONS", actions.get(action).get("collectionScope"));
         }
     }
 }

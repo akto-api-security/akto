@@ -191,8 +191,14 @@ public class AbstractThreatDetectionAction extends UserAction {
 
   protected static final int OWN_EVENTS_LIMIT = 100_000;
 
-  // false once an older threat backend rejected the host scope field (400); limited users then use their own events
-  private static volatile boolean backendAcceptsHostScope = true;
+  // when an older threat backend last rejected the host scope field (400); limited users then use their own events
+  // for a while and the field is tried again after HOST_SCOPE_RETRY_SECONDS, so an upgraded backend is picked up
+  private static volatile int hostScopeRejectedAt = 0;
+  private static final int HOST_SCOPE_RETRY_SECONDS = 10 * 60;
+
+  private static boolean backendAcceptsHostScope() {
+    return hostScopeRejectedAt == 0 || Context.now() - hostScopeRejectedAt > HOST_SCOPE_RETRY_SECONDS;
+  }
 
   /*
    * Host scope sent with the threat backend's aggregations for a user limited to specific collections, so the
@@ -201,17 +207,17 @@ public class AbstractThreatDetectionAction extends UserAction {
    * is visible to them (empty results) or the backend does not accept the field yet.
    */
   protected Map<String, Object> backendHostScope() {
-    if (!backendAcceptsHostScope || !isLimitedToOwnAgents()) {
+    if (!backendAcceptsHostScope() || !isLimitedToOwnAgents()) {
       return null;
     }
     Map<String, Object> scope = new HashMap<>();
     return ArgusCollectionScope.scopeActivityFilters(getSUser(), scope) ? scope : null;
   }
 
-  /** True when an older threat backend rejected the host scope; remembered, so the caller (and later requests) use own events. */
+  /** True when an older threat backend rejected the host scope; remembered for a while, so the caller (and later requests) use own events. */
   protected static boolean hostScopeRejected(Map<String, Object> hostScope, int statusCode) {
     if (hostScope != null && statusCode == 400) {
-      backendAcceptsHostScope = false;
+      hostScopeRejectedAt = Context.now();
       return true;
     }
     return false;

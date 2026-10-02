@@ -107,13 +107,14 @@ public class RBAC {
             return name;
         }
 
-        /** Role for a stored role string: the enum name, or the display name some older records store (e.g. "SECURITY ENGINEER"). Null if neither. */
+        /** Role for a stored role string: the enum name, or the display name some older records store (e.g. "SECURITY ENGINEER"), in any case. Null if neither. */
         public static Role fromName(String roleName) {
             if (roleName == null) {
                 return null;
             }
+            String trimmed = roleName.trim();
             for (Role role : values()) {
-                if (role.name().equals(roleName) || role.getName().equals(roleName)) {
+                if (role.name().equalsIgnoreCase(trimmed) || role.getName().equalsIgnoreCase(trimmed)) {
                     return role;
                 }
             }
@@ -334,6 +335,7 @@ public class RBAC {
             }
         } catch (Exception e) {
         }
-        return Role.GUEST;
+        // unknown or deleted role: no access, the same as RBACDao.getCurrentRoleForUser
+        return Role.NO_ACCESS;
     }
 }

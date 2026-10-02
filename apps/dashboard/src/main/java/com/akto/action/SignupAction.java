@@ -296,7 +296,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping before init: " + this.scopeRoleMapping);
                 if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), pendingInviteCode.getAccountId(), email);
+                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, inviteRoleOrMember(pendingInviteCode), pendingInviteCode.getAccountId(), email);
                     logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after init: " + this.scopeRoleMapping);
                 }
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
@@ -385,7 +385,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping before init: " + this.scopeRoleMapping);
             if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), invitedToAccountId, email);
+                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, inviteRoleOrMember(pendingInviteCode), invitedToAccountId, email);
                 logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after init: " + this.scopeRoleMapping);
             }
             // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -605,7 +605,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping before init: " + this.scopeRoleMapping);
                     if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.name(), accountId, email);
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, inviteRoleOrMember(pendingInviteCode), accountId, email);
                         logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after init: " + this.scopeRoleMapping);
                     }
                     // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -632,10 +632,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                         true, !oktaGroups.isEmpty());
             }
             if (groupScopeRoleMapping != null) {
-                SsoRoleMapping.auditRoleChange(email, accountId, groupScopeRoleMapping, "authorization-code/callback", servletRequest);
+                boolean rolesChanged = SsoRoleMapping.auditRoleChange(email, accountId, groupScopeRoleMapping, "authorization-code/callback", servletRequest);
                 this.scopeRoleMapping = groupScopeRoleMapping;
                 createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), null, groupScopeRoleMapping);
-                SsoRoleMapping.clearUserCache(email, accountId);
+                if (rolesChanged) SsoRoleMapping.clearUserCache(email, accountId);
             } else {
                 createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
             }
@@ -1211,10 +1211,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[Azure SSO] email=" + useremail + ", groups=" + samlGroups + ", groupScopeRoleMapping=" + groupScopeRoleMapping);
 
             if (groupScopeRoleMapping != null) {
-                SsoRoleMapping.auditRoleChange(useremail, this.accountId, groupScopeRoleMapping, "signup-azure-saml", servletRequest);
+                boolean rolesChanged = SsoRoleMapping.auditRoleChange(useremail, this.accountId, groupScopeRoleMapping, "signup-azure-saml", servletRequest);
                 this.scopeRoleMapping = groupScopeRoleMapping;
                 createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null, groupScopeRoleMapping);
-                SsoRoleMapping.clearUserCache(useremail, this.accountId);
+                if (rolesChanged) SsoRoleMapping.clearUserCache(useremail, this.accountId);
             } else {
                 createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null);
             }
@@ -1348,6 +1348,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 //
 //        return "SUCCESS";
 //    }
+
+    // older invites keep a single role instead of per-product roles; use it for every product
+    private static String inviteRoleOrMember(PendingInviteCode pendingInviteCode) {
+        String role = pendingInviteCode == null ? null : pendingInviteCode.getInviteeRole();
+        return role == null || role.trim().isEmpty() ? RBAC.Role.MEMBER.name() : role;
+    }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method, Map<String,String> scopeRoleMapping) throws IOException {
