@@ -280,7 +280,11 @@ public class RBACDao extends CommonContextDao<RBAC> {
                 continue;
             }
             if (rule.getHostRegex() != null && !rule.getHostRegex().trim().isEmpty()) {
-                filters.add(Filters.regex(ApiCollection.HOST_NAME, rule.getHostRegex()));
+                // collections without a host (created by hand or from a file) are matched by their name instead
+                Bson noHost = Filters.or(Filters.exists(ApiCollection.HOST_NAME, false), Filters.eq(ApiCollection.HOST_NAME, null), Filters.eq(ApiCollection.HOST_NAME, ""));
+                filters.add(Filters.or(
+                        Filters.regex(ApiCollection.HOST_NAME, rule.getHostRegex()),
+                        Filters.and(noHost, Filters.regex(ApiCollection.NAME, rule.getHostRegex()))));
             } else {
                 filters.add(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
                         Filters.eq(CollectionTags.KEY_NAME, rule.getTagKey()),

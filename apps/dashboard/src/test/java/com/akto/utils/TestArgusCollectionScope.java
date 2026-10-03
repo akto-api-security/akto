@@ -422,10 +422,16 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
     @Test
     public void testCollectionRules() {
         insertAgentCollection(4, "team-a-new-agent.example.com"); // added later, matches the host rule
+        // a collection made by hand has no host: its name is matched instead
+        ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(5, "team-a-manual"));
+        // a collection with a host is matched by its host only, so renaming it can't move it into a team
+        ApiCollection renamed = ApiCollection.createManualCollection(6, "team-a-renamed");
+        renamed.setHostName("team-b-other.example.com");
+        ApiCollectionsDao.instance.insertOne(renamed);
         insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
         insertUser(106, "TEAM_A_BY_HOST");
         as(106, CONTEXT_SOURCE.AGENTIC);
-        assertEquals(new HashSet<>(Arrays.asList(1, 4)), new HashSet<>(ArgusCollectionScope.getRestrictedCollectionIds(user(106))));
+        assertEquals(new HashSet<>(Arrays.asList(1, 4, 5)), new HashSet<>(ArgusCollectionScope.getRestrictedCollectionIds(user(106))));
         assertEquals(new HashSet<>(Arrays.asList(OWN_HOST, "team-a-new-agent.example.com")), ArgusCollectionScope.getRestrictedHosts(user(106)));
 
         insertRuleRole("TEAM_BY_TAG", new CollectionRule(null, Constants.AKTO_GEN_AI_TAG, "Gen AI"));
