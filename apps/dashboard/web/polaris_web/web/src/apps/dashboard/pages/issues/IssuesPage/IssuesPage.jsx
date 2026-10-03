@@ -41,6 +41,8 @@ import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
 import { getDashboardCategory, isAgenticSecurityCategory, mapLabel, categoryToShortName } from "../../../../main/labelHelper.js";
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import SeveritySelector from "../components/SeveritySelector";
+import { usePermissions, withPermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 
 const sortOptions = [
@@ -117,6 +119,7 @@ const resourceName = {
 };
 
 function IssuesPage() {
+    const { canCall } = usePermissions()
     const [headers, setHeaders] = useState([
         {
             title: '',
@@ -634,33 +637,44 @@ function IssuesPage() {
         }
 
 
+        // ignoring with a compulsory description also saves the description on each issue
+        const ignoreRequires = (reasonKey) => requiresDescription(reasonKey)
+            ? ['api/bulkUpdateIssueStatus', 'api/updateIssueDescription']
+            : 'api/bulkUpdateIssueStatus'
+
         let issues = [
             {
                 content: 'Update severity',
-                onAction: () => { openSeverityUpdateModal(items) }
+                onAction: () => { openSeverityUpdateModal(items) },
+                requires: 'api/bulkUpdateIssueSeverity'
             },
             {
                 content: 'False positive',
                 key: 'falsePositive',
-                onAction: () => { ignoreAction('falsePositive') }
+                onAction: () => { ignoreAction('falsePositive') },
+                requires: ignoreRequires('falsePositive')
             },
             {
                 content: 'Acceptable risk',
                 key: 'acceptableFix',
-                onAction: () => { ignoreAction('acceptableFix') }
+                onAction: () => { ignoreAction('acceptableFix') },
+                requires: ignoreRequires('acceptableFix')
             },
             {
                 content: 'No time to fix',
                 key: 'noTimeToFix',
-                onAction: () => { ignoreAction('noTimeToFix') }
+                onAction: () => { ignoreAction('noTimeToFix') },
+                requires: ignoreRequires('noTimeToFix')
             },
             {
                 content: 'Export selected Issues',
-                onAction: () => { openVulnerabilityReport(items, false) }
+                onAction: () => { openVulnerabilityReport(items, false) },
+                requires: 'api/generateReportPDF'
             },
             {
                 content: 'Export selected Issues summary',
-                onAction: () => { openVulnerabilityReport(items, true) }
+                onAction: () => { openVulnerabilityReport(items, true) },
+                requires: 'api/generateReportPDF'
             },
             {
                 content: 'Export selected Issues as Markdown',
@@ -673,33 +687,39 @@ function IssuesPage() {
             {
                 content: 'Create jira ticket',
                 onAction: () => { createJiraTicketBulk() },
-                disabled: (window.JIRA_INTEGRATED === 'false')
+                disabled: (window.JIRA_INTEGRATED === 'false'),
+                requires: ['api/fetchIntegration', 'api/bulkCreateJiraTickets']
             },
             {
                 content: 'Create azure work item',
                 onAction: () => { createAzureBoardWorkItemBulk() },
-                disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
+                disabled: (window.AZURE_BOARDS_INTEGRATED === 'false'),
+                requires: ['api/fetchAzureBoardsIntegration', 'api/bulkCreateAzureWorkItems']
             },
             {
                 content: 'Create ServiceNow ticket',
                 onAction: () => { createServiceNowTicketBulk() },
-                disabled: (window.SERVICENOW_INTEGRATED === 'false')
+                disabled: (window.SERVICENOW_INTEGRATED === 'false'),
+                requires: ['api/fetchServiceNowIntegration', 'api/bulkCreateServiceNowTickets']
             },
             {
                 content: 'Create DevRev ticket',
                 onAction: () => { createDevRevTicketBulk() },
-                disabled: (window.DEVREV_INTEGRATED === 'false')
+                disabled: (window.DEVREV_INTEGRATED === 'false'),
+                requires: ['api/fetchDevRevIntegration', 'api/createDevRevTickets']
             },
             {
                 content: 'Create Wiz finding(s)',
                 onAction: () => { createWizFindings() },
-                disabled: (window.WIZ_INTEGRATED === 'false')
+                disabled: (window.WIZ_INTEGRATED === 'false'),
+                requires: 'api/createWizFindings'
             },
         ];
 
         let reopen = [{
             content: 'Reopen',
-            onAction: () => { reopenAction() }
+            onAction: () => { reopenAction() },
+            requires: 'api/bulkUpdateIssueStatus'
         }]
 
         let ret = [];
@@ -1195,7 +1215,7 @@ function IssuesPage() {
 
                         : components
                 ]}
-                primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export results</Button>}
+                primaryAction={<AllowedAction allowed={canCall('api/generateReportPDF')}><Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export results</Button></AllowedAction>}
                 secondaryActions={
                     <HorizontalStack gap={2}>
                         <Box minWidth="240px">
@@ -1219,7 +1239,7 @@ function IssuesPage() {
                         >
                             <ActionList
                                 actionRole="menuitem"
-                                items={[
+                                items={withPermissions([
                                     {
                                         content: 'Export results as CSV',
                                         onAction: exportCsv,
@@ -1231,8 +1251,9 @@ function IssuesPage() {
                                     {
                                         content: 'Export summary report',
                                         onAction: () => openVulnerabilityReport([], true),
+                                        requires: 'api/generateReportPDF',
                                     },
-                                ]}
+                                ])}
                             />
                         </Popover>
                     </HorizontalStack>}

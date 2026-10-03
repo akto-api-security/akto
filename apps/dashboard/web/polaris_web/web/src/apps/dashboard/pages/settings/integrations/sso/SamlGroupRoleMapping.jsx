@@ -4,6 +4,8 @@ import { DeleteMinor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../../api';
 import { rolesOptions, getRoleDisplayName } from '../../roles/roleUtils';
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from '../../../../components/shared/AllowedAction';
 
 // group names are stored as keys, which can't contain '.' or start with '$'
 function groupError(group, mapping) {
@@ -16,6 +18,7 @@ function groupError(group, mapping) {
 
 // Maps SSO groups (as sent in the SAML groups claim) to Akto roles, applied on every login.
 function SamlGroupRoleMapping({ configType, savedMapping, savedRemoveAccessWithoutGroup }) {
+    const { canCall } = usePermissions()
     const [saved, setSaved] = useState({ mapping: {}, removeAccessWithoutGroup: false })
     const [mapping, setMapping] = useState({})
     const [removeAccessWithoutGroup, setRemoveAccessWithoutGroup] = useState(false)
@@ -139,7 +142,9 @@ function SamlGroupRoleMapping({ configType, savedMapping, savedRemoveAccessWitho
                     ) : null}
                     <HorizontalStack align="end" gap="3" blockAlign="center">
                         {changed ? <Text variant="bodySm" color="subdued">Unsaved changes</Text> : null}
+                        <AllowedAction allowed={canCall('api/saveSamlGroupRoleMapping')}>
                         <Button primary loading={saving} disabled={!changed} onClick={handleSave}>Save</Button>
+                        </AllowedAction>
                     </HorizontalStack>
                 </VerticalStack>
             </LegacyCard.Section>

@@ -8,10 +8,13 @@ import { Button } from "@shopify/polaris"
 import { useNavigate } from "react-router-dom"
 import WebhooksStore from "../webhooks/webhooksStore"
 import Store from "../../../../store"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../../components/shared/AllowedAction"
 
 function WebhooksCore(props) {
 
     const { type } = props
+    const { canCall } = usePermissions()
 
     const navigate = useNavigate()
 
@@ -116,6 +119,7 @@ function WebhooksCore(props) {
             items: [{
                 content: item.activeStatus === "ACTIVE" ? 'Deactivate' : 'Activate',
                 onAction: () => handleWebhookStatusChange(item.id, item.activeStatus === "ACTIVE" ? "INACTIVE": "ACTIVE"),
+                requires: 'api/changeStatus',
             }]
         }]
     }
@@ -154,9 +158,11 @@ function WebhooksCore(props) {
     )
 
     const createCustomWebhook =  (
+        <AllowedAction allowed={canCall('api/addCustomWebhook')}>
         <Button onClick={() => navigate('create_custom_webhook')}>
             Create Custom Webhook
         </Button>
+        </AllowedAction>
     )
 
     return (
@@ -165,6 +171,7 @@ function WebhooksCore(props) {
             cardContent={webhooksCardContent}
             component={WebhooksCard}
             secondaryAction={createCustomWebhook}
+            readOnly={!canCall('api/addCustomWebhook')}
         />
     )
 }

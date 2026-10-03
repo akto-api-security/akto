@@ -4,11 +4,14 @@ import PersistStore from '@/apps/main/PersistStore';
 
 import defaultPayloadsApi from './api'
 import func from '@/util/func'
+import { usePermissions } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 import {useState, useEffect} from 'react'
 function DefaultPayloads() {
 
     const hostNameMap = PersistStore(state => state.hostNameMap)
+    const { canCall } = usePermissions()
     const allHostnames = Object.keys(hostNameMap)
 
 
@@ -122,7 +125,9 @@ function DefaultPayloads() {
                         }
                         {
                             <div className='footer-save'>
-                                <Button primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText}>Save</Button>
+                                <AllowedAction allowed={canCall('api/saveDefaultPayload')}>
+                                    <Button primary onClick={savePattern} disabled={patternText === '' || selectedDDefaultPayload === patternText}>Save</Button>
+                                </AllowedAction>
                             </div>
                         }
                     </VerticalStack>

@@ -9,6 +9,13 @@ const accessTokenUrl = "/dashboard/accessToken"
 // De-dupe concurrent 403s (e.g. a page firing many parallel requests on a fresh tab) into one token refresh.
 let refreshTokenPromise = null
 
+// set by util/permissions once the user's permissions load: true when the server would refuse this action for the user
+let isDeniedAction = () => false
+export function setDeniedActionCheck(check) {
+  isDeniedAction = check
+}
+export const ROLE_DENIED_MESSAGE = "Your role does not have access to this. Ask an admin if you need it."
+
 // create axios
 const service = axios.create({
   baseURL: window.location.origin, // api base_url
@@ -127,6 +134,15 @@ const err = async (error) => {
 // request interceptor
 // For every request that is sent from the vue app, automatically attach the accessToken from the store
 service.interceptors.request.use((config) => {
+  // a call the server would refuse for this role is not sent: it fails the same way, without a request or a toast
+  const action = String(config.url || '').replace(/^\//, '')
+  if (action.startsWith('api/') && isDeniedAction(action)) {
+    return Promise.reject(Object.assign(new Error(ROLE_DENIED_MESSAGE), {
+      config: { ...config, suppress403Toast: true },
+      response: { status: 403, data: { actionErrors: [ROLE_DENIED_MESSAGE] }, headers: {} },
+      deniedByRole: true,
+    }))
+  }
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
   config.headers["access-token"] = SessionStore.getState().accessToken

@@ -10,6 +10,7 @@ import SearchableResourceList from "../../../components/shared/SearchableResourc
 import observeApi from "../../observe/api";
 import { usersCollectionRenderItem } from "../rbac/utils";
 import { getRoleDisplayName } from "../roles/roleUtils";
+import { usePermissions } from "@/util/permissions";
 
 const NO_COLLECTION_ID = -2147483648 // placeholder the server uses for "no collections"; never a real grant
 
@@ -52,7 +53,10 @@ const Users = () => {
     const PRODUCT_SCOPES = useMemo(() => getAvailableProductScopes(), [])
     const username = window.USER_NAME
     const userRole = window.USER_ROLE
-    const isAdmin = userRole === 'ADMIN'
+    const { canCall } = usePermissions()
+    // admins of all collections: remove users, set access end dates, manage every product and per-user collections
+    const isAdmin = canCall('api/removeUser')
+    const canEditCollections = canCall('api/updateUserCollections') && canCall('api/getAllUsersCollections')
     const isLocalDeploy = func.checkLocal()
     const rbacAccess = func.checkForRbacFeatureBasic()
     const rbacAccessAdvanced = func.checkForRbacFeature()
@@ -100,7 +104,7 @@ const Users = () => {
         try {
             const team = await settingRequests.getTeamData()
             setUsers(team || [])
-            if (isAdmin && rbacAccessAdvanced) {
+            if (canEditCollections && rbacAccessAdvanced) {
                 const collections = await observeApi.getAllUsersCollections().catch(() => ({}))
                 setUsersCollection(collections || {})
             }
@@ -202,10 +206,14 @@ const Users = () => {
 
     const renderItem = (user) => {
         const { id, name, login } = user
+        
+        const initials = func.initials(login)
+        const media = <Avatar user size="medium" name={login} initials={initials} />
+
         const isSelf = login === username
         const shortcutActions = []
-        if (canManageUser(user)) {
-            if (isAdmin && rbacAccessAdvanced && !isAdminInCurrentProduct(user)) {
+        if (canManageUser(user) && canCall('api/updateUserScopeRoleMapping')) {
+            if (canEditCollections && rbacAccessAdvanced && !isAdminInCurrentProduct(user)) {
                 const count = savedCollections(user).length
                 // the list holds chosen collections only; a role limited by rules still limits the user
                 const roleInProduct = (user.scopeRoleMapping && Object.keys(user.scopeRoleMapping).length > 0) ? user.scopeRoleMapping[currentProduct] : user.role
@@ -217,14 +225,14 @@ const Users = () => {
                 })
             }
             shortcutActions.push({ content: 'Edit access', accessibilityLabel: `Edit access for ${login}`, onAction: () => setEditing(user) })
-        } else if (user.isInvitation && (isAdmin || user.id === myId)) {
+        } else if (user.isInvitation && canCall('api/removeInvitation') && (isAdmin || user.id === myId)) {
             shortcutActions.push({ content: 'Revoke invite', accessibilityLabel: `Revoke invite for ${login}`, onAction: () => revokeInvite(user) })
         }
 
         return (
             <ResourceItem
                 id={`${id}-${login}`}
-                media={<Avatar customer size="medium" name={login} initials={func.initials(login)} />}
+                media={media}
                 shortcutActions={shortcutActions}
                 persistActions
                 accessibilityLabel={login}
@@ -246,7 +254,7 @@ const Users = () => {
     }
 
     const inviteDisabledReason = isLocalDeploy ? "Inviting is off on local deployments."
-        : (userRole === 'GUEST' || userRole === 'DEVELOPER') ? "Your role can't invite users."
+        : !canCall('api/inviteUsers') ? "Your role can't invite users."
             : window.INVITE_DISABLED_FOR_SSO ? "Users are added through your SSO provider." : null
 
     return (

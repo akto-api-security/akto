@@ -24,6 +24,7 @@ import { GithubRow} from './rows/GithubRow';
 import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import { createPortal } from 'react-dom';
 import "./style.css"
+import { withPermissions } from "@/util/permissions";
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
 import PersistStore from '../../../main/PersistStore';
@@ -869,7 +870,7 @@ function GithubServerTable(props) {
                 selectable={props.selectable || false}
                 onSelectionChange={customSelectionChange}
                 headings={processedHeadings}
-                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(bulkActionResources) : []}
+                promotedBulkActions={props.selectable ? props.promotedBulkActions && withPermissions(props.promotedBulkActions(bulkActionResources)) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
                 sortable={sortableColumns}
                 sortColumnIndex={activeColumnSort.columnIndex}

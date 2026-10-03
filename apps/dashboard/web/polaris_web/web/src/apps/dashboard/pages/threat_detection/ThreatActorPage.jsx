@@ -18,6 +18,8 @@ import React from "react";
 import { getDashboardCategory, mapLabel, getReportCategoryShortName, shortNameToCategory } from "../../../main/labelHelper";
 import PersistStore from "../../../main/PersistStore";
 import useThreatReportDownload from "../../hooks/useThreatReportDownload";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../components/shared/AllowedAction";
 
 // Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
 const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
@@ -51,6 +53,7 @@ const ChartComponent = ({ onSubCategoryClick, currDateRange }) => {
 const MemoizedChartComponent = React.memo(ChartComponent);
 
 function ThreatActorPage() {
+  const { canCall } = usePermissions();
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
 
@@ -135,9 +138,11 @@ function ThreatActorPage() {
         />
       }
       secondaryActions={
-        <Button primary onClick={downloadThreatReport}>
-          Export Threat Report
-        </Button>
+        <AllowedAction allowed={canCall('api/generateThreatReport')}>
+          <Button primary onClick={downloadThreatReport}>
+            Export Threat Report
+          </Button>
+        </AllowedAction>
       }
       components={components}
     />

@@ -12,6 +12,7 @@ import {
     editablePermissions, isLimitedToCollections, isGivableByTeamAdmin, describeRule, usageSummary, hostPatternError, tagRuleError
 } from "./roleUtils";
 import { roleDetailsUrl, CreateRoleModal } from "./Roles";
+import { usePermissions } from "@/util/permissions";
 
 const PRODUCT_LABELS = { API: 'API Security', AGENTIC: 'Akto ARGUS', ENDPOINT: 'Akto ATLAS', DAST: 'DAST' }
 
@@ -41,7 +42,9 @@ function RoleDetails() {
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
     const roleName = searchParams.get('name')
-    const canEdit = window.USER_ROLE === 'ADMIN' && !func.checkLocal()
+    const { canCall } = usePermissions()
+    const canEdit = canCall('api/updateCustomRole') && !func.checkLocal()
+    const canDelete = canCall('api/deleteCustomRole')
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const threatGranted = isThreatFeatureGranted()
 
@@ -429,7 +432,7 @@ function RoleDetails() {
     const secondaryActions = canEdit ? (
         <HorizontalStack gap="2">
             <Button onClick={() => setCopyOpen(true)}>Copy</Button>
-            {inUse ? (
+            {!canDelete ? null : inUse ? (
                 <Tooltip content={`Used by ${usageSummary(usage)}. Give them another role first.`}>
                     <Button destructive disabled>Delete</Button>
                 </Tooltip>
@@ -440,7 +443,7 @@ function RoleDetails() {
     const components = [detailsCard, permissionsCard, collectionsCard, teamAdminCard, usersCard]
     if (!canEdit) {
         components.unshift(
-            <Banner key="read-only" status="info"><p>Only admins can change roles.</p></Banner>
+            <Banner key="read-only" status="info"><p>Only admins of all collections can change roles.</p></Banner>
         )
     }
 

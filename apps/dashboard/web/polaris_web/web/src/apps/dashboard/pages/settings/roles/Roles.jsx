@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import func from "@/util/func";
 import settingRequests from "../api";
 import { rolesOptions, getRoleDisplayName, collectionsSummary, usageSummary, roleNameError } from "./roleUtils";
+import { usePermissions } from "@/util/permissions";
 
 export { rolesOptions, getRoleDisplayName }
 
@@ -87,7 +88,8 @@ const Roles = () => {
     const navigate = useNavigate()
     const userRole = window.USER_ROLE
     const isLocalDeploy = func.checkLocal()
-    const canEdit = userRole === 'ADMIN' && !isLocalDeploy
+    const { canCall } = usePermissions()
+    const canEdit = canCall('api/createCustomRole') && !isLocalDeploy
 
     const [roles, setRoles] = useState([])
     const [roleUsage, setRoleUsage] = useState({})
@@ -118,7 +120,7 @@ const Roles = () => {
     const existingNames = roles.map(r => r.name)
 
     const createDisabledReason = isLocalDeploy ? "Custom roles aren't available on local deployments."
-        : userRole !== 'ADMIN' ? "Only admins can create roles." : null
+        : !canCall('api/createCustomRole') ? "Only admins of all collections can create roles." : null
 
     const renderItem = (role) => {
         const changes = Object.keys(role.permissionOverrides || {}).length

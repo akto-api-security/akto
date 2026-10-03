@@ -6,9 +6,12 @@ import FlyLayout from '../../../components/layouts/FlyLayout';
 import SpinnerCentered from '../../../components/progress/SpinnerCentered';
 import TooltipText from '../../../components/shared/TooltipText';
 import func from '@/util/func';
+import { usePermissions } from '@/util/permissions';
+import AllowedAction from '../../../components/shared/AllowedAction';
 
 function AgenticHistoryModal({ isOpen, onClose, onHistoryClick, historyItems = [], searchQuery = '', onSearchQueryChange, isLoading = false, onDelete }) {
     const [hoveredItemId, setHoveredItemId] = useState(null);
+    const { canCall } = usePermissions();
     const handleDelete = (e, conversationId) => {
         e.stopPropagation();
         clearConversationFromLocal(conversationId);
@@ -66,9 +69,11 @@ function AgenticHistoryModal({ isOpen, onClose, onHistoryClick, historyItems = [
                                     </Box>
                                     {
                                         hoveredItemId === item.id ? (
-                                            <Button monochrome icon={DeleteMinor} plain
-                                                onClick={(e) => handleDelete(e, item.id)}
-                                            />
+                                            <AllowedAction allowed={canCall('api/deleteConversationHistory')}>
+                                                <Button monochrome icon={DeleteMinor} plain
+                                                    onClick={(e) => handleDelete(e, item.id)}
+                                                />
+                                            </AllowedAction>
                                         ) : <Text variant="bodyMd" tone="subdued">{func.prettifyEpoch(item.lastUpdatedAt)}</Text>
                                     }
                                 </HorizontalStack>

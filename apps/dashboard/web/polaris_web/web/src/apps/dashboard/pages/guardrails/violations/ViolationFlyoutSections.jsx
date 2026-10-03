@@ -18,6 +18,7 @@ import { NoteMinor } from "@shopify/polaris-icons";
 import AssetTopologyGraph from "@/apps/dashboard/pages/observe/agentic/AssetTopologyGraph";
 import DetailGrid from "@/apps/dashboard/pages/observe/agentic/DetailGrid";
 import SampleData from "@/apps/dashboard/components/shared/SampleData";
+import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
@@ -74,14 +75,18 @@ export function HumanApprovalTabLabel({ count }) {
     );
 }
 
-export function HumanApprovalActions({ pending, response, onApprove, onBlock, loading, subtle }) {
+export function HumanApprovalActions({ pending, response, onApprove, onBlock, loading, subtle, allowed = true }) {
     if (!pending) {
         return <HumanResponseBadge response={response} />;
     }
     return (
         <>
-            <Button size="slim" primary={!subtle} plain={!!subtle} loading={loading} onClick={onApprove}>Approve</Button>
-            <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Deny</Button>
+            <AllowedAction allowed={allowed}>
+                <Button size="slim" primary={!subtle} plain={!!subtle} loading={loading} onClick={onApprove}>Approve</Button>
+            </AllowedAction>
+            <AllowedAction allowed={allowed}>
+                <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Deny</Button>
+            </AllowedAction>
         </>
     );
 }

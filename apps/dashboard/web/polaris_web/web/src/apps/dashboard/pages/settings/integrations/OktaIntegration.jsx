@@ -10,6 +10,8 @@ import StepsComponent from './components/StepsComponent';
 import Details from './components/Details';
 import DeleteModal from './components/DeleteModal';
 import { rolesOptions, getRoleDisplayName } from '../roles/Roles';
+import { usePermissions } from '@/util/permissions';
+import AllowedAction from '../../../components/shared/AllowedAction';
 
 function dashboardActionError(err, fallback) {
     const list = err?.response?.data?.actionErrors
@@ -25,6 +27,7 @@ function managementApiTokenMaskedFromResponse(resp) {
 
 function OktaIntegration() {
     const hostname = window.location.origin
+    const { canCall } = usePermissions()
 
     const [componentType, setComponentType] = useState(0)
     const [loading, setLoading] = useState(false)
@@ -125,7 +128,9 @@ function OktaIntegration() {
                         helpText="Used only to read group membership from Okta when groups are not in the access token."
                     />
                     <HorizontalStack align="end">
+                        <AllowedAction allowed={canCall('api/addOktaSso')}>
                         <Button submit primary size="medium">Submit</Button>
+                        </AllowedAction>
                     </HorizontalStack>
                 </FormLayout>
             </Form>
@@ -509,7 +514,9 @@ function OktaIntegration() {
             ) : null}
             <HorizontalStack align="end" gap="2">
                 <Button onClick={handleCancelEdit}>Cancel</Button>
+                <AllowedAction allowed={canCall('api/saveOktaGroupRoleMapping')}>
                 <Button primary loading={savingSettings} onClick={handleSaveSettings}>Save</Button>
+                </AllowedAction>
             </HorizontalStack>
         </VerticalStack>
     )
@@ -527,12 +534,14 @@ function OktaIntegration() {
                         </VerticalStack>
                         {!editMode && (
                             <Box flexShrink={0}>
+                                <AllowedAction allowed={canCall('api/saveOktaGroupRoleMapping')}>
                                 <Button
                                     icon={hasGroupMappings || hasSavedManagementToken ? EditMinor : PlusMinor}
                                     onClick={handleEditClick} primary size="medium"
                                 >
                                     {hasGroupMappings || hasSavedManagementToken ? 'Edit' : 'Set up'}
                                 </Button>
+                                </AllowedAction>
                             </Box>
                         )}
                     </HorizontalStack>
@@ -553,7 +562,7 @@ function OktaIntegration() {
                 ) : componentType === 1 ? (
                     formComponent
                 ) : (
-                    <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} />
+                    <Details values={listValues} onClickFunc={() => setShowDeleteModal(true)} deleteAllowed={canCall('api/deleteOktaSso')} />
                 )}
             </LegacyCard>
             {componentType === 2 && roleMappingCard}
@@ -576,8 +585,9 @@ function OktaIntegration() {
                 )}
                 component={oktaSSOComponent}
                 docsUrl="https://docs.akto.io/sso/okta-oidc"
+                readOnly={!canCall('api/addOktaSso')}
             />
-            <DeleteModal showDeleteModal={showDeleteModal} setShowDeleteModal={setShowDeleteModal} SsoType="Okta" onAction={handleDelete} />
+            <DeleteModal showDeleteModal={showDeleteModal} setShowDeleteModal={setShowDeleteModal} SsoType="Okta" onAction={handleDelete} allowed={canCall('api/deleteOktaSso')} />
         </>
     )
 }

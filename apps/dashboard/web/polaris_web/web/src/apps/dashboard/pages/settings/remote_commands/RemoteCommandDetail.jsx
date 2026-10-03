@@ -10,6 +10,8 @@ import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleC
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import settingRequests from '../api'
 import func from '@/util/func'
+import { usePermissions } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -172,6 +174,7 @@ function RemoteCommandDetail() {
     const [refreshing, setRefreshing] = useState(false)
     const [tableVersion, setTableVersion] = useState(0)
     const [cancelling, setCancelling] = useState(false)
+    const { canCall } = usePermissions()
     const pollRef = useRef(null)
 
     async function loadData() {
@@ -284,9 +287,11 @@ function RemoteCommandDetail() {
                             <Text color="subdued" variant="bodySm">Expired</Text>
                         )}
                         {command?.status === 'ACTIVE' && (
-                            <Button destructive onClick={handleCancel} loading={cancelling} size="slim">
-                                Cancel Command
-                            </Button>
+                            <AllowedAction allowed={canCall('api/cancelEndpointRemoteCommand')}>
+                                <Button destructive onClick={handleCancel} loading={cancelling} size="slim">
+                                    Cancel Command
+                                </Button>
+                            </AllowedAction>
                         )}
                     </HorizontalStack>
                 </HorizontalStack>
