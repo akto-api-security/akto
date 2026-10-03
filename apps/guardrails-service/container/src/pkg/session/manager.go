@@ -174,6 +174,13 @@ func (sm *SessionManager) syncSessions(ctx context.Context) {
 			continue
 		}
 
+		// Skip until session guardrails have a summary or session-anomaly lock (no sparse docs).
+		if strings.TrimSpace(session.LastSummary) == "" && !session.IsMalicious {
+			session.mu.RUnlock()
+			skippedCount++
+			continue
+		}
+
 		// Truncate conversation payloads to 100 words for DB storage
 		truncatedConvs := make([]ConversationEntry, len(session.Conversations))
 		for i, conv := range session.Conversations {
@@ -349,6 +356,9 @@ func ExtractPromptFromRequestPayload(payload string) string {
 
 	if prompt, ok := env.outer["prompt"].(string); ok {
 		return prompt
+	}
+	if body, ok := env.outer["body"].(string); ok {
+		return body
 	}
 
 	return payload
@@ -682,6 +692,7 @@ Assistant response, the only evidence available so far, note it explicitly if th
 // GenerateAndUpdateSummary calls cyborg's getLLMResponseV2 to generate a new summary
 // isRequest: true for user requests, false for system responses
 func (sm *SessionManager) GenerateAndUpdateSummary(ctx context.Context, sessionID string, currentItem string, isRequest bool) error {
+	currentItem = strings.TrimSpace(currentItem)
 	if currentItem == "" {
 		return nil
 	}
