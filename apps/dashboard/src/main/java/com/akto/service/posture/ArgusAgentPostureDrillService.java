@@ -14,6 +14,7 @@ import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.utils.crons.AgenticPostureScoreCron;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -25,10 +26,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 // Flyout drills for the Argus posture score and the agent list, sharing one per-agent profile level.
 public class ArgusAgentPostureDrillService {
@@ -88,6 +91,10 @@ public class ArgusAgentPostureDrillService {
     }
 
     private PostureDrillResult postureScoreRoot(InsightDataBundle bundle, List<ApiCollection> agents, int skip, int limit) {
+        List<ApiCollection> slice = AgenticPostureScoreCron.worstSlice(agents, ApiCollection::getPostureScore);
+        Set<Integer> sliceIds = new HashSet<>();
+        for (ApiCollection agent : slice) sliceIds.add(agent.getId());
+
         List<Map<String, Object>> rows = new ArrayList<>();
         Map<PostureScoreCategory, Integer> affectedByCategory = new HashMap<>();
         double composite = 0;
@@ -98,14 +105,14 @@ public class ArgusAgentPostureDrillService {
             double topSubScore = 0;
             for (ApiCollection agent : agents) {
                 double sub = category.subScore(agent.getPostureSubScores());
-                subScoreSum += sub;
+                if (sliceIds.contains(agent.getId())) subScoreSum += sub;
                 if (sub > 0) affected++;
                 if (sub > topSubScore) {
                     topSubScore = sub;
                     top = agent;
                 }
             }
-            double avg = agents.isEmpty() ? 0 : subScoreSum / agents.size();
+            double avg = slice.isEmpty() ? 0 : subScoreSum / slice.size();
             double points = category.weight * avg / 100d;
             composite += points;
             affectedByCategory.put(category, affected);
@@ -131,8 +138,9 @@ public class ArgusAgentPostureDrillService {
                         col("topContributor", "Top contributor"), col("remediation", "Remediation")),
                 true);
         result.setSummary(Arrays.asList(
-                new InsightResult.Metric("postureScore", "Posture score", round1(composite), "count",
-                        Math.round(composite) + " / 100"),
+                new InsightResult.Metric("postureScore",
+                        "Posture score · Calculated based on worst " + slice.size() + " agent(s)",
+                        round1(composite), "count", Math.round(composite) + " / 100"),
                 new InsightResult.Metric("agentsScored", "Agents scored", agents.size(), "count",
                         InsightUtil.grouped(agents.size())),
                 new InsightResult.Metric("topCategory", "Biggest contributor", null, "text",
