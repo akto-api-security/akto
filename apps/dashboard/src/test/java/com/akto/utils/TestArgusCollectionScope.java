@@ -23,6 +23,7 @@ import com.akto.MongoBasedTest;
 import com.akto.action.AuditDataAction;
 import com.akto.action.GuardrailPoliciesAction;
 import com.akto.action.user.AzureSsoAction;
+import com.akto.action.ApiCollectionsAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.GuardrailPoliciesDao;
@@ -459,6 +460,36 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         insertUser(109, "TEAM_BAD_PATTERN");
         as(109, CONTEXT_SOURCE.AGENTIC);
         assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), ArgusCollectionScope.getRestrictedCollectionIds(user(109)));
+    }
+
+    @Test
+    public void testNewCollectionReachesRuleRoles() {
+        // users already browsing see a matching collection as soon as it is created, not after their cache expires
+        insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
+        insertUser(106, "TEAM_A_BY_HOST");
+        HashMap<String, FeatureAccess> features = new HashMap<>();
+        features.put(UsersCollectionsList.RBAC_FEATURE, new FeatureAccess(true));
+        Organization org = new Organization("org-rule-test", "org", "admin@example.com", new HashSet<>(Collections.singletonList(ACCOUNT_ID)), false);
+        org.setFeatureWiseAllowed(features);
+        OrganizationsDao.instance.insertOne(org);
+        try {
+            assertTrue(RBACDao.usesCollectionRules(106, ACCOUNT_ID));
+            assertFalse(RBACDao.usesCollectionRules(TEAM_A, ACCOUNT_ID));
+            as(106, CONTEXT_SOURCE.AGENTIC);
+            assertFalse(UsersCollectionsList.getCollectionsIdForUser(106, ACCOUNT_ID).isEmpty());
+
+            as(ADMIN, CONTEXT_SOURCE.AGENTIC);
+            ApiCollectionsAction action = new ApiCollectionsAction();
+            action.setCollectionName("team-a-created");
+            assertEquals("SUCCESS", action.createCollection());
+            int created = action.getApiCollections().get(0).getId();
+
+            as(106, CONTEXT_SOURCE.AGENTIC);
+            assertTrue(UsersCollectionsList.getCollectionsIdForUser(106, ACCOUNT_ID).contains(created));
+        } finally {
+            OrganizationsDao.instance.getMCollection().deleteMany(new org.bson.Document("_id", "org-rule-test"));
+            UsersCollectionsList.deleteAccountCollectionIdsFromCache(ACCOUNT_ID);
+        }
     }
 
     @Test

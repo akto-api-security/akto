@@ -639,8 +639,9 @@ public class ApiCollectionsAction extends UserAction {
                         Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                         new UpdateOptions().upsert(false)
                 );
-                RbacCacheVersionDao.accessChanged(accountId);
             }
+            // roles with host rules may match the new collection
+            RbacCacheVersionDao.accessChanged(accountId);
 
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
             // remove the cache of context collections for account
@@ -1541,6 +1542,7 @@ public class ApiCollectionsAction extends UserAction {
                 if(updateResult == null) {
                     return Action.ERROR.toUpperCase();
                 }
+                RbacCacheVersionDao.accessChanged(Context.accountId.get());
                 return Action.SUCCESS.toUpperCase();
             }
 
@@ -1612,6 +1614,8 @@ public class ApiCollectionsAction extends UserAction {
                     );
                 }
             }
+            // roles with tag rules may match different collections now
+            RbacCacheVersionDao.accessChanged(Context.accountId.get());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();

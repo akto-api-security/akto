@@ -265,7 +265,21 @@ public class RBACDao extends CommonContextDao<RBAC> {
     public static final int NO_COLLECTION_ID = Integer.MIN_VALUE;
 
     private static final ConcurrentHashMap<String, Pair<Set<Integer>, Integer>> ruleCollectionsCache = new ConcurrentHashMap<>();
-    private static final int RULE_CACHE_EXPIRY_TIME = 2 * 60;
+    public static final int RULE_CACHE_EXPIRY_TIME = 2 * 60;
+
+    /** True when the user's role in the current product picks collections by host or tag rules. */
+    public static boolean usesCollectionRules(int userId, int accountId) {
+        RBAC rbac = getCurrentRBACForUser(userId, accountId);
+        if (rbac == null) {
+            return false;
+        }
+        String currentRole = instance.fetchRole(rbac);
+        if (currentRole != null && currentRole.isEmpty()) {
+            currentRole = rbac.getRole();
+        }
+        CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
+        return customRole != null && customRole.getCollectionRules() != null && !customRole.getCollectionRules().isEmpty();
+    }
 
     /** Collections matching a role's host / tag rules, cached per account and rule set. */
     public static Set<Integer> ruleCollectionIds(int accountId, List<CollectionRule> rules) {

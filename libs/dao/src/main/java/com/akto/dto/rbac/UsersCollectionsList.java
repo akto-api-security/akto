@@ -96,7 +96,10 @@ public class UsersCollectionsList {
         List<Integer> collectionList = new ArrayList<>();
         boolean fromCache = true;
         
-        if(collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > EXPIRY_TIME)) {
+        int age = collectionIdEntry == null ? 0 : Context.now() - collectionIdEntry.getSecond();
+        // rule matches change as collections are discovered, so those users are refreshed sooner
+        if(collectionIdEntry == null || age > EXPIRY_TIME
+                || (age > RBACDao.RULE_CACHE_EXPIRY_TIME && RBACDao.usesCollectionRules(userId, accountId))) {
             fromCache = false;
             Organization organization = OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, accountId));
