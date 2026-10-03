@@ -75,6 +75,7 @@
                     window.IS_AWS_WAF_INTEGRATED = '${requestScope.isAwsWafIntegrated}'
                     window.IS_CLOUDFLARE_WAF_INTEGRATED = '${requestScope.isCloudflareWafIntegrated}'
                     window.SCOPE_ROLE_MAPPING = JSON.parse('${requestScope.scopeRoleMapping}' || '{}');
+                    window.SCOPE_BASE_ROLE_MAPPING = JSON.parse('${requestScope.scopeBaseRoleMapping}' || '{}');
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
                     window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');

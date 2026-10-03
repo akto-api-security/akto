@@ -1,5 +1,9 @@
 package com.akto.action.user;
 
+import com.akto.audit_logs_util.Audit;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -37,6 +41,8 @@ public class OktaSsoAction extends UserAction {
     private String managementApiToken;
     private Map<String, String> oktaGroupToAktoUserRoleMap;
     private boolean syncGroupsToUserTags;
+    // null keeps the saved value (some saves, e.g. token edits, do not send it)
+    private Boolean removeAccessWithoutGroup;
     private List<String> oktaGroupNames;
 
     private static boolean hasStoredOktaApiToken(OktaConfig c) {
@@ -117,6 +123,14 @@ public class OktaSsoAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    // audit: the Okta group mapping before this request and what was asked for
+    public String auditOktaMapping() {
+        OktaConfig existing = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(Context.accountId.get()));
+        String before = existing == null ? "none" : existing.getOktaGroupToAktoUserRoleMap() + " removeAccessWithoutGroup=" + existing.isRemoveAccessWithoutGroup();
+        return "before=" + before + " requested=" + oktaGroupToAktoUserRoleMap + " removeAccessWithoutGroup=" + removeAccessWithoutGroup;
+    }
+
+    @Audit(description = "User changed the Okta group to role mapping", resource = Resource.SSO_CONFIG, operation = Operation.UPDATE, metadataGenerators = {"auditOktaMapping"})
     public String saveOktaGroupRoleMapping() {
         int accountId = Context.accountId.get();
         OktaConfig oktaConfig = (OktaConfig) ConfigsDao.instance.findOne(Constants.ID, OktaConfig.getOktaId(accountId));
@@ -155,6 +169,9 @@ public class OktaSsoAction extends UserAction {
         bsonUpdates.add(Updates.unset("groupRoleMapping"));
         bsonUpdates.add(Updates.unset("oktaRoleMapping"));
         bsonUpdates.add(Updates.set(OktaConfig.SYNC_GROUPS_TO_USER_TAGS, syncGroupsToUserTags));
+        if (removeAccessWithoutGroup != null) {
+            bsonUpdates.add(Updates.set(OktaConfig.REMOVE_ACCESS_WITHOUT_GROUP, removeAccessWithoutGroup));
+        }
         if (incomingToken != null) {
             if (incomingToken.trim().isEmpty()) {
                 bsonUpdates.add(Updates.unset(OktaConfig.MANAGEMENT_API_TOKEN));
@@ -212,6 +229,7 @@ public class OktaSsoAction extends UserAction {
             this.redirectUri = oktaConfig.getRedirectUri();
             this.oktaGroupToAktoUserRoleMap = oktaConfig.getOktaGroupToAktoUserRoleMap();
             this.syncGroupsToUserTags = oktaConfig.isSyncGroupsToUserTags();
+            this.removeAccessWithoutGroup = oktaConfig.isRemoveAccessWithoutGroup();
             this.managementApiToken = hasStoredOktaApiToken(oktaConfig) ? Constants.ASTERISK : null;
         } else {
             this.managementApiToken = null;
@@ -266,6 +284,13 @@ public class OktaSsoAction extends UserAction {
     }
     public void setSyncGroupsToUserTags(boolean syncGroupsToUserTags) {
         this.syncGroupsToUserTags = syncGroupsToUserTags;
+    }
+
+    public Boolean getRemoveAccessWithoutGroup() {
+        return removeAccessWithoutGroup;
+    }
+    public void setRemoveAccessWithoutGroup(Boolean removeAccessWithoutGroup) {
+        this.removeAccessWithoutGroup = removeAccessWithoutGroup;
     }
 
     public void setManagementApiToken(String managementApiToken) {

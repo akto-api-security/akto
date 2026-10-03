@@ -1,6 +1,7 @@
 package com.akto.threat.backend.utils;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.HostScope;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -21,6 +22,73 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ThreatUtils {
+
+  /*
+   * Host attribution, the same for listing events and for every aggregation: exact match (hosts) OR loose
+   * device+service match (looseHostKeys, for 2-vs-3-segment hostname format mismatches) OR claude-config
+   * scanner events (no collection of their own, attributed by device id instead) - see the
+   * Filter.loose_host_keys/claude_device_ids/match_claude_config proto doc comments for the client-side
+   * derivation this mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
+   * Null when no condition is given.
+   */
+  public static Document hostAttributionMatch(List<String> hosts, List<String> looseHostKeys,
+                                              List<String> claudeDeviceIds, boolean matchClaudeConfig) {
+    List<Document> hostOrConditions = new ArrayList<>();
+    if (!hosts.isEmpty()) {
+      hostOrConditions.add(new Document("host", new Document("$in", hosts)));
+    }
+    if (!looseHostKeys.isEmpty()) {
+      Document looseKeyExpr = new Document("$concat", Arrays.asList(
+          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0)),
+          " ",
+          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), -1))
+      ));
+      hostOrConditions.add(new Document("$expr",
+          new Document("$in", Arrays.asList(looseKeyExpr, looseHostKeys))));
+    }
+    Document claudeConfigHostMatch = new Document("host",
+        Pattern.compile("^[^.]+\\.(claude-settings|claude)$", Pattern.CASE_INSENSITIVE));
+    if (matchClaudeConfig) {
+      hostOrConditions.add(claudeConfigHostMatch);
+    } else if (!claudeDeviceIds.isEmpty()) {
+      Document deviceIdExpr = new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0));
+      hostOrConditions.add(new Document("$and", Arrays.asList(
+          claudeConfigHostMatch,
+          new Document("$expr", new Document("$in", Arrays.asList(deviceIdExpr, claudeDeviceIds)))
+      )));
+    }
+    if (hostOrConditions.isEmpty()) {
+      return null;
+    }
+    return hostOrConditions.size() == 1 ? hostOrConditions.get(0) : new Document("$or", hostOrConditions);
+  }
+
+  /** Match limiting an aggregation to the request's HostScope (some agents only); matches nothing when its lists are all empty. */
+  public static Document hostScopeMatch(HostScope scope) {
+    Document match = hostAttributionMatch(scope.getHostsList(), scope.getLooseHostKeysList(), scope.getClaudeDeviceIdsList(), false);
+    return match != null ? match : new Document("host", new Document("$in", Collections.emptyList()));
+  }
+
+  /** Adds the host scope to a $match document, alongside any $and it already has. */
+  public static void andHostScope(Document match, Document hostScopeMatch) {
+    if (hostScopeMatch == null) {
+      return;
+    }
+    List<Object> and = new ArrayList<>();
+    Object existing = match.get("$and");
+    if (existing instanceof List) {
+      and.addAll((List<?>) existing);
+    }
+    and.add(hostScopeMatch);
+    match.put("$and", and);
+  }
+
+  /** Adds the host scope as the first stage of an events aggregation (Mongo merges it with the following $match). */
+  public static void addHostScope(List<Document> pipeline, Document hostScopeMatch) {
+    if (hostScopeMatch != null) {
+      pipeline.add(0, new Document("$match", hostScopeMatch));
+    }
+  }
 
     private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")

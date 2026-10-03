@@ -42,13 +42,14 @@ const settingRequests = {
         })
     },
 
-    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+    updateUserScopeRoleMapping(email, scopeRoleMapping, accessExpiresAt) {
         return request({
             url: '/api/updateUserScopeRoleMapping',
             method: 'post',
             data: {
                 email: email,
-                scopeRoleMapping: scopeRoleMapping
+                scopeRoleMapping: scopeRoleMapping,
+                accessExpiresAt: accessExpiresAt
             }
         })
     },
@@ -410,6 +411,9 @@ const settingRequests = {
             oktaGroupToAktoUserRoleMap,
             syncGroupsToUserTags: opts.syncGroupsToUserTags === true,
         }
+        if (Object.prototype.hasOwnProperty.call(opts, 'removeAccessWithoutGroup')) {
+            data.removeAccessWithoutGroup = opts.removeAccessWithoutGroup === true
+        }
         if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
             const t = opts.managementApiToken
             // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
@@ -430,11 +434,11 @@ const settingRequests = {
         })
     },
 
-    saveSamlGroupRoleMapping(groupRoleMapping, configType) {
+    saveSamlGroupRoleMapping(groupRoleMapping, configType, removeAccessWithoutGroup) {
         return request({
             url: '/api/saveSamlGroupRoleMapping',
             method: 'post',
-            data: {groupRoleMapping, configType}
+            data: {groupRoleMapping, configType, removeAccessWithoutGroup}
         })
     },
 
@@ -601,6 +605,13 @@ const settingRequests = {
             }
         });
     },
+    fetchAssignableRoles(){
+        return request({
+            url: '/api/fetchAssignableRoles',
+            method: 'post',
+            data: {}
+        });
+    },
     getRoleHierarchy(){
         return request({
             url: '/api/getRoleHierarchy',
@@ -673,11 +684,11 @@ const settingRequests = {
             data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules, assignableRoles) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules, assignableRoles}
         })
     },
     deleteCustomRole(roleName) {

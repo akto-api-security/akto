@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Box, Button, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Box, Button, Checkbox, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../../api';
@@ -7,8 +7,9 @@ import { rolesOptions, getRoleDisplayName } from '../../roles/Roles';
 import Dropdown from '../../../../components/layouts/Dropdown';
 
 // Maps SSO groups (as sent in the SAML groups claim) to Akto roles, applied on every login.
-function SamlGroupRoleMapping({ configType, savedMapping }) {
+function SamlGroupRoleMapping({ configType, savedMapping, savedRemoveAccessWithoutGroup }) {
     const [mapping, setMapping] = useState({})
+    const [removeAccessWithoutGroup, setRemoveAccessWithoutGroup] = useState(false)
     const [newGroup, setNewGroup] = useState('')
     const [newRole, setNewRole] = useState('')
     const [customRoleOptions, setCustomRoleOptions] = useState([])
@@ -17,6 +18,10 @@ function SamlGroupRoleMapping({ configType, savedMapping }) {
     useEffect(() => {
         setMapping(savedMapping || {})
     }, [savedMapping])
+
+    useEffect(() => {
+        setRemoveAccessWithoutGroup(savedRemoveAccessWithoutGroup === true)
+    }, [savedRemoveAccessWithoutGroup])
 
     useEffect(() => {
         settingRequests.getCustomRoles().then((resp) => {
@@ -55,7 +60,7 @@ function SamlGroupRoleMapping({ configType, savedMapping }) {
     const handleSave = async () => {
         setSaving(true)
         try {
-            await settingRequests.saveSamlGroupRoleMapping(mapping, configType)
+            await settingRequests.saveSamlGroupRoleMapping(mapping, configType, removeAccessWithoutGroup)
             func.setToast(true, false, "Group mappings saved successfully!")
         } catch (e) {
             // Error toast already shown by the request interceptor
@@ -75,7 +80,7 @@ function SamlGroupRoleMapping({ configType, savedMapping }) {
                 <VerticalStack gap="4">
                     <Text variant="bodyMd" color="subdued">
                         Users get the mapped role on every SSO login, for all products. If a user is in several mapped groups,
-                        the most privileged role is used. Users in no mapped group keep their current role.
+                        the most privileged role is used. Users in no mapped group keep their current role, unless the option below is on.
                         Enter the group exactly as your IdP sends it in the groups claim (Azure AD sends group Object IDs by default).
                     </Text>
                     {Object.keys(mapping).length > 0 ? (
@@ -111,6 +116,12 @@ function SamlGroupRoleMapping({ configType, savedMapping }) {
                         </Box>
                         <Button onClick={handleAdd}>Add</Button>
                     </HorizontalStack>
+                    <Checkbox
+                        label="Remove access for users in none of the mapped groups"
+                        helpText="On each SSO login, a user who is in none of the groups above gets no access in any product, instead of keeping their current role. Admins are never changed."
+                        checked={removeAccessWithoutGroup}
+                        onChange={setRemoveAccessWithoutGroup}
+                    />
                     <HorizontalStack align="end">
                         <Button primary loading={saving} onClick={handleSave}>Save</Button>
                     </HorizontalStack>

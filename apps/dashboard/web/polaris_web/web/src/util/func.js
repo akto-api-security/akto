@@ -2311,8 +2311,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return allowedAccountsForPosture.some(x => x === activeAccount)
   },
 
+  // Base role in the product being viewed (custom roles resolved by the server); USER_ROLE is for the product the page loaded in
+  currentProductBaseRole(){
+    return window.SCOPE_BASE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]] || window.USER_ROLE
+  },
   hasThreatAccess(){
-    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(this.currentProductBaseRole())
   },
   // Argus only: only Admin and Threat Engineer can create, edit, delete or approve guardrail policies (when RBAC is enabled)
   canManageGuardrailPolicies(){
@@ -2320,11 +2324,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     if (!isArgus || this.checkLocal() || !(this.checkForRbacFeature() || this.checkForRbacFeatureBasic()) || this.isUserAdmin()) {
       return true
     }
-    // Role for the current product; a custom role name is not a base role, so use the resolved base role then
-    const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
-    const baseRoles = ['ADMIN', 'MEMBER', 'DEVELOPER', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER', 'NO_ACCESS']
-    const role = baseRoles.includes(scopeRole) ? scopeRole : window.USER_ROLE
-    return ['ADMIN', 'THREAT_ENGINEER'].includes(role)
+    return ['ADMIN', 'THREAT_ENGINEER'].includes(this.currentProductBaseRole())
   },
   isUserAdmin(){
     const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]

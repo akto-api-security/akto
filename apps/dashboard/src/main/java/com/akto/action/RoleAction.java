@@ -2,8 +2,11 @@ package com.akto.action;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
@@ -12,7 +15,14 @@ import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
+import com.akto.dto.rbac.CollectionRule;
+import com.akto.dto.rbac.RbacEnums.Feature;
+import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 import com.akto.util.Pair;
+import com.akto.utils.RoleAssignment;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -95,7 +105,7 @@ public class RoleAction extends UserAction {
             /*
              * We do not want role name from the reserved names.
              */
-            Role.valueOf(this.roleName);
+            Role.valueOf(this.roleName.toUpperCase());
             addActionError(this.roleName + " is a reserved keyword.");
             return false;
         } catch(Exception e){
@@ -120,6 +130,85 @@ public class RoleAction extends UserAction {
     @Setter
     private boolean threatProtectionEnabled;
 
+    @Setter
+    private Map<String, String> permissionOverrides;
+
+    @Setter
+    private List<CollectionRule> collectionRules;
+
+    private boolean validateCollectionRules() {
+        if (collectionRules == null) {
+            return true;
+        }
+        for (CollectionRule rule : collectionRules) {
+            String error = rule == null ? "Invalid collection rule" : rule.validate();
+            if (error != null) {
+                addActionError(error);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Setter
+    private List<String> assignableRoles;
+
+    // a team admin may only give scoped, non-admin custom roles, so it can never hand out access beyond its team
+    private boolean validateAssignableRoles() {
+        if (assignableRoles == null) {
+            return true;
+        }
+        for (String name : assignableRoles) {
+            if (!RoleAssignment.isGivableByTeamAdmin(CustomRoleDao.instance.findRoleByName(name))) {
+                addActionError("Role " + name + " cannot be given by a team admin: it must exist, be limited to collections and not be based on Admin.");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // users of a role cache their collections; clear them so a role change applies right away
+    private void clearRoleCaches() {
+        CustomRoleDao.clearRoleCache();
+        UsersCollectionsList.deleteAccountCollectionIdsFromCache(Context.accountId.get());
+    }
+
+    private boolean validatePermissionOverrides() {
+        if (permissionOverrides == null) {
+            return true;
+        }
+        for (Map.Entry<String, String> entry : permissionOverrides.entrySet()) {
+            try {
+                Feature feature = Feature.valueOf(entry.getKey());
+                ReadWriteAccess.valueOf(entry.getValue());
+                if (!CustomRole.isOverridable(feature)) {
+                    addActionError(entry.getKey() + " cannot be changed for a role.");
+                    return false;
+                }
+            } catch (Exception e) {
+                addActionError("Invalid permission: " + entry.getKey() + " = " + entry.getValue());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // audit: the role as it was before this request and what was asked for
+    public String auditRoleChange() {
+        CustomRole existing = roleName == null ? null : CustomRoleDao.instance.findRoleByName(roleName.toUpperCase());
+        String before = existing == null ? "none" : describeRole(existing.getBaseRole(), existing.getApiCollectionsId(),
+                existing.getCollectionRules(), existing.getPermissionOverrides(), existing.getAssignableRoles());
+        return "role=" + roleName + " before=" + before + " requested="
+                + describeRole(baseRole, apiCollectionIds, collectionRules, permissionOverrides, assignableRoles);
+    }
+
+    private static String describeRole(String baseRole, List<Integer> collections, List<CollectionRule> rules,
+                                        Map<String, String> overrides, List<String> assignable) {
+        return "{base=" + baseRole + ", collections=" + collections + ", rules=" + rules
+                + ", overrides=" + (overrides == null ? null : new TreeMap<>(overrides)) + ", canGive=" + assignable + "}";
+    }
+
+    @Audit(description = "User created a custom role", resource = Resource.CUSTOM_ROLE, operation = Operation.CREATE, metadataGenerators = {"auditRoleChange"})
     public String createCustomRole() {
 
         if (!validateRoleName()) {
@@ -142,16 +231,21 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(!defaultInviteCheck()){
+        if(!defaultInviteCheck() || !validatePermissionOverrides() || !validateCollectionRules() || !validateAssignableRoles()){
             return ERROR.toUpperCase();
         }
 
         CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, threatProtectionEnabled, new ArrayList<>());
+        role.setPermissionOverrides(permissionOverrides);
+        role.setCollectionRules(collectionRules);
+        role.setAssignableRoles(assignableRoles);
         CustomRoleDao.instance.insertOne(role);
+        clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User updated a custom role", resource = Resource.CUSTOM_ROLE, operation = Operation.UPDATE, metadataGenerators = {"auditRoleChange"})
     public String updateCustomRole(){
         if (!validateRoleName()) {
             return ERROR.toUpperCase();
@@ -173,18 +267,26 @@ public class RoleAction extends UserAction {
         if(!defaultInviteCheck() && !existingRole.getDefaultInviteRole()){
             return ERROR.toUpperCase();
         }
+        if (!validatePermissionOverrides() || !validateCollectionRules() || !validateAssignableRoles()) {
+            return ERROR.toUpperCase();
+        }
 
         CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, roleName),Updates.combine(
             Updates.set(CustomRole.BASE_ROLE, baseRole),
             Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
             Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole),
-            Updates.set(CustomRole.THREAT_PROTECTION_ENABLED, threatProtectionEnabled)
+            Updates.set(CustomRole.THREAT_PROTECTION_ENABLED, threatProtectionEnabled),
+            Updates.set(CustomRole.PERMISSION_OVERRIDES, permissionOverrides),
+            Updates.set(CustomRole.COLLECTION_RULES, collectionRules),
+            Updates.set(CustomRole.ASSIGNABLE_ROLES, assignableRoles)
         ));
+        clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();
     }
 
+    @Audit(description = "User deleted a custom role", resource = Resource.CUSTOM_ROLE, operation = Operation.DELETE, metadataGenerators = {"auditRoleChange"})
     public String deleteCustomRole(){
         CustomRole existingRole = CustomRoleDao.instance.findRoleByName(roleName);
 
@@ -217,6 +319,9 @@ public class RoleAction extends UserAction {
         }
 
         CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
+        // a role created later with the same name must not become givable by team admins on its own
+        CustomRoleDao.instance.updateMany(Filters.eq(CustomRole.ASSIGNABLE_ROLES, roleName), Updates.pull(CustomRole.ASSIGNABLE_ROLES, roleName));
+        clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
         return SUCCESS.toUpperCase();

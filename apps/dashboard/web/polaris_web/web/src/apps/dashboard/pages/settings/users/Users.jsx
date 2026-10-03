@@ -1,4 +1,5 @@
 import {  Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, ResourceItem, ResourceList, Text, Modal, TextField, Checkbox, VerticalStack } from "@shopify/polaris"
+import SingleDate from "../../../components/layouts/SingleDate"
 import { DeleteMajor, PasskeyMajor } from "@shopify/polaris-icons"
 import { useEffect, useState, useRef, useMemo } from "react";
 import settingRequests from "../api";
@@ -96,6 +97,7 @@ const Users = () => {
         currentRole: "",
         currentScopeRoleMapping: {},
         editingScopeRoleMapping: {},
+        accessExpiresOn: "", // YYYY-MM-DD, empty = never
         isSimpleRole: false // true if user only has simple role, false if has scopeRoleMapping
     })
 
@@ -215,11 +217,18 @@ const Users = () => {
             roleHierarchyResp.push('RESET_PASSWORD')
         }
 
+        // team admins can only give the roles set on their custom role
+        const assignableResp = await settingRequests.fetchAssignableRoles().catch(() => ({}))
+        const teamAdminRoles = assignableResp?.assignableRoles
+        if (teamAdminRoles) {
+            roleHierarchyResp = [...teamAdminRoles]
+        }
+
         const customRolesResponse = await settingRequests.getCustomRoles()
         if(customRolesResponse.roles){
             setCustomRoles(customRolesResponse.roles.map(x => {
 
-                if(roleHierarchyResp.includes(x.baseRole)){
+                if(!teamAdminRoles && roleHierarchyResp.includes(x.baseRole)){
                     roleHierarchyResp.push(x.name)
                 }
                 if(x.defaultInviteRole){
@@ -314,7 +323,15 @@ const Users = () => {
         return getRoleDisplayName(oldRole)
     }
 
-    const openEditScopeRoleModal = (userId, email, name, currentRole, currentScopeRoleMapping) => {
+    // access expiry is stored as epoch seconds; the modal edits it as a local date
+    const toDateInput = (epochSeconds) => {
+        if (!epochSeconds) return ""
+        const d = new Date(epochSeconds * 1000)
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    const toEpochEndOfDay = (dateInput) => dateInput ? Math.floor(new Date(`${dateInput}T23:59:59`).getTime() / 1000) : 0
+
+    const openEditScopeRoleModal = (userId, email, name, currentRole, currentScopeRoleMapping, accessExpiresAt) => {
         const isSimpleRole = !currentScopeRoleMapping || Object.keys(currentScopeRoleMapping).length === 0
         setEditScopeRoleModal({
             isActive: true,
@@ -324,6 +341,7 @@ const Users = () => {
             currentRole,
             currentScopeRoleMapping: currentScopeRoleMapping || {},
             editingScopeRoleMapping: currentScopeRoleMapping ? { ...currentScopeRoleMapping } : {},
+            accessExpiresOn: toDateInput(accessExpiresAt),
             isSimpleRole
         })
     }
@@ -337,6 +355,7 @@ const Users = () => {
             currentRole: "",
             currentScopeRoleMapping: {},
             editingScopeRoleMapping: {},
+            accessExpiresOn: "",
             isSimpleRole: false
         })
     }
@@ -365,17 +384,19 @@ const Users = () => {
     }
 
     const saveEditedScopeRoleMapping = async () => {
-        const { email, editingScopeRoleMapping } = editScopeRoleModal
+        const { email, editingScopeRoleMapping, accessExpiresOn } = editScopeRoleModal
+        const accessExpiresAt = toEpochEndOfDay(accessExpiresOn)
 
         try {
             // Call backend to update scope-role mapping
-            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping)
+            // only admins set the expiry; the backend ignores it from anyone else
+            await settingRequests.updateUserScopeRoleMapping(email, editingScopeRoleMapping, window.USER_ROLE === 'ADMIN' ? accessExpiresAt : undefined)
 
             // Update UI
             const scopes = Object.keys(editingScopeRoleMapping)
             setUsers(users.map(user =>
                 user.login === email
-                    ? { ...user, scopeRoleMapping: editingScopeRoleMapping, productScopes: scopes }
+                    ? { ...user, scopeRoleMapping: editingScopeRoleMapping, productScopes: scopes, accessExpiresAt }
                     : user
             ))
             func.setToast(true, false, "User access updated successfully")
@@ -515,7 +536,7 @@ const Users = () => {
                                                 }
 
                                                 <Button
-                                                    onClick={() => openEditScopeRoleModal(id, login, name, role, item?.scopeRoleMapping)}
+                                                    onClick={() => openEditScopeRoleModal(id, login, name, role, item?.scopeRoleMapping, item?.accessExpiresAt)}
                                                 >
                                                     Edit Access
                                                 </Button>
@@ -626,28 +647,6 @@ const Users = () => {
                     ]}
                 >
                     <Modal.Section>
-                        {/* Current Configuration Display */}
-                        <Box paddingBlockEnd="400" borderBottomWidth="1" borderColor="border">
-                            <Text variant="headingSm" as="h3">Current Configuration</Text>
-                            <Box paddingBlockStart="200">
-                                {editScopeRoleModal.isSimpleRole
-                                    ? <Text variant="bodySm">{getRoleDisplayName(editScopeRoleModal.currentRole)}</Text>
-                                    : Object.entries(editScopeRoleModal.currentScopeRoleMapping).length > 0
-                                    ? (
-                                        Object.entries(editScopeRoleModal.currentScopeRoleMapping).map(([scope, role]) => {
-                                            const scopeLabel = PRODUCT_SCOPES.find(s => s.value === scope)?.label || scope
-                                            return (
-                                                <Text key={scope} variant="bodySm">
-                                                    {getRoleDisplayName(role)} for {scopeLabel}
-                                                </Text>
-                                            )
-                                        })
-                                    )
-                                    : <Text variant="bodySm">No access configured</Text>
-                                }
-                            </Box>
-                        </Box>
-
                         {/* Edit Configuration */}
                         <Box paddingBlockStart="400">
                             <Text variant="headingSm" as="h3">Configure Access by Scope</Text>
@@ -695,6 +694,23 @@ const Users = () => {
                                 })}
                             </Box>
                         </Box>
+                        {window.USER_ROLE === 'ADMIN' ? (
+                            <VerticalStack gap="2">
+                                <SingleDate
+                                    label="Access expires on (optional)"
+                                    dataKey="No expiry"
+                                    data={editScopeRoleModal.accessExpiresOn ? new Date(`${editScopeRoleModal.accessExpiresOn}T00:00:00`) : null}
+                                    dispatch={(action) => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: toDateInput(Object.values(action.obj)[0].getTime() / 1000) }))}
+                                    disableDatesBefore={new Date()}
+                                />
+                                <HorizontalStack align="space-between" blockAlign="center">
+                                    <Text variant="bodySm" color="subdued">After this date the user has no access in any product until it is extended.</Text>
+                                    {editScopeRoleModal.accessExpiresOn ? (
+                                        <Button plain destructive onClick={() => setEditScopeRoleModal(prev => ({ ...prev, accessExpiresOn: "" }))}>Remove expiry</Button>
+                                    ) : null}
+                                </HorizontalStack>
+                            </VerticalStack>
+                        ) : null}
                     </Modal.Section>
                 </Modal>
 

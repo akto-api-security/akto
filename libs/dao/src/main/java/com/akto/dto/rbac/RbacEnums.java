@@ -52,7 +52,9 @@ public class RbacEnums {
         ADMIN_ACTIONS(AccessGroups.ADMIN),
         USER_ACTIONS(AccessGroups.USER),
         AI_AGENTS(AccessGroups.AI),
-        THREAT_PROTECTION(AccessGroups.THREAT_PROTECTION);
+        THREAT_PROTECTION(AccessGroups.THREAT_PROTECTION),
+        // threat detection configuration, retention and account-wide threat actions; defaults to THREAT_PROTECTION access
+        THREAT_SETTINGS(AccessGroups.THREAT_PROTECTION);
 
         private final AccessGroups accessGroup;
 

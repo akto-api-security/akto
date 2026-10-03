@@ -97,6 +97,19 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         }
     }
 
+    /** Whether a role with the given access to the action's feature may call it. Admin actions need the Admin role. */
+    static boolean hasRequiredAccess(String featureLabel, String accessType, ReadWriteAccess accessGiven, String userRole) {
+        if (featureLabel.equals(Feature.ADMIN_ACTIONS.name())) {
+            return Role.ADMIN.name().equals(userRole);
+        }
+        if (accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || accessType.equalsIgnoreCase(accessGiven.toString())) {
+            return !accessGiven.equals(ReadWriteAccess.NO_ACCESS);
+        }
+        return false;
+    }
+
+    private static final boolean DENY_ON_ERROR = "true".equalsIgnoreCase(System.getenv("AKTO_RBAC_DENY_ON_ERROR"));
+
     public final static String FORBIDDEN = "FORBIDDEN";
     public final static String USER = "user";
 
@@ -243,25 +256,14 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
 
-            /*
-             * Threat protection is the one feature a custom role can be granted or denied
-             * independently of its base role. Scoped to this feature because resolving it
-             * costs a custom role lookup.
-             */
-            if (featureType == Feature.THREAT_PROTECTION) {
-                accessGiven = RBACDao.resolveThreatAccess(userId, sessionAccId, accessGiven);
-            }
+            // custom roles: threat toggle and per-feature overrides
+            accessGiven = RBACDao.resolveFeatureAccess(userId, sessionAccId, featureType, accessGiven);
 
-            boolean hasRequiredAccess = false;
-
-            if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
-                hasRequiredAccess = !accessGiven.equals(ReadWriteAccess.NO_ACCESS);
-            }
-            if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
-                hasRequiredAccess = userRole.equals(Role.ADMIN.name());
-            }
+            boolean hasRequiredAccess = hasRequiredAccess(featureLabel, accessType, accessGiven, userRole);
 
             if(!hasRequiredAccess) {
+                // app log only (no DB write), so a page repeatedly calling an API it cannot use adds no load
+                logger.info("RBAC denied api: " + invocation.getProxy().getActionName() + " userId: " + userId + " role: " + userRole + " feature: " + featureLabel + " " + accessType);
                 ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
                 return FORBIDDEN;
             }
@@ -349,8 +351,14 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
         } catch(Exception e) {
             String api = invocation.getProxy().getActionName();
-            String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage();
+            // A failed access check must not grant access. Until AKTO_RBAC_DENY_ON_ERROR is on, it is only logged (report-only).
+            boolean deny = DENY_ON_ERROR && DashboardMode.isMetered();
+            String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage() + (deny ? " (denied)" : " (allowed, report-only)");
             loggerMaker.errorAndAddToDb(e, error);
+            if (deny) {
+                ((ActionSupport) invocation.getAction()).addActionError("Unable to verify your access. Please try again or contact your admin.");
+                return FORBIDDEN;
+            }
         }
 
         String result = invocation.invoke();

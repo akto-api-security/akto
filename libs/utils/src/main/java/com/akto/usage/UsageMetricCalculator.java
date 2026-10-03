@@ -56,7 +56,7 @@ public class UsageMetricCalculator {
     private final static String BASIC_RBAC_FEATURE = "RBAC_BASIC";
     private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
-    private static final int REFRESH_INTERVAL_RBAC = 60 * 60; // 1 hour.
+    private static final int REFRESH_INTERVAL_RBAC = 5 * 60; // 5 minutes.
     private static Map<Integer, Set<Integer>> deactivatedCollectionsMap = new HashMap<>();
 
     private static final ConcurrentHashMap<Integer, Pair<Boolean, Integer>> hasRbacFeatureEnabledMap = new ConcurrentHashMap<>();
@@ -91,7 +91,7 @@ public class UsageMetricCalculator {
         Pair<Boolean, Integer> prevVal = hasRbacFeatureEnabledMap.getOrDefault(accountId, new Pair<>(false, timeNow));
         boolean ans = prevVal.getFirst();
         int lastCalTime = prevVal.getSecond();
-        if(!hasRbacFeatureEnabledMap.contains(accountId) || (lastCalTime + REFRESH_INTERVAL_RBAC < timeNow)){
+        if(!hasRbacFeatureEnabledMap.containsKey(accountId) || (lastCalTime + REFRESH_INTERVAL_RBAC < timeNow)){
             ans = checkForPaidFeature(accountId);
             hasRbacFeatureEnabledMap.put(accountId, new Pair<>(ans, timeNow));
         }

@@ -626,15 +626,19 @@ public class ApiCollectionsAction extends UserAction {
                     Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, RBAC.Role.ADMIN.getName())
                 );
 
-            RBACDao.instance.getMCollection().updateOne(
-                    Filters.and(
-                            Filters.eq(RBAC.USER_ID, userId),
-                            Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            adminFilter
-                    ),
-                    Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
-                    new UpdateOptions().upsert(false)
-            );
+            // users with access to all collections already see it; adding it would narrow them to just this one
+            List<Integer> userCollections = RBACDao.instance.getUserCollectionsById(userId, accountId);
+            if (userCollections != null && !userCollections.isEmpty()) {
+                RBACDao.instance.getMCollection().updateOne(
+                        Filters.and(
+                                Filters.eq(RBAC.USER_ID, userId),
+                                Filters.eq(RBAC.ACCOUNT_ID, accountId),
+                                adminFilter
+                        ),
+                        Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
+                        new UpdateOptions().upsert(false)
+                );
+            }
 
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
             // remove the cache of context collections for account
@@ -731,21 +735,29 @@ public class ApiCollectionsAction extends UserAction {
         int accountIdForRbac = Context.accountId.get();
         List<Integer> affectedUserIds = new ArrayList<>();
         try {
+            /*
+             * An empty list means "all collections", so a grant whose every collection is deleted keeps
+             * its (now unmatched) ids: it must end up seeing nothing, not everything.
+             */
+            Set<Integer> deletedIds = new HashSet<>(apiCollectionIds);
+            for (CustomRole role : CustomRoleDao.instance.findAll(Filters.in(CustomRole.API_COLLECTIONS_ID, apiCollectionIds))) {
+                if (!deletedIds.containsAll(role.getApiCollectionsId())) {
+                    CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, role.getName()),
+                            Updates.pullAll(CustomRole.API_COLLECTIONS_ID, apiCollectionIds));
+                }
+            }
+
             for (RBAC rbac : RBACDao.instance.findAll(Filters.and(
                     Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
                     Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)))) {
                 affectedUserIds.add(rbac.getUserId());
+                if (!deletedIds.containsAll(rbac.getApiCollectionsId())) {
+                    RBACDao.instance.updateOne(Filters.eq(Constants.ID, rbac.getId()),
+                            Updates.pullAll(RBAC.API_COLLECTIONS_ID, apiCollectionIds));
+                }
             }
-
-            CustomRoleDao.instance.updateMany(
-                    Filters.in(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
-                    Updates.pullAll(CustomRole.API_COLLECTIONS_ID, apiCollectionIds));
-
-            RBACDao.instance.updateMany(
-                    Filters.and(
-                            Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
-                            Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)),
-                    Updates.pullAll(RBAC.API_COLLECTIONS_ID, apiCollectionIds));
+            CustomRoleDao.clearRoleCache();
+            UsersCollectionsList.deleteAccountCollectionIdsFromCache(accountIdForRbac);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error pruning deleted collections from access grants");
         }

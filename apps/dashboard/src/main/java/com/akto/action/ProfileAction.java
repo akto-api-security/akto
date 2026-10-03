@@ -192,9 +192,16 @@ public class ProfileAction extends UserAction {
         ));
 
         BasicDBObject scopeRoleMapping = new BasicDBObject();
+        // base role per product (custom roles resolved), so the UI checks the role of the product it is in
+        BasicDBObject scopeBaseRoleMapping = new BasicDBObject();
         if(userRbac.getScopeRoleMapping() != null){
             for(String key : userRbac.getScopeRoleMapping().keySet()){
                 scopeRoleMapping.append(key, userRbac.getScopeRoleMapping().get(key));
+                try {
+                    RBAC.Role baseRole = userRbac.getRoleForScope(GlobalEnums.CONTEXT_SOURCE.valueOf(key));
+                    if (baseRole != null) scopeBaseRoleMapping.append(key, baseRole.name());
+                } catch (IllegalArgumentException ignored) {
+                }
             }
         }
 
@@ -220,7 +227,8 @@ public class ProfileAction extends UserAction {
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
-                .append("scopeRoleMapping", scopeRoleMapping);
+                .append("scopeRoleMapping", scopeRoleMapping)
+                .append("scopeBaseRoleMapping", scopeBaseRoleMapping);
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);

@@ -1,4 +1,4 @@
-import { Box, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
+import { Box, Button, Collapsible, Divider, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Tag, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import func from "@/util/func";
 import settingRequests from "../api";
@@ -7,6 +7,7 @@ import { usersCollectionRenderItem } from "../rbac/utils";
 import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
+import Dropdown from "../../../components/layouts/Dropdown";
 
 const rolesOptions = [
     {
@@ -73,6 +74,30 @@ function isThreatFeatureGranted() {
     }
     return stiggFeatures?.THREAT_DETECTION?.isGranted === true
 }
+
+// Permissions an admin can change per custom role; anything not changed keeps the base role's access
+const PERMISSION_FEATURES = [
+    { feature: 'INVITE_MEMBERS', label: 'Invite users and change their roles' },
+    { feature: 'THREAT_PROTECTION', label: 'Threat protection and guardrail activity' },
+    { feature: 'THREAT_SETTINGS', label: 'Threat settings and data retention' },
+    { feature: 'AI_AGENTS', label: 'AI agents' },
+    { feature: 'API_COLLECTIONS', label: 'API collections and inventory' },
+    { feature: 'SENSITIVE_DATA', label: 'Sensitive data' },
+    { feature: 'SAMPLE_DATA', label: 'Request and response samples' },
+    { feature: 'START_TEST_RUN', label: 'Run tests' },
+    { feature: 'TEST_RESULTS', label: 'Test results' },
+    { feature: 'ISSUES', label: 'Issues' },
+    { feature: 'INTEGRATIONS', label: 'Integrations' },
+    { feature: 'API_TOKENS', label: 'API tokens' },
+]
+
+const ROLE_DEFAULT = 'ROLE_DEFAULT'
+const accessOptions = [
+    { label: 'Base role default', value: ROLE_DEFAULT },
+    { label: 'No access', value: 'NO_ACCESS' },
+    { label: 'Read', value: 'READ' },
+    { label: 'Read and write', value: 'READ_WRITE' },
+]
 
 const Roles = () => {
 
@@ -169,6 +194,65 @@ const Roles = () => {
         })
     }
 
+    const updatePermission = (role, feature, access) => {
+        setRoles(prevRoles => {
+            return prevRoles.map(r => {
+                if (r.name === role) {
+                    const permissionOverrides = { ...(r.permissionOverrides || {}) }
+                    if (access === ROLE_DEFAULT) {
+                        delete permissionOverrides[feature]
+                    } else {
+                        permissionOverrides[feature] = access
+                    }
+                    return {
+                        ...r,
+                        permissionOverrides
+                    }
+                }
+                return r;
+            })
+        })
+    }
+
+    const updateCollectionRules = (role, collectionRules) => {
+        setRoles(prevRoles => prevRoles.map(r => r.name === role ? { ...r, collectionRules } : r))
+    }
+
+    const toggleAssignableRole = (role, otherRole, checked) => {
+        setRoles(prevRoles => prevRoles.map(r => {
+            if (r.name !== role) return r
+            const current = (r.assignableRoles || []).filter(x => x !== otherRole)
+            return { ...r, assignableRoles: checked ? [...current, otherRole] : current }
+        }))
+    }
+
+    // roles a team admin may give: limited to collections and not based on Admin (the backend enforces the same)
+    const isGivableByTeamAdmin = (r) => r.baseRole !== 'ADMIN' &&
+        ((r.apiCollectionsId || []).length > 0 || (r.collectionRules || []).length > 0)
+
+    const [permissionsOpen, setPermissionsOpen] = useState(false)
+    const changedPermissionsCount = (r) => Object.keys(r?.permissionOverrides || {}).length
+
+    const [newHostPattern, setNewHostPattern] = useState('')
+    const [newTag, setNewTag] = useState('')
+
+    const addCollectionRule = (role, currentRules) => {
+        const host = newHostPattern.trim()
+        const tag = newTag.trim()
+        if ((host.length > 0) === (tag.length > 0)) {
+            func.setToast(true, true, "Enter either a host pattern or a tag")
+            return
+        }
+        let rule = { hostRegex: host }
+        if (tag.length > 0) {
+            const [tagKey, ...rest] = tag.split('=')
+            rule = { tagKey: tagKey.trim(), tagValue: rest.join('=').trim() }
+        }
+        updateCollectionRules(role, [...(currentRules || []), rule])
+        setNewHostPattern('')
+        setNewTag('')
+    }
+
     const updateDefaultInviteRole = (role, value) => {
         setRoles(prevRoles => {
             return prevRoles.map(r => {
@@ -185,12 +269,16 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData))
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, threatValueToSave(roleData), roleData.permissionOverrides || {}, roleData.collectionRules || [],
+            (roleData.assignableRoles || []).filter(r => tempRoles.some(t => t.name === r && isGivableByTeamAdmin(t))))
         await getRoleData();
     }
 
     const handleClose = () => {
         setRoles(tempRoles)
+        setNewHostPattern('')
+        setNewTag('')
+        setPermissionsOpen(false)
     }
 
     const [newRoleName, setNewRoleName] = useState('')
@@ -274,6 +362,85 @@ const Roles = () => {
                                                         />
                                                     ) : null}
                                                 </HorizontalStack>
+                                            </Box>
+                                            <Box padding={4}>
+                                                <VerticalStack gap="4">
+                                                    <Divider />
+                                                    <VerticalStack gap="3">
+                                                        <HorizontalStack align="space-between" blockAlign="center">
+                                                            <VerticalStack gap="1">
+                                                                <Text variant="headingSm" as="h4">Permissions</Text>
+                                                                <Text variant="bodySm" color="subdued">
+                                                                    {changedPermissionsCount(item) > 0
+                                                                        ? `${changedPermissionsCount(item)} changed from the base role`
+                                                                        : "Same as the base role"}
+                                                                </Text>
+                                                            </VerticalStack>
+                                                            <Button plain disclosure={permissionsOpen ? "up" : "down"} onClick={() => setPermissionsOpen(!permissionsOpen)}>
+                                                                {permissionsOpen ? "Hide" : "Change"}
+                                                            </Button>
+                                                        </HorizontalStack>
+                                                        <Collapsible open={permissionsOpen} id={`permissions-${name}`}>
+                                                            <Box borderWidth="1" borderColor="border-subdued" borderRadius="2" padding="3">
+                                                                <VerticalStack gap="3">
+                                                                    {PERMISSION_FEATURES.map(({ feature, label }) => (
+                                                                        <HorizontalStack key={feature} align="space-between" blockAlign="center" wrap={false} gap="4">
+                                                                            <Text variant="bodyMd">{label}</Text>
+                                                                            <Box width="220px">
+                                                                                <Dropdown
+                                                                                    id={`permission-${name}-${feature}`}
+                                                                                    menuItems={accessOptions}
+                                                                                    initial={item?.permissionOverrides?.[feature] || ROLE_DEFAULT}
+                                                                                    selected={(access) => updatePermission(name, feature, access)}
+                                                                                />
+                                                                            </Box>
+                                                                        </HorizontalStack>
+                                                                    ))}
+                                                                </VerticalStack>
+                                                            </Box>
+                                                        </Collapsible>
+                                                    </VerticalStack>
+                                                    <Divider />
+                                                    <VerticalStack gap="2">
+                                                        <Text variant="headingSm" as="h4">Roles this role can give</Text>
+                                                        <Text variant="bodySm" color="subdued">For team admins: users of this role can invite people and change roles only to these roles, and only for users who already have one of them.</Text>
+                                                        {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).length === 0 ? (
+                                                            <Text variant="bodySm" color="subdued">No other roles limited to collections yet.</Text>
+                                                        ) : (
+                                                            <HorizontalStack gap="4" wrap>
+                                                                {tempRoles.filter(r => r.name !== name && isGivableByTeamAdmin(r)).map(r => (
+                                                                    <Checkbox key={r.name} label={r.name}
+                                                                        checked={(item.assignableRoles || []).includes(r.name)}
+                                                                        onChange={(checked) => toggleAssignableRole(name, r.name, checked)} />
+                                                                ))}
+                                                            </HorizontalStack>
+                                                        )}
+                                                    </VerticalStack>
+                                                    <Divider />
+                                                    <VerticalStack gap="2">
+                                                        <Text variant="headingSm" as="h4">Also include collections matching</Text>
+                                                        <Text variant="bodySm" color="subdued">Collections added later that match a rule are included automatically.</Text>
+                                                        {(item.collectionRules || []).length > 0 ? (
+                                                            <HorizontalStack gap="2" wrap>
+                                                                {item.collectionRules.map((rule, index) => (
+                                                                    <Tag key={index} onRemove={() => updateCollectionRules(name, item.collectionRules.filter((_, i) => i !== index))}>
+                                                                        {rule.hostRegex ? `Host matches ${rule.hostRegex}` : `Tag ${rule.tagKey} = ${rule.tagValue}`}
+                                                                    </Tag>
+                                                                ))}
+                                                            </HorizontalStack>
+                                                        ) : null}
+                                                        <HorizontalStack gap="3" blockAlign="end" wrap={false}>
+                                                            <Box width="100%">
+                                                                <TextField label="Host pattern (regex)" value={newHostPattern} onChange={setNewHostPattern} placeholder="^team-a-.*" autoComplete="off" />
+                                                            </Box>
+                                                            <Box width="100%">
+                                                                <TextField label="Or tag" value={newTag} onChange={setNewTag} placeholder="team=team-a" autoComplete="off" />
+                                                            </Box>
+                                                            <Button onClick={() => addCollectionRule(name, item.collectionRules)}>Add</Button>
+                                                        </HorizontalStack>
+                                                    </VerticalStack>
+                                                    <Divider />
+                                                </VerticalStack>
                                             </Box>
                                             <Box>
                                                 <SearchableResourceList
