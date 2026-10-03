@@ -24,12 +24,8 @@ import java.util.regex.Pattern;
 public class ThreatUtils {
 
   /*
-   * Host attribution, the same for listing events and for every aggregation: exact match (hosts) OR loose
-   * device+service match (looseHostKeys, for 2-vs-3-segment hostname format mismatches) OR claude-config
-   * scanner events (no collection of their own, attributed by device id instead) - see the
-   * Filter.loose_host_keys/claude_device_ids/match_claude_config proto doc comments for the client-side
-   * derivation this mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
-   * Null when no condition is given.
+   * Events of the given hosts, matched the same way as the activity list: exact host, loose "device service"
+   * key, or claude-config events by device id. Null when nothing is given.
    */
   public static Document hostAttributionMatch(List<String> hosts, List<String> looseHostKeys,
                                               List<String> claudeDeviceIds, boolean matchClaudeConfig) {

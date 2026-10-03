@@ -275,15 +275,15 @@ const Users = () => {
                         action={{ content: 'Go to docs', url: 'https://docs.akto.io/getting-started/quick-start-with-akto-cloud', target: "_blank" }}
                         status="info"
                     >
-                        <p>Inviting team members is disabled in local. Collaborate with your team by using Akto cloud or AWS/GCP deploy.</p>
+                        <Text as="p">Inviting team members is disabled in local. Collaborate with your team by using Akto cloud or AWS/GCP deploy.</Text>
                     </Banner>
                 ) : null}
                 <Banner title="Role permissions">
-                    <p>Each role has different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></p>
+                    <Text as="p">Each role has different permissions. <Link url="https://docs.akto.io/" target="_blank">Learn more</Link></Text>
                 </Banner>
                 {loadFailed ? (
                     <Banner status="critical" title="Couldn't load users" action={{ content: 'Try again', onAction: loadUsers }}>
-                        <p>{loadFailed}</p>
+                        <Text as="p">{loadFailed}</Text>
                     </Banner>
                 ) : null}
                 {userRole !== 'GUEST' ? (

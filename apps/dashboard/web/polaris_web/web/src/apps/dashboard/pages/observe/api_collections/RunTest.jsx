@@ -19,6 +19,7 @@ import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
 import settingsApi from "../../settings/api";
 import { usePermissions, whenAllowed } from "@/util/permissions";
 import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories } from "../../test_editor/tests_table/categoryUtil";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const initialAutoTicketingDetails = {
     shouldCreateTickets: false,
@@ -376,7 +377,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0 || !canCall('api/startTest')} ><div data-testid="run_test_button">{mapLabel('Run test', getDashboardCategory())}</div></Button>
+            <AllowedAction allowed={canCall('api/startTest')}><Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">{mapLabel('Run test', getDashboardCategory())}</div></Button></AllowedAction>
         </div>
     );
 

@@ -106,7 +106,7 @@ function RoleDetails() {
         return (
             <Page title={roleName || "Role"} backAction={{ content: 'Roles', onAction: () => navigate('/dashboard/settings/roles') }}>
                 <Banner status="critical" title="Couldn't load this role" action={{ content: 'Try again', onAction: load }}>
-                    <p>{loadFailed}</p>
+                    <Text as="p">{loadFailed}</Text>
                 </Banner>
             </Page>
         )
@@ -117,7 +117,7 @@ function RoleDetails() {
                 <LegacyCard sectioned>
                     <EmptyState heading="This role doesn't exist anymore" image="/public/images/emptystate-files.png"
                         action={{ content: 'Back to roles', onAction: () => navigate('/dashboard/settings/roles') }}>
-                        <p>It may have been deleted by another admin.</p>
+                        <Text as="p">It may have been deleted by another admin.</Text>
                     </EmptyState>
                 </LegacyCard>
             </Page>
@@ -143,7 +143,6 @@ function RoleDetails() {
     const draftLimited = isLimitedToCollections(draft)
     const inUse = (usage.users || 0) + (usage.invites || 0) > 0
 
-    // ── Details ───────────────────────────────────────────────────────────────
     const detailsCard = (
         <LegacyCard title="Details" key="details" sectioned>
             <VerticalStack gap="4">
@@ -170,14 +169,13 @@ function RoleDetails() {
                 </HorizontalGrid>
                 {draft.baseRole === 'ADMIN' && draftLimited ? (
                     <Banner status="info">
-                        <p>Users with this role are limited to some collections, so they can't manage users, roles or SSO.</p>
+                        <Text as="p">Users with this role are limited to some collections, so they can't manage users, roles or SSO.</Text>
                     </Banner>
                 ) : null}
             </VerticalStack>
         </LegacyCard>
     )
 
-    // ── Permissions ───────────────────────────────────────────────────────────
     const accessOptions = (feature) => [
         { label: `Default (${ACCESS_LABELS[baseAccess(feature)] || baseAccess(feature)})`, value: ROLE_DEFAULT },
         { label: ACCESS_LABELS.NO_ACCESS, value: 'NO_ACCESS' },
@@ -231,7 +229,6 @@ function RoleDetails() {
         </LegacyCard>
     )
 
-    // ── Collections ───────────────────────────────────────────────────────────
     const visibleSelected = draft.apiCollectionsId.filter(id => visibleCollectionIds.has(id))
     const hiddenSelected = draft.apiCollectionsId.filter(id => !visibleCollectionIds.has(id))
     const ruleError = ruleType === 'HOST' ? hostPatternError(ruleValue) : tagRuleError(ruleValue)
@@ -263,7 +260,7 @@ function RoleDetails() {
         <LegacyCard title="Collections" key="collections">
             <LegacyCard.Section>
                 <Banner status={draftLimited ? "info" : undefined}>
-                    <p>{collectionsText} Leave both empty to give access to all collections.</p>
+                    <Text as="p">{collectionsText} Leave both empty to give access to all collections.</Text>
                 </Banner>
             </LegacyCard.Section>
             <LegacyCard.Section title="Chosen collections">
@@ -333,7 +330,6 @@ function RoleDetails() {
         </LegacyCard>
     )
 
-    // ── Team admin ────────────────────────────────────────────────────────────
     const givableRoles = allRoles.filter(r => r.name !== role.name && isGivableByTeamAdmin(r))
     const canInvite = effectiveAccess('INVITE_MEMBERS') === 'READ_WRITE'
     const teamAdminCard = (
@@ -345,7 +341,7 @@ function RoleDetails() {
                 </Text>
                 {!canInvite ? (
                     <Banner status="info">
-                        <p>This role can't invite users. Set "Invite users and change their roles" to Read and write to use this list.</p>
+                        <Text as="p">This role can't invite users. Set "Invite users and change their roles" to Read and write to use this list.</Text>
                     </Banner>
                 ) : null}
                 {givableRoles.length === 0 ? (
@@ -369,7 +365,6 @@ function RoleDetails() {
         </LegacyCard>
     )
 
-    // ── Users ─────────────────────────────────────────────────────────────────
     const usersCard = (
         <LegacyCard title={`Users with this role (${usageSummary(usage)})`} key="users">
             {members.length === 0 ? (
@@ -399,7 +394,6 @@ function RoleDetails() {
         </LegacyCard>
     )
 
-    // ── Actions ───────────────────────────────────────────────────────────────
     const save = async () => {
         setSaving(true)
         try {
@@ -443,7 +437,7 @@ function RoleDetails() {
     const components = [detailsCard, permissionsCard, collectionsCard, teamAdminCard, usersCard]
     if (!canEdit) {
         components.unshift(
-            <Banner key="read-only" status="info"><p>Only admins of all collections can change roles.</p></Banner>
+            <Banner key="read-only" status="info"><Text as="p">Only admins of all collections can change roles.</Text></Banner>
         )
     }
 

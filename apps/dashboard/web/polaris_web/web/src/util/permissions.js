@@ -53,13 +53,10 @@ function checks(state) {
     return {
         loaded: state.loaded,
         noProductAccess: state.noProductAccess,
-        // can the user call this server action (e.g. "api/addSplunkIntegration")
         canCall: (action) => !denied(action),
-        // can they call every one of these
         canCallAll: (...actions) => actions.every(action => !denied(action)),
         canRead: (feature) => !state.noProductAccess && accessIn(state, feature) !== 'NO_ACCESS',
         canWrite: (feature) => !state.noProductAccess && accessIn(state, feature) === 'READ_WRITE',
-        // can the user open the page at this path
         canOpen: (path) => { const action = pageRequires(path); return !state.noProductAccess && (!action || !denied(action)) },
     }
 }

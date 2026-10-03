@@ -20,7 +20,6 @@ function Integrations() {
 
     const [sortValue, setSortValue] = useState('DATE_MODIFIED_DESC');
     const navigate = useNavigate()
-    // integrations the role can't open (e.g. SSO for non-admins) are not listed
     const { canOpen } = usePermissions()
 
     let burpSuiteObj = {

@@ -23,13 +23,10 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 
 /*
- * Who may give which role, for invites and role changes in every product.
- * - Users limited to specific collections (team admins) may only give the roles their custom role lists
- *   ("roles this role can give"), so they can never hand out access beyond their team.
- * - Everyone else follows the role hierarchy, as before.
- * - Nobody may give a custom role that has more access to a feature than they have themselves.
- * - An admin of the product the request comes from manages every product, as before, even ones they have no role in.
- * Checks run in the product the role is given for, not the product the request came from.
+ * Who may give which role, checked in the product the role is given for:
+ * - users limited to collections (team admins) give only the roles their custom role lists;
+ * - everyone else follows the role hierarchy, and an admin manages every product, as before;
+ * - nobody gives a custom role with more access to a feature than they have.
  */
 public class RoleAssignment {
 

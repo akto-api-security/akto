@@ -980,6 +980,7 @@ function HomeDashboard() {
     let summaryInfo = [
         {
             title: 'Issues',
+            requires: 'api/findTotalIssues',
             data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
             color: 'critical',
@@ -988,6 +989,7 @@ function HomeDashboard() {
         },
         {
             title: mapLabel("API Risk Score", getDashboardCategory()),
+            requires: 'api/fetchApiStats',
             data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2))  : apiRiskScore,
             variant: 'heading2xl',
             color: (customRiskScoreAvg > 2.5 || apiRiskScore > 2.5) ? 'critical' : 'warning',
@@ -998,6 +1000,7 @@ function HomeDashboard() {
         },
         {
             title: 'Test Coverage',
+            requires: 'api/fetchApiStats',
             data: testCoverage + "%",
             variant: 'heading2xl',
             color: testCoverage > 80 ? 'success' : 'warning',
@@ -1009,6 +1012,7 @@ function HomeDashboard() {
     if (!isMCPSecurityCategory()) {
         summaryInfo.unshift({
             title: mapLabel("Total APIs", getDashboardCategory()),
+            requires: 'api/fetchEndpointsCount',
             data: transform.formatNumberWithCommas(totalAPIs),
             variant: 'heading2xl',
             byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
@@ -1030,7 +1034,7 @@ function HomeDashboard() {
     }
 
     const summaryComp = (
-        <SummaryCard summaryItems={summaryInfo} />
+        <SummaryCard summaryItems={summaryInfo.filter(item => !item.requires || canCall(item.requires))} />
     )
 
 

@@ -158,7 +158,7 @@ const Roles = () => {
             action={canEdit ? { content: 'Create role', onAction: () => setCreateModal({ open: true, source: null }) } : undefined}
             image="/public/images/emptystate-files.png"
         >
-            <p>Custom roles start from a built-in role. You can change what they can do and limit them to some collections.</p>
+            <Text as="p">Custom roles start from a built-in role. You can change what they can do and limit them to some collections.</Text>
         </EmptyState>
     )
 
@@ -177,7 +177,7 @@ const Roles = () => {
             <VerticalStack gap="4">
                 {loadFailed ? (
                     <Banner status="critical" title="Couldn't load roles" action={{ content: 'Try again', onAction: loadRoles }}>
-                        <p>{loadFailed}</p>
+                        <Text as="p">{loadFailed}</Text>
                     </Banner>
                 ) : null}
                 <LegacyCard>

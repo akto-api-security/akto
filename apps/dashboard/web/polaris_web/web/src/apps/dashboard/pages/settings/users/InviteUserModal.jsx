@@ -64,7 +64,7 @@ const InviteUserModal = ({ open, onClose, productScopes, roleOptions, defaultInv
                     <VerticalStack gap="3">
                         <Text>We emailed the invite. You can also share this link with them directly. It works for one week.</Text>
                         <CopyCommand command={inviteLink} />
-                        <div ref={ref} />
+                        <Box ref={ref} />
                     </VerticalStack>
                 </Modal.Section>
             </Modal>
@@ -83,7 +83,7 @@ const InviteUserModal = ({ open, onClose, productScopes, roleOptions, defaultInv
                 <Form onSubmit={send}>
                     <VerticalStack gap="4">
                         {givable.length === 0 ? (
-                            <Banner status="warning"><p>Your role can't give any roles yet. Ask an admin.</p></Banner>
+                            <Banner status="warning"><Text as="p">Your role can't give any roles yet. Ask an admin.</Text></Banner>
                         ) : null}
                         <TextField
                             label="Email"

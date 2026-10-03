@@ -22,7 +22,6 @@ function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmi
     const [saving, setSaving] = useState(false)
     const [step, setStep] = useState('edit') // edit, confirmRemove, confirmReset, resetLink
     const [resetLink, setResetLink] = useState('')
-    const [triedSave, setTriedSave] = useState(false)
     const copyRef = useRef(null)
 
     useEffect(() => {
@@ -37,7 +36,6 @@ function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmi
         setMapping(initial)
         setExpiresOn(toDate(user.accessExpiresAt))
         setStep('edit')
-        setTriedSave(false)
         setResetLink('')
     }, [user])
 
@@ -66,7 +64,6 @@ function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmi
     const name = user?.name && user.name !== '-' ? user.name : user?.login
 
     const save = async () => {
-        setTriedSave(true)
         if (pastExpiry) return
         // products not shown here keep their roles; shown products left unticked get no access
         const toSave = { ...(user.scopeRoleMapping || {}) }
@@ -115,7 +112,7 @@ function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmi
     const editContent = (
         <VerticalStack gap="4">
             {roleOptionsEmpty ? (
-                <Banner status="warning"><p>Your role can't give any roles yet. Ask an admin.</p></Banner>
+                <Banner status="warning"><Text as="p">Your role can't give any roles yet. Ask an admin.</Text></Banner>
             ) : null}
             <VerticalStack gap="2">
                 <Text variant="headingSm" as="h3">Products</Text>
@@ -142,7 +139,7 @@ function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmi
                 })}
             </VerticalStack>
             {noProduct ? (
-                <Banner status="warning"><p>{`${name} won't have access to any product.${canRemove ? ' To take them out of the account, remove the user instead.' : ''}`}</p></Banner>
+                <Banner status="warning"><Text as="p">{`${name} won't have access to any product.${canRemove ? ' To take them out of the account, remove the user instead.' : ''}`}</Text></Banner>
             ) : null}
             {isAdmin ? (
                 <>
@@ -199,7 +196,7 @@ function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmi
                     <VerticalStack gap="2">
                         <Text>Send this link to the user. It works once.</Text>
                         <Box padding="3" background="bg-subdued" borderRadius="2"><Text breakWord>{resetLink}</Text></Box>
-                        <div ref={copyRef} />
+                        <Box ref={copyRef} />
                     </VerticalStack>
                 ) : null}
             </Modal.Section>

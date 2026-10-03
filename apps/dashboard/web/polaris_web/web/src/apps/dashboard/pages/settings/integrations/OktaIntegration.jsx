@@ -509,7 +509,7 @@ function OktaIntegration() {
             />
             {removeAccessWithoutGroup && Object.keys(oktaGroupToAktoUserRoleMap).length > 0 ? (
                 <Banner status="warning">
-                    <p>Users who are in none of the mapped Okta groups lose access at their next login.</p>
+                    <Text as="p">Users who are in none of the mapped Okta groups lose access at their next login.</Text>
                 </Banner>
             ) : null}
             <HorizontalStack align="end" gap="2">

@@ -137,7 +137,7 @@ function SamlGroupRoleMapping({ configType, savedMapping, savedRemoveAccessWitho
                     />
                     {removeAccessWithoutGroup && hasMapping ? (
                         <Banner status="warning">
-                            <p>Check that your IdP sends the groups claim before saving. Users who are in none of these groups lose access at their next login.</p>
+                            <Text as="p">Check that your IdP sends the groups claim before saving. Users who are in none of these groups lose access at their next login.</Text>
                         </Banner>
                     ) : null}
                     <HorizontalStack align="end" gap="3" blockAlign="center">

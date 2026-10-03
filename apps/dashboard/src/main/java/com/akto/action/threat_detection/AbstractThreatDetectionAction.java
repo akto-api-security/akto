@@ -201,10 +201,8 @@ public class AbstractThreatDetectionAction extends UserAction {
   }
 
   /*
-   * Host scope sent with the threat backend's aggregations for a user limited to specific collections, so the
-   * backend counts only the user's agents (matched like the activity list) instead of the dashboard pulling
-   * their events. Null when the user is not limited, or when their own events must be used instead: nothing
-   * is visible to them (empty results) or the backend does not accept the field yet.
+   * Host scope for a user limited to specific collections, so the threat backend counts only their agents.
+   * Null when the user isn't limited, sees nothing, or the backend doesn't accept the field yet.
    */
   protected Map<String, Object> backendHostScope() {
     if (!backendAcceptsHostScope() || !isLimitedToOwnAgents()) {

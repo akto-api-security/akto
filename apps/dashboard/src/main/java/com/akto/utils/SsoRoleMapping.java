@@ -44,10 +44,8 @@ public class SsoRoleMapping {
             Role.ADMIN, Role.THREAT_ENGINEER, Role.THREAT_VIEWER, Role.MEMBER, Role.DEVELOPER, Role.GUEST);
 
     /*
-     * Roles to set at this login, or null to leave the user's roles as they are.
-     * The most privileged mapped role applies to every licensed product. When the user is in none of the
-     * mapped groups, roles stay as they are unless removeAccessWithoutGroup is on and the IdP sent the full
-     * group list (groupsComplete), in which case the user gets no access.
+     * Roles to set at this login (the most privileged mapped role, in every licensed product), or null to keep them.
+     * A user in no mapped group gets no access only when removeAccessWithoutGroup is on and the IdP sent all groups.
      */
     public static Map<String, String> rolesForLogin(String userEmail, int accountId, Map<String, String> groupRoleMapping,
                                                     Collection<String> groups, boolean removeAccessWithoutGroup, boolean groupsComplete) {
