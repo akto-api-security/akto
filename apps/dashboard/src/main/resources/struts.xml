@@ -460,6 +460,28 @@
             </result>
         </action>
 
+        <action name="api/fetchUserPermissions" class="com.akto.action.UserPermissionsAction" method="fetchUserPermissions">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^featureAccess.*, ^deniedActions.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchAssignableRoles" class="com.akto.action.TeamAction" method="fetchAssignableRoles">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

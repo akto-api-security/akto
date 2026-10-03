@@ -72,8 +72,24 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         this.collectionScope = collectionScope;
     }
 
+    public String getFeatureLabel() {
+        return featureLabel;
+    }
+
+    public String getAccessType() {
+        return accessType;
+    }
+
+    public String getCollectionScope() {
+        return collectionScope;
+    }
+
     // Error for users limited to specific collections, or null if the request is allowed
     private String checkCollectionScope(Object action, User user, int accountId) {
+        return collectionScopeError(collectionScope, action, user, accountId);
+    }
+
+    static String collectionScopeError(String collectionScope, Object action, User user, int accountId) {
         if (collectionScope == null) return null;
         RbacEnums.CollectionScope scope = RbacEnums.CollectionScope.valueOf(collectionScope.toUpperCase());
         if (scope == RbacEnums.CollectionScope.ALL_COLLECTIONS) {
@@ -105,6 +121,29 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             default:
                 return null;
         }
+    }
+
+    public static final String ROLE_DENIED_MESSAGE = "Your role does not have access to this. Ask an admin if you need it.";
+
+    /*
+     * Why the user may not call an action with these role check settings, or null if they may. The interceptor and the
+     * permissions sent to the UI both use this, so what the UI hides is exactly what the server refuses.
+     * The product check (no role in the product) and non-metered dashboards are handled by the callers.
+     */
+    public static String accessError(String featureLabel, String accessType, String collectionScope, Object action,
+                                     User user, int accountId, Role userRoleRecord) {
+        // relaxed to full access for accounts without the paid RBAC feature, except admin actions
+        if (!(UsageMetricCalculator.isRbacFeatureAvailable(accountId) || featureLabel.equalsIgnoreCase(Feature.ADMIN_ACTIONS.toString()))) {
+            return null;
+        }
+        Feature featureType = Feature.valueOf(featureLabel.toUpperCase());
+        // custom roles: threat toggle and per-feature overrides
+        ReadWriteAccess accessGiven = RBACDao.resolveFeatureAccess(user.getId(), accountId, featureType,
+                userRoleRecord.getReadWriteAccessForFeature(featureType));
+        if (!hasRequiredAccess(featureLabel, accessType, accessGiven, userRoleRecord.getName().toUpperCase())) {
+            return ROLE_DENIED_MESSAGE;
+        }
+        return collectionScopeError(collectionScope, action, user, accountId);
     }
 
     /** Whether a role with the given access to the action's feature may call it. Admin actions need the Admin role. */
@@ -271,25 +310,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 return invocation.invoke();
             }
 
-            Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
-
-            ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
-
-            // custom roles: threat toggle and per-feature overrides
-            accessGiven = RBACDao.resolveFeatureAccess(userId, sessionAccId, featureType, accessGiven);
-
-            boolean hasRequiredAccess = hasRequiredAccess(featureLabel, accessType, accessGiven, userRole);
-
-            if(!hasRequiredAccess) {
+            String accessError = accessError(featureLabel, accessType, collectionScope, invocation.getAction(), user, sessionAccId, userRoleRecord);
+            if (accessError != null) {
                 // app log only (no DB write), so a page repeatedly calling an API it cannot use adds no load
                 logger.info("RBAC denied api: " + invocation.getProxy().getActionName() + " userId: " + userId + " role: " + userRole + " feature: " + featureLabel + " " + accessType);
-                ((ActionSupport) invocation.getAction()).addActionError("Your role does not have access to this. Ask an admin if you need it.");
-                return FORBIDDEN;
-            }
-
-            String collectionScopeError = checkCollectionScope(invocation.getAction(), user, sessionAccId);
-            if (collectionScopeError != null) {
-                ((ActionSupport) invocation.getAction()).addActionError(collectionScopeError);
+                ((ActionSupport) invocation.getAction()).addActionError(accessError);
                 return FORBIDDEN;
             }
 
