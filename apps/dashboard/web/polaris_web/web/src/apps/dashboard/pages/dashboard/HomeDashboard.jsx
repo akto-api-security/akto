@@ -5,6 +5,7 @@ import threatApi from "../threat_detection/api"
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
+import AskOverlayButton from "./ask/AskOverlayButton"
 import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
@@ -1686,6 +1687,7 @@ function HomeDashboard() {
                     isFirstPage={true}
                     components={pageComponents}
                     primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} disabled={selectedTab === 1} />}
+                    secondaryActions={<AskOverlayButton domain="API" />}
                 />
             }
 

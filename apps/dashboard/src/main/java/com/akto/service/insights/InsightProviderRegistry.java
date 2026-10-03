@@ -18,6 +18,12 @@ import com.akto.service.insights.providers.SkillEvaluationConcentrationProvider;
 import com.akto.service.insights.providers.TestPoliciesOnProdProvider;
 import com.akto.service.insights.providers.UngovernedAiRatioProvider;
 import com.akto.service.insights.providers.WhatChangedThisWeekProvider;
+import com.akto.service.insights.providers.UnauthenticatedSensitiveApisProvider;
+import com.akto.service.insights.providers.UntestedHighRiskApisProvider;
+import com.akto.service.insights.providers.SensitiveDataHotspotsProvider;
+import com.akto.service.insights.providers.AgingOpenCriticalsProvider;
+import com.akto.service.insights.providers.IssueConcentrationProvider;
+import com.akto.service.insights.providers.IssueRecurrenceProvider;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -53,6 +59,16 @@ public final class InsightProviderRegistry {
         register(new PromptInjectionRepeatsProvider());
         register(new TestPoliciesOnProdProvider());
         register(new SkillEvaluationConcentrationProvider());
+
+        // — API_POSTURE / TESTING_POSTURE (Ask Akto overlay) — cheapest-first within each group,
+        // same convention as the two blocks above.
+        register(new UnauthenticatedSensitiveApisProvider());
+        register(new UntestedHighRiskApisProvider());
+        register(new SensitiveDataHotspotsProvider());
+
+        register(new AgingOpenCriticalsProvider());
+        register(new IssueConcentrationProvider());
+        register(new IssueRecurrenceProvider());
     }
 
     private InsightProviderRegistry() {}

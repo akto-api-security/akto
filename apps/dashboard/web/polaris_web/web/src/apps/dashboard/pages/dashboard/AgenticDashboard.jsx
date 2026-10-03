@@ -6,6 +6,7 @@ import { produce } from 'immer'
 import values from "@/util/values";
 import func from '@/util/func'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
+import AskOverlayButton from "./ask/AskOverlayButton"
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import "./agentic-dashboard.css"
 import "react-grid-layout/css/styles.css"
@@ -1441,7 +1442,7 @@ const AgenticDashboard = () => {
                         />
                     }
                     primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
-                    secondaryActions={[componentsMenu]}
+                    secondaryActions={[componentsMenu, <AskOverlayButton key="ask-akto" domain="AGENTIC" />]}
                     components={[
                         <div key="grid-container" ref={containerRef} style={{ width: '100%' }}>
                             {layoutLoading ? (
