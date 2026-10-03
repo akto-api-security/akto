@@ -500,7 +500,7 @@ public class DaoInit {
                 .codecRegistry(codecRegistry)
                 .build();
 
-        clients[0] = MongoClients.create(clientSettings);
+        clients[0] = com.akto.util.DbNames.wrap(MongoClients.create(clientSettings));
     }
     public static void init(ConnectionString connectionString) {
         init(connectionString, ReadPreference.secondary(), WriteConcern.ACKNOWLEDGED);
@@ -541,6 +541,7 @@ public class DaoInit {
         TestingRunPlaygroundDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ApiCollectionsDao.instance.createIndicesIfAbsent();
+        AgenticPostureScoreHistoryDao.instance.createIndicesIfAbsent();
         ActivitiesDao.instance.createIndicesIfAbsent();
         DependencyNodeDao.instance.createIndicesIfAbsent();
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();

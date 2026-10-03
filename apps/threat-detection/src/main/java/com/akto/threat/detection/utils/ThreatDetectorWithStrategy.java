@@ -34,6 +34,10 @@ public class ThreatDetectorWithStrategy {
         return strategy.getThreatPositions(filterId, httpResponseParams);
     }
 
+    public String getWeakAuthenticationReason(HttpResponseParams httpResponseParams) {
+        return threatDetector.getWeakAuthenticationReason(httpResponseParams);
+    }
+
     public URLTemplate findMatchingUrlTemplate(HttpResponseParams httpResponseParams) {
         return threatDetector.findMatchingUrlTemplate(httpResponseParams);
     }

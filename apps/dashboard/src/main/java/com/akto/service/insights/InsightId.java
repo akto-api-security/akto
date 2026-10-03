@@ -68,18 +68,9 @@ public enum InsightId {
         READ_ONLY
     }
 
-    /**
-     * Which surface an insight belongs to. ATLAS_DISCOVERY and GUARDRAIL_VIOLATIONS are the
-     * original agentic-flavoured groups (still never mixed in the same listInsights(ctx, group)
-     * call — see InsightService.listInsights); API_POSTURE and TESTING_POSTURE were added for
-     * the Ask Akto overlay, which DOES read several groups in one request (InsightService.listBrief),
-     * rendering each as its own section.
-     *
-     * requiredFeature is the RBAC gate for this group, used by InsightService.groupVisible to
-     * decide whether to include or omit the group in an aggregate response — putting it on the
-     * enum means a new group can't be added without answering "who can see this".
-     */
-    @Getter
+    /** Which surface an insight belongs to — Atlas Discovery vs the guardrail/violations set
+     *  merged in from feature/dashbaord/guardrail-insights. Callers filter listInsights by this so
+     *  groups never mix in the same list; see InsightService.listInsights. */
     public enum Group {
         ATLAS_DISCOVERY(Feature.API_COLLECTIONS),
         GUARDRAIL_VIOLATIONS(Feature.API_COLLECTIONS),

@@ -1,5 +1,6 @@
 package com.akto.action.monitoring;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.UserAction;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
@@ -37,7 +38,7 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<Log> agentLogs;
     private int startTime;
     private int endTime;
-    private String logKey; // optional filter: "agent-logs", "proxy-logs", "installation-logs", etc.
+    private String logKey; // optional filter: "agent-logs", "proxy-logs", "system-proxy-logs", "installation-logs", etc.
     private String afterId;  // ObjectId hex cursor — fetch logs older than this document
     private int pageSize;    // number of logs per page; defaults to DEFAULT_PAGE_SIZE
     private long totalCount; // total matching logs (without cursor), for display
@@ -50,6 +51,11 @@ public class EndpointShieldAgentAction extends UserAction {
     private List<UserAnalysisData> userAnalysisList = new ArrayList<>();
 
     public String fetchUserAnalysisList() {
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            userAnalysisList = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
         // startTime > 0 means a real range was picked (endTime is always nonzero, even for "All
         // time" — see AgenticAssetsPage.jsx), so branch on startTime alone to keep "All time" on
         // the cheap lifetime-counter path below instead of an on-the-fly query.
@@ -393,6 +399,11 @@ public class EndpointShieldAgentAction extends UserAction {
         if (this.username == null || this.username.isEmpty()) {
             addActionError("Username is required");
             return ERROR.toUpperCase();
+        }
+        // Users limited to specific collections (Argus): devices/users are not attributable to their collections, so none are shown
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            userAnalysis = null;
+            return SUCCESS.toUpperCase();
         }
 
         userAnalysis = UserAnalysisDataDao.instance.findOne(

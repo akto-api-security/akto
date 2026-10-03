@@ -1,6 +1,7 @@
 package com.akto.service.insights;
 
 import com.akto.dao.RBACDao;
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.context.Context;
 import com.akto.dao.insights.InsightNarrativeCacheDao;
 import com.akto.dto.ApiInfo;
@@ -17,21 +18,8 @@ import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
+import java.util.*;
+import java.util.concurrent.*;
 /**
  * Orchestrates the insights feature: shared-bundle load, provider dispatch, evidence
  * bounding, and (detail only) the narrative cache + LLM call. This is the one class
@@ -75,6 +63,12 @@ public class InsightService {
         return cached.bundle;
     }
 
+    // Drops every cached bundle for the account, so the next read reflects freshly written cron output.
+    public static void invalidateAccount(int accountId) {
+        String prefix = accountId + "_";
+        BUNDLE_CACHE.keySet().removeIf(key -> key.startsWith(prefix));
+    }
+
     public List<InsightResult> listInsights(InsightContext ctx, InsightId.Group group) {
         InsightDataBundle bundle = getOrLoadBundle(ctx);
         prewarm(bundle, group);
@@ -100,7 +94,7 @@ public class InsightService {
         }
         List<Future<InsightResult>> futures = new ArrayList<>(providers.size());
         for (InsightProvider provider : providers) {
-            futures.add(PROVIDER_EXECUTOR.submit(withContext(accountId, userId, contextSource,
+            futures.add(PROVIDER_EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                     () -> computeSafely(provider, bundle, ctx, InsightProvider.Scope.LIST))));
         }
 
@@ -175,21 +169,6 @@ public class InsightService {
             case "LOW": return 4;
             default: return 5;
         }
-    }
-
-    private <T> Callable<T> withContext(int accountId, Integer userId, CONTEXT_SOURCE contextSource, Callable<T> body) {
-        return () -> {
-            Context.accountId.set(accountId);
-            Context.userId.set(userId);
-            Context.contextSource.set(contextSource);
-            try {
-                return body.call();
-            } finally {
-                Context.accountId.remove();
-                Context.userId.remove();
-                Context.contextSource.remove();
-            }
-        };
     }
 
     public InsightResult getInsightDetail(InsightContext ctx, InsightId id, boolean forceRefresh) {
@@ -484,6 +463,28 @@ public class InsightService {
         } catch (Exception e) {
             logger.error("InsightService.recentlyOpenedIssues failed: " + e.getMessage());
             return Collections.emptyList();
+        }
+    }
+    
+    /**
+     * Argus (AGENTIC) posture insight cards read malicious/guardrail events the same way this
+     * class's own threat-backend futures do (see InsightDataLoader), just outside the bundle —
+     * ArgusPostureService's card-breakdown methods are pure over this raw list rather than
+     * fetching it themselves, so this is the one place that owns the InsightsThreatBackendAccess
+     * instantiation. A capped raw-row fetch (not a server-side aggregation: the threat-detection-
+     * backend has no {@code $group by {apiCollectionId, filterId}} endpoint), minimalFields=true
+     * since only apiCollectionId/filterId/severity/label/timestamp are read, and reuses
+     * AbstractThreatDetectionAction's own 2-minute response cache — the exact same
+     * fetchAllMaliciousEvents(start, end, limit, null, null, true) shape SecurityPostureAction's
+     * trendWindowEventsFuture already uses.
+     */
+    public List<DashboardMaliciousEvent> fetchArgusMaliciousEvents(InsightContext ctx, int limit) {
+        InsightsThreatBackendAccess threatAccess = new InsightsThreatBackendAccess();
+        try {
+            return threatAccess.violationEventsMinimal(ctx.getStartTs(), ctx.getEndTs(), limit, null);
+        } catch (Exception e) {
+            logger.error("InsightService: fetchArgusMaliciousEvents failed: " + e.getMessage());
+            return new ArrayList<>();
         }
     }
 }

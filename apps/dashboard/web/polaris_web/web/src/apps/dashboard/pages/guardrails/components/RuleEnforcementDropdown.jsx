@@ -1,11 +1,11 @@
-import { HorizontalStack, VerticalStack, Text, Box, Banner } from "@shopify/polaris";
+import { HorizontalStack, VerticalStack, Text, Box, Banner, List } from "@shopify/polaris";
 import Dropdown from "../../../components/layouts/Dropdown";
 import GuardrailEnforcementInfoIcon from "./GuardrailEnforcementInfoIcon";
 import { GUARDRAIL_BEHAVIOUR, GUARDRAIL_BEHAVIOUR_OPTIONS, normalizeBehaviourValue } from "../utils";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
 import Store from "../../../store";
 
-const WARN_ENABLED_ACCOUNT_IDS = ['1726615470', '1000000'];
+const WARN_ENABLED_ACCOUNT_IDS = ['1726615470', '1000000', '1669322524'];
 
 export default function RuleEnforcementDropdown({
     id,
@@ -59,11 +59,17 @@ export default function RuleEnforcementDropdown({
             )}
             {showWarnNote && (
                 <Banner tone="info">
-                    <Text variant="bodyMd">
-                        Warn currently applies only to input prompts submitted by the user - a flagged prompt is held, and resending it unchanged lets it through.
-                        On Claude CLI, Copilot CLI, and VS Code, a flagged tool call prompts you to explicitly allow it before it runs.
-                        Output messages and internal responses generated inside agent aren't supported by Warn yet - these are blocked instead.
-                    </Text>
+                    <List type="bullet">
+                        <List.Item>
+                            A flagged prompt is held and a warning is shown. Resend the same prompt to proceed.
+                        </List.Item>
+                        <List.Item>
+                            Flagged tool calls need your approval to run. Supported only on Claude CLI, Copilot CLI, and VS Code.
+                        </List.Item>
+                        <List.Item>
+                            Agent responses aren't supported yet. Flagged responses are blocked.
+                        </List.Item>
+                    </List>
                 </Banner>
             )}
         </VerticalStack>

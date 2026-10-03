@@ -12,7 +12,9 @@ import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dao.insights.agentic.AgentFindingGroupAggregation;
 import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.insights.agentic.AgentFindingGroup;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -196,20 +198,26 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
 
     }
 
-    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections, List<Integer> restrictToCollectionIds){
-        List<Bson> pipeline = new ArrayList<>();
-        if(deactivatedCollections == null) deactivatedCollections = new HashSet<>();
-
+    /** Shared by getTotalSubcategoriesCountMap and openIssueGroupsForDashboard — both are "OPEN
+     *  issues, RBAC + dashboard-context scoped, restricted to a lastSeen window[, further
+     *  restricted to a collection-id list]"; this is the one place that shape is built. */
+    private Bson openIssuesInWindowFilter(int startTs, int endTs, Set<Integer> deactivatedCollections, List<Integer> restrictToCollectionIds) {
         List<Bson> matchConditions = new ArrayList<>();
-        matchConditions.add(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"));
-        matchConditions.add(Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp));
-        matchConditions.add(Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp));
-        matchConditions.add(Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections));
+        matchConditions.add(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name()));
+        matchConditions.add(Filters.gte(TestingRunIssues.LAST_SEEN, startTs));
+        matchConditions.add(Filters.lte(TestingRunIssues.LAST_SEEN, endTs));
+        if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+            matchConditions.add(Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections));
+        }
         if (restrictToCollectionIds != null && !restrictToCollectionIds.isEmpty()) {
             matchConditions.add(Filters.in(TestingRunIssues.ID_API_COLLECTION_ID, restrictToCollectionIds));
         }
+        return addCollectionsFilterForDashboard(Filters.and(matchConditions));
+    }
 
-        pipeline.add(Aggregates.match(addCollectionsFilterForDashboard(Filters.and(matchConditions))));
+    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections, List<Integer> restrictToCollectionIds){
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(openIssuesInWindowFilter(startTimeStamp, endTimeStamp, deactivatedCollections, restrictToCollectionIds)));
 
         BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
@@ -306,6 +314,28 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         return finalMap;
     }
 
+
+    /**
+     * Argus (AGENTIC) posture read: OPEN issues in the dashboard's own date range, grouped
+     * {collection, testSubCategory, severity} in Mongo — never the raw issue documents. Shares
+     * both its match stage (openIssuesInWindowFilter) and its group/project shape
+     * (AgentFindingGroupAggregation) with the rest of this DAO/package instead of hand-rolling
+     * either again.
+     */
+    public List<AgentFindingGroup> openIssueGroupsForDashboard(int startTs, int endTs, int urlsPerGroupCap) {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(openIssuesInWindowFilter(startTs, endTs, null, null)));
+        pipeline.addAll(AgentFindingGroupAggregation.groupAndProject(
+                TestingRunIssues.ID_API_COLLECTION_ID,
+                "_id." + TestingIssuesId.TEST_SUB_CATEGORY,
+                TestingRunIssues.KEY_SEVERITY,
+                TestingRunIssues.LAST_SEEN,
+                "_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL,
+                urlsPerGroupCap));
+
+        return AgentFindingGroupAggregation.parse(
+                getMCollection().aggregate(pipeline, BasicDBObject.class).into(new ArrayList<>()));
+    }
 
     public MongoCollection<Document> getRawCollection() {
         return clients[0].getDatabase(getDBName()).getCollection(getCollName(), Document.class);

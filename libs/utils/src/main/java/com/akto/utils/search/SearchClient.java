@@ -58,8 +58,15 @@ public abstract class SearchClient {
         int accountId, long startMs, long endMs,
         Map<String, List<String>> filters, Boolean atlasTrafficFilter);
 
+    public ArgusStats fetchArgusStats(
+        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent) {
+        return fetchArgusStats(accountId, startMs, endMs, null, atlasTrafficFilter, includeTracesContent);
+    }
+
+    /** Same as above, narrowed by field filters (e.g. serviceId) - null for no filters. */
     public abstract ArgusStats fetchArgusStats(
-        int accountId, long startMs, long endMs, Boolean atlasTrafficFilter, boolean includeTracesContent);
+        int accountId, long startMs, long endMs, Map<String, List<String>> filters,
+        Boolean atlasTrafficFilter, boolean includeTracesContent);
 
     /**
      * Time-ranged replacement for UserAnalysisDataDao's lifetime-total read — sums input/output
@@ -68,6 +75,34 @@ public abstract class SearchClient {
      */
     public abstract List<UserAnalysisData> fetchUserAnalysisTokenTotals(
         int accountId, long startMs, long endMs);
+
+    /**
+     * Argus (AGENTIC) posture read: a per-serviceId (not per-device) rollup for the dashboard's
+     * own window — token totals plus a real topic/subTopic breakdown straight off the indexed
+     * AgentQueryRecord fields (the ones UserAnalysisCron writes back via bulkUpdateTopics).
+     * Deliberately NOT the Mongo-materialized "harmful topic" classification
+     * (UserAnalysisData#getHarmfulTopics) — that's an LLM-computed, cron-only rollup with no live
+     * ES/ADX equivalent; see service/posture/CLAUDE.md's Argus section for why AGENTIC
+     * observability uses topic concentration instead of a harmful-topic signal.
+     * atlasTrafficFilter=false at the call site — Argus/agentic traffic is exactly the "not
+     * Atlas" half of AgentQueryRecord's isAtlasTraffic split. Only id.serviceId (deviceId left
+     * blank — this is a per-service rollup)/totalInputTokens/totalOutputTokens/topicHierarchy are
+     * populated; harmfulTopics/aiSummary are always empty.
+     */
+    public abstract List<UserAnalysisData> fetchAgenticServiceObservability(
+        int accountId, long startMs, long endMs, int topicsPerServiceCap);
+
+    /**
+     * Argus (AGENTIC) posture read: the account-wide (not per-service) topic/subTopic hierarchy
+     * for the dashboard's own window — the top `topicsCap` topics overall, each with its top
+     * `subTopicsCap` subtopics, straight off the indexed AgentQueryRecord fields. Same
+     * atlasTrafficFilter=false rationale as fetchAgenticServiceObservability above (Argus/agentic
+     * traffic is the "not Atlas" half of isAtlasTraffic). Returned map shape matches
+     * UserAnalysisData#topicHierarchy exactly (domain -> subDomain -> doc_count), insertion order
+     * = descending count, so no separate DTO is needed for this global rollup.
+     */
+    public abstract Map<String, Map<String, Integer>> fetchAgenticGlobalTopicHierarchy(
+        int accountId, long startMs, long endMs, int topicsCap, int subTopicsCap);
 
     public abstract List<Map<String, Object>> fetchTraceDetail(
         int accountId, String traceId, Boolean atlasTrafficFilter);

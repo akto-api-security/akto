@@ -143,9 +143,17 @@ public class Utils {
     }
 
     public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, RedactionType redactionType) {
+        return buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, ignoredEvent, redactionType, null);
+    }
+
+    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, RedactionType redactionType, String reason) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if (errors != null && !errors.isEmpty()) {
             metadataBuilder.addAllSchemaErrors(errors);
+        }
+        boolean hasReason = reason != null && !reason.isEmpty();
+        if (hasReason) {
+            metadataBuilder.setReason(reason);
         }
 
         // Determine status based on ignoredEvent flag
@@ -175,6 +183,9 @@ public class Utils {
         if (metadata != null) {
             metadataBuilder.setCountryCode(metadata.getCountryCode());
             metadataBuilder.setDestCountryCode(metadata.getDestCountryCode() != null ? metadata.getDestCountryCode() : "");
+        }
+        // Keep the reason even when geo metadata couldn't be built
+        if (metadata != null || hasReason) {
             maliciousReqBuilder.setMetadata(metadataBuilder.build());
         }
         return maliciousReqBuilder.build();

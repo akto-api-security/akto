@@ -296,6 +296,75 @@ const api = {
         })
     },
 
+    fetchArgusPostureSummary: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                environment
+            }
+        })
+    },
+
+    fetchArgusPostureChanges: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureChanges',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, environment }
+        })
+    },
+
+    // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
+    fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsights',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    // Meant to be called after fetchArgusPostureInsights has already rendered — this one does a
+    // real LLM call per card on a cache miss, so it must never block the card data itself.
+    fetchArgusPostureInsightSummaries: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsightSummaries',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    triggerArgusPostureRegenerate: async () => {
+        return await request({ url: '/api/triggerArgusPostureRegenerate', method: 'post', data: {} })
+    },
+
+    fetchArgusPostureRegenerateStatus: async () => {
+        return await request({ url: '/api/fetchArgusPostureRegenerateStatus', method: 'post', data: {} })
+    },
+
+    fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, environment, skip, limit) => {
+        return await request({
+            url: '/api/fetchArgusPostureDrill',
+            method: 'post',
+            data: {
+                drillId,
+                path: path || '',
+                startTimestamp,
+                endTimestamp,
+                environment,
+                skip: skip || 0,
+                limit: limit || 20
+            }
+        })
+    },
+
     fetchPostureSummary: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchPostureSummary',
@@ -325,7 +394,7 @@ const api = {
                 limit: limit || 20
             }
         })
-    }
+    },
 }
 
 export default api;

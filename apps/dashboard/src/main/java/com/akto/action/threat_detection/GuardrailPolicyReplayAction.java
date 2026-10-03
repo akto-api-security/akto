@@ -223,6 +223,10 @@ public class GuardrailPolicyReplayAction extends AbstractThreatDetectionAction {
         // Serialize on the request thread: it reads the saved policy and mutates the draft, and the
         // draft object is request-scoped.
         GuardrailPolicies saved = loadSavedPolicy();
+        
+        if (saved != null && (policy.getModelConfigs() == null || policy.getModelConfigs().isEmpty())) {
+            policy.setModelConfigs(saved.getModelConfigs());
+        }
         BasicDBObject editedPayload = GuardrailsServiceClient.serializePolicy(policy, policyName, contextSource);
         // Snap the window's upper bound to the same bucket the baseline cache is keyed on. If this
         // were plain Context.now(), every run would examine a slightly different set of events while

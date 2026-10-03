@@ -52,11 +52,24 @@ _FIELDS = (
     "ANTHROPIC_FOUNDRY_API_KEY",
     "ANTHROPIC_FOUNDRY_DEPLOYMENT",
     "ANTHROPIC_FOUNDRY_MODEL",
+    # AWS Bedrock (Converse API). Auth: BEDROCK_API_KEY (Bearer) wins; else
+    # IAM BEDROCK_ACCESS_KEY_ID + BEDROCK_SECRET_ACCESS_KEY (+ optional
+    # BEDROCK_SESSION_TOKEN), SigV4-signed.
+    "BEDROCK_REGION",
+    "BEDROCK_MODEL",
+    "BEDROCK_API_KEY",
+    "BEDROCK_ACCESS_KEY_ID",
+    "BEDROCK_SECRET_ACCESS_KEY",
+    "BEDROCK_SESSION_TOKEN",
+    # Seconds before expiry to refresh pod IAM-role credentials (EKS Pod
+    # Identity / IRSA). Default 1800 (30 min); capped at half their lifetime.
+    "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC",
     # Integrations
     "SLACK_WEBHOOK_URL",
     "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
+    "SCANNER_RESPONSE_FORMAT",
     # Portable anonymizer service URL (e.g. http://anonymizer:8093).
     "ANONYMIZER_URL",
     # --- Per-scanner semantic cache (Redis vector store + embedder service) ---
@@ -87,6 +100,16 @@ _FIELDS = (
     "DATABASE_ABSTRACTOR_SERVICE_TOKEN",
     # Seconds between metric pushes to database-abstractor. Default 60s.
     "METRICS_PUSH_INTERVAL_SEC",
+    # Default endpoint for each "_fast" provider (providers.py); a modelConfigs
+    # entry's own "baseUrl" overrides this per-request.
+    "QWEN3GUARD_VLLM_BASE_URL",
+    "GEMMA_VLLM_BASE_URL",
+    "GEMMA_VLLM_ARBITER_BASE_URL",
+    # Per-"_fast"-provider auth (sent as Authorization: Bearer) — one key per
+    # container, matching the base URLs above.
+    "QWEN_VLLM_KEY",
+    "GEMMA_VLLM_KEY",
+    "GEMMA_26B_VLLM_KEY",
 )
 
 
@@ -128,12 +151,26 @@ class Settings:
     ANTHROPIC_FOUNDRY_API_KEY: str
     ANTHROPIC_FOUNDRY_DEPLOYMENT: str
     ANTHROPIC_FOUNDRY_MODEL: str
+    BEDROCK_REGION: str
+    BEDROCK_MODEL: str
+    BEDROCK_API_KEY: str
+    BEDROCK_ACCESS_KEY_ID: str
+    BEDROCK_SECRET_ACCESS_KEY: str
+    BEDROCK_SESSION_TOKEN: str
+    BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC: str
     SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
+    SCANNER_RESPONSE_FORMAT: str
     ANONYMIZER_URL: str
     DATABASE_ABSTRACTOR_SERVICE_TOKEN: str
     METRICS_PUSH_INTERVAL_SEC: str
+    QWEN3GUARD_VLLM_BASE_URL: str
+    GEMMA_VLLM_BASE_URL: str
+    GEMMA_VLLM_ARBITER_BASE_URL: str
+    QWEN_VLLM_KEY: str
+    GEMMA_VLLM_KEY: str
+    GEMMA_26B_VLLM_KEY: str
 
     def __init__(self):
         for f in _FIELDS:

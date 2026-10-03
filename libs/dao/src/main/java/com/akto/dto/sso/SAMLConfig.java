@@ -1,4 +1,6 @@
 package com.akto.dto.sso;
+import java.util.Map;
+
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import com.akto.dto.Config;
@@ -23,6 +25,10 @@ public class SAMLConfig extends Config  {
 
     public static final String ORGANIZATION_DOMAIN = "organizationDomain";
     private String organizationDomain;
+
+    // IdP group (as sent in the SAML groups claim) -> Akto role name (standard or custom)
+    public static final String GROUP_ROLE_MAPPING = "groupRoleMapping";
+    private Map<String, String> groupRoleMapping;
 
     public SAMLConfig(){}
     
@@ -89,6 +95,14 @@ public class SAMLConfig extends Config  {
 
     public void setOrganizationDomain(String organizationDomain) {
         this.organizationDomain = organizationDomain;
+    }
+
+    public Map<String, String> getGroupRoleMapping() {
+        return groupRoleMapping;
+    }
+
+    public void setGroupRoleMapping(Map<String, String> groupRoleMapping) {
+        this.groupRoleMapping = groupRoleMapping;
     }
 
 }

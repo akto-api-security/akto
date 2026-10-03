@@ -22,7 +22,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -118,6 +118,8 @@ export default function LeftNav() {
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
+    const showAgenticPosture = isAgenticSecurityCategory() && func.isAgenticPostureEnabled();
+
     const navItems = useMemo(() => {
         let items = [
             {
@@ -182,7 +184,7 @@ export default function LeftNav() {
                     handleSelect("dashboard_endpoint_posture");
                     // The new posture page is still only for the internal test account; every
                     // other @akto.io account keeps landing on the older EndpointPosture page.
-                    navigate(activeAccount === 1779231193 ? "/dashboard/security-posture" : "/dashboard/endpoint-dashboard");
+                    navigate(func.hasAccessToNewPosture() ? "/dashboard/security-posture" : "/dashboard/endpoint-dashboard");
                     setActive("normal");
                 },
                 selected: leftNavSelected === "dashboard_endpoint_posture",
@@ -192,11 +194,18 @@ export default function LeftNav() {
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
                 onClick: () => {
-                    handleSelect("dashboard_home");
-                    navigate("/dashboard/home");
+                    if (showAgenticPosture) {
+                        handleSelect("dashboard_agentic_posture");
+                        navigate("/dashboard/agentic-posture");
+                    } else {
+                        handleSelect("dashboard_home");
+                        navigate("/dashboard/home");
+                    }
                     setActive("normal");
                 },
-                selected: leftNavSelected === "dashboard_home",
+                selected: showAgenticPosture
+                    ? leftNavSelected === "dashboard_agentic_posture" || currPathString.startsWith("dashboard_agentic_posture")
+                    : leftNavSelected === "dashboard_home",
                 key: "2",
             }] : []),
             {
@@ -773,7 +782,7 @@ export default function LeftNav() {
         }
 
         return items
-    }, [activeAccount, accounts, dashboardCategory, handleAccountChange, isAllowedDashboardUser, leftNavSelected, currPathString])
+    }, [activeAccount, accounts, dashboardCategory, handleAccountChange, isAllowedDashboardUser, showAgenticPosture, leftNavSelected, currPathString])
 
     const navigationMarkup = (
         <div className={`${active} ${dashboardCategory === "Agentic Security" ? "agentic-security-nav" : ""}`}>

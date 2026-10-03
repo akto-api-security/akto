@@ -430,6 +430,14 @@ const settingRequests = {
         })
     },
 
+    saveSamlGroupRoleMapping(groupRoleMapping, configType) {
+        return request({
+            url: '/api/saveSamlGroupRoleMapping',
+            method: 'post',
+            data: {groupRoleMapping, configType}
+        })
+    },
+
     addAzureSso(loginUrl, x509Certificate, ssoEntityId, applicationIdentifier, acsUrl, configType) {
         return request({
             url: '/api/addSAMLSso',
@@ -878,11 +886,11 @@ const settingRequests = {
         })
     },
     // ATLAS: server-side paginated Endpoint Shield agents (replaces the load-all fetchModuleInfo on that page)
-    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
+    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], browserNames = [], agentVersions = [], statuses = [], providers = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
         return await request({
             url: '/api/fetchEndpointShieldAgents',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, queryValue, startTimestamp, endTimestamp }
+            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, browserNames, agentVersions, statuses, providers, queryValue, startTimestamp, endTimestamp }
         })
     },
     async fetchEndpointShieldFilterOptions() {

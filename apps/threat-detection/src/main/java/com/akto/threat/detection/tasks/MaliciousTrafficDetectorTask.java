@@ -430,6 +430,11 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
           }
         }
         
+        String reason = null;
+        if (filterId.equals(ThreatDetector.WEAK_AUTHENTICATION_FILTER_ID)) {
+          reason = threatDetector.getWeakAuthenticationReason(responseParam);
+        }
+
         // Later we will also add aggregation support
         RedactionType redactionType = Utils.getRedactionType(responseParam.getRequestParams().getHeaders(), dataActor);
         // Eg: 100 4xx requests in last 10 minutes.
@@ -449,7 +454,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         String aggKey = actor + "|" + groupKey;
 
 
-        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType);
+        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, vulnerable, successfulExploit, isIgnoredEvent, redactionType, reason);
 
         if (!isAggFilter) {
           generateAndPushMaliciousEventRequest(
