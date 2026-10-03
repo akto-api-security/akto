@@ -4,8 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.lang.reflect.Field;
 import java.util.Collections;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -13,7 +12,6 @@ import org.junit.Test;
 import com.akto.MongoBasedTest;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
-import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -42,17 +40,15 @@ public class TestRbacCacheVersion extends MongoBasedTest {
     // what another instance does when it changes access: write the role and bump the version, without touching our caches
     static void changeOnAnotherInstance(String role) {
         RBACDao.instance.updateOne(Filters.eq(RBAC.USER_ID, USER), Updates.set(RBAC.SCOPE_ROLE_MAPPING, Collections.singletonMap("API", role)));
-        RbacCacheVersionDao.instance.getMCollection().updateOne(Filters.eq("_id", ACCOUNT_ID), Updates.inc("version", 1L),
+        RbacCacheVersionDao.instance.getMCollection().updateOne(Filters.eq("_id", ACCOUNT_ID),
+                Updates.combine(Updates.inc("version", 1L), Updates.set("updatedAt", Context.now())),
                 new com.mongodb.client.model.UpdateOptions().upsert(true));
     }
 
-    @SuppressWarnings("unchecked")
     static void lastCheckedLongAgo() throws Exception {
-        Field field = RbacCacheVersionDao.class.getDeclaredField("seenVersions");
+        Field field = RbacCacheVersionDao.class.getDeclaredField("lastCheck");
         field.setAccessible(true);
-        Map<Integer, Pair<Long, Integer>> seen = (ConcurrentHashMap<Integer, Pair<Long, Integer>>) field.get(null);
-        Pair<Long, Integer> entry = seen.get(ACCOUNT_ID);
-        seen.put(ACCOUNT_ID, new Pair<>(entry.getFirst(), Context.now() - RbacCacheVersionDao.CHECK_INTERVAL - 1));
+        ((AtomicInteger) field.get(null)).set(Context.now() - RbacCacheVersionDao.CHECK_INTERVAL - 1);
     }
 
     @Test
@@ -67,6 +63,27 @@ public class TestRbacCacheVersion extends MongoBasedTest {
         lastCheckedLongAgo();
         RbacCacheVersionDao.syncIfChanged(ACCOUNT_ID); // new version seen: cached access dropped
         assertEquals("GUEST", cachedRole());
+    }
+
+    @Test
+    public void testOneCheckCoversEveryAccount() throws Exception {
+        int otherAccount = ACCOUNT_ID + 1;
+        RBACDao.instance.insertOne(new RBAC(USER, null, otherAccount, Collections.singletonMap("API", "MEMBER")));
+        RbacCacheVersionDao.syncIfChanged(ACCOUNT_ID);
+        assertEquals("MEMBER", cachedRole());
+        assertEquals("MEMBER", RBACDao.getCurrentRBACForUser(USER, otherAccount).getScopeRoleMapping().get("API"));
+
+        changeOnAnotherInstance("GUEST");
+        RBACDao.instance.updateOne(Filters.and(Filters.eq(RBAC.USER_ID, USER), Filters.eq(RBAC.ACCOUNT_ID, otherAccount)),
+                Updates.set(RBAC.SCOPE_ROLE_MAPPING, Collections.singletonMap("API", "GUEST")));
+        RbacCacheVersionDao.instance.getMCollection().updateOne(Filters.eq("_id", otherAccount),
+                Updates.combine(Updates.inc("version", 1L), Updates.set("updatedAt", Context.now())),
+                new com.mongodb.client.model.UpdateOptions().upsert(true));
+
+        lastCheckedLongAgo();
+        RbacCacheVersionDao.syncIfChanged(ACCOUNT_ID); // a single read, for both accounts
+        assertEquals("GUEST", cachedRole());
+        assertEquals("GUEST", RBACDao.getCurrentRBACForUser(USER, otherAccount).getScopeRoleMapping().get("API"));
     }
 
     @Test
