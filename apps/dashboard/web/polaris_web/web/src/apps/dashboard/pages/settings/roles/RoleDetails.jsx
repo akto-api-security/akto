@@ -1,4 +1,4 @@
-import { Badge, Banner, Box, Button, Checkbox, EmptyState, Form, HorizontalGrid, HorizontalStack, LegacyCard, Modal, Page, ResourceItem, ResourceList, Select, Spinner, Tag, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Badge, Banner, Box, Button, Checkbox, EmptyState, Form, HorizontalGrid, HorizontalStack, LegacyCard, Modal, Page, ResourceItem, ResourceList, Spinner, Tag, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import func from "@/util/func";
@@ -13,6 +13,7 @@ import {
 } from "./roleUtils";
 import { roleDetailsUrl, CreateRoleModal } from "./Roles";
 import { usePermissions } from "@/util/permissions";
+import Dropdown from "../../../components/layouts/Dropdown";
 
 const PRODUCT_LABELS = { API: 'API Security', AGENTIC: 'Akto ARGUS', ENDPOINT: 'Akto ATLAS', DAST: 'DAST' }
 
@@ -147,11 +148,12 @@ function RoleDetails() {
         <LegacyCard title="Details" key="details" sectioned>
             <VerticalStack gap="4">
                 <HorizontalGrid columns={{ xs: 1, md: 2 }} gap="4">
-                    <Select
+                    <Dropdown
+                        id="role-based-on"
                         label="Based on"
-                        options={rolesOptions}
-                        value={draft.baseRole}
-                        onChange={(baseRole) => update({ baseRole })}
+                        menuItems={rolesOptions}
+                        initial={draft.baseRole}
+                        selected={(baseRole) => update({ baseRole })}
                         disabled={!canEdit}
                         helpText="The role starts with this built-in role's permissions."
                     />
@@ -211,12 +213,11 @@ function RoleDetails() {
                                         {followsThreat ? <Text variant="bodySm" color="subdued">{`Follows threat protection: ${ACCESS_LABELS[effectiveAccess(feature)]}`}</Text> : null}
                                     </VerticalStack>
                                     <Box minWidth="220px">
-                                        <Select
-                                            label={label}
-                                            labelHidden
-                                            options={accessOptions(feature)}
-                                            value={draft.permissionOverrides[feature] || ROLE_DEFAULT}
-                                            onChange={(access) => setPermission(feature, access)}
+                                        <Dropdown
+                                            id={`role-access-${feature}`}
+                                            menuItems={accessOptions(feature)}
+                                            initial={draft.permissionOverrides[feature] || ROLE_DEFAULT}
+                                            selected={(access) => setPermission(feature, access)}
                                             disabled={!canEdit}
                                         />
                                     </Box>
@@ -301,11 +302,12 @@ function RoleDetails() {
                         <Form onSubmit={addRule}>
                             <HorizontalStack gap="3" blockAlign="start" wrap={false}>
                                 <Box minWidth="160px">
-                                    <Select
+                                    <Dropdown
+                                        id="role-rule-type"
                                         label="Match by"
-                                        options={[{ label: 'Host name', value: 'HOST' }, { label: 'Tag', value: 'TAG' }]}
-                                        value={ruleType}
-                                        onChange={(value) => { setRuleType(value); setRuleTouched(false) }}
+                                        menuItems={[{ label: 'Host name', value: 'HOST' }, { label: 'Tag', value: 'TAG' }]}
+                                        initial={ruleType}
+                                        selected={(value) => { setRuleType(value); setRuleTouched(false) }}
                                     />
                                 </Box>
                                 <Box width="100%">
@@ -314,7 +316,7 @@ function RoleDetails() {
                                         value={ruleValue}
                                         onChange={(value) => { setRuleValue(value); setRuleTouched(true) }}
                                         placeholder={ruleType === 'HOST' ? "^team-a-.*\\.example\\.com$" : "team=team-a"}
-                                        helpText={ruleType === 'HOST' ? "A regular expression. Use ^ and $ to match the whole host name." : "key=value, as set on the collection."}
+                                        helpText={ruleType === 'HOST' ? "A regular expression. Use ^ and $ to match the whole host name. Collections without a host are matched by name." : "key=value, as set on the collection."}
                                         error={ruleTouched && ruleValue.length > 0 && ruleError ? ruleError : undefined}
                                         autoComplete="off"
                                     />

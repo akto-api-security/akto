@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react'
-import { Badge, Banner, Box, Button, Checkbox, Form, HorizontalStack, LegacyCard, Select, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Badge, Banner, Box, Button, Checkbox, Form, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor } from '@shopify/polaris-icons';
 import func from "@/util/func"
 import settingRequests from '../../api';
 import { rolesOptions, getRoleDisplayName } from '../../roles/roleUtils';
 import { usePermissions } from "@/util/permissions"
 import AllowedAction from '../../../../components/shared/AllowedAction';
+import Dropdown from '../../../../components/layouts/Dropdown';
 
 // group names are stored as keys, which can't contain '.' or start with '$'
 function groupError(group, mapping) {
@@ -42,7 +43,7 @@ function SamlGroupRoleMapping({ configType, savedMapping, savedRemoveAccessWitho
         }).catch(() => {})
     }, [])
 
-    const roleOptions = [{ label: 'Pick a role', value: '', disabled: true }, ...rolesOptions, ...customRoleOptions]
+    const roleOptions = [...rolesOptions, ...customRoleOptions]
     const hasMapping = Object.keys(mapping).length > 0
     const changed = JSON.stringify(mapping) !== JSON.stringify(saved.mapping) || removeAccessWithoutGroup !== saved.removeAccessWithoutGroup
     const addError = groupError(newGroup, mapping) || (newRole ? '' : 'Pick a role.')
@@ -118,7 +119,9 @@ function SamlGroupRoleMapping({ configType, savedMapping, savedRemoveAccessWitho
                                     error={triedAdd && groupError(newGroup, mapping) ? groupError(newGroup, mapping) : undefined} />
                             </Box>
                             <Box minWidth="200px" width="100%">
-                                <Select label="Akto role" options={roleOptions} value={newRole} onChange={setNewRole}
+                                {/* remounted after each add, so the picked role clears */}
+                                <Dropdown key={Object.keys(mapping).length} id="sso-group-role" label="Akto role" placeHolder="Pick a role"
+                                    menuItems={roleOptions} initial={newRole} selected={setNewRole}
                                     error={triedAdd && !groupError(newGroup, mapping) && !newRole ? 'Pick a role.' : undefined} />
                             </Box>
                             <Box paddingBlockStart="6">

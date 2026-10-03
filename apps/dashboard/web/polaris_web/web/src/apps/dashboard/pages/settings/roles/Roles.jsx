@@ -1,10 +1,11 @@
-import { Badge, Banner, Box, EmptyState, Form, FormLayout, HorizontalStack, LegacyCard, Modal, Page, ResourceItem, ResourceList, Select, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { Badge, Banner, Box, EmptyState, Form, FormLayout, HorizontalStack, LegacyCard, Modal, Page, ResourceItem, ResourceList, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import func from "@/util/func";
 import settingRequests from "../api";
 import { rolesOptions, getRoleDisplayName, collectionsSummary, usageSummary, roleNameError } from "./roleUtils";
 import { usePermissions } from "@/util/permissions";
+import Dropdown from "../../../components/layouts/Dropdown";
 
 export { rolesOptions, getRoleDisplayName }
 
@@ -70,11 +71,12 @@ export function CreateRoleModal({ open, onClose, source, existingNames, onCreate
                             autoComplete="off"
                             autoFocus
                         />
-                        <Select
+                        <Dropdown
+                            id="create-role-start-from"
                             label="Start from"
-                            options={rolesOptions}
-                            value={baseRole}
-                            onChange={setBaseRole}
+                            menuItems={rolesOptions}
+                            initial={baseRole}
+                            selected={setBaseRole}
                             helpText={source ? "Collections, rules and permission changes are copied too." : "The role gets this built-in role's permissions. You can change them next."}
                         />
                     </FormLayout>

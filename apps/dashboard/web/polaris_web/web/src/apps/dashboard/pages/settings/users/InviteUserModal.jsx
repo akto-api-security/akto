@@ -1,8 +1,9 @@
-import { Banner, Box, Checkbox, Divider, Form, HorizontalStack, InlineError, Modal, Select, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { Banner, Box, Checkbox, Divider, Form, HorizontalStack, InlineError, Modal, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { useEffect, useRef, useState } from "react"
 import func from "@/util/func"
 import settingRequests from "../api"
 import CopyCommand from "../../../components/shared/CopyCommand"
+import Dropdown from "../../../components/layouts/Dropdown"
 
 const EMAIL_PATTERN = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
 
@@ -116,8 +117,8 @@ const InviteUserModal = ({ open, onClose, productScopes, roleOptions, defaultInv
                                                 })} />
                                             {checked ? (
                                                 <Box minWidth="240px">
-                                                    <Select label={`Role in ${scope.label}`} labelHidden options={givable} value={mapping[scope.value]}
-                                                        onChange={(role) => setMapping(prev => ({ ...prev, [scope.value]: role }))} />
+                                                    <Dropdown id={`invite-role-${scope.value}`} menuItems={givable} initial={mapping[scope.value]}
+                                                        selected={(role) => setMapping(prev => ({ ...prev, [scope.value]: role }))} />
                                                 </Box>
                                             ) : <Text color="subdued">No access</Text>}
                                         </HorizontalStack>

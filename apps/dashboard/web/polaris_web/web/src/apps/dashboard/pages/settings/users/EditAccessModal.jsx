@@ -1,6 +1,7 @@
-import { Banner, Box, Button, Checkbox, Divider, HorizontalStack, InlineError, Modal, Select, Text, VerticalStack } from "@shopify/polaris"
+import { Banner, Box, Button, Checkbox, Divider, HorizontalStack, InlineError, Modal, Text, VerticalStack } from "@shopify/polaris"
 import { useEffect, useRef, useState } from "react"
 import SingleDate from "../../../components/layouts/SingleDate"
+import Dropdown from "../../../components/layouts/Dropdown"
 import settingRequests from "../api"
 import func from "@/util/func"
 
@@ -129,8 +130,9 @@ function EditAccessModal({ user, productScopes, roleOptions, defaultRole, isAdmi
                                     onChange={(value) => toggleScope(scope.value, value)} />
                                 {checked ? (
                                     <Box minWidth="240px">
-                                        <Select label={`Role in ${scope.label}`} labelHidden options={optionsFor(scope.value)}
-                                            value={mapping[scope.value]} onChange={(role) => setMapping(prev => ({ ...prev, [scope.value]: role }))} />
+                                        <Dropdown id={`edit-role-${scope.value}`} menuItems={optionsFor(scope.value)}
+                                            disabledOptions={optionsFor(scope.value).filter(option => option.disabled).map(option => option.value)}
+                                            initial={mapping[scope.value]} selected={(role) => setMapping(prev => ({ ...prev, [scope.value]: role }))} />
                                     </Box>
                                 ) : <Text color="subdued">No access</Text>}
                             </HorizontalStack>
