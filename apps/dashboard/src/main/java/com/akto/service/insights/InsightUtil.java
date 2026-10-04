@@ -316,7 +316,10 @@ public final class InsightUtil {
 
     public static String agenticVendorOf(ApiCollection c) {
         if (c == null) return null;
-        String vendor = agenticVendorToken(c.getHostName());
+        // The saas-agent tag is authoritative (e.g. copilot-studio) — the host of a SaaS agent is
+        // user-named and carries no vendor token.
+        String vendor = agenticVendorToken(AgenticObserveUtil.getSaasAgentTagValue(c));
+        if (vendor == null) vendor = agenticVendorToken(c.getHostName());
         if (vendor == null) vendor = agenticVendorToken(c.getName());
         if (vendor == null) vendor = agenticVendorToken(AgenticObserveUtil.getAssetTagValue(c));
         return vendor;
@@ -432,6 +435,11 @@ public final class InsightUtil {
             return "OpenAI";
         }
     
+        // Microsoft Copilot Studio — must precede the generic "copilot" match below
+        if (v.contains(Constants.COPILOT_STUDIO_AI_AGENT_NAME)) {
+            return "microsoft-copilot-studio";
+        }
+
         // GitHub Copilot
         if (v.contains("copilot") ||
             v.contains("github")) {

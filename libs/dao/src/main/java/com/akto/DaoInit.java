@@ -570,6 +570,7 @@ public class DaoInit {
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
         McpAllowlistDao.instance.createIndicesIfAbsent();
+        AllowVendorAllowlistDao.instance.createIndicesIfAbsent();
         McpRegistryConfigDao.instance.createIndicesIfAbsent();
         HistoricalDataDao.instance.createIndicesIfAbsent();
         EndpointInfoViewDao.instance.createIndicesIfAbsent();
