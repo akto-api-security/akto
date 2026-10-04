@@ -72,7 +72,10 @@ public class McpAgentAction extends UserAction {
             boolean isFirstRequest = true;
             String storedTitle = null;
             if(StringUtils.isNotEmpty(conversationId)) {
-                GenericAgentConversation conversation = AgentConversationDao.instance.findOne(Filters.eq("conversationId", conversationId));
+                GenericAgentConversation conversation = AgentConversationDao.instance.findOne(Filters.and(
+                    Filters.eq("conversationId", conversationId),
+                    AgentConversationDao.instance.getUserFilter()
+                ));
                 if(conversation != null) {
                     isFirstRequest = false;
                     storedTitle = conversation.getTitle();
@@ -248,6 +251,7 @@ public class McpAgentAction extends UserAction {
             GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
+                responseFromMcpServer.setUserId(Context.userId.get());
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);
             }
             this.response = new BasicDBObject();
@@ -269,6 +273,7 @@ public class McpAgentAction extends UserAction {
 
             List<Bson> matchFilters = new ArrayList<>();
             matchFilters.add(AgentConversationDao.instance.getContextSourceFilter());
+            matchFilters.add(AgentConversationDao.instance.getUserFilter());
             if (StringUtils.isNotEmpty(searchQuery)) {
                 matchFilters.add(Filters.regex("title", Pattern.compile(Pattern.quote(searchQuery), Pattern.CASE_INSENSITIVE)));
             }
@@ -317,7 +322,10 @@ public class McpAgentAction extends UserAction {
             return ERROR.toUpperCase();
         }
         try {
-            AgentConversationDao.instance.deleteAll(Filters.eq("conversationId", conversationId));
+            AgentConversationDao.instance.deleteAll(Filters.and(
+                Filters.eq("conversationId", conversationId),
+                AgentConversationDao.instance.getUserFilter()
+            ));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             logger.error("Error deleting conversation history", e);            addActionError("Failed to delete conversation history: " + e.getMessage());

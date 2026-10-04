@@ -38,4 +38,6 @@ public class GenericAgentConversation {
     private ConversationType conversationType;
     public static final String CONTEXT_SOURCE = "contextSource";
     private String contextSource;
+    public static final String USER_ID = "userId";
+    private Integer userId;
 }
