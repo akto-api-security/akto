@@ -569,7 +569,10 @@ public final class InsightUtil {
      *  the parsed token isn't a real vendor ("not-attached") — nothing to classify from it. */
     public static String endpointVendorName(ApiCollection c) {
         if (c == null) return null;
-        return endpointVendorNameOfHost(c.getHostName());
+        // A SaaS agent's host is "<id>.ai-agent.<user-chosen bot name>", so parts[2] is not a vendor;
+        // its saas-agent tag (e.g. copilot-studio) is.
+        String saasVendor = agenticVendorToken(AgenticObserveUtil.getSaasAgentTagValue(c));
+        return saasVendor != null ? saasVendor : endpointVendorNameOfHost(c.getHostName());
     }
 
     /** Same as {@link #endpointVendorName(ApiCollection)}, taking a raw hostName directly — for
