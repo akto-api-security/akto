@@ -434,6 +434,8 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         String reason = null;
         if (filterId.equals(ThreatDetector.WEAK_AUTHENTICATION_FILTER_ID)) {
           reason = threatDetector.getWeakAuthenticationReason(responseParam);
+        } else if (filterId.equals(ThreatDetector.VPN_DETECTION_FILTER_ID)) {
+          reason = threatDetector.getVpnReason(responseParam);
         }
 
         // Later we will also add aggregation support
