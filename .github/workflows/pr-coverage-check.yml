@@ -30,10 +30,14 @@ jobs:
       - name: Run tests with coverage (mini-testing + mini-runtime + deps)
         run: mvn -B package -pl apps/mini-testing,apps/mini-runtime -am
 
-      # Pinned to the v1.8.0 release commit (not a mutable tag) for supply-chain safety.
+      # Pinned to an unreleased main commit, not a tagged release: v1.8.0's
+      # "coverage-changed-files" output is actually whole-file coverage (including
+      # all pre-existing untested code in any file you touch), not real diff coverage.
+      # This commit renames it to coverage-changed-lines and fixes it to mean what it
+      # says - "the coverage of lines that were changed in the PR".
       - name: Post coverage report on the PR
         id: jacoco
-        uses: Madrapps/jacoco-report@e51ce1f46f7f8b5331593f935e59cbaf44b84920 # v1.8.0
+        uses: Madrapps/jacoco-report@2d0aea11fcfac3fff0987ff855c4a59c8903f8ff # main, unreleased
         with:
           paths: |
             ${{ github.workspace }}/apps/mini-testing/target/site/jacoco/jacoco.xml
@@ -45,17 +49,17 @@ jobs:
           comment-type: both
           skip-if-no-changes: true
           min-coverage-overall: 50
-          min-coverage-changed-files: 50
+          min-coverage-changed-lines: 50
 
       - name: Fail if changed-lines coverage is below 50%
         run: |
-          COVERAGE="${{ steps.jacoco.outputs.coverage-changed-files }}"
+          COVERAGE="${{ steps.jacoco.outputs.coverage-changed-lines }}"
 
           if [ -z "$COVERAGE" ]; then
-            echo "No changed-files coverage reported (no coverable lines in this diff) - nothing to gate on."
+            echo "No changed-lines coverage reported (no coverable lines in this diff) - nothing to gate on."
             exit 0
           fi
 
-          echo "Changed-files coverage: ${COVERAGE}%"
+          echo "Changed-lines coverage: ${COVERAGE}%"
           awk -v c="$COVERAGE" 'BEGIN { exit !(c + 0 >= 50) }' \
             || { echo "::error::Patch coverage on changed lines is ${COVERAGE}%, below the 50% minimum."; exit 1; }
