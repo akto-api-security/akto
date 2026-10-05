@@ -212,11 +212,18 @@ public class ArgusPostureAction extends UserAction {
             InsightDataBundle bundle = getOrEmpty(bundleFuture, null, "bundle");
             List<AgentFindingGroup> openIssueGroups = needsIssues
                     ? getOrEmpty(openIssueGroupsFuture, new ArrayList<>(), "openIssueGroups") : new ArrayList<>();
+
+            Future<Map<String, Info>> testInfoFuture = needsIssues
+                    ? EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
+                            () -> fetchTestInfo(openIssueGroups)))
+                    : null;
+
             List<DashboardMaliciousEvent> maliciousEvents = needsEvents
                     ? getOrEmpty(maliciousEventsFuture, new ArrayList<>(), "maliciousEvents") : new ArrayList<>();
             List<UserAnalysisData> serviceObservability = needsObservability
                     ? getOrEmpty(serviceObservabilityFuture, new ArrayList<>(), "serviceObservability") : new ArrayList<>();
-            Map<String, Info> testInfoByType = needsIssues ? fetchTestInfo(openIssueGroups) : new HashMap<>();
+            Map<String, Info> testInfoByType = needsIssues
+                    ? getOrEmpty(testInfoFuture, new HashMap<>(), "testInfoByType") : new HashMap<>();
 
             postureDrill = argusPostureService.fetchDrill(drillId, skip, limit,
                     openIssueGroups, testInfoByType, maliciousEvents, serviceObservability, bundle);
