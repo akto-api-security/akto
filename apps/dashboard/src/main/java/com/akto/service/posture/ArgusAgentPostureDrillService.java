@@ -211,11 +211,9 @@ public class ArgusAgentPostureDrillService {
     private PostureDrillResult agentList(List<ApiCollection> agents, List<PostureDrillResult.BreadcrumbItem> trail,
                                          int skip, int limit) {
         long highOrCritical = 0;
-        double scoreSum = 0;
         List<Map<String, Object>> rows = new ArrayList<>();
         for (ApiCollection agent : agents) {
             long score = Math.round(agent.getPostureScore());
-            scoreSum += agent.getPostureScore();
             if (score >= ArgusPostureService.SEVERITY_HIGH_AT) highOrCritical++;
 
             Map<String, Object> row = new LinkedHashMap<>();
@@ -232,12 +230,10 @@ public class ArgusAgentPostureDrillService {
         PostureDrillResult result = base("Agents by posture score", trail, Arrays.asList(
                 col("agent", "Agent"), col("type", "Type"), col("environment", "Environment"),
                 col("score", "Score"), col("severity", "Severity"), col("topIssue", "Top issue")), true);
-        double avg = agents.isEmpty() ? 0 : scoreSum / agents.size();
         result.setSummary(Arrays.asList(
                 new InsightResult.Metric("agents", "Agents scored", agents.size(), "count", InsightUtil.grouped(agents.size())),
                 new InsightResult.Metric("highOrCritical", "High or critical", highOrCritical, agents.size(), "count",
-                        InsightUtil.grouped(highOrCritical), null),
-                new InsightResult.Metric("averageScore", "Average score", round1(avg), "count", Math.round(avg) + " / 100")));
+                        InsightUtil.grouped(highOrCritical), null)));
         result.setEmptyMessage("No agents have been scored in this environment yet.");
         return page(result, rows, skip, limit);
     }

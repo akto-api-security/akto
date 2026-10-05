@@ -216,9 +216,10 @@ public class ArgusPostureAction extends UserAction {
                     ? getOrEmpty(maliciousEventsFuture, new ArrayList<>(), "maliciousEvents") : new ArrayList<>();
             List<UserAnalysisData> serviceObservability = needsObservability
                     ? getOrEmpty(serviceObservabilityFuture, new ArrayList<>(), "serviceObservability") : new ArrayList<>();
+            Map<String, Info> testInfoByType = needsIssues ? fetchTestInfo(openIssueGroups) : new HashMap<>();
 
             postureDrill = argusPostureService.fetchDrill(drillId, skip, limit,
-                    openIssueGroups, maliciousEvents, serviceObservability, bundle);
+                    openIssueGroups, testInfoByType, maliciousEvents, serviceObservability, bundle);
             PostureDrillNarrativeService.attachNarrative(postureDrill, ctx, drillId, path);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
