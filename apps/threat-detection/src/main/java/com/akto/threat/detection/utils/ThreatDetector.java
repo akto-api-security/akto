@@ -5,12 +5,14 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.ahocorasick.trie.Trie;
 import org.json.JSONObject;
 
+import com.akto.IpAnonymizerLookup;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -44,6 +46,7 @@ public class ThreatDetector {
     public static final String LFI_FILTER_ID = "LocalFileInclusionLFIRFI";
     public static final String USER_AUTH_MISMATCH_FILTER_ID = "UserAuthMismatch";
     public static final String WEAK_AUTHENTICATION_FILTER_ID = "WeakAuthentication";
+    public static final String VPN_DETECTION_FILTER_ID = "VpnDetection";
     public static final String SQL_INJECTION_FILTER_ID = "SQLInjection";
     public static final String OS_COMMAND_INJECTION_FILTER_ID = "OSCommandInjection";
     public static final String SSRF_FILTER_ID = "SSRF";
@@ -54,6 +57,7 @@ public class ThreatDetector {
     private Trie lfiTrie;
     private Trie osCommandInjectionTrie;
     private Trie ssrfTrie;
+    private IpAnonymizerLookup ipAnonymizerLookup;
     private static final LoggerMaker logger = new LoggerMaker(ThreatDetector.class, LogDb.THREAT_DETECTION);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -86,6 +90,9 @@ public class ThreatDetector {
             }
             if (threatFilter.getId().equals(WEAK_AUTHENTICATION_FILTER_ID)) {
                 return isWeakAuthenticationThreat(httpResponseParams);
+            }
+            if (threatFilter.getId().equals(VPN_DETECTION_FILTER_ID)) {
+                return isVpnThreat(httpResponseParams);
             }
             return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
         } catch (Exception e) {
@@ -146,6 +153,39 @@ public class ThreatDetector {
                 osCommandInjectionTrie, ssrfTrie);
         return urlTemplate;
 
+    }
+
+    public void setIpAnonymizerLookup(IpAnonymizerLookup ipAnonymizerLookup) {
+        this.ipAnonymizerLookup = ipAnonymizerLookup;
+    }
+
+    private IpAnonymizerLookup ipAnonymizerLookup() {
+        return ipAnonymizerLookup != null ? ipAnonymizerLookup : IpAnonymizerLookup.getInstance();
+    }
+
+    public boolean isVpnThreat(HttpResponseParams httpResponseParams) {
+        return getVpnReason(httpResponseParams) != null;
+    }
+
+    public String getVpnReason(HttpResponseParams httpResponseParams) {
+        if (httpResponseParams == null || httpResponseParams.getSourceIP() == null) {
+            return null;
+        }
+        String ip = httpResponseParams.getSourceIP();
+        Optional<IpAnonymizerLookup.Info> info = ipAnonymizerLookup().lookup(ip);
+        if (!info.isPresent() || !info.get().isVpnOrTor()) {
+            return null;
+        }
+        IpAnonymizerLookup.Info match = info.get();
+        List<String> flags = new ArrayList<>();
+        if (match.isTor()) flags.add("tor");
+        if (match.isVpn()) flags.add("vpn");
+        if (match.isHosting()) flags.add("hosting");
+        String reason = (match.isTor() ? "Tor exit IP " : "VPN IP ") + ip + " (" + String.join(", ", flags) + ")";
+        if (match.getAsnOrg() != null) {
+            reason += " ASN: " + match.getAsnOrg();
+        }
+        return reason;
     }
 
     public boolean isWeakAuthenticationThreat(HttpResponseParams httpResponseParams) {
