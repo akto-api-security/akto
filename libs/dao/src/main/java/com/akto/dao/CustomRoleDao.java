@@ -12,9 +12,10 @@ public class CustomRoleDao extends AccountsContextDao<CustomRole> {
 
     public static final CustomRoleDao instance = new CustomRoleDao();
 
-    // Per-request access checks read custom roles through this cache; role create/update/delete clear it
+    // Per-request access checks read custom roles through this cache. Every role write clears it on all
+    // instances (RbacCacheVersionDao.accessChanged), so it can be kept long
     private static final ConcurrentHashMap<String, Pair<CustomRole, Integer>> roleCache = new ConcurrentHashMap<>();
-    private static final int ROLE_CACHE_EXPIRY_TIME = 60;
+    private static final int ROLE_CACHE_EXPIRY_TIME = 15 * 60;
 
     public CustomRole findRoleByNameCached(String roleName) {
         if (roleName == null) {

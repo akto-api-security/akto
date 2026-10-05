@@ -516,6 +516,18 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
     }
 
     @Test
+    public void testRuleQueriesHaveIndexes() {
+        // without them every rule match reads every collection document
+        ApiCollectionsDao.instance.createIndicesIfAbsent();
+        List<String> keys = new ArrayList<>();
+        for (org.bson.Document index : ApiCollectionsDao.instance.getMCollection().listIndexes()) {
+            keys.add(((org.bson.Document) index.get("key")).keySet().toString());
+        }
+        assertTrue(keys.toString(), keys.contains("[hostName]"));
+        assertTrue(keys.toString(), keys.contains("[tagsList.keyName, tagsList.value]"));
+    }
+
+    @Test
     public void testCollectionRuleValidation() {
         assertNull(new CollectionRule("^team-a-", null, null).validate());
         assertNull(new CollectionRule(null, "team", "a").validate());
