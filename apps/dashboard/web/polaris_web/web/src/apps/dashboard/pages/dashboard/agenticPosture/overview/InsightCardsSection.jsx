@@ -1,5 +1,6 @@
 import { Box, Button, Card, HorizontalStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import func from '@/util/func'
 
 // One stat within a card — a number/name plus its subdued label, optionally paired with a real
 // (never invented) severity badge — the same SeverityBadge every other severity anywhere else in
@@ -45,7 +46,7 @@ function statsFor(card) {
                 <Stat key="total" label="Open issues" value={card.totalOpenIssues} />,
                 card.topFinding && (
                     <Stat key="top" label="Most common issue"
-                        value={`${card.topFinding.vulnType} on ${card.topFinding.agentName} (${card.topFinding.count})`}
+                        value={`"${card.topFinding.vulnType}" on ${card.topFinding.agentName} (${card.topFinding.count})`}
                         severity={card.topFinding.severity} />
                 ),
             ]
@@ -72,8 +73,8 @@ function statsFor(card) {
             ]
         case 'OBSERVABILITY':
             return [
-                <Stat key="tokens" label="Tokens used" value={card.totalTokens} />,
-                card.hottestAgent && <Stat key="agent" label="Top agent by tokens" value={`${card.hottestAgent.agentName} (${card.hottestAgent.tokens})`} />,
+                <Stat key="tokens" label="Tokens used" value={card.totalTokens != null ? func.prettifyShort(card.totalTokens) : null} />,
+                card.hottestAgent && <Stat key="agent" label="Top agent by tokens" value={`${card.hottestAgent.agentName} (${func.prettifyShort(card.hottestAgent.tokens)})`} />,
                 card.topTopics?.length > 0 && <Stat key="topics" label="Top topics" value={card.topTopics.map((t) => t.topic).join(', ')} />,
             ]
         default:
