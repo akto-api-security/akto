@@ -1,0 +1,61 @@
+name: PR coverage check
+
+on:
+  pull_request:
+    branches: [ feature/mini-runtime-release ]
+    types: [ opened, synchronize, reopened ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  coverage-check:
+    # ubuntu-latest (24.04) dropped libssl1.1, which the flapdoodle-embedded MongoDB 4.4.x
+    # binary in libs/dao's tests needs - matches the runner prod.yml already uses successfully.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure base ref is fetched
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Run tests with coverage (mini-testing + mini-runtime + deps)
+        run: mvn -B package -pl apps/mini-testing,apps/mini-runtime -am
+
+      # Pinned to the v1.8.0 release commit (not a mutable tag) for supply-chain safety.
+      - name: Post coverage report on the PR
+        id: jacoco
+        uses: Madrapps/jacoco-report@e51ce1f46f7f8b5331593f935e59cbaf44b84920 # v1.8.0
+        with:
+          paths: |
+            ${{ github.workspace }}/apps/mini-testing/target/site/jacoco/jacoco.xml
+            ${{ github.workspace }}/apps/mini-runtime/target/site/jacoco/jacoco.xml
+            ${{ github.workspace }}/libs/*/target/site/jacoco/jacoco.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: Coverage Report
+          update-comment: true
+          comment-type: both
+          skip-if-no-changes: true
+          min-coverage-overall: 50
+          min-coverage-changed-files: 50
+
+      - name: Fail if changed-lines coverage is below 50%
+        run: |
+          COVERAGE="${{ steps.jacoco.outputs.coverage-changed-files }}"
+
+          if [ -z "$COVERAGE" ]; then
+            echo "No changed-files coverage reported (no coverable lines in this diff) - nothing to gate on."
+            exit 0
+          fi
+
+          echo "Changed-files coverage: ${COVERAGE}%"
+          awk -v c="$COVERAGE" 'BEGIN { exit !(c + 0 >= 50) }' \
+            || { echo "::error::Patch coverage on changed lines is ${COVERAGE}%, below the 50% minimum."; exit 1; }
