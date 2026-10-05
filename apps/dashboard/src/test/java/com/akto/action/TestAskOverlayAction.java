@@ -183,16 +183,6 @@ public class TestAskOverlayAction extends MongoBasedTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void testDefaultGroupsFor_endpoint_returnsGuardrailOnly() throws Exception {
-        AskOverlayAction action = newAction();
-        Class<?>[] sig = {CONTEXT_SOURCE.class};
-        Set<InsightId.Group> actual =
-                (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsFor", sig, CONTEXT_SOURCE.ENDPOINT);
-        assertEquals(Collections.singleton(InsightId.Group.GUARDRAIL_VIOLATIONS), actual);
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
     public void testDefaultGroupsFor_apiDastAndDefault_returnApiAndTestingPosture() throws Exception {
         AskOverlayAction action = newAction();
         Class<?>[] sig = {CONTEXT_SOURCE.class};

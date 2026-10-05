@@ -80,7 +80,9 @@ public class TestIssueRecurrenceProvider extends MongoBasedTest {
             r.setEndTimestamp(Context.now());
             rows.add(r);
         }
-        TestingRunResultDao.instance.insertMany(rows);
+        // Where every current summary stores vulnerable results; the legacy-collection partition
+        // is covered in TestInsightLazySources.
+        VulnerableTestingRunResultDao.instance.insertMany(rows);
     }
 
     private InsightResult computeUnscoped(InsightDataBundle bundle) {

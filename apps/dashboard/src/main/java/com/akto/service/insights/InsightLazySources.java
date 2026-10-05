@@ -4,12 +4,14 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -25,9 +27,11 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UnwindOptions;
 
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -196,8 +200,17 @@ final class InsightLazySources {
     List<IssueRecurrenceRow> issueRecurrence() {
         try {
             Map<String, MergedRecurrence> merged = new HashMap<>();
-            accumulateRecurrence(TestingRunResultDao.instance.getRawCollection(), true, merged);
-            accumulateRecurrence(VulnerableTestingRunResultDao.instance.getRawCollection(), false, merged);
+            // testing_run_result is huge and has no index leading on `vulnerable`, so a bare
+            // {vulnerable: true} match is a full collection scan (~38s on 400k rows). Scoping it to
+            // the legacy summaries' ids rides the {testRunResultSummaryId, vulnerable} index.
+            List<ObjectId> legacySummaryIds = legacySummaryIds();
+            if (!legacySummaryIds.isEmpty()) {
+                accumulateRecurrence(TestingRunResultDao.instance.getRawCollection(), Arrays.asList(
+                        Filters.in(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, legacySummaryIds),
+                        Filters.eq(TestingRunResult.VULNERABLE, true)), merged);
+            }
+            // vulnerable_testing_run_results is vulnerable-only by construction.
+            accumulateRecurrence(VulnerableTestingRunResultDao.instance.getRawCollection(), Collections.emptyList(), merged);
 
             List<IssueRecurrenceRow> rows = new ArrayList<>();
             for (MergedRecurrence m : merged.values()) {
@@ -211,12 +224,24 @@ final class InsightLazySources {
         }
     }
 
-    private void accumulateRecurrence(MongoCollection<Document> rawColl, boolean legacyCollection,
+    /** Summaries whose vulnerable results still live in testing_run_result — the same per-summary
+     *  rule VulnerableTestingRunResultDao.isStoredInVulnerableCollection applies, where either
+     *  "new summary" flag means the results moved to vulnerable_testing_run_results. */
+    private List<ObjectId> legacySummaryIds() {
+        Bson filter = Filters.and(
+                Filters.ne(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true),
+                Filters.ne(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY_OLD, true));
+        List<ObjectId> ids = new ArrayList<>();
+        for (TestingRunResultSummary s : TestingRunResultSummariesDao.instance.getMCollection()
+                .find(filter).projection(Projections.include(Constants.ID))) {
+            ids.add(s.getId());
+        }
+        return ids;
+    }
+
+    private void accumulateRecurrence(MongoCollection<Document> rawColl, List<Bson> scopeClauses,
                                        Map<String, MergedRecurrence> merged) {
-        List<Bson> matchClauses = new ArrayList<>();
-        // Only the legacy testing_run_result collection mixes vulnerable and non-vulnerable
-        // rows together; vulnerable_testing_run_results is vulnerable-only by construction.
-        if (legacyCollection) matchClauses.add(Filters.eq(TestingRunResult.VULNERABLE, true));
+        List<Bson> matchClauses = new ArrayList<>(scopeClauses);
         addRbacCollectionFilter(matchClauses, TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
 
         List<Bson> pipeline = new ArrayList<>();

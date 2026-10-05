@@ -5,6 +5,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
@@ -14,6 +15,7 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.Severity;
@@ -56,6 +58,7 @@ public class TestInsightLazySources extends MongoBasedTest {
         TestingRunIssuesDao.instance.getMCollection().drop();
         TestingRunResultDao.instance.getMCollection().drop();
         VulnerableTestingRunResultDao.instance.getMCollection().drop();
+        TestingRunResultSummariesDao.instance.getMCollection().drop();
 
         for (CONTEXT_SOURCE cs : CONTEXT_SOURCE.values()) {
             UsersCollectionsList.deleteContextCollectionsForUser(ACCOUNT_ID, cs);
@@ -177,7 +180,7 @@ public class TestInsightLazySources extends MongoBasedTest {
     @Test
     public void testIssueRecurrence_rerunWithinSameSummary_countsAsOneDistinctRun() {
         ApiInfoKey key = new ApiInfoKey(4001, "/api/rerun", Method.GET);
-        ObjectId sharedSummaryId = new ObjectId();
+        ObjectId sharedSummaryId = legacySummaryId();
 
         TestingRunResultDao.instance.insertMany(Arrays.asList(
                 vulnerableResult(key, "SQLI", sharedSummaryId, true),
@@ -199,7 +202,7 @@ public class TestInsightLazySources extends MongoBasedTest {
         ApiInfoKey key = new ApiInfoKey(4002, "/api/merged", Method.GET);
 
         TestingRunResultDao.instance.insertMany(java.util.Collections.singletonList(
-                vulnerableResult(key, "XSS", new ObjectId(), true)));
+                vulnerableResult(key, "XSS", legacySummaryId(), true)));
         VulnerableTestingRunResultDao.instance.insertMany(java.util.Collections.singletonList(
                 vulnerableResult(key, "XSS", new ObjectId(), true)));
 
@@ -221,8 +224,8 @@ public class TestInsightLazySources extends MongoBasedTest {
         ApiInfoKey includedKey = new ApiInfoKey(4003, "/api/vulnerable", Method.GET);
 
         TestingRunResultDao.instance.insertMany(Arrays.asList(
-                vulnerableResult(excludedKey, "SSRF", new ObjectId(), false),
-                vulnerableResult(includedKey, "SSRF", new ObjectId(), true)));
+                vulnerableResult(excludedKey, "SSRF", legacySummaryId(), false),
+                vulnerableResult(includedKey, "SSRF", legacySummaryId(), true)));
 
         runUnscoped(() -> {
             List<IssueRecurrenceRow> rows = lazySources().issueRecurrence();
@@ -230,6 +233,31 @@ public class TestInsightLazySources extends MongoBasedTest {
             assertEquals(1, rows.size());
             assertEquals("/api/vulnerable", rows.get(0).getUrl());
         });
+    }
+
+    /** A summary whose vulnerable results stayed in testing_run_result (newTestingSummary=false) —
+     *  the only summaries issueRecurrence() reads that collection for. */
+    private ObjectId legacySummaryId() {
+        TestingRunResultSummary summary = new TestingRunResultSummary();
+        summary.setId(new ObjectId());
+        summary.setNewTestingSummary(false);
+        TestingRunResultSummariesDao.instance.insertOne(summary);
+        return summary.getId();
+    }
+
+    /** A summary flagged as new keeps its vulnerable results in vulnerable_testing_run_results, so
+     *  any copy of them in testing_run_result is not read again. */
+    @Test
+    public void testIssueRecurrence_newSummaryRowsInLegacyCollection_notRead() {
+        ApiInfoKey key = new ApiInfoKey(4004, "/api/new-summary", Method.GET);
+        TestingRunResultSummary newSummary = new TestingRunResultSummary();
+        newSummary.setId(new ObjectId());
+        TestingRunResultSummariesDao.instance.insertOne(newSummary);
+
+        TestingRunResultDao.instance.insertMany(java.util.Collections.singletonList(
+                vulnerableResult(key, "BOLA", newSummary.getId(), true)));
+
+        runUnscoped(() -> assertEquals(0, lazySources().issueRecurrence().size()));
     }
 
     private TestingRunResult vulnerableResult(ApiInfoKey key, String testSubType, ObjectId summaryId, boolean vulnerable) {
@@ -253,8 +281,8 @@ public class TestInsightLazySources extends MongoBasedTest {
             m.when(() -> UsersCollectionsList.getCollectionsIdForUser(anyInt(), anyInt())).thenReturn(null);
 
             TestingRunResultDao.instance.insertMany(Arrays.asList(
-                    vulnerableResult(new ApiInfoKey(5001, "/a", Method.GET), "T1", new ObjectId(), true),
-                    vulnerableResult(new ApiInfoKey(5002, "/b", Method.GET), "T2", new ObjectId(), true)));
+                    vulnerableResult(new ApiInfoKey(5001, "/a", Method.GET), "T1", legacySummaryId(), true),
+                    vulnerableResult(new ApiInfoKey(5002, "/b", Method.GET), "T2", legacySummaryId(), true)));
 
             List<IssueRecurrenceRow> rows = lazySources().issueRecurrence();
 
@@ -273,8 +301,8 @@ public class TestInsightLazySources extends MongoBasedTest {
                     .thenReturn(java.util.Collections.singletonList(5001));
 
             TestingRunResultDao.instance.insertMany(Arrays.asList(
-                    vulnerableResult(new ApiInfoKey(5001, "/a", Method.GET), "T1", new ObjectId(), true),
-                    vulnerableResult(new ApiInfoKey(5002, "/b", Method.GET), "T2", new ObjectId(), true)));
+                    vulnerableResult(new ApiInfoKey(5001, "/a", Method.GET), "T1", legacySummaryId(), true),
+                    vulnerableResult(new ApiInfoKey(5002, "/b", Method.GET), "T2", legacySummaryId(), true)));
 
             List<IssueRecurrenceRow> rows = lazySources().issueRecurrence();
 

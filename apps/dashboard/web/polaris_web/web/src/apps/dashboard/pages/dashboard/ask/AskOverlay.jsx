@@ -126,6 +126,7 @@ export default function AskOverlay({ open, onClose }) {
                                 onRetryTiles={refetch}
                                 onAsk={handleAsk}
                                 onOpenRoute={handleOpenRoute}
+                                onClose={onClose}
                             />
                         ) : (
                             <ChatView

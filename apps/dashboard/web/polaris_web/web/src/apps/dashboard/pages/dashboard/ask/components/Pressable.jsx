@@ -13,7 +13,8 @@ function isFocusVisible(el) {
 
 // A clickable surface built on Box: button semantics, Enter/Space activation, and a focus ring
 // shown for keyboard focus only. Not a Polaris Link, which underlines its content on hover even
-// with removeUnderline. Background and border swap on hover.
+// with removeUnderline. Background and border swap on hover. Box has no cursor prop, so the
+// pointer comes from the [data-ask-pressable] rule in askOverlay.css.
 export default function Pressable({
     onClick,
     accessibilityLabel,
@@ -36,6 +37,9 @@ export default function Pressable({
     const handleKeyDown = (e) => {
         if (!isActivationKey(e.key)) return
         e.preventDefault()
+        // Consumed here, so an ancestor's own Enter handling (HomeView runs the active result)
+        // doesn't fire as well.
+        e.stopPropagation()
         if (onClick) onClick()
     }
 
@@ -44,6 +48,7 @@ export default function Pressable({
             {...boxProps}
             role="button"
             tabIndex={0}
+            data-ask-pressable=""
             aria-label={accessibilityLabel}
             background={hovered && hoverBackground ? hoverBackground : background}
             borderColor={hovered && hoverBorderColor ? hoverBorderColor : borderColor}

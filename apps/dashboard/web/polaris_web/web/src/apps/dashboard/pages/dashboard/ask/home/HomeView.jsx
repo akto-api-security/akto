@@ -22,7 +22,7 @@ const FOOTER_HINTS = [["↑↓", "Move"], ["↵", "Ask or open"], ["esc", "Close
 // Empty query shows tiles + "Try asking"; a non-empty query shows the typed-results list,
 // arrow-key navigable, Enter running the active row. Mounted fresh on every open, so the query
 // starts empty and the input autofocuses.
-export default function HomeView({ tiles, tilesLoading, tilesError, onRetryTiles, onAsk, onOpenRoute }) {
+export default function HomeView({ tiles, tilesLoading, tilesError, onRetryTiles, onAsk, onOpenRoute, onClose }) {
     const [query, setQuery] = useState("")
     const [active, setActive] = useState(0)
     const category = useDashboardCategory()
@@ -86,7 +86,9 @@ export default function HomeView({ tiles, tilesLoading, tilesError, onRetryTiles
                             ariaAutocomplete="list"
                         />
                     </Box>
-                    <KeyHint>esc</KeyHint>
+                    <Pressable onClick={onClose} accessibilityLabel="Close" borderRadius="1">
+                        <KeyHint>esc</KeyHint>
+                    </Pressable>
                 </HorizontalStack>
             </Box>
             <Divider borderColor="border-ask-divider" />
