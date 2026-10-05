@@ -30,6 +30,7 @@ import com.akto.dao.CustomRoleDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.CustomRole;
+import com.akto.dto.rbac.CollectionRule;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.User;
@@ -229,6 +230,38 @@ public class TestRbacGuards extends MongoBasedTest {
         good.put(Feature.INVITE_MEMBERS.name(), ReadWriteAccess.NO_ACCESS.name());
         assertEquals("SUCCESS", roleAction("TEAM_X", good).createCustomRole());
         assertEquals(good, CustomRoleDao.instance.findRoleByName("TEAM_X").getPermissionOverrides());
+    }
+
+    @Test
+    public void testRuleMatchesSavedWithTheRole() {
+        Context.accountId.set(ACCOUNT_ID);
+        CustomRoleDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        ApiCollection matching = ApiCollection.createManualCollection(21, "team-a-agent");
+        matching.setHostName("team-a-agent.example.com");
+        ApiCollectionsDao.instance.insertOne(matching);
+        ApiCollection other = ApiCollection.createManualCollection(22, "team-b-agent");
+        other.setHostName("team-b-agent.example.com");
+        ApiCollectionsDao.instance.insertOne(other);
+
+        RoleAction create = roleAction("TEAM_RULES", null);
+        create.setCollectionRules(java.util.Collections.singletonList(new CollectionRule("^team-a-", null, null)));
+        assertEquals("SUCCESS", create.createCustomRole());
+        assertEquals(java.util.Collections.singletonList(21), CustomRoleDao.instance.findRoleByName("TEAM_RULES").getRuleCollectionIds());
+
+        // a pattern Java accepts but Mongo can't run is refused, so the role never keeps matches of an older pattern
+        RoleAction update = roleAction("TEAM_RULES", null);
+        update.setCollectionRules(java.util.Collections.singletonList(new CollectionRule("\\p{javaLowerCase}+", null, null)));
+        assertEquals("ERROR", update.updateCustomRole());
+        assertEquals("This host pattern can't be used. Use a standard regular expression.", update.getActionErrors().iterator().next());
+        CustomRole saved = CustomRoleDao.instance.findRoleByName("TEAM_RULES");
+        assertEquals("^team-a-", saved.getCollectionRules().get(0).getHostRegex());
+        assertEquals(java.util.Collections.singletonList(21), saved.getRuleCollectionIds());
+
+        RoleAction retarget = roleAction("TEAM_RULES", null);
+        retarget.setCollectionRules(java.util.Collections.singletonList(new CollectionRule("^team-b-", null, null)));
+        assertEquals("SUCCESS", retarget.updateCustomRole());
+        assertEquals(java.util.Collections.singletonList(22), CustomRoleDao.instance.findRoleByName("TEAM_RULES").getRuleCollectionIds());
     }
 
     private static List<Integer> grantedCollections(int userId) {

@@ -9,7 +9,6 @@ import java.util.TreeMap;
 import com.akto.audit_logs_util.Audit;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CustomRoleDao;
-import com.akto.dao.RuleCollections;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.RbacCacheVersionDao;
@@ -224,6 +223,9 @@ public class RoleAction extends UserAction {
     @Setter
     private List<CollectionRule> collectionRules;
 
+    // what the rules match, worked out once while validating and saved with the role
+    private List<Integer> ruleMatches;
+
     private boolean validateCollectionRules() {
         if (collectionRules == null) {
             return true;
@@ -234,6 +236,14 @@ public class RoleAction extends UserAction {
                 addActionError(error);
                 return false;
             }
+        }
+        try {
+            ruleMatches = new ArrayList<>(RBACDao.matchRules(collectionRules));
+            java.util.Collections.sort(ruleMatches);
+        } catch (Exception e) {
+            // valid in Java but not in Mongo, e.g. \p{javaLowerCase}
+            addActionError("This host pattern can't be used. Use a standard regular expression.");
+            return false;
         }
         return true;
     }
@@ -333,10 +343,10 @@ public class RoleAction extends UserAction {
         role.setPermissionOverrides(permissionOverrides);
         role.setCollectionRules(collectionRules);
         role.setAssignableRoles(assignableRoles);
-        CustomRoleDao.instance.insertOne(role);
         if (collectionRules != null && !collectionRules.isEmpty()) {
-            RuleCollections.match(role);
+            role.setRuleCollectionIds(ruleMatches);
         }
+        CustomRoleDao.instance.insertOne(role);
         clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
@@ -383,12 +393,12 @@ public class RoleAction extends UserAction {
         ));
         if (apiCollectionIds != null) updates.add(Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds));
         if (permissionOverrides != null) updates.add(Updates.set(CustomRole.PERMISSION_OVERRIDES, permissionOverrides));
-        if (collectionRules != null) updates.add(Updates.set(CustomRole.COLLECTION_RULES, collectionRules));
+        if (collectionRules != null) {
+            updates.add(Updates.set(CustomRole.COLLECTION_RULES, collectionRules));
+            updates.add(Updates.set(CustomRole.RULE_COLLECTION_IDS, ruleMatches));
+        }
         if (assignableRoles != null) updates.add(Updates.set(CustomRole.ASSIGNABLE_ROLES, assignableRoles));
         CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, roleName), Updates.combine(updates));
-        if (collectionRules != null) {
-            RuleCollections.match(CustomRoleDao.instance.findRoleByName(roleName));
-        }
         clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
