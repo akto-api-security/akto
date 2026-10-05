@@ -12,6 +12,8 @@ import {
   } from '@shopify/polaris-icons';
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { AUTH_TYPES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
+import { usePermissions, whenAllowed } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 function AuthTypes() {
     const headers = [
@@ -49,6 +51,7 @@ function AuthTypes() {
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate()
+    const { canCall } = usePermissions()
 
 
     const handleRedirect = () => {
@@ -101,9 +104,9 @@ function AuthTypes() {
         <Box>
         <PageWithMultipleCards
             title={"Auth types"}
-            primaryAction={<Button primary onClick={handleRedirect}>Create new auth type</Button>}
+            primaryAction={<AllowedAction allowed={canCall('api/addCustomAuthType')}><Button primary onClick={handleRedirect}>Create new auth type</Button></AllowedAction>}
             secondaryActions={
-                <Button onClick={() => handleResetModalChange()}>Reset</Button>
+                <AllowedAction allowed={canCall('api/resetAllCustomAuthTypes')}><Button onClick={() => handleResetModalChange()}>Reset</Button></AllowedAction>
             }
             isFirstPage={true}
             components={[
@@ -113,7 +116,7 @@ function AuthTypes() {
                     headingText={"No Auth type"}
                     description={"Define custom auth mechanism based on where you send the auth key. We support auth key detection in header, payload and even cookies in your APIs."}
                     buttonText={"Create auth type"}
-                    redirectUrl={"/dashboard/settings/auth-types/details"}
+                    redirectUrl={canCall('api/addCustomAuthType') ? "/dashboard/settings/auth-types/details" : undefined}
                     learnText={"Creating auth type"}
                     docsUrl={AUTH_TYPES_PAGE_DOCS_URL}
                 />
@@ -137,6 +140,7 @@ function AuthTypes() {
                 primaryAction={{
                     content: 'Reset',
                     onAction: handleReset,
+                    ...whenAllowed(canCall('api/resetAllCustomAuthTypes')),
                 }}
                 secondaryActions={[
                     {

@@ -16,6 +16,7 @@ import LocalStore from "../../../../main/LocalStorageStore";
 import func from "@/util/func"
 import SampleData from "../../../components/shared/SampleData";
 import { isApiSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
+import { usePermissions, permissions, loadPermissions, whenAllowed } from "@/util/permissions";
 
 function UserConfig() {
 
@@ -34,6 +35,9 @@ function UserConfig() {
     const [commonTestTemplate, setCommonTestTemplate] = useState({message: ""});
     const [commonTestTemplate2, setCommonTestTemplate2] = useState("");
     const [initialDeltaTime, setInitialDeltaTime] = useState(120) ;
+    const { canCall } = usePermissions()
+    // rate limit, ignore time and pre/post scripts are admin settings
+    const canSeeAdminSettings = canCall('api/fetchAdminSettings')
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
 
@@ -55,7 +59,9 @@ function UserConfig() {
             else setHardcodedOpen(false)
         }
 
-        if(window.USER_ROLE === 'ADMIN') {
+        await loadPermissions()
+        const adminSettingsAllowed = permissions.canCall('api/fetchAdminSettings')
+        if(adminSettingsAllowed) {
             await settingRequests.fetchAdminSettings().then((resp)=> {
                 setInitialLimit(resp.accountSettings.globalRateLimit);
                 setInitialLimitAgentic(resp.accountSettings.globalRateLimitAgentic);
@@ -64,7 +70,7 @@ function UserConfig() {
                 LocalStore.getState().setDefaultIgnoreSummaryTime(val)
             })
         }
-        try {
+        if (adminSettingsAllowed) try {
             await api.fetchScript('PRE_REQUEST').then((resp)=> {
                 if (resp && resp.testScript) {
                     const js = resp.testScript.javascript ?? ""
@@ -327,7 +333,8 @@ function UserConfig() {
     const commonTemplateComponent = (
         <LegacyCard sectioned title="Global Test Configuration" key="commonTestTemplate" primaryFooterAction={
             {
-                content: "Save", destructive: false, onAction: () => { saveCommonTemplate() }
+                content: "Save", destructive: false, onAction: () => { saveCommonTemplate() },
+                ...whenAllowed(canCall('api/saveCommonTestTemplate'))
             }
         }>
             <Divider />
@@ -341,9 +348,9 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    let components = [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime, commonTemplateComponent]
+    let components = canSeeAdminSettings ? [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime, commonTemplateComponent] : [<TestCollectionConfiguration/>, commonTemplateComponent]
 
-    if (func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
+    if (canSeeAdminSettings && func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
         components.push(preRequestScriptComponent)
         components.push(postRequestScriptComponent)
     }
@@ -359,7 +366,7 @@ function UserConfig() {
                         User config
                     </Text>
                 }
-                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests }}
+                primaryAction={{ content: 'Stop all tests', onAction: handleStopAllTests, requires: 'api/stopAllTests' }}
             />
 
     )

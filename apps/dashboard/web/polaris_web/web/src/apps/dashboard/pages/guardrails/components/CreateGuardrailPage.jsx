@@ -34,6 +34,8 @@ import { findAssetTag } from '../../observe/agentic/mcpClientHelper';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey, splitPolicyServers } from '../serverTargetingUtils';
 import func from "@/util/func";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -164,6 +166,7 @@ const buildRedactionRules = (enabled, rules) => {
 };
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, initialStep = 1 }) => {
+    const { canCall } = usePermissions();
     // Step management
     const [currentStep, setCurrentStep] = useState(initialStep);
     const [loading, setLoading] = useState(false);
@@ -1790,14 +1793,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 <Button onClick={handleNext} disabled={steps.findIndex(s => s.number === currentStep) >= steps.length - 1}>
                                     Next
                                 </Button>
-                                <Button
-                                    primary
-                                    onClick={handleSave}
-                                    loading={loading}
-                                    disabled={!allStepsValid}
-                                >
-                                    {isEditMode ? "Update policy" : "Create policy"}
-                                </Button>
+                                <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                                    <Button
+                                        primary
+                                        onClick={handleSave}
+                                        loading={loading}
+                                        disabled={!allStepsValid}
+                                    >
+                                        {isEditMode ? "Update policy" : "Create policy"}
+                                    </Button>
+                                </AllowedAction>
                             </HorizontalStack>
                         </HorizontalStack>
                     </div>

@@ -37,6 +37,7 @@ import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dto.RBAC;
 import com.akto.dto.CustomRole;
@@ -355,6 +356,8 @@ public class ApiCollectionsAction extends UserAction {
     private String hostNameRegex;
 
     public String fetchAllCollections() {
+        // collections found in traffic since the last look may match custom roles' rules
+        RuleCollections.refreshInBackground(Context.accountId.get());
         // Optional case-insensitive regex on name / hostName. When both are null/blank (every
         // existing caller — the UI sends no such param), the filter is Filters.empty(), i.e.
         // byte-for-byte identical to the previous behaviour. The filter only engages when a
@@ -407,6 +410,7 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() throws Exception {
+        RuleCollections.refreshInBackground(Context.accountId.get());
         long start = System.currentTimeMillis();
         User user = getSUser();
         String loggedInUser = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
@@ -626,15 +630,22 @@ public class ApiCollectionsAction extends UserAction {
                     Filters.eq(RBAC.SCOPE_ROLE_MAPPING + "." + currentScope, RBAC.Role.ADMIN.getName())
                 );
 
-            RBACDao.instance.getMCollection().updateOne(
-                    Filters.and(
-                            Filters.eq(RBAC.USER_ID, userId),
-                            Filters.eq(RBAC.ACCOUNT_ID, accountId),
-                            adminFilter
-                    ),
-                    Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
-                    new UpdateOptions().upsert(false)
-            );
+            // users with access to all collections already see it; adding it would narrow them to just this one
+            List<Integer> userCollections = RBACDao.instance.getUserCollectionsById(userId, accountId);
+            if (userCollections != null && !userCollections.isEmpty()) {
+                RBACDao.instance.getMCollection().updateOne(
+                        Filters.and(
+                                Filters.eq(RBAC.USER_ID, userId),
+                                Filters.eq(RBAC.ACCOUNT_ID, accountId),
+                                adminFilter
+                        ),
+                        Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
+                        new UpdateOptions().upsert(false)
+                );
+                RbacCacheVersionDao.accessChanged(accountId);
+            }
+            // roles with host rules may match the new collection
+            RuleCollections.refreshSoon(accountId);
 
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
             // remove the cache of context collections for account
@@ -731,21 +742,30 @@ public class ApiCollectionsAction extends UserAction {
         int accountIdForRbac = Context.accountId.get();
         List<Integer> affectedUserIds = new ArrayList<>();
         try {
+            /*
+             * An empty list means "all collections", so a grant whose every collection is deleted keeps
+             * its (now unmatched) ids: it must end up seeing nothing, not everything.
+             */
+            Set<Integer> deletedIds = new HashSet<>(apiCollectionIds);
+            for (CustomRole role : CustomRoleDao.instance.findAll(Filters.in(CustomRole.API_COLLECTIONS_ID, apiCollectionIds))) {
+                if (!deletedIds.containsAll(role.getApiCollectionsId())) {
+                    CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, role.getName()),
+                            Updates.pullAll(CustomRole.API_COLLECTIONS_ID, apiCollectionIds));
+                }
+            }
+
             for (RBAC rbac : RBACDao.instance.findAll(Filters.and(
                     Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
                     Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)))) {
                 affectedUserIds.add(rbac.getUserId());
+                if (!deletedIds.containsAll(rbac.getApiCollectionsId())) {
+                    RBACDao.instance.updateOne(Filters.eq(Constants.ID, rbac.getId()),
+                            Updates.pullAll(RBAC.API_COLLECTIONS_ID, apiCollectionIds));
+                }
             }
-
-            CustomRoleDao.instance.updateMany(
-                    Filters.in(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
-                    Updates.pullAll(CustomRole.API_COLLECTIONS_ID, apiCollectionIds));
-
-            RBACDao.instance.updateMany(
-                    Filters.and(
-                            Filters.eq(RBAC.ACCOUNT_ID, accountIdForRbac),
-                            Filters.in(RBAC.API_COLLECTIONS_ID, apiCollectionIds)),
-                    Updates.pullAll(RBAC.API_COLLECTIONS_ID, apiCollectionIds));
+            CustomRoleDao.clearRoleCache();
+            UsersCollectionsList.deleteAccountCollectionIdsFromCache(accountIdForRbac);
+            RbacCacheVersionDao.accessChanged(accountIdForRbac);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error pruning deleted collections from access grants");
         }
@@ -1526,6 +1546,7 @@ public class ApiCollectionsAction extends UserAction {
                 if(updateResult == null) {
                     return Action.ERROR.toUpperCase();
                 }
+                RuleCollections.refreshSoon(Context.accountId.get());
                 return Action.SUCCESS.toUpperCase();
             }
 
@@ -1597,6 +1618,8 @@ public class ApiCollectionsAction extends UserAction {
                     );
                 }
             }
+            // roles with tag rules may match different collections now
+            RuleCollections.refreshSoon(Context.accountId.get());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
@@ -1608,10 +1631,22 @@ public class ApiCollectionsAction extends UserAction {
 
     public String updateUserCollections() {
         int accountId = Context.accountId.get();
+        int callerId = getSUser().getId();
+        if (userCollectionMap == null) {
+            return SUCCESS.toUpperCase();
+        }
+        for (String userIdStr : userCollectionMap.keySet()) {
+            if (String.valueOf(callerId).equals(userIdStr)) {
+                addActionError("You can't change your own collections. Ask another admin.");
+                return ERROR.toUpperCase();
+            }
+        }
 
         for(Map.Entry<String, List<Integer>> entry : userCollectionMap.entrySet()) {
             int userId = Integer.parseInt(entry.getKey());
-            Set<Integer> apiCollections = new HashSet<>(entry.getValue());
+            Set<Integer> apiCollections = new HashSet<>(entry.getValue() == null ? Collections.emptyList() : entry.getValue());
+            // "no collections" placeholder from the users list, never a real grant
+            apiCollections.remove(RBACDao.NO_COLLECTION_ID);
 
             /*
              * Need actual role, not base role,
@@ -1621,18 +1656,8 @@ public class ApiCollectionsAction extends UserAction {
                     Filters.eq(RBAC.USER_ID, userId),
                     Filters.eq(RBAC.ACCOUNT_ID, accountId)));
 
-            // Get scope-specific role if scopeRoleMapping exists, otherwise use primary role
-            String role = null;
-            if (rbac != null) {
-                RBAC.Role scopeAwareRole = rbac.getRoleForScope(
-                        Context.contextSource.get()
-                );
-                if (scopeAwareRole != null) {
-                    role = scopeAwareRole.name();
-                } else {
-                    role = rbac.getRole();
-                }
-            }
+            // the role name in the current product (custom or built-in), not its base role
+            String role = rbac == null ? null : RBACDao.instance.fetchRole(rbac);
 
             CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
             /*
@@ -1652,6 +1677,7 @@ public class ApiCollectionsAction extends UserAction {
              */
             RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userId, accountId));
         }
+        RbacCacheVersionDao.accessChanged(accountId);
 
         return SUCCESS.toUpperCase();
     }

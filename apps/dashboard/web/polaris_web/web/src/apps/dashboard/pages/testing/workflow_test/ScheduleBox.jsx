@@ -10,6 +10,8 @@ import { Button } from '@mui/material';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import func from '@/util/func'
+import { usePermissions } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 const ScheduleBox = (props) => {
     let testingRun = props.testingRun;
@@ -17,6 +19,7 @@ const ScheduleBox = (props) => {
     let deleteFn = props.deleteFn
 
     const [recurring, setRecurring] = useState(false)
+    const { canCall } = usePermissions()
     const [startTimestamp, setStartTimestamp] = useState(dayjs())
 
     useEffect(() => {
@@ -54,9 +57,9 @@ const ScheduleBox = (props) => {
 
     const finalButton = () => {
         if (testingRun) {
-            return <Button onClick={deleteSchedule} style={{color: "white"}} size="small">Delete</Button>
+            return <AllowedAction allowed={canCall('api/deleteScheduledWorkflowTests')}><Button onClick={deleteSchedule} style={{color: "white"}} size="small">Delete</Button></AllowedAction>
         } else {
-            return <Button onClick={save} style={{color: "white"}} size="small">Save</Button>
+            return <AllowedAction allowed={canCall('api/startTest')}><Button onClick={save} style={{color: "white"}} size="small">Save</Button></AllowedAction>
         }
     }
     

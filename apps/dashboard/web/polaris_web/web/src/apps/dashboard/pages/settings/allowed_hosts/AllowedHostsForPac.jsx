@@ -31,6 +31,8 @@ function AllowedHostsForPac() {
             onAdd={addAllowedHost}
             onDelete={deleteAllowedHost}
             patternKey="pattern"
+            addRequires="api/addAllowedHostForPac"
+            deleteRequires="api/deleteProxyPattern"
         />
     )
 }

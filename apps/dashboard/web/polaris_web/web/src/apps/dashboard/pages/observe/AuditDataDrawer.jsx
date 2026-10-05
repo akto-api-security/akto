@@ -24,6 +24,7 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable"
 import { CellType } from "../../components/tables/rows/GithubRow"
 import GithubCell from "../../components/tables/cells/GithubCell"
 import { getServerActionFlags, getRegistryOverride } from "./auditServerActionFlags"
+import { usePermissions, withPermissions } from "@/util/permissions"
 
 const childResourceName = { singular: "item", plural: "items" }
 
@@ -110,9 +111,11 @@ function AuditDataDrawer({
     const [loadingChildren, setLoadingChildren] = useState(false)
     const [busy, setBusy] = useState(false)
     const [registryConfigured, setRegistryConfigured] = useState(false)
+    const { canCall } = usePermissions()
+    const canReadRegistries = canCall('api/fetchMcpRegistries')
 
     useEffect(() => {
-        if (!show || !isEndpointSecurity) return
+        if (!show || !isEndpointSecurity || !canReadRegistries) return
         let cancelled = false
         ;(async () => {
             try {
@@ -125,7 +128,7 @@ function AuditDataDrawer({
             }
         })()
         return () => { cancelled = true }
-    }, [show, isEndpointSecurity])
+    }, [show, isEndpointSecurity, canReadRegistries])
 
     const fetchChildren = useCallback(async () => {
         if (!auditItem) return
@@ -234,13 +237,14 @@ function AuditDataDrawer({
 
     // GithubSimpleTable owns the selection state and passes the selected ids in.
     const promotedBulkActions = (selectedHexIds) => ([
-        { content: "Allow", onAction: () => updateSelectedChildren("Approved", selectedHexIds) },
+        { content: "Allow", onAction: () => updateSelectedChildren("Approved", selectedHexIds), requires: 'api/updateAuditData' },
         {
             content: "Block",
             onAction: () => updateSelectedChildren("Rejected", selectedHexIds),
             destructive: true,
+            requires: 'api/updateAuditData',
         },
-        { content: "Conditionally allow", onAction: () => requestChildrenConditional(selectedHexIds) },
+        { content: "Conditionally allow", onAction: () => requestChildrenConditional(selectedHexIds), requires: 'api/updateAuditData' },
     ])
 
     // Registry-precedence override: when registry is configured but parent server
@@ -268,22 +272,25 @@ function AuditDataDrawer({
         addHandlerAvailable: typeof onAddToAllowlist === "function",
     })
 
-    const serverActionItems = [
+    const serverActionItems = withPermissions([
         {
             content: "Allow this server",
             onAction: () => updateServer("Approved"),
             disabled: !flags.allow,
+            requires: 'api/updateAuditData',
         },
         {
             content: "Block this server",
             destructive: true,
             onAction: () => updateServer("Rejected"),
             disabled: !flags.block,
+            requires: 'api/updateAuditData',
         },
         {
             content: "Block for all agents",
             destructive: true,
             onAction: () => blockForAllAgents(),
+            requires: 'api/updateAuditData',
         },
         {
             content: "Conditionally allow this server",
@@ -293,15 +300,18 @@ function AuditDataDrawer({
                 }
             },
             disabled: !flags.conditional,
+            requires: 'api/updateAuditData',
         },
-        {
+        // depends on the MCP registry setting, which the role may not be able to read
+        canReadRegistries && {
             content: "Add to MCP registry",
             onAction: () => {
                 if (typeof onAddToAllowlist === "function") onAddToAllowlist(auditItem)
             },
             disabled: !flags.add,
+            requires: 'api/addMcpAllowlistEntry',
         },
-    ]
+    ].filter(Boolean))
 
     const childrenSection = (
         <Box>

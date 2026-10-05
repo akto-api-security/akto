@@ -9,8 +9,11 @@ import OtpVerification from './OtpVerification';
 import api from '../api';
 import { v4 as uuidv4 } from 'uuid';
 import AuthParams from './AuthParams';
+import { usePermissions } from '@/util/permissions';
+import AllowedAction from '../../../components/shared/AllowedAction';
 
 function LoginStepBuilder({ extractInformation, showOnlyApi, setStoreData, miniTestingServiceName = '' }) {
+    const { canCall } = usePermissions()
 
     const initialStepState = {
         id: "x1",
@@ -221,7 +224,7 @@ function LoginStepBuilder({ extractInformation, showOnlyApi, setStoreData, miniT
                     <AuthParams authParams={authParams} setAuthParams={setAuthParams}/>
 
                     <br />
-                    {showOnlyApi ? null :<Button id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></Button>}
+                    {showOnlyApi ? null :<AllowedAction allowed={canCall('api/addAuthMechanism')}><Button id={"save-token"} primary onClick={handleSave}><div data-testid="save_token_automated">Save changes</div></Button></AllowedAction>}
 
                 </div>
             }

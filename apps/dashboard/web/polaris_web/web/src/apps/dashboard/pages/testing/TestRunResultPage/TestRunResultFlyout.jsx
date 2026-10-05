@@ -31,6 +31,8 @@ import TestRunResultChat from './TestRunResultChat.jsx'
 import AiExecutionJourney from './components/AiExecutionJourney'
 import AskAktoSection from './AskAktoSection.jsx'
 import PersistStore from '../../../../main/PersistStore'
+import { usePermissions, withPermissions, permissions, loadPermissions } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 const SKIPPED_TEST_DOCS_URL = "https://docs.akto.io/api-security-testing/concepts/skipped-test-cases";
 const SKIP_ERROR_KEYWORDS = ["skipping execution"];
@@ -42,6 +44,7 @@ function isSkippedTestError(errorText) {
 function TestRunResultFlyout(props) {
     const { selectedTestRunResult, loading, issueDetails, getDescriptionText, infoState, createJiraTicket, createDevRevTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, serviceNowTicketUrl, devrevWorkUrl, wizFindingUrl, conversations, conversationRemediationText, showForbidden, aiSummary, aiSummaryLoading, aiMessages, aiLoading, onGenerateAiOverview, onSendFollowUp, toolsCalls, runAutomatedTests } = props
     const [remediationText, setRemediationText] = useState("")
+    const { canCall, canCallAll } = usePermissions()
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
     const [apiInfo, setApiInfo] = useState({})
@@ -472,7 +475,7 @@ function TestRunResultFlyout(props) {
         return (
             issueDetails?.id &&
             <Popover
-                activator={<Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button>}
+                activator={<AllowedAction allowed={canCall('api/bulkUpdateIssueStatus')}><Button disclosure onClick={() => setPopoverActive(!popoverActive)}>Triage</Button></AllowedAction>}
                 active={popoverActive}
                 onClose={() => setPopoverActive(false)}
                 autofocusTarget="first-node"
@@ -535,24 +538,28 @@ function TestRunResultFlyout(props) {
                                                 autofocusTarget="first-node"
                                             >
                                                 <ActionList
-                                                    items={[
+                                                    items={withPermissions([
                                                         {
                                                             content: 'Critical',
-                                                            onAction: () => handleSeverityUpdate('CRITICAL')
+                                                            onAction: () => handleSeverityUpdate('CRITICAL'),
+                                                            requires: 'api/bulkUpdateIssueSeverity'
                                                         },
                                                         {
                                                             content: 'High',
-                                                            onAction: () => handleSeverityUpdate('HIGH')
+                                                            onAction: () => handleSeverityUpdate('HIGH'),
+                                                            requires: 'api/bulkUpdateIssueSeverity'
                                                         },
                                                         {
                                                             content: 'Medium',
-                                                            onAction: () => handleSeverityUpdate('MEDIUM')
+                                                            onAction: () => handleSeverityUpdate('MEDIUM'),
+                                                            requires: 'api/bulkUpdateIssueSeverity'
                                                         },
                                                         {
                                                             content: 'Low',
-                                                            onAction: () => handleSeverityUpdate('LOW')
+                                                            onAction: () => handleSeverityUpdate('LOW'),
+                                                            requires: 'api/bulkUpdateIssueSeverity'
                                                         }
-                                                    ]}
+                                                    ])}
                                                 />
                                             </Popover>
                                     ) : null}
@@ -581,11 +588,13 @@ function TestRunResultFlyout(props) {
                                 />
                             ) : (
                                 !description ? (
+                                    <AllowedAction allowed={canCall('api/updateIssueDescription')}>
                                     <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
                                         Add description
                                     </Button>
+                                    </AllowedAction>
                                 ) : (
-                                    <Button plain removeUnderline textAlign="left" onClick={() => setIsEditingDescription(true)}>
+                                    <Button plain removeUnderline textAlign="left" onClick={canCall('api/updateIssueDescription') ? () => setIsEditingDescription(true) : undefined}>
                                         <Text as="span" variant="bodyMd" color="subdued" alignment="start">
                                             {description}
                                         </Text>
@@ -622,7 +631,7 @@ function TestRunResultFlyout(props) {
                     {selectedTestRunResult && selectedTestRunResult.vulnerable &&
                         <HorizontalStack gap={2} wrap={false}>
                             <JiraTicketCreationModal
-                                activator={window.JIRA_INTEGRATED === 'true' ? <Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button> : <></>}
+                                activator={window.JIRA_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchIntegration', 'api/createJiraIssue')}><Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button></AllowedAction> : <></>}
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
                                 handleSaveAction={handleSaveAction}
@@ -636,7 +645,7 @@ function TestRunResultFlyout(props) {
                                 setLabelsText={setLabelsText}
                             />
                             <JiraTicketCreationModal
-                                activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
+                                activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchAzureBoardsIntegration', 'api/createAzureBoardsWorkItem')}><Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button></AllowedAction> : <></>}
                                 modalActive={boardsModalActive}
                                 setModalActive={setBoardsModalActive}
                                 handleSaveAction={handleAzureBoardWorkitemCreation}
@@ -649,7 +658,7 @@ function TestRunResultFlyout(props) {
                                 isAzureModal={true}
                             />
                             <JiraTicketCreationModal
-                                activator={window.SERVICENOW_INTEGRATED === 'true' ? <Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button> : <></>}
+                                activator={window.SERVICENOW_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchServiceNowIntegration', 'api/createServiceNowTicket')}><Button id={"create-servicenow-ticket-button"} primary onClick={handleServiceNowClick} disabled={serviceNowTicketUrl !== "" || window.SERVICENOW_INTEGRATED !== "true"}>Create ServiceNow Ticket</Button></AllowedAction> : <></>}
                                 modalActive={serviceNowModalActive}
                                 setModalActive={setServiceNowModalActive}
                                 handleSaveAction={handleServiceNowTicketCreation}
@@ -662,7 +671,7 @@ function TestRunResultFlyout(props) {
                                 isServiceNowModal={true}
                             />
                             <JiraTicketCreationModal
-                                activator={window.DEVREV_INTEGRATED === 'true' ? <Button id={"create-devrev-ticket-button"} primary onClick={handleDevRevClick} disabled={devrevWorkUrl !== "" || window.DEVREV_INTEGRATED !== "true"}>Create DevRev Ticket</Button> : <></>}
+                                activator={window.DEVREV_INTEGRATED === 'true' ? <AllowedAction allowed={canCallAll('api/fetchDevRevIntegration', 'api/createDevRevTickets')}><Button id={"create-devrev-ticket-button"} primary onClick={handleDevRevClick} disabled={devrevWorkUrl !== "" || window.DEVREV_INTEGRATED !== "true"}>Create DevRev Ticket</Button></AllowedAction> : <></>}
                                 modalActive={devrevModalActive}
                                 setModalActive={setDevRevModalActive}
                                 handleSaveAction={handleDevRevTicketCreation}
@@ -676,9 +685,11 @@ function TestRunResultFlyout(props) {
                             />
                            
                             { window?.WIZ_INTEGRATED === 'true' ? 
+                                <AllowedAction allowed={canCall('api/createWizFindings')}>
                                 <Button id={"create-wiz-finding-button"} primary onClick={handleWizFindingCreation} disabled={ wizFindingUrl?.length > 0 }>
                                     Create Wiz Finding
-                                </Button> 
+                                </Button>
+                                </AllowedAction> 
                                 : <></>
                             }
                         </HorizontalStack>
@@ -937,7 +948,7 @@ function TestRunResultFlyout(props) {
             const isVulnerabilityHighlightingEnabled = true;
             const currentId = selectedTestRunResult?.id;
 
-            if (currentId && analyzedIdRef.current !== currentId && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
+            if (currentId && analyzedIdRef.current !== currentId && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled && canCall('api/analyze_vulnerability')) {
                 analyzedIdRef.current = currentId;
                 // Drop the previously viewed result's highlights so we never show
                 // stale/mismatched evidence while the new analysis runs.
@@ -948,6 +959,9 @@ function TestRunResultFlyout(props) {
                     // Multi-exec tests only mark the last attempt as vulnerable; analyze that one only.
                     const lastIdx = selectedTestRunResult.testResults.length - 1;
                     const analysisPromises = [lastIdx].map(async (idx) => {
+                        // the flyout can open before the permissions have loaded
+                        await loadPermissions();
+                        if (!permissions.canCall('api/analyze_vulnerability')) return null;
                         const result = selectedTestRunResult.testResults[idx];
                         // Parse the message if it's a string
                         let messageObj = result.message;
@@ -1065,7 +1079,7 @@ function TestRunResultFlyout(props) {
 
                 return () => clearTimeout(timeoutId);
             }
-        }, [selectedTestRunResult?.id]);
+        }, [selectedTestRunResult?.id, canCall]);
 
     // Component that renders the request/response editors for the selected result.
     const ValuesTabContent = React.memo(({ isAgentic = false, runAutomatedTests = false } = {}) => {
@@ -1348,7 +1362,7 @@ function TestRunResultFlyout(props) {
         />
     )
 
-    const askAktoComp = (
+    const askAktoComp = canCall('api/chatAndStore') && (
         <AskAktoSection
             aiSummary={aiSummary}
             aiSummaryLoading={aiSummaryLoading}

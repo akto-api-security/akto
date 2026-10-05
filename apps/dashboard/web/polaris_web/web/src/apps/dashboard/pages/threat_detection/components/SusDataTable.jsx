@@ -19,6 +19,8 @@ import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
 import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import { HumanApprovalActions, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
 
 const resourceName = {
@@ -278,6 +280,7 @@ const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLO
 
 function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, onRegisterExport, refreshNonce = 0 }) {
   const location = useLocation();
+  const { canCall } = usePermissions();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -803,6 +806,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       return {
         content: `${label} ${displayText}`,
+        requires: actionType === 'delete' ? 'api/deleteMaliciousEvents' : 'api/updateMaliciousEventStatus',
         onAction: () => {
           if (useFilters) {
             if (!validateFiltersForBulkOperation(validationType)) return;
@@ -1187,7 +1191,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         // the row's anchor navigation (the "reload"), plus stopPropagation for the row click.
         approveAction: (
           <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
+            <AllowedAction allowed={canCall('api/approveServerForPolicy')}>
+              <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
+            </AllowedAction>
           </div>
         ),
         ...(isHumanApproval && {
@@ -1199,6 +1205,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                   <HumanApprovalActions
                     pending
                     subtle
+                    allowed={canCall('api/updateMaliciousEventStatus')}
                     onApprove={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.APPROVED)}
                     onBlock={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.BLOCKED)}
                   />

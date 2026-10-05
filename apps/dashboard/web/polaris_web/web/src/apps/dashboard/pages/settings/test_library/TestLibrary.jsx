@@ -4,6 +4,8 @@ import settingsApi from "../api";
 import api from "./api";
 import func from "@/util/func";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
+import { usePermissions, whenAllowed, withPermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 function TestLibrary() {
 
@@ -13,6 +15,7 @@ function TestLibrary() {
     }
 
     const [data, setData] = useState([aktoTestLibrary]);
+    const { canCall } = usePermissions()
 
     async function fetchData() {
         let res1 = await settingsApi.fetchAdminSettings()
@@ -125,16 +128,18 @@ function TestLibrary() {
                     const { repositoryUrl, author, timestamp, count } = item;
 
                     const shortcutActions = author !== "AKTO" ?
-                        [
+                        withPermissions([
                             {
                                 content: 'Sync',
                                 onAction: () => { handleSyncTestLibrary(repositoryUrl) },
+                                requires: 'api/syncCustomLibrary',
                             },
                             {
                                 content: 'Remove test library',
                                 onAction: () => { handleRemoveTestLibrary(repositoryUrl) },
+                                requires: 'api/removeTestLibrary',
                             }
-                        ] : []
+                        ]) : []
 
                     return (<ResourceItem
                         id={repositoryUrl}
@@ -163,6 +168,7 @@ function TestLibrary() {
                     id: "add-new-test-library",
                     content: 'Add',
                     onAction: addTestLibrary,
+                    ...whenAllowed(canCall('api/addTestLibrary')),
                 }}
             >
                 <Modal.Section>
@@ -197,9 +203,9 @@ function TestLibrary() {
                     Test library
                 </Text>
             }
-            primaryAction={<Button primary onClick={showAddTestLibraryModal}>Add new test library</Button>}
+            primaryAction={<AllowedAction allowed={canCall('api/addTestLibrary')}><Button primary onClick={showAddTestLibraryModal}>Add new test library</Button></AllowedAction>}
             secondaryActions={window.USER_ROLE === 'ADMIN' ? (
-                <Button onClick={handleSyncAllDefaultTestLibraries}>Sync all default libraries</Button>
+                <AllowedAction allowed={canCall('api/syncAllDefaultTestLibraries')}><Button onClick={handleSyncAllDefaultTestLibraries}>Sync all default libraries</Button></AllowedAction>
             ) : null}
             isFirstPage={true}
             divider={true}

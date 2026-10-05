@@ -416,6 +416,7 @@ const pendingRunStatusRequestRef = useRef(null)
           const deleteConfirmationMessage = `Are you sure, you want to delete test run${func.addPlurality(selectedTestRuns.length)}?`
           func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleTestRunDeletion(selectedTestRuns))
         },
+        requires: 'api/deleteTestRuns',
       },
     ]
   };

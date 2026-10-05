@@ -7,6 +7,7 @@ import FlyLayout from '../../../components/layouts/FlyLayout'
 import settingRequests from '../api'
 import { CellType } from '../../../components/tables/rows/GithubRow'
 import func from '@/util/func'
+import { withPermissions } from '@/util/permissions'
 
 const resourceName = { singular: 'rule', plural: 'rules' }
 
@@ -186,6 +187,7 @@ function FileInspection() {
             items: [{
                 content: 'Edit',
                 onAction: () => openEdit(row),
+                requires: ['api/addFileInspectionRule', 'api/deleteFileInspectionRule'],
             }]
         }]
     }
@@ -240,6 +242,8 @@ function FileInspection() {
                 onAdd={onAdd}
                 onDelete={onDelete}
                 patternKey="path"
+                addRequires="api/addFileInspectionRule"
+                deleteRequires="api/deleteFileInspectionRule"
                 headers={RULE_HEADERS}
                 buildRow={(_key, info) => ({
                     existenceOnlyText: info.existenceOnly ? 'Yes' : 'No',
@@ -254,7 +258,7 @@ function FileInspection() {
                 open={editModal}
                 onClose={() => setEditModal(false)}
                 title="Edit rule"
-                primaryAction={{ content: 'Save', onAction: saveEdit, loading: editSaving }}
+                primaryAction={withPermissions({ content: 'Save', onAction: saveEdit, loading: editSaving, requires: ['api/addFileInspectionRule', 'api/deleteFileInspectionRule'] })}
                 secondaryActions={[{ content: 'Cancel', onAction: () => setEditModal(false) }]}
             >
                 <Modal.Section>

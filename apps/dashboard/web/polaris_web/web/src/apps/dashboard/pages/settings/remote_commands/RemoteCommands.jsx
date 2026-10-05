@@ -398,7 +398,7 @@ function RemoteCommands() {
             <PageWithMultipleCards
                 title="Remote Commands"
                 isFirstPage={true}
-                primaryAction={{ content: '+ New Command', onAction: () => setShowModal(true) }}
+                primaryAction={{ content: '+ New Command', onAction: () => setShowModal(true), requires: 'api/queueEndpointRemoteCommand' }}
                 components={[table]}
             />
             {showModal && (

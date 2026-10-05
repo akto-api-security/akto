@@ -29,6 +29,8 @@ import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
 import ChatMessage from "../../testing/TestRunResultPage/components/ChatMessage";
 import { MESSAGE_TYPES } from "../../testing/TestRunResultPage/components/chatConstants";
+import { usePermissions, withPermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 // For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
 // requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
@@ -77,6 +79,7 @@ function _configFromOrig(orig, ruleViolated) {
 // Self-contained approve button + modal. Kept as its own component so typing the duration
 // re-renders only this small tree, not the whole SampleDetails flyout (which caused a flash).
 function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
+    const { canCall } = usePermissions();
     const setGuardrailApprovedByPolicy = SessionStore((state) => state.setGuardrailApprovedByPolicy);
     const [modalActive, setModalActive] = useState(false);
     const [mode, setMode] = useState("ALWAYS"); // ALWAYS | DURATION
@@ -128,7 +131,7 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 
     return (
         <Modal
-            activator={<Button size="slim" onClick={openModal}>Approve server</Button>}
+            activator={<AllowedAction allowed={canCall('api/approveServerForPolicy')}><Button size="slim" onClick={openModal}>Approve server</Button></AllowedAction>}
             open={modalActive}
             onClose={() => setModalActive(false)}
             primaryAction={{ content: "Approve", loading, onAction: handleApprove }}
@@ -169,6 +172,7 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter, humanResponse: humanResponseProp } = props
     const resolvedThreatFiltersMap = threatFiltersMap || {};
+    const { canCall, canCallAll } = usePermissions();
 
     // Determine if we should use hardcoded guardrail descriptions
     const useGuardrailDescription = isAgenticSecurityCategory() || isEndpointSecurityCategory();
@@ -1294,22 +1298,26 @@ Reference URL: ${window.location.href}`.trim();
                             onClose={() => setActionPopoverActive(false)}
                         >
                             <ActionList
-                                items={[
+                                items={withPermissions([
                                     eventStatus === 'UNDER_REVIEW' || eventStatus === 'TRIAGE' ? {
                                         content: 'Reactivate',
                                         onAction: () => handleStatusChange('ACTIVE'),
+                                        requires: 'api/updateMaliciousEventStatus',
                                     } : {
                                         content: 'Mark for Review',
                                         onAction: () => handleStatusChange('UNDER_REVIEW'),
+                                        requires: 'api/updateMaliciousEventStatus',
                                     },
                                     eventStatus === 'IGNORED' ? {
                                         content: 'Reactivate',
                                         onAction: () => handleStatusChange('ACTIVE'),
+                                        requires: 'api/updateMaliciousEventStatus',
                                     } : {
                                         content: 'Ignore',
                                         onAction: () => handleStatusChange('IGNORED'),
+                                        requires: 'api/updateMaliciousEventStatus',
                                     }
-                                ].filter(item => item)}
+                                ].filter(item => item))}
                             />
                         </Popover>
                         )}
@@ -1318,6 +1326,7 @@ Reference URL: ${window.location.href}`.trim();
                                 pending={isHumanApprovalPending}
                                 response={humanResponse}
                                 loading={triageLoading}
+                                allowed={canCall('api/updateMaliciousEventStatus')}
                                 onApprove={() => handleHumanApproval("APPROVED")}
                                 onBlock={() => handleHumanApproval("BLOCKED")}
                             />
@@ -1351,13 +1360,15 @@ Reference URL: ${window.location.href}`.trim();
                         ) : (
                             <JiraTicketCreationModal
                                 activator={
-                                    <Button
-                                        size="slim"
-                                        onClick={handleJiraClick}
-                                        disabled={window.JIRA_INTEGRATED !== "true"}
-                                    >
-                                        Create Jira Ticket
-                                    </Button>
+                                    <AllowedAction allowed={canCallAll('api/fetchIntegration', 'api/createGeneralJiraTicket')}>
+                                        <Button
+                                            size="slim"
+                                            onClick={handleJiraClick}
+                                            disabled={window.JIRA_INTEGRATED !== "true"}
+                                        >
+                                            Create Jira Ticket
+                                        </Button>
+                                    </AllowedAction>
                                 }
                                 modalActive={modalActive}
                                 setModalActive={setModalActive}
@@ -1382,13 +1393,15 @@ Reference URL: ${window.location.href}`.trim();
                         ) : (
                             <JiraTicketCreationModal
                                 activator={
-                                    <Button
-                                        size="slim"
-                                        onClick={handleAzureBoardClick}
-                                        disabled={window.AZURE_BOARDS_INTEGRATED !== "true"}
-                                    >
-                                        Create Work Item
-                                    </Button>
+                                    <AllowedAction allowed={canCallAll('api/fetchAzureBoardsIntegration', 'api/createGeneralAzureBoardsWorkItem')}>
+                                        <Button
+                                            size="slim"
+                                            onClick={handleAzureBoardClick}
+                                            disabled={window.AZURE_BOARDS_INTEGRATED !== "true"}
+                                        >
+                                            Create Work Item
+                                        </Button>
+                                    </AllowedAction>
                                 }
                                 modalActive={boardsModalActive}
                                 setModalActive={setBoardsModalActive}

@@ -117,8 +117,20 @@ public class GuardrailPoliciesAction extends UserAction {
             // Mongo treats limit <= 0 as "unlimited", so clamp instead of passing it through as-is.
             skip = Math.max(skip, 0);
             limit = limit <= 0 ? DEFAULT_FETCH_LIMIT : Math.min(limit, MAX_FETCH_LIMIT);
-            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
-            this.total = GuardrailPoliciesDao.instance.getTotalCount();
+            List<ApiCollection> ownCollections = ArgusCollectionScope.getRestrictedCollections(getSUser());
+            if (ownCollections == null) {
+                this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
+                this.total = GuardrailPoliciesDao.instance.getTotalCount();
+            } else {
+                // Users limited to collections don't see policies that target only other teams' servers
+                Set<String> allowedTargets = allowedTargets(ownCollections);
+                List<GuardrailPolicies> visible = new ArrayList<>();
+                for (GuardrailPolicies p : GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 0)) {
+                    if (isVisibleToScope(p, allowedTargets)) visible.add(p);
+                }
+                this.total = visible.size();
+                this.guardrailPolicies = new ArrayList<>(visible.subList(Math.min(skip, visible.size()), Math.min(skip + limit, visible.size())));
+            }
 
             // Resolve targetTags/targetDeviceIds → device IDs fresh on every fetch.
             // applyToDeviceIds left null (never set below) = no targeting configured → apply to all devices.
@@ -533,29 +545,14 @@ public class GuardrailPoliciesAction extends UserAction {
         if (ownCollections == null) {
             return null;
         }
-        Set<String> allowedTargets = new HashSet<>();
-        for (ApiCollection collection : ownCollections) {
-            allowedTargets.add(String.valueOf(collection.getId()));
-            if (collection.getHostName() != null) allowedTargets.add(collection.getHostName());
-            if (collection.getName() != null) allowedTargets.add(collection.getName());
-            if (collection.getDisplayName() != null) allowedTargets.add(collection.getDisplayName());
-        }
+        Set<String> allowedTargets = allowedTargets(ownCollections);
 
         String scopeError = "You can apply guardrail policies only to the collections assigned to you";
         for (GuardrailPolicies p : policies.get()) {
             if (p.isApplyToAllServers() || p.isNegatedAgentServers() || p.isNegatedMcpServers() || p.isNegatedLlmServers()) {
                 return scopeError;
             }
-            List<String> targets = new ArrayList<>();
-            if (p.getSelectedMcpServers() != null) targets.addAll(p.getSelectedMcpServers());
-            if (p.getSelectedAgentServers() != null) targets.addAll(p.getSelectedAgentServers());
-            for (List<GuardrailPolicies.SelectedServer> servers : Arrays.asList(
-                    p.getSelectedMcpServersV2(), p.getSelectedAgentServersV2(), p.getSelectedLlmServersV2())) {
-                if (servers == null) continue;
-                for (GuardrailPolicies.SelectedServer server : servers) {
-                    targets.add(server.getId() != null ? server.getId() : server.getName());
-                }
-            }
+            List<String> targets = policyTargets(p);
             if (targets.isEmpty()) {
                 return scopeError;
             }
@@ -566,6 +563,40 @@ public class GuardrailPoliciesAction extends UserAction {
             }
         }
         return null;
+    }
+
+    static Set<String> allowedTargets(List<ApiCollection> ownCollections) {
+        Set<String> allowedTargets = new HashSet<>();
+        for (ApiCollection collection : ownCollections) {
+            allowedTargets.add(String.valueOf(collection.getId()));
+            if (collection.getHostName() != null) allowedTargets.add(collection.getHostName());
+            if (collection.getName() != null) allowedTargets.add(collection.getName());
+            if (collection.getDisplayName() != null) allowedTargets.add(collection.getDisplayName());
+        }
+        return allowedTargets;
+    }
+
+    static List<String> policyTargets(GuardrailPolicies p) {
+        List<String> targets = new ArrayList<>();
+        if (p.getSelectedMcpServers() != null) targets.addAll(p.getSelectedMcpServers());
+        if (p.getSelectedAgentServers() != null) targets.addAll(p.getSelectedAgentServers());
+        for (List<GuardrailPolicies.SelectedServer> servers : Arrays.asList(
+                p.getSelectedMcpServersV2(), p.getSelectedAgentServersV2(), p.getSelectedLlmServersV2())) {
+            if (servers == null) continue;
+            for (GuardrailPolicies.SelectedServer server : servers) {
+                targets.add(server.getId() != null ? server.getId() : server.getName());
+            }
+        }
+        return targets;
+    }
+
+    /** Global policies (apply to all, exclude mode, no servers picked) also cover the user's servers, so they stay visible. */
+    static boolean isVisibleToScope(GuardrailPolicies p, Set<String> allowedTargets) {
+        if (p.isApplyToAllServers() || p.isNegatedAgentServers() || p.isNegatedMcpServers() || p.isNegatedLlmServers()) {
+            return true;
+        }
+        List<String> targets = policyTargets(p);
+        return targets.isEmpty() || targets.stream().anyMatch(allowedTargets::contains);
     }
 
     private static final int MAX_APPROVAL_DAYS = 365;

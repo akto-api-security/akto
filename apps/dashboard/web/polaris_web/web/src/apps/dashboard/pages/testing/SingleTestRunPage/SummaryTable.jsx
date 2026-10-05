@@ -12,6 +12,7 @@ import {
     setCachedRunStatusCounts,
 } from '../TestRunsPage/runStatusCache'
 import { shouldFetchRunStatusSummary } from '../TestRunsPage/runStatusUtils'
+import { withPermissions } from '@/util/permissions'
 
 function SummaryTable({testingRunResultSummaries, setSummary}) {
 
@@ -68,6 +69,7 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
             func.setToast(true, false, `${selectedTestRuns.length} test summar${selectedTestRuns.length > 1 ? "ies" : "y"} deleted successfully`)
             window.location.reload();
           },
+          requires: 'api/deleteTestRunsFromSummaries',
         },
       ]};
 
@@ -176,7 +178,7 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
                         selectedItemsCount={
                             allResourcesSelected ? 'All' : selectedResources.length
                         }
-                        promotedBulkActions={promotedBulkActions(selectedResources)}
+                        promotedBulkActions={withPermissions(promotedBulkActions(selectedResources))}
                         onSelectionChange={handleSelectionChange}
                     >
                         {rowMarkup}

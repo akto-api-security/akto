@@ -29,6 +29,8 @@ import {
     splitPolicyServers,
     resolveClientKey,
 } from "./serverTargetingUtils";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../components/shared/AllowedAction";
 
 // Apply ?category= override synchronously before first render — mirrors ThreatReport.jsx/
 // VulnerabilityReport.jsx. A deep-link opened in a fresh tab (e.g. from a violation's
@@ -163,6 +165,7 @@ const sortPinnedSystemPolicies = (systemRows) =>
 
 function GuardrailPolicies() {
     const canManagePolicies = func.canManageGuardrailPolicies();
+    const { canCall } = usePermissions();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -616,6 +619,7 @@ function GuardrailPolicies() {
         return [
             {
                 content: `Backfill histor${selectedPolicies.length > 1 ? "ies" : "y"} for ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
+                requires: 'api/startPolicyBackfillReplay',
                 onAction: () => {
                     const selectedRows = tablePolicyData.filter(row => selectedPolicies.includes(row.id));
                     setBackfillPolicies(selectedRows.map(row => ({
@@ -626,6 +630,7 @@ function GuardrailPolicies() {
             },
             canManagePolicies && {
                 content: `Delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
+                requires: 'api/deleteGuardrailPolicies',
                 onAction: async () => {
                     const deleteConfirmationMessage = `Are you sure you want to delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}?`;
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", async () => {
@@ -654,7 +659,8 @@ function GuardrailPolicies() {
                         <span style={{ color: '#008060' }}>Enable policy</span>,
                     icon: isActive ? CancelMinor : ChecklistMajor,
                     onAction: () => handleToggleStatus(item),
-                    destructive: isActive
+                    destructive: isActive,
+                    requires: 'api/createGuardrailPolicy'
                 },
                 {
                     content: 'View details',
@@ -865,9 +871,11 @@ function GuardrailPolicies() {
                     <Popover
                         active={presetsPopoverActive}
                         activator={
-                            <Button disclosure onClick={() => setPresetsPopoverActive(!presetsPopoverActive)}>
-                                Presets
-                            </Button>
+                            <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                                <Button disclosure onClick={() => setPresetsPopoverActive(!presetsPopoverActive)}>
+                                    Presets
+                                </Button>
+                            </AllowedAction>
                         }
                         onClose={() => setPresetsPopoverActive(false)}
                     >
@@ -892,7 +900,9 @@ function GuardrailPolicies() {
                             </Scrollable>
                         </Popover.Pane>
                     </Popover>
-                    <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                    <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                        <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                    </AllowedAction>
                 </HorizontalStack>
             }
             components={components}

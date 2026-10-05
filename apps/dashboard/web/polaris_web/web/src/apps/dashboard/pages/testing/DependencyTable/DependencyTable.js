@@ -1,4 +1,4 @@
-import { Button, HorizontalStack, Icon, Link, Popover, Spinner, Text } from "@shopify/polaris";
+import { Banner, Button, HorizontalStack, Icon, Link, Popover, Spinner, Text } from "@shopify/polaris";
 import { useState } from "react";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
@@ -10,6 +10,8 @@ import func from "../../../../../util/func";
 import EditModal from "./EditModal";
 import GlobalVarModal from "./GlobalVarModal";
 import { useLocation } from "react-router-dom";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const headers = [
     {
@@ -55,6 +57,7 @@ const generateKeyForReplaceDetailMap = (apiCollectionId, url, method, key, isHea
 
 function DependencyTable() {
     const [loading, setLoading] = useState(false)
+    const { canCall } = usePermissions()
     const [runResults, setRunResults] = useState({})
     const [refresh, setRefresh] = useState(false)
     const [invokeLoading, setInvokeLoading] = useState(false)
@@ -265,7 +268,8 @@ function DependencyTable() {
         />
     )
 
-    const components = [resultTable, modalComponent, globalVarModalComponent]
+    // building the table is a write action on the server: a role without it doesn't load the table
+    const components = [canCall('api/buildDependencyTable') ? resultTable : <Banner key="no-access" status="info">Your role can't load the dependency table. Ask an admin if you need it.</Banner>, modalComponent, globalVarModalComponent]
 
     const invokeDependencyTable = (sourceCodeApis, updateFunc) => {
         if (invokeLoading || invokeLoadingSecond) return
@@ -305,9 +309,11 @@ function DependencyTable() {
         <Popover
             active={moreActions}
             activator={(
+                <AllowedAction allowed={canCall('api/invokeDependencyTable')}>
                 <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
                     Invoke
                 </Button>
+                </AllowedAction>
             )}
             autofocusTarget="first-node"
             onClose={() => { setMoreActions(false) }}
@@ -329,9 +335,11 @@ function DependencyTable() {
     )
 
     const globalVarsComponent = (
+        <AllowedAction allowed={canCall('api/saveGlobalVars')}>
         <Button onClick={() => { setGlobalVarActive(true) }} >
             Edit Global vars
         </Button>
+        </AllowedAction>
     )
 
     return (

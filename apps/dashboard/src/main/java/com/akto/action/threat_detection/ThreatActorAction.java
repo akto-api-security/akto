@@ -96,8 +96,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchActorsCountPerCounty() {
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       Map<String, Object> filters = new HashMap<>();
       if (latestAttack != null && !latestAttack.isEmpty()) filters.put("latestAttack", latestAttack);
       this.actorsCountPerCountry = new OwnAgentThreatStats(
@@ -119,6 +120,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -127,6 +131,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return fetchActorsCountPerCounty();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActorByCountryResponse>toProtoMessage(
