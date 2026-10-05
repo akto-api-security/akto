@@ -54,11 +54,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
         rbacEntryCache.remove(key);
     }
 
-    /** Drops every cached RBAC entry and rule match of the account (see RbacCacheVersionDao). */
+    /** Drops every cached RBAC entry of the account (see RbacCacheVersionDao). */
     public static void clearAccountCache(int accountId) {
         rbacEntryCache.keySet().removeIf(key -> key.getSecond() != null && key.getSecond() == accountId);
-        String accountPrefix = accountId + "|";
-        ruleCollectionsCache.keySet().removeIf(key -> key.startsWith(accountPrefix));
     }
 
     /*
@@ -240,7 +238,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
                 apiCollectionsId.addAll(customRole.getApiCollectionsId());
             }
             if (hasRules) {
-                apiCollectionsId.addAll(ruleCollectionIds(accountId, customRole.getCollectionRules()));
+                apiCollectionsId.addAll(RuleCollections.idsFor(customRole));
             }
         }
 
@@ -264,30 +262,8 @@ public class RBACDao extends CommonContextDao<RBAC> {
     /** Collection id that matches no collection; keeps a limited user limited when nothing matches. */
     public static final int NO_COLLECTION_ID = Integer.MIN_VALUE;
 
-    private static final ConcurrentHashMap<String, Pair<Set<Integer>, Integer>> ruleCollectionsCache = new ConcurrentHashMap<>();
-    public static final int RULE_CACHE_EXPIRY_TIME = 2 * 60;
-
-    /** True when the user's role in the current product picks collections by host or tag rules. */
-    public static boolean usesCollectionRules(int userId, int accountId) {
-        RBAC rbac = getCurrentRBACForUser(userId, accountId);
-        if (rbac == null) {
-            return false;
-        }
-        String currentRole = instance.fetchRole(rbac);
-        if (currentRole != null && currentRole.isEmpty()) {
-            currentRole = rbac.getRole();
-        }
-        CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(currentRole);
-        return customRole != null && customRole.getCollectionRules() != null && !customRole.getCollectionRules().isEmpty();
-    }
-
-    /** Collections matching a role's host / tag rules, cached per account and rule set. */
-    public static Set<Integer> ruleCollectionIds(int accountId, List<CollectionRule> rules) {
-        String key = accountId + "|" + rules;
-        Pair<Set<Integer>, Integer> cached = ruleCollectionsCache.get(key);
-        if (cached != null && Context.now() - cached.getSecond() <= RULE_CACHE_EXPIRY_TIME) {
-            return cached.getFirst();
-        }
+    /** Collections matching host / tag rules, straight from the DB (callers use the ids saved on the role, see RuleCollections). */
+    public static Set<Integer> matchRules(List<CollectionRule> rules) {
         List<Bson> filters = new ArrayList<>();
         for (CollectionRule rule : rules) {
             if (rule == null || rule.validate() != null) {
@@ -307,22 +283,12 @@ public class RBACDao extends CommonContextDao<RBAC> {
         }
         Set<Integer> ids = new HashSet<>();
         if (!filters.isEmpty()) {
-            try {
-                // raw query: the RBAC-filtered DAO methods resolve the user's collections through this method
-                for (ApiCollection collection : ApiCollectionsDao.instance.getMCollection()
-                        .find(Filters.or(filters)).projection(Projections.include(ApiCollection.ID))) {
-                    ids.add(collection.getId());
-                }
-            } catch (Exception e) {
-                // e.g. a pattern Mongo rejects: match nothing, so the user stays limited instead of seeing everything
-                logger.error("Error resolving collection rules " + rules + ": " + e.getMessage());
-                ids.clear();
+            // raw query: the RBAC-filtered DAO methods resolve the user's collections through the rules
+            for (ApiCollection collection : ApiCollectionsDao.instance.getMCollection()
+                    .find(Filters.or(filters)).projection(Projections.include(ApiCollection.ID))) {
+                ids.add(collection.getId());
             }
         }
-        if (ruleCollectionsCache.size() > 1000) {
-            ruleCollectionsCache.clear(); // keeps the cache bounded when rules change often
-        }
-        ruleCollectionsCache.put(key, new Pair<>(ids, Context.now()));
         return ids;
     }
 

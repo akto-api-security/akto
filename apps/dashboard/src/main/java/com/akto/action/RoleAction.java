@@ -9,6 +9,7 @@ import java.util.TreeMap;
 import com.akto.audit_logs_util.Audit;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CustomRoleDao;
+import com.akto.dao.RuleCollections;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.RbacCacheVersionDao;
@@ -33,6 +34,7 @@ import com.akto.util.Pair;
 import com.akto.utils.RoleAssignment;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 
 import lombok.Setter;
@@ -73,7 +75,8 @@ public class RoleAction extends UserAction {
          * Need all data for a role, 
          * thus no projections being used.
          */
-        roles = CustomRoleDao.instance.findAll(new BasicDBObject());
+        // rule matches can be thousands of ids and the page doesn't use them
+        roles = CustomRoleDao.instance.findAll(new BasicDBObject(), Projections.exclude(CustomRole.RULE_COLLECTION_IDS));
         roleUsage = countRoleUsage(Context.accountId.get());
         baseRolePermissions = new HashMap<>();
         for (Role role : Role.values()) {
@@ -331,6 +334,9 @@ public class RoleAction extends UserAction {
         role.setCollectionRules(collectionRules);
         role.setAssignableRoles(assignableRoles);
         CustomRoleDao.instance.insertOne(role);
+        if (collectionRules != null && !collectionRules.isEmpty()) {
+            RuleCollections.match(role);
+        }
         clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
@@ -380,6 +386,9 @@ public class RoleAction extends UserAction {
         if (collectionRules != null) updates.add(Updates.set(CustomRole.COLLECTION_RULES, collectionRules));
         if (assignableRoles != null) updates.add(Updates.set(CustomRole.ASSIGNABLE_ROLES, assignableRoles));
         CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, roleName), Updates.combine(updates));
+        if (collectionRules != null) {
+            RuleCollections.match(CustomRoleDao.instance.findRoleByName(roleName));
+        }
         clearRoleCaches();
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 

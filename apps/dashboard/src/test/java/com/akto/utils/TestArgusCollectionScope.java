@@ -25,6 +25,7 @@ import com.akto.action.GuardrailPoliciesAction;
 import com.akto.action.user.AzureSsoAction;
 import com.akto.action.ApiCollectionsAction;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuleCollections;
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.McpAuditInfoDao;
@@ -463,7 +464,7 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
     }
 
     @Test
-    public void testNewCollectionReachesRuleRoles() {
+    public void testNewCollectionReachesRuleRoles() throws InterruptedException {
         // users already browsing see a matching collection as soon as it is created, not after their cache expires
         insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
         insertUser(106, "TEAM_A_BY_HOST");
@@ -473,8 +474,6 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         org.setFeatureWiseAllowed(features);
         OrganizationsDao.instance.insertOne(org);
         try {
-            assertTrue(RBACDao.usesCollectionRules(106, ACCOUNT_ID));
-            assertFalse(RBACDao.usesCollectionRules(TEAM_A, ACCOUNT_ID));
             as(106, CONTEXT_SOURCE.AGENTIC);
             assertFalse(UsersCollectionsList.getCollectionsIdForUser(106, ACCOUNT_ID).isEmpty());
 
@@ -484,12 +483,36 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
             assertEquals("SUCCESS", action.createCollection());
             int created = action.getApiCollections().get(0).getId();
 
+            // matched again in the background
             as(106, CONTEXT_SOURCE.AGENTIC);
-            assertTrue(UsersCollectionsList.getCollectionsIdForUser(106, ACCOUNT_ID).contains(created));
+            boolean seen = false;
+            for (int i = 0; i < 50 && !seen; i++) {
+                seen = UsersCollectionsList.getCollectionsIdForUser(106, ACCOUNT_ID).contains(created);
+                if (!seen) Thread.sleep(100);
+            }
+            assertTrue(seen);
         } finally {
             OrganizationsDao.instance.getMCollection().deleteMany(new org.bson.Document("_id", "org-rule-test"));
             UsersCollectionsList.deleteAccountCollectionIdsFromCache(ACCOUNT_ID);
         }
+    }
+
+    @Test
+    public void testRuleMatchesAreSavedNotRunPerRequest() {
+        insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
+        insertUser(106, "TEAM_A_BY_HOST");
+        as(106, CONTEXT_SOURCE.AGENTIC);
+        // the first use matches the rules once and saves the result on the role
+        assertTrue(RBACDao.instance.getUserCollectionsById(106, ACCOUNT_ID).contains(1));
+        assertEquals(Collections.singletonList(1), CustomRoleDao.instance.findRoleByName("TEAM_A_BY_HOST").getRuleCollectionIds());
+
+        // a collection found in traffic is not seen until the rules are matched again: requests only read the saved ids
+        insertAgentCollection(7, "team-a-from-traffic.example.com");
+        assertFalse(RBACDao.instance.getUserCollectionsById(106, ACCOUNT_ID).contains(7));
+
+        RuleCollections.refresh(ACCOUNT_ID);
+        assertEquals(Arrays.asList(1, 7), CustomRoleDao.instance.findRoleByName("TEAM_A_BY_HOST").getRuleCollectionIds());
+        assertTrue(RBACDao.instance.getUserCollectionsById(106, ACCOUNT_ID).contains(7));
     }
 
     @Test

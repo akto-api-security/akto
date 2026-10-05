@@ -356,6 +356,8 @@ public class ApiCollectionsAction extends UserAction {
     private String hostNameRegex;
 
     public String fetchAllCollections() {
+        // collections found in traffic since the last look may match custom roles' rules
+        RuleCollections.refreshInBackground(Context.accountId.get());
         // Optional case-insensitive regex on name / hostName. When both are null/blank (every
         // existing caller — the UI sends no such param), the filter is Filters.empty(), i.e.
         // byte-for-byte identical to the previous behaviour. The filter only engages when a
@@ -408,6 +410,7 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() throws Exception {
+        RuleCollections.refreshInBackground(Context.accountId.get());
         long start = System.currentTimeMillis();
         User user = getSUser();
         String loggedInUser = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
@@ -639,9 +642,10 @@ public class ApiCollectionsAction extends UserAction {
                         Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                         new UpdateOptions().upsert(false)
                 );
+                RbacCacheVersionDao.accessChanged(accountId);
             }
             // roles with host rules may match the new collection
-            RbacCacheVersionDao.accessChanged(accountId);
+            RuleCollections.refreshSoon(accountId);
 
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
             // remove the cache of context collections for account
@@ -1542,7 +1546,7 @@ public class ApiCollectionsAction extends UserAction {
                 if(updateResult == null) {
                     return Action.ERROR.toUpperCase();
                 }
-                RbacCacheVersionDao.accessChanged(Context.accountId.get());
+                RuleCollections.refreshSoon(Context.accountId.get());
                 return Action.SUCCESS.toUpperCase();
             }
 
@@ -1615,7 +1619,7 @@ public class ApiCollectionsAction extends UserAction {
                 }
             }
             // roles with tag rules may match different collections now
-            RbacCacheVersionDao.accessChanged(Context.accountId.get());
+            RuleCollections.refreshSoon(Context.accountId.get());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();

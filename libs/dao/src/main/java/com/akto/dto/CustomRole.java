@@ -20,6 +20,7 @@ public class CustomRole {
     public static final String PERMISSION_OVERRIDES = "permissionOverrides";
     public static final String COLLECTION_RULES = "collectionRules";
     public static final String ASSIGNABLE_ROLES = "assignableRoles";
+    public static final String RULE_COLLECTION_IDS = "ruleCollectionIds";
     private String name;
     private String baseRole;
     private List<Integer> apiCollectionsId;
@@ -57,6 +58,11 @@ public class CustomRole {
     @Getter
     @Setter
     private List<CollectionRule> collectionRules;
+
+    // Collections those rules matched when last checked (see RuleCollections); null until first checked
+    @Getter
+    @Setter
+    private List<Integer> ruleCollectionIds;
 
     /*
      * Custom roles that users of this role may give to others, when this role is limited to specific
