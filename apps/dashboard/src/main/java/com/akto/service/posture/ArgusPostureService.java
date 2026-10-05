@@ -629,6 +629,7 @@ public class ArgusPostureService {
      */
     public PostureDrillResult fetchDrill(String drillId, int skip, int limit,
                                           List<AgentFindingGroup> openIssueGroups,
+                                          Map<String, Info> testInfoByType,
                                           List<DashboardMaliciousEvent> maliciousEvents,
                                           List<UserAnalysisData> serviceObservability,
                                           InsightDataBundle bundle) {
@@ -642,7 +643,7 @@ public class ArgusPostureService {
         if (drillId == null) return unknownDrill();
         switch (drillId) {
             case DRILL_RED_TEAM_ISSUES:
-                return redTeamIssuesDrill(openIssueGroups, collectionsById, skip, effectiveLimit);
+                return redTeamIssuesDrill(openIssueGroups, testInfoByType, collectionsById, skip, effectiveLimit);
             case DRILL_GUARDRAIL_EVENTS:
                 return guardrailEventsDrill(maliciousEvents, collectionsById, skip, effectiveLimit);
             case DRILL_OBSERVABILITY:
@@ -653,6 +654,7 @@ public class ArgusPostureService {
     }
 
     private PostureDrillResult redTeamIssuesDrill(List<AgentFindingGroup> openIssueGroups,
+                                                   Map<String, Info> testInfoByType,
                                                    Map<Integer, ApiCollection> collectionsById, int skip, int limit) {
         PostureDrillResult result = new PostureDrillResult();
         result.setTitle("Open red-team issues");
@@ -677,7 +679,7 @@ public class ArgusPostureService {
         for (AgentFindingGroup g : groups) {
             totalOpenIssues += g.getCount();
             rows.add(PostureService.row("agentName", agentName(g.getCollectionId(), collectionsById),
-                    "vulnType", g.getType(), "severity", g.getSecondary(), "count", g.getCount(),
+                    "vulnType", testDisplayName(g.getType(), testInfoByType), "severity", g.getSecondary(), "count", g.getCount(),
                     "lastSeen", g.getLastSeen()));
         }
         result.getSummary().add(new InsightResult.Metric("issueGroups", "Distinct issue groups",

@@ -35,6 +35,7 @@ const DRILL_RISK_SCORE = 'riskScoreBreakdown'
 // builders) is already epoch seconds, not epoch millis, and must never render as a bare number —
 // this was the "AI summary/table shows raw seconds" bug this level's build fixed.
 const EPOCH_FIELDS = new Set(['detectedAt', 'firstSeen', 'lastSeen', 'lastScannedAt', 'timestamp'])
+const TOKEN_FIELDS = new Set(['inputTokens', 'outputTokens', 'totalTokens'])
 
 // A CTA's own `params` (e.g. Critical alerts' "View all" -> {severity: "CRITICAL"}) has to land
 // as a URL query param, not router `state` — the destination pages this app already has (e.g.
@@ -50,6 +51,10 @@ function ctaHref(cta) {
 
 function EpochCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(value || 0)}</Text>
+}
+
+function TokenCell({ value }) {
+    return <Text variant="bodySm">{value === null || value === undefined ? '-' : func.prettifyShort(value)}</Text>
 }
 
 // Same badge every severity anywhere else in the app already renders (guardrail violations, the
@@ -70,7 +75,7 @@ function DrillStats({ drill, hideTotal }) {
     const stats = (drill.summary || []).map((m) => ({
         key: m.key,
         label: m.label,
-        value: m.formatted,
+        value: m.unit === 'tokens' && m.value != null ? func.prettifyShort(m.value) : m.formatted,
         suffix: m.denominator !== null && m.denominator !== undefined ? `of ${m.denominator.toLocaleString()}` : undefined,
     }))
     // The table's first column names what each row is, so the list gets a real title ("Tools")
@@ -654,6 +659,7 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         minWidth: 130,
         cellStyle: { display: 'flex', alignItems: 'center' },
         ...(EPOCH_FIELDS.has(c.field) ? { cellRenderer: EpochCell }
+            : TOKEN_FIELDS.has(c.field) ? { cellRenderer: TokenCell }
             : c.field === 'severity' ? { cellRenderer: SeverityCell } : {}),
     })), [drill?.columns])
 
