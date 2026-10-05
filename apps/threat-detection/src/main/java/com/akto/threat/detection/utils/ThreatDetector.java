@@ -177,15 +177,11 @@ public class ThreatDetector {
             return null;
         }
         IpAnonymizerLookup.Info match = info.get();
-        List<String> flags = new ArrayList<>();
-        if (match.isTor()) flags.add("tor");
-        if (match.isVpn()) flags.add("vpn");
-        if (match.isHosting()) flags.add("hosting");
-        String reason = (match.isTor() ? "Tor exit IP " : "VPN IP ") + ip + " (" + String.join(", ", flags) + ")";
-        if (match.getAsnOrg() != null) {
-            reason += " ASN: " + match.getAsnOrg();
+        String provider = match.getAsnOrg() != null ? " (network provider: " + match.getAsnOrg() + ")" : "";
+        if (match.isTor()) {
+            return "Tor exit node " + ip + provider + ". Tor hides the client's real origin.";
         }
-        return reason;
+        return "IP " + ip + " is listed as a VPN exit" + provider + ".";
     }
 
     public boolean isWeakAuthenticationThreat(HttpResponseParams httpResponseParams) {
