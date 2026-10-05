@@ -1,45 +1,39 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import { Icon, Text, VerticalStack } from "@shopify/polaris"
+import { useMemo, useState } from "react"
+import { Box, Divider, HorizontalStack, Icon, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { AnalyticsMajor, ChevronRightMinor } from "@shopify/polaris-icons"
 import RecommendationTiles from "./RecommendationTiles"
-import ResultsList from "./ResultsList"
+import ResultsList, { RESULTS_LISTBOX_ID, resultOptionId } from "./ResultsList"
+import Pressable from "../components/Pressable"
+import ScrollArea from "../components/ScrollArea"
+import KeyHint from "../components/KeyHint"
+import IconTile from "../components/IconTile"
+import Dot from "../components/Dot"
 import { buildResults } from "../palette/resolveCommand"
 import { applyNavigationSideEffects } from "../palette/paletteHelpers"
-import { SUGGESTED_PROMPTS_BY_DOMAIN } from "../palette/commandRegistry"
+import { suggestedPrompts } from "../palette/commandRegistry"
+import useDashboardCategory from "../palette/useDashboardCategory"
+
+// Sheet height min(700px, 100vh - 80px) minus the input row and footer.
+const BODY_HEIGHT = "min(595px, calc(100vh - 185px))"
+
+const FOOTER_HINTS = [["↑↓", "Move"], ["↵", "Ask or open"], ["esc", "Close"]]
 
 // The overlay's home surface — design_handoff_ask_akto_overlay/README.md, screens 2 and 3.
-// One input drives two bodies: empty query shows tiles + "Try asking"; a non-empty query
-// replaces the body with the typed-results list (Ask Akto / Go to / Suggested questions),
-// arrow-key navigable, Enter running whichever row is active. Owns `query`/`active` because both
-// the input and the results list need them in lockstep — splitting that state across two
-// components would just be prop-drilling the same two values back and forth.
-export default function HomeView({ open, domain, tiles, tilesLoading, tilesError, onRetryTiles, onAsk, onOpenRoute }) {
+// Empty query shows tiles + "Try asking"; a non-empty query shows the typed-results list,
+// arrow-key navigable, Enter running the active row. Mounted fresh on every open, so the query
+// starts empty and the input autofocuses.
+export default function HomeView({ tiles, tilesLoading, tilesError, onRetryTiles, onAsk, onOpenRoute }) {
     const [query, setQuery] = useState("")
     const [active, setActive] = useState(0)
-    const inputRef = useRef(null)
+    const category = useDashboardCategory()
 
-    // HomeView stays mounted across close/reopen (see AskOverlay's header comment on why —
-    // conversation persistence needs the chat state alive, and this component is the sibling
-    // that pays for it), so a fresh query + focus on every reopen has to be driven by `open`
-    // rather than mount, which only fires once.
-    useEffect(() => {
-        if (!open) return
-        setQuery("")
-        setActive(0)
-        inputRef.current?.focus()
-    }, [open])
-
-    const results = useMemo(() => buildResults(query, domain), [query, domain])
+    const results = useMemo(() => buildResults(query, category), [query, category])
     const hasQuery = query.trim().length > 0
     const clampedActive = Math.min(active, Math.max(results.length - 1, 0))
 
     const runResult = (option) => {
         if (!option) return
-        if (option.kind === "ASK_AKTO") {
-            onAsk(option.query)
-            return
-        }
-        if (option.kind === "PROMPT") {
+        if (option.kind === "ASK_AKTO" || option.kind === "PROMPT") {
             onAsk(option.query)
             return
         }
@@ -61,36 +55,47 @@ export default function HomeView({ open, domain, tiles, tilesLoading, tilesError
         }
     }
 
-    const prompts = SUGGESTED_PROMPTS_BY_DOMAIN[domain] || []
+    const handleQueryChange = (value) => {
+        setQuery(value)
+        setActive(0)
+    }
+
+    const prompts = suggestedPrompts(category)
 
     return (
         <>
-            <div className="ask-input-row">
-                <span className="ask-input-icon"><span className="ask-input-icon-dot" /></span>
-                <input
-                    ref={inputRef}
-                    className="ask-home-input"
-                    value={query}
-                    onChange={(e) => { setQuery(e.target.value); setActive(0) }}
-                    onKeyDown={handleKeyDown}
-                    placeholder="What do you want to look into?"
-                    aria-label="Ask Akto or jump to a page"
-                    role="combobox"
-                    aria-expanded={hasQuery}
-                    aria-controls="ask-results-listbox"
-                    aria-activedescendant={hasQuery ? `ask-result-${clampedActive}` : undefined}
-                    autoComplete="off"
-                />
-                <span className="ask-kbd">esc</span>
-            </div>
+            <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3" onKeyDown={handleKeyDown}>
+                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                    <Box background="bg-primary-subdued-hover" borderRadius="full" padding="3">
+                        <Dot background="bg-primary" />
+                    </Box>
+                    <Box width="100%">
+                        <TextField
+                            label="Ask Akto or jump to a page"
+                            labelHidden
+                            borderless
+                            autoFocus
+                            autoComplete="off"
+                            placeholder="What do you want to look into?"
+                            value={query}
+                            onChange={handleQueryChange}
+                            role="combobox"
+                            ariaExpanded={hasQuery}
+                            ariaControls={RESULTS_LISTBOX_ID}
+                            ariaActiveDescendant={hasQuery ? resultOptionId(clampedActive) : undefined}
+                            ariaAutocomplete="list"
+                        />
+                    </Box>
+                    <KeyHint>esc</KeyHint>
+                </HorizontalStack>
+            </Box>
+            <Divider borderColor="border-ask-divider" />
 
-            <div className="ask-body">
+            <ScrollArea height={BODY_HEIGHT}>
                 {hasQuery ? (
-                    <div id="ask-results-listbox" role="listbox">
-                        <ResultsList results={results} active={clampedActive} onSelect={runResult} onHover={setActive} />
-                    </div>
+                    <ResultsList results={results} active={clampedActive} onSelect={runResult} onHover={setActive} />
                 ) : (
-                    <>
+                    <VerticalStack gap="6">
                         <RecommendationTiles
                             tiles={tiles}
                             loading={tilesLoading}
@@ -101,24 +106,44 @@ export default function HomeView({ open, domain, tiles, tilesLoading, tilesError
                         <VerticalStack gap="1">
                             <Text variant="headingSm" as="h3">Try asking</Text>
                             {prompts.map((p) => (
-                                <button key={p} type="button" className="ask-prompt-row" onClick={() => onAsk(p)}>
-                                    <span className="ask-prompt-icon"><Icon source={AnalyticsMajor} /></span>
-                                    <span className="ask-prompt-text">{p}</span>
-                                    <span className="ask-chevron"><Icon source={ChevronRightMinor} /></span>
-                                </button>
+                                <Pressable
+                                    key={p}
+                                    onClick={() => onAsk(p)}
+                                    hoverBackground="bg-primary-subdued-hover"
+                                    borderRadius="full"
+                                    paddingBlockStart="1_5-experimental"
+                                    paddingBlockEnd="1_5-experimental"
+                                    paddingInlineStart="2"
+                                    paddingInlineEnd="2"
+                                >
+                                    <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                                        <IconTile source={AnalyticsMajor} background="bg-primary-subdued-hover" borderRadius="full" />
+                                        <Box width="100%">
+                                            <Text as="span" variant="bodyMd">{p}</Text>
+                                        </Box>
+                                        <Icon source={ChevronRightMinor} color="subdued" />
+                                    </HorizontalStack>
+                                </Pressable>
                             ))}
                         </VerticalStack>
-                    </>
+                    </VerticalStack>
                 )}
-            </div>
+            </ScrollArea>
 
-            <div className="ask-footer">
-                <span className="ask-footer-hint"><span className="ask-kbd">↑↓</span>Move</span>
-                <span className="ask-footer-hint"><span className="ask-kbd">↵</span>Ask or open</span>
-                <span className="ask-footer-hint"><span className="ask-kbd">esc</span>Close</span>
-                <span className="ask-spacer" />
-                <span>Nothing changes without your confirmation</span>
-            </div>
+            <Divider borderColor="border-ask-divider" />
+            <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="2" paddingBlockEnd="2">
+                <HorizontalStack align="space-between" blockAlign="center" gap="4">
+                    <HorizontalStack gap="4" blockAlign="center">
+                        {FOOTER_HINTS.map(([key, label]) => (
+                            <HorizontalStack key={key} gap="1_5-experimental" blockAlign="center">
+                                <KeyHint>{key}</KeyHint>
+                                <Text as="span" variant="bodySm" color="subdued">{label}</Text>
+                            </HorizontalStack>
+                        ))}
+                    </HorizontalStack>
+                    <Text as="span" variant="bodySm" color="subdued">Nothing changes without your confirmation</Text>
+                </HorizontalStack>
+            </Box>
         </>
     )
 }

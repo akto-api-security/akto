@@ -17,6 +17,14 @@
 // `breadcrumb` is the subtitle a typed-result row shows (design_handoff_ask_akto_overlay: "Go to"
 // rows show a breadcrumb like "Testing › Issues") — plain text, not a route.
 import func from "@/util/func"
+import {
+    CATEGORY_AGENTIC_SECURITY,
+    CATEGORY_API_SECURITY,
+    CATEGORY_DAST,
+    CATEGORY_ENDPOINT_SECURITY,
+    CATEGORY_GEN_AI,
+    CATEGORY_MCP_SECURITY,
+} from "@/apps/main/labelHelper"
 
 export const COMMANDS = [
     { id: "inventory", label: "API inventory", breadcrumb: "Discovery › API collections",
@@ -109,30 +117,49 @@ export const INTENTS = [
     },
 ]
 
-// Domain label as shown in the palette's own copy ("Answer with live data from …") — mirrors the
-// dashboard toggle's own naming, not InsightId.Group or CONTEXT_SOURCE's enum names.
-export const DOMAIN_LABELS = {
-    API: "API security",
-    AGENTIC: "Agentic",
-    ENDPOINT: "Endpoint",
+// The dashboard's name as the topbar's category dropdown shows it, for the palette's own copy
+// ("Answer with live data from …").
+const CATEGORY_LABELS = {
+    [CATEGORY_API_SECURITY]: "API Security",
+    [CATEGORY_DAST]: "DAST",
+    [CATEGORY_AGENTIC_SECURITY]: "Akto Argus",
+    [CATEGORY_MCP_SECURITY]: "MCP Security",
+    [CATEGORY_GEN_AI]: "Gen AI",
+    [CATEGORY_ENDPOINT_SECURITY]: "Akto Atlas",
 }
 
+export function categoryLabel(category) {
+    return CATEGORY_LABELS[category] || CATEGORY_LABELS[CATEGORY_API_SECURITY]
+}
+
+const API_PROMPTS = [
+    "How have critical issues changed this month?",
+    "Which sensitive APIs have no authentication?",
+    "Which high-risk APIs have never been tested?",
+]
+const AGENTIC_PROMPTS = [
+    "Which MCP tools were flagged as malicious?",
+    "Show threat activity for the last 30 days",
+    "Which agents failed red-teaming?",
+]
+const ENDPOINT_PROMPTS = [
+    "Which devices use malicious skills?",
+    "How many tokens were used this week?",
+    "Which guardrail policies blocked the most prompts?",
+]
+
 // "Try asking" / typed-query suggested-question matches, and the seed for a chat follow-up chip
-// row (see chat/ChatMessage.jsx) — scoped per dashboard domain, same three domains the tiles use.
-export const SUGGESTED_PROMPTS_BY_DOMAIN = {
-    API: [
-        "How have critical issues changed this month?",
-        "Which sensitive APIs have no authentication?",
-        "Which high-risk APIs have never been tested?",
-    ],
-    AGENTIC: [
-        "Which MCP tools were flagged as malicious?",
-        "Show threat activity for the last 30 days",
-        "Which agents failed red-teaming?",
-    ],
-    ENDPOINT: [
-        "Which devices use malicious skills?",
-        "How many tokens were used this week?",
-        "Which guardrail policies blocked the most prompts?",
-    ],
+// row (see chat/ChatMessage.jsx). Grouped the same way the backend picks tile sets from
+// x-context-source: API/DAST, the agentic dashboards, and Endpoint.
+const SUGGESTED_PROMPTS_BY_CATEGORY = {
+    [CATEGORY_API_SECURITY]: API_PROMPTS,
+    [CATEGORY_DAST]: API_PROMPTS,
+    [CATEGORY_AGENTIC_SECURITY]: AGENTIC_PROMPTS,
+    [CATEGORY_MCP_SECURITY]: AGENTIC_PROMPTS,
+    [CATEGORY_GEN_AI]: AGENTIC_PROMPTS,
+    [CATEGORY_ENDPOINT_SECURITY]: ENDPOINT_PROMPTS,
+}
+
+export function suggestedPrompts(category) {
+    return SUGGESTED_PROMPTS_BY_CATEGORY[category] || API_PROMPTS
 }

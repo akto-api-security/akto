@@ -91,6 +91,6 @@ public class TestArgusAgentPostureDrillService {
         return new InsightDataBundle(ctx, collections, new HashMap<>(), new HashMap<>(), new HashMap<>(),
                 new ArrayList<>(), new ArrayList<>(), new HashSet<>(), new HashMap<>(), new ArrayList<>(),
                 new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), false, collections,
-                new HashMap<>(), null);
+                new HashMap<>(), null, null);
     }
 }

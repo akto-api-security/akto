@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { HorizontalStack, Box, Text, Spinner, Button, Card, VerticalStack, HorizontalGrid } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards'
-import AskOverlayButton from "./ask/AskOverlayButton"
 import TitleWithInfo from '../../components/shared/TitleWithInfo'
 import DateRangeFilter from '../../components/layouts/DateRangeFilter'
 import ComponentHeader from './new_components/ComponentHeader'
@@ -626,7 +625,7 @@ function EndpointPosture() {
                 />
             }
             primaryAction={resetButton}
-            secondaryActions={[dateRangeFilter, <AskOverlayButton key="ask-akto" domain="ENDPOINT" />]}
+            secondaryActions={[dateRangeFilter]}
             components={[
                 <div key="grid-container" ref={containerRef} style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflow: 'hidden', boxSizing: 'border-box' }}>
                     <GridLayout

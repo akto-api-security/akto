@@ -1,14 +1,20 @@
 import request from "@/util/request"
 
-// One round trip for the whole overlay landing state — recommendations (always cheap), the
-// CRITICAL/HIGH insight tiles, and the on-the-fly "what changed" feed. `domain` picks which
-// dashboard's tile set + default insight groups come back — "API" | "AGENTIC" | "ENDPOINT" — see
-// com.akto.action.AskOverlayAction#fetchAskOverlay on the dashboard side.
+// Which dashboard's tiles come back is decided by the x-context-source header request.js adds to
+// every call — nothing about the dashboard is sent in the body.
 const api = {
-    fetchAskOverlay: async (domain) => request({
+    // Recommendations, CRITICAL/HIGH insight tiles and the "what changed" feed in one round trip.
+    fetchAskOverlay: async () => request({
         url: '/api/fetchAskOverlay',
         method: 'post',
-        data: { domain }
+        data: {}
+    }),
+    // AI curation of those same tiles ({status, picks: [{tileId, prompt}]}); slower, fetched after
+    // the tiles have rendered.
+    fetchAskOverlayCuration: async () => request({
+        url: '/api/fetchAskOverlayCuration',
+        method: 'post',
+        data: {}
     }),
 }
 

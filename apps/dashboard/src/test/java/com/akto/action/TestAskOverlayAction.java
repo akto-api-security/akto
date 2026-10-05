@@ -29,8 +29,8 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mockStatic;
 
 /**
- * Covers AskOverlayAction#fetchAskOverlay and its private helpers (defaultGroupsForDomain,
- * parseDomain, parseGroups, clamp) via reflection where the public entry point doesn't
+ * Covers AskOverlayAction#fetchAskOverlay and its private helpers (defaultGroupsFor,
+ * parseGroups, clamp) via reflection where the public entry point doesn't
  * surface enough to assert on directly. See apps/dashboard/src/main/java/com/akto/service/ask/CLAUDE.md
  * for the feature's domain-scoping table this file exercises.
  */
@@ -50,9 +50,9 @@ public class TestAskOverlayAction extends MongoBasedTest {
     // ── fetchAskOverlay() — public entry point ─────────────────────────────────────────
 
     @Test
-    public void testFetchAskOverlay_happyPath_defaultDomainAndGroups_returnsSuccessWithApiTiles() {
+    public void testFetchAskOverlay_happyPath_apiContextSourceDefaultGroups_returnsSuccessWithApiTiles() {
         AskOverlayAction action = newAction();
-        action.setDomain("API");
+        Context.contextSource.set(CONTEXT_SOURCE.API);
         String result = action.fetchAskOverlay();
         assertEquals("SUCCESS", result);
         assertNotNull(action.getAskOverlay());
@@ -65,7 +65,7 @@ public class TestAskOverlayAction extends MongoBasedTest {
     @Test
     public void testFetchAskOverlay_unknownGroupName_returnsErrorWithMessage() {
         AskOverlayAction action = newAction();
-        action.setDomain("API");
+        Context.contextSource.set(CONTEXT_SOURCE.API);
         action.setGroups(Collections.singletonList("NOT_A_REAL_GROUP"));
 
         String result = action.fetchAskOverlay();
@@ -84,24 +84,10 @@ public class TestAskOverlayAction extends MongoBasedTest {
     }
 
     @Test
-    public void testFetchAskOverlay_domainNull_degradesLenientlyToApi_notError() {
+    public void testFetchAskOverlay_noContextSourceHeader_defaultsToApiTiles() {
         AskOverlayAction action = newAction();
-        action.setDomain(null);
         assertEquals("SUCCESS", action.fetchAskOverlay());
-    }
-
-    @Test
-    public void testFetchAskOverlay_domainEmpty_degradesLenientlyToApi_notError() {
-        AskOverlayAction action = newAction();
-        action.setDomain("");
-        assertEquals("SUCCESS", action.fetchAskOverlay());
-    }
-
-    @Test
-    public void testFetchAskOverlay_domainGarbage_degradesLenientlyToApi_notError() {
-        AskOverlayAction action = newAction();
-        action.setDomain("not_a_real_domain");
-        assertEquals("SUCCESS", action.fetchAskOverlay());
+        assertEquals(4, action.getAskOverlay().getRecommendations().size());
     }
 
     /**
@@ -122,8 +108,8 @@ public class TestAskOverlayAction extends MongoBasedTest {
 
             for (CONTEXT_SOURCE cs : CONTEXT_SOURCE.values()) {
                 AskOverlayAction action = newAction();
-                action.setDomain(cs.name());
-                assertEquals("Domain " + cs.name() + " should succeed", "SUCCESS", action.fetchAskOverlay());
+                Context.contextSource.set(cs);
+                assertEquals("Context source " + cs.name() + " should succeed", "SUCCESS", action.fetchAskOverlay());
                 assertNotNull(action.getAskOverlay());
             }
         } catch (Exception e) {
@@ -134,7 +120,7 @@ public class TestAskOverlayAction extends MongoBasedTest {
     @Test
     public void testFetchAskOverlay_tileAndFeedLimitsBeyondMax_clampedSilently_doesNotBlowUp() {
         AskOverlayAction action = newAction();
-        action.setDomain("API");
+        Context.contextSource.set(CONTEXT_SOURCE.API);
         action.setTileLimit(999);
         action.setFeedLimit(999);
 
@@ -161,7 +147,7 @@ public class TestAskOverlayAction extends MongoBasedTest {
         Context.userId.remove();
         try {
             AskOverlayAction action = newAction();
-            action.setDomain("API");
+            Context.contextSource.set(CONTEXT_SOURCE.API);
 
             String result = action.fetchAskOverlay();
 
@@ -182,59 +168,43 @@ public class TestAskOverlayAction extends MongoBasedTest {
     }
 
     @Test
-    public void testParseDomain_nullEmptyAndGarbage_defaultToApi() throws Exception {
-        AskOverlayAction action = newAction();
-        Class<?>[] sig = {String.class};
-        assertEquals(CONTEXT_SOURCE.API, invokePrivate(action, "parseDomain", sig, (Object) null));
-        assertEquals(CONTEXT_SOURCE.API, invokePrivate(action, "parseDomain", sig, ""));
-        assertEquals(CONTEXT_SOURCE.API, invokePrivate(action, "parseDomain", sig, "not_a_real_domain"));
-    }
-
-    @Test
-    public void testParseDomain_validValues_caseInsensitive() throws Exception {
-        AskOverlayAction action = newAction();
-        Class<?>[] sig = {String.class};
-        assertEquals(CONTEXT_SOURCE.AGENTIC, invokePrivate(action, "parseDomain", sig, "agentic"));
-        assertEquals(CONTEXT_SOURCE.ENDPOINT, invokePrivate(action, "parseDomain", sig, "ENDPOINT"));
-        assertEquals(CONTEXT_SOURCE.DAST, invokePrivate(action, "parseDomain", sig, "Dast"));
-    }
-
-    @Test
     @SuppressWarnings("unchecked")
-    public void testDefaultGroupsForDomain_agenticMcpGenAi_returnAtlasAndGuardrail() throws Exception {
+    public void testDefaultGroupsFor_agenticMcpGenAi_returnAtlasAndGuardrail() throws Exception {
         AskOverlayAction action = newAction();
         Class<?>[] sig = {CONTEXT_SOURCE.class};
         Set<InsightId.Group> expected = new HashSet<>(Arrays.asList(
                 InsightId.Group.ATLAS_DISCOVERY, InsightId.Group.GUARDRAIL_VIOLATIONS));
 
         for (CONTEXT_SOURCE cs : Arrays.asList(CONTEXT_SOURCE.AGENTIC, CONTEXT_SOURCE.MCP, CONTEXT_SOURCE.GEN_AI)) {
-            Set<InsightId.Group> actual = (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsForDomain", sig, cs);
-            assertEquals("Mismatch for domain " + cs, expected, actual);
+            Set<InsightId.Group> actual = (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsFor", sig, cs);
+            assertEquals("Mismatch for context source " + cs, expected, actual);
         }
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    public void testDefaultGroupsForDomain_endpoint_returnsGuardrailOnly() throws Exception {
+    public void testDefaultGroupsFor_endpoint_returnsGuardrailOnly() throws Exception {
         AskOverlayAction action = newAction();
         Class<?>[] sig = {CONTEXT_SOURCE.class};
         Set<InsightId.Group> actual =
-                (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsForDomain", sig, CONTEXT_SOURCE.ENDPOINT);
+                (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsFor", sig, CONTEXT_SOURCE.ENDPOINT);
         assertEquals(Collections.singleton(InsightId.Group.GUARDRAIL_VIOLATIONS), actual);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    public void testDefaultGroupsForDomain_apiDastAndDefault_returnApiAndTestingPosture() throws Exception {
+    public void testDefaultGroupsFor_apiDastAndDefault_returnApiAndTestingPosture() throws Exception {
         AskOverlayAction action = newAction();
         Class<?>[] sig = {CONTEXT_SOURCE.class};
         Set<InsightId.Group> expected = new HashSet<>(Arrays.asList(
                 InsightId.Group.API_POSTURE, InsightId.Group.TESTING_POSTURE));
 
         for (CONTEXT_SOURCE cs : Arrays.asList(CONTEXT_SOURCE.API, CONTEXT_SOURCE.DAST)) {
-            Set<InsightId.Group> actual = (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsForDomain", sig, cs);
-            assertEquals("Mismatch for domain " + cs, expected, actual);
+            Set<InsightId.Group> actual = (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsFor", sig, cs);
+            assertEquals("Mismatch for context source " + cs, expected, actual);
         }
+        Set<InsightId.Group> forNull = (Set<InsightId.Group>) invokePrivate(action, "defaultGroupsFor", sig, (Object) null);
+        assertEquals("No x-context-source header is treated as API", expected, forNull);
     }
 
     @Test
@@ -270,7 +240,7 @@ public class TestAskOverlayAction extends MongoBasedTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void testParseGroups_explicitGroups_overridesDomainDefault() throws Exception {
+    public void testParseGroups_explicitGroups_overridesContextSourceDefault() throws Exception {
         AskOverlayAction action = newAction();
         Class<?>[] sig = {List.class, CONTEXT_SOURCE.class};
 
@@ -284,7 +254,7 @@ public class TestAskOverlayAction extends MongoBasedTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void testParseGroups_nullOrEmpty_fallsBackToDomainDefault() throws Exception {
+    public void testParseGroups_nullOrEmpty_fallsBackToContextSourceDefault() throws Exception {
         AskOverlayAction action = newAction();
         Class<?>[] sig = {List.class, CONTEXT_SOURCE.class};
         Set<InsightId.Group> expected = new HashSet<>(Arrays.asList(

@@ -1,63 +1,99 @@
-import { Icon, Text } from "@shopify/polaris"
+import { Box, Button, HorizontalStack, Icon, Spinner, Text, VerticalStack } from "@shopify/polaris"
 import { CircleAlertMajor, CircleTickMajor, ExternalMinor } from "@shopify/polaris-icons"
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer"
+import IconTile from "../components/IconTile"
 
 // One "Suggested actions" row — design_handoff_ask_akto_overlay/README.md, "5. Suggested
 // actions". Two kinds:
 //
-// - `nav`: a plain destination chip. Clicking it closes the popup and navigates — no preview,
-//   per the design ("Navigation actions close the popup and route to the page, with no
-//   preview").
-// - `write`: the two-phase MCP write-tool contract, made visible. There is no structured
-//   "the model wants to write something" signal on the wire (/api/chatAndStore returns plain
-//   text — see ChatMessage.jsx's own header comment) — so the row's preview IS the assistant's
-//   own dry-run message, shown verbatim, and Confirm re-sends a fixed confirmation phrase over
-//   the SAME conversation. The model still never confirms on its own: only this button click
-//   sends it. `doneText` is the model's real reply to that confirmation, which — per the
-//   write-tool prompt contract — is required to state the actual re-read count, never a generic
-//   "success".
+// - `nav`: a destination. Opening it closes the popup and navigates, with no preview.
+// - `write`: the two-phase MCP write-tool contract, made visible. /api/chatAndStore returns plain
+//   text, so the preview IS the assistant's own dry-run message, and Confirm re-sends a fixed
+//   confirmation phrase over the same conversation — the model never confirms on its own.
+//   `doneText` is the model's real reply, which per the write-tool contract states the re-read
+//   count, never a generic "success".
+function ActionTrailing({ kind, state, onOpenNav, onReview }) {
+    if (kind === "nav") return <Button size="slim" onClick={onOpenNav}>Open</Button>
+    if (state === "idle") return <Button size="slim" onClick={onReview}>Review</Button>
+    if (state === "running") {
+        return (
+            <HorizontalStack gap="1_5-experimental" blockAlign="center" wrap={false}>
+                <Spinner size="small" accessibilityLabel="Applying" />
+                <Text as="span" variant="bodySm" color="subdued">Applying</Text>
+            </HorizontalStack>
+        )
+    }
+    if (state === "done") {
+        return (
+            <Box color="text-ask-success">
+                <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                    <Icon source={CircleTickMajor} color="success" />
+                    <Text as="span" variant="bodySm" fontWeight="medium">Done</Text>
+                </HorizontalStack>
+            </Box>
+        )
+    }
+    return null
+}
+
+// Indents the preview/done panels past the row's icon, as in the design.
+function ActionPanel({ children }) {
+    return (
+        <Box paddingInlineStart="16" paddingInlineEnd="4" paddingBlockEnd="3">
+            {children}
+        </Box>
+    )
+}
+
 export default function ActionRow({ kind, label, desc, state, previewText, doneText, onReview, onCancel, onConfirm, onUndo, onOpenNav }) {
-    const iconTile = kind === "write" ? "ask-action-icon-write" : "ask-action-icon-nav"
+    const isWrite = kind === "write"
 
     return (
-        <div className="ask-action-row">
-            <div className="ask-action-row-head">
-                <span className={`ask-action-icon ${iconTile}`}>
-                    <Icon source={kind === "write" ? CircleAlertMajor : ExternalMinor} />
-                </span>
-                <span className="ask-result-label">
-                    <Text variant="bodyMd" fontWeight="medium" as="span">{label}</Text>
-                    <Text variant="bodySm" color="subdued" as="span">{desc}</Text>
-                </span>
+        <VerticalStack gap="0">
+            <Box paddingBlockStart="3" paddingBlockEnd="3" paddingInlineStart="4" paddingInlineEnd="4">
+                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                    <IconTile
+                        source={isWrite ? CircleAlertMajor : ExternalMinor}
+                        background={isWrite ? "bg-primary-subdued-hover" : "bg-hover"}
+                        padding="1_5-experimental"
+                    />
+                    <Box width="100%">
+                        <VerticalStack gap="0">
+                            <Text as="span" variant="bodyMd" fontWeight="medium">{label}</Text>
+                            <Text as="span" variant="bodySm" color="subdued">{desc}</Text>
+                        </VerticalStack>
+                    </Box>
+                    <ActionTrailing kind={kind} state={state} onOpenNav={onOpenNav} onReview={onReview} />
+                </HorizontalStack>
+            </Box>
 
-                {kind === "nav" ? (
-                    <button type="button" className="ask-action-btn" onClick={onOpenNav}>Open</button>
-                ) : state === "idle" ? (
-                    <button type="button" className="ask-action-btn" onClick={onReview}>Review</button>
-                ) : state === "running" ? (
-                    <span className="ask-action-running"><span className="ask-spinner" />Applying</span>
-                ) : state === "done" ? (
-                    <span className="ask-action-done"><Icon source={CircleTickMajor} />Done</span>
-                ) : null}
-            </div>
-
-            {kind === "write" && state === "confirm" ? (
-                <div className="ask-action-preview">
-                    <Text variant="bodySm" fontWeight="semibold" color="subdued" as="p">Preview — nothing has changed yet</Text>
-                    <div className="ask-action-preview-body"><MarkdownViewer markdown={previewText || ""} noPadding /></div>
-                    <div className="ask-action-preview-buttons">
-                        <button type="button" className="ask-action-btn" onClick={onCancel}>Cancel</button>
-                        <button type="button" className="ask-action-confirm-btn" onClick={onConfirm}>Confirm</button>
-                    </div>
-                </div>
+            {isWrite && state === "confirm" ? (
+                <ActionPanel>
+                    <Box padding="3" borderRadius="2" background="bg-subdued" borderWidth="1" borderColor="border-subdued">
+                        <VerticalStack gap="2">
+                            <Text as="p" variant="bodySm" fontWeight="semibold" color="subdued">Preview — nothing has changed yet</Text>
+                            <MarkdownViewer markdown={previewText || ""} noPadding />
+                            <HorizontalStack align="end" gap="2">
+                                <Button size="slim" onClick={onCancel}>Cancel</Button>
+                                <Button size="slim" primary onClick={onConfirm}>Confirm</Button>
+                            </HorizontalStack>
+                        </VerticalStack>
+                    </Box>
+                </ActionPanel>
             ) : null}
 
-            {kind === "write" && state === "done" ? (
-                <div className="ask-action-done-panel">
-                    <span className="ask-spacer"><MarkdownViewer markdown={doneText || ""} noPadding /></span>
-                    <button type="button" className="ask-action-btn" onClick={onUndo}>Undo</button>
-                </div>
+            {isWrite && state === "done" ? (
+                <ActionPanel>
+                    <Box paddingBlockStart="2" paddingBlockEnd="2" paddingInlineStart="3" paddingInlineEnd="3" borderRadius="2" background="bg-success-subdued-hover">
+                        <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                            <Box width="100%">
+                                <MarkdownViewer markdown={doneText || ""} noPadding />
+                            </Box>
+                            <Button size="slim" onClick={onUndo}>Undo</Button>
+                        </HorizontalStack>
+                    </Box>
+                </ActionPanel>
             ) : null}
-        </div>
+        </VerticalStack>
     )
 }

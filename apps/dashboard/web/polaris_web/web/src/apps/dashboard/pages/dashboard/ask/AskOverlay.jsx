@@ -1,29 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
+import { Box, HorizontalGrid, Portal, ScrollLock } from "@shopify/polaris"
 import useAskData from "./useAskData"
+import useAskChat from "./chat/useAskChat"
 import HomeView from "./home/HomeView"
 import ChatView from "./chat/ChatView"
-import "./askOverlay.css"
+import useDashboardCategory from "./palette/useDashboardCategory"
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
-// The whole overlay — design_handoff_ask_akto_overlay/README.md. A custom sheet, not Polaris
-// Modal: the design's exact sizing (max-width 760px, height min(700px, 100vh-7vh-16px), 7vh top
-// offset), custom header/footer chrome and no Polaris title bar don't fit any Modal size variant
-// (`large` is a fixed ~980px), and the README explicitly allows this ("a custom sheet if Modal's
-// chrome gets in the way" — it does here). That trade means the backdrop/focus-trap/Escape
-// Modal gives for free have to be hand-rolled below.
+// Same layers Polaris Modal uses (--p-z-index-10 / -11).
+const BACKDROP_Z_INDEX = "518"
+const SHEET_Z_INDEX = "519"
+
+// Centers the sheet at up to 960px. A grid, not HorizontalStack align="center": a stack's align
+// is an inherited CSS custom property, so it would center every HorizontalStack inside the sheet
+// that doesn't set align itself.
+const SHEET_COLUMNS = "minmax(0, 1fr) minmax(0, 960px) minmax(0, 1fr)"
+
+// The whole overlay — design_handoff_ask_akto_overlay/README.md. A custom sheet rather than
+// Polaris Modal: the design's 760px width, header/footer chrome and lack of a title bar don't fit
+// any Modal size, so the focus trap and Escape handling Modal provides are done here.
 //
-// Stays mounted at all times (rendered via portal regardless of `open`, hidden with `.ask-hidden`
-// rather than unmounted) so `mode`/messages/conversationId in ChatView survive a close + reopen —
-// "Keep the conversation while the page stays mounted, and clear it on 'New question'" per the
-// design. Only an explicit "New question" click (handleNewQuestion) resets it.
-export default function AskOverlay({ open, onClose, domain }) {
+// The sheet unmounts when closed; the conversation survives because useAskChat lives here, and
+// this component stays mounted with the page.
+export default function AskOverlay({ open, onClose }) {
     const navigate = useNavigate()
-    const { tiles, loading: tilesLoading, error: tilesError, refetch } = useAskData(open, domain)
+    const category = useDashboardCategory()
+    const chat = useAskChat()
     const [mode, setMode] = useState("home")
-    const [seed, setSeed] = useState(null)
+    // Tiles only appear on the home view, so reopening into a chat (or staying in one) fetches
+    // nothing; going back via "New question" loads them then.
+    const { tiles, loading: tilesLoading, error: tilesError, refetch } = useAskData(open && mode === "home", category)
     const sheetRef = useRef(null)
 
     useEffect(() => {
@@ -48,16 +56,10 @@ export default function AskOverlay({ open, onClose, domain }) {
             }
         }
         document.addEventListener("keydown", onKeyDown)
-        const prevOverflow = document.body.style.overflow
-        document.body.style.overflow = "hidden"
-        return () => {
-            document.removeEventListener("keydown", onKeyDown)
-            document.body.style.overflow = prevOverflow
-        }
+        return () => document.removeEventListener("keydown", onKeyDown)
     }, [open, onClose])
 
-    // Navigating from inside the overlay closes it first — leaving it open behind a page
-    // navigation would strand a stale sheet in the DOM.
+    // Navigating from inside the overlay closes it first, so no stale sheet is left behind.
     const handleOpenRoute = useCallback((route, params) => {
         onClose()
         if (!route) return
@@ -68,54 +70,75 @@ export default function AskOverlay({ open, onClose, domain }) {
         navigate(query ? `${route}?${query}` : route)
     }, [navigate, onClose])
 
+    const { ask, reset } = chat
     const handleAsk = useCallback((prompt) => {
         setMode("chat")
-        setSeed({ prompt, nonce: Date.now() })
-    }, [])
+        ask(prompt)
+    }, [ask])
 
     const handleNewQuestion = useCallback(() => {
+        reset()
         setMode("home")
-        setSeed(null)
-    }, [])
+    }, [reset])
 
-    return createPortal(
-        <div className="ask-overlay-root">
-            <div
-                className={`ask-backdrop${open ? "" : " ask-hidden"}`}
+    if (!open) return null
+
+    return (
+        <Portal idPrefix="ask-akto">
+            <ScrollLock />
+            <Box
+                position="fixed"
+                insetBlockStart="0"
+                insetBlockEnd="0"
+                insetInlineStart="0"
+                insetInlineEnd="0"
+                zIndex={BACKDROP_Z_INDEX}
+                background="bg-ask-backdrop"
                 onClick={onClose}
-                role="presentation"
+            />
+            <Box
+                position="fixed"
+                insetBlockStart="16"
+                insetInlineStart="4"
+                insetInlineEnd="4"
+                zIndex={SHEET_Z_INDEX}
+                onClick={onClose}
             >
-                <div
-                    ref={sheetRef}
-                    className="ask-sheet"
-                    onClick={(e) => e.stopPropagation()}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label="Ask Akto"
-                >
-                    {mode === "home" ? (
-                        <HomeView
-                            open={open}
-                            domain={domain}
-                            tiles={tiles}
-                            tilesLoading={tilesLoading}
-                            tilesError={tilesError}
-                            onRetryTiles={refetch}
-                            onAsk={handleAsk}
-                            onOpenRoute={handleOpenRoute}
-                        />
-                    ) : (
-                        <ChatView
-                            domain={domain}
-                            seed={seed}
-                            onClose={onClose}
-                            onCollapse={handleNewQuestion}
-                            onOpenRoute={handleOpenRoute}
-                        />
-                    )}
-                </div>
-            </div>
-        </div>,
-        document.body
+                <HorizontalGrid columns={SHEET_COLUMNS}>
+                    <Box />
+                    <Box
+                        ref={sheetRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Ask Akto"
+                        background="bg"
+                        borderRadius="3"
+                        shadow="2xl"
+                        overflowX="hidden"
+                        overflowY="hidden"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {mode === "home" ? (
+                            <HomeView
+                                tiles={tiles}
+                                tilesLoading={tilesLoading}
+                                tilesError={tilesError}
+                                onRetryTiles={refetch}
+                                onAsk={handleAsk}
+                                onOpenRoute={handleOpenRoute}
+                            />
+                        ) : (
+                            <ChatView
+                                chat={chat}
+                                onClose={onClose}
+                                onNewQuestion={handleNewQuestion}
+                                onOpenRoute={handleOpenRoute}
+                            />
+                        )}
+                    </Box>
+                    <Box />
+                </HorizontalGrid>
+            </Box>
+        </Portal>
     )
 }

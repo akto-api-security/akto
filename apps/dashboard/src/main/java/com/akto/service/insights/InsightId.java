@@ -82,5 +82,9 @@ public enum InsightId {
         Group(Feature requiredFeature) {
             this.requiredFeature = requiredFeature;
         }
+
+        public Feature getRequiredFeature() {
+            return requiredFeature;
+        }
     }
 }

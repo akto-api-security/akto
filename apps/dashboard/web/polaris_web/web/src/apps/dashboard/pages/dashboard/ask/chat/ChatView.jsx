@@ -1,36 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from "react"
-import { Icon, Text } from "@shopify/polaris"
-import { CancelMinor, ChevronLeftMinor } from "@shopify/polaris-icons"
+import { useEffect, useRef, useState } from "react"
+import { Box, Button, Divider, Form, HorizontalStack, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { ArrowUpMinor, CancelMinor, ChevronLeftMinor } from "@shopify/polaris-icons"
 import AgenticThinkingBox from "@/apps/dashboard/pages/agentic/components/AgenticThinkingBox"
-import AgenticSearchInput from "@/apps/dashboard/pages/agentic/components/AgenticSearchInput"
-import { sendQuery } from "@/apps/dashboard/pages/agentic/services/agenticService"
 import ChatMessage from "./ChatMessage"
+import ScrollArea from "../components/ScrollArea"
 
-const CONFIRM_MESSAGE = "Yes, go ahead — please proceed."
-const UNDO_MESSAGE = "Please undo the change you just made."
+// Sheet height min(700px, 100vh - 80px) minus the header and the composer.
+const MESSAGES_HEIGHT = "min(548px, calc(100vh - 232px))"
 
-// The overlay's chat mode — design_handoff_ask_akto_overlay/README.md, "4. Answer view". Reuses
-// the SAME agenticService.sendQuery the full Ask Akto page and every other chat surface in the
-// app already use (not a fourth chat implementation) via `conversationType=COMMAND_PALETTE`.
-//
-// Owns `acts` (per-message write-action state) here rather than in ChatMessage because
-// confirming or undoing a write sends a FOLLOW-UP message over the exact same conversation, but
-// deliberately does NOT push it into the visible `messages` list as its own turn — the design
-// shows the result inline in the action row's done panel, not as a second "Yes, go ahead" bubble
-// cluttering the thread. That silent round trip still goes through the real two-phase contract:
-// only this component's onConfirmAction ever sends the confirmation, and only after the user's
-// own click.
-export default function ChatView({ domain, seed, onClose, onCollapse, onOpenRoute }) {
-    const [messages, setMessages] = useState([])
-    const [loading, setLoading] = useState(false)
+// The overlay's chat mode — design_handoff_ask_akto_overlay/README.md, "4. Answer view".
+// Presentational: the conversation itself lives in useAskChat, owned by AskOverlay.
+export default function ChatView({ chat, onClose, onNewQuestion, onOpenRoute }) {
+    const { messages, loading, acts, ask, markStreamed, reviewAction, cancelAction, confirmAction, undoAction } = chat
     const [draft, setDraft] = useState("")
-    const [acts, setActs] = useState({})
-    const conversationIdRef = useRef(null)
-    const unmountedRef = useRef(false)
     const scrollRef = useRef(null)
-    const seededRef = useRef(null)
-
-    useEffect(() => () => { unmountedRef.current = true }, [])
 
     useEffect(() => {
         const el = scrollRef.current
@@ -38,120 +21,96 @@ export default function ChatView({ domain, seed, onClose, onCollapse, onOpenRout
         requestAnimationFrame(() => { el.scrollTop = el.scrollHeight })
     }, [messages, loading, acts])
 
-    const ask = useCallback(async (text) => {
-        const trimmed = (text || "").trim()
-        if (!trimmed) return
-        setMessages((prev) => [...prev, { id: Date.now(), role: "user", message: trimmed }])
-        setLoading(true)
-        try {
-            const res = await sendQuery(trimmed, conversationIdRef.current, "COMMAND_PALETTE")
-            if (unmountedRef.current) return
-            conversationIdRef.current = res?.conversationId || conversationIdRef.current
-            setMessages((prev) => [...prev, {
-                id: Date.now() + 1,
-                role: "assistant",
-                message: res?.response || "I couldn't get an answer just now — please try again.",
-                userPrompt: trimmed,
-            }])
-        } catch (e) {
-            if (unmountedRef.current) return
-            setMessages((prev) => [...prev, { id: Date.now() + 1, role: "assistant", message: "Something went wrong reaching Ask Akto. Please try again." }])
-        } finally {
-            if (!unmountedRef.current) setLoading(false)
-        }
-    }, [])
-
-    useEffect(() => {
-        if (!seed || seed.nonce === seededRef.current) return
-        seededRef.current = seed.nonce
-        ask(seed.prompt)
-    }, [seed, ask])
-
-    const setActState = (id, patch) => setActs((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
-
-    const onReviewAction = (id) => setActState(id, { state: "confirm" })
-    const onCancelAction = (id) => setActState(id, { state: "idle" })
-
-    const onConfirmAction = useCallback(async (id) => {
-        setActState(id, { state: "running" })
-        try {
-            const res = await sendQuery(CONFIRM_MESSAGE, conversationIdRef.current, "COMMAND_PALETTE")
-            if (unmountedRef.current) return
-            conversationIdRef.current = res?.conversationId || conversationIdRef.current
-            setActState(id, { state: "done", doneText: res?.response || "Done." })
-        } catch (e) {
-            if (unmountedRef.current) return
-            setActState(id, { state: "confirm", doneText: null })
-        }
-    }, [])
-
-    const onUndoAction = useCallback(async (id) => {
-        setActState(id, { state: "running" })
-        try {
-            const res = await sendQuery(UNDO_MESSAGE, conversationIdRef.current, "COMMAND_PALETTE")
-            if (unmountedRef.current) return
-            conversationIdRef.current = res?.conversationId || conversationIdRef.current
-            setActState(id, { state: "done", doneText: res?.response || "Done." })
-        } catch (e) {
-            if (unmountedRef.current) return
-            setActState(id, { state: "done" })
-        }
-    }, [])
-
-    const handleDraftSubmit = (value) => {
-        if (value && value.trim()) {
-            ask(value.trim())
-            setDraft("")
-        }
+    const handleSubmit = () => {
+        const text = draft.trim()
+        if (!text || loading) return
+        ask(text)
+        setDraft("")
     }
 
     return (
         <>
-            <div className="ask-chat-header">
-                <button type="button" className="ask-chat-header-btn" onClick={onCollapse}>
-                    <Icon source={ChevronLeftMinor} />
-                    <span>New question</span>
-                </button>
-                <span className="ask-spacer" />
-                <button type="button" className="ask-chat-close-btn" onClick={onClose} aria-label="Close">
-                    <Icon source={CancelMinor} />
-                </button>
-            </div>
+            <Box paddingInlineStart="3" paddingInlineEnd="3" paddingBlockStart="2" paddingBlockEnd="2">
+                <HorizontalStack align="space-between" blockAlign="center">
+                    <Button plain monochrome removeUnderline icon={ChevronLeftMinor} onClick={onNewQuestion}>New question</Button>
+                    <Button plain monochrome icon={CancelMinor} onClick={onClose} accessibilityLabel="Close" />
+                </HorizontalStack>
+            </Box>
+            <Divider borderColor="border-ask-divider" />
 
-            <div ref={scrollRef} className="ask-messages" aria-live="polite" aria-atomic="false" aria-busy={loading}>
-                {messages.map((msg) => msg.role === "user" ? (
-                    <div key={msg.id} className="ask-user-bubble"><Text as="span">{msg.message}</Text></div>
-                ) : (
-                    <ChatMessage
-                        key={msg.id}
-                        message={msg.message}
-                        userPrompt={msg.userPrompt}
-                        domain={domain}
-                        actionState={acts[msg.id]}
-                        onReviewAction={() => onReviewAction(msg.id)}
-                        onCancelAction={() => onCancelAction(msg.id)}
-                        onConfirmAction={() => onConfirmAction(msg.id)}
-                        onUndoAction={() => onUndoAction(msg.id)}
-                        onOpenRoute={onOpenRoute}
-                        onAsk={ask}
-                    />
-                ))}
-                {loading ? <AgenticThinkingBox /> : null}
-            </div>
+            <ScrollArea ref={scrollRef} height={MESSAGES_HEIGHT} padding="5" aria-live="polite" aria-busy={loading}>
+                <VerticalStack gap="6">
+                    {messages.map((msg) => msg.role === "user" ? (
+                        <HorizontalStack key={msg.id} align="end">
+                            <Box
+                                maxWidth="80%"
+                                background="bg-primary"
+                                color="text-on-color"
+                                borderRadiusStartStart="4"
+                                borderRadiusStartEnd="4"
+                                borderRadiusEndStart="4"
+                                borderRadiusEndEnd="1"
+                                paddingBlockStart="2"
+                                paddingBlockEnd="2"
+                                paddingInlineStart="3"
+                                paddingInlineEnd="3"
+                            >
+                                <Text as="p" variant="bodyMd">{msg.message}</Text>
+                            </Box>
+                        </HorizontalStack>
+                    ) : (
+                        <ChatMessage
+                            key={msg.id}
+                            message={msg.message}
+                            userPrompt={msg.userPrompt}
+                            skipStreaming={Boolean(msg.streamed)}
+                            onStreamingComplete={() => markStreamed(msg.id)}
+                            actionState={acts[msg.id]}
+                            onReviewAction={() => reviewAction(msg.id)}
+                            onCancelAction={() => cancelAction(msg.id)}
+                            onConfirmAction={() => confirmAction(msg.id)}
+                            onUndoAction={() => undoAction(msg.id)}
+                            onOpenRoute={onOpenRoute}
+                            onAsk={ask}
+                        />
+                    ))}
+                    {loading ? <AgenticThinkingBox /> : null}
+                </VerticalStack>
+            </ScrollArea>
 
-            <div className="ask-composer-wrap">
-                <AgenticSearchInput
-                    value={draft}
-                    onChange={setDraft}
-                    onSubmit={handleDraftSubmit}
-                    placeholder="Ask a follow-up"
-                    isStreaming={loading}
-                    isFixed={false}
-                    inputWidth="100%"
-                    containerStyle={{ display: "block" }}
-                    helperText="Actions that change data always show a preview first."
-                />
-            </div>
+            <Divider borderColor="border-ask-divider" />
+            <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">
+                <Form onSubmit={handleSubmit}>
+                    <VerticalStack gap="1_5-experimental">
+                        <Box background="bg" borderRadius="3" shadow="md" paddingInlineStart="3" paddingInlineEnd="2" paddingBlockStart="1" paddingBlockEnd="1">
+                            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                                <Box width="100%">
+                                    <TextField
+                                        label="Ask a follow-up"
+                                        labelHidden
+                                        borderless
+                                        autoComplete="off"
+                                        placeholder="Ask a follow-up"
+                                        value={draft}
+                                        onChange={setDraft}
+                                    />
+                                </Box>
+                                <Button
+                                    primary
+                                    submit
+                                    icon={ArrowUpMinor}
+                                    accessibilityLabel="Send"
+                                    loading={loading}
+                                    disabled={!draft.trim()}
+                                />
+                            </HorizontalStack>
+                        </Box>
+                        <HorizontalStack align="center">
+                            <Text as="p" variant="bodySm" color="subdued">Actions that change data always show a preview first.</Text>
+                        </HorizontalStack>
+                    </VerticalStack>
+                </Form>
+            </Box>
         </>
     )
 }

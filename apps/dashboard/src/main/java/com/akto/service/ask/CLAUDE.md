@@ -1,10 +1,15 @@
 # Ask Akto overlay
 
-A prompt-first command-palette overlay on top of the existing dashboards (Home/API, Agentic,
-Endpoint) — one input that answers with charts/graphs like the full chat page, plus a handful of
-always-on "worth doing now" tiles backed by live numbers. Not a new page: no route, no redirect,
-no per-user layout preference. Opened by a header button + `⌘K` from whichever dashboard the user
-is already on.
+A prompt-first command-palette overlay available on every page — one input that answers with
+charts/graphs like the full chat page, plus a handful of always-on "worth doing now" tiles backed
+by live numbers. Not a new page: no route, no redirect, no per-user layout preference. Opened by
+the topbar's Ask Akto button (`Headers.js`, gated on `DASHBOARD_INSIGHTS`) or `⌘K`.
+
+**There is no `domain` parameter anywhere.** Which dashboard's tiles, prompts and chat scope apply
+is the current dashboard category, which `request.js` already sends on every call as
+`x-context-source` (→ `Context.contextSource`). Request bodies carry nothing about it. A chat
+question that belongs to another dashboard gets that context source's own "not my domain, go to
+X" answer — the AI never re-routes a question to a different domain.
 
 Two things it deliberately reuses rather than rebuilds: the agent (MCP `/generic_chat`, 35+
 tools) and the insights engine (`InsightService`, provider registry, 60s-cached bundle). Read
@@ -15,19 +20,23 @@ own internals — this doc covers the overlay layered on top of it.
 
 ```
 Frontend (pages/dashboard/ask/)
-    AskOverlayButton (⌘K, domain="API"|"AGENTIC"|"ENDPOINT")
-        → AskOverlay (Polaris Modal, large)
-            → CommandPalette   — resolves typed text: intent → route, fuzzy → command, else "Ask Akto: <text>"
-                → chat mode reuses AgenticSearchInput/AgenticStreamingResponse (same primitives as the full chat page)
-                → conversationType=COMMAND_PALETTE, contextSource header set by the palette
-            → RecommendationTiles + ChangeFeedTable  — one GET, api/fetchAskOverlay
+    Headers.js topbar → AskOverlayButton (⌘K)
+        → AskOverlay (Polaris Portal + Box sheet; useAskChat keeps the conversation across close/reopen)
+            → HomeView      — typed text resolves locally (resolveCommand): "Ask Akto: <text>", go-to pages, suggested prompts
+            → ChatView      — sendQuery(..., "COMMAND_PALETTE") → api/chatAndStore → AgentClient → MCP /generic_chat
+            → tiles         — useAskData: api/fetchAskOverlay first (render), then api/fetchAskOverlayCuration (reorder + reword)
+        category for copy/prompts: useDashboardCategory() (PersistStore.dashboardCategory) — never sent in a body
 
 Backend
     AskOverlayAction#fetchAskOverlay (api/fetchAskOverlay, featureLabel=ASK_GPT/READ)
-        → parses `domain` string into CONTEXT_SOURCE (default API on missing/unrecognized)
+        → contextSource = Context.contextSource (x-context-source header; null → API)
         → Layer 1: RecommendationCatalog.compute(contextSource)      — cheap, no cache, every request
-        → Layer 2: InsightService.buildAskOverlay(...)               — CRITICAL/HIGH insight tiles, 60s-cached bundle
+        → Layer 2: InsightService.buildAskOverlay(ctx, ...)          — CRITICAL/HIGH insight tiles, 60s-cached bundle
         → on-the-fly "what changed" feed (no ActivitiesDao — that collection is stale/dead)
+    AskOverlayAction#fetchAskOverlayCuration (api/fetchAskOverlayCuration, same gate)
+        → recomputes the same tiles server-side (never trusts client-sent tiles)
+        → AskTileCurationService → AskTileCurationHandler (LLM): picks 1-4 tiles + the question each fires
+        → cached in insight_narrative_cache keyed by md5(account | contextSource | version | tile content), 1-day TTL
 
 MCP (two sibling repos, see below)
     ask-akto-mcp        — tool definitions + executors (read + two-phase write)
@@ -42,7 +51,9 @@ MCP (two sibling repos, see below)
 |---|---|
 | `service/ask/RecommendationCatalog.java` | Layer 1 — domain-dispatched cheap tiles, see below |
 | `service/ask/Recommendation.java` | One tile: id/label/count/severity/prompt/route/params |
-| `action/AskOverlayAction.java` | `api/fetchAskOverlay` — parses `domain`/`groups`, calls both layers |
+| `action/AskOverlayAction.java` | `api/fetchAskOverlay` + `api/fetchAskOverlayCuration` — context source from the header, optional `groups`, calls both layers |
+| `service/ask/AskTileCurationService.java` + `AskTileCuration.java` | AI curation over the computed tiles — candidate filtering (zero-count recs excluded, <2 candidates → `SKIPPED`), cache, and dropping picks whose id isn't a real tile |
+| `libs/utils/.../gpt_prompts/AskTileCurationHandler.java` | The LLM call. Same grounded-narrative base as the Argus cards: any number in a written prompt must be a tile's own value, or the response is rejected (one retry) |
 | `service/insights/AskOverlayResponse.java` | `{recommendations, insightTiles, whatChanged, omittedGroups, generatedAt}` |
 | `service/insights/InsightTile.java` | Narrower type than `InsightResult` — evidence/markdown/narrativeInput are structurally unreachable, not just nulled |
 | `service/insights/InsightService.java` (`buildAskOverlay`) | Orchestrates both layers, per-group RBAC (`groupVisible`), CRITICAL/HIGH filter, 2-per-group cap |
@@ -51,8 +62,8 @@ MCP (two sibling repos, see below)
 | `service/insights/InsightDataBundle.java` | The 60s-cached per-account bundle; API_POSTURE/TESTING_POSTURE lazy accessors live here |
 | `service/insights/InsightLazySources.java` | The actual lazy-read implementations bundle delegates to (own file — see "InsightLazySources lives on its own" below) |
 | `service/insights/providers/{Unauthenticated​SensitiveApisProvider, UntestedHighRiskApisProvider, SensitiveDataHotspotsProvider, AgingOpenCriticalsProvider, IssueConcentrationProvider, IssueRecurrenceProvider}.java` | The 6 new API_POSTURE/TESTING_POSTURE insight providers |
-| `web/.../pages/dashboard/ask/**` | Frontend — see its own file list; `AskOverlayButton` is the one thing each dashboard mounts |
-| `web/.../pages/dashboard/{HomeDashboard,AgenticDashboard,EndpointPosture}.jsx` | Mount `<AskOverlayButton domain="API"\|"AGENTIC"\|"ENDPOINT" />` |
+| `web/.../pages/dashboard/ask/**` | Frontend — native Polaris only; colors with no stock token are `--p-color-*-ask-*` tokens in `askOverlay.css` |
+| `web/.../components/layouts/header/Headers.js` | Mounts `<AskOverlayButton />` once, in the topbar, for every page |
 
 ### `ask-akto-mcp` (`/Users/aryankhandelwal/akto-code/clone-test/test-editor-services`, branch `feature/add_tools_write`)
 
@@ -81,11 +92,13 @@ The chat service. `COMMAND_PALETTE` is a new `ConversationType`.
 
 ## Domain scoping — `CONTEXT_SOURCE`, not a separate enum
 
-`RecommendationCatalog.compute(CONTEXT_SOURCE contextSource)` picks one of 3 tile sets. This
-reuses `com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE` (`API, MCP, GEN_AI, AGENTIC, DAST,
-ENDPOINT`) rather than a parallel dashboard-only enum — `MCP`/`GEN_AI` fold into the same tile set
-as `AGENTIC`. `AskOverlayAction.defaultGroupsForDomain` uses the same enum to pick the default
-`InsightId.Group` set when the frontend doesn't send `groups` explicitly:
+`RecommendationCatalog.compute(CONTEXT_SOURCE contextSource)` picks one of 3 tile sets, where
+`contextSource` is the request's own `x-context-source`. This reuses
+`com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE` (`API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT`)
+rather than a parallel dashboard-only enum — `MCP`/`GEN_AI` fold into the same tile set as
+`AGENTIC`. `AskOverlayAction.defaultGroupsFor` uses the same enum to pick the default
+`InsightId.Group` set when the frontend doesn't send `groups` explicitly. The frontend's
+suggested prompts are grouped the same way (`commandRegistry.suggestedPrompts(category)`):
 
 | `contextSource` | Recommendation tiles | Default insight groups |
 |---|---|---|

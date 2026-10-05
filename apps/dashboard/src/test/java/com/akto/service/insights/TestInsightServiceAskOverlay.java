@@ -201,7 +201,7 @@ public class TestInsightServiceAskOverlay extends MongoBasedTest {
             groups.add(InsightId.Group.API_POSTURE);
             groups.add(InsightId.Group.TESTING_POSTURE);
 
-            AskOverlayResponse response = spyService.buildAskOverlay(ctx(), CONTEXT_SOURCE.API, groups, 10, 10);
+            AskOverlayResponse response = spyService.buildAskOverlay(ctx(), groups, 10, 10);
 
             assertEquals(java.util.Collections.singletonList("TESTING_POSTURE"), response.getOmittedGroups());
             assertNotNull(response.getInsightTiles());
@@ -237,7 +237,7 @@ public class TestInsightServiceAskOverlay extends MongoBasedTest {
             groups.add(InsightId.Group.API_POSTURE);
             groups.add(InsightId.Group.TESTING_POSTURE);
 
-            AskOverlayResponse response = service.buildAskOverlay(ctx(), CONTEXT_SOURCE.API, groups, 10, 10);
+            AskOverlayResponse response = service.buildAskOverlay(ctx(), groups, 10, 10);
 
             Set<String> tileIds = new HashSet<>();
             for (InsightTile t : response.getInsightTiles()) tileIds.add(t.getInsightId());
@@ -271,7 +271,7 @@ public class TestInsightServiceAskOverlay extends MongoBasedTest {
             groups.add(InsightId.Group.API_POSTURE);
             groups.add(InsightId.Group.TESTING_POSTURE);
 
-            AskOverlayResponse response = service.buildAskOverlay(ctx(), CONTEXT_SOURCE.API, groups, 2, 10);
+            AskOverlayResponse response = service.buildAskOverlay(ctx(), groups, 2, 10);
 
             List<InsightTile> tiles = response.getInsightTiles();
             assertEquals("tileLimit=2 must be the final size even though 3 candidates survived the per-group cap",
@@ -308,7 +308,7 @@ public class TestInsightServiceAskOverlay extends MongoBasedTest {
             Set<InsightId.Group> groups = new LinkedHashSet<>();
             groups.add(InsightId.Group.API_POSTURE);
 
-            AskOverlayResponse response = service.buildAskOverlay(ctx(), CONTEXT_SOURCE.API, groups, 10, 10);
+            AskOverlayResponse response = service.buildAskOverlay(ctx(), groups, 10, 10);
 
             assertNotNull(response);
             assertTrue("Layer 1 failure must degrade to an empty list, not propagate", response.getRecommendations().isEmpty());

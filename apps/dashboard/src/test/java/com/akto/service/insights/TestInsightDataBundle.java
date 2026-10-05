@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Covers the InsightDataBundle surface added for the Ask Akto overlay: the memo() cache (a lazy

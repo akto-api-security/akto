@@ -301,14 +301,14 @@ public class InsightService {
     private static final int TILES_PER_GROUP_CAP = 2;
     private static final int WHAT_CHANGED_LOOKBACK_SECONDS = 14 * 24 * 3600;
 
-    public AskOverlayResponse buildAskOverlay(InsightContext ctx, CONTEXT_SOURCE domain,
-            Set<InsightId.Group> groups, int tileLimit, int feedLimit) {
+    /** Which dashboard's tiles to build is ctx's own contextSource (the request's x-context-source). */
+    public AskOverlayResponse buildAskOverlay(InsightContext ctx, Set<InsightId.Group> groups, int tileLimit, int feedLimit) {
         AskOverlayResponse response = new AskOverlayResponse();
         response.setGeneratedAt(System.currentTimeMillis() / 1000);
 
         // Layer 1 — cheap, always-on, independent of everything below.
         try {
-            response.setRecommendations(RecommendationCatalog.compute(domain));
+            response.setRecommendations(RecommendationCatalog.compute(ctx.getContextSource()));
         } catch (Exception e) {
             logger.error("InsightService.buildAskOverlay: recommendations failed: " + e.getMessage());
         }
