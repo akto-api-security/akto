@@ -34,7 +34,7 @@ jobs:
             exit 1
           fi
 
-      - name: PR description check (>=10 non-empty lines)
+      - name: PR description check (>=100 words)
         id: description
         continue-on-error: true
         env:
@@ -44,14 +44,18 @@ jobs:
           import os
           import re
 
+          # Word count instead of raw newline count: a well-written description as a
+          # few wrapped prose paragraphs has far fewer literal "\n"s than a sparse
+          # bullet list, even though it has more actual content. Words are a better
+          # proxy for "has substance" regardless of paragraph vs. bullet style.
           body = os.environ.get("PR_BODY") or ""
           body = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
-          count = len([line for line in body.splitlines() if line.strip()])
+          word_count = len(body.split())
 
-          print(f"Non-empty description lines: {count}")
+          print(f"Description word count: {word_count}")
 
-          if count < 10:
-              print(f"::error::PR description has only {count} non-empty line(s); at least 10 are required. "
+          if word_count < 100:
+              print(f"::error::PR description has only {word_count} word(s); at least 100 are required. "
                     "Please describe what changed, why, and how it was tested.")
               raise SystemExit(1)
           EOF
