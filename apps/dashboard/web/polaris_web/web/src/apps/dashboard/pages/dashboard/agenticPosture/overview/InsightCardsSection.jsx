@@ -45,7 +45,7 @@ function statsFor(card) {
                 <Stat key="total" label="Open issues" value={card.totalOpenIssues} />,
                 card.topFinding && (
                     <Stat key="top" label="Most common issue"
-                        value={`${card.topFinding.vulnType} on ${card.topFinding.agentName} (${card.topFinding.count})`}
+                        value={`"${card.topFinding.vulnType}" on ${card.topFinding.agentName} (${card.topFinding.count})`}
                         severity={card.topFinding.severity} />
                 ),
             ]

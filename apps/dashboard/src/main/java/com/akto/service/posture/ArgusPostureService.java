@@ -369,7 +369,7 @@ public class ArgusPostureService {
             String agentName = agentName(stats.topFinding.getCollectionId(), collectionsById);
             String vulnType = testDisplayName(stats.topFinding.getType(), testInfoByType);
             BasicDBObject top = new BasicDBObject("agentName", agentName)
-                    .append("vulnType", "\"" + vulnType + "\"")
+                    .append("vulnType", vulnType)
                     .append("severity", stats.topFinding.getSecondary())
                     .append("count", stats.topFinding.getCount());
             card.put("topFinding", top);
