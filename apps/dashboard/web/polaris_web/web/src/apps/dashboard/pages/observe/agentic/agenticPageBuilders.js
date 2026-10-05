@@ -38,7 +38,7 @@ export function getRiskStatus(score) {
     if (score >= 4) return "attention";
     if (score >= 2.5) return "warning";
     if (score > 0) return "info";
-    return undefined;
+    return "success";
 }
 
 // Human label derived from the bucket — no duplicated thresholds.

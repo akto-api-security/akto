@@ -212,6 +212,7 @@ function shapeRow(row) {
   return {
     ...row,
     type: row.clientType,
+    riskScore: row.riskScore || 0,
     endpointCount: row.endpointsCount,
     lastSeen: row.lastSeenEpoch > 0 ? func.prettifyEpoch(row.lastSeenEpoch) : "",
     assetTagValue: row.groupKey,
