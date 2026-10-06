@@ -42,7 +42,6 @@ import com.akto.util.DashboardMode;
 import org.apache.commons.io.FileUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 
@@ -727,13 +726,10 @@ public class Main {
                                         + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
                                         + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                                Bson filterQ = Filters.and(
-                                    Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
-                                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                                    Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
-                                );
+                                int sinceTimestamp = Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime);
 
-                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(filterQ);
+                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(
+                                        testingRun.getHexId(), sinceTimestamp, State.FAILED);
                                 TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 TestingRunResultSummary summary;
                                 if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){

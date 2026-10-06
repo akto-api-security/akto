@@ -690,8 +690,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip);
     }
 
-    public long countTestingRunResultSummaries(Bson filter){
-        return DbLayer.countTestingRunResultSummaries(filter);
+    public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state){
+        return DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, state);
     }
 
     public TestScript fetchTestScript(TestScript.Type type){

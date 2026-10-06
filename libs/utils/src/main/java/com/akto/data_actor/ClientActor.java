@@ -4329,12 +4329,14 @@ public class ClientActor extends DataActor {
         return nodeList;
     }
 
-    public long countTestingRunResultSummaries(Bson filter) {
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("filter", filter);
-        Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
+    public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state) {
         try {
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("testingRunHexId", testingRunHexId);
+            obj.put("sinceTimestamp", sinceTimestamp);
+            obj.put("state", state.toString());
+            Map<String, List<String>> headers = buildHeaders();
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {

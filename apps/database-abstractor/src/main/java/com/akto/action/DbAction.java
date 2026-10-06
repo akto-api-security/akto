@@ -148,6 +148,7 @@ public class DbAction extends ActionSupport {
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
     Bson filter;
+    int sinceTimestamp;
 
     String operator;
 
@@ -1870,7 +1871,7 @@ public class DbAction extends ActionSupport {
     }
     
     public String countTestingRunResultSummaries() {
-        count = DbLayer.countTestingRunResultSummaries(filter);
+        count = DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, TestingRun.State.valueOf(state));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -2857,6 +2858,14 @@ public class DbAction extends ActionSupport {
 
     public void setFilter(Bson filter) {
         this.filter = filter;
+    }
+
+    public int getSinceTimestamp() {
+        return sinceTimestamp;
+    }
+
+    public void setSinceTimestamp(int sinceTimestamp) {
+        this.sinceTimestamp = sinceTimestamp;
     }
 
     public String getOperator() {
