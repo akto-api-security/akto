@@ -19,6 +19,8 @@ import ChartypeComponent from "../../testing/TestRunsPage/ChartypeComponent"
 import BarGraph from "../../../components/charts/BarGraph"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 const headers = [
     {
@@ -157,6 +159,7 @@ function AllSensitiveData() {
     // const [prompts, setPrompts] = useState([])
     // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const navigate = useNavigate()
+    const { canCall } = usePermissions()
     const collectionsMap = PersistStore((state) => state.collectionsMap)
     const filtersMap = PersistStore((state) => state.filtersMap)
     const setFiltersMap = PersistStore((state) => state.setFiltersMap)
@@ -350,9 +353,9 @@ function AllSensitiveData() {
 
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
-            { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <Button onClick={resetSampleData}>Reset Sample Data</Button> : <></>}
+            { (func.checkOnPrem() && window?.USER_NAME !== undefined && window.USER_NAME.includes("razorpay")) ? <AllowedAction allowed={canCall('api/resetSampleData')}><Button onClick={resetSampleData}>Reset Sample Data</Button></AllowedAction> : <></>}
             {/* <Button onClick={displayGPT}>Ask AktoGPT</Button> */}
-            <Button onClick={fillSensitiveDataTypes}>Fill Data Types</Button>
+            <AllowedAction allowed={canCall('api/fillSensitiveDataTypes')}><Button onClick={fillSensitiveDataTypes}>Fill Data Types</Button></AllowedAction>
         </HorizontalStack>
     )
 
@@ -437,7 +440,7 @@ function AllSensitiveData() {
                     docsUrl="https://docs.akto.io/api-inventory/concepts/sensitive-data" 
                 />
             }
-            primaryAction={<Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button>}
+            primaryAction={<AllowedAction allowed={canCall('api/saveCustomDataType')}><Button id={"all-data-types"} primary onClick={handleRedirect}>Create custom data types</Button></AllowedAction>}
             secondaryActions={secondaryActionsComp}
             isFirstPage={true}
             components={

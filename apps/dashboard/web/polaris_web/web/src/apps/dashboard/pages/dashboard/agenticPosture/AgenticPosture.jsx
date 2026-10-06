@@ -20,6 +20,8 @@ import InsightCardsSection from './overview/InsightCardsSection'
 import FrameworkReadinessSection from './overview/FrameworkReadinessSection'
 import ChangesSinceLastWeekSection from './overview/ChangesSinceLastWeekSection'
 import dashboardApi from '../api'
+import { usePermissions } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 function SectionHeading({ title, description, action }) {
     return (
@@ -60,6 +62,7 @@ function dateRangeFromSearchParams(searchParams) {
 
 function AgenticPosture() {
     const navigate = useNavigate()
+    const { canCall } = usePermissions()
     const [searchParams, setSearchParams] = useSearchParams()
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
@@ -296,7 +299,7 @@ function AgenticPosture() {
                     isFirstPage={true}
                     components={[<Box key="body">{pageBody}</Box>]}
                     secondaryActions={
-                        <Button icon={RefreshMajor} onClick={regenerate} loading={regenerating} disabled={regenerating}>Regenerate</Button>
+                        <AllowedAction allowed={canCall('api/triggerArgusPostureRegenerate')}><Button icon={RefreshMajor} onClick={regenerate} loading={regenerating} disabled={regenerating}>Regenerate</Button></AllowedAction>
                     }
                     primaryAction={
                         <DateRangeFilter

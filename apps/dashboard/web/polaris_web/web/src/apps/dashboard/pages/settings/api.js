@@ -42,13 +42,14 @@ const settingRequests = {
         })
     },
 
-    updateUserScopeRoleMapping(email, scopeRoleMapping) {
+    updateUserScopeRoleMapping(email, scopeRoleMapping, accessExpiresAt) {
         return request({
             url: '/api/updateUserScopeRoleMapping',
             method: 'post',
             data: {
                 email: email,
-                scopeRoleMapping: scopeRoleMapping
+                scopeRoleMapping: scopeRoleMapping,
+                accessExpiresAt: accessExpiresAt
             }
         })
     },
@@ -410,6 +411,9 @@ const settingRequests = {
             oktaGroupToAktoUserRoleMap,
             syncGroupsToUserTags: opts.syncGroupsToUserTags === true,
         }
+        if (Object.prototype.hasOwnProperty.call(opts, 'removeAccessWithoutGroup')) {
+            data.removeAccessWithoutGroup = opts.removeAccessWithoutGroup === true
+        }
         if (Object.prototype.hasOwnProperty.call(opts, 'managementApiToken')) {
             const t = opts.managementApiToken
             // Struts cannot distinguish JSON null from omitted String fields; send "" to mean "clear stored token".
@@ -430,11 +434,11 @@ const settingRequests = {
         })
     },
 
-    saveSamlGroupRoleMapping(groupRoleMapping, configType) {
+    saveSamlGroupRoleMapping(groupRoleMapping, configType, removeAccessWithoutGroup) {
         return request({
             url: '/api/saveSamlGroupRoleMapping',
             method: 'post',
-            data: {groupRoleMapping, configType}
+            data: {groupRoleMapping, configType, removeAccessWithoutGroup}
         })
     },
 
@@ -601,6 +605,13 @@ const settingRequests = {
             }
         });
     },
+    fetchAssignableRoles(){
+        return request({
+            url: '/api/fetchAssignableRoles',
+            method: 'post',
+            data: {}
+        });
+    },
     getRoleHierarchy(){
         return request({
             url: '/api/getRoleHierarchy',
@@ -666,18 +677,19 @@ const settingRequests = {
             data: {}
         })
     },
-    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
+    // opts: permissionOverrides, collectionRules, assignableRoles (and threatProtectionEnabled) when copying a role
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, opts = {}) {
         return request({
             url: '/api/createCustomRole',
             method: 'post',
-            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled }
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, ...opts }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules, assignableRoles) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, threatProtectionEnabled, permissionOverrides, collectionRules, assignableRoles}
         })
     },
     deleteCustomRole(roleName) {
@@ -886,11 +898,11 @@ const settingRequests = {
         })
     },
     // ATLAS: server-side paginated Endpoint Shield agents (replaces the load-all fetchModuleInfo on that page)
-    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
+    async fetchEndpointShieldAgents({ skip = 0, limit = 20, sortKey = "lastHeartbeat", sortOrder = -1, hostnames = [], usernames = [], deviceIds = [], oses = [], browserNames = [], agentVersions = [], statuses = [], providers = [], queryValue = "", startTimestamp = 0, endTimestamp = 0 } = {}) {
         return await request({
             url: '/api/fetchEndpointShieldAgents',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, queryValue, startTimestamp, endTimestamp }
+            data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, browserNames, agentVersions, statuses, providers, queryValue, startTimestamp, endTimestamp }
         })
     },
     async fetchEndpointShieldFilterOptions() {

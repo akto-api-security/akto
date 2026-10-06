@@ -1,6 +1,9 @@
 import request from "@/util/request";
 import { enrichRow } from "./utils";
 
+// Traces queries over wide date ranges can exceed the global 60s default.
+const LLM_REQUEST_TIMEOUT_MS = 120000;
+
 function llmMessagesRequest(data) {
     return request({ url: "/api/fetchLLMMessages", method: "post", data });
 }
@@ -67,6 +70,7 @@ export default {
         return request({
             url: "/api/searchLLMPrompts",
             method: "post",
+            timeout: LLM_REQUEST_TIMEOUT_MS,
             data: {
                 startTime,
                 endTime,
@@ -116,6 +120,7 @@ export default {
         return request({
             url: "/api/fetchArgusStats",
             method: "post",
+            timeout: LLM_REQUEST_TIMEOUT_MS,
             data: { startTime, endTime },
         }).then(r => ({
             totalSpans:        r?.aggTotalSpans        || 0,

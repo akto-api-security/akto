@@ -82,6 +82,7 @@ public class ModuleInfoAction extends UserAction {
     @Setter private List<String> hostnames;
     @Setter private List<String> deviceIds;
     @Setter private List<String> oses;
+    @Setter private List<String> browserNames, agentVersions, statuses, providers;
     @Setter private String queryValue;
     @Setter private int startTimestamp;
     @Setter private int endTimestamp;
@@ -96,6 +97,9 @@ public class ModuleInfoAction extends UserAction {
     private static final String AD_DEVICE_ID = ModuleInfo.ADDITIONAL_DATA + ".deviceId";
     private static final String AD_USERNAME = ModuleInfo.ADDITIONAL_DATA + ".username";
     private static final String AD_OS = ModuleInfo.ADDITIONAL_DATA + ".os";
+    private static final String AD_BROWSER_NAME = ModuleInfo.ADDITIONAL_DATA + ".browserName";
+    private static final String AD_PROVIDER = ModuleInfo.ADDITIONAL_DATA + ".provider";
+    private static final String AD_CURRENT_STATUS = ModuleInfo.ADDITIONAL_DATA + ".currentStatus";
 
     private Bson buildEndpointShieldFilter() {
         List<Bson> f = new ArrayList<>();
@@ -105,7 +109,12 @@ public class ModuleInfoAction extends UserAction {
         if (hostnames != null && !hostnames.isEmpty()) f.add(Filters.in(ModuleInfo.NAME, hostnames));
         if (usernames != null && !usernames.isEmpty()) f.add(Filters.in(AD_USERNAME, usernames));
         if (deviceIds != null && !deviceIds.isEmpty()) f.add(Filters.in(AD_DEVICE_ID, deviceIds));
-        if (oses != null && !oses.isEmpty()) f.add(Filters.in(AD_OS, oses));
+        List<Bson> osOrBrowser = new ArrayList<>();
+        if (oses != null && !oses.isEmpty()) osOrBrowser.add(Filters.in(AD_OS, oses));
+        if (browserNames != null && !browserNames.isEmpty()) osOrBrowser.add(Filters.in(AD_BROWSER_NAME, browserNames));
+        if (providers != null && !providers.isEmpty()) osOrBrowser.add(Filters.in(AD_PROVIDER, providers));
+        if (!osOrBrowser.isEmpty()) f.add(Filters.or(osOrBrowser));
+        if (agentVersions != null && !agentVersions.isEmpty()) f.add(Filters.in(ModuleInfo.CURRENT_VERSION, agentVersions));
         if (queryValue != null && !queryValue.trim().isEmpty()) {
             String q = Pattern.quote(queryValue.trim());
             f.add(Filters.or(
@@ -157,6 +166,10 @@ public class ModuleInfoAction extends UserAction {
     private static Document endpointShieldCurrentStatusExpr(int now) {
         return new Document("$switch", new Document()
                 .append("branches", Arrays.asList(
+                        new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.ADDITIONAL_DATA + ".installStatus", "installing")))
+                                .append("then", "installing"),
+                        new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.ADDITIONAL_DATA + ".installStatus", "failed")))
+                                .append("then", "install_failed"),
                         new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)))
                                 .append("then", STATUS_FAILED),
                         new Document("case", new Document("$gte", Arrays.asList(
@@ -216,12 +229,20 @@ public class ModuleInfoAction extends UserAction {
                         Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
                 Aggregates.addFields(
                         new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
-                        new Field<>(ModuleInfo.ADDITIONAL_DATA + ".currentStatus", endpointShieldCurrentStatusExpr(Context.now()))),
+                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(Context.now()))),
+                Aggregates.match(statuses == null || statuses.isEmpty() ? new Document() : Filters.in(AD_CURRENT_STATUS, statuses)),
                 Aggregates.project(Projections.exclude(ORIG_ID_FIELD)),
                 Aggregates.sort(finalSort),
                 Aggregates.skip(sk),
                 Aggregates.limit(lim)
         );
+
+        if (statuses != null && !statuses.isEmpty()) {
+            List<Bson> countPipeline = new ArrayList<>(pipeline.subList(0, pipeline.size() - 3));
+            countPipeline.add(Aggregates.count("total"));
+            Document statusCount = ModuleInfoDao.instance.getMCollection().aggregate(countPipeline, Document.class).first();
+            total = statusCount == null ? 0 : ((Number) statusCount.get("total")).longValue();
+        }
 
         moduleInfos = new ArrayList<>();
         MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, ModuleInfo.class).cursor();
@@ -250,6 +271,10 @@ public class ModuleInfoAction extends UserAction {
         filterOptions.put("usernames", distinctStrings(AD_USERNAME, base));
         filterOptions.put("deviceIds", distinctStrings(AD_DEVICE_ID, base));
         filterOptions.put("oses", distinctStrings(AD_OS, base));
+        filterOptions.put("browserNames", distinctStrings(AD_BROWSER_NAME, base));
+        filterOptions.put("agentVersions", distinctStrings(ModuleInfo.CURRENT_VERSION, base));
+        filterOptions.put("providers", distinctStrings(AD_PROVIDER, base));
+        filterOptions.put("statuses", distinctStatuses(base));
         return SUCCESS.toUpperCase();
     }
 
@@ -331,6 +356,18 @@ public class ModuleInfoAction extends UserAction {
 
         moduleInfos = infos;
         return SUCCESS.toUpperCase();
+    }
+
+    private List<String> distinctStatuses(Bson base) {
+        List<String> out = new ArrayList<>();
+        try {
+            for (Document d : ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
+                    Aggregates.match(base),
+                    Aggregates.group(endpointShieldCurrentStatusExpr(Context.now()))), Document.class)) {
+                if (d.get("_id") instanceof String) out.add((String) d.get("_id"));
+            }
+        } catch (Exception ignored) {}
+        return out;
     }
 
     private List<String> distinctStrings(String field, Bson filter) {

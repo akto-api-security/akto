@@ -4,6 +4,7 @@ import com.akto.utils.ArgusCollectionScope;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuleCollections;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -2213,6 +2214,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
      * endpoint doesn't touch), scoped to just this page's devices — see AgenticAssetsPage.jsx.
      */
     public String fetchAgenticAssetsSummary() {
+        // Argus and Atlas asset page: newly found agents may match custom roles' rules
+        RuleCollections.refreshInBackground(Context.accountId.get());
         response = new BasicDBObject();
         try {
             long tStart = System.currentTimeMillis();

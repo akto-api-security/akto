@@ -1,6 +1,13 @@
-import { Badge, Box, Card, HorizontalStack, IndexTable, Link, ProgressBar, Text } from '@shopify/polaris'
+import { Badge, Box, Card, HorizontalStack, IndexTable, Link, Text } from '@shopify/polaris'
 import { riskBand } from '../../agenticPostureShared'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import CustomProgressBar from '../../new_components/CustomProgressBar'
+
+const BAR_COLOR_FOR_TONE = {
+    critical: 'var(--p-color-bg-critical-strong)',
+    warning: 'var(--p-color-bg-warning-strong-experimental)',
+    success: 'var(--p-color-bg-success-strong)',
+}
 
 const HEADINGS = [
     { title: 'Rank' },
@@ -50,7 +57,9 @@ function HighestRiskAgentsTable({ agents, onOpenAgent }) {
                             <Box minWidth="140px">
                                 <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                                     <Box width="90px">
-                                        <ProgressBar progress={agent.score} size="small" color={band ? band.tone : 'primary'} />
+                                        <CustomProgressBar progress={agent.score} height="8px" borderRadius="var(--p-border-radius-1)"
+                                            backgroundColor="var(--p-color-bg-strong)"
+                                            topColor={band ? BAR_COLOR_FOR_TONE[band.tone] : 'var(--p-color-bg-primary)'} />
                                     </Box>
                                     <Text variant="bodySm" fontWeight="semibold">{agent.score}</Text>
                                 </HorizontalStack>

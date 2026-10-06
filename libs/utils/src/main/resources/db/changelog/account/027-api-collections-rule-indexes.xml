@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors ApiCollectionsDao.createIndicesIfAbsent, for custom roles' collection rules
+        (RuleCollections): a host rule is a regex on hostName (or on name, which baseline already
+        indexes), a tag rule an $elemMatch on tagsList keyName + value. With these, matching a rule
+        reads index entries instead of every api_collections document.
+
+        Index names match what MCollection.generateIndexName gives ApiCollectionsDao, so these are
+        no-ops if DaoInit already built them.
+    -->
+
+    <changeSet id="027-account-api-collections-host-name-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_collections"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_collections">
+            <mongodb:keys>{ "hostName": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "hostName_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_collections">
+                <mongodb:keys>{ "hostName": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="027-account-api-collections-tags-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_collections"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_collections">
+            <mongodb:keys>{ "tagsList.keyName": 1, "tagsList.value": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "keyName-value_1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_collections">
+                <mongodb:keys>{ "tagsList.keyName": 1, "tagsList.value": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

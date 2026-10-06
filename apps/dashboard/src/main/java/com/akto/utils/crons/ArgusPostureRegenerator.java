@@ -1,6 +1,7 @@
 package com.akto.utils.crons;
 
 import com.akto.dao.context.Context;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightService;
@@ -32,7 +33,10 @@ public class ArgusPostureRegenerator {
     }
 
     // False when a run is already in progress for this account.
-    public static boolean trigger(int accountId) {
+    public static boolean trigger() {
+        final int accountId = Context.accountId.get();
+        final int userId = Context.userId.get();
+        final CONTEXT_SOURCE contextSource = Context.contextSource.get();
         Status status = STATUS.computeIfAbsent(accountId, k -> new Status());
         synchronized (status) {
             if (status.running) return false;
@@ -40,7 +44,10 @@ public class ArgusPostureRegenerator {
             status.startedAt = Context.now();
             status.error = null;
         }
-        EXECUTOR.submit(() -> run(accountId, status));
+        EXECUTOR.submit(Context.withContext(accountId, userId, contextSource, () -> {
+            run(status);
+            return null;
+        }));
         return true;
     }
 
@@ -54,9 +61,9 @@ public class ArgusPostureRegenerator {
     }
 
     // Tool classification runs first because the posture score reads its tool capabilities.
-    private static void run(int accountId, Status status) {
+    private static void run(Status status) {
+        int accountId = Context.accountId.get();
         try {
-            Context.accountId.set(accountId);
             TOOL_CLASSIFICATION_CRON.forceRunForAccount(accountId);
             POSTURE_SCORE_CRON.forceRunForAccount(accountId);
             InsightService.invalidateAccount(accountId);
@@ -67,7 +74,6 @@ public class ArgusPostureRegenerator {
         } finally {
             status.finishedAt = Context.now();
             status.running = false;
-            Context.accountId.remove();
         }
     }
 }

@@ -22,9 +22,12 @@ import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
 import LocalStore from "../../../../main/LocalStorageStore";
 import observeFunc from "../../observe/transform";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import { getCallbackCheckError, getResultColor, getResultDescription, isCallbackTest, markTestResultVulnerable, normalizeCallbackUuids, startCallbackPolling, startPlaygroundPolling } from "../webhookCallbackUtils"
 
 const SampleApi = () => {
+    const { canCall } = usePermissions()
 
     const setToastConfig = Store(state => state.setToastConfig)
     const allCollections = PersistStore(state => state.allCollections);
@@ -461,7 +464,9 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : mapLabel('Run test', getDashboardCategory())}</Button>
+                    <AllowedAction allowed={isChatBotOpen || canCall('api/runTestForGivenTemplate')}>
+                        <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : mapLabel('Run test', getDashboardCategory())}</Button>
+                    </AllowedAction>
                 </HorizontalStack>
             </div>
 

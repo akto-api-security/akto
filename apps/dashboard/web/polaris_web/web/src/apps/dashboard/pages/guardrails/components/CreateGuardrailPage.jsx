@@ -34,6 +34,8 @@ import { findAssetTag } from '../../observe/agentic/mcpClientHelper';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey, splitPolicyServers } from '../serverTargetingUtils';
 import func from "@/util/func";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -164,6 +166,7 @@ const buildRedactionRules = (enabled, rules) => {
 };
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, initialStep = 1 }) => {
+    const { canCall } = usePermissions();
     // Step management
     const [currentStep, setCurrentStep] = useState(initialStep);
     const [loading, setLoading] = useState(false);
@@ -216,6 +219,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         custom: []
     });
     const [newCustomWord, setNewCustomWord] = useState("");
+    const [enableMultiLingualBlock, setEnableMultiLingualBlock] = useState(false);
 
     // Step 4: Sensitive Information Guardrails
     const [enablePiiTypes, setEnablePiiTypes] = useState(false);
@@ -462,6 +466,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableSentiment,
         sentimentConfidenceScore,
         wordFilters,
+        enableMultiLingualBlock,
         // Step 4
         enablePiiTypes,
         piiTypes,
@@ -788,6 +793,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             custom: []
         });
         setNewCustomWord("");
+        setEnableMultiLingualBlock(false);
         setEnablePiiTypes(false);
         setPiiTypes([]);
         setEnableRegexPatterns(false);
@@ -1257,6 +1263,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setWordFilters={setWordFilters}
                         newCustomWord={newCustomWord}
                         setNewCustomWord={setNewCustomWord}
+                        enableMultiLingualBlock={enableMultiLingualBlock}
+                        setEnableMultiLingualBlock={setEnableMultiLingualBlock}
                     />
                 );
             case 4:
@@ -1785,14 +1793,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 <Button onClick={handleNext} disabled={steps.findIndex(s => s.number === currentStep) >= steps.length - 1}>
                                     Next
                                 </Button>
-                                <Button
-                                    primary
-                                    onClick={handleSave}
-                                    loading={loading}
-                                    disabled={!allStepsValid}
-                                >
-                                    {isEditMode ? "Update policy" : "Create policy"}
-                                </Button>
+                                <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                                    <Button
+                                        primary
+                                        onClick={handleSave}
+                                        loading={loading}
+                                        disabled={!allStepsValid}
+                                    >
+                                        {isEditMode ? "Update policy" : "Create policy"}
+                                    </Button>
+                                </AllowedAction>
                             </HorizontalStack>
                         </HorizontalStack>
                     </div>

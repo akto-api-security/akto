@@ -23,6 +23,8 @@ import CustomPieChart from './new_components/CustomPieChart'
 import CustomLineChart from './new_components/CustomLineChart'
 import CustomDataTable from './new_components/CustomDataTable'
 import EmptyCard from './new_components/EmptyCard'
+import { usePermissions } from '@/util/permissions'
+import AllowedAction from '../../components/shared/AllowedAction'
 
 // Helper function to get compliance color based on risk level (percentage)
 // Higher percentage = more issues = higher risk = red color
@@ -81,6 +83,26 @@ const AgenticDashboard = () => {
     const [popoverActive, setPopoverActive] = useState(false);
     const [gridWidth, setGridWidth] = useState(1200);
     const setToastConfig = Store(state => state.setToastConfig);
+    const { canCall } = usePermissions();
+    // data the role can't load isn't requested, and the widgets showing it are left out
+    const callIfAllowed = (action, call) => canCall(action) ? call() : Promise.reject(new Error(`${action} not allowed`));
+    const WIDGET_REQUIRES = {
+        'api-discovery-pie': 'api/fetchEndpointDiscoveryData',
+        'issues-pie': 'api/fetchIssuesData',
+        'average-issue-age': 'api/fetchIssuesData',
+        'compliance-at-risks': 'api/fetchIssuesData',
+        'open-resolved-issues': 'api/fetchIssuesData',
+        'weakest-areas': 'api/fetchIssuesData',
+        'top-apis-issues': 'api/fetchIssuesData',
+        'tested-vs-non-tested': 'api/fetchTestingData',
+        'threat-detection-pie': 'api/fetchThreatData',
+        'open-resolved-threats': 'api/fetchThreatData',
+        'top-requests-by-type': 'api/fetchThreatData',
+        'top-attacked-apis': 'api/fetchThreatData',
+        'top-bad-actors': 'api/fetchThreatData',
+        'threat-requests-chart': 'api/getDailyThreatActorsCount',
+    };
+    const canShowWidget = (itemId) => !WIDGET_REQUIRES[itemId] || canCall(WIDGET_REQUIRES[itemId]);
 
     // State for all dashboard data - initialized with empty/default values
     const [apiDiscoveryData, setApiDiscoveryData] = useState({});
@@ -139,7 +161,7 @@ const AgenticDashboard = () => {
     useEffect(() => {
         const loadSavedLayout = async () => {
             try {
-                const resp = await api.fetchDashboardLayout(SCREEN_NAME)
+                const resp = await callIfAllowed('api/fetchDashboardLayout', () => api.fetchDashboardLayout(SCREEN_NAME))
 
                 const layoutString = typeof resp === 'string' ? resp : resp?.layout
 
@@ -417,17 +439,17 @@ const AgenticDashboard = () => {
                 const hasThreatDetectionFeature = func.checkForFeatureSaas('THREAT_DETECTION');
                 
                 const apiPromises = [
-                    api.fetchEndpointDiscoveryData(startTs, endTs),
-                    api.fetchIssuesData(startTs, endTs),
-                    api.fetchTestingData(startTs, endTs),
-                    api.fetchThreatData(startTs, endTs),
-                    observeApi.fetchNewEndpointsTrendForHostCollections(startTs, endTs),
-                    observeApi.fetchNewEndpointsTrendForNonHostCollections(startTs, endTs),
+                    callIfAllowed('api/fetchEndpointDiscoveryData', () => api.fetchEndpointDiscoveryData(startTs, endTs)),
+                    callIfAllowed('api/fetchIssuesData', () => api.fetchIssuesData(startTs, endTs)),
+                    callIfAllowed('api/fetchTestingData', () => api.fetchTestingData(startTs, endTs)),
+                    callIfAllowed('api/fetchThreatData', () => api.fetchThreatData(startTs, endTs)),
+                    callIfAllowed('api/fetchNewEndpointsTrendForHostCollections', () => observeApi.fetchNewEndpointsTrendForHostCollections(startTs, endTs)),
+                    callIfAllowed('api/fetchNewEndpointsTrendForNonHostCollections', () => observeApi.fetchNewEndpointsTrendForNonHostCollections(startTs, endTs)),
                 ];
                 
                 // Only add getDailyThreatActorsCount if THREAT_DETECTION feature is enabled
                 if (hasThreatDetectionFeature) {
-                    apiPromises.push(threatApi.getDailyThreatActorsCount(startTs, endTs, []));
+                    apiPromises.push(callIfAllowed('api/getDailyThreatActorsCount', () => threatApi.getDailyThreatActorsCount(startTs, endTs, [])));
                 }
                 
                 const results = await Promise.allSettled(apiPromises);
@@ -1389,28 +1411,32 @@ const AgenticDashboard = () => {
         >
             <Box padding={4}>
                 <VerticalStack gap={4}>
-                    <Button
-                        onClick={saveDashboardLayout}
-                        disabled={!hasUnsavedChanges}
-                        loading={isSaving}
-                        fullWidth
-                    >
-                        Save Layout
-                    </Button>
+                    <AllowedAction allowed={canCall('api/saveDashboardLayout')}>
+                        <Button
+                            onClick={saveDashboardLayout}
+                            disabled={!hasUnsavedChanges}
+                            loading={isSaving}
+                            fullWidth
+                        >
+                            Save Layout
+                        </Button>
+                    </AllowedAction>
                     {savedLayout != null && savedVisibleComponents != null && (
                         JSON.stringify(savedLayout) !== JSON.stringify(defaultLayout) ||
                         JSON.stringify(savedVisibleComponents) !== JSON.stringify(defaultVisibleComponents)
                     ) && (
-                        <Button
-                            onClick={resetToDefaultLayout}
-                            disabled={isSaving}
-                            fullWidth
-                        >
-                            Reset to default
-                        </Button>
+                        <AllowedAction allowed={canCall('api/saveDashboardLayout')}>
+                            <Button
+                                onClick={resetToDefaultLayout}
+                                disabled={isSaving}
+                                fullWidth
+                            >
+                                Reset to default
+                            </Button>
+                        </AllowedAction>
                     )}
                     <ActionList
-                        items={defaultVisibleComponents.map(itemId => ({
+                        items={defaultVisibleComponents.filter(canShowWidget).map(itemId => ({
                             content: (
                                 <HorizontalStack gap={2} blockAlign='center'>
                                     <input
@@ -1449,7 +1475,7 @@ const AgenticDashboard = () => {
                             ) : (
                                 <GridLayout
                                     width={gridWidth}
-                                    layout={layout.filter(item => visibleComponents.includes(item.i))}
+                                    layout={layout.filter(item => visibleComponents.includes(item.i) && canShowWidget(item.i))}
                                     gridConfig={{
                                         cols: 12,
                                         rowHeight: 100,
@@ -1466,7 +1492,7 @@ const AgenticDashboard = () => {
                                     compactor={null}
                                     onLayoutChange={onLayoutChange}
                                 >
-                                    {visibleComponents.map((itemId) => (
+                                    {visibleComponents.filter(canShowWidget).map((itemId) => (
                                         <div key={itemId}>
                                             {allComponentsMap[itemId]}
                                         </div>

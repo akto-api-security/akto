@@ -15,6 +15,8 @@ import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const AUTH_TYPE_ENUM_VALUES = new Set(AUTH_TYPES.map((t) => t.value))
 
@@ -38,6 +40,7 @@ function APIQuery() {
     const handleToggle = useCallback(() => setOpen((open) => !open), []);
     const [apiCount, setApiCount] = useState(0)
     const [active, setActive] = useState(false);
+    const { canCall } = usePermissions()
     const collectionsMap = PersistStore.getState().collectionsMap
     const [isUpdate, setIsUpdate] = useState(false)
     const [moreActions, setMoreActions] = useState(false);
@@ -326,6 +329,7 @@ function APIQuery() {
     }
 
     const primaryActionLabel = isUpdate ? 'Update conditions' : 'Save as API Group'
+    const canSave = canCall(isUpdate ? 'api/updateCustomCollection' : 'api/createCustomCollection')
 
     const findMissingUrls = useCallback(() => {
         navigate(`/dashboard/observe/debug-endpoints`);
@@ -378,7 +382,7 @@ function APIQuery() {
                     titleText={"Explore Mode"}
                 />
             }
-            primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button>}
+            primaryAction={<AllowedAction allowed={canSave}><Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button></AllowedAction>}
             secondaryActions={secondaryActionsComp}
             components={components}
             backUrl="dashboard/observe/query_mode"

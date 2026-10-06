@@ -38,6 +38,10 @@ public class ThreatDetectorWithStrategy {
         return threatDetector.getWeakAuthenticationReason(httpResponseParams);
     }
 
+    public String getVpnReason(HttpResponseParams httpResponseParams) {
+        return threatDetector.getVpnReason(httpResponseParams);
+    }
+
     public URLTemplate findMatchingUrlTemplate(HttpResponseParams httpResponseParams) {
         return threatDetector.findMatchingUrlTemplate(httpResponseParams);
     }

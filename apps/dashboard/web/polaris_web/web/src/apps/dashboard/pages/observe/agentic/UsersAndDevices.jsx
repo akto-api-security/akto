@@ -406,7 +406,7 @@ function UsersAndDevices() {
 
     const promotedBulkActions = useCallback((selectedIds) => {
         if (!isUsersTab) return [];
-        return [{ content: 'Edit device tags', onAction: () => openEditTagModal(selectedIds) }];
+        return [{ content: 'Edit device tags', onAction: () => openEditTagModal(selectedIds), requires: 'api/bulkUpdateUserDeviceTag' }];
     }, [isUsersTab, openEditTagModal]);
 
     const summaryItems = useMemo(() => [
