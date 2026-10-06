@@ -319,6 +319,8 @@ public class Main {
 
         return ret;
     }
+    private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -532,44 +534,6 @@ public class Main {
 
         singleTypeInfoInit(accountId);
 
-        if (USE_NEW_CLAIM_LOOP) {
-            newLeaseAwareClaimLoop(accountSettings, testingProducer, testingConsumer, testCompletion, logSentMap, accountId);
-        } else {
-            legacyControlLoop(accountSettings, testingProducer, testingConsumer, testCompletion, logSentMap, accountId);
-        }
-    }
-
-    /**
-     * Toggle for the new claimNextTestWork-based loop (see newLeaseAwareClaimLoop). Off by default -
-     * flip only once the server-side endpoint exists and has been tested. legacyControlLoop is the
-     * exact, unmodified control loop this repo has always run; it is not touched by this migration,
-     * only extracted verbatim so the two can be switched between.
-     */
-    private static final boolean USE_NEW_CLAIM_LOOP = false;
-
-    /**
-     * The new claimNextTestWork-based loop. One call replaces today's
-     * findPendingTestingRunResultSummary + findPendingTestingRun + createTRRSummaryIfAbsent +
-     * claimTestingRunResultSummary, and the staleness-check block (isSummaryRunning/isTestingRunRunning/
-     * isResumeCase + "Test run was executed long ago") collapses into a switch on the verdict the
-     * server already decided atomically. Not implemented yet - falls back to the legacy loop so
-     * flipping USE_NEW_CLAIM_LOOP today is a no-op until this is filled in.
-     */
-    private static void newLeaseAwareClaimLoop(AccountSettings accountSettings, Producer testingProducer,
-            ConsumerUtil testingConsumer, TestCompletion testCompletion, Map<Integer, Integer> logSentMap,
-            int accountId) throws InterruptedException, IOException {
-        loggerMaker.warnAndAddToDb("newLeaseAwareClaimLoop not yet implemented, falling back to legacyControlLoop");
-        legacyControlLoop(accountSettings, testingProducer, testingConsumer, testCompletion, logSentMap, accountId);
-    }
-
-    /**
-     * The existing control loop, extracted verbatim from runModule() - no logic changed, only moved,
-     * so this remains the exact, battle-tested behavior this repo has always run. See
-     * newLeaseAwareClaimLoop for the replacement this is being migrated to.
-     */
-    private static void legacyControlLoop(AccountSettings accountSettings, Producer testingProducer,
-            ConsumerUtil testingConsumer, TestCompletion testCompletion, Map<Integer, Integer> logSentMap,
-            int accountId) throws InterruptedException, IOException {
         while (true) {
             TestExecutor testExecutor = new TestExecutor();
             // Reset current execution fallback flag for new test cycle
@@ -696,15 +660,114 @@ public class Main {
                 }
                 setTestingRunConfig(testingRun, trrs);
 
-                StaleWorkReconciler.ReconciliationResult reconciliation = StaleWorkReconciler.reconcileStaleOrRunningWork(
-                        testingRun, trrs, summaryId, isResumeCase, isSummaryRunning, isTestingRunRunning,
-                        isTestingRunResultRerunCase, config, start, leaseToken);
-                if (reconciliation.shouldContinue) {
-                    continue;
+                boolean maxRetriesReached = false;
+
+                if (isResumeCase) {
+                    loggerMaker.infoAndAddToDb("Resuming summary " + trrs.getHexId()
+                            + ": production already complete, draining remaining messages");
+                } else if (isSummaryRunning || isTestingRunRunning) {
+                    loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
+                    TestingRunResultSummary testingRunResultSummary;
+                    if (trrs != null) {
+                        testingRunResultSummary = trrs;
+                    } else {
+                        Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = dataActor.fetchTestingRunResultSummaryMap(testingRun.getId().toHexString());
+                        testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
+                    }
+                    // For rerun case, we need to check the original test results
+                    List<TestingRunResult> testingRunResults;
+                    if (testingRunResultSummary != null) {
+                        if (isTestingRunResultRerunCase) {
+                            testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getOriginalTestingRunResultSummaryId().toHexString());
+                        } else {
+                            testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
+                        }
+
+                        if (testingRunResults != null && !testingRunResults.isEmpty()) {
+                            TestingRunResult testingRunResult = testingRunResults.get(0);
+                            if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
+                                loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
+                                        + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                        + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                continue;
+                            } else {
+                                loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
+                                        + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                        + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                                int sinceTimestamp = Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime);
+
+                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(
+                                        testingRun.getHexId(), sinceTimestamp, State.FAILED);
+                                TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                TestingRunResultSummary summary;
+                                if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
+                                    summary = dataActor.updateIssueCountInSummaryFenced(testingRunResultSummary.getId().toHexString(), runResultSummary.getCountIssues(), leaseToken);
+                                    loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                    maxRetriesReached = true;
+                                }else{
+                                    summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString(), leaseToken);
+                                }
+    
+                                runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                if (summary == null) {
+                                    loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                    continue;
+                                }
+                                // TODO: Delete completely, disabled feature not used anymore
+                                // GithubUtils.publishGithubComments(runResultSummary);
+                            }
+                        } else {
+                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
+                                    + testingRunResultSummary.getHexId()
+                                    + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                    + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                            //won't reach here for testing run result rerun case, as there will be a minimum of 1 TRR
+                            //for safety delete run result.
+                            if (isTestingRunResultRerunCase) {
+                                dataActor.deleteTestRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                config.setTestingRunResultList(null);
+                                config.setRerunTestingRunResultSummary(null);
+                                loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId(), LogDb.TESTING);
+                                continue;
+                            }
+                            TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString(), leaseToken);
+                            if (summary == null) {
+                                loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                continue;
+                            }
+                        }
+
+                        // insert new summary based on old summary
+                        if(maxRetriesReached){
+                            loggerMaker.infoAndAddToDb("Exiting out as maxRetries have been reached for testingRun: " + testingRun.getHexId(), LogDb.TESTING);
+                        }else{
+                            if (summaryId != null) {
+                                trrs.setId(new ObjectId());
+                                trrs.setStartTimestamp(start);
+                                trrs.setState(State.RUNNING);
+                                // Same reasoning as the leased mint in the else branch below and in
+                                // failTestingRun: an un-leased insert here is permanently unreachable
+                                // via the safe TRRS-scoped discovery path from the moment of its
+                                // creation, for the exact same reason - it's the same bug, just on
+                                // the safe-path retry instead of the fallback-path retry.
+                                trrs.setLeaseToken(leaseToken);
+                                trrs.setLeaseExpiryTs(Context.now() + TestingLease.LEASE_SECONDS);
+                                dataActor.insertTestingRunResultSummary(trrs);
+                                TestingLease.getInstance().adopt(leaseToken);
+                                summaryId = trrs.getId();
+                            } else {
+                                trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start, leaseToken, TestingLease.LEASE_SECONDS);
+                                if (trrs != null) TestingLease.getInstance().adopt(leaseToken);
+                                summaryId = trrs.getId();
+                            }
+                        }
+                    } else {
+                        loggerMaker.infoAndAddToDb("No summary found. Let's run it as usual");
+                    }
                 }
-                trrs = reconciliation.trrs;
-                summaryId = reconciliation.summaryId;
-                boolean maxRetriesReached = reconciliation.maxRetriesReached;
 
                 if (summaryId == null) {
                     trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start, leaseToken, TestingLease.LEASE_SECONDS);
@@ -713,14 +776,47 @@ public class Main {
                 }
 
 
+                if (trrs.getState() == State.SCHEDULED) {
+                    if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
+                        //case of github status push
+                        // TODO: Delete completely, disabled feature not used anymore
+                        // GithubUtils.publishGithubStatus(trrs);
+
+                    }
+                }
+
                 Organization organization = OrgUtils.getOrganizationCached(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 Executor.clearRoleCache();
 
                 if(!maxRetriesReached){
-                    startTestExecutionMain(testingProducer, testingConsumer, testExecutor, trrs, isResumeCase, testingRun,
-                            summaryId, syncLimit);
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    TestExecutor.initRunDeadline(trrs, maxRunTime);
+                    if(Constants.IS_NEW_TESTING_ENABLED){
+                        // doInitOnly rebuilds the in-memory test configuration without re-producing,
+                        // and notably skips initProducer's delete of the topic we came back for
+                        testingProducer.initProducer(testingRun, summaryId, isResumeCase, syncLimit);
+                        int pickedUpTimestamp = trrs != null ? trrs.getStartTimestamp() : Context.now();
+                        /*
+                         * Pass the FULL maxRunTime, not a shrunk "remaining" delta - ConsumerUtil's
+                         * own MAX_RUNTIME check already compares (Context.now() - pickedUpTimestamp)
+                         * i.e. elapsed since the ORIGINAL start, against whatever we pass here. If we
+                         * pass an already-shrunk delta on top of that, the subtraction effectively
+                         * happens twice: elapsed >= (maxRunTime - elapsed), i.e. the run's real
+                         * deadline arrives at HALF the intended budget. The old file-based mechanism
+                         * never hit this because TestingStateStore held the full original maxRunTime
+                         * (write-once, never shrunk) and just kept overriding whatever delta got
+                         * passed in - so it silently masked the fact that the delta was never needed.
+                         * Confirmed live: durationSec=3681 firing MAX_RUNTIME against a 7200s budget.
+                         */
+                        loggerMaker.infoAndAddToDb("Resume: maxRunTime=" + maxRunTime
+                                + "s elapsed=" + (Context.now() - pickedUpTimestamp) + "s");
+                        testingConsumer.init(maxRunTime, summaryId.toHexString(), pickedUpTimestamp);
+                    }else{
+                        testExecutor.init(testingRun, summaryId, syncLimit, false);
+                    }
+                    AllMetrics.instance.setTestingRunCount(1);
                 }
                 // raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
@@ -754,37 +850,6 @@ public class Main {
 
             Thread.sleep(1000);
         }
-    }
-
-    private static void startTestExecutionMain(Producer testingProducer, ConsumerUtil testingConsumer, TestExecutor testExecutor,
-            TestingRunResultSummary trrs, boolean isResumeCase, TestingRun testingRun, ObjectId summaryId,
-            SyncLimit syncLimit) {
-        int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-        TestExecutor.initRunDeadline(trrs, maxRunTime);
-        if(Constants.IS_NEW_TESTING_ENABLED){
-            // doInitOnly rebuilds the in-memory test configuration without re-producing,
-            // and notably skips initProducer's delete of the topic we came back for
-            testingProducer.initProducer(testingRun, summaryId, isResumeCase, syncLimit);
-            int pickedUpTimestamp = trrs != null ? trrs.getStartTimestamp() : Context.now();
-            /*
-             * Pass the FULL maxRunTime, not a shrunk "remaining" delta - ConsumerUtil's
-             * own MAX_RUNTIME check already compares (Context.now() - pickedUpTimestamp)
-             * i.e. elapsed since the ORIGINAL start, against whatever we pass here. If we
-             * pass an already-shrunk delta on top of that, the subtraction effectively
-             * happens twice: elapsed >= (maxRunTime - elapsed), i.e. the run's real
-             * deadline arrives at HALF the intended budget. The old file-based mechanism
-             * never hit this because TestingStateStore held the full original maxRunTime
-             * (write-once, never shrunk) and just kept overriding whatever delta got
-             * passed in - so it silently masked the fact that the delta was never needed.
-             * Confirmed live: durationSec=3681 firing MAX_RUNTIME against a 7200s budget.
-             */
-            loggerMaker.infoAndAddToDb("Resume: maxRunTime=" + maxRunTime
-                    + "s elapsed=" + (Context.now() - pickedUpTimestamp) + "s");
-            testingConsumer.init(maxRunTime, summaryId.toHexString(), pickedUpTimestamp);
-        }else{
-            testExecutor.init(testingRun, summaryId, syncLimit, false);
-        }
-        AllMetrics.instance.setTestingRunCount(1);
     }
 
     private static boolean isEntirelyOutOfTestingScope(TestingEndpoints testingEndpoints) {
