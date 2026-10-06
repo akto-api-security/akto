@@ -669,6 +669,10 @@ prettifyEpoch(epoch) {
       queryParamsString = message["request"]["queryParams"]
       requestHeadersString = message["request"]["headers"] || "{}"
       requestPayloadString = message["request"]["body"] || "{}"
+    } else if (func.isBareTrafficPayload(message)) {
+      // Not a traffic envelope at all (e.g. guardrail backfill events recorded before they were
+      // wrapped): the whole object is the request body, so show it instead of an empty pane.
+      requestPayloadString = JSON.stringify(message)
     } else {
       let url = message["path"]
       let urlSplit = (typeof url === "string") ? url?.split("?") : []
@@ -799,16 +803,27 @@ prettifyEpoch(epoch) {
     }
     return result
   },
+  // Envelope keys every traffic sample carries at least one of; an object with none of them is a
+  // raw body stored where an envelope was expected.
+  TRAFFIC_ENVELOPE_KEYS: ["request", "response", "method", "path", "type", "requestPayload", "responsePayload",
+    "requestHeaders", "responseHeaders", "statusCode", "status"],
+  isBareTrafficPayload(message) {
+    return !func.TRAFFIC_ENVELOPE_KEYS.some((key) => key in message)
+  },
+  // Joins first-line parts, dropping missing ones so an incomplete envelope never renders "undefined".
+  joinFirstLineParts(...parts) {
+    return parts.filter((part) => part !== null && part !== undefined && part !== "").join(" ")
+  },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
       let url = message["request"]["url"] || ""
-      return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
+      return func.joinFirstLineParts(message["request"]["method"], url + func.convertQueryParamsToUrl(queryParams), message["request"]["type"])
     } else {
       let pathString = ""
       if(message.path !== null && message?.path !== undefined){
         pathString = message.path.split("?")[0];
       }
-      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
+      return func.joinFirstLineParts(message?.method, pathString + func.convertQueryParamsToUrl(queryParams), message?.type)
     }
   },
   webSocketRequestFirstLine(message, queryParams) {
@@ -827,9 +842,9 @@ prettifyEpoch(epoch) {
   },
   responseFirstLine(message) {
     if (message["response"]) {
-      return message["response"]["statusCode"] + ""
+      return func.joinFirstLineParts(message["response"]["statusCode"])
     } else {
-      return message.statusCode + " " + message.status
+      return func.joinFirstLineParts(message.statusCode, message.status)
     }
   },
   isWebSocketApiType(apiType) {
