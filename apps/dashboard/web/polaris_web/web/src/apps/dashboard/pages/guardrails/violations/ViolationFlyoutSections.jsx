@@ -27,6 +27,7 @@ import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory }
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
+import NearbyMessages from "@/apps/dashboard/pages/threat_detection/components/NearbyMessages";
 import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/ComplianceTags";
 
 export function HumanResponseBadge({ response }) {
@@ -365,19 +366,23 @@ export function OverviewSection({ row, detail }) {
 
 // ─── Prompt & Response tab ────────────────────────────────────────────────────────
 
-export function PromptResponseSection({ detail }) {
+export function PromptResponseSection({ detail, host, anchorTimestamp }) {
     const pr = detail?.promptResponse;
     const hasPrompt = !!pr?.promptBody;
     const hasResponse = !!(pr && (pr.behaviour || pr.blockedBy || pr.blockedAt || pr.reason || pr.message));
+    const nearbyMessages = <NearbyMessages host={host} anchorTimestamp={anchorTimestamp} heading="Nearby Messages" padding="4" />;
 
     if (!hasPrompt && !hasResponse) {
         return (
-            <Box padding="8">
-                <VerticalStack gap="1" inlineAlign="center">
-                    <Text variant="bodySm" fontWeight="semibold">No prompt or response data</Text>
-                    <Text variant="bodySm" color="subdued">This violation has no captured prompt or response payload.</Text>
-                </VerticalStack>
-            </Box>
+            <VerticalStack gap="0">
+                <Box padding="8">
+                    <VerticalStack gap="1" inlineAlign="center">
+                        <Text variant="bodySm" fontWeight="semibold">No prompt or response data</Text>
+                        <Text variant="bodySm" color="subdued">This violation has no captured prompt or response payload.</Text>
+                    </VerticalStack>
+                </Box>
+                {nearbyMessages}
+            </VerticalStack>
         );
     }
 
@@ -450,6 +455,8 @@ export function PromptResponseSection({ detail }) {
                     )}
                 </VerticalStack>
             </Box>
+
+            {nearbyMessages}
         </VerticalStack>
     );
 }
