@@ -101,31 +101,31 @@
     color:var(--color-options) !important;
 }
 
-[method="GET"] {
+[method="GET"]:not(form) {
     color: var(--color-get) !important;
 }
 
-[method="POST"] {
+[method="POST"]:not(form) {
     color: var(--color-post) !important;
 }
 
-[method="PUT"] {
+[method="PUT"]:not(form) {
     color: var(--color-put) !important;
 }
 
-[method="DELETE"] {
+[method="DELETE"]:not(form) {
     color: var(--color-delete) !important;
 }
 
-[method="PATCH"] {
+[method="PATCH"]:not(form) {
     color: var(--color-patch) !important;
 }
 
-[method="HEAD"] {
+[method="HEAD"]:not(form) {
     color: var(--color-head) !important;
 }
 
-[method="OPTIONS"] {
+[method="OPTIONS"]:not(form) {
     color:var(--color-options) !important;
 }
 

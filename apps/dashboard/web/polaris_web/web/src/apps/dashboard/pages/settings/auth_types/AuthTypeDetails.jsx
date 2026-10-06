@@ -1,4 +1,4 @@
-import { LegacyCard, HorizontalGrid, TextField } from "@shopify/polaris";
+import { LegacyCard, HorizontalGrid, TextField, Banner } from "@shopify/polaris";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useState, useEffect, useReducer } from "react";
 import authTypesApi from "./api";
@@ -9,6 +9,7 @@ import func from "@/util/func";
 import DetailsPage from "../../../components/DetailsPage";
 import {produce} from "immer"
 import { useSearchParams } from 'react-router-dom';
+import { usePermissions } from "@/util/permissions";
 
 const selectOptions = [
     {
@@ -47,6 +48,9 @@ function AuthTypeDetails() {
     const isEditMode = location?.state?.edit
     const isNew = !isDataInState && !isNameInSearch
     const pageTitle = isNew ? "Add auth type" : "Configure auth type"
+    const { canCall } = usePermissions()
+    // a role that can't save sees the auth type read-only, so there are no changes to save
+    const canSave = canCall((isNew || isEditMode) ? 'api/addCustomAuthType' : 'api/updateCustomAuthType')
     const [initialState, setInitialState] = useState({ name: "", active:undefined, headerConditions: [], payloadConditions: [] })
     const [currState, dispatchCurrState] = useReducer(produce((draft, action) => func.conditionStateReducer(draft, action)), {});
     const [change, setChange] = useState(false)
@@ -92,6 +96,7 @@ function AuthTypeDetails() {
     }, [currState])
 
     const handleChange = (obj) => {
+        if (!canSave) return
         dispatchCurrState({type:"update", obj:obj})
     }
 
@@ -106,6 +111,7 @@ function AuthTypeDetails() {
                         label="Name" value={currState.name}
                         placeholder='New auth type name' 
                         {...isNew  ? {onChange: (val) => handleChange({name: val})} : {}}
+                        disabled={!canSave}
                         requiredIndicator={true}
                         {...errorMessage.length > 0 ? {error: errorMessage} : {}}
                     />
@@ -113,13 +119,14 @@ function AuthTypeDetails() {
                     <Dropdown id={"active-dropdown"} 
                     menuItems={activeItems} placeHolder={"Auth type active status"}
                     selected={(val) => { handleChange({ active: val }) }} 
-                    initial={currState.active} label= "Active" /> } 
+                    initial={currState.active} label= "Active" disabled={!canSave} /> } 
                 </HorizontalGrid>
             </LegacyCard.Section>
         </LegacyCard>
     )
 
     const handleDispatch = (val, key) => {
+        if (!canSave) return
         if(val?.key==="condition"){
             dispatchCurrState({...val, key:key})
         } else {
@@ -156,6 +163,9 @@ function AuthTypeDetails() {
       )
 
     let components = [descriptionCard, conditionsCard]
+    if (!canSave) {
+        components = [<Banner status="info" key="readOnly">You can view this auth type, but your role can't change it.</Banner>, ...components]
+    }
 
     const saveAction = async () => {
         let headerKeys = transform.convertPredicateToArray(currState.headerConditions);

@@ -5,9 +5,11 @@ import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import CopyCommand from '../../../components/shared/CopyCommand';
 import StepsComponent from './components/StepsComponent';
+import { usePermissions, whenAllowed } from '@/util/permissions';
 
 function GithubSso() {
     
+    const { canCall } = usePermissions()
     const [githubClientId, setGithubClientId] = useState("")
     const [githubClientSecret, setGithubClientSecret] = useState("")
     const [showGithubSsoModal, setShowGithubSsoModal] = useState(false)
@@ -134,7 +136,8 @@ function GithubSso() {
             primaryAction={{
                 content: githubPresent ? 'Delete Github SSO' : 'Add GitHub SSO',
                 onAction: githubPresent ? handleDeleteGithubSso : handleAddGithubSso,
-                disabled: isModalDisabled
+                disabled: isModalDisabled,
+                ...whenAllowed(canCall(githubPresent ? 'api/deleteGithubSso' : 'api/addGithubSso'))
             }}
         >
             <Modal.Section>
@@ -148,14 +151,14 @@ function GithubSso() {
 
     const card = (
         <LegacyCard title="GitHub SSO"
-        {...componentType === 0 ? {} : {primaryFooterAction:{ content: (githubPresent ? 'Delete GitHub SSO' : 'Add GitHub SSO'), onAction: () => setShowGithubSsoModal(true) } }} 
+        {...componentType === 0 ? {} : {primaryFooterAction:{ content: (githubPresent ? 'Delete GitHub SSO' : 'Add GitHub SSO'), onAction: () => setShowGithubSsoModal(true), ...whenAllowed(canCall(githubPresent ? 'api/deleteGithubSso' : 'api/addGithubSso')) } }} 
         >
             {listComponent}
         </LegacyCard>
     )
     return (
         <>
-        <IntegrationsLayout title="GitHub SSO" cardContent={cardContent} component={card} docsUrl="https://docs.akto.io/sso/github-oidc" />
+        <IntegrationsLayout title="GitHub SSO" cardContent={cardContent} component={card} docsUrl="https://docs.akto.io/sso/github-oidc" readOnly={!canCall('api/addGithubSso')} />
         {modal}
         </>
     )

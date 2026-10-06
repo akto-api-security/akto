@@ -35,10 +35,13 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.function.ToDoubleFunction;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
@@ -60,6 +63,14 @@ public class AgenticPostureScoreCron {
     private static final int POINTS_SENSITIVE_DATA       = 10;
     private static final int POINTS_ACCESS_AUTH          = 10;
     private static final int POINTS_OVERPRIVILEGED_TOOLS = 10;
+
+    private static final int WORST_SLICE_MIN = 5;
+    private static final double WORST_SLICE_RATIO = 0.10;
+
+    private static final int RED_TEAM_SATURATION_COUNT = 5;
+    private static final int GUARDRAIL_SATURATION_COUNT = 50;
+
+    private static final List<String> SEVERITY_ORDER = Arrays.asList("CRITICAL", "HIGH", "MEDIUM", "LOW");
 
     // Follows ToolCapabilityClassifier's severity order.
     private static final Map<String, Integer> CAPABILITY_POINTS = new HashMap<>();
@@ -134,7 +145,8 @@ public class AgenticPostureScoreCron {
             Map<Integer, Map<String, Integer>> maliciousSeverities =
                     new HostCollectionResolver(agentCollections).severityByCollection(hostCounts);
             List<WriteModel<ApiCollection>> updates = new ArrayList<>();
-            double scoredSum = 0;
+            List<Double> composites = new ArrayList<>();
+            int agentsWithNoSignal = 0;
             for (ApiCollection c : agentCollections) {
                 List<ApiInfo> apis = apiInfosByCollection.getOrDefault(c.getId(), new ArrayList<>());
                 // An open red-team finding proves a scan ran even when ApiInfo.lastTested wasn't stamped.
@@ -142,8 +154,8 @@ public class AgenticPostureScoreCron {
                         || apis.stream().anyMatch(a -> a != null && a.getLastTested() > 0);
                 boolean coveredByPolicy = isCoveredByGuardrailPolicy(policies, c);
 
-                double redTeam = worstSeverityScore(redTeamSeverities.get(c.getId()));
-                double guardrailMalicious = worstSeverityScore(maliciousSeverities.get(c.getId()));
+                double redTeam = redTeamSeverityScore(redTeamSeverities.get(c.getId()));
+                double guardrailMalicious = guardrailSeverityScore(maliciousSeverities.get(c.getId()));
                 double coverage = coverageSubScore(coveredByPolicy, collectionEverTested);
                 double sensitiveData = sensitiveDataSubScore(c.getId(), sensitiveByCollection);
                 double accessAuth = accessAuthSubScore(apis);
@@ -165,7 +177,8 @@ public class AgenticPostureScoreCron {
                 }
 
                 double composite = agentComposite(redTeam, guardrailMalicious, coverage, sensitiveData, accessAuth, overprivilegedTools);
-                scoredSum += composite;
+                composites.add(composite);
+                if (composite == 0) agentsWithNoSignal++;
 
                 updates.add(new UpdateOneModel<>(
                         Filters.eq(ApiCollection.ID, c.getId()),
@@ -185,9 +198,9 @@ public class AgenticPostureScoreCron {
                         + " agent collections for accountId=" + accountId);
             }
 
-            // Every agent always gets a composite, so agentsWithNoSignal is 0.
             AgenticPostureScoreHistoryDao.instance.insertOne(
-                    new AgenticPostureScoreHistory(scoredSum / agentCollections.size(), agentCollections.size(), 0, now));
+                    new AgenticPostureScoreHistory(worstSliceMean(composites), agentCollections.size(),
+                            agentsWithNoSignal, now));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in agentic posture score cron for accountId=" + accountId + ": " + e.getMessage());
         }
@@ -208,6 +221,28 @@ public class AgenticPostureScoreCron {
         return agents;
     }
 
+    public static <T> List<T> worstSlice(List<T> items, ToDoubleFunction<T> score) {
+        List<T> assessed = new ArrayList<>();
+        for (T item : items) {
+            if (item != null && score.applyAsDouble(item) > 0) assessed.add(item);
+        }
+        assessed.sort(Comparator.comparingDouble(score).reversed());
+        int n = Math.min(assessed.size(),
+                Math.max(WORST_SLICE_MIN, (int) Math.ceil(assessed.size() * WORST_SLICE_RATIO)));
+        return assessed.subList(0, n);
+    }
+
+    static double worstSliceMean(List<Double> composites) {
+        return mean(worstSlice(composites, Double::doubleValue));
+    }
+
+    private static double mean(List<Double> values) {
+        if (values.isEmpty()) return 0;
+        double sum = 0;
+        for (double v : values) sum += v;
+        return sum / values.size();
+    }
+
     // Weighted average of six 0-100 sub-scores.
     private static double agentComposite(double redTeam, double guardrailMalicious, double coverage,
                                           double sensitiveData, double accessAuth, double overprivilegedTools) {
@@ -222,24 +257,48 @@ public class AgenticPostureScoreCron {
         return (earned / available) * 100.0;
     }
 
-    // Severity of the worst finding, so extra low-severity findings never dilute a high one; 0 when none.
-    private static double worstSeverityScore(Map<String, Integer> bySeverity) {
-        if (bySeverity == null) return 0.0;
-        int worst = 0;
-        for (Map.Entry<String, Integer> e : bySeverity.entrySet()) {
-            if (e.getValue() != null && e.getValue() > 0) worst = Math.max(worst, severityWeight(e.getKey()));
+    private static String worstSeverity(Map<String, Integer> bySeverity) {
+        if (bySeverity == null) return null;
+        for (String severity : SEVERITY_ORDER) {
+            Integer count = bySeverity.get(severity);
+            if (count != null && count > 0) return severity;
         }
-        return worst;
+        return null;
     }
 
-    private static int severityWeight(String severity) {
-        if (severity == null) return 0;
-        switch (severity) {
-            case "CRITICAL": return 100;
-            case "HIGH": return 70;
-            case "MEDIUM": return 40;
-            case "LOW": return 15;
-            default: return 0;
+    private static double band(double floor, double ceiling, double fraction) {
+        return floor + (ceiling - floor) * fraction;
+    }
+
+    static double redTeamSeverityScore(Map<String, Integer> bySeverity) {
+        String worst = worstSeverity(bySeverity);
+        if (worst == null) return 0.0;
+        double fraction = Math.min(1.0, bySeverity.get(worst) / (double) RED_TEAM_SATURATION_COUNT);
+        switch (worst) {
+            case "CRITICAL":
+                return band(96, 100, fraction);
+            case "HIGH":
+                return band(76, 95, fraction);
+            case "MEDIUM":
+                return band(51, 75, fraction);
+            default:
+                return band(25, 50, fraction);
+        }
+    }
+
+    static double guardrailSeverityScore(Map<String, Integer> bySeverity) {
+        String worst = worstSeverity(bySeverity);
+        if (worst == null) return 0.0;
+        if ("CRITICAL".equals(worst)) return 100.0;
+        double fraction = Math.min(1.0,
+                Math.log1p(bySeverity.get(worst)) / Math.log1p(GUARDRAIL_SATURATION_COUNT));
+        switch (worst) {
+            case "HIGH":
+                return band(76, 99, fraction);
+            case "MEDIUM":
+                return band(51, 75, fraction);
+            default:
+                return band(25, 50, fraction);
         }
     }
 

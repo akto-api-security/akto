@@ -43,6 +43,8 @@ import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endp
 import { sendQuery } from "../../agentic/services/agenticService";
 import AgenticThinkingBox from "../../agentic/components/AgenticThinkingBox";
 import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
   
 const CenterViewType = {
     Table: 0,
@@ -523,6 +525,7 @@ function ApiCollections(props) {
     const {customCollectionDataFilter, onlyShowCollectionsTable, sendData} = props;
 
     const userRole = window.USER_ROLE
+    const { canCall } = usePermissions()
 
     const navigate = useNavigate();
 
@@ -1398,7 +1401,8 @@ function ApiCollections(props) {
                 onAction: () => {
                     const deleteConfirmationMessage = `Are you sure, you want to delete these untracked API collection${func.addPlurality(selectedResources.length)}? This will remove them from the untracked list.`
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleUntrackedDelete(selectedResources))
-                }
+                },
+                requires: 'api/deleteUntrackedCollections'
             });
             return actions;
         }
@@ -1422,12 +1426,14 @@ function ApiCollections(props) {
                         "Blocking this skill will flag it as blocked. Are you sure?",
                         "Block Skill",
                         () => handleSkillUpdateAction(resolvedCollectionIds, true)
-                    )
+                    ),
+                    requires: 'api/updateSkillBlockStatus'
                 });
             } else if (allBlocked) {
                 actions.push({
                     content: `Unblock skill`,
-                    onAction: () => handleSkillUpdateAction(resolvedCollectionIds, false)
+                    onAction: () => handleSkillUpdateAction(resolvedCollectionIds, false),
+                    requires: 'api/updateSkillBlockStatus'
                 });
             }
             return actions;
@@ -1443,7 +1449,8 @@ function ApiCollections(props) {
                     onAction: () => {
                         const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
                         func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
-                    }
+                    },
+                    requires: 'api/deactivateCollections'
                 }
             )
         } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
@@ -1453,7 +1460,8 @@ function ApiCollections(props) {
                     onAction: () =>  {
                         const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
                         func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
-                    }
+                    },
+                    requires: 'api/activateCollections'
                 }
             )
         }
@@ -1463,7 +1471,8 @@ function ApiCollections(props) {
                 onAction: () => {
                     const deleteConfirmationMessage = `Are you sure, you want to delete collection${func.addPlurality(selectedResources.length)}?`
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleCollectionsAction(selectedResources.filter(v => !defaultApiGroups.includes(v)), api.deleteMultipleCollections, "deleted"))
-                }
+                },
+                requires: 'api/deleteMultipleCollections'
             }
         )
 
@@ -1542,6 +1551,7 @@ function ApiCollections(props) {
         actions.push(
             {
                 content: shareContent,
+                requires: 'api/updateUserCollections'
             }
         )
     }
@@ -1568,7 +1578,8 @@ function ApiCollections(props) {
         )
 
         const toggleEnvType = {
-            content: toggleTypeContent
+            content: toggleTypeContent,
+            requires: 'api/updateEnvType'
         }
 
         const allOutOfTestScopeFalse = selectedResources.every(id => {
@@ -1595,7 +1606,8 @@ function ApiCollections(props) {
             actions.push(
                 {
                     content: content,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, toastContent, allOutOfTestScopeTrue)
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, toastContent, allOutOfTestScopeTrue),
+                    requires: 'api/toggleCollectionsOutOfTestScope'
                 }
             )
         }
@@ -1603,11 +1615,12 @@ function ApiCollections(props) {
         // Add Run Test button for multi-collection testing (hidden for Atlas / Endpoint Security)
         if (selectedResources.length > 1 && !isEndpointSecurityCategory()) {
             actions.push({
-                content: <Button id="bulk-run-test-button" primary>Run test</Button>,
+                content: <Button id="bulk-run-test-button" primary disabled={!canCall('api/startTest')}>Run test</Button>,
                 onAction: () => {
                     setSelectedCollectionIdsForTest(selectedResources);
                     setShowMultiCollectionRunTest(true);
-                }
+                },
+                requires: 'api/startTest'
             })
         }
 
@@ -1916,8 +1929,8 @@ function ApiCollections(props) {
                     />
                 </Popover.Pane>
             </Popover>
-            <Button onClick={handleAnalyzeDashboard}>Analyze Inventory</Button>
-            {!activeFilterType && <Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button>}
+            <AllowedAction allowed={canCall('api/chatAndStore')}><Button onClick={handleAnalyzeDashboard}>Analyze Inventory</Button></AllowedAction>
+            {!activeFilterType && <AllowedAction allowed={canCall('api/createCollection') || canCall('api/createCustomCollection')}><Button id={"create-new-collection-popup"} secondaryActions onClick={showCreateNewCollectionPopup}>Create new collection</Button></AllowedAction>}
         </HorizontalStack>
     )
 

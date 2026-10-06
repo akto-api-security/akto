@@ -42,7 +42,7 @@ function Sparkline({ points, tone }) {
 // Fleet-wide posture score hero; shows "Not computed yet" instead of falling back to mock data.
 function PostureScoreCard({ postureScore, onOpenBreakdown }) {
     if (!postureScore) return null
-    const { value, agentsScored, agentsWithNoSignal, dataGaps, trend, delta, deltaTone } = postureScore
+    const { value, agentsScored, dataGaps, trend, delta, deltaTone } = postureScore
     const hasValue = value !== null && value !== undefined
     const hasDelta = delta !== null && delta !== undefined
     const deltaPositive = delta > 0
@@ -85,9 +85,7 @@ function PostureScoreCard({ postureScore, onOpenBreakdown }) {
                     {hasValue && agentsScored > 0 && (
                         <HorizontalStack align="space-between" blockAlign="center">
                             <Text variant="bodySm" color="subdued">
-                                {agentsWithNoSignal > 0
-                                    ? `Based on ${agentsScored - agentsWithNoSignal} of ${agentsScored} agents`
-                                    : `Based on ${agentsScored} agent${agentsScored === 1 ? '' : 's'}`}
+                                Based on agents with highest scores
                             </Text>
                             {clickable && <Button plain>How is this calculated?</Button>}
                         </HorizontalStack>

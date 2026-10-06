@@ -5,6 +5,8 @@ import { ToggleComponent } from '../about/About'
 import settingRequests from '../api'
 import func from '@/util/func'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
+import { usePermissions } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 const resourceName = { singular: 'pattern', plural: 'patterns' }
 
@@ -24,6 +26,8 @@ function DomainsCard() {
     const [selected, setSelected] = useState({ chattyDomains: [], aiDomains: [] })
     const [inputValues, setInputValues] = useState({ chattyDomains: '', aiDomains: '' })
     const [saving, setSaving] = useState({ chattyDomains: false, aiDomains: false })
+    const { canCall } = usePermissions()
+    const canUpdateDomains = canCall('api/updateAccountDomains')
 
     useEffect(() => {
         settingRequests.fetchAdminSettings()
@@ -109,6 +113,7 @@ function DomainsCard() {
                                     />
                                     {selCount > 0 && (
                                         <HorizontalStack align="end">
+                                            <AllowedAction allowed={canUpdateDomains}>
                                             <Button
                                                 destructive
                                                 size="slim"
@@ -117,6 +122,7 @@ function DomainsCard() {
                                             >
                                                 {`Remove ${selCount} selected`}
                                             </Button>
+                                            </AllowedAction>
                                         </HorizontalStack>
                                     )}
                                     <TextField
@@ -125,6 +131,7 @@ function DomainsCard() {
                                         placeholder="Add domain e.g. openai.com"
                                         autoComplete="off"
                                         connectedRight={
+                                            <AllowedAction allowed={canUpdateDomains}>
                                             <Button
                                                 primary
                                                 loading={saving[key]}
@@ -133,6 +140,7 @@ function DomainsCard() {
                                             >
                                                 Add
                                             </Button>
+                                            </AllowedAction>
                                         }
                                     />
                                 </VerticalStack>
@@ -147,6 +155,7 @@ function DomainsCard() {
 
 function ProxyPatterns() {
     const [switchProxyMode, setSwitchProxyMode] = useState(false)
+    const { canCall } = usePermissions()
 
     async function onFetch() {
         const { map, switchProxyMode: mode } = await fetchProxyPatterns()
@@ -175,7 +184,7 @@ function ProxyPatterns() {
 
     const extraContent = (
         <>
-            <ToggleComponent text="Proxy Mode" onToggle={handleToggle} initial={switchProxyMode} />
+            <ToggleComponent text="Proxy Mode" onToggle={handleToggle} initial={switchProxyMode} disabled={!canCall('api/addMatchingPatternForProxy')} />
             {!switchProxyMode && <Banner status="warning">Enable proxy mode to add patterns.</Banner>}
         </>
     )
@@ -195,6 +204,8 @@ function ProxyPatterns() {
             onAdd={onAdd}
             onDelete={onDelete}
             patternKey="pattern"
+            addRequires="api/addMatchingPatternForProxy"
+            deleteRequires="api/deleteProxyPattern"
             additionalCards={[<DomainsCard key="domains-card" />]}
         />
     )

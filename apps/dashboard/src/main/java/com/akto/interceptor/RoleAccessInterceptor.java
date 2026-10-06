@@ -8,6 +8,7 @@ import com.mongodb.client.model.Filters;
 import com.akto.audit_logs_util.Audit;
 import com.akto.audit_logs_util.AuditLogsUtil;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC;
@@ -71,12 +72,37 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         this.collectionScope = collectionScope;
     }
 
-    // Error for Argus users limited to specific collections, or null if the request is allowed
-    private String checkCollectionScope(Object action, User user) {
+    public String getFeatureLabel() {
+        return featureLabel;
+    }
+
+    public String getAccessType() {
+        return accessType;
+    }
+
+    public String getCollectionScope() {
+        return collectionScope;
+    }
+
+    // Error for users limited to specific collections, or null if the request is allowed
+    private String checkCollectionScope(Object action, User user, int accountId) {
+        return collectionScopeError(collectionScope, action, user, accountId);
+    }
+
+    static String collectionScopeError(String collectionScope, Object action, User user, int accountId) {
         if (collectionScope == null) return null;
+        RbacEnums.CollectionScope scope = RbacEnums.CollectionScope.valueOf(collectionScope.toUpperCase());
+        if (scope == RbacEnums.CollectionScope.ALL_COLLECTIONS) {
+            // users, roles and SSO change access to every collection, so they are for admins of all collections only.
+            // Collection limits apply only with the RBAC feature.
+            if (!UsageMetricCalculator.isRbacFeatureAvailable(accountId)) return null;
+            List<Integer> userCollections = UsersCollectionsList.getAssignedCollectionIds(user.getId(), accountId);
+            return userCollections == null || userCollections.isEmpty() ? null
+                    : "Only admins with access to all collections can manage users, roles and SSO.";
+        }
         List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(user);
         if (restrictedIds == null) return null;
-        switch (RbacEnums.CollectionScope.valueOf(collectionScope.toUpperCase())) {
+        switch (scope) {
             case ACCOUNT_WIDE:
                 return "Users limited to specific collections cannot change account-wide settings.";
             case OWN_COLLECTION:
@@ -97,6 +123,42 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         }
     }
 
+    public static final String ROLE_DENIED_MESSAGE = "Your role does not have access to this. Ask an admin if you need it.";
+
+    /*
+     * Why the user may not call an action with these role check settings, or null if they may. The interceptor and the
+     * permissions sent to the UI both use this, so what the UI hides is exactly what the server refuses.
+     * The product check (no role in the product) and non-metered dashboards are handled by the callers.
+     */
+    public static String accessError(String featureLabel, String accessType, String collectionScope, Object action,
+                                     User user, int accountId, Role userRoleRecord) {
+        // relaxed to full access for accounts without the paid RBAC feature, except admin actions
+        if (!(UsageMetricCalculator.isRbacFeatureAvailable(accountId) || featureLabel.equalsIgnoreCase(Feature.ADMIN_ACTIONS.toString()))) {
+            return null;
+        }
+        Feature featureType = Feature.valueOf(featureLabel.toUpperCase());
+        // custom roles: threat toggle and per-feature overrides
+        ReadWriteAccess accessGiven = RBACDao.resolveFeatureAccess(user.getId(), accountId, featureType,
+                userRoleRecord.getReadWriteAccessForFeature(featureType));
+        if (!hasRequiredAccess(featureLabel, accessType, accessGiven, userRoleRecord.getName().toUpperCase())) {
+            return ROLE_DENIED_MESSAGE;
+        }
+        return collectionScopeError(collectionScope, action, user, accountId);
+    }
+
+    /** Whether a role with the given access to the action's feature may call it. Admin actions need the Admin role. */
+    static boolean hasRequiredAccess(String featureLabel, String accessType, ReadWriteAccess accessGiven, String userRole) {
+        if (featureLabel.equals(Feature.ADMIN_ACTIONS.name())) {
+            return Role.ADMIN.name().equals(userRole);
+        }
+        if (accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || accessType.equalsIgnoreCase(accessGiven.toString())) {
+            return !accessGiven.equals(ReadWriteAccess.NO_ACCESS);
+        }
+        return false;
+    }
+
+    private static final boolean DENY_ON_ERROR = "true".equalsIgnoreCase(System.getenv("AKTO_RBAC_DENY_ON_ERROR"));
+
     public final static String FORBIDDEN = "FORBIDDEN";
     public final static String USER = "user";
 
@@ -104,6 +166,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
         try {
             Object accountIdObj = session.get(UserDetailsFilter.ACCOUNT_ID);
             String accountIdStr = accountIdObj == null ? null : accountIdObj+"";
+            if(accountIdStr == null && Context.accountId.get() != null){
+                // sessions used straight from the API (no page load) have no account yet; UserDetailsFilter already
+                // picked one of the user's own accounts for this request. Without this the checks below were skipped.
+                accountIdStr = String.valueOf(Context.accountId.get());
+            }
             if(accountIdStr == null){
                 throw new Exception("found account id as null in interceptor");
             }
@@ -149,6 +216,8 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
             timeNow = Context.now();
             int userId = user.getId();
+            // drop cached access if it was changed on another dashboard instance
+            RbacCacheVersionDao.syncIfChanged(sessionAccId);
 
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
 
@@ -176,7 +245,9 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
             if (!isOnboardingRequest && userRoleRecord.equals(Role.NO_ACCESS)) {
                 HttpServletResponse response = (HttpServletResponse) ServletActionContext.getResponse();
                 response.setHeader("X-No-Access-Error", "true");
-                ((ActionSupport) invocation.getAction()).addActionError("You do not have access to this product. Please ask Admin to grant access or navigate to accessible product");
+                ((ActionSupport) invocation.getAction()).addActionError(RBACDao.hasMissingRole(userId, sessionAccId)
+                        ? "Your role was removed. Ask an admin to give you a new role."
+                        : "You don't have access to this product. Ask an admin for access, or switch to another product.");
 
                 String contextSourceStr = contextSource.toString();
                 logger.debug("Access denied for user " + user.getLogin() + " to product scope: " + contextSourceStr);
@@ -239,36 +310,11 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
                 return invocation.invoke();
             }
 
-            Feature featureType = Feature.valueOf(this.featureLabel.toUpperCase());
-
-            ReadWriteAccess accessGiven = userRoleRecord.getReadWriteAccessForFeature(featureType);
-
-            /*
-             * Threat protection is the one feature a custom role can be granted or denied
-             * independently of its base role. Scoped to this feature because resolving it
-             * costs a custom role lookup.
-             */
-            if (featureType == Feature.THREAT_PROTECTION) {
-                accessGiven = RBACDao.resolveThreatAccess(userId, sessionAccId, accessGiven);
-            }
-
-            boolean hasRequiredAccess = false;
-
-            if(this.accessType.equalsIgnoreCase(ReadWriteAccess.READ.toString()) || this.accessType.equalsIgnoreCase(accessGiven.toString())){
-                hasRequiredAccess = !accessGiven.equals(ReadWriteAccess.NO_ACCESS);
-            }
-            if(featureLabel.equals(Feature.ADMIN_ACTIONS.name())){
-                hasRequiredAccess = userRole.equals(Role.ADMIN.name());
-            }
-
-            if(!hasRequiredAccess) {
-                ((ActionSupport) invocation.getAction()).addActionError("The role '" + userRole + "' does not have access.");
-                return FORBIDDEN;
-            }
-
-            String collectionScopeError = checkCollectionScope(invocation.getAction(), user);
-            if (collectionScopeError != null) {
-                ((ActionSupport) invocation.getAction()).addActionError(collectionScopeError);
+            String accessError = accessError(featureLabel, accessType, collectionScope, invocation.getAction(), user, sessionAccId, userRoleRecord);
+            if (accessError != null) {
+                // app log only (no DB write), so a page repeatedly calling an API it cannot use adds no load
+                logger.info("RBAC denied api: " + invocation.getProxy().getActionName() + " userId: " + userId + " role: " + userRole + " feature: " + featureLabel + " " + accessType);
+                ((ActionSupport) invocation.getAction()).addActionError(accessError);
                 return FORBIDDEN;
             }
 
@@ -349,8 +395,14 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
 
         } catch(Exception e) {
             String api = invocation.getProxy().getActionName();
-            String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage();
+            // A failed access check must not grant access. Until AKTO_RBAC_DENY_ON_ERROR is on, it is only logged (report-only).
+            boolean deny = DENY_ON_ERROR && DashboardMode.isMetered();
+            String error = "Error in RoleInterceptor for api: " + api + " ERROR: " + e.getMessage() + (deny ? " (denied)" : " (allowed, report-only)");
             loggerMaker.errorAndAddToDb(e, error);
+            if (deny) {
+                ((ActionSupport) invocation.getAction()).addActionError("Unable to verify your access. Please try again or contact your admin.");
+                return FORBIDDEN;
+            }
         }
 
         String result = invocation.invoke();

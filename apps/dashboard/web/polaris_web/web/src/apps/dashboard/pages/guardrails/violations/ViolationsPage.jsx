@@ -62,6 +62,8 @@ import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/Insi
 import InsightsEntryButton from "@/apps/dashboard/pages/observe/agentic/insights/InsightsEntryButton";
 import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insights/useInsightsEntryPoint";
 import { INSIGHT_GROUP } from "@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
 
 // ─── Method → display type mapping ──────────────────────────────────────────────
 
@@ -201,9 +203,12 @@ function ReasonCellRenderer({ value }) {
 // Needs Approval tab only. Stops the click from bubbling into the row's onRowClicked (which
 // would otherwise open the ViolationFlyout instead of the approve modal).
 function ApproveCellRenderer({ data, onApprove }) {
+    const { canCall } = usePermissions();
     return (
         <div onClick={(e) => e.stopPropagation()}>
-            <Button size="slim" onClick={() => onApprove?.(data)}>Approve</Button>
+            <AllowedAction allowed={canCall("api/approveServerForPolicy")}>
+                <Button size="slim" onClick={() => onApprove?.(data)}>Approve</Button>
+            </AllowedAction>
         </div>
     );
 }
@@ -235,6 +240,7 @@ const DEFAULT_COL_DEF = {
 };
 
 function HumanResponseCellRenderer({ value, data, onHumanApproval }) {
+    const { canCall } = usePermissions();
     const response = data?.humanResponse ?? value;
     const pending = isHumanApprovalPending(response);
     return (
@@ -244,6 +250,7 @@ function HumanResponseCellRenderer({ value, data, onHumanApproval }) {
                 <HumanApprovalActions
                     pending
                     subtle
+                    allowed={canCall("api/updateMaliciousEventStatus")}
                     onApprove={() => onHumanApproval?.(data, "APPROVED")}
                     onBlock={() => onHumanApproval?.(data, "BLOCKED")}
                 />
@@ -1549,19 +1556,20 @@ function Violations() {
     }, [getSelectedPendingIds, clearBulkSelection, triggerTableRefresh]);
 
     const bulkActions = useMemo(() => {
+        // AgGridTable disables (with the reason) actions whose `requires` the role can't call
         if (isHumanApprovalTab) {
             const actions = [];
             if (bulkPendingCount > 0) {
-                actions.push({ label: "Approve", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.APPROVED) });
-                actions.push({ label: "Deny", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.BLOCKED) });
+                actions.push({ label: "Approve", requires: "api/updateMaliciousEventStatus", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.APPROVED) });
+                actions.push({ label: "Deny", requires: "api/updateMaliciousEventStatus", onAction: () => handleBulkHumanApproval(HUMAN_RESPONSE.BLOCKED) });
             }
-            actions.push({ label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) });
+            actions.push({ label: "Delete", requires: "api/deleteMaliciousEvents", destructive: true, onAction: () => setDeleteConfirmOpen(true) });
             return actions;
         }
         return [
-            { label: "Mark for Review", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
-            { label: "Ignore", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
-            { label: "Delete", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
+            { label: "Mark for Review", requires: "api/updateMaliciousEventStatus", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
+            { label: "Ignore", requires: "api/updateMaliciousEventStatus", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
+            { label: "Delete", requires: "api/deleteMaliciousEvents", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
         ];
     }, [isHumanApprovalTab, bulkPendingCount, handleBulkStatusUpdate, handleBulkHumanApproval]);
 

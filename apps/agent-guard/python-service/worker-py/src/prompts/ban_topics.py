@@ -2,6 +2,8 @@
 
 from typing import Any
 
+from ._abcd import to_abcd
+
 DEFAULT = """You are a security system that detects whether a message discusses or relates to specific banned topics.
 
 Banned topics: %s
@@ -69,6 +71,17 @@ Text to analyze:
 %s"""
 
 
+# Single-letter variants, derived from the JSON templates above.
+_ABCD_KWARGS = {
+    "flag_key": "isBanned",
+    "safe": "NO BANNED TOPIC",
+    "flag": "BANNED TOPIC",
+    "near_miss": "a banned topic in an educational, defensive, fictional, or incidental context",
+}
+DEFAULT_ABCD = to_abcd(DEFAULT, label="ban_topics/default", **_ABCD_KWARGS)
+GEMMA_ABCD = to_abcd(GEMMA, label="ban_topics/gemma", **_ABCD_KWARGS)
+
+
 def _format_topic_entry(topic: str, descriptions: dict[str, str], sample_phrases: dict[str, list]) -> str:
     lines = [f"- {topic}"]
     desc = descriptions.get(topic, "")
@@ -95,12 +108,14 @@ def _format_topics(
     return ", ".join(str(t) for t in topics if t)
 
 
-def build(config: dict[str, Any], provider_name: str, text: str) -> str:
+def build(config: dict[str, Any], provider_name: str, text: str, response_format: str = "") -> str:
     topics_str = _format_topics(
         config.get("topics", []),
         config.get("topicDescriptions", {}),
         config.get("topicSamplePhrases", {}),
     )
     # Any Gemma backend (gemma_vertexai, gemma_foundry) gets the Gemma-tuned prompt.
-    template = GEMMA if provider_name.startswith("gemma") else DEFAULT
-    return template % (topics_str, text)
+    gemma = provider_name.startswith("gemma")
+    if response_format == "abcd":
+        return (GEMMA_ABCD if gemma else DEFAULT_ABCD) % (topics_str, text)
+    return (GEMMA if gemma else DEFAULT) % (topics_str, text)

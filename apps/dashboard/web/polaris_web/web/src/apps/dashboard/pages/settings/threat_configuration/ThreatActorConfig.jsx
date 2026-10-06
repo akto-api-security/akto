@@ -3,9 +3,12 @@ import func from "@/util/func"
 import { LegacyCard, VerticalStack, HorizontalStack, Divider, Text, Button, Box, Autocomplete, TextField, HorizontalGrid } from "@shopify/polaris";
 import api from "../../../pages/threat_detection/api.js";
 import Dropdown from "../../../components/layouts/Dropdown.jsx";
+import AllowedAction from "../../../components/shared/AllowedAction";
+import { usePermissions, whenAllowed } from "@/util/permissions";
 import { DeleteMinor } from "@shopify/polaris-icons"
 
 const ThreatActorConfigComponent = ({ title, description }) => {
+    const { canCall } = usePermissions();
     const [actorIds, setActorIds] = useState([]);
     const [isSaveDisabled, setIsSaveDisabled] = useState(true);
 
@@ -89,7 +92,8 @@ const ThreatActorConfigComponent = ({ title, description }) => {
                 content: 'Save',
                 onAction: onSave,
                 loading: false,
-                disabled: isSaveDisabled
+                disabled: isSaveDisabled,
+                ...whenAllowed(canCall('api/modifyThreatConfiguration'))
             }}
         >
             <Divider />
@@ -123,7 +127,7 @@ const ThreatActorConfigComponent = ({ title, description }) => {
                         </HorizontalGrid>
                     ))}
                     <HorizontalStack align="space-between">
-                        <Button onClick={addActorId}>Add Actor ID</Button>
+                        <AllowedAction allowed={canCall('api/modifyThreatConfiguration')}><Button onClick={addActorId}>Add Actor ID</Button></AllowedAction>
                     </HorizontalStack>
                 </VerticalStack>
             </LegacyCard.Section>

@@ -24,6 +24,8 @@ import TlsAuth from '../user_config/TlsAuth';
 import SampleDataAuth from '../user_config/SampleDataAuth';
 import DigestAuth from '../user_config/DigestAuth';
 import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH, COPILOT_OAUTH } from "./TestRoleConstants";
+import { usePermissions, whenAllowed } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 
 
@@ -61,6 +63,9 @@ const AuthComponent = ({
   const [digestAuthInfo, setDigestAuthInfo] = useState({ authParams: [] });
   const [copilotOAuthInfo, setCopilotOAuthInfo] = useState({ tenantId: "", clientId: "", clientSecret: "" });
   const [copilotConnecting, setCopilotConnecting] = useState(false);
+  const { canCall, canCallAll } = usePermissions();
+  // saving an auth also re-saves the role
+  const canSaveAuth = canCallAll(editableDoc > -1 ? 'api/updateAuthInRole' : 'api/addAuthToRole', 'api/updateTestRoles');
 
   useEffect(() => {
     if (showAuthComponent && editableDoc >= 0 && initialItems?.authWithCondList?.[editableDoc]) {
@@ -324,6 +329,7 @@ const AuthComponent = ({
       primaryFooterAction={openAuth !== COPILOT_OAUTH ? {
         content: <div data-testid="save_token_details_button">Save</div>,
         onAction: handleSaveAuthMechanism,
+        ...whenAllowed(canSaveAuth)
       } : undefined}
     >
       <LegacyCard.Section title="Token details">
@@ -526,9 +532,11 @@ const AuthComponent = ({
                   autoComplete="off"
                 />
               </FormLayout>
+              <AllowedAction allowed={canSaveAuth && canCall('api/copilot/getAuthorizationUrl')}>
               <Button primary loading={copilotConnecting} onClick={handleCopilotSaveAndConnect}>
                 Save &amp; Connect with Microsoft
               </Button>
+              </AllowedAction>
             </VerticalStack>
           </Collapsible>
       </LegacyStack>
@@ -630,9 +638,11 @@ const AuthComponent = ({
           <Button disabled>Add auth</Button>
         </Tooltip>
       ) : (
+        <AllowedAction allowed={canCallAll('api/addAuthToRole', 'api/updateTestRoles')}>
         <Button primary onClick={() => setShowAuthComponent(true)}>
           <div data-testid="add_auth_button">Add auth</div>
         </Button>
+        </AllowedAction>
       )}
     </HorizontalStack>
   );

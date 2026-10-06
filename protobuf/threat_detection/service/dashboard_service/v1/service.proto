@@ -195,6 +195,15 @@ message FetchMaliciousEventsResponse {
   repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
 }
 
+// Limits an aggregation to some agents' events, matched like ListMaliciousRequestsRequest.Filter's
+// hosts / loose_host_keys / claude_device_ids (ORed). Set for users limited to specific collections;
+// when set with every list empty, nothing matches.
+message HostScope {
+  repeated string hosts = 1;
+  repeated string loose_host_keys = 2;
+  repeated string claude_device_ids = 3;
+}
+
 message ListThreatApiRequest {
   message Filter {
     repeated string urls = 1;
@@ -207,6 +216,7 @@ message ListThreatApiRequest {
   uint32 limit = 2;
   map<string, int32> sort = 3;
   Filter filter = 4;
+  optional HostScope host_scope = 5;
 }
 
 message ListThreatApiResponse {
@@ -227,6 +237,7 @@ message ThreatActorByCountryRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  optional HostScope host_scope = 4;
 }
 
 message ThreatActorByCountryResponse {
@@ -243,6 +254,7 @@ message ThreatCategoryWiseCountRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   string status = 4;
+  optional HostScope host_scope = 5;
 }
 
 message ThreatActorFilterRequest {
@@ -270,6 +282,7 @@ message ThreatSeverityWiseCountRequest {
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
   string status = 4;
+  optional HostScope host_scope = 5;
 }
 
 message ThreatSeverityWiseCountResponse {
@@ -285,6 +298,7 @@ message DailyActorsCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  optional HostScope host_scope = 4;
 }
 
 message DailyActorsCountResponse {
@@ -308,6 +322,7 @@ message ThreatActivityTimelineRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   repeated string latest_attack = 3;
+  optional HostScope host_scope = 4;
 }
 
 message ThreatActivityTimelineResponse {
@@ -478,6 +493,7 @@ message FetchTopNDataRequest {
   repeated string latest_attack = 3;
   uint32 limit = 4;
   optional string status = 5; // Narrow top hosts to one status (e.g. ACTIVE); omitted counts every status
+  optional HostScope host_scope = 6;
 }
 
 message FetchTopNDataResponse {
@@ -528,6 +544,7 @@ message FetchHostSeverityCountsResponse {
 message FetchSkillSeverityCountsRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  optional HostScope host_scope = 3;
 }
 
 message FetchSkillSeverityCountsResponse {
@@ -546,6 +563,7 @@ message FetchDashboardTopDataRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
   uint32 limit = 3;
+  optional HostScope host_scope = 4;
 }
 
 message FetchDashboardTopDataResponse {

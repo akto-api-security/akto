@@ -18,6 +18,7 @@ import useTable from "../components/tables/TableContext";
 import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
 import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
+import { loadPermissions } from "@/util/permissions";
 
 
 function Dashboard() {
@@ -84,6 +85,8 @@ function Dashboard() {
     // Onboarding flow disabled - alert monitoring used to be skipped on /onboarding
     // because its APIs could 403 during setup. Nothing routes there any more.
     useEffect(() => {
+        // what this user can do here, so pages hide or disable what they can't use
+        loadPermissions()
         selectItems([])
         // if (location.pathname.includes('/onboarding')) {
         //     return;

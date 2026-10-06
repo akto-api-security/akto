@@ -258,9 +258,9 @@ public class TestArgusScopedActions extends ArgusScopeTestBase {
         action.setTraceId(traceId);
         RoleAccessInterceptor interceptor = new RoleAccessInterceptor();
         interceptor.setCollectionScope("OWN_COLLECTION");
-        Method method = RoleAccessInterceptor.class.getDeclaredMethod("checkCollectionScope", Object.class, User.class);
+        Method method = RoleAccessInterceptor.class.getDeclaredMethod("checkCollectionScope", Object.class, User.class, int.class);
         method.setAccessible(true);
-        return (String) method.invoke(interceptor, action, user(userId));
+        return (String) method.invoke(interceptor, action, user(userId), ACCOUNT_ID);
     }
 
     @Test

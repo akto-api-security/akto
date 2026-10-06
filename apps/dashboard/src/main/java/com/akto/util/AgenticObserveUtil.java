@@ -113,6 +113,10 @@ public final class AgenticObserveUtil {
         return collection != null && hasTagKey(collection.getEnvType(), Constants.AKTO_SAAS_AGENT_TAG);
     }
 
+    public static String getSaasAgentTagValue(ApiCollection collection) {
+        return collection == null ? null : getTagValue(collection.getEnvType(), Constants.AKTO_SAAS_AGENT_TAG);
+    }
+
     // The plugin's own name, from its plugin-name tag; falls back to the hostname's trailing segment.
     public static String getPluginName(ApiCollection collection) {
         if (!isPluginCollection(collection)) return null;

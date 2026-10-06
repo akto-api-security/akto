@@ -4,11 +4,13 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
+import { usePermissions, whenAllowed } from '@/util/permissions'
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function CloudflareWaf() {
+    const { canCall } = usePermissions()
     const [accountOrZoneId, setAccountOrZoneId] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [integrationType, setIntegrationType] = useState('zones');
@@ -21,8 +23,8 @@ function CloudflareWaf() {
 
     const wafCard = (
         <LegacyCard
-            primaryFooterAction={{content: 'Save', onAction: () => addCloudflareWafIntegration()}}
-            secondaryFooterActions={[{content: 'Delete', onAction: () => deleteCloudflareWafIntegration()}]}
+            primaryFooterAction={{content: 'Save', onAction: () => addCloudflareWafIntegration(), ...whenAllowed(canCall('api/addCloudflareWafIntegration'))}}
+            secondaryFooterActions={[{content: 'Delete', onAction: () => deleteCloudflareWafIntegration(), ...whenAllowed(canCall('api/deleteCloudflareWafIntegration'))}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Cloudflare-WAF</Text>
@@ -93,7 +95,7 @@ function CloudflareWaf() {
 
     let cardContent = "Seamlessly enhance your web application security with Cloudflare-WAF integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
     return (
-        <IntegrationsLayout title= "Cloudflare WAF" cardContent={cardContent} component={wafCard} docsUrl=""/>
+        <IntegrationsLayout title= "Cloudflare WAF" cardContent={cardContent} component={wafCard} docsUrl="" readOnly={!canCall('api/addCloudflareWafIntegration')}/>
     )
 }
 

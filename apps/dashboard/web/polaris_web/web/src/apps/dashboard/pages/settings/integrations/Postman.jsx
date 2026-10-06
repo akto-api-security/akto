@@ -5,9 +5,11 @@ import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import Dropdown from '../../../components/layouts/Dropdown';
 import Store from '../../../store';
+import { usePermissions, whenAllowed } from '@/util/permissions';
 
 function Postman() {
     
+    const { canCall } = usePermissions()
     const [postmanKey, setPostmanKey] = useState('');
     const [workspaces, setWorkspaces] = useState([]);
     const [selected, setSelected] = useState('');
@@ -76,7 +78,7 @@ function Postman() {
     const PostmanCard = (
         <LegacyCard
             secondaryFooterActions={[{content: 'See how it works',onAction: seeWork}]}
-            primaryFooterAction={{content: 'Save', onAction: saveCollection}}
+            primaryFooterAction={{content: 'Save', onAction: saveCollection, ...whenAllowed(canCall('api/addOrUpdatePostmanCred'))}}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Postman</Text>
@@ -102,7 +104,7 @@ function Postman() {
 
     let cardContent = "Seamlessly enhance your web application security with Postman integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
     return (
-        <IntegrationsLayout title= "Postman" cardContent={cardContent} component={PostmanCard} docsUrl="https://docs.akto.io/traffic-connections/postman"/> 
+        <IntegrationsLayout title= "Postman" cardContent={cardContent} component={PostmanCard} docsUrl="https://docs.akto.io/traffic-connections/postman" readOnly={!canCall('api/addOrUpdatePostmanCred')}/> 
     )
 }
 

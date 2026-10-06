@@ -8,8 +8,11 @@ import AgenticHistoryModal from './components/AgenticHistoryModal';
 import AgenticConversationPage from './AgenticConversationPage';
 import { getConversationsList } from './services/agenticService';
 import func from '@/util/func';
+import { usePermissions, NO_PERMISSION_REASON } from '@/util/permissions';
 
 function AgenticMainPage() {
+    const { canCall } = usePermissions();
+    const canChat = canCall('api/chatAndStore');
     // In a real app, this might come from a context or prop
     const username = (window.USER_FULL_NAME?.length > 0) ? window.USER_FULL_NAME : func.extractEmailDetails(window.USER_NAME)?.username || ""
 
@@ -127,10 +130,11 @@ function AgenticMainPage() {
                             value={searchValue}
                             onChange={setSearchValue}
                             onSubmit={handleSearchSubmit}
+                            {...(canChat ? {} : { disabled: true, placeholder: NO_PERMISSION_REASON })}
                         />
                         <AgenticSuggestions
                             onSuggestionClick={handleSuggestionClick}
-                            hide={searchValue.trim().length > 0}
+                            hide={searchValue.trim().length > 0 || !canChat}
                         />
                     </VerticalStack>    
                     <AgenticHistoryCards

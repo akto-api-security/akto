@@ -8,6 +8,8 @@ import "./rows/row.css";
 import { debounce } from 'lodash';
 import { AgGridRowRenderer } from "./rows/AgGridRow";
 import { CellType } from "./rows/GithubRow";
+import { withPermissions } from "@/util/permissions";
+import AllowedAction from "../shared/AllowedAction";
 
 const AG_GRID_COLUMN_TYPES = {
     [CellType.TEXT]: { cellRenderer: "agGridRow" },
@@ -84,10 +86,12 @@ function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
                     </HorizontalStack>
                     {bulkActions.length > 0 && (
                         <HorizontalStack gap="2">
-                            {bulkActions.map(action => (
-                                <Button key={action.label} size="slim" destructive={action.destructive} onClick={action.onAction}>
-                                    {action.label}
-                                </Button>
+                            {withPermissions(bulkActions).map(action => (
+                                <AllowedAction key={action.label} allowed={!action.disabled} reason={action.helpText}>
+                                    <Button size="slim" destructive={action.destructive} onClick={action.onAction}>
+                                        {action.label}
+                                    </Button>
+                                </AllowedAction>
                             ))}
                         </HorizontalStack>
                     )}

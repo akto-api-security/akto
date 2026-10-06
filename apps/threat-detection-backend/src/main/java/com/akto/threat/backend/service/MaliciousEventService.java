@@ -545,33 +545,11 @@ public class MaliciousEventService {
     // their own, attributed by device id instead) — see the Filter.search_text/loose_host_keys/
     // claude_device_ids/match_claude_config proto doc comments for the client-side derivation this
     // mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
-    List<Document> hostOrConditions = new ArrayList<>();
-    if (!filter.getHostsList().isEmpty()) {
-      hostOrConditions.add(new Document("host", new Document("$in", filter.getHostsList())));
-    }
-    if (!filter.getLooseHostKeysList().isEmpty()) {
-      Document looseKeyExpr = new Document("$concat", Arrays.asList(
-          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0)),
-          " ",
-          new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), -1))
-      ));
-      hostOrConditions.add(new Document("$expr",
-          new Document("$in", Arrays.asList(looseKeyExpr, filter.getLooseHostKeysList()))));
-    }
-    Document claudeConfigHostMatch = new Document("host",
-        Pattern.compile("^[^.]+\\.(claude-settings|claude)$", Pattern.CASE_INSENSITIVE));
-    if (filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig()) {
-      hostOrConditions.add(claudeConfigHostMatch);
-    } else if (!filter.getClaudeDeviceIdsList().isEmpty()) {
-      Document deviceIdExpr = new Document("$arrayElemAt", Arrays.asList(new Document("$split", Arrays.asList("$host", ".")), 0));
-      hostOrConditions.add(new Document("$and", Arrays.asList(
-          claudeConfigHostMatch,
-          new Document("$expr", new Document("$in", Arrays.asList(deviceIdExpr, filter.getClaudeDeviceIdsList())))
-      )));
-    }
+    Document hostMatch = ThreatUtils.hostAttributionMatch(filter.getHostsList(), filter.getLooseHostKeysList(),
+        filter.getClaudeDeviceIdsList(), filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig());
     List<Document> extraAndClauses = new ArrayList<>();
-    if (!hostOrConditions.isEmpty()) {
-      extraAndClauses.add(hostOrConditions.size() == 1 ? hostOrConditions.get(0) : new Document("$or", hostOrConditions));
+    if (hostMatch != null) {
+      extraAndClauses.add(hostMatch);
     }
     if (filter.hasSearchText() && !filter.getSearchText().isEmpty()) {
       Pattern searchPattern = Pattern.compile(Pattern.quote(filter.getSearchText()), Pattern.CASE_INSENSITIVE);

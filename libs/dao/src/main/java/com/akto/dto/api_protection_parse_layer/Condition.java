@@ -1,6 +1,13 @@
 package com.akto.dto.api_protection_parse_layer;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+@Getter
+@Setter
+@NoArgsConstructor
 public class Condition {
 
     private int matchCount;
@@ -8,64 +15,32 @@ public class Condition {
     private String incrementFilter;
     private String thresholdBreachFilter;
     private DistinctIdentifier distinctIdentifier;
-
-    public static class DistinctIdentifier {
-        private int count;
-        private String source; // "request_payload", "response_payload", "request_headers"
-        private String key;
-
-        public DistinctIdentifier() {}
-
-        public DistinctIdentifier(int count, String source, String key) {
-            this.count = count;
-            this.source = source;
-            this.key = key;
-        }
-
-        public int getCount() { return count; }
-        public void setCount(int count) { this.count = count; }
-        public String getSource() { return source; }
-        public void setSource(String source) { this.source = source; }
-        public String getKey() { return key; }
-        public void setKey(String key) { this.key = key; }
-    }
-
-    public Condition() {
-    }
+    private ValueSource groupBy;
 
     public Condition(int matchCount, int windowThreshold) {
         this.matchCount = matchCount;
         this.windowThreshold = windowThreshold;
     }
 
-    public int getMatchCount() {
-        return matchCount;
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ValueSource {
+        private String source; // "request_payload", "response_payload", "request_headers"
+        private String key;
     }
-    public void setMatchCount(int matchCount) {
-        this.matchCount = matchCount;
-    }
-    public int getWindowThreshold() {
-        return windowThreshold;
-    }
-    public void setWindowThreshold(int windowThreshold) {
-        this.windowThreshold = windowThreshold;
-    }
-    public DistinctIdentifier getDistinctIdentifier() {
-        return distinctIdentifier;
-    }
-    public void setDistinctIdentifier(DistinctIdentifier distinctIdentifier) {
-        this.distinctIdentifier = distinctIdentifier;
-    }
-    public String getIncrementFilter() {
-        return incrementFilter;
-    }
-    public void setIncrementFilter(String incrementFilter) {
-        this.incrementFilter = incrementFilter;
-    }
-    public String getThresholdBreachFilter() {
-        return thresholdBreachFilter;
-    }
-    public void setThresholdBreachFilter(String thresholdBreachFilter) {
-        this.thresholdBreachFilter = thresholdBreachFilter;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class DistinctIdentifier extends ValueSource {
+        private int count;
+        private String attribute; // built-in value used instead of source/key, e.g. "country_code"
+
+        public DistinctIdentifier(int count, String source, String key) {
+            super(source, key);
+            this.count = count;
+        }
     }
 }

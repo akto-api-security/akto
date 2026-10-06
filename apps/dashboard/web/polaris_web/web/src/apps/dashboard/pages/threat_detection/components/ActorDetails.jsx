@@ -5,7 +5,10 @@ import { ActivityLog } from "./ActivityLog";
 import Store from "../../../store";
 import api from "../api";
 import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
+    const { canCall } = usePermissions();
     const [ipStatus, setIpStatus] = useState(actorDetails.status || "active")
     const [showModal, setShowModal] = useState(false)
     const [activityLog, setActivityLog] = useState([])
@@ -63,7 +66,7 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
                 </VerticalStack>
                 {!isEndpointSecurityCategory() && (
                     <Modal
-                        activator={<Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button>}
+                        activator={<AllowedAction allowed={canCall('api/modifyThreatActorStatus')}><Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button></AllowedAction>}
                         open={showModal}
                         onClose={() => setShowModal(false)}
                         primaryAction={
