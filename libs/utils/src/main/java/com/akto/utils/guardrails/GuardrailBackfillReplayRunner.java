@@ -90,7 +90,6 @@ public final class GuardrailBackfillReplayRunner {
 
         List<BasicDBObject> items = new ArrayList<>();
         Map<String, Map<String, Object>> rowById = new HashMap<>();
-        Map<String, String> envelopeById = new HashMap<>();
         for (Map<String, Object> row : batch) {
             String prompt = asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD));
             if (StringUtils.isBlank(prompt)) {
@@ -104,7 +103,6 @@ public final class GuardrailBackfillReplayRunner {
                 prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)));
             items.add(new BasicDBObject("id", id).append("envelope", envelope));
             rowById.put(id, row);
-            envelopeById.put(id, envelope);
         }
 
         // Computed even when replay/record below throws, so a caller that wants to log progress
@@ -129,8 +127,7 @@ public final class GuardrailBackfillReplayRunner {
                     String id = verdict.path("id").asText("");
                     Map<String, Object> row = rowById.get(id);
                     if (row != null) {
-                        recordDetection(accountId, policyName, contextSourceForEvents, row, envelopeById.get(id),
-                            verdict, bearerToken);
+                        recordDetection(accountId, policyName, contextSourceForEvents, row, verdict, bearerToken);
                     }
                 }
             }
@@ -146,8 +143,7 @@ public final class GuardrailBackfillReplayRunner {
      *  detectedAt a replay verdict alone would give — verdict must have been requested with
      *  includeDetectionDetails=true or category/subCategory/severity come back empty. */
     private static void recordDetection(int accountId, String policyName, String contextSource,
-                                        Map<String, Object> row, String envelope, JsonNode verdict,
-                                        String bearerToken) throws Exception {
+                                        Map<String, Object> row, JsonNode verdict, String bearerToken) throws Exception {
         String id = verdict.path("id").asText("");
         long detectedAtSec = asLong(row.get(AgentQueryRecord.F_TIMESTAMP)) / 1000L;
 
@@ -192,9 +188,7 @@ public final class GuardrailBackfillReplayRunner {
         maliciousEvent.put("latestApiMethod", GuardrailsServiceClient.TRACE_METHOD);
         maliciousEvent.put("latestApiEndpoint", GuardrailsServiceClient.TRACE_PATH);
         maliciousEvent.put("latestApiCollectionId", detectedAtSec);
-        // The replayed envelope, not the bare queryPayload: the dashboard reads method/path/
-        // requestPayload/statusCode off latestApiPayload, as it does for buildAPIPayload's output.
-        maliciousEvent.put("latestApiPayload", envelope);
+        maliciousEvent.put("latestApiPayload", asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD)));
         maliciousEvent.put("eventType", "EVENT_TYPE_SINGLE");
         maliciousEvent.put("category", category);
         maliciousEvent.put("subCategory", subCategory);
