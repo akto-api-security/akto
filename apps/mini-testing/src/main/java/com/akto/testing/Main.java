@@ -42,7 +42,6 @@ import com.akto.util.DashboardMode;
 import org.apache.commons.io.FileUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 
@@ -727,13 +726,10 @@ public class Main {
                                         + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
                                         + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                                Bson filterQ = Filters.and(
-                                    Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
-                                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                                    Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
-                                );
+                                int sinceTimestamp = Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime);
 
-                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(filterQ);
+                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(
+                                        testingRun.getHexId(), sinceTimestamp, State.FAILED);
                                 TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 TestingRunResultSummary summary;
                                 if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
@@ -749,7 +745,8 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     continue;
                                 }
-                                GithubUtils.publishGithubComments(runResultSummary);
+                                // TODO: Delete completely, disabled feature not used anymore
+                                // GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
                             loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
@@ -801,7 +798,8 @@ public class Main {
                 if (trrs.getState() == State.SCHEDULED) {
                     if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                         //case of github status push
-                        GithubUtils.publishGithubStatus(trrs);
+                        // TODO: Delete completely, disabled feature not used anymore
+                        // GithubUtils.publishGithubStatus(trrs);
 
                     }
                 }

@@ -1344,7 +1344,13 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
                 NODE_LIMIT);
     }
 
-    public static long countTestingRunResultSummaries(Bson filter){
+    public static long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state){
+        ObjectId testingRunId = new ObjectId(testingRunHexId);
+        Bson filter = Filters.and(
+                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, sinceTimestamp),
+                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+                Filters.eq(TestingRunResultSummary.STATE, state)
+        );
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 
