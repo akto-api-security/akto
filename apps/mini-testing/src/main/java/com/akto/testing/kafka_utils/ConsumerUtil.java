@@ -220,6 +220,58 @@ public class ConsumerUtil {
         TestingExecutorLifecycle.shutdownQuietly(executor, waitSeconds, force);
     }
 
+    private static void closeKafkaConsumerQuietly(Consumer<String, String> c, String context) {
+        if (c == null) return;
+        try {
+            c.close();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error closing kafka consumer (" + context + "): " + e.getMessage());
+        }
+    }
+
+    private static void closeParallelConsumerQuietly(ParallelStreamProcessor<String, String> pc, boolean abrupt) {
+        if (pc == null) return;
+        try {
+            if (abrupt) {
+                pc.closeDontDrainFirst();
+            } else {
+                pc.closeDrainFirst();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error closing parallel consumer: " + e.getClass().getSimpleName()
+                    + " " + e.getMessage());
+        }
+    }
+
+    /**
+     * Builds the Kafka consumer for this attempt and wraps it in the parallel-consumer library's
+     * processor. Assigns the static consumer field as a side effect (the consumer itself has to
+     * exist before ParallelConsumerOptions can reference it).
+     */
+    private ParallelStreamProcessor<String, String> createParallelConsumer(String summaryIdForTest, int concurrency) {
+        Properties consumerProperties = properties;
+        if (Constants.CONCURRENT_TESTING) {
+            consumerProperties = new Properties();
+            consumerProperties.putAll(properties);
+            consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, Constants.getKafkaGroupIdConfig(summaryIdForTest));
+        }
+        consumer = new KafkaConsumer<>(consumerProperties);
+        ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
+            .consumer(consumer)
+            .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
+            .maxConcurrency(concurrency)
+            .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
+            // Must stay above the underlying KafkaConsumer's own default.api.timeout.ms (60s) -
+            // a commit slower than that but still recoverable (observed: 60.006s) otherwise
+            // exhausts the whole budget before even one attempt completes, leaving zero room
+            // for the retry this setting exists to allow.
+            .offsetCommitTimeout(Duration.ofSeconds(90))
+            .batchSize(1)
+            .maxFailureHistory(3)
+            .build();
+        return ParallelStreamProcessor.createEosStreamProcessor(options);
+    }
+
     /**
      * Performs bulk update of lastTested field for all APIs that were tested
      */
@@ -284,37 +336,10 @@ public class ConsumerUtil {
 
         ParallelStreamProcessor<String, String> parallelConsumer = null;
 
-        boolean consumerFailed = false;
         TestRunMetrics.StopReason stopReason = TestRunMetrics.StopReason.UNKNOWN;
         try {
-            if (consumer != null) {
-                try {
-                    consumer.close();
-                } catch (Exception e) {
-                    loggerMaker.warnAndAddToDb("Error closing previous kafka consumer: " + e.getMessage());
-                }
-            }
-            Properties consumerProperties = properties;
-            if (Constants.CONCURRENT_TESTING) {
-                consumerProperties = new Properties();
-                consumerProperties.putAll(properties);
-                consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
-            }
-            consumer = new KafkaConsumer<>(consumerProperties);
-            ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
-                .consumer(consumer)
-                .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
-                .maxConcurrency(concurrency)
-                .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
-                // Must stay above the underlying KafkaConsumer's own default.api.timeout.ms (60s) -
-                // a commit slower than that but still recoverable (observed: 60.006s) otherwise
-                // exhausts the whole budget before even one attempt completes, leaving zero room
-                // for the retry this setting exists to allow.
-                .offsetCommitTimeout(Duration.ofSeconds(90))
-                .batchSize(1)
-                .maxFailureHistory(3)
-                .build();
-            parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
+            closeKafkaConsumerQuietly(consumer, "previous run");
+            parallelConsumer = createParallelConsumer(summaryIdForTest, concurrency);
             parallelConsumer.subscribe(Arrays.asList(topicName));
             metrics.logConsumerUp(1);
 
@@ -414,7 +439,6 @@ public class ConsumerUtil {
             }
 
         } catch (Exception e) {
-            consumerFailed = true;
             stopReason = TestRunMetrics.StopReason.ERROR;
             String errMsg = "Error in polling records summaryId=" + summaryIdForTest
                     + " polled=" + metrics.polled()
@@ -424,31 +448,18 @@ public class ConsumerUtil {
                     + " cause=" + (e.getCause() != null ? e.getCause().getClass().getName() + ": " + e.getCause().getMessage() : e.getMessage());
             loggerMaker.errorAndAddToDb(e, errMsg);
         }finally{
-            metrics.logEnd(stopReason, consumerFailed, processedRecords.get());
+            // Single source of truth: cleanup style is a deterministic function of stopReason,
+            // not a second, separately-tracked flag that has to be kept in sync by hand.
+            boolean abruptClose = stopReason == TestRunMetrics.StopReason.ERROR;
+
+            metrics.logEnd(stopReason, abruptClose, processedRecords.get());
 
             flushLastTestedUpdates();
-            shutdownExecutorQuietly(consumerFailed ? 5 : 30, consumerFailed);
+            shutdownExecutorQuietly(abruptClose ? 5 : 30, abruptClose);
 
-            if(parallelConsumer != null){
-                try {
-                    if (consumerFailed) {
-                        parallelConsumer.closeDontDrainFirst();
-                    } else {
-                        parallelConsumer.closeDrainFirst();
-                    }
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error closing parallel consumer: " + e.getClass().getSimpleName()
-                            + " " + e.getMessage());
-                }
-            }
+            closeParallelConsumerQuietly(parallelConsumer, abruptClose);
             parallelConsumer = null;
-            if (consumer != null) {
-                try {
-                    consumer.close();
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"Error closing kafka consumer: " + e.getMessage());
-                }
-            }
+            closeKafkaConsumerQuietly(consumer, "shutdown");
             Producer.deleteTestResultsTopic(summaryIdForTest);
             TestingStateStore.clear();
         }
