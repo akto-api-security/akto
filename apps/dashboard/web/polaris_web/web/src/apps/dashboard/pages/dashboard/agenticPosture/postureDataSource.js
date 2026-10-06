@@ -2,7 +2,7 @@ import postureSummaryMock from './mockData/postureSummary.mock.json'
 import agentDetailMock from './mockData/agentDetail.mock.json'
 import dashboardApi from '../api'
 
-// Real API keys override mock; sections the backend doesn't return yet still read from mock.
+// Only sections rendered under a "Coming soon" overlay use sample data; real sections never fall back to it.
 const MOCK_DELAY_MS = 250
 
 function delay(value) {
@@ -25,8 +25,11 @@ async function fetchPostureSummary(startTimestamp, endTimestamp, environment) {
         dashboardApi.fetchArgusPostureChanges(startTimestamp, endTimestamp, env).catch((error) => { console.error('fetchArgusPostureChanges failed:', error); return null }),
     ])
     return {
-        ...postureSummaryMock,
+        dangerousPaths: postureSummaryMock.dangerousPaths,
+        coverageGovernance: postureSummaryMock.coverageGovernance,
         ...summary,
+        environments: summary?.environments || [],
+        kpis: summary?.kpis || [],
         postureScore: summary?.postureScore || POSTURE_SCORE_FETCH_ERROR,
         highestRiskAgents: summary?.highestRiskAgents || [],
         changesThisWeek: changes?.rows || [],

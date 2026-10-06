@@ -213,7 +213,6 @@ function AgenticPosture() {
     const openKpiLink = (kpi) => { if (kpi.linkGroupKey) openAgent(kpi.linkGroupKey) }
 
     // Highest-risk rows carry a real ApiCollection id as groupKey, so they open the collection page.
-    const openCollection = (collectionId) => navigate(`/dashboard/observe/inventory/${encodeURIComponent(collectionId)}`)
 
     const topbar = (
         <VerticalStack gap="4">
@@ -252,27 +251,27 @@ function AgenticPosture() {
             </Section>
 
             <Section
+                title="Highest-Risk Agents"
+                description="Ranked by blast radius — privilege held, data reached, and controls missing."
+                action={<Button onClick={() => openDrill('highRiskAgents')}>View all agents</Button>}
+            >
+                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={(groupKey) => openDrill('highRiskAgents', groupKey)} />
+            </Section>
+
+            <Section title="Insights" description="Red-team, guardrail activity, and observability — the account-wide picture, each with an AI summary.">
+                <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
+            </Section>
+
+            <Section
                 title="Dangerous Execution Paths"
                 description="End-to-end chains where untrusted input reaches a privileged action against a sensitive resource with a control missing in between."
             >
                 <DangerousPathsSection dangerousPaths={pageData.dangerousPaths} />
             </Section>
 
-            <Section
-                title="Highest-Risk Agents"
-                description="Ranked by blast radius — privilege held, data reached, and controls missing."
-                action={<Button onClick={() => openDrill('highRiskAgents')}>View all agents</Button>}
-            >
-                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={openCollection} />
-            </Section>
-
             {/* <Section title="Risk by Domain" description="Where posture gaps are concentrated, and whether each domain is getting better or worse.">
                 <RiskByDomainSection riskByDomain={pageData.riskByDomain} />
             </Section> */}
-
-            <Section title="Insights" description="Red-team, guardrail activity, and observability — the account-wide picture, each with an AI summary.">
-                <InsightCardsSection cards={insightCards} summaries={insightSummaries} summariesLoading={insightSummariesLoading} onOpenRoute={navigate} onOpenDrill={openDrill} />
-            </Section>
 
             <Section title="Coverage & Governance" description="Posture is only as reliable as what Argus can see.">
                 <CoverageGovernanceSection coverageGovernance={pageData.coverageGovernance} />

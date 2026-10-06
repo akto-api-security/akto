@@ -15,9 +15,13 @@ import com.akto.dto.nhi_governance.NhiIdentity;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * One immutable snapshot of every Mongo/threat-backend read the 10 providers need,
@@ -150,6 +154,24 @@ public class InsightDataBundle {
     // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host, then actor
     // (event collection ids aren't reliable); null when the threat backend is unavailable.
     public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs) {
+        return maliciousSeverityCounts(collectionIds, startTs, null);
+    }
+
+    // Same, counting only the events that pass eventFilter (null = all events).
+    public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs,
+                                                                        Predicate<DashboardMaliciousEvent> eventFilter) {
+        return countsByCollection(collectionIds, startTs, eventFilter,
+                e -> e.getSeverity() == null ? "UNKNOWN" : e.getSeverity().toUpperCase(Locale.ROOT));
+    }
+
+    // collectionId -> {flagged data ("email", "<policy> (LLM rule)") -> count} since startTs; null when unavailable.
+    public Map<Integer, Map<String, Integer>> sensitiveDataCounts(List<Integer> collectionIds, int startTs) {
+        return countsByCollection(collectionIds, startTs, InsightUtil::isSensitiveDataEvent, InsightUtil::sensitiveDataLabel);
+    }
+
+    private Map<Integer, Map<String, Integer>> countsByCollection(List<Integer> collectionIds, int startTs,
+                                                                 Predicate<DashboardMaliciousEvent> eventFilter,
+                                                                 Function<DashboardMaliciousEvent, String> keyOf) {
         if (!threatBackendAvailable || threatAccess == null) return null;
         int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
         List<DashboardMaliciousEvent> hostCounts = hostCountsSince.get(since);
@@ -158,7 +180,9 @@ public class InsightDataBundle {
             hostCountsSince.putIfAbsent(since, hostCounts);
         }
         if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);
-        Map<Integer, Map<String, Integer>> byCollection = hostResolver.severityByCollection(hostCounts);
+        List<DashboardMaliciousEvent> events = eventFilter == null ? hostCounts
+                : hostCounts.stream().filter(eventFilter).collect(Collectors.toList());
+        Map<Integer, Map<String, Integer>> byCollection = hostResolver.countByCollection(events, keyOf);
         byCollection.keySet().retainAll(new HashSet<>(collectionIds));
         return byCollection;
     }

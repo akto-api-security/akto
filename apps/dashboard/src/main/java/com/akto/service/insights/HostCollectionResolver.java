@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * The exact/loose/claude-config three-tier host -> collection-id join, extracted from
@@ -92,14 +93,22 @@ public class HostCollectionResolver {
 
     // collectionId -> {severity -> count} over the events that resolve to a collection.
     public Map<Integer, Map<String, Integer>> severityByCollection(List<DashboardMaliciousEvent> hostCounts) {
+        return countByCollection(hostCounts,
+                e -> e.getSeverity() == null ? "UNKNOWN" : e.getSeverity().toUpperCase(Locale.ROOT));
+    }
+
+    // collectionId -> {key -> count} over the events that resolve to a collection; events with a null key are skipped.
+    public Map<Integer, Map<String, Integer>> countByCollection(List<DashboardMaliciousEvent> events,
+                                                               Function<DashboardMaliciousEvent, String> keyOf) {
         Map<Integer, Map<String, Integer>> out = new HashMap<>();
-        if (hostCounts == null) return out;
-        for (DashboardMaliciousEvent e : hostCounts) {
+        if (events == null) return out;
+        for (DashboardMaliciousEvent e : events) {
             if (e == null) continue;
+            String key = keyOf.apply(e);
+            if (key == null) continue;
             List<Integer> ids = resolveEvent(e.getHost(), e.getActor());
             if (ids.isEmpty()) continue;
-            String severity = e.getSeverity() == null ? "UNKNOWN" : e.getSeverity().toUpperCase(Locale.ROOT);
-            out.computeIfAbsent(ids.get(0), k -> new HashMap<>()).merge(severity, 1, Integer::sum);
+            out.computeIfAbsent(ids.get(0), k -> new HashMap<>()).merge(key, 1, Integer::sum);
         }
         return out;
     }

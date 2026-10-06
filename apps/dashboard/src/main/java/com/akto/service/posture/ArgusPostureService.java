@@ -76,10 +76,8 @@ public class ArgusPostureService {
     public static final String DRILL_PROTECTION_COVERAGE = KPI_PROTECTION_COVERAGE;
     public static final String DRILL_PRIVILEGED_TOOLS = KPI_PRIVILEGED_TOOLS;
     public static final String DRILL_SENSITIVE_DATA = KPI_SENSITIVE_DATA;
+    private static final int SENSITIVE_DATA_WINDOW_SECONDS = 90 * 86400;
 
-    private static final String GUARDED = "Guarded";
-    private static final String PARTLY_GUARDED = "Partly guarded";
-    private static final String UNGUARDED = "Unguarded";
 
     private static final String PROTECTION_NONE = "None";
     private static final String PROTECTION_ALERT_ONLY = "Alert only";
@@ -99,7 +97,7 @@ public class ArgusPostureService {
         kpis.add(highRiskAgentsKpi(scoped));
         kpis.add(identityAccessKpi());
         kpis.add(privilegedToolsKpi(scoped, environment, deactivatedIds));
-        kpis.add(sensitiveDataKpi(scoped, bundle.sensitiveByCollection));
+        kpis.add(sensitiveDataKpi(scoped, sensitiveViolationsByAsset(bundle, scoped)));
         kpis.add(protectionCoverageKpi(scoped, bundle.policies));
 
         BasicDBObject response = new BasicDBObject();
@@ -867,9 +865,6 @@ public class ArgusPostureService {
             kpi.put("footnote", countLine(production, "production", "None in production"));
         }
 
-        long externallyExposed = 0;
-        kpi.put("secondaryFootnote", countLine(externallyExposed, "externally exposed", "None externally exposed"));
-        kpi.put("secondaryTone", riskTone(externallyExposed, "warning"));
         return kpi;
     }
 
@@ -940,19 +935,34 @@ public class ArgusPostureService {
     }
 
     private BasicDBObject sensitiveDataKpi(List<ApiCollection> assets,
-                                           Map<Integer, List<String>> sensitiveByCollection) {
-        long withSensitive = 0;
-        for (ApiCollection asset : assets) {
-            List<String> types = sensitiveByCollection.get(asset.getId());
-            if (types != null && !types.isEmpty()) withSensitive++;
+                                           Map<Integer, Map<String, Integer>> sensitiveViolationsByAsset) {
+        long violations = 0, withSensitive = 0;
+        if (sensitiveViolationsByAsset != null) {
+            for (ApiCollection asset : assets) {
+                Map<String, Integer> bySeverity = sensitiveViolationsByAsset.get(asset.getId());
+                if (bySeverity == null || bySeverity.isEmpty()) continue;
+                withSensitive++;
+                violations += bySeverity.values().stream().mapToInt(Integer::intValue).sum();
+            }
         }
 
-        BasicDBObject kpi = kpi(KPI_SENSITIVE_DATA, "Sensitive Data", withSensitive);
-        kpi.put("footnote", "asset(s) access sensitive data");
-        long canSendExternally = 0;
-        kpi.put("secondaryFootnote", countLine(canSendExternally, "can send it externally", "None can send it externally"));
-        kpi.put("secondaryTone", riskTone(canSendExternally, "critical"));
+        BasicDBObject kpi = kpi(KPI_SENSITIVE_DATA, "Sensitive Data", violations);
+        kpi.put("footnote", sensitiveViolationsByAsset == null
+                ? "Guardrail violation data unavailable"
+                : "violation(s) in the last 90 days across " + withSensitive + " asset(s)");
         return kpi;
+    }
+
+    /** assetId -> {severity -> count} of sensitive-data guardrail violations (PII or custom LLM rule, see
+     *  InsightUtil.isSensitiveDataEvent) in the last 90 days — the same events and agent attribution the
+     *  posture score's sensitive-data category uses; null when the threat backend is unavailable. */
+    private static Map<Integer, Map<String, Integer>> sensitiveViolationsByAsset(InsightDataBundle bundle,
+                                                                               List<ApiCollection> assets) {
+        List<Integer> ids = new ArrayList<>();
+        for (ApiCollection a : assets) ids.add(a.getId());
+        if (ids.isEmpty()) return new HashMap<>();
+        return bundle.maliciousSeverityCounts(ids, Context.now() - SENSITIVE_DATA_WINDOW_SECONDS,
+                InsightUtil::isSensitiveDataEvent);
     }
 
     private BasicDBObject protectionCoverageKpi(List<ApiCollection> assets, List<GuardrailPolicies> policies) {
@@ -1035,43 +1045,23 @@ public class ArgusPostureService {
             assets.add(c);
         }
         List<ApiCollection> scoped = assetsIn(assets, environment);
+        Map<Integer, Map<String, Integer>> violationsByAsset = sensitiveViolationsByAsset(bundle, scoped);
+        List<Integer> scopedIds = new ArrayList<>();
+        for (ApiCollection a : scoped) scopedIds.add(a.getId());
+        Map<Integer, Map<String, Integer>> dataByAsset = scopedIds.isEmpty() ? new HashMap<>()
+                : bundle.sensitiveDataCounts(scopedIds, Context.now() - SENSITIVE_DATA_WINDOW_SECONDS);
 
         List<ApiCollection> withSensitive = new ArrayList<>();
-        for (ApiCollection asset : scoped) {
-            List<String> types = bundle.sensitiveByCollection.get(asset.getId());
-            if (types != null && !types.isEmpty()) withSensitive.add(asset);
-        }
-
-        GuardrailsCoverageBreakdown breakdown = computeCoverage(withSensitive, bundle.policies);
-
-        Map<Integer, List<String>> unguardedByAsset = new HashMap<>();
-        Map<Integer, String> stateByAsset = new HashMap<>();
-        long guarded = 0, partly = 0, unguarded = 0;
-
-        for (ApiCollection asset : withSensitive) {
-            List<String> detected = bundle.sensitiveByCollection.get(asset.getId());
-
-            Set<String> guardedKeys = guardedPiiKeys(breakdown.coveringPolicies.get(asset.getId()));
-            List<String> exposed = new ArrayList<>();
-            for (String type : detected) {
-                if (!guardedKeys.contains(PiiPatterns.piiTypeKey(type))) exposed.add(type);
+        Map<Integer, Integer> violationCount = new HashMap<>();
+        if (violationsByAsset != null) {
+            for (ApiCollection asset : scoped) {
+                Map<String, Integer> bySeverity = violationsByAsset.get(asset.getId());
+                if (bySeverity == null || bySeverity.isEmpty()) continue;
+                withSensitive.add(asset);
+                violationCount.put(asset.getId(), bySeverity.values().stream().mapToInt(Integer::intValue).sum());
             }
-
-            String state = exposed.isEmpty() ? GUARDED
-                    : exposed.size() < detected.size() ? PARTLY_GUARDED
-                    : UNGUARDED;
-            if (GUARDED.equals(state)) guarded++;
-            else if (PARTLY_GUARDED.equals(state)) partly++;
-            else unguarded++;
-
-            unguardedByAsset.put(asset.getId(), exposed);
-            stateByAsset.put(asset.getId(), state);
         }
-
-        withSensitive.sort(Comparator
-                .comparingInt((ApiCollection c) -> stateRank(stateByAsset.get(c.getId())))
-                .thenComparing(Comparator.comparingInt(
-                        (ApiCollection c) -> unguardedByAsset.get(c.getId()).size()).reversed()));
+        withSensitive.sort(Comparator.comparingInt((ApiCollection c) -> violationCount.get(c.getId())).reversed());
 
         PostureDrillResult result = new PostureDrillResult();
         result.setTitle("Sensitive data");
@@ -1082,42 +1072,48 @@ public class ArgusPostureService {
         result.setTotal(withSensitive.size());
         result.setSkip(effectiveSkip);
         result.setLimit(effectiveLimit);
-        result.setSummary(sensitiveDataSummary(guarded, partly, unguarded, withSensitive.size()));
-        result.setEmptyMessage("No assets access sensitive data in this environment.");
+        long totalViolations = violationCount.values().stream().mapToLong(Integer::longValue).sum();
+        result.setSummary(Arrays.asList(
+                new InsightResult.Metric("violations", "Sensitive-data violations (90d)", totalViolations, "count",
+                        InsightUtil.grouped(totalViolations)),
+                new InsightResult.Metric("withViolations", "Assets affected", withSensitive.size(), scoped.size(), "count",
+                        InsightUtil.grouped(withSensitive.size()), null)));
+        result.setEmptyMessage("No assets with sensitive-data guardrail violations in the last 90 days.");
+        if (violationsByAsset == null) {
+            result.addDataGap(new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED",
+                    "Guardrail violation data could not be fetched, so sensitive-data violations can't be shown."));
+        }
         result.setCtas(Arrays.asList(
+                new InsightResult.Cta("view_activity", "View guardrail activity", "NAVIGATE",
+                        InsightRoutes.GUARDRAIL_ACTIVITY, new HashMap<>(), true),
                 new InsightResult.Cta("create_policy", "Create guardrail policy", "NAVIGATE",
-                        InsightRoutes.GUARDRAIL_POLICIES, new HashMap<>(), true),
-                new InsightResult.Cta("view_agentic_assets", "View agentic assets", "NAVIGATE",
-                        InsightRoutes.AGENTIC_ASSETS, new HashMap<>(), false)));
+                        InsightRoutes.GUARDRAIL_POLICIES, new HashMap<>(), false)));
 
         int from = Math.min(effectiveSkip, withSensitive.size());
         int to = Math.min(from + effectiveLimit, withSensitive.size());
         List<Map<String, Object>> rows = new ArrayList<>();
         for (ApiCollection asset : withSensitive.subList(from, to)) {
-            rows.add(sensitiveDataRow(asset, bundle, unguardedByAsset, stateByAsset));
+            Map<String, Object> row = new HashMap<>();
+            row.put("asset", assetIdentity(asset));
+            row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
+            row.put("environment", envBucket(envTagValue(asset)));
+            Map<String, Integer> data = dataByAsset == null ? null : dataByAsset.get(asset.getId());
+            row.put("dataTypes", data == null || data.isEmpty() ? "-" : InsightUtil.sensitiveDataLine(data));
+            row.put("violations", violationCount.get(asset.getId()));
+            row.put("severity", worstSeverityOf(violationsByAsset.get(asset.getId())));
+            rows.add(row);
         }
         result.setRows(rows);
         return result;
     }
 
-    /** Normalised PII type names every covering policy explicitly lists. Only `piiTypes` counts —
-     *  an LLM rule's free-text prompt isn't machine-readable, so it is not treated as coverage. */
-    private static Set<String> guardedPiiKeys(List<GuardrailPolicies> covering) {
-        Set<String> keys = new HashSet<>();
-        if (covering == null) return keys;
-        for (GuardrailPolicies p : covering) {
-            if (p == null || p.getPiiTypes() == null) continue;
-            for (GuardrailPolicies.PiiType t : p.getPiiTypes()) {
-                if (t != null && t.getType() != null) keys.add(PiiPatterns.piiTypeKey(t.getType()));
-            }
+    private static String worstSeverityOf(Map<String, Integer> bySeverity) {
+        String worst = null;
+        for (Map.Entry<String, Integer> e : bySeverity.entrySet()) {
+            if (e.getValue() == null || e.getValue() <= 0) continue;
+            if (worst == null || InsightUtil.severityRank(e.getKey()) < InsightUtil.severityRank(worst)) worst = e.getKey();
         }
-        return keys;
-    }
-
-    private static int stateRank(String state) {
-        if (UNGUARDED.equals(state)) return 0;
-        if (PARTLY_GUARDED.equals(state)) return 1;
-        return 2;
+        return worst;
     }
 
     private static List<PostureDrillResult.ColumnDef> sensitiveDataColumns() {
@@ -1125,41 +1121,14 @@ public class ArgusPostureService {
                 new PostureDrillResult.ColumnDef("asset", "Asset"),
                 new PostureDrillResult.ColumnDef("type", "Type"),
                 new PostureDrillResult.ColumnDef("environment", "Environment"),
-                new PostureDrillResult.ColumnDef("sensitiveData", "Sensitive data"),
-                new PostureDrillResult.ColumnDef("unguardedTypes", "Unguarded types"),
-                new PostureDrillResult.ColumnDef("protection", "Protection"));
+                new PostureDrillResult.ColumnDef("dataTypes", "Data flagged"),
+                new PostureDrillResult.ColumnDef("violations", "Sensitive-data violations (90d)"),
+                new PostureDrillResult.ColumnDef("severity", "Worst severity"));
     }
 
     /** Every tile is out of the same total (assets holding sensitive data), so each carries it as a
      *  denominator. It stays out of `formatted` on purpose — that string is what the narrative model
      *  reads, and "0 / 1" there gets misread as "0 of 1 findings". The UI renders it as a suffix. */
-    private static List<InsightResult.Metric> sensitiveDataSummary(long guarded, long partly,
-                                                                   long unguarded, int total) {
-        return Arrays.asList(
-                new InsightResult.Metric("guarded", "Guarded", guarded, total, "count",
-                        InsightUtil.grouped(guarded), null),
-                new InsightResult.Metric("partlyGuarded", "Partly guarded", partly, total, "count",
-                        InsightUtil.grouped(partly), null),
-                new InsightResult.Metric("unguarded", "Unguarded", unguarded, total, "count",
-                        InsightUtil.grouped(unguarded), null));
-    }
-
-    private static Map<String, Object> sensitiveDataRow(ApiCollection asset, InsightDataBundle bundle,
-                                                        Map<Integer, List<String>> unguardedByAsset,
-                                                        Map<Integer, String> stateByAsset) {
-        List<String> detected = bundle.sensitiveByCollection.get(asset.getId());
-        List<String> exposed = unguardedByAsset.get(asset.getId());
-
-        Map<String, Object> row = new HashMap<>();
-        row.put("asset", assetIdentity(asset));
-        row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
-        row.put("environment", envBucket(envTagValue(asset)));
-        row.put("sensitiveData", String.join(", ", detected));
-        row.put("unguardedTypes", exposed.isEmpty() ? "-" : String.join(", ", exposed));
-        row.put("protection", stateByAsset.get(asset.getId()));
-        return row;
-    }
-
     public PostureDrillResult fetchPrivilegedToolsDrill(InsightDataBundle bundle, String environment,
                                                         int skip, int limit) {
         int effectiveLimit = limit > 0 ? limit : DEFAULT_DRILL_LIMIT;

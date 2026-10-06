@@ -1,5 +1,6 @@
 package com.akto.service.insights;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.GuardrailPolicies.SelectedServer;
@@ -182,6 +183,39 @@ public final class InsightUtil {
 
     public static boolean policyHasPiiDetection(GuardrailPolicies p) {
         return p != null && p.getPiiTypes() != null && !p.getPiiTypes().isEmpty();
+    }
+
+    private static final String PII_RULE_PREFIX = "pii-";
+    private static final List<String> LLM_DATA_RULES = Arrays.asList("userdefinedllmrule", "userdefinedllmredactionrule");
+
+    /** True when the rule that fired (a guardrail event's subCategory == rule_violated) is a data check:
+     *  a PII detection ("PII-<type>") or a custom LLM (DLP) rule. A policy's other checks, such as prompt
+     *  injection, don't count even when the same policy also detects PII. */
+    public static boolean isSensitiveDataEvent(DashboardMaliciousEvent e) {
+        if (e == null || e.getSubCategory() == null) return false;
+        // With no rule_violated the producer falls back to the policy name, which isn't a rule (e.g. "pii-policy").
+        if (e.getSubCategory().equalsIgnoreCase(e.getCategory())) return false;
+        String rule = e.getSubCategory().trim().toLowerCase(Locale.ROOT);
+        return rule.startsWith(PII_RULE_PREFIX) || LLM_DATA_RULES.contains(rule);
+    }
+
+    /** What was flagged, for display: the PII type ("PII-email" -> "email"), or the firing policy's
+     *  name for a custom LLM rule. Null for non-sensitive events. */
+    public static String sensitiveDataLabel(DashboardMaliciousEvent e) {
+        if (!isSensitiveDataEvent(e)) return null;
+        String rule = e.getSubCategory().trim();
+        if (rule.toLowerCase(Locale.ROOT).startsWith(PII_RULE_PREFIX)) return rule.substring(PII_RULE_PREFIX.length()).toLowerCase(Locale.ROOT);
+        String policy = StringUtils.isNotBlank(e.getCategory()) ? e.getCategory() : e.getFilterId();
+        return (StringUtils.isNotBlank(policy) ? policy : "Custom") + " (LLM rule)";
+    }
+
+    /** "email (12), password (3)" — most frequent first. */
+    public static String sensitiveDataLine(Map<String, Integer> countsByLabel) {
+        List<Map.Entry<String, Integer>> entries = new ArrayList<>(countsByLabel.entrySet());
+        entries.sort((x, y) -> Integer.compare(y.getValue(), x.getValue()));
+        List<String> parts = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : entries) parts.add(entry.getKey() + " (" + entry.getValue() + ")");
+        return String.join(", ", parts);
     }
 
     public static boolean policyHasPromptInjectionDetection(GuardrailPolicies p) {
