@@ -200,6 +200,17 @@ export function prettyPrintIfJson(text) {
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
 }
 
+// Display text for a single captured prompt payload (e.g. a nearby message's queryPayload),
+// extracted the same way the Values tab's Prompt section is: the last user message when the
+// payload is chat-shaped JSON, otherwise the payload itself, pretty-printed if it's JSON.
+export function promptTextFromPayload(payload) {
+    const raw = coerceToText(payload);
+    if (!raw || isEmptyJsonText(raw)) return null;
+    const prompt = coerceToText(extractPromptBody(_parseJson(raw)));
+    const { text } = prettyPrintIfJson(prompt || raw);
+    return sanitizeDisplayText(text, Infinity) || null;
+}
+
 // Some backends pre-combine metadata.reason as "<Title>: <message>" (e.g. "Blocked: personal
 // accounts are not permitted..." or "Sandbox Disabled: The sandbox.enabled field is not
 // present..."). That leading title just restates the action/status already shown elsewhere

@@ -28,6 +28,7 @@ import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/co
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
 import { selectContextTurns, useContextWindow } from "@/apps/dashboard/pages/threat_detection/components/NearbyMessages";
+import { promptTextFromPayload } from "./violationsData";
 import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/ComplianceTags";
 
 export function HumanResponseBadge({ response }) {
@@ -365,24 +366,19 @@ export function OverviewSection({ row, detail }) {
 }
 
 // ─── Nearby messages ─────────────────────────────────────────────────────────────
-// Same messages as the Threat Activity flyout (shared fetch + selection), rendered in this
-// flyout's own chat format via ChatSessionSection.
-
-function toChatSessionMessages(contextWindow) {
-    return selectContextTurns(contextWindow).flatMap(({ turn, isAnchor }) => {
-        const timestamp = turn?.latestTimestamp ? Math.floor(turn.latestTimestamp / 1000) : undefined;
-        const request = { type: "request", text: turn?.queryPayload || "", author: "User", timestamp, isVulnerable: isAnchor };
-        return turn?.responsePayload
-            ? [request, { type: "response", text: turn.responsePayload, author: "AI Model", timestamp }]
-            : [request];
-    });
-}
+// Same messages as the Threat Activity flyout (shared fetch + selection), but rendered the way
+// this tab renders the flagged prompt: just the prompt text, no chat bubbles or responses.
 
 function NearbyMessagesSection({ host, anchorTimestamp }) {
     const { contextWindow, loading } = useContextWindow(host, anchorTimestamp);
-    const messages = useMemo(() => toChatSessionMessages(contextWindow), [contextWindow]);
+    const prompts = useMemo(
+        () => selectContextTurns(contextWindow)
+            .map(({ turn, isAnchor }) => ({ turn, isAnchor, text: promptTextFromPayload(turn?.queryPayload) }))
+            .filter(({ text }) => text),
+        [contextWindow],
+    );
 
-    if (!loading && messages.length === 0) return null;
+    if (!loading && prompts.length === 0) return null;
 
     return (
         <>
@@ -392,7 +388,19 @@ function NearbyMessagesSection({ host, anchorTimestamp }) {
                     <Text variant="headingMd" color="subdued">Nearby Messages</Text>
                     {loading
                         ? <Text variant="bodySm" color="subdued">Loading nearby messages...</Text>
-                        : <ChatSessionSection messages={messages} />}
+                        : prompts.map(({ turn, isAnchor, text }, idx) => (
+                            <VerticalStack gap="1" key={idx}>
+                                <HorizontalStack gap="2" blockAlign="center">
+                                    {turn.latestTimestamp ? (
+                                        <Text variant="bodySm" color="subdued">
+                                            {func.epochToDateTime(Math.floor(turn.latestTimestamp / 1000))}
+                                        </Text>
+                                    ) : null}
+                                    {isAnchor && <Badge size="small" status="critical">Current Message</Badge>}
+                                </HorizontalStack>
+                                <HighlightedText text={text} mono />
+                            </VerticalStack>
+                        ))}
                 </VerticalStack>
             </Box>
         </>
