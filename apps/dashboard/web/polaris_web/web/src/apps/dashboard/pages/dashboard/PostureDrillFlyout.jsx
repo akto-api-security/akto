@@ -157,7 +157,7 @@ function DrillNarrative({ drill }) {
 // already capped server-side (PostureService.PROFILE_SECTION_CAP), so this renders them plainly
 // rather than through AgGridTable's own SSRM pagination.
 
-const SEVERITY_DOT_COLOR = { CRITICAL: '#D82C0D', HIGH: '#EF8A15', MEDIUM: '#EEC200', LOW: '#8C9196' }
+const SEVERITY_LEVELS = new Set(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'])
 const STATUS_BADGE_STATUS = { Met: 'success', Partial: 'attention', Gap: 'critical' }
 
 function ProfileHeader({ drill, onCtaClick }) {
@@ -167,7 +167,9 @@ function ProfileHeader({ drill, onCtaClick }) {
             <HorizontalStack align="space-between" blockAlign="start" wrap={false}>
                 <HorizontalStack gap="3" blockAlign="center">
                     <Text variant="headingXl" as="h2">{drill.title}</Text>
-                    {drill.badge && <Badge status={drill.badge.tone}>{drill.badge.label}</Badge>}
+                    {drill.badge && (SEVERITY_LEVELS.has(String(drill.badge.label).toUpperCase())
+                        ? <SeverityBadge severity={drill.badge.label} />
+                        : <Badge status={drill.badge.tone}>{drill.badge.label}</Badge>)}
                 </HorizontalStack>
                 {ctas.length > 0 && (
                     <HorizontalStack gap="2">
@@ -221,7 +223,7 @@ function ProfileTimeline({ section }) {
                                     <Text variant="bodySm" color="subdued" alignment="end">{func.prettifyEpoch(r.timestamp || 0)}</Text>
                                     <Box position="relative">
                                         <Box paddingBlockStart="1">
-                                            <Box className="agentic-dot" style={{ '--dot-color': SEVERITY_DOT_COLOR[String(r.severity || '').toUpperCase()] || '#8C9196' }} />
+                                            <Box className="agentic-dot" style={{ '--dot-color': func.getHexColorForSeverity(String(r.severity || '').toUpperCase()) }} />
                                         </Box>
                                         {i < rows.length - 1 && (
                                             <Box position="absolute" insetBlockStart="4" insetBlockEnd="0" width="4px" borderInlineEndWidth="1" borderColor="border-subdued" />
