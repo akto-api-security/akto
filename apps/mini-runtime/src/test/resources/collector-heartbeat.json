@@ -1,0 +1,9 @@
+{
+  "additionalData": "{\"env\": {\"AKTO_FAST_INGESTION\": \"false\", \"POD_NAME\": \"akto-k8s-p8vxl\"}, \"pipeline\": {\"delta\": {\"events_discarded\": 13, \"events_dropped_backpressure\": 4, \"events_dropped_channel_full\": 3, \"events_dropped_kernel_ring_buf\": 5, \"events_dropped_malformed\": 1, \"events_received\": 1000}, \"ingestion_mode\": \"flat_buffer\", \"window_sec\": 0.018224083}, \"profiling\": {\"cpu_cores_total\": 10, \"cpu_cores_used\": 0, \"cpu_percent\": 0, \"goroutines\": 4, \"memory_cumulative_mb\": 7.1622772216796875, \"memory_total_mb\": 22.22095489501953, \"memory_used_mb\": 5.811592102050781, \"num_gc\": 2}}",
+  "daemonId": "f1e38386-c9de-49d2-b242-6422f775a0e9",
+  "daemonPodName": "akto-tc:pod-e2e:node-e2e",
+  "imageVersion": "test-image:v1",
+  "moduleType": "TRAFFIC_COLLECTOR",
+  "timestamp": "1790164045",
+  "type": "heartbeat"
+}

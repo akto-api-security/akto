@@ -155,6 +155,10 @@ public class AllMetrics {
 
                 processAndCleanupTcMetrics(tcCpuUsageMetrics, "TC_CPU_USAGE", _this.orgId, metricDataList);
                 processAndCleanupTcMetrics(tcMemoryUsageMetrics, "TC_MEMORY_USAGE", _this.orgId, metricDataList);
+                for (Map.Entry<String, Map<String, Metric>> pipelineEntry : tcPipelineMetrics.entrySet()) {
+                    processAndCleanupTcMetrics(pipelineEntry.getValue(), pipelineEntry.getKey(), _this.orgId, metricDataList);
+                }
+                reapDeadTcInstances();
 
                 if(!metricDataList.isEmpty()) {
                     _this.sendDataToAkto(metricDataList);
@@ -165,32 +169,52 @@ public class AllMetrics {
         }, 0, 120, TimeUnit.SECONDS);
     }
 
+    /**
+     * Emits one MetricData per live traffic collector instance and drops instances
+     * that have stopped heartbeating.
+     *
+     * Eviction is by last-seen time, not by value. Keying it off "value == 0" (as
+     * this previously did) makes a healthy collector reporting zero drops
+     * indistinguishable from a dead one — and zero is exactly where the drop
+     * counters sit most of the time, so that path fired constantly and left gaps
+     * in the chart instead of a flat zero line.
+     *
+     * The metric type is taken from the metric itself rather than hardcoded:
+     * pipeline counters are SUM (per-window deltas that must add up across
+     * instances), CPU/memory/utilisation are GAUGE.
+     */
     private void processAndCleanupTcMetrics(Map<String, Metric> metricsMap, String metricId, String orgId, List<MetricData> metricDataList) {
-        List<String> deadInstances = new ArrayList<>();
+        int now = Context.now();
 
         for (Map.Entry<String, Metric> entry : metricsMap.entrySet()) {
             String tcInstanceId = entry.getKey();
             Metric metric = entry.getValue();
-            float value = metric.getMetricAndReset();
+
+            Integer lastSeen = tcInstanceLastSeen.get(tcInstanceId);
+            if (lastSeen == null || now - lastSeen > TC_INSTANCE_STALE_SECS) {
+                metricsMap.remove(tcInstanceId);
+                continue;
+            }
+
+            MetricData.MetricType type = MetricType.SUM.equals(metric.getMetricType())
+                    ? MetricData.MetricType.SUM
+                    : MetricData.MetricType.GAUGE;
 
             MetricData metricData = new MetricData(
                 metricId,
-                value,
+                metric.getMetricAndReset(),
                 orgId,
                 tcInstanceId,
-                MetricData.MetricType.GAUGE,
+                type,
                 ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()
             );
             metricDataList.add(metricData);
-
-            if (value == 0.0f) {
-                deadInstances.add(tcInstanceId);
-            }
         }
+    }
 
-        for (String deadInstanceId : deadInstances) {
-            metricsMap.remove(deadInstanceId);
-        }
+    private void reapDeadTcInstances() {
+        int now = Context.now();
+        tcInstanceLastSeen.entrySet().removeIf(entry -> now - entry.getValue() > TC_INSTANCE_STALE_SECS);
     }
 
     private AllMetrics(){}
@@ -250,6 +274,18 @@ public class AllMetrics {
     // Traffic Collector profiling metrics - per instance tracking
     private final Map<String, Metric> tcCpuUsageMetrics = new ConcurrentHashMap<>();
     private final Map<String, Metric> tcMemoryUsageMetrics = new ConcurrentHashMap<>();
+
+    // Traffic Collector eBPF pipeline metrics: metricId -> (instanceId -> Metric).
+    // Nested rather than one field per counter, so adding a counter is an enum
+    // entry plus a call site instead of a new field, map, setter and flush line.
+    private final Map<String, Map<String, Metric>> tcPipelineMetrics = new ConcurrentHashMap<>();
+
+    // Epoch seconds at which each traffic collector instance last reported.
+    private final Map<String, Integer> tcInstanceLastSeen = new ConcurrentHashMap<>();
+
+    // A collector is treated as gone after this long without a heartbeat. The
+    // daemonset heartbeats every 60s, so this is roughly 10 missed heartbeats.
+    private static final int TC_INSTANCE_STALE_SECS = 600;
     private int accountId;
     private String orgId;
 
@@ -447,15 +483,38 @@ public class AllMetrics {
 
     // Traffic Collector profiling metrics - per instance
     public void setTcCpuUsage(String instanceId, float val) {
+        touchTcInstance(instanceId);
         tcCpuUsageMetrics.computeIfAbsent(instanceId,
             k -> new GaugeMetric("TC_CPU_USAGE", 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
             .record(val);
     }
 
     public void setTcMemoryUsage(String instanceId, float val) {
+        touchTcInstance(instanceId);
         tcMemoryUsageMetrics.computeIfAbsent(instanceId,
             k -> new GaugeMetric("TC_MEMORY_USAGE", 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
             .record(val);
+    }
+
+    /**
+     * Records one eBPF pipeline counter for one traffic collector instance.
+     *
+     * Always SUM: the collector sends per-window deltas, and this class flushes
+     * every 120s while the daemonset heartbeats every 60s. GaugeMetric.record()
+     * overwrites, so a gauge would discard one of every two heartbeats and
+     * silently report half the real count.
+     */
+    public void setTcPipelineMetric(String metricId, String instanceId, float val) {
+        touchTcInstance(instanceId);
+        tcPipelineMetrics
+            .computeIfAbsent(metricId, k -> new ConcurrentHashMap<>())
+            .computeIfAbsent(instanceId,
+                k -> new SumMetric(metricId, 60, accountId, orgId, ModuleInfo.ModuleType.TRAFFIC_COLLECTOR.name()))
+            .record(val);
+    }
+
+    private void touchTcInstance(String instanceId) {
+        tcInstanceLastSeen.put(instanceId, Context.now());
     }
 
 
