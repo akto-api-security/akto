@@ -18,7 +18,8 @@ function isContextWindowAvailable() {
 }
 
 // anchorTimestamp is the flagged event's detectedAt, in epoch seconds.
-function useContextWindow(host, anchorTimestamp, enabled) {
+// Returns { contextWindow: {anchor, before, after} | null, loading }.
+export function useContextWindow(host, anchorTimestamp, enabled = true) {
     const [contextWindow, setContextWindow] = useState(null); // {anchor, before, after}
     const [loading, setLoading] = useState(false);
 
@@ -43,6 +44,17 @@ function useContextWindow(host, anchorTimestamp, enabled) {
     }, [enabled, host, anchorTimestamp]);
 
     return { contextWindow, loading };
+}
+
+// The turns to show, oldest first: the last few before the flagged message, the flagged message
+// itself (isAnchor), then the first few after it. Shared so every view shows the same messages.
+export function selectContextTurns(contextWindow) {
+    if (!contextWindow) return [];
+    return [
+        ...(contextWindow.before || []).slice(-TURNS_BEFORE).map((turn) => ({ turn, isAnchor: false })),
+        ...(contextWindow.anchor ? [{ turn: contextWindow.anchor, isAnchor: true }] : []),
+        ...(contextWindow.after || []).slice(0, TURNS_AFTER).map((turn) => ({ turn, isAnchor: false })),
+    ];
 }
 
 function ContextTurn({ turn, isAnchor = false }) {
@@ -83,10 +95,9 @@ function ContextTurn({ turn, isAnchor = false }) {
     );
 }
 
-// Renders a divider followed by the nearby messages, or `fallback` when there are none to show
-// (feature unavailable, disabled, or nothing found). `padding` lets callers that aren't already
-// inside a padded container match their surrounding sections.
-export default function NearbyMessages({ host, anchorTimestamp, enabled = true, heading, padding = "0", fallback = null }) {
+// Threat-activity (SampleDetails) presentation: a divider followed by the nearby messages as
+// bordered cards, or `fallback` when there are none to show (unavailable, disabled, or nothing found).
+export default function NearbyMessages({ host, anchorTimestamp, enabled = true, fallback = null }) {
     const { contextWindow, loading } = useContextWindow(host, anchorTimestamp, enabled);
 
     if (!loading && !contextWindow) return fallback;
@@ -94,29 +105,20 @@ export default function NearbyMessages({ host, anchorTimestamp, enabled = true, 
     return (
         <>
             <Divider />
-            <Box padding={padding}>
+            {loading ? (
+                <Box padding="4">
+                    <HorizontalStack gap="2" align="center">
+                        <Spinner size="small" />
+                        <Text variant="bodyMd" color="subdued">Loading nearby messages...</Text>
+                    </HorizontalStack>
+                </Box>
+            ) : (
                 <VerticalStack gap="4">
-                    {heading && <Text variant="headingMd" color="subdued">{heading}</Text>}
-                    {loading ? (
-                        <Box padding="4">
-                            <HorizontalStack gap="2" align="center">
-                                <Spinner size="small" />
-                                <Text variant="bodyMd" color="subdued">Loading nearby messages...</Text>
-                            </HorizontalStack>
-                        </Box>
-                    ) : (
-                        <VerticalStack gap="4">
-                            {(contextWindow.before || []).slice(-TURNS_BEFORE).map((turn, idx) => (
-                                <ContextTurn key={`before-${idx}`} turn={turn} />
-                            ))}
-                            {contextWindow.anchor && <ContextTurn turn={contextWindow.anchor} isAnchor />}
-                            {(contextWindow.after || []).slice(0, TURNS_AFTER).map((turn, idx) => (
-                                <ContextTurn key={`after-${idx}`} turn={turn} />
-                            ))}
-                        </VerticalStack>
-                    )}
+                    {selectContextTurns(contextWindow).map(({ turn, isAnchor }, idx) => (
+                        <ContextTurn key={idx} turn={turn} isAnchor={isAnchor} />
+                    ))}
                 </VerticalStack>
-            </Box>
+            )}
         </>
     );
 }

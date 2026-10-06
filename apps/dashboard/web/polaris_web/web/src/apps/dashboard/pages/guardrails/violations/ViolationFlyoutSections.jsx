@@ -27,7 +27,7 @@ import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory }
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
-import NearbyMessages from "@/apps/dashboard/pages/threat_detection/components/NearbyMessages";
+import { selectContextTurns, useContextWindow } from "@/apps/dashboard/pages/threat_detection/components/NearbyMessages";
 import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/ComplianceTags";
 
 export function HumanResponseBadge({ response }) {
@@ -364,13 +364,48 @@ export function OverviewSection({ row, detail }) {
     );
 }
 
+// ─── Nearby messages ─────────────────────────────────────────────────────────────
+// Same messages as the Threat Activity flyout (shared fetch + selection), rendered in this
+// flyout's own chat format via ChatSessionSection.
+
+function toChatSessionMessages(contextWindow) {
+    return selectContextTurns(contextWindow).flatMap(({ turn, isAnchor }) => {
+        const timestamp = turn?.latestTimestamp ? Math.floor(turn.latestTimestamp / 1000) : undefined;
+        const request = { type: "request", text: turn?.queryPayload || "", author: "User", timestamp, isVulnerable: isAnchor };
+        return turn?.responsePayload
+            ? [request, { type: "response", text: turn.responsePayload, author: "AI Model", timestamp }]
+            : [request];
+    });
+}
+
+function NearbyMessagesSection({ host, anchorTimestamp }) {
+    const { contextWindow, loading } = useContextWindow(host, anchorTimestamp);
+    const messages = useMemo(() => toChatSessionMessages(contextWindow), [contextWindow]);
+
+    if (!loading && messages.length === 0) return null;
+
+    return (
+        <>
+            <Divider />
+            <Box padding="4">
+                <VerticalStack gap="3">
+                    <Text variant="headingMd" color="subdued">Nearby Messages</Text>
+                    {loading
+                        ? <Text variant="bodySm" color="subdued">Loading nearby messages...</Text>
+                        : <ChatSessionSection messages={messages} />}
+                </VerticalStack>
+            </Box>
+        </>
+    );
+}
+
 // ─── Prompt & Response tab ────────────────────────────────────────────────────────
 
 export function PromptResponseSection({ detail, host, anchorTimestamp }) {
     const pr = detail?.promptResponse;
     const hasPrompt = !!pr?.promptBody;
     const hasResponse = !!(pr && (pr.behaviour || pr.blockedBy || pr.blockedAt || pr.reason || pr.message));
-    const nearbyMessages = <NearbyMessages host={host} anchorTimestamp={anchorTimestamp} heading="Nearby Messages" padding="4" />;
+    const nearbyMessages = <NearbyMessagesSection host={host} anchorTimestamp={anchorTimestamp} />;
 
     if (!hasPrompt && !hasResponse) {
         return (
