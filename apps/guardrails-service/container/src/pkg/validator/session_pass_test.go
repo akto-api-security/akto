@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
+	"github.com/akto-api-security/akto-endpoint-shield/mcp/types"
 	"github.com/akto-api-security/guardrails-service/pkg/config"
 	"go.uber.org/zap"
 )
@@ -21,6 +22,28 @@ func sessionPassService(sessionEnabled bool) *Service {
 	return &Service{logger: zap.NewNop(), config: &config.Config{SessionEnabled: sessionEnabled}}
 }
 
+// reportRecorder is a RequestProcessor that only records ReportPendingRequestThreats calls.
+type reportRecorder struct {
+	mcp.RequestProcessor
+	calls []reportCall
+}
+
+type reportCall struct {
+	ctx     mcp.ValidationContext
+	reports []*mcp.ValidationResult
+}
+
+func (r *reportRecorder) ReportPendingRequestThreats(vc *mcp.ValidationContext, pending []*mcp.ValidationResult) {
+	r.calls = append(r.calls, reportCall{ctx: *vc, reports: pending})
+}
+
+func reportingService() (*Service, *reportRecorder) {
+	rec := &reportRecorder{}
+	s := sessionPassService(true)
+	s.processor = rec
+	return s, rec
+}
+
 func withSummary() (string, bool) { return testSummaryPayload, true }
 func noSummary() (string, bool)   { return "", false }
 
@@ -28,10 +51,13 @@ func noSummary() (string, bool)   { return "", false }
 type stubValidate struct {
 	bareBlocked, sessBlocked bool
 	bareErr, sessErr         error
+	sessResult               *mcp.ProcessResult // overrides the session verdict when set
+	bareModified             string
 	sessDelay                time.Duration
 	sessGate                 chan struct{} // when set, the session pass waits on it
 	bareDelay                time.Duration
 	bareCtx, sessCtx         atomic.Pointer[mcp.ValidationContext]
+	sessMuted                atomic.Bool // session ctx had SkipThreat and DeferRequestThreatReport at call time
 }
 
 func (st *stubValidate) fn(vc *mcp.ValidationContext, payload string) (*mcp.ProcessResult, string, string, error) {
@@ -39,13 +65,17 @@ func (st *stubValidate) fn(vc *mcp.ValidationContext, payload string) (*mcp.Proc
 	if payload == testBarePayload {
 		st.bareCtx.Store(vc)
 		time.Sleep(st.bareDelay)
-		return &mcp.ProcessResult{IsBlocked: st.bareBlocked}, payload, payload, st.bareErr
+		return &mcp.ProcessResult{IsBlocked: st.bareBlocked, ModifiedPayload: st.bareModified}, payload, payload, st.bareErr
 	}
 	st.sessCtx.Store(vc)
+	st.sessMuted.Store(vc.SkipThreat && vc.DeferRequestThreatReport)
 	if st.sessGate != nil {
 		<-st.sessGate
 	}
 	time.Sleep(st.sessDelay)
+	if st.sessResult != nil {
+		return st.sessResult, payload, payload, st.sessErr
+	}
 	return &mcp.ProcessResult{IsBlocked: st.sessBlocked}, payload, payload, st.sessErr
 }
 
@@ -171,5 +201,106 @@ func TestValidateWithSessionPass_PassesOverlap(t *testing.T) {
 	s.validateWithSessionPass(&mcp.ValidationContext{}, testSessionID, testBarePayload, withSummary, st.fn)
 	if elapsed := time.Since(start); elapsed >= d+d/2 {
 		t.Fatalf("passes did not run concurrently: took %v", elapsed)
+	}
+}
+
+func TestValidateWithSessionPass_SessionPassIsMuted(t *testing.T) {
+	s, rec := reportingService()
+	st := &stubValidate{}
+	valCtx := &mcp.ValidationContext{SkipThreat: false}
+	s.validateWithSessionPass(valCtx, testSessionID, testBarePayload, withSummary, st.fn)
+
+	bareCtx := st.bareCtx.Load()
+	if bareCtx.SkipThreat || bareCtx.DeferRequestThreatReport {
+		t.Fatal("bare pass must report normally")
+	}
+	if !st.sessMuted.Load() {
+		t.Fatal("session pass must run muted with request redactions deferred")
+	}
+	if valCtx.SkipThreat || valCtx.DeferRequestThreatReport {
+		t.Fatal("reporting flags must be restored on the written-back context")
+	}
+	if len(rec.calls) != 0 {
+		t.Fatalf("clean session verdict must not report, got %d calls", len(rec.calls))
+	}
+}
+
+func TestValidateWithSessionPass_BareBlockReportsNothingExtra(t *testing.T) {
+	s, rec := reportingService()
+	st := &stubValidate{bareBlocked: true, sessBlocked: true}
+	s.validateWithSessionPass(&mcp.ValidationContext{}, testSessionID, testBarePayload, withSummary, st.fn)
+	time.Sleep(20 * time.Millisecond) // let the abandoned session pass finish
+	if len(rec.calls) != 0 {
+		t.Fatalf("bare block must be the only report, got %d session reports", len(rec.calls))
+	}
+}
+
+func TestValidateWithSessionPass_SessionBlockReported(t *testing.T) {
+	s, rec := reportingService()
+	meta := types.ThreatMetadata{PolicyName: "p1"}
+	st := &stubValidate{sessResult: &mcp.ProcessResult{IsBlocked: true, Behaviour: "block", Metadata: meta}}
+	valCtx := &mcp.ValidationContext{}
+	s.validateWithSessionPass(valCtx, testSessionID, testBarePayload, withSummary, st.fn)
+
+	if len(rec.calls) != 1 || len(rec.calls[0].reports) != 1 {
+		t.Fatalf("want one block report, got %+v", rec.calls)
+	}
+	call := rec.calls[0]
+	vr := call.reports[0]
+	if vr.Allowed || vr.Behaviour != "block" || vr.Metadata.PolicyName != "p1" {
+		t.Fatalf("unexpected block report: %+v", vr)
+	}
+	if call.ctx.SkipThreat || call.ctx.SessionID != testSessionID || call.ctx.RequestPayload != testSummaryPayload {
+		t.Fatalf("report context: skip=%v sessionID=%q payload=%q", call.ctx.SkipThreat, call.ctx.SessionID, call.ctx.RequestPayload)
+	}
+}
+
+func TestValidateWithSessionPass_SessionBlockRespectsSkipThreat(t *testing.T) {
+	s, rec := reportingService()
+	st := &stubValidate{sessBlocked: true}
+	s.validateWithSessionPass(&mcp.ValidationContext{SkipThreat: true}, testSessionID, testBarePayload, withSummary, st.fn)
+	if len(rec.calls) != 1 || !rec.calls[0].ctx.SkipThreat {
+		t.Fatal("report must carry the caller's SkipThreat so the processor still honours it")
+	}
+}
+
+func TestValidateWithSessionPass_SessionRedactionsReported(t *testing.T) {
+	pending := []*mcp.ValidationResult{{Allowed: true, Modified: true, ModifiedPayload: "masked-1"}, {Allowed: true, Modified: true, ModifiedPayload: "masked-2"}}
+
+	s, rec := reportingService()
+	st := &stubValidate{sessResult: &mcp.ProcessResult{ModifiedPayload: "masked", PendingThreatReports: pending}}
+	s.validateWithSessionPass(&mcp.ValidationContext{}, testSessionID, testBarePayload, withSummary, st.fn)
+	if len(rec.calls) != 1 || len(rec.calls[0].reports) != 2 || rec.calls[0].reports[0] != pending[0] {
+		t.Fatalf("want deferred request redactions reported as-is, got %+v", rec.calls)
+	}
+
+	// Bare pass already redacted (and reported) — the session redaction is not reported again.
+	s, rec = reportingService()
+	st = &stubValidate{bareModified: "bare-masked", sessResult: &mcp.ProcessResult{ModifiedPayload: "masked", PendingThreatReports: pending}}
+	s.validateWithSessionPass(&mcp.ValidationContext{}, testSessionID, testBarePayload, withSummary, st.fn)
+	if len(rec.calls) != 0 {
+		t.Fatalf("redaction already reported by bare pass, got %d extra reports", len(rec.calls))
+	}
+}
+
+func TestValidateWithSessionPass_ResponseRedactionRebuilt(t *testing.T) {
+	s, rec := reportingService()
+	meta := types.ThreatMetadata{PolicyName: "p1"}
+	st := &stubValidate{sessResult: &mcp.ProcessResult{ModifiedPayload: "masked", Behaviour: "alert", Metadata: meta}}
+	s.validateWithSessionPass(&mcp.ValidationContext{}, testSessionID, testBarePayload, withSummary, st.fn)
+	if len(rec.calls) != 1 || len(rec.calls[0].reports) != 1 {
+		t.Fatalf("want one rebuilt redaction report, got %+v", rec.calls)
+	}
+	vr := rec.calls[0].reports[0]
+	if !vr.Allowed || !vr.Modified || vr.ModifiedPayload != "" || vr.Metadata.PolicyName != "p1" {
+		t.Fatalf("unexpected rebuilt redaction report: %+v", vr)
+	}
+
+	// No metadata to attribute it to — nothing is reported rather than an empty threat.
+	s, rec = reportingService()
+	st = &stubValidate{sessResult: &mcp.ProcessResult{ModifiedPayload: "masked"}}
+	s.validateWithSessionPass(&mcp.ValidationContext{}, testSessionID, testBarePayload, withSummary, st.fn)
+	if len(rec.calls) != 0 {
+		t.Fatalf("unattributed redaction must not be reported, got %+v", rec.calls)
 	}
 }

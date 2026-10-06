@@ -2149,6 +2149,17 @@ type passOutcome struct {
 	fromSession bool
 }
 
+// validateWithSessionPass runs the bare pass (single prompt, no session) and, when
+// session guardrails are enabled, the session-summary pass concurrently. A blocking
+// bare verdict wins without waiting on the session pass; otherwise the session
+// verdict is used if a summary applied. sessionDrivenBlock reports whether the block
+// came from the session pass.
+//
+// Each pass gets its own copy of valCtx since the processor writes to it; the winning
+// copy is written back so callers see the same context state as the sequential flow.
+//
+// The session pass runs muted (SkipThreat) so a request the bare pass blocks is not
+// reported twice; when the session verdict wins, reportSessionVerdict reports it.
 func (s *Service) validateWithSessionPass(
 	valCtx *mcp.ValidationContext,
 	sessionID, barePayload string,
@@ -2161,6 +2172,10 @@ func (s *Service) validateWithSessionPass(
 	sessionEnabled := s.config != nil && s.config.SessionEnabled
 	sessCtx := *valCtx
 	sessCtx.SessionID = sessionID
+	sessCtx.SkipThreat = true
+	// Keeps request-side redaction results on ProcessResult.PendingThreatReports
+	// instead of sending them, so a winning session pass can report them exactly.
+	sessCtx.DeferRequestThreatReport = true
 	// Buffered so the goroutine never blocks when a blocking bare verdict returns early.
 	sessCh := make(chan passOutcome, 1)
 	if sessionEnabled {
@@ -2197,11 +2212,41 @@ func (s *Service) validateWithSessionPass(
 		*valCtx = bareCtx
 		return bare, false
 	}
+	// Restore the reporting flags so callers that report from valCtx behave as before.
+	sessCtx.SkipThreat = valCtx.SkipThreat
+	sessCtx.DeferRequestThreatReport = valCtx.DeferRequestThreatReport
 	*valCtx = sessCtx
 	if sess.err != nil {
 		return sess, false
 	}
+	s.reportSessionVerdict(valCtx, sess.result, result.ModifiedPayload != "")
 	return sess, sess.result.IsBlocked
+}
+
+// reportSessionVerdict reports what a winning (muted) session pass found: its block,
+// or else its redactions. Redactions are skipped when the bare pass already redacted,
+// since the bare pass reported that finding itself. reportCtx is the session pass's
+// context, which already carries the payloads that pass evaluated and produced.
+func (s *Service) reportSessionVerdict(reportCtx *mcp.ValidationContext, result *mcp.ProcessResult, bareRedacted bool) {
+	if s.processor == nil || result == nil {
+		return
+	}
+	var reports []*mcp.ValidationResult
+	switch {
+	case result.IsBlocked:
+		reports = []*mcp.ValidationResult{{Allowed: false, Metadata: result.Metadata, Behaviour: result.Behaviour}}
+	case bareRedacted:
+	case len(result.PendingThreatReports) > 0:
+		reports = result.PendingThreatReports
+	case result.ModifiedPayload != "" && result.Metadata.PolicyName != "":
+		// Response-side redactions are never deferred; rebuild from the merged result.
+		// reportCtx.ResponsePayload already holds the redacted response.
+		reports = []*mcp.ValidationResult{{Allowed: true, Modified: true, Metadata: result.Metadata, Behaviour: result.Behaviour}}
+	}
+	if len(reports) == 0 {
+		return
+	}
+	s.processor.ReportPendingRequestThreats(reportCtx, reports)
 }
 
 // ValidateRequest validates a request against guardrail policies. Returns (result,
