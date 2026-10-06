@@ -72,6 +72,7 @@ public class ConsumerUtil {
 
     public static ExecutorService executor = Executors.newFixedThreadPool(150, workerThreadFactory);
     private static final int maxRunTimeForTests = Constants.MINI_TESTING_TASK_TIMEOUT_SECONDS;
+    private static final int STALL_TIMEOUT_SECONDS = 420; // > maxRunTimeForTests with margin
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
@@ -399,6 +400,9 @@ public class ConsumerUtil {
                     }
                 });
 
+            int lastSeenProcessed = -1;
+            int lastProgressTs = Context.now();
+
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
                     stopReason = TestRunMetrics.StopReason.STOPPED;
@@ -412,9 +416,26 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }
+                else if (parallelConsumer.isClosedOrFailed()) {
+                    stopReason = TestRunMetrics.StopReason.CONSUMER_FAILED;
+                    loggerMaker.errorAndAddToDb("Consumer engine closed/failed summaryId=" + summaryIdForTest);
+                    executor.shutdownNow();
+                    break;
+                }
 
                 int processed = processedRecords.get();
                 long workRemaining = parallelConsumer.workRemaining();
+
+                if (processed != lastSeenProcessed) {
+                    lastSeenProcessed = processed;
+                    lastProgressTs = Context.now();
+                } else if (workRemaining > 0 && Context.now() - lastProgressTs > STALL_TIMEOUT_SECONDS) {
+                    stopReason = TestRunMetrics.StopReason.STALLED;
+                    loggerMaker.errorAndAddToDb("No progress for " + STALL_TIMEOUT_SECONDS + "s summaryId="
+                            + summaryIdForTest + " workRemaining=" + workRemaining);
+                    executor.shutdownNow();
+                    break;
+                }
                 // Only actually calls Kafka at the heartbeat's own cadence (tick decides
                 // internally), not once per ~100ms loop iteration.
                 metrics.tick(processed, workRemaining, () -> KafkaAdminClient.getConsumerLag(topicName, groupId));
@@ -450,7 +471,9 @@ public class ConsumerUtil {
         }finally{
             // Single source of truth: cleanup style is a deterministic function of stopReason,
             // not a second, separately-tracked flag that has to be kept in sync by hand.
-            boolean abruptClose = stopReason == TestRunMetrics.StopReason.ERROR;
+            boolean abruptClose = stopReason == TestRunMetrics.StopReason.ERROR
+                    || stopReason == TestRunMetrics.StopReason.CONSUMER_FAILED
+                    || stopReason == TestRunMetrics.StopReason.STALLED;
 
             metrics.logEnd(stopReason, abruptClose, processedRecords.get());
 
@@ -460,6 +483,14 @@ public class ConsumerUtil {
             closeParallelConsumerQuietly(parallelConsumer, abruptClose);
             parallelConsumer = null;
             closeKafkaConsumerQuietly(consumer, "shutdown");
+
+            if (stopReason == TestRunMetrics.StopReason.CONSUMER_FAILED
+                    || stopReason == TestRunMetrics.StopReason.STALLED) {
+                // state file/topic left intact for restart to resume
+                loggerMaker.errorAndAddToDb("Exiting process summaryId=" + summaryIdForTest + " reason=" + stopReason);
+                System.exit(1);
+            }
+
             Producer.deleteTestResultsTopic(summaryIdForTest);
             TestingStateStore.clear();
         }

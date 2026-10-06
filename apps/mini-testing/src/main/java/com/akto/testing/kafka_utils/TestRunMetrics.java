@@ -43,7 +43,11 @@ public class TestRunMetrics {
         /** Queue drained, idle grace elapsed, nothing left to recover -> completed. */
         IDLE_COMPLETE,
         /** Polling/processing threw. */
-        ERROR
+        ERROR,
+        /** parallel-consumer engine reported itself closed/failed independent of any exception reaching the drain loop. */
+        CONSUMER_FAILED,
+        /** No record has finished processing for STALL_TIMEOUT_SECONDS while work remains. */
+        STALLED
     }
 
     /**
