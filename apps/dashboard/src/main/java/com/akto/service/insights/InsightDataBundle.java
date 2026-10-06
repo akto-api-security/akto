@@ -172,19 +172,41 @@ public class InsightDataBundle {
     private Map<Integer, Map<String, Integer>> countsByCollection(List<Integer> collectionIds, int startTs,
                                                                  Predicate<DashboardMaliciousEvent> eventFilter,
                                                                  Function<DashboardMaliciousEvent, String> keyOf) {
-        if (!threatBackendAvailable || threatAccess == null) return null;
-        int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
-        List<DashboardMaliciousEvent> hostCounts = hostCountsSince.get(since);
-        if (hostCounts == null) {
-            hostCounts = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
-            hostCountsSince.putIfAbsent(since, hostCounts);
-        }
-        if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);
+        List<DashboardMaliciousEvent> hostCounts = cachedEventsSince(startTs);
+        if (hostCounts == null) return null;
         List<DashboardMaliciousEvent> events = eventFilter == null ? hostCounts
                 : hostCounts.stream().filter(eventFilter).collect(Collectors.toList());
-        Map<Integer, Map<String, Integer>> byCollection = hostResolver.countByCollection(events, keyOf);
+        Map<Integer, Map<String, Integer>> byCollection = hostResolver().countByCollection(events, keyOf);
         byCollection.keySet().retainAll(new HashSet<>(collectionIds));
         return byCollection;
+    }
+
+    private List<DashboardMaliciousEvent> cachedEventsSince(int startTs) {
+        if (!threatBackendAvailable || threatAccess == null) return null;
+        int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
+        List<DashboardMaliciousEvent> events = hostCountsSince.get(since);
+        if (events == null) {
+            events = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
+            hostCountsSince.putIfAbsent(since, events);
+        }
+        return events;
+    }
+
+    /** Events inside the page's date range (ctx start..end), from the same cache; null when the threat
+     *  backend is unavailable. */
+    public List<DashboardMaliciousEvent> windowEvents() {
+        List<DashboardMaliciousEvent> events = cachedEventsSince(ctx.getStartTs());
+        if (events == null) return null;
+        long start = ctx.getStartTs();
+        long end = ctx.getEndTs() > 0 ? ctx.getEndTs() : Long.MAX_VALUE;
+        return events.stream().filter(e -> e != null && e.getTimestamp() >= start && e.getTimestamp() <= end)
+                .collect(Collectors.toList());
+    }
+
+    /** Attributes events to this bundle's collections (host, then actor). */
+    public HostCollectionResolver hostResolver() {
+        if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);
+        return hostResolver;
     }
 
     // Newest-first events for these collections; null when the threat backend is unavailable.

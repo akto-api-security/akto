@@ -37,6 +37,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.concurrent.*;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -51,7 +52,7 @@ public class ArgusPostureService {
 
     private static final String KPI_ASSETS              = "assets";
     private static final String KPI_HIGH_RISK_AGENTS    = "highRiskAgents";
-    private static final String KPI_IDENTITY_ACCESS     = "identityAccess";
+    private static final String KPI_GUARDRAIL_VIOLATIONS = "guardrailViolations";
     private static final String KPI_PRIVILEGED_TOOLS    = "privilegedTools";
     private static final String KPI_SENSITIVE_DATA      = "sensitiveData";
     private static final String KPI_PROTECTION_COVERAGE = "protectionCoverage";
@@ -76,7 +77,8 @@ public class ArgusPostureService {
     public static final String DRILL_PROTECTION_COVERAGE = KPI_PROTECTION_COVERAGE;
     public static final String DRILL_PRIVILEGED_TOOLS = KPI_PRIVILEGED_TOOLS;
     public static final String DRILL_SENSITIVE_DATA = KPI_SENSITIVE_DATA;
-    private static final int SENSITIVE_DATA_WINDOW_SECONDS = 90 * 86400;
+    public static final String DRILL_GUARDRAIL_VIOLATIONS = KPI_GUARDRAIL_VIOLATIONS;
+    private static final int TOP_GUARDRAIL_VIOLATIONS = 20;
 
 
     private static final String PROTECTION_NONE = "None";
@@ -95,7 +97,7 @@ public class ArgusPostureService {
         List<BasicDBObject> kpis = new ArrayList<>();
         kpis.add(assetsKpi(scoped, environment));
         kpis.add(highRiskAgentsKpi(scoped));
-        kpis.add(identityAccessKpi());
+        kpis.add(guardrailViolationsKpi(scopedWindowEvents(bundle, scoped, environment)));
         kpis.add(privilegedToolsKpi(scoped, environment, deactivatedIds));
         kpis.add(sensitiveDataKpi(scoped, sensitiveViolationsByAsset(bundle, scoped)));
         kpis.add(protectionCoverageKpi(scoped, bundle.policies));
@@ -882,12 +884,96 @@ public class ArgusPostureService {
         return kpi;
     }
 
-    private BasicDBObject identityAccessKpi() {
-        BasicDBObject kpi = kpi(KPI_IDENTITY_ACCESS, "Identity & Access", 0L);
-        kpi.put("footnote", "overprivileged identity(s)");
-        kpi.put("secondaryFootnote", sharedOrphanedLine(0, 0));
-        kpi.put("secondaryTone", "subdued");
+    private BasicDBObject guardrailViolationsKpi(List<DashboardMaliciousEvent> events) {
+        BasicDBObject kpi = kpi(KPI_GUARDRAIL_VIOLATIONS, "Guardrail Violations", events == null ? 0L : (long) events.size());
+        if (events == null) {
+            kpi.put("footnote", "Guardrail violation data unavailable");
+            return kpi;
+        }
+        kpi.put("footnote", "violation(s) in the selected time range");
+        Map<String, Integer> bySeverity = new HashMap<>();
+        for (DashboardMaliciousEvent e : events) {
+            if (e.getSeverity() != null) bySeverity.merge(e.getSeverity().toUpperCase(Locale.ROOT), 1, Integer::sum);
+        }
+        List<String> parts = new ArrayList<>();
+        for (String severity : Arrays.asList("CRITICAL", "HIGH")) {
+            Integer n = bySeverity.get(severity);
+            if (n != null && n > 0) parts.add(n + " " + severity.toLowerCase(Locale.ROOT));
+        }
+        kpi.put("secondaryFootnote", parts.isEmpty() ? "None critical or high" : String.join(" · ", parts));
+        kpi.put("secondaryTone", bySeverity.containsKey("CRITICAL") ? "critical" : parts.isEmpty() ? "subdued" : "warning");
         return kpi;
+    }
+
+    /** Guardrail violations in the page's date range: every one for "All environments", otherwise only
+     *  those attributed (host, then actor) to the selected environment's assets; null when unavailable. */
+    private static List<DashboardMaliciousEvent> scopedWindowEvents(InsightDataBundle bundle, List<ApiCollection> scoped,
+                                                                   String environment) {
+        List<DashboardMaliciousEvent> events = bundle.windowEvents();
+        if (events == null || isAllEnvironments(environment)) return events;
+        Set<Integer> ids = new HashSet<>();
+        for (ApiCollection a : scoped) ids.add(a.getId());
+        List<DashboardMaliciousEvent> out = new ArrayList<>();
+        for (DashboardMaliciousEvent e : events) {
+            List<Integer> resolved = bundle.hostResolver().resolveEvent(e.getHost(), e.getActor());
+            if (!resolved.isEmpty() && ids.contains(resolved.get(0))) out.add(e);
+        }
+        return out;
+    }
+
+    /** Top 20 guardrail violations in the page's date range, most severe first then newest. */
+    public PostureDrillResult fetchGuardrailViolationsDrill(InsightDataBundle bundle, String environment) {
+        List<ApiCollection> assets = new ArrayList<>();
+        for (ApiCollection c : bundle.collections) {
+            if (c != null && !c.isDeactivated()) assets.add(c);
+        }
+        List<DashboardMaliciousEvent> events = scopedWindowEvents(bundle, assetsIn(assets, environment), environment);
+        List<DashboardMaliciousEvent> sorted = events == null ? new ArrayList<>() : new ArrayList<>(events);
+        sorted.sort(Comparator
+                .comparingInt((DashboardMaliciousEvent e) -> InsightUtil.severityRank(e.getSeverity()))
+                .thenComparing(Comparator.comparingLong(DashboardMaliciousEvent::getTimestamp).reversed()));
+        List<DashboardMaliciousEvent> top = sorted.subList(0, Math.min(TOP_GUARDRAIL_VIOLATIONS, sorted.size()));
+
+        Map<Integer, ApiCollection> byId = new HashMap<>();
+        for (ApiCollection c : bundle.collections) if (c != null) byId.put(c.getId(), c);
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (DashboardMaliciousEvent e : top) {
+            List<Integer> resolved = bundle.hostResolver().resolveEvent(e.getHost(), e.getActor());
+            ApiCollection agent = resolved.isEmpty() ? null : byId.get(resolved.get(0));
+            Map<String, Object> row = new HashMap<>();
+            row.put("agentName", agent != null ? agentDisplayName(agent) : (e.getHost() != null ? e.getHost() : "-"));
+            row.put("policy", e.getCategory() != null ? e.getCategory() : e.getFilterId());
+            row.put("rule", e.getSubCategory());
+            row.put("severity", e.getSeverity());
+            row.put("detectedAt", e.getTimestamp());
+            rows.add(row);
+        }
+
+        PostureDrillResult result = new PostureDrillResult();
+        result.setTitle("Guardrail violations");
+        result.setBreadcrumb(Collections.singletonList(new PostureDrillResult.BreadcrumbItem("", "Guardrail violations")));
+        result.setColumns(Arrays.asList(
+                new PostureDrillResult.ColumnDef("agentName", "Agent"),
+                new PostureDrillResult.ColumnDef("policy", "Policy"),
+                new PostureDrillResult.ColumnDef("rule", "Rule"),
+                new PostureDrillResult.ColumnDef("severity", "Severity"),
+                new PostureDrillResult.ColumnDef("detectedAt", "Detected at")));
+        result.setDrillable(false);
+        result.setRows(rows);
+        result.setTotal(rows.size());
+        result.setSkip(0);
+        result.setLimit(TOP_GUARDRAIL_VIOLATIONS);
+        long total = events == null ? 0 : events.size();
+        result.setSummary(Collections.singletonList(new InsightResult.Metric("violations",
+                "Violations in this time range (top " + TOP_GUARDRAIL_VIOLATIONS + " shown)", total, "count", InsightUtil.grouped(total))));
+        result.setEmptyMessage("No guardrail violations in this time range.");
+        if (events == null) {
+            result.addDataGap(new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED",
+                    "Guardrail violation data could not be fetched."));
+        }
+        result.setCtas(Collections.singletonList(new InsightResult.Cta("view_all_violations", "View all violations",
+                "NAVIGATE", InsightRoutes.GUARDRAIL_ACTIVITY, new HashMap<>(), true)));
+        return result;
     }
 
     private BasicDBObject privilegedToolsKpi(List<ApiCollection> assets, String environment,
@@ -949,20 +1035,29 @@ public class ArgusPostureService {
         BasicDBObject kpi = kpi(KPI_SENSITIVE_DATA, "Sensitive Data", violations);
         kpi.put("footnote", sensitiveViolationsByAsset == null
                 ? "Guardrail violation data unavailable"
-                : "violation(s) in the last 90 days across " + withSensitive + " asset(s)");
+                : "violation(s) in the selected time range across " + withSensitive + " asset(s)");
         return kpi;
     }
 
     /** assetId -> {severity -> count} of sensitive-data guardrail violations (PII or custom LLM rule, see
-     *  InsightUtil.isSensitiveDataEvent) in the last 90 days — the same events and agent attribution the
-     *  posture score's sensitive-data category uses; null when the threat backend is unavailable. */
+     *  InsightUtil.isSensitiveDataEvent) in the page's date range; null when the threat backend is unavailable. */
     private static Map<Integer, Map<String, Integer>> sensitiveViolationsByAsset(InsightDataBundle bundle,
                                                                                List<ApiCollection> assets) {
-        List<Integer> ids = new ArrayList<>();
+        return sensitiveCountsByAsset(bundle, assets,
+                e -> e.getSeverity() == null ? "UNKNOWN" : e.getSeverity().toUpperCase(Locale.ROOT));
+    }
+
+    private static Map<Integer, Map<String, Integer>> sensitiveCountsByAsset(InsightDataBundle bundle, List<ApiCollection> assets,
+                                                                           Function<DashboardMaliciousEvent, String> keyOf) {
+        List<DashboardMaliciousEvent> events = bundle.windowEvents();
+        if (events == null) return null;
+        List<DashboardMaliciousEvent> sensitive = new ArrayList<>();
+        for (DashboardMaliciousEvent e : events) if (InsightUtil.isSensitiveDataEvent(e)) sensitive.add(e);
+        Map<Integer, Map<String, Integer>> byAsset = bundle.hostResolver().countByCollection(sensitive, keyOf);
+        Set<Integer> ids = new HashSet<>();
         for (ApiCollection a : assets) ids.add(a.getId());
-        if (ids.isEmpty()) return new HashMap<>();
-        return bundle.maliciousSeverityCounts(ids, Context.now() - SENSITIVE_DATA_WINDOW_SECONDS,
-                InsightUtil::isSensitiveDataEvent);
+        byAsset.keySet().retainAll(ids);
+        return byAsset;
     }
 
     private BasicDBObject protectionCoverageKpi(List<ApiCollection> assets, List<GuardrailPolicies> policies) {
@@ -1046,10 +1141,7 @@ public class ArgusPostureService {
         }
         List<ApiCollection> scoped = assetsIn(assets, environment);
         Map<Integer, Map<String, Integer>> violationsByAsset = sensitiveViolationsByAsset(bundle, scoped);
-        List<Integer> scopedIds = new ArrayList<>();
-        for (ApiCollection a : scoped) scopedIds.add(a.getId());
-        Map<Integer, Map<String, Integer>> dataByAsset = scopedIds.isEmpty() ? new HashMap<>()
-                : bundle.sensitiveDataCounts(scopedIds, Context.now() - SENSITIVE_DATA_WINDOW_SECONDS);
+        Map<Integer, Map<String, Integer>> dataByAsset = sensitiveCountsByAsset(bundle, scoped, InsightUtil::sensitiveDataLabel);
 
         List<ApiCollection> withSensitive = new ArrayList<>();
         Map<Integer, Integer> violationCount = new HashMap<>();
@@ -1074,11 +1166,11 @@ public class ArgusPostureService {
         result.setLimit(effectiveLimit);
         long totalViolations = violationCount.values().stream().mapToLong(Integer::longValue).sum();
         result.setSummary(Arrays.asList(
-                new InsightResult.Metric("violations", "Sensitive-data violations (90d)", totalViolations, "count",
+                new InsightResult.Metric("violations", "Sensitive-data violations", totalViolations, "count",
                         InsightUtil.grouped(totalViolations)),
                 new InsightResult.Metric("withViolations", "Assets affected", withSensitive.size(), scoped.size(), "count",
                         InsightUtil.grouped(withSensitive.size()), null)));
-        result.setEmptyMessage("No assets with sensitive-data guardrail violations in the last 90 days.");
+        result.setEmptyMessage("No assets with sensitive-data guardrail violations in this time range.");
         if (violationsByAsset == null) {
             result.addDataGap(new InsightResult.Gap("THREAT_BACKEND", "REQUEST_FAILED",
                     "Guardrail violation data could not be fetched, so sensitive-data violations can't be shown."));
@@ -1122,7 +1214,7 @@ public class ArgusPostureService {
                 new PostureDrillResult.ColumnDef("type", "Type"),
                 new PostureDrillResult.ColumnDef("environment", "Environment"),
                 new PostureDrillResult.ColumnDef("dataTypes", "Data flagged"),
-                new PostureDrillResult.ColumnDef("violations", "Sensitive-data violations (90d)"),
+                new PostureDrillResult.ColumnDef("violations", "Sensitive-data violations"),
                 new PostureDrillResult.ColumnDef("severity", "Worst severity"));
     }
 
@@ -1344,13 +1436,6 @@ public class ArgusPostureService {
 
     private static String countLine(long count, String whenSome, String whenNone) {
         return count > 0 ? count + " " + whenSome : whenNone;
-    }
-
-    private static String sharedOrphanedLine(long shared, long orphaned) {
-        if (shared == 0 && orphaned == 0) return "No shared or orphaned identity(s)";
-        if (orphaned == 0) return shared + " shared";
-        if (shared == 0) return orphaned + " orphaned";
-        return shared + " shared · " + orphaned + " orphaned";
     }
 
     // Package-private (not private): TestArgusPostureService exercises this wrapper directly, and
