@@ -14,6 +14,7 @@ const AgenticSearchInput = forwardRef(({
     sidebarWidth = '300px',
     inputWidth = '520px',
     disabled = false,
+    helperText,
 }, ref) => {
     const [internalValue, setInternalValue] = useState('');
     const inputRef = useRef(null);
@@ -162,7 +163,7 @@ const AgenticSearchInput = forwardRef(({
                 </Box>
                 <Box style={{ textAlign: 'center', marginTop: '8px' }}>
                     <Text variant="bodySm" color="subdued">
-                        Ask Akto can make mistakes. For help <Link url="mailto:support@akto.io">contact support</Link>.
+                        {helperText || <>Ask Akto can make mistakes. For help <Link url="mailto:support@akto.io">contact support</Link>.</>}
                     </Text>
                 </Box>
             </Box>

@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Box, Text } from '@shopify/polaris'
 import ChartRenderer from './ChartRenderer'
 
@@ -29,7 +30,18 @@ export const markdownComponents = {
             <code className="markdown-code-block">{children}</code>
         );
     },
-    pre: ({ children }) => <pre className="markdown-pre">{children}</pre>,
+    // A chart fence (```chart:pie etc.) is emitted as a code block, so react-markdown wraps it in
+    // `pre` the same as any other code block — without this check every chart would render inside
+    // the monospace .markdown-pre box. `code`'s own renderer above returns a bare ChartRenderer
+    // element (not wrapped in <code>) when it detects one, so a chart is recognizable here by its
+    // child's element type.
+    pre: ({ children }) => {
+        const child = Array.isArray(children) ? children[0] : children;
+        if (React.isValidElement(child) && child.type === ChartRenderer) {
+            return <>{children}</>;
+        }
+        return <pre className="markdown-pre">{children}</pre>;
+    },
     blockquote: ({ children }) => <blockquote className="markdown-blockquote">{children}</blockquote>,
     strong: ({ children }) => <strong className="markdown-strong">{children}</strong>,
     em: ({ children }) => <em className="markdown-em">{children}</em>,
@@ -225,11 +237,15 @@ export const markdownStyles = `
     }
 `
 
+// GitHub-flavored markdown: tables (styled by the table rules in markdownStyles), strikethrough,
+// task lists and autolinked URLs. Plain react-markdown only parses CommonMark.
+const REMARK_PLUGINS = [remarkGfm]
+
 // React component for rendering markdown with shared components. inertLinks swaps in the
 // non-navigable variant (see inertMarkdownComponents above) for untrusted content.
 export const MarkdownRenderer = ({ children, inertLinks }) => {
     return (
-        <ReactMarkdown components={inertLinks ? inertMarkdownComponents : markdownComponents}>
+        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={inertLinks ? inertMarkdownComponents : markdownComponents}>
             {children}
         </ReactMarkdown>
     )

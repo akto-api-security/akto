@@ -678,8 +678,11 @@ public class ArgusPostureService {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (AgentFindingGroup g : groups) {
             totalOpenIssues += g.getCount();
+            // apiCollectionId isn't a column: it lets a caller (the Ask Akto red-team conversation
+            // tool) look up this group's issues by collection and vulnType.
             rows.add(PostureService.row("agentName", agentName(g.getCollectionId(), collectionsById),
-                    "vulnType", testDisplayName(g.getType(), testInfoByType), "severity", g.getSecondary(), "count", g.getCount(),
+                    "apiCollectionId", g.getCollectionId(),
+                    "vulnType", g.getType(), "severity", g.getSecondary(), "count", g.getCount(),
                     "lastSeen", g.getLastSeen()));
         }
         result.getSummary().add(new InsightResult.Metric("issueGroups", "Distinct issue groups",

@@ -17,6 +17,7 @@ import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
 import { shortNameToCategory } from '../../../../main/labelHelper';
 import insightsApi from '@/apps/dashboard/pages/observe/agentic/insights/insightsApi';
+import AskOverlayButton from '@/apps/dashboard/pages/dashboard/ask/AskOverlayButton';
 import { INSIGHT_GROUP, INSIGHT_GROUP_LABEL, INSIGHT_GROUP_ROUTE, INSIGHT_DEEP_LINK_PARAM } from '@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers';
 
 const INSIGHT_POPOVER_GROUPS = [INSIGHT_GROUP.ATLAS_DISCOVERY, INSIGHT_GROUP.GUARDRAIL_VIOLATIONS];
@@ -204,7 +205,7 @@ export default function Header() {
 
     const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const { agenticSecurityGranted, endpointSecurityGranted, dastGranted, mcpSecurityGranted } = func.getStiggFeatureGrants();
-    const dashboardInsightsGranted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
+    const dashboardInsightsGranted = func.checkLocal() || func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
 
     const disabledDashboardCategories = useMemo(() => {
         const disabled = [];
@@ -464,6 +465,9 @@ export default function Header() {
                     2025 Wrapped <span style={{marginInlineStart: '2px'}}>🎁</span>
                 </div>
             </div> */}
+
+            {/* Same entitlement the overlay's own endpoints check (usageInterceptor DASHBOARD_INSIGHTS). */}
+            {dashboardInsightsGranted && <AskOverlayButton />}
 
             {dashboardInsightsGranted && (
                 <Popover

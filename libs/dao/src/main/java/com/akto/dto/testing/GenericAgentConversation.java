@@ -19,7 +19,8 @@ public class GenericAgentConversation {
         DOCS_AGENT,
         ANALYZE_DASHBOARD_DATA,
         AGENTIC_OBSERVE,
-        INSIGHTS
+        INSIGHTS,
+        COMMAND_PALETTE
     }
 
     private String title;
