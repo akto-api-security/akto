@@ -1,0 +1,79 @@
+name: PR fast checks
+
+on:
+  pull_request:
+    branches: [ feature/mini-runtime-release ]
+    types: [ opened, synchronize, reopened, edited ]
+
+jobs:
+  fast-checks:
+    runs-on: ubuntu-latest
+    # No checkout, no build - every check below reads straight from the GitHub API,
+    # so the whole job finishes in a few seconds.
+    steps:
+      - name: PR size check (<=1000 changed lines, excluding generated/vendor paths)
+        id: size
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate \
+            --jq '.[] | select(.filename |
+              test("(^|/)target/|(^|/)node_modules/|(^|/)dist/|(^|/)build/|package-lock\\.json$|yarn\\.lock$|pnpm-lock\\.yaml$|\\.min\\.js$") | not
+            ) | (.additions + .deletions)' > line_counts.txt
+
+          CHANGED_LINES=$(awk '{ sum += $1 } END { print sum+0 }' line_counts.txt)
+          echo "Changed lines (excluding generated/vendor paths): $CHANGED_LINES"
+
+          if [ "$CHANGED_LINES" -gt 1000 ]; then
+            echo "::error::PR changes $CHANGED_LINES lines, which exceeds the 1000 line limit. Please split this PR into smaller ones."
+            exit 1
+          fi
+
+      - name: PR description check (>=100 words)
+        id: description
+        continue-on-error: true
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 - <<'EOF'
+          import os
+          import re
+
+          # Word count instead of raw newline count: a well-written description as a
+          # few wrapped prose paragraphs has far fewer literal "\n"s than a sparse
+          # bullet list, even though it has more actual content. Words are a better
+          # proxy for "has substance" regardless of paragraph vs. bullet style.
+          body = os.environ.get("PR_BODY") or ""
+          body = re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
+          word_count = len(body.split())
+
+          print(f"Description word count: {word_count}")
+
+          if word_count < 100:
+              print(f"::error::PR description has only {word_count} word(s); at least 100 are required. "
+                    "Please describe what changed, why, and how it was tested.")
+              raise SystemExit(1)
+          EOF
+
+      - name: Fail if any check failed
+        if: always()
+        run: |
+          size='${{ steps.size.outcome }}'
+          description='${{ steps.description.outcome }}'
+
+          {
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| PR size | $size |"
+            echo "| PR description | $description |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$size" != "success" ] || [ "$description" != "success" ]; then
+            echo "::error::One or more PR quality gates failed - see the step logs/summary above."
+            exit 1
+          fi

@@ -1359,9 +1359,7 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
                 NODE_LIMIT);
     }
 
-    /** Was Bson filter - see the cyborg-side DbLayer for why (never worked, no codec for a raw
-     *  Bson query-builder object over HTTP). This stub path just rebuilds the equivalent filter. */
-    public static long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, State state){
+    public static long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state){
         ObjectId testingRunId = new ObjectId(testingRunHexId);
         Bson filter = Filters.and(
                 Filters.gte(TestingRunResultSummary.START_TIMESTAMP, sinceTimestamp),

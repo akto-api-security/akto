@@ -1,0 +1,65 @@
+name: PR coverage check
+
+on:
+  pull_request:
+    branches: [ feature/mini-runtime-release ]
+    types: [ opened, synchronize, reopened ]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  coverage-check:
+    # ubuntu-latest (24.04) dropped libssl1.1, which the flapdoodle-embedded MongoDB 4.4.x
+    # binary in libs/dao's tests needs - matches the runner prod.yml already uses successfully.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure base ref is fetched
+        run: git fetch origin "${{ github.base_ref }}" --depth=1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Run tests with coverage (mini-testing + mini-runtime + deps)
+        run: mvn -B package -pl apps/mini-testing,apps/mini-runtime -am
+
+      # Pinned to an unreleased main commit, not a tagged release: v1.8.0's
+      # "coverage-changed-files" output is actually whole-file coverage (including
+      # all pre-existing untested code in any file you touch), not real diff coverage.
+      # This commit renames it to coverage-changed-lines and fixes it to mean what it
+      # says - "the coverage of lines that were changed in the PR".
+      - name: Post coverage report on the PR
+        id: jacoco
+        uses: Madrapps/jacoco-report@2d0aea11fcfac3fff0987ff855c4a59c8903f8ff # main, unreleased
+        with:
+          paths: |
+            ${{ github.workspace }}/apps/mini-testing/target/site/jacoco/jacoco.xml
+            ${{ github.workspace }}/apps/mini-runtime/target/site/jacoco/jacoco.xml
+            ${{ github.workspace }}/libs/*/target/site/jacoco/jacoco.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          title: Coverage Report
+          update-comment: true
+          comment-type: both
+          skip-if-no-changes: true
+          min-coverage-overall: 50
+          min-coverage-changed-lines: 50
+
+      - name: Fail if changed-lines coverage is below 50%
+        run: |
+          COVERAGE="${{ steps.jacoco.outputs.coverage-changed-lines }}"
+
+          if [ -z "$COVERAGE" ]; then
+            echo "No changed-lines coverage reported (no coverable lines in this diff) - nothing to gate on."
+            exit 0
+          fi
+
+          echo "Changed-lines coverage: ${COVERAGE}%"
+          awk -v c="$COVERAGE" 'BEGIN { exit !(c + 0 >= 50) }' \
+            || { echo "::error::Patch coverage on changed lines is ${COVERAGE}%, below the 50% minimum."; exit 1; }

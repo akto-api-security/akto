@@ -41,7 +41,6 @@ import com.akto.util.DashboardMode;
 import org.apache.commons.io.FileUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 

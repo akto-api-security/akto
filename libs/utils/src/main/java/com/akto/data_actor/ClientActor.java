@@ -4450,13 +4450,6 @@ public class ClientActor extends DataActor {
         return nodeList;
     }
 
-    /**
-     * Was Bson filter - never actually worked for any caller. Handing a raw Bson query-builder
-     * object (e.g. Filters$AndFilter) to BasicDBObject.toString() crashes with
-     * CodecConfigurationException before the request is even built - confirmed root cause of a
-     * real production incident (23 Sep). Primitives round-trip over JSON with no codec involved on
-     * either side.
-     */
     public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state) {
         try {
             BasicDBObject obj = new BasicDBObject();
