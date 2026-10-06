@@ -28,6 +28,21 @@
             <artifactId>dao</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Pinned directly (not left to transitive mediation) so mini-testing alone runs the
+             kafka-clients version parallel-consumer-core's fork was built/tested against; other
+             modules keep whatever they already declare. -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.9.2</version>
+        </dependency>
+        <!-- Community fork of io.confluent.parallelconsumer, which is no longer maintained.
+             Declared here (not in libs/utils) since mini-testing is the only consumer. -->
+        <dependency>
+            <groupId>bz.stub.parallelconsumer</groupId>
+            <artifactId>parallel-consumer-core</artifactId>
+            <version>0.6.0.0</version>
+        </dependency>
         <dependency>
             <groupId>com.akto.apps</groupId>
             <artifactId>akto-utility-server</artifactId>

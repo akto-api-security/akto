@@ -38,13 +38,14 @@ public class TestRunMetrics {
         MAX_RUNTIME,
         /** All expected records processed and the queue drained. */
         ALL_PROCESSED,
-        /** Queue drained but records still missing after the idle grace -> consumer restarted from last commit. */
-        IDLE_RESTART,
-        /** Queue drained, idle grace elapsed, nothing left to recover -> completed. */
-        IDLE_COMPLETE,
         /** Polling/processing threw. */
-        ERROR
-    }
+        ERROR,
+        /** The lease's own TTL expired with no confirmed renewal - the general, cause-unknown backstop. */
+        LEASE_LOST,
+        /** The consumer engine (isClosedOrFailed()) reported it died on its own - a faster, unambiguous
+         *  signal than waiting out LEASE_LOST's TTL, so the lease is voluntarily released rather than
+         *  left for the TTL to catch up on. */
+        CONSUMER_FAILED }
 
     /**
      * Pipeline stages timed per test. LOOKUP is config/sample resolution; RUN_TEST is the full
@@ -94,9 +95,19 @@ public class TestRunMetrics {
 
     // Run identity/context.
     private final String summaryId;
-    private final int startTime;        // Context epoch seconds
+    private final int startTime;        // Context epoch seconds - lifetime, from the ORIGINAL
+                                         // attempt, carried across every resume. Correct for
+                                         // durationSec/the printed elapsed= field, but wrong as
+                                         // rate's denominator once processed (reset per init())
+                                         // and this stop being the same clock - see sessionStartTime.
     private final int expectedRecords;
     private final ExecutorService executor;
+    /** This session's own start - a fresh TestRunMetrics is constructed on every init(), so this
+     *  is just "now" at construction. Used only as rate's denominator, so a resumed session's
+     *  rate reflects its own actual throughput instead of processed-this-session divided by
+     *  elapsed-since-the-very-first-attempt (which undercounts by however long every prior
+     *  stall/restart in the chain took). */
+    private final int sessionStartTime = Context.now();
 
     // Outcome counters.
     private final AtomicInteger polled = new AtomicInteger(0);
@@ -248,12 +259,6 @@ public class TestRunMetrics {
         loggerMaker.warnAndAddToDb("TESTRUN CONSUMER-UP summaryId=" + summaryId + " attempt=" + attempt);
     }
 
-    public void logRestart(long idleMs, int processed, long workRemaining) {
-        loggerMaker.warnAndAddToDb("TESTRUN RESTART summaryId=" + summaryId
-                + " reason=idle_incomplete idleMs=" + idleMs + " "
-                + runStats(processed, workRemaining));
-    }
-
     public void logEnd(StopReason reason, boolean failed, int processed) {
         int accountedFor = passed.get() + vulnerable.get() + skipped.get()
                 + timedOut.get() + rejected.get() + errored.get();
@@ -271,6 +276,17 @@ public class TestRunMetrics {
 
     /** Call once per drain-loop iteration. Publishes the queue gauge and emits heartbeat/stall on cadence. */
     public void tick(int processed, long workRemaining) {
+        tick(processed, workRemaining, null);
+    }
+
+    /**
+     * @param lagSupplier cumulative, resume-safe "records still outstanding" (Kafka lag) - only
+     *                    invoked right here, at the heartbeat's own cadence, not once per tick,
+     *                    so this doesn't add an AdminClient call to the loop's ~100ms cadence.
+     *                    Null is fine (remaining/eta just report -1) - kept optional so the one
+     *                    caller that doesn't have a lag figure handy doesn't need one either.
+     */
+    public void tick(int processed, long workRemaining, java.util.function.LongSupplier lagSupplier) {
         AllMetrics.instance.setTestingKafkaQueuePending(workRemaining);
         long nowMs = System.currentTimeMillis();
 
@@ -281,7 +297,15 @@ public class TestRunMetrics {
 
         if (nowMs - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
             lastHeartbeatMs = nowMs;
-            logProgressHeartbeat(processed, workRemaining);
+            long lag = -1;
+            if (lagSupplier != null) {
+                try {
+                    lag = lagSupplier.getAsLong();
+                } catch (Exception e) {
+                    // best-effort - remaining/eta just fall back to -1 below
+                }
+            }
+            logProgressHeartbeat(processed, workRemaining, lag);
             logCostBreakdown();
         }
 
@@ -355,10 +379,19 @@ public class TestRunMetrics {
     }
 
     /** WARN-level run-wide progress line: how far along the M*N matrix is, throughput, ETA and pool saturation. */
-    private void logProgressHeartbeat(int processed, long workRemaining) {
+    private void logProgressHeartbeat(int processed, long workRemaining, long lag) {
         int elapsed = Math.max(1, Context.now() - startTime);
-        double rate = processed / (double) elapsed;
-        int remaining = expectedRecords > 0 ? Math.max(0, expectedRecords - processed) : -1;
+        // rate's own denominator: this session's elapsed, not the run's lifetime elapsed above.
+        // processed resets to zero on every init() same as sessionStartTime does, so both sides
+        // of this division stay in sync across a resume - customer infra reads this rate field
+        // directly, and it was reporting ~1/s on a healthy ~40/s resumed run before this fix.
+        int sessionElapsed = Math.max(1, Context.now() - sessionStartTime);
+        double rate = processed / (double) sessionElapsed;
+        // Kafka lag, not expectedRecords - processed: processed is per-session (resets on every
+        // resume) while expectedRecords is the whole topic's total, so that subtraction
+        // overstates remaining by however much prior sessions already did. Lag is already
+        // cumulative and resume-safe - it's the same number ALL_PROCESSED's own check uses.
+        int remaining = lag >= 0 ? (int) lag : -1;
         long eta = (remaining >= 0 && rate > 0.01) ? (long) (remaining / rate) : -1;
 
         loggerMaker.warnAndAddToDb("TESTRUN PROGRESS summaryId=" + summaryId
