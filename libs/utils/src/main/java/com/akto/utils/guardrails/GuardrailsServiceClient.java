@@ -187,21 +187,13 @@ public final class GuardrailsServiceClient {
      * request payload JSON — real rows look like {@code {"body": ...}} or
      * {@code {"body":..., "toolName":...}}, the same shape live gateway traffic has. Wrapping it
      * again would bury the prompt one level deeper than any field mapping or extractor looks.
-     *
-     * <p>Also carries {@code type}/{@code statusCode}/{@code status} — the same placeholders
-     * buildAPIPayload (mcp-endpoint-shield's threat_reporter.go) writes — because this envelope
-     * doubles as a backfilled malicious event's {@code latestApiPayload}, and the dashboard builds
-     * each sample pane's first line from those keys ("undefined undefined" without them).
      */
     public static String traceEnvelope(String requestPayload, String responsePayload) {
         return new BasicDBObject()
             .append("method", TRACE_METHOD)
             .append("path", TRACE_PATH)
-            .append("type", "http")
             .append("requestPayload", requestPayload)
             .append("responsePayload", responsePayload == null ? "" : responsePayload)
-            .append("statusCode", 200)
-            .append("status", "OK")
             .toJson();
     }
 
