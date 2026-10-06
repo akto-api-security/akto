@@ -8,12 +8,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.OffsetSpec;
-import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.TopicPartitionInfo;
-
-import java.util.Collections;
 
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
@@ -118,53 +114,6 @@ public class KafkaAdminClient {
             return lag;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error reading consumer lag for topic " + topicName + " group " + groupId);
-            return -1;
-        }
-    }
-
-    /**
-     * The total number of messages ever produced to this attempt's topic, read back from Kafka
-     * directly rather than trusted from any caller-supplied value - restores TESTRUN PROGRESS's
-     * done=X/Y and its ETA with a value that reflects the real topic, not a write-once record that
-     * can go stale across a resume.
-     *
-     * Called once per init(), before any consumption starts, so its own listOffsets call isn't
-     * in the hot per-tick loop the way getConsumerLag's is.
-     *
-     * @return the end offset across all partitions, or -1 when it cannot be determined.
-     */
-    public static long getEndOffset(String topicName) {
-        AdminClient adminClient = get();
-        if (adminClient == null) {
-            return -1;
-        }
-        try {
-            TopicDescription description = adminClient
-                    .describeTopics(Collections.singletonList(topicName))
-                    .allTopicNames().get(10, TimeUnit.SECONDS)
-                    .get(topicName);
-            if (description == null) {
-                return -1;
-            }
-
-            Map<TopicPartition, OffsetSpec> endSpecs = new HashMap<>();
-            for (TopicPartitionInfo partition : description.partitions()) {
-                endSpecs.put(new TopicPartition(topicName, partition.partition()), OffsetSpec.latest());
-            }
-            if (endSpecs.isEmpty()) {
-                return -1;
-            }
-
-            Map<TopicPartition, ListOffsetsResult.ListOffsetsResultInfo> endOffsets = adminClient
-                    .listOffsets(endSpecs).all().get(10, TimeUnit.SECONDS);
-
-            long total = 0;
-            for (ListOffsetsResult.ListOffsetsResultInfo info : endOffsets.values()) {
-                total += info.offset();
-            }
-            return total;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error reading end offset for topic " + topicName);
             return -1;
         }
     }

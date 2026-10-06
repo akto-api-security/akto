@@ -324,11 +324,11 @@ public class ConsumerUtil {
         final String groupId = Constants.getKafkaGroupIdConfig(summaryIdForTest);
         AtomicInteger processedRecords = new AtomicInteger(0);
 
-        // Fresh observability for this run (replaces any previous run's state). expectedRecords
-        // read back from Kafka's own end offset rather than trusted from the file, which can go
-        // stale across a resume (TESTRUN PROGRESS's done=X/Y and ETA need the real total).
-        long expectedRecords = KafkaAdminClient.getEndOffset(topicName);
-        metrics = new TestRunMetrics(summaryIdForTest, startTime, (int) expectedRecords, executor);
+        // Fresh observability for this run (replaces any previous run's state).
+        final int expectedRecords = currentTestInfo.containsField(TestingStateStore.EXPECTED_RECORDS)
+                ? currentTestInfo.getInt(TestingStateStore.EXPECTED_RECORDS)
+                : -1;
+        metrics = new TestRunMetrics(summaryIdForTest, startTime, expectedRecords, executor);
         int apiCount = (instance.getTestingUtil() != null && instance.getTestingUtil().getSampleMessages() != null)
                 ? instance.getTestingUtil().getSampleMessages().size() : -1;
         int testCount = instance.getTestConfigMap() != null ? instance.getTestConfigMap().size() : -1;
