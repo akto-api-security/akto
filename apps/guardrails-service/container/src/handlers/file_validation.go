@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
@@ -29,6 +31,25 @@ var urlFetchClient = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	},
+}
+
+// publicURLFetchClient also refuses internal addresses; checked after DNS resolution, so rebinding can't bypass it.
+var publicURLFetchClient = &http.Client{
+	CheckRedirect: urlFetchClient.CheckRedirect,
+	Transport:     &http.Transport{DialContext: (&net.Dialer{Control: refuseInternalAddress}).DialContext},
+}
+
+func refuseInternalAddress(_, address string, _ syscall.RawConn) error {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(host)
+	if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
+		ip.IsUnspecified() {
+		return fmt.Errorf("refusing to fetch internal address %s", host)
+	}
+	return nil
 }
 
 type fileInput struct {
@@ -88,6 +109,8 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	}
 
 	contextSource := strings.TrimSpace(c.PostForm("contextSource"))
+	// Named policies are enforced regardless of their scope, as on /validate/request.
+	policyName := strings.TrimSpace(c.PostForm("policyName"))
 
 	requestHeaders := h.fileRequestHeaders(c)
 
@@ -95,7 +118,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 
 	// Pre-flight policy gate: with no policy applicable to this caller there is nothing
 	// to enforce, so skip fetching, extracting and inspecting the content entirely.
-	if h.policyGate != nil {
+	if h.policyGate != nil && policyName == "" {
 		applicable, err := h.policyGate(contextSource, requestHeaders, strings.TrimSpace(c.PostForm("tag")))
 		if err != nil {
 			// Could not tell — inspect rather than assume there is nothing to enforce.
@@ -139,6 +162,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		Status:         strings.TrimSpace(c.PostForm("status")),
 		Tag:            strings.TrimSpace(c.PostForm("tag")),
 		Metadata:       strings.TrimSpace(c.PostForm("metadata")),
+		PolicyName:     policyName,
 		Source:         "file",
 	}
 
@@ -438,7 +462,11 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) *fi
 		return &fileInput{Filename: filename, Err: fmt.Errorf("invalid URL: %w", err)}
 	}
 
-	resp, err := urlFetchClient.Do(req)
+	client := publicURLFetchClient
+	if h.cfg.File.AllowPrivateURLs {
+		client = urlFetchClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return &fileInput{Filename: filename, Err: fmt.Errorf("failed to fetch URL: %w", err)}
 	}

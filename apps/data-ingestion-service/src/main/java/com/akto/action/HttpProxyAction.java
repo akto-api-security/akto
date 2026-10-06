@@ -5,6 +5,7 @@ import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
+import com.akto.utils.AktoMetadataDirective;
 import com.akto.utils.LitellmAgentEndpointRewrite;
 import com.akto.utils.LitellmDeviceHeartbeat;
 import com.akto.utils.LitellmUserRegistry;
@@ -16,6 +17,7 @@ import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -64,12 +66,21 @@ public class HttpProxyAction extends ActionSupport {
     private String activityId;
     // Raw request from endpoint shield, used for account-type detection.
     private String fullRequest;
+    // LiteLLM guardrail entry's JSON: policy_name, context_source, other keys become tags.
+    private String akto_metadata;
+    // Files to validate when file_guardrails=true: [{filename, type, content (base64) or url}].
+    private List<Map<String, Object>> files;
+    // "true" validates files instead of proxying the request.
+    private String file_guardrails;
 
     private Map<String, Object> data;
     private boolean success;
     private String message;
 
     public String httpProxy() {
+        if ("true".equalsIgnoreCase(file_guardrails)) {
+            return validateFiles();
+        }
         long start = System.currentTimeMillis();
         try {
             loggerMaker.infoAndAddToDb(
@@ -79,6 +90,7 @@ public class HttpProxyAction extends ActionSupport {
             Map<String, Object> requestData = buildRequestData();
             // Before the rewrite: a directive's ENDPOINT context source moves the traffic to Atlas.
             VxlanPolicyDirective.apply(requestData);
+            AktoMetadataDirective.apply(requestData);
             String litellmUserEmail = LitellmAgentEndpointRewrite.apply(requestData);
             if ("true".equalsIgnoreCase(ingest_data)) {
                 // Once per user per process, and only on ingest calls, so verdicts stay fast.
@@ -117,6 +129,36 @@ public class HttpProxyAction extends ActionSupport {
             message = "Unexpected error: " + e.getMessage();
             data = new HashMap<>();
             data.put("error", e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * file_guardrails=true: validates attached files with the same Atlas routing and policy scope as the
+     * request they came with (same envelope, plus files). Verdict only, no ingestion.
+     */
+    private String validateFiles() {
+        long start = System.currentTimeMillis();
+        try {
+            data = new HashMap<>();
+            if (files == null || files.isEmpty()) {
+                success = true;
+                return Action.SUCCESS.toUpperCase();
+            }
+            Map<String, Object> requestData = buildRequestData();
+            VxlanPolicyDirective.apply(requestData);
+            AktoMetadataDirective.apply(requestData);
+            LitellmAgentEndpointRewrite.apply(requestData);
+            data = gateway.validateFile(requestData, files);
+            success = true;
+            loggerMaker.infoAndAddToDb("[http-proxy] file guardrails completed - files: {}, account: {}, latencyMs: {}",
+                files.size(), akto_account_id, System.currentTimeMillis() - start);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("[http-proxy] file guardrails unexpected error - account: " + akto_account_id + ", error: " + e.getMessage());
+            success = false;
+            message = "Unexpected error: " + e.getMessage();
+            data = new HashMap<>();
             return Action.ERROR.toUpperCase();
         }
     }
@@ -223,6 +265,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("client_hook", client_hook);
         requestData.put("activityId", activityId);
         requestData.put("fullRequest", fullRequest);
+        requestData.put(AktoMetadataDirective.FIELD, akto_metadata);
 
         return requestData;
     }

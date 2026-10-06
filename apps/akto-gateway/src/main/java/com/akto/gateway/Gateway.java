@@ -6,7 +6,13 @@ import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 
@@ -24,6 +30,14 @@ public class Gateway {
     public static final String GUARDRAILS_REQUEST_PAYLOAD = "guardrailsRequestPayload";
     // Optional comma-separated policy names the guardrails service narrows its policies to.
     public static final String GUARDRAILS_POLICY_NAME = "policyName";
+    // Request context /validate/file reads, so files get the same policies and scoping as the request.
+    private static final List<String> FILE_CONTEXT_FIELDS = Arrays.asList("contextSource", "path", "method",
+        "akto_account_id", "akto_vxlan_id", "ip", "requestHeaders", "time", "statusCode", "status", "tag", "metadata",
+        GUARDRAILS_POLICY_NAME);
+    // Image validation (OCR) is not enabled for this path yet, so images are dropped rather than validated.
+    private static final String IMAGE_TYPE = "image";
+    private static final List<String> SKIPPED_FILE_EXTENSIONS = Arrays.asList(".jpg", ".jpeg", ".png", ".gif",
+        ".webp", ".bmp", ".tif", ".tiff", ".heic", ".svg");
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -317,6 +331,51 @@ public class Gateway {
 
     public DataPublisher getDataPublisher() {
         return dataPublisher;
+    }
+
+    /**
+     * Validates attachments ([{filename, type, content (base64) | url}]) with the guardrails service's
+     * /validate/file, using the request's context: content is uploaded, a url is fetched by the guardrails
+     * service. Images and undecodable entries are skipped; the verdict comes back as guardrailsResult.
+     */
+    public Map<String, Object> validateFile(Map<String, Object> requestData, List<Map<String, Object>> files) {
+        Map<String, Object> fields = new HashMap<>();
+        for (String key : FILE_CONTEXT_FIELDS) {
+            putIfNotNull(fields, requestData, key);
+        }
+        List<GuardrailsClient.FileUpload> uploads = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        // Newest first, so the guardrails service's file cap drops old attachments rather than the latest.
+        List<Map<String, Object>> newestFirst = new ArrayList<>(files);
+        Collections.reverse(newestFirst);
+        for (Map<String, Object> file : newestFirst) {
+            String filename = asString(file.get("filename"));
+            String url = asString(file.get("url"));
+            if (IMAGE_TYPE.equalsIgnoreCase(asString(file.get("type"))) || isSkippedFile(filename)) {
+                loggerMaker.infoAndAddToDb("Skipping image attachment, image validation is not enabled: " + filename);
+                continue;
+            }
+            if (!url.isEmpty()) {
+                urls.add(url);
+                continue;
+            }
+            try {
+                byte[] content = Base64.getDecoder().decode(asString(file.get("content")));
+                uploads.add(new GuardrailsClient.FileUpload(filename.isEmpty() ? "attachment" : filename, content));
+            } catch (IllegalArgumentException e) {
+                loggerMaker.warnAndAddToDb("Skipping file with invalid base64 content: " + filename);
+            }
+        }
+        Map<String, Object> result = new HashMap<>();
+        if (!uploads.isEmpty() || !urls.isEmpty()) {
+            result.put("guardrailsResult", guardrailsClient.callValidateFile(fields, uploads, urls));
+        }
+        return result;
+    }
+
+    static boolean isSkippedFile(String filename) {
+        String lower = filename.toLowerCase(Locale.ROOT);
+        return SKIPPED_FILE_EXTENSIONS.stream().anyMatch(lower::endsWith);
     }
 
     public void setDataPublisher(DataPublisher dataPublisher) {
