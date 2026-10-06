@@ -1876,55 +1876,24 @@ public class ClientActor extends DataActor {
                 loggerMaker.errorAndAddToDb("non 2xx response in findTestingRun", LoggerMaker.LogDb.RUNTIME);
                 return null;
             }
-            return parseTestingRunFromResponsePayload(responsePayload, "findTestingRun");
+            Document testingRun = null;
+            try {
+                Document doc = Document.parse(responsePayload);
+                testingRun = (Document) doc.get("testingRun");
+                Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
+                String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
+                fillTestingEndpointsType(type, testingRun);
+                String hexId = testingRun.getString("hexId");
+                testingRun.put("id", hexId);
+                TestingRun res = decode(apiInfoKeyCodec, testingRun);
+                res.setId(new ObjectId(hexId));
+                return res;
+            } catch(Exception e) {
+                logTestingRunDecodeFailure("findTestingRun", testingRun, e);
+                return null;
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in findTestingRun" + e, LoggerMaker.LogDb.RUNTIME);
-            return null;
-        }
-    }
-
-    private TestingRun parseTestingRunFromResponsePayload(String responsePayload, String apiName) {
-        Document testingRun = null;
-        try {
-            Document doc = Document.parse(responsePayload);
-            testingRun = (Document) doc.get("testingRun");
-            if (testingRun == null) {
-                return null;
-            }
-            Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
-            String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-            fillTestingEndpointsType(type, testingRun);
-            String hexId = testingRun.getString("hexId");
-            testingRun.put("id", hexId);
-            TestingRun res = decode(apiInfoKeyCodec, testingRun);
-            res.setId(new ObjectId(hexId));
-            return res;
-        } catch(Exception e) {
-            logTestingRunDecodeFailure(apiName, testingRun, e);
-            return null;
-        }
-    }
-
-    public ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds) {
-        Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("miniTestingName", miniTestingName);
-        obj.put("leaseToken", leaseToken);
-        obj.put("leaseSeconds", leaseSeconds);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/claimNextTestWork", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in claimNextTestWork", LoggerMaker.LogDb.RUNTIME);
-                return null;
-            }
-            String verdict = BasicDBObject.parse(responsePayload).getString("verdict");
-            TestingRunResultSummary trrs = parseTestingRunResultSummaryFromResponsePayload(responsePayload);
-            TestingRun testingRun = parseTestingRunFromResponsePayload(responsePayload, "claimNextTestWork");
-            return new ClaimResult(verdict, trrs, testingRun);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in claimNextTestWork" + e, LoggerMaker.LogDb.RUNTIME);
             return null;
         }
     }
