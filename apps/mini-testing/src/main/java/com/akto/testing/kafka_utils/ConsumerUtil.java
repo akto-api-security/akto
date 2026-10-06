@@ -13,10 +13,10 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
+import java.time.Duration;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -44,13 +44,10 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBObject;
 
-import io.confluent.parallelconsumer.ParallelConsumerOptions;
-import io.confluent.parallelconsumer.ParallelStreamProcessor;
+import bz.stub.parallelconsumer.ParallelConsumerOptions;
+import bz.stub.parallelconsumer.ParallelStreamProcessor;
 
 public class ConsumerUtil {
-
-    /** If queue stays empty with no processed progress this long, treat remaining expected records as lost. */
-    private static final long DRAIN_IDLE_GRACE_MS = 5L * 60L * 1000L;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     static Properties properties = com.akto.runtime.utils.Utils.configProperties(Constants.LOCAL_KAFKA_BROKER_URL, Constants.AKTO_KAFKA_GROUP_ID_CONFIG, Constants.AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG);
@@ -264,82 +261,64 @@ public class ConsumerUtil {
         if (currentTestInfo.containsField(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS)) {
             effectiveMaxRunTime = currentTestInfo.getInt(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, maxRunTimeInSeconds);
         }
-        final int expectedRecords = currentTestInfo.containsField(TestingStateStore.EXPECTED_RECORDS)
-                ? currentTestInfo.getInt(TestingStateStore.EXPECTED_RECORDS)
-                : -1;
         final int accountId = currentTestInfo.containsField(TestingStateStore.ACCOUNT_ID)
                 ? currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID)
                 : (Context.accountId.get() != null ? Context.accountId.get() : -1);
         if (accountId > 0) {
             Context.accountId.set(accountId);
         }
-        AtomicBoolean firstRecordRead = new AtomicBoolean(false);
+        final String topicName = Constants.getTestResultsTopicName(summaryIdForTest);
+        final String groupId = Constants.getKafkaGroupIdConfig(summaryIdForTest);
         AtomicInteger processedRecords = new AtomicInteger(0);
 
-        // Fresh observability for this run (replaces any previous run's state).
-        metrics = new TestRunMetrics(summaryIdForTest, startTime, expectedRecords, executor);
+        // Fresh observability for this run (replaces any previous run's state). expectedRecords
+        // read back from Kafka's own end offset rather than trusted from the file, which can go
+        // stale across a resume (TESTRUN PROGRESS's done=X/Y and ETA need the real total).
+        long expectedRecords = KafkaAdminClient.getEndOffset(topicName);
+        metrics = new TestRunMetrics(summaryIdForTest, startTime, (int) expectedRecords, executor);
         int apiCount = (instance.getTestingUtil() != null && instance.getTestingUtil().getSampleMessages() != null)
                 ? instance.getTestingUtil().getSampleMessages().size() : -1;
         int testCount = instance.getTestConfigMap() != null ? instance.getTestConfigMap().size() : -1;
         metrics.logStart(accountId, apiCount, testCount, concurrency,
                 maxRunTimeForTests, effectiveMaxRunTime);
 
-        boolean isConsumerRunning = currentTestInfo.getBoolean(TestingStateStore.CONSUMER_RUNNING, false);
-
         ParallelStreamProcessor<String, String> parallelConsumer = null;
 
-        /*
-         * Edge case:
-         * In case the module restarts and starts processing the incomplete testing run,
-         * then the consumer will process some of the records again.
-         * This happens because the commits to kafka are periodic (5 seconds, default) and not per message.
-         */
-        
         boolean consumerFailed = false;
         TestRunMetrics.StopReason stopReason = TestRunMetrics.StopReason.UNKNOWN;
-        int consumerAttempt = 0;
         try {
-            boolean restartConsumer = isConsumerRunning;
-            while (restartConsumer) {
-                restartConsumer = false;
-                consumerAttempt++;
-                if (parallelConsumer != null) {
-                    try {
-                        parallelConsumer.closeDontDrainFirst();
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error closing parallel consumer: " + e.getClass().getSimpleName()
-                                + " " + e.getMessage());
-                    }
-                    parallelConsumer = null;
-                    firstRecordRead.set(false);
+            if (consumer != null) {
+                try {
+                    consumer.close();
+                } catch (Exception e) {
+                    loggerMaker.warnAndAddToDb("Error closing previous kafka consumer: " + e.getMessage());
                 }
-                if (consumer != null) {
-                    try {
-                        consumer.close();
-                    } catch (Exception e) {
-                        loggerMaker.warnAndAddToDb("Error closing previous kafka consumer: " + e.getMessage());
-                    }
-                }
-                Properties consumerProperties = properties;
-                if (Constants.CONCURRENT_TESTING) {
-                    consumerProperties = new Properties();
-                    consumerProperties.putAll(properties);
-                    consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, Constants.getKafkaGroupIdConfig(summaryIdForTest));
-                }
-                consumer = new KafkaConsumer<>(consumerProperties);
-                ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
-                    .consumer(consumer)
-                    .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
-                    .maxConcurrency(concurrency)
-                    .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
-                    .batchSize(1)
-                    .maxFailureHistory(3)
-                    .build();
-                parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
-                parallelConsumer.subscribe(Arrays.asList(Constants.getTestResultsTopicName(summaryIdForTest)));
-                metrics.logConsumerUp(consumerAttempt);
+            }
+            Properties consumerProperties = properties;
+            if (Constants.CONCURRENT_TESTING) {
+                consumerProperties = new Properties();
+                consumerProperties.putAll(properties);
+                consumerProperties.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+            }
+            consumer = new KafkaConsumer<>(consumerProperties);
+            ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
+                .consumer(consumer)
+                .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED)
+                .maxConcurrency(concurrency)
+                .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC)
+                // Must stay above the underlying KafkaConsumer's own default.api.timeout.ms (60s) -
+                // a commit slower than that but still recoverable (observed: 60.006s) otherwise
+                // exhausts the whole budget before even one attempt completes, leaving zero room
+                // for the retry this setting exists to allow.
+                .offsetCommitTimeout(Duration.ofSeconds(90))
+                .batchSize(1)
+                .maxFailureHistory(3)
+                .build();
+            parallelConsumer = ParallelStreamProcessor.createEosStreamProcessor(options);
+            parallelConsumer.subscribe(Arrays.asList(topicName));
+            metrics.logConsumerUp(1);
 
-                parallelConsumer.poll(record -> {
+            parallelConsumer.poll(record -> {
                     String threadName = Thread.currentThread().getName();
                     String message = record.value();
                     String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
@@ -350,7 +329,6 @@ public class ConsumerUtil {
                         if(!executor.isShutdown()){
                             metrics.onSubmit(recordId, threadName);
                             Future<?> future = executor.submit(() -> runTestFromMessage(message, recordId));
-                            firstRecordRead.set(true);
                             try {
                                 future.get(maxRunTimeForTests, TimeUnit.SECONDS);
                             } catch (TimeoutException e) {
@@ -396,8 +374,6 @@ public class ConsumerUtil {
                     }
                 });
 
-            long drainIdleSinceMs = -1L;
-            int lastProcessedSeen = -1;
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
                     stopReason = TestRunMetrics.StopReason.STOPPED;
@@ -412,44 +388,29 @@ public class ConsumerUtil {
                     break;
                 }
 
-                long nowMs = System.currentTimeMillis();
                 int processed = processedRecords.get();
-                if (processed > lastProcessedSeen) {
-                    lastProcessedSeen = processed;
-                    drainIdleSinceMs = -1L;
-                }
-
                 long workRemaining = parallelConsumer.workRemaining();
-                metrics.tick(processed, workRemaining);
+                // Only actually calls Kafka at the heartbeat's own cadence (tick decides
+                // internally), not once per ~100ms loop iteration.
+                metrics.tick(processed, workRemaining, () -> KafkaAdminClient.getConsumerLag(topicName, groupId));
 
-                boolean locallyEmpty = firstRecordRead.get() && workRemaining == 0;
-                    if (locallyEmpty) {
-                        if (expectedRecords > 0 && processed >= expectedRecords) {
-                            stopReason = TestRunMetrics.StopReason.ALL_PROCESSED;
-                            int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                            shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
-                            break;
-                        }
-
-                        if (drainIdleSinceMs < 0) {
-                            drainIdleSinceMs = nowMs;
-                        } else if (nowMs - drainIdleSinceMs >= DRAIN_IDLE_GRACE_MS) {
-                            if (expectedRecords > 0 && processed < expectedRecords) {
-                                stopReason = TestRunMetrics.StopReason.IDLE_RESTART;
-                                metrics.logRestart(DRAIN_IDLE_GRACE_MS, processed, workRemaining);
-                                restartConsumer = true;
-                                break;
-                            }
-                            stopReason = TestRunMetrics.StopReason.IDLE_COMPLETE;
-                            int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                            shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
-                            break;
-                        }
-                    } else {
-                        drainIdleSinceMs = -1L;
+                /*
+                 * Completion is decided by kafka, not by counting locally. The old check compared
+                 * processedRecords - which restarts at zero on every init() - against a total that
+                 * does not, so a resumed drain could never satisfy it and simply spun until max
+                 * runtime. Lag is absolute: whoever produced the messages and whoever consumed
+                 * them, zero means every record has been processed and committed.
+                 */
+                if (workRemaining == 0) {
+                    long lag = KafkaAdminClient.getConsumerLag(topicName, groupId);
+                    if (lag == 0) {
+                        stopReason = TestRunMetrics.StopReason.ALL_PROCESSED;
+                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
+                        shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
+                        break;
                     }
-                    Thread.sleep(100);
                 }
+                Thread.sleep(100);
             }
 
         } catch (Exception e) {
