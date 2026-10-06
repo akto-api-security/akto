@@ -4,14 +4,16 @@ import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import settingRequests from '../api';
 import func from '@/util/func'
+import { usePermissions, whenAllowed } from '@/util/permissions'
 
 function Splunk() {
     
+    const { canCall } = usePermissions()
     const [splunkUrl, setSplunkUrl] = useState('');
     const [splunkToken, setSplunkToken] = useState('');
     const PostmanCard = (
         <LegacyCard
-            primaryFooterAction={{content: 'Save', onAction: () => addSplunkIntegration()}}
+            primaryFooterAction={{content: 'Save', onAction: () => addSplunkIntegration(), ...whenAllowed(canCall('api/addSplunkIntegration'))}}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Splunk</Text>
@@ -49,7 +51,7 @@ function Splunk() {
 
     let cardContent = "Seamlessly enhance your web application security with Splunk integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
     return (
-        <IntegrationsLayout title= "Splunk SIEM" cardContent={cardContent} component={PostmanCard} docsUrl=""/> 
+        <IntegrationsLayout title= "Splunk SIEM" cardContent={cardContent} component={PostmanCard} docsUrl="" readOnly={!canCall('api/addSplunkIntegration')}/> 
     )
 }
 

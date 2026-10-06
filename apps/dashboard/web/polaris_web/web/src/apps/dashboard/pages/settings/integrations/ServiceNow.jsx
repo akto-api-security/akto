@@ -5,9 +5,12 @@ import { Button, Divider, LegacyCard, Text, TextField, VerticalStack } from '@sh
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from "@/util/func"
+import { usePermissions, whenAllowed } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 const ServiceNow = () => {
 
+    const { canCall } = usePermissions()
     const [instanceUrl, setInstanceUrl] = useState('')
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
@@ -164,12 +167,14 @@ const ServiceNow = () => {
                 content: isSaving ? 'Saving...' : 'Save',
                 onAction: addServiceNowIntegration,
                 disabled: isSaveDisabled(),
-                loading: isSaving
+                loading: isSaving,
+                ...whenAllowed(canCall('api/addServiceNowIntegration'))
             }}
             secondaryFooterActions={[{
                 content: 'Remove',
                 onAction: removeServiceNowIntegration,
-                disabled: !isRemoveable || isSaving
+                disabled: !isRemoveable || isSaving,
+                ...whenAllowed(canCall('api/removeServiceNowIntegration'))
             }]}
         >
           <LegacyCard.Section>
@@ -203,6 +208,7 @@ const ServiceNow = () => {
                         requiredIndicator
                     />
 
+                    <AllowedAction allowed={canCall('api/fetchServiceNowTables')}>
                     <Button
                         onClick={handleFetchTables}
                         disabled={isFetchButtonDisabled()}
@@ -210,6 +216,7 @@ const ServiceNow = () => {
                     >
                         {isFetchingTables ? 'Fetching Tables...' : 'Fetch Tables'}
                     </Button>
+                    </AllowedAction>
 
                     {tablesFetched && tables.length > 0 && (
                         <DropdownSearch
@@ -240,6 +247,7 @@ const ServiceNow = () => {
             cardContent={cardContent}
             component={ServiceNowCard}
             docsUrl="https://docs.akto.io/traffic-connections/postman"
+            readOnly={!canCall('api/addServiceNowIntegration')}
         />
     )
 }

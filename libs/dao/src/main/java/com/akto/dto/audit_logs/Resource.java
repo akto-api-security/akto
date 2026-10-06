@@ -14,4 +14,7 @@ public enum Resource {
     TEST_ROLE,
     TESTING_RUN,
     TRACES_CONTENT,
+    USER_ACCESS,
+    CUSTOM_ROLE,
+    SSO_CONFIG,
 }

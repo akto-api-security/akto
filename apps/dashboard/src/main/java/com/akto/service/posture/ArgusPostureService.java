@@ -367,13 +367,14 @@ public class ArgusPostureService {
 
         if (stats.topFinding != null) {
             String agentName = agentName(stats.topFinding.getCollectionId(), collectionsById);
+            String vulnType = testDisplayName(stats.topFinding.getType(), testInfoByType);
             BasicDBObject top = new BasicDBObject("agentName", agentName)
-                    .append("vulnType", stats.topFinding.getType())
+                    .append("vulnType", vulnType)
                     .append("severity", stats.topFinding.getSecondary())
                     .append("count", stats.topFinding.getCount());
             card.put("topFinding", top);
             facts.add(fact("topFindingAgent", "Agent with the most common issue", agentName));
-            facts.add(fact("topFindingType", "Most common issue type", stats.topFinding.getType()));
+            facts.add(fact("topFindingType", "Most common issue type", vulnType));
             facts.add(fact("topFindingCount", "Occurrences of that issue", InsightUtil.grouped(stats.topFinding.getCount())));
         } else {
             card.put("topFinding", null);
@@ -402,7 +403,7 @@ public class ArgusPostureService {
 
         Info info = testInfoByType.get(worst.getType());
         if (info != null) {
-            String label = info.getName() != null ? info.getName() : worst.getType();
+            String label = testDisplayName(worst.getType(), testInfoByType);
             StringBuilder text = new StringBuilder("Most critical open issue — ").append(label)
                     .append(" on ").append(agentName).append(" (").append(worst.getSecondary()).append("). ");
             if (info.getDescription() != null) text.append(info.getDescription()).append(" ");
@@ -416,6 +417,11 @@ public class ArgusPostureService {
                     .append("text", "Validated red-team outcome on " + agentName + ": " + conversation.getValidationMessage()));
         }
         return context;
+    }
+
+    private static String testDisplayName(String type, Map<String, Info> testInfoByType) {
+        Info info = testInfoByType.get(type);
+        return info != null && info.getName() != null ? info.getName() : type;
     }
 
     private AgentConversationResult firstResolved(List<String> conversationIds, Map<String, AgentConversationResult> conversationsById) {
@@ -623,6 +629,7 @@ public class ArgusPostureService {
      */
     public PostureDrillResult fetchDrill(String drillId, int skip, int limit,
                                           List<AgentFindingGroup> openIssueGroups,
+                                          Map<String, Info> testInfoByType,
                                           List<DashboardMaliciousEvent> maliciousEvents,
                                           List<UserAnalysisData> serviceObservability,
                                           InsightDataBundle bundle) {
@@ -636,7 +643,7 @@ public class ArgusPostureService {
         if (drillId == null) return unknownDrill();
         switch (drillId) {
             case DRILL_RED_TEAM_ISSUES:
-                return redTeamIssuesDrill(openIssueGroups, collectionsById, skip, effectiveLimit);
+                return redTeamIssuesDrill(openIssueGroups, testInfoByType, collectionsById, skip, effectiveLimit);
             case DRILL_GUARDRAIL_EVENTS:
                 return guardrailEventsDrill(maliciousEvents, collectionsById, skip, effectiveLimit);
             case DRILL_OBSERVABILITY:
@@ -647,6 +654,7 @@ public class ArgusPostureService {
     }
 
     private PostureDrillResult redTeamIssuesDrill(List<AgentFindingGroup> openIssueGroups,
+                                                   Map<String, Info> testInfoByType,
                                                    Map<Integer, ApiCollection> collectionsById, int skip, int limit) {
         PostureDrillResult result = new PostureDrillResult();
         result.setTitle("Open red-team issues");
@@ -1538,7 +1546,7 @@ public class ArgusPostureService {
             gaps.add(gapRow("AGENTIC_ASSETS", "NO_ROWS", "No AI agents have been discovered yet, so the posture score can't be computed."));
         } else if (latest.getAgentsWithNoSignal() > 0) {
             gaps.add(gapRow("AGENTIC_ASSETS", "PARTIAL_COVERAGE",
-                    latest.getAgentsWithNoSignal() + " of " + latest.getAgentsScored() + " agents haven't been scored yet and are excluded from this average."));
+                    latest.getAgentsWithNoSignal() + " of " + latest.getAgentsScored() + " agent(s) haven't been scored yet and are excluded from the score."));
         }
         return gaps;
     }

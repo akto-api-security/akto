@@ -5,8 +5,10 @@ import settingRequests from "../api";
 import func from "@/util/func";
 import ModuleEnvConfigComponent from "../health_logs/ModuleEnvConfig"
 import EmptyCard from "../../dashboard/new_components/EmptyCard"
+import { usePermissions, whenAllowed } from "@/util/permissions"
 
 const ModuleInfo = () => {
+    const { canCall, canCallAll } = usePermissions()
     const [ moduleInfos, setModuleInfos ] = useState([])
     const [ allowedEnvFields, setAllowedEnvFields ] = useState([])
     const [ selectedModules, setSelectedModules ] = useState([])
@@ -87,6 +89,12 @@ const ModuleInfo = () => {
         }
     }
 
+    // MINI_RUNTIME env saves update the shared overrides and then restart every mini-runtime
+    const canSaveEnv = selectedModule?.moduleType === 'MINI_RUNTIME'
+        ? canCallAll('api/updateRuntimeEnvOverrides', 'api/rebootModules')
+        : canCall('api/updateModuleEnvAndReboot')
+    const isEnvEditable = CONFIGURABLE_MODULE_TYPES.includes(selectedModule?.moduleType) && canSaveEnv
+
     const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
 
     const moduleInfoRows = sortedModuleInfos.map(module => {
@@ -135,12 +143,14 @@ const ModuleInfo = () => {
                         {
                             content: 'Restart process',
                             onAction: () => handleRebootModules(false),
-                            disabled: selectedModules.length === 0
+                            disabled: selectedModules.length === 0,
+                            ...whenAllowed(canCall('api/rebootModules'))
                         },
                         {
                             content: 'Delete topic and restart process',
                             onAction: () => handleRebootModules(true),
-                            disabled: selectedModules.length === 0
+                            disabled: selectedModules.length === 0,
+                            ...whenAllowed(canCall('api/rebootModules'))
                         }
                     ]}
                 >
@@ -191,14 +201,14 @@ const ModuleInfo = () => {
                     <ModuleEnvConfigComponent
                         title="Environment Variables"
                         description={
-                            CONFIGURABLE_MODULE_TYPES.includes(selectedModule?.moduleType)
+                            isEnvEditable
                                 ? `Configure environment variables for ${selectedModule?.name || 'module'}`
                                 : `Environment variables for ${selectedModule?.name || 'module'} (read-only)`
                         }
                         module={selectedModule}
                         allowedEnvFields={allowedEnvFields}
                         onSaveEnv={handleSaveEnv}
-                        readOnly={!CONFIGURABLE_MODULE_TYPES.includes(selectedModule?.moduleType)}
+                        readOnly={!isEnvEditable}
                     />
                 </Modal.Section>
             </Modal>

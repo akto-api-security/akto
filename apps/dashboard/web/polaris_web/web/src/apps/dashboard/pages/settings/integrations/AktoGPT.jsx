@@ -7,9 +7,11 @@ import settingFunctions from '../module'
 import func from "@/util/func"
 import PersistStore from '../../../../main/PersistStore'
 import { debounce } from 'lodash'
+import { usePermissions, whenAllowed } from "@/util/permissions"
 
 function AktoGPT() {
 
+    const { canCall } = usePermissions()
     const apiCollections = PersistStore(state => state.allCollections)
     const [selectedItems, setSelectedItems] = useState([]);
     const [clonedItems, setClonedItems] = useState([]);
@@ -117,7 +119,7 @@ function AktoGPT() {
     const component = (
         <LegacyCard title="Akto GPT configuration" 
                     secondaryFooterActions={[{content: 'Discard Changes', destructive: true, onAction: discardAction, disabled: compareItems() }]}
-                    primaryFooterAction={{content: 'Save', onAction: saveAction, disabled: compareItems()}}
+                    primaryFooterAction={{content: 'Save', onAction: saveAction, disabled: compareItems(), ...whenAllowed(canCall('api/saveAktoGptConfig'))}}
         >
             <LegacyCard.Section 
                 title={(
@@ -141,7 +143,7 @@ function AktoGPT() {
     let cardContent = "Seamlessly enhance your web application security with AktoGPT integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
 
   return (
-    <IntegrationsLayout title="AktoGPT" cardContent={cardContent} component={component} docsUrl="https://docs.akto.io/aktogpt"/>
+    <IntegrationsLayout title="AktoGPT" cardContent={cardContent} component={component} docsUrl="https://docs.akto.io/aktogpt" readOnly={!canCall('api/saveAktoGptConfig')}/>
   )
 }
 

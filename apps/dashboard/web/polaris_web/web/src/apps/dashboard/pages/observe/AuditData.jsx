@@ -23,6 +23,7 @@ import CollectionIcon from "../../components/shared/CollectionIcon";
 import settingsApi from "../settings/api";
 import { intersectServerActionFlags, getRegistryOverride } from "./auditServerActionFlags";
 import "../../components/shared/style.css";
+import { usePermissions, permissions, loadPermissions } from "@/util/permissions";
 
 const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills', VENDORS: 'vendors' };
 const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
@@ -428,6 +429,8 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
 
 function AuditData() {
     const [loading, setLoading] = useState(true);
+    const { canCall } = usePermissions();
+    const canReadRegistries = canCall('api/fetchMcpRegistries');
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAuditItem, setSelectedAuditItem] = useState(null);
     const [filterVersion, setFilterVersion] = useState(0);
@@ -510,10 +513,13 @@ function AuditData() {
     const endpointRowCacheRef = useRef({});
 
     useEffect(() => {
-        if (!isEndpointSecurity) return;
+        if (!isEndpointSecurity || !canReadRegistries) return;
         let cancelled = false;
         (async () => {
             try {
+                // the page can open before the permissions have loaded
+                await loadPermissions();
+                if (!permissions.canCall('api/fetchMcpRegistries')) return;
                 const res = await settingsApi.fetchMcpRegistries();
                 const list = res?.mcpRegistries;
                 const ok = Array.isArray(list) && list.length > 0;
@@ -525,7 +531,7 @@ function AuditData() {
         return () => {
             cancelled = true;
         };
-    }, [isEndpointSecurity]);
+    }, [isEndpointSecurity, canReadRegistries]);
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -668,6 +674,7 @@ function AuditData() {
             actions.push({
                 content: approveLabel,
                 onAction: () => bulkUpdateVendors(true, selectedIds),
+                requires: 'api/addVendorAllowlistEntry',
             });
         }
         if (!allUnapproved) {
@@ -675,6 +682,7 @@ function AuditData() {
                 content: removeLabel,
                 destructive: true,
                 onAction: () => bulkUpdateVendors(false, selectedIds),
+                requires: 'api/removeVendorAllowlistEntry',
             });
         }
         return actions;
@@ -686,22 +694,26 @@ function AuditData() {
                 content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
                 icon: GreenSettingsIcon,
                 onAction: () => { setSelectedAuditItem(item); setModalOpen(true); },
+                requires: 'api/updateAuditData',
             },
             {
                 content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
                 icon: GreenTickIcon,
                 onAction: () => { updateAuditData(item.hexId, "Approved") },
+                requires: 'api/updateAuditData',
             },
             ...(item.isEndpointSource ? [{
                 content: <span style={{ color: '#008060' }}>Add to MCP Allowed List</span>,
                 icon: GreenTickIcon,
                 onAction: () => { addToMcpAllowlist(item.mcpServerName) },
+                requires: 'api/addMcpAllowlistEntry',
             }] : []),
             {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
                 icon: RedCancelIcon,
                 onAction: () => { updateAuditData(item.hexId, "Rejected") },
                 destructive: true,
+                requires: 'api/updateAuditData',
             },
         ]}]
     }
@@ -784,6 +796,7 @@ function AuditData() {
             actions.push({
                 content: allowLabel,
                 onAction: () => bulkUpdateSkills(false, selectedIds),
+                requires: 'api/updateSkillBlockStatus',
             });
         }
         if (!allBlocked) {
@@ -791,6 +804,7 @@ function AuditData() {
                 content: blockLabel,
                 destructive: true,
                 onAction: () => bulkUpdateSkills(true, selectedIds),
+                requires: 'api/updateSkillBlockStatus',
             });
         }
         return actions;
@@ -818,25 +832,32 @@ function AuditData() {
                 content: allowLabel,
                 disabled: !flags.allow,
                 onAction: () => guard(flags.allow, () => bulkUpdateServers("Approved", selectedIds)),
+                requires: 'api/updateAuditData',
             },
             {
                 content: blockLabel,
                 destructive: true,
                 disabled: !flags.block,
                 onAction: () => guard(flags.block, () => bulkUpdateServers("Rejected", selectedIds)),
+                requires: 'api/updateAuditData',
             },
         ];
         if (flags.conditional && rows.length === selectedIds.length) {
             actions.push({
                 content: n === 1 ? "Conditionally allow this server" : "Conditionally allow selected servers",
                 onAction: () => handleRequestConditionalBulk(rows),
+                requires: 'api/updateAuditData',
             });
         }
-        actions.push({
-            content: "Add to MCP registry",
-            disabled: !flags.add,
-            onAction: () => guard(flags.add, () => bulkAddToRegistry(selectedIds)),
-        });
+        // depends on the MCP registry setting, which the role may not be able to read
+        if (canReadRegistries) {
+            actions.push({
+                content: "Add to MCP registry",
+                disabled: !flags.add,
+                onAction: () => guard(flags.add, () => bulkAddToRegistry(selectedIds)),
+                requires: 'api/addMcpAllowlistEntry',
+            });
+        }
         return actions;
     };
 

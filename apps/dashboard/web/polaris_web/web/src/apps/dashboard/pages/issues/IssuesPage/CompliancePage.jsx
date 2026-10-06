@@ -32,6 +32,8 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import { mapLabel, getDashboardCategory, categoryToShortName } from "../../../../main/labelHelper";
 import testingApi from "../../testing/api.js"
+import { usePermissions, withPermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -98,6 +100,7 @@ const resourceName = {
 };
 
 function CompliancePage() {
+    const { canCall } = usePermissions()
     const [headers, setHeaders] = useState([
         {
           title: '',
@@ -512,50 +515,65 @@ function CompliancePage() {
             })
         }
         
+        // ignoring with a compulsory description also saves the description on each issue
+        const ignoreRequires = (ignoreReason) => requiresDescription(getIgnoreReasonKey(ignoreReason))
+            ? ['api/bulkUpdateIssueStatus', 'api/updateIssueDescription']
+            : 'api/bulkUpdateIssueStatus'
+
         let issues = [{
             content: 'False positive',
-            onAction: () => { ignoreAction("False positive") }
+            onAction: () => { ignoreAction("False positive") },
+            requires: ignoreRequires("False positive")
         },
         {
             content: 'Acceptable risk',
-            onAction: () => { ignoreAction("Acceptable risk") }
+            onAction: () => { ignoreAction("Acceptable risk") },
+            requires: ignoreRequires("Acceptable risk")
         },
         {
             content: 'No time to fix',
-            onAction: () => { ignoreAction("No time to fix") }
+            onAction: () => { ignoreAction("No time to fix") },
+            requires: ignoreRequires("No time to fix")
         },
         {
             content: 'Export selected Issues',
-            onAction: () => { openVulnerabilityReport(items, false) }
+            onAction: () => { openVulnerabilityReport(items, false) },
+            requires: 'api/generateReportPDF'
         },
         {
             content: 'Export selected Issues summary',
-            onAction: () => { openVulnerabilityReport(items, true) }
+            onAction: () => { openVulnerabilityReport(items, true) },
+            requires: 'api/generateReportPDF'
         },
         {
             content: 'Create jira ticket',
-            onAction: () => { createJiraTicketBulk() }
+            onAction: () => { createJiraTicketBulk() },
+            requires: ['api/fetchIntegration', 'api/bulkCreateJiraTickets']
         },
         {
             content: 'Create azure work item',
             onAction: () => { createAzureBoardWorkItemBulk() },
-            disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
+            disabled: (window.AZURE_BOARDS_INTEGRATED === 'false'),
+            requires: ['api/fetchAzureBoardsIntegration', 'api/bulkCreateAzureWorkItems']
         },
         {
             content: 'Create ServiceNow ticket',
             onAction: () => { createServiceNowTicketBulk(items) },
-            disabled: (window.SERVICENOW_INTEGRATED === 'false')
+            disabled: (window.SERVICENOW_INTEGRATED === 'false'),
+            requires: ['api/fetchServiceNowIntegration', 'api/bulkCreateServiceNowTickets']
         },
         {
             content: 'Create Wiz finding(s)',
             onAction: () => { createWizFindings() },
-            disabled: (window.WIZ_INTEGRATED === 'false')
+            disabled: (window.WIZ_INTEGRATED === 'false'),
+            requires: 'api/createWizFindings'
         },
     ]
         
         let reopen =  [{
             content: 'Reopen',
-            onAction: () => { reopenAction() }
+            onAction: () => { reopenAction() },
+            requires: 'api/bulkUpdateIssueStatus'
         }]
         
         let ret = [];
@@ -860,7 +878,7 @@ function CompliancePage() {
             
             : components
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export {complianceView} report</Button>}
+            primaryAction={<AllowedAction allowed={canCall('api/generateReportPDF')}><Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export {complianceView} report</Button></AllowedAction>}
             secondaryActions={
                 <HorizontalStack gap={2}>
                     <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
@@ -872,12 +890,13 @@ function CompliancePage() {
                     >
                         <ActionList
                             actionRole="menuitem"
-                            items={[
+                            items={withPermissions([
                                 {
                                     content: 'Export summary report',
                                     onAction: () => openVulnerabilityReport([], true),
+                                    requires: 'api/generateReportPDF',
                                 },
-                            ]}
+                            ])}
                         />
                     </Popover>
                 </HorizontalStack>

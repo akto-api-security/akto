@@ -5,9 +5,12 @@ import { Box, Button, Divider, HorizontalStack, LegacyCard, Link, Tag, Text, Tex
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
 import func from "@/util/func"
+import { usePermissions, whenAllowed } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 const DevRev = () => {
 
+    const { canCall } = usePermissions()
     const [orgUrl, setOrgUrl] = useState('')
     const [personalAccessToken, setPersonalAccessToken] = useState('')
     const [parts, setParts] = useState([])
@@ -190,12 +193,14 @@ const DevRev = () => {
                 content: isSaving ? (isRemoveable ? 'Updating...' : 'Saving...') : (isRemoveable ? 'Update' : 'Save'),
                 onAction: addDevRevIntegration,
                 disabled: isSaveDisabled(),
-                loading: isSaving
+                loading: isSaving,
+                ...whenAllowed(canCall('api/addDevRevIntegration'))
             }}
             secondaryFooterActions={[{
                 content: 'Remove',
                 onAction: removeDevRevIntegration,
-                disabled: !isRemoveable || isSaving
+                disabled: !isRemoveable || isSaving,
+                ...whenAllowed(canCall('api/removeDevRevIntegration'))
             }]}
         >
           <LegacyCard.Section>
@@ -256,6 +261,7 @@ const DevRev = () => {
                             />
                         </div>
 
+                        <AllowedAction allowed={canCall('api/fetchDevRevParts')}>
                         <Button
                             primary
                             onClick={handleFetchParts}
@@ -264,6 +270,7 @@ const DevRev = () => {
                         >
                             {isFetchingParts ? 'Fetching Parts...' : 'Fetch Parts'}
                         </Button>
+                        </AllowedAction>
                     </div>
 
                     {partsFetched && parts.length > 0 && (
@@ -342,6 +349,7 @@ const DevRev = () => {
             cardContent={cardContent}
             component={DevRevCard}
             docsUrl="https://docs.akto.io/issues/how-to/devrev-integration"
+            readOnly={!canCall('api/addDevRevIntegration')}
         />
     )
 }

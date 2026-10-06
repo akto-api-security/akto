@@ -414,6 +414,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     return [
       {
         content: `Block ${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`,
+        requires: 'api/bulkModifyThreatActorStatusCloudflare',
         onAction: async () => {
           try {
             await api.bulkModifyThreatActorStatusCloudflare(selectedIps, "blocked");

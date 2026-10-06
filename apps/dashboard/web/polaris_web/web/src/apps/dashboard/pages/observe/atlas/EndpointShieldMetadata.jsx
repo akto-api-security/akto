@@ -350,10 +350,12 @@ function EndpointShieldMetadata() {
         actions.push({
             content: `Enable system proxy for ${agentCount} ${agentWord}`,
             onAction: bulkToggleSystemProxy(true),
+            requires: 'api/bulkUpdateModuleEnvAndReboot',
         });
         actions.push({
             content: `Disable system proxy for ${agentCount} ${agentWord}`,
             onAction: bulkToggleSystemProxy(false),
+            requires: 'api/bulkUpdateModuleEnvAndReboot',
         });
 
         if (allInstallers) {
@@ -375,10 +377,12 @@ function EndpointShieldMetadata() {
             actions.push({
                 content: `Enable auto update for ${agentCount} ${agentWord}`,
                 onAction: bulkToggleAutoUpdate(true),
+                requires: 'api/bulkUpdateModuleEnvAndReboot',
             });
             actions.push({
                 content: `Disable auto update for ${agentCount} ${agentWord}`,
                 onAction: bulkToggleAutoUpdate(false),
+                requires: 'api/bulkUpdateModuleEnvAndReboot',
             });
 
             actions.push({
@@ -396,6 +400,7 @@ function EndpointShieldMetadata() {
                         }
                     });
                 },
+                requires: 'api/bulkUpdateModuleEnvAndReboot',
             });
         }
 
@@ -415,6 +420,7 @@ function EndpointShieldMetadata() {
                         }
                     });
                 },
+                requires: 'api/deleteModuleInfo',
             });
         }
         return actions;

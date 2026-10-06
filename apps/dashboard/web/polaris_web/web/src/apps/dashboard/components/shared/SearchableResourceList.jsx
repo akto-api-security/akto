@@ -11,9 +11,10 @@ function SearchableResourceList({ resourceName, items, renderItem, loading, isFi
   const [selectedItems, setSelectedItems] = useState(alreadySelectedItems || [])
   const [resourceItems, setResourceItems] = useState(items)
 
+  // items can arrive after the first render (e.g. collections still loading)
   useEffect(() => {
-    setResourceItems(items)
-  }, [])
+    if (value === '') setResourceItems(items)
+  }, [items])
 
   useEffect(() => {
     if(onSelectedItemsChange) {
@@ -26,7 +27,8 @@ function SearchableResourceList({ resourceName, items, renderItem, loading, isFi
     if(item === '') {
       setResourceItems(items)
     } else {
-        const filterRegex = new RegExp(item, 'i')
+        // plain text search: characters like ( or * in a name must not break it
+        const filterRegex = new RegExp(item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')
         const resultOptions = items.filter((option) => {
             if(option.name) {
               return option.name.match(filterRegex)

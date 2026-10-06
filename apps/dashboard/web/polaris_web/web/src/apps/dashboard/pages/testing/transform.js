@@ -1433,6 +1433,7 @@ const transform = {
         content: 'Re-run',
         icon: ReplayMinor,
         onAction: () => TestingStore.getState().setRerunModal(true),
+        requires: 'api/startTest',
       },
       {
         content: 'Add to CI/CD pipeline',
@@ -1445,6 +1446,7 @@ const transform = {
         destructive: true,
         onAction: () => { this.stopTest(hexId || ""); window.location.reload(); },
         disabled: true,
+        requires: 'api/stopTest',
       }
     ]
   },

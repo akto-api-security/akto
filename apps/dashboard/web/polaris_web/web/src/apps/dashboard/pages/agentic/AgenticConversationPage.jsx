@@ -10,8 +10,11 @@ import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
 import { sendQuery, getConversationsList } from './services/agenticService';
+import { usePermissions, NO_PERMISSION_REASON } from '@/util/permissions';
 
 function AgenticConversationPage({ initialQuery, existingConversationId, onBack, existingMessages = [], onLoadConversation, conversationType, metadata }) {
+    const { canCall } = usePermissions();
+    const canChat = canCall('api/chatAndStore');
     // Conversation state
     const [conversationId, setConversationId] = useState(existingConversationId || null);
     const [messages, setMessages] = useState([]);
@@ -260,7 +263,7 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                                         {completedStreamingMessages.has(message._id) && (
                                             <AgenticCopyButton content={message.message} />
                                         )}
-                                        {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && (
+                                        {index === messages.length - 1 && !isLoading && !isStreaming && message.suggestions && canChat && (
                                             <AgenticSuggestionsList
                                                 suggestions={message.suggestions}
                                                 onSuggestionClick={(suggestion) => {
@@ -290,7 +293,8 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     value={followUpValue}
                     onChange={setFollowUpValue}
                     onSubmit={() => handleFollowUpSubmit(followUpValue)}
-                    placeholder="Ask a follow up..."
+                    placeholder={canChat ? "Ask a follow up..." : NO_PERMISSION_REASON}
+                    disabled={!canChat}
                     isStreaming={isStreaming}
                     isFixed={true}
                     centerAlign={true}

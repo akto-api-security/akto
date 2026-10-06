@@ -11,6 +11,8 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { sharedIconCacheService } from "../../../components/shared/CollectionIcon";
 import func from "@/util/func";
 import api from "../../guardrails/api";
+import AllowedAction from "../../../components/shared/AllowedAction";
+import { usePermissions } from "@/util/permissions";
 import "./BrowserExtensionSettings.css";
 
 // full config-driven custom-host form (mirrors the extension's monitoring-config schema)
@@ -49,6 +51,7 @@ function hostAvatar(host, iconUrl) {
 }
 
 function BrowserExtensionSettings() {
+    const { canCall } = usePermissions();
     const [configured, setConfigured] = useState([]);
     const [catalogue, setCatalogue] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -333,6 +336,7 @@ function BrowserExtensionSettings() {
         items.push({
             content: isActive ? "Deactivate" : "Activate",
             onAction: () => toggleConfigured(item.host, !isActive),
+            requires: "api/setBrowserExtensionConfigActive",
         });
         if (item.isCustom) {
             items.push({
@@ -341,11 +345,13 @@ function BrowserExtensionSettings() {
                     const raw = mergedRows.find((c) => (c.host || "").toLowerCase() === item.id);
                     if (raw) openEdit(raw);
                 },
+                requires: "api/saveBrowserExtensionConfig",
             });
             items.push({
                 content: "Remove",
                 destructive: true,
                 onAction: () => removeConfigured(item.host, item.hexId),
+                requires: "api/deleteBrowserExtensionConfigs",
             });
         }
         return [{ items }];
@@ -354,8 +360,8 @@ function BrowserExtensionSettings() {
     const promotedBulkActions = (selectedIds) => {
         const hosts = tableRows.filter((r) => selectedIds.includes(r.id)).map((r) => r.host);
         return [
-            { content: "Activate", onAction: () => bulkSetActive(hosts, true) },
-            { content: "Deactivate", onAction: () => bulkSetActive(hosts, false) },
+            { content: "Activate", onAction: () => bulkSetActive(hosts, true), requires: "api/setBrowserExtensionConfigsActive" },
+            { content: "Deactivate", onAction: () => bulkSetActive(hosts, false), requires: "api/setBrowserExtensionConfigsActive" },
         ];
     };
 
@@ -560,7 +566,7 @@ function BrowserExtensionSettings() {
                 subtitle={"Choose which hosts the Akto extension inspects."}
                 isFirstPage={true}
                 fullWidth={false}
-                primaryAction={<Button primary onClick={openCustom}>Add custom host</Button>}
+                primaryAction={<AllowedAction allowed={canCall("api/saveBrowserExtensionConfig")}><Button primary onClick={openCustom}>Add custom host</Button></AllowedAction>}
                 secondaryActions={<Button onClick={handleDownload} disabled={loading || mergedRows.length === 0}>Download</Button>}
                 components={[pickerModal, configuredSection]}
         />

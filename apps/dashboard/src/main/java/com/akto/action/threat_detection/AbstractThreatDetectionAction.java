@@ -176,6 +176,10 @@ public class AbstractThreatDetectionAction extends UserAction {
       return cached.response;
     }
     MaliciousEventResponse fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    if (fresh == null) {
+      // a failed fetch is not "no events": don't cache it, so the next request tries again
+      return new MaliciousEventResponse(new ArrayList<>(), 0);
+    }
     maliciousEventsCache.put(cacheKey, new CachedMaliciousEventResponse(fresh, System.currentTimeMillis()));
     return fresh;
   }
@@ -186,6 +190,36 @@ public class AbstractThreatDetectionAction extends UserAction {
   }
 
   protected static final int OWN_EVENTS_LIMIT = 100_000;
+
+  // when an older threat backend last rejected the host scope field (400); limited users then use their own events
+  // for a while and the field is tried again after HOST_SCOPE_RETRY_SECONDS, so an upgraded backend is picked up
+  private static volatile int hostScopeRejectedAt = 0;
+  private static final int HOST_SCOPE_RETRY_SECONDS = 10 * 60;
+
+  private static boolean backendAcceptsHostScope() {
+    return hostScopeRejectedAt == 0 || Context.now() - hostScopeRejectedAt > HOST_SCOPE_RETRY_SECONDS;
+  }
+
+  /*
+   * Host scope for a user limited to specific collections, so the threat backend counts only their agents.
+   * Null when the user isn't limited, sees nothing, or the backend doesn't accept the field yet.
+   */
+  protected Map<String, Object> backendHostScope() {
+    if (!backendAcceptsHostScope() || !isLimitedToOwnAgents()) {
+      return null;
+    }
+    Map<String, Object> scope = new HashMap<>();
+    return ArgusCollectionScope.scopeActivityFilters(getSUser(), scope) ? scope : null;
+  }
+
+  /** True when an older threat backend rejected the host scope; remembered for a while, so the caller (and later requests) use own events. */
+  protected static boolean hostScopeRejected(Map<String, Object> hostScope, int statusCode) {
+    if (hostScope != null && statusCode == 400) {
+      hostScopeRejectedAt = Context.now();
+      return true;
+    }
+    return false;
+  }
 
   /**
    * All-time events of the user's own agents (host-scoped, minimal fields, cached), or null if the
@@ -265,7 +299,8 @@ public class AbstractThreatDetectionAction extends UserAction {
         );
       }
     } catch (Exception e) {
-      // Error handling is left to the caller - return empty list on error
+      // null tells the caller the fetch failed, so the failure is not cached as "no events"
+      return null;
     }
     return new MaliciousEventResponse(result, total);
   }
@@ -382,6 +417,12 @@ public class AbstractThreatDetectionAction extends UserAction {
    */
   protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
       int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter) {
+    return fetchSubcategoryWiseCounts(startTimestamp, endTimestamp, latestAttack, statusFilter, null);
+  }
+
+  // hostScope: see backendHostScope(); null counts the whole account. Null result when the backend rejected the host scope.
+  protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
+      int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter, Map<String, Object> hostScope) {
     try {
       String url = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
       MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -392,6 +433,7 @@ public class AbstractThreatDetectionAction extends UserAction {
           put("end_ts", endTimestamp);
           put("latestAttack", latestAttack);
           if (statusFilter != null && !statusFilter.isEmpty()) put("status", statusFilter);
+          if (hostScope != null) put("hostScope", hostScope);
         }
       };
       String msg = objectMapper.valueToTree(body).toString();
@@ -407,6 +449,9 @@ public class AbstractThreatDetectionAction extends UserAction {
           .build();
 
       try (Response resp = httpClient.newCall(request).execute()) {
+        if (hostScopeRejected(hostScope, resp.code())) {
+          return null;
+        }
         String responseBody = resp.body() != null ? resp.body().string() : "";
         return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse>toProtoMessage(
             com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.class,

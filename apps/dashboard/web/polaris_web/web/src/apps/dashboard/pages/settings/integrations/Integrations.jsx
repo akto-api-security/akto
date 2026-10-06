@@ -11,6 +11,7 @@ import {useState} from 'react';
 import '../settings.css'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs';
 import { useNavigate} from 'react-router-dom'
+import { usePermissions } from "@/util/permissions"
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards';
 import func from "@/util/func"
 import { isAgenticSecurityCategory, isMCPSecurityCategory } from '../../../../main/labelHelper'
@@ -19,6 +20,7 @@ function Integrations() {
 
     const [sortValue, setSortValue] = useState('DATE_MODIFIED_DESC');
     const navigate = useNavigate()
+    const { canOpen } = usePermissions()
 
     let burpSuiteObj = {
         id: 'burp',
@@ -264,7 +266,12 @@ function Integrations() {
         },
     ]
 
+  // integrations the role can't open are neither listed nor counted
   function getTabItems(tabId) {
+    return allTabItems(tabId).filter(item => !item?.id || canOpen(`/dashboard/settings/integrations/${item.id}`))
+  }
+
+  function allTabItems(tabId) {
     const emptyItem = [];
     const trafficItems = [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];

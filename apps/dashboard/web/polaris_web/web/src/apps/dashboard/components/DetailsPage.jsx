@@ -3,13 +3,16 @@ import ContextualLayout from "./layouts/ContextualLayout";
 
 function DetailsPage(props){
 
-    const {pageTitle, saveAction, discardAction, isDisabled, components, backUrl } = props
+    const {pageTitle, saveAction, discardAction, isDisabled, components, backUrl, titleMetadata, subtitle, secondaryActions, isSaving } = props
 
     const pageMarkup = (
         <PageWithMultipleCards title={pageTitle}
             backUrl={backUrl}
             divider
             components={components}
+            titleMetadata={titleMetadata}
+            subtitle={subtitle}
+            secondaryActions={secondaryActions}
         />
     )
 
@@ -18,6 +21,7 @@ function DetailsPage(props){
             saveAction={saveAction}
             discardAction={discardAction}
             isDisabled={isDisabled}
+            isSaving={isSaving}
             pageMarkup={pageMarkup}
         />
     )

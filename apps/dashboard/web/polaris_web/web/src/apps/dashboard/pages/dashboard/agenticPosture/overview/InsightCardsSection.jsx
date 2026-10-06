@@ -1,5 +1,6 @@
 import { Box, Button, Card, HorizontalStack, Spinner, Text, VerticalStack } from '@shopify/polaris'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import func from '@/util/func'
 
 // One stat within a card — a number/name plus its subdued label, optionally paired with a real
 // (never invented) severity badge — the same SeverityBadge every other severity anywhere else in
@@ -42,10 +43,10 @@ function statsFor(card) {
     switch (card.id) {
         case 'RED_TEAM_BREAKDOWN':
             return [
-                <Stat key="total" label="Open issues" value={card.totalOpenIssues} />,
+                <Stat key="total" label="Open issues" value={card.totalOpenIssues != null ? func.prettifyShort(card.totalOpenIssues) : null} />,
                 card.topFinding && (
                     <Stat key="top" label="Most common issue"
-                        value={`${card.topFinding.vulnType} on ${card.topFinding.agentName} (${card.topFinding.count})`}
+                        value={`"${card.topFinding.vulnType}" on ${card.topFinding.agentName} (${func.prettifyShort(card.topFinding.count)})`}
                         severity={card.topFinding.severity} />
                 ),
             ]
@@ -55,25 +56,25 @@ function statsFor(card) {
             ))
         case 'GUARDRAIL_BREAKDOWN':
             return [
-                <Stat key="total" label="Guardrail events" value={card.totalEvents} />,
-                card.byAgent?.[0] && <Stat key="agent" label="Top agent" value={`${card.byAgent[0].agentName} (${card.byAgent[0].count})`} />,
+                <Stat key="total" label="Guardrail events" value={card.totalEvents != null ? func.prettifyShort(card.totalEvents) : null} />,
+                card.byAgent?.[0] && <Stat key="agent" label="Top agent" value={`${card.byAgent[0].agentName} (${func.prettifyShort(card.byAgent[0].count)})`} />,
                 card.byPolicy?.[0] && (
-                    <Stat key="policy" label="Top policy" value={`${card.byPolicy[0].policy} (${card.byPolicy[0].count})`}
+                    <Stat key="policy" label="Top policy" value={`${card.byPolicy[0].policy} (${func.prettifyShort(card.byPolicy[0].count)})`}
                         severity={card.byPolicy[0].severity} />
                 ),
             ]
         case 'GUARDRAIL_HOTSPOT':
             return [
-                card.hottestAgent && <Stat key="agent" label="Most active agent" value={`${card.hottestAgent.agentName} (${card.hottestAgent.count})`} />,
+                card.hottestAgent && <Stat key="agent" label="Most active agent" value={`${card.hottestAgent.agentName} (${func.prettifyShort(card.hottestAgent.count)})`} />,
                 card.hottestPolicy && (
-                    <Stat key="policy" label="Most-triggered policy" value={`${card.hottestPolicy.policy} (${card.hottestPolicy.count})`}
+                    <Stat key="policy" label="Most-triggered policy" value={`${card.hottestPolicy.policy} (${func.prettifyShort(card.hottestPolicy.count)})`}
                         severity={card.hottestPolicy.severity} />
                 ),
             ]
         case 'OBSERVABILITY':
             return [
-                <Stat key="tokens" label="Tokens used" value={card.totalTokens} />,
-                card.hottestAgent && <Stat key="agent" label="Top agent by tokens" value={`${card.hottestAgent.agentName} (${card.hottestAgent.tokens})`} />,
+                <Stat key="tokens" label="Tokens used" value={card.totalTokens != null ? func.prettifyShort(card.totalTokens) : null} />,
+                card.hottestAgent && <Stat key="agent" label="Top agent by tokens" value={`${card.hottestAgent.agentName} (${func.prettifyShort(card.hottestAgent.tokens)})`} />,
                 card.topTopics?.length > 0 && <Stat key="topics" label="Top topics" value={card.topTopics.map((t) => t.topic).join(', ')} />,
             ]
         default:

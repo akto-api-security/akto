@@ -33,8 +33,29 @@ import { fetchActionItemsData } from './components/actionItemsTransform';
 import { getDashboardCategory, isMCPSecurityCategory, isApiSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
+import { usePermissions } from '@/util/permissions';
 
 function HomeDashboard() {
+
+    const { canCall } = usePermissions();
+    // data the role can't load isn't requested; its widget falls back to empty or is left out
+    const callIfAllowed = (action, call) => canCall(action) ? call() : Promise.reject(new Error(`${action} not allowed`));
+    // widgets that load their own data, by the action they load it with
+    const WIDGET_REQUIRES = {
+        'critical-apis': 'api/fetchCriticalIssuesTrend',
+        'vulnerable-apis': 'api/fetchSeverityInfoForIssues',
+        'critical-findings': 'api/getIssueSummaryInfo',
+        'threat-timeline': 'api/getDailyThreatActorsCount',
+        'threat-severity': 'api/fetchCountBySeverity',
+        'threat-categories': 'api/fetchThreatCategoryCount',
+        'risk-score': 'api/fetchApiStats',
+        'access-type': 'api/fetchApiStats',
+        'auth-type': 'api/fetchApiStats',
+        'api-type': 'api/fetchApiStats',
+        'mcp-open-alerts': 'api/fetchMcpdata',
+        'mcp-types-table': 'api/fetchMcpdata',
+    };
+    const canLoadApiCallStats = canCall('api/fetchApiCallStats');
 
     const [loading, setLoading] = useState(true);
     const [showBannerComponent, setShowBannerComponent] = useState(false)
@@ -243,6 +264,7 @@ function HomeDashboard() {
     }
 
     const testSummaryData = async () => {
+        if (!canCall('api/retrieveAllCollectionTests')) return
         const endTimestamp = func.timeNow()
         await testingApi.fetchTestingDetails(
             0, endTimestamp, "endTimestamp", "-1", 0, 10, null, null, ""
@@ -270,6 +292,7 @@ function HomeDashboard() {
     }
 
     const fetchPolicyGuardrailStats = async (startTs, endTs) => {
+        if (!canLoadApiCallStats) return;
         if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
             const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
             setPolicyGuardrailStats(emptyData);
@@ -340,6 +363,7 @@ function HomeDashboard() {
     };
 
     const fetchMcpApiCallStats = async (startTs, endTs) => {
+        if (!canLoadApiCallStats) return;
         if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
             const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
             setMcpApiCallStats(emptyData);
@@ -465,15 +489,15 @@ function HomeDashboard() {
         setLoading(true)
         // Fast-loading APIs - page will load with these first
         let apiPromises = [
-            observeApi.getUserEndpoints(),
-            api.findTotalIssues(startTimestamp, endTimestamp),
-            api.fetchApiStats(startTimestamp, endTimestamp),
-            api.fetchEndpointsCount(startTimestamp, endTimestamp),
-            testingApi.fetchSeverityInfoForIssues({activeCollections: true}, [], 0)
+            callIfAllowed('api/getCustomerEndpoints', () => observeApi.getUserEndpoints()),
+            callIfAllowed('api/findTotalIssues', () => api.findTotalIssues(startTimestamp, endTimestamp)),
+            callIfAllowed('api/fetchApiStats', () => api.fetchApiStats(startTimestamp, endTimestamp)),
+            callIfAllowed('api/fetchEndpointsCount', () => api.fetchEndpointsCount(startTimestamp, endTimestamp)),
+            callIfAllowed('api/fetchSeverityInfoForIssues', () => testingApi.fetchSeverityInfoForIssues({activeCollections: true}, [], 0))
         ];
 
         // Only fetch MCP data if not in API Security category
-        if (!isApiSecurityCategory()) {
+        if (!isApiSecurityCategory() && canCall('api/fetchMcpdata')) {
             apiPromises.push(
                 api.fetchMcpdata('TOTAL_APIS'),
                 api.fetchMcpdata('THIRD_PARTY_APIS'),
@@ -556,7 +580,7 @@ function HomeDashboard() {
 
     const fetchMissingApiInfoData = async (apisStatsResp) => {
         try {
-            const missingApiInfoData = await api.getApiInfoForMissingData(0, endTimestamp)
+            const missingApiInfoData = await callIfAllowed('api/getAPIInfosForMissingData', () => api.getApiInfoForMissingData(0, endTimestamp))
 
             if (missingApiInfoData) {
                 const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
@@ -577,9 +601,9 @@ function HomeDashboard() {
     const fetchThreatData = async () => {
         try {
             const threatPromises = [
-                threatApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, []),
-                threatApi.fetchCountBySeverity(startTimestamp, endTimestamp),
-                threatApi.fetchThreatCategoryCount(startTimestamp, endTimestamp)
+                callIfAllowed('api/getDailyThreatActorsCount', () => threatApi.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])),
+                callIfAllowed('api/fetchCountBySeverity', () => threatApi.fetchCountBySeverity(startTimestamp, endTimestamp)),
+                callIfAllowed('api/fetchThreatCategoryCount', () => threatApi.fetchThreatCategoryCount(startTimestamp, endTimestamp))
             ];
 
             const results = await Promise.allSettled(threatPromises);
@@ -956,6 +980,7 @@ function HomeDashboard() {
     let summaryInfo = [
         {
             title: 'Issues',
+            requires: 'api/findTotalIssues',
             data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
             color: 'critical',
@@ -964,6 +989,7 @@ function HomeDashboard() {
         },
         {
             title: mapLabel("API Risk Score", getDashboardCategory()),
+            requires: 'api/fetchApiStats',
             data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2))  : apiRiskScore,
             variant: 'heading2xl',
             color: (customRiskScoreAvg > 2.5 || apiRiskScore > 2.5) ? 'critical' : 'warning',
@@ -974,6 +1000,7 @@ function HomeDashboard() {
         },
         {
             title: 'Test Coverage',
+            requires: 'api/fetchApiStats',
             data: testCoverage + "%",
             variant: 'heading2xl',
             color: testCoverage > 80 ? 'success' : 'warning',
@@ -985,6 +1012,7 @@ function HomeDashboard() {
     if (!isMCPSecurityCategory()) {
         summaryInfo.unshift({
             title: mapLabel("Total APIs", getDashboardCategory()),
+            requires: 'api/fetchEndpointsCount',
             data: transform.formatNumberWithCommas(totalAPIs),
             variant: 'heading2xl',
             byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
@@ -1006,7 +1034,7 @@ function HomeDashboard() {
     }
 
     const summaryComp = (
-        <SummaryCard summaryItems={summaryInfo} />
+        <SummaryCard summaryItems={summaryInfo.filter(item => !item.requires || canCall(item.requires))} />
     )
 
 
@@ -1624,15 +1652,18 @@ function HomeDashboard() {
             ...gridComponents
         ]
     }
+    gridComponents = gridComponents.filter(({id}) => !WIDGET_REQUIRES[id] || canCall(WIDGET_REQUIRES[id]))
 
     const gridComponent = (
         (isMCPSecurityCategory()) ? (
             <VerticalStack gap={5}>
                 {/* First row with MCP Components Requests and Policy Guardrails side by side */}
+                {canLoadApiCallStats && (
                 <HorizontalGrid gap={5} columns={2}>
                     {mcpApiRequestsCard}
                     {policyGuardrailsCard}
                 </HorizontalGrid>
+                )}
                 {/* Second row with equal columns for remaining components */}
                 <HorizontalGrid gap={5} columns={2}>
                     {gridComponents.slice(2).map(({id, component}) => (

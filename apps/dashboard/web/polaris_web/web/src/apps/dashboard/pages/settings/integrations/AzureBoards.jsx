@@ -4,9 +4,11 @@ import IntegrationsLayout from './IntegrationsLayout'
 import { Divider, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import func from "@/util/func"
+import { usePermissions, whenAllowed } from "@/util/permissions"
 
 const AzureBoards = () => {
     
+    const { canCall } = usePermissions()
     const [baseUrl, setBaseUrl] = useState('')
     const [organization, setOrganization] = useState('')
     const [projectIds, setProjectIds] = useState('')
@@ -43,8 +45,8 @@ const AzureBoards = () => {
     
     const AzureBoardsCard = (
         <LegacyCard
-            primaryFooterAction={{content: 'Save', onAction: addAzureBoardsIntegration }}
-            secondaryFooterActions={[{content: 'Remove', onAction: removeAzureBoardsIntegration, disabled: !isRemoveable}]}
+            primaryFooterAction={{content: 'Save', onAction: addAzureBoardsIntegration, ...whenAllowed(canCall('api/addAzureBoardsIntegration')) }}
+            secondaryFooterActions={[{content: 'Remove', onAction: removeAzureBoardsIntegration, disabled: !isRemoveable, ...whenAllowed(canCall('api/removeAzureBoardsIntegration'))}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Azure Boards</Text>
@@ -67,7 +69,7 @@ const AzureBoards = () => {
     let cardContent = "Seamlessly enhance your web application security with Azure DevOps Boards. Create Azure Boards work items for api vulnerability issues and view them on the tap of a button"
 
     return (
-        <IntegrationsLayout title= "Azure Boards" cardContent={cardContent} component={AzureBoardsCard} docsUrl="https://docs.akto.io/traffic-connections/postman"/> 
+        <IntegrationsLayout title= "Azure Boards" cardContent={cardContent} component={AzureBoardsCard} docsUrl="https://docs.akto.io/traffic-connections/postman" readOnly={!canCall('api/addAzureBoardsIntegration')}/> 
     )
 }
 

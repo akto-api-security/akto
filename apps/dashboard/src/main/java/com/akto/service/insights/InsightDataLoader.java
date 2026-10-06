@@ -7,6 +7,7 @@ import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.GuardrailPoliciesDao;
+import com.akto.dao.AllowVendorAllowlistDao;
 import com.akto.dao.McpAllowlistDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -117,7 +118,7 @@ public class InsightDataLoader {
         Future<List<GuardrailPolicies>> policiesFuture = submitTimed(accountId, userId, contextSource,
                 "policies (limit 5000 + per-policy device-tag resolution)", this::loadPolicies, List::size);
         Future<Set<String>> allowlistNamesLowerFuture = submitTimed(accountId, userId, contextSource,
-                "allowlistNamesLower (McpAllowlistDao.findAll, unbounded)", this::loadAllowlistNames, Set::size);
+                "allowlistNamesLower (McpAllowlistDao+AllowVendorAllowlistDao.findAll, unbounded)", this::loadAllowlistNames, Set::size);
 
         BundleFields fields = new BundleFields();
         contextReaderFor(contextSource).read(this, fields, ctx, accountId, userId, contextSource, collections);
@@ -367,8 +368,10 @@ public class InsightDataLoader {
      */
     private Set<String> loadAllowlistNames() {
         try {
-            List<McpAllowlist> rows = McpAllowlistDao.instance.findAll(Filters.empty(),
-                    Projections.include(McpAllowlist.NAME, McpAllowlist.ENTRY_TYPE));
+            Bson projection = Projections.include(McpAllowlist.NAME, McpAllowlist.ENTRY_TYPE);
+            List<McpAllowlist> rows = new ArrayList<>(McpAllowlistDao.instance.findAll(
+                    Filters.ne(McpAllowlist.ENTRY_TYPE, McpAllowlist.ENTRY_TYPE_VENDOR), projection));
+            rows.addAll(AllowVendorAllowlistDao.instance.findAll(Filters.empty(), projection));
             Set<String> names = new HashSet<>();
             for (McpAllowlist a : rows) {
                 if (a.getName() == null) continue;
