@@ -2138,6 +2138,72 @@ func (s *Service) withValidationDeadline(ctx context.Context) (context.Context, 
 	return context.WithTimeout(ctx, time.Duration(s.config.ValidationTimeoutMs)*time.Millisecond)
 }
 
+// passOutcome is one validation pass's result.
+type passOutcome struct {
+	result              *mcp.ProcessResult
+	evalPayload         string
+	preRedactionPayload string
+	err                 error
+	ran                 bool
+	// fromSession is set when this is the session-summary pass's outcome.
+	fromSession bool
+}
+
+func (s *Service) validateWithSessionPass(
+	valCtx *mcp.ValidationContext,
+	sessionID, barePayload string,
+	summaryPayload func() (string, bool),
+	validate func(vc *mcp.ValidationContext, payload string) (*mcp.ProcessResult, string, string, error),
+) (out passOutcome, sessionDrivenBlock bool) {
+	bareCtx := *valCtx
+	bareCtx.SessionID = ""
+
+	sessionEnabled := s.config != nil && s.config.SessionEnabled
+	sessCtx := *valCtx
+	sessCtx.SessionID = sessionID
+	// Buffered so the goroutine never blocks when a blocking bare verdict returns early.
+	sessCh := make(chan passOutcome, 1)
+	if sessionEnabled {
+		go func() {
+			defer func() {
+				if p := recover(); p != nil {
+					s.logger.Error("Session summary validation pass panicked",
+						zap.String("sessionID", sessionID),
+						zap.Any("panic", p))
+					sessCh <- passOutcome{ran: true, fromSession: true, err: fmt.Errorf("session summary pass panicked: %v", p)}
+				}
+			}()
+			withSummary, ok := summaryPayload()
+			if !ok {
+				sessCh <- passOutcome{}
+				return
+			}
+			s.logger.Info("Session summary changed payload, running summary validation pass",
+				zap.String("sessionID", sessionID))
+			result, eval, pre, err := validate(&sessCtx, withSummary)
+			sessCh <- passOutcome{result: result, evalPayload: eval, preRedactionPayload: pre, err: err, ran: true, fromSession: true}
+		}()
+	}
+
+	result, eval, pre, err := validate(&bareCtx, barePayload)
+	bare := passOutcome{result: result, evalPayload: eval, preRedactionPayload: pre, err: err, ran: true}
+	if err != nil || result.IsBlocked || !sessionEnabled {
+		*valCtx = bareCtx
+		return bare, false
+	}
+
+	sess := <-sessCh
+	if !sess.ran {
+		*valCtx = bareCtx
+		return bare, false
+	}
+	*valCtx = sessCtx
+	if sess.err != nil {
+		return sess, false
+	}
+	return sess, sess.result.IsBlocked
+}
+
 // ValidateRequest validates a request against guardrail policies. Returns (result,
 // activityID, err); activityID is non-empty only for a pending Human Approval verdict.
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, string, error) {
@@ -2288,15 +2354,23 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	procCtx, cancelProc := s.withValidationDeadline(ctx)
 	defer cancelProc()
 
-	validate := func(extractedPayload string) (*mcp.ProcessResult, string, string, error) {
+	validate := func(vc *mcp.ValidationContext, extractedPayload string) (*mcp.ProcessResult, string, string, error) {
 		eval, pre := s.redactIgnorePhrasesForEvaluation(extractedPayload, policies, "ValidateRequest", sessionID)
-		valCtx.RequestPayload = eval
-		result, err := s.processor.ProcessRequestParallel(procCtx, eval, valCtx, policies, auditPolicies, hasAuditRules)
+		vc.RequestPayload = eval
+		result, err := s.processor.ProcessRequestParallel(procCtx, eval, vc, policies, auditPolicies, hasAuditRules)
 		return result, eval, pre, err
 	}
+	summaryPayload := func() (string, bool) {
+		rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+		if rawWithSummary == payload {
+			return "", false
+		}
+		return s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, true), true
+	}
 
-	valCtx.SessionID = ""
-	processResult, evalPayload, preRedactionPayload, err := validate(payloadBare)
+	// Bare and session-summary passes run concurrently; a blocking bare verdict wins.
+	outcome, sessionDrivenBlock := s.validateWithSessionPass(valCtx, sessionID, payloadBare, summaryPayload, validate)
+	processResult, evalPayload, preRedactionPayload, err := outcome.result, outcome.evalPayload, outcome.preRedactionPayload, outcome.err
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
 			zap.String("sessionID", sessionID),
@@ -2304,28 +2378,10 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.Error(err))
 		return nil, "", fmt.Errorf("failed to process request: %w", err)
 	}
-
-	sessionDrivenBlock := false
-	if !processResult.IsBlocked && s.config != nil && s.config.SessionEnabled {
-		if rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID); rawWithSummary != payload {
-			s.logger.Info("Session summary changed payload, running summary validation pass",
-				zap.String("sessionID", sessionID))
-			valCtx.SessionID = sessionID
-			payloadWithSummary := s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, true)
-			processResult, evalPayload, preRedactionPayload, err = validate(payloadWithSummary)
-			if err != nil {
-				s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
-					zap.String("sessionID", sessionID),
-					zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
-					zap.Error(err))
-				return nil, "", fmt.Errorf("failed to process request: %w", err)
-			}
-			s.logger.Info("ValidateRequest - session summary payload validated",
-				zap.String("sessionID", sessionID),
-				zap.String("payloadWithSummary", payloadWithSummary),
-				zap.String("evalPayload", evalPayload))
-			sessionDrivenBlock = processResult.IsBlocked
-		}
+	if outcome.fromSession {
+		s.logger.Info("ValidateRequest - session summary payload validated",
+			zap.String("sessionID", sessionID),
+			zap.String("evalPayload", evalPayload))
 	}
 	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, evalPayload, preRedactionPayload, "ValidateRequest", sessionID)
 
@@ -2510,14 +2566,22 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	procCtx, cancelProc := s.withValidationDeadline(ctx)
 	defer cancelProc()
 
-	validate := func(extractedPayload string) (*mcp.ProcessResult, string, string, error) {
+	validate := func(vc *mcp.ValidationContext, extractedPayload string) (*mcp.ProcessResult, string, string, error) {
 		eval, pre := s.redactIgnorePhrasesForEvaluation(extractedPayload, policies, "ValidateResponse", sessionID)
-		result, err := s.processor.ProcessResponseParallel(procCtx, eval, valCtx, policies)
+		result, err := s.processor.ProcessResponseParallel(procCtx, eval, vc, policies)
 		return result, eval, pre, err
 	}
+	summaryPayload := func() (string, bool) {
+		rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, responseBody, sessionID)
+		if rawWithSummary == responseBody {
+			return "", false
+		}
+		return s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, false), true
+	}
 
-	valCtx.SessionID = ""
-	processResult, evalPayload, preRedactionPayload, err := validate(responseBodyBare)
+	// Bare and session-summary passes run concurrently; a blocking bare verdict wins.
+	outcome, sessionContextBlock := s.validateWithSessionPass(valCtx, sessionID, responseBodyBare, summaryPayload, validate)
+	processResult, evalPayload, preRedactionPayload, err := outcome.result, outcome.evalPayload, outcome.preRedactionPayload, outcome.err
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
@@ -2528,31 +2592,10 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			zap.Error(err))
 		return nil, "", fmt.Errorf("failed to process response: %w", err)
 	}
-
-	sessionContextBlock := false
-	if !processResult.IsBlocked && s.config != nil && s.config.SessionEnabled {
-		if rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, responseBody, sessionID); rawWithSummary != responseBody {
-			s.logger.Info("Session summary changed payload, running summary validation pass",
-				zap.String("sessionID", sessionID))
-			valCtx.SessionID = sessionID
-			withSummary := s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, false)
-			processResult, evalPayload, preRedactionPayload, err = validate(withSummary)
-			if err != nil {
-				s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
-					zap.String("path", params.Path),
-					zap.String("method", params.Method),
-					zap.String("account", params.AktoAccountID),
-					zap.String("sessionID", sessionID),
-					zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
-					zap.Error(err))
-				return nil, "", fmt.Errorf("failed to process response: %w", err)
-			}
-			s.logger.Info("ValidateResponse - session summary payload validated",
-				zap.String("sessionID", sessionID),
-				zap.String("withSummary", withSummary),
-				zap.String("evalPayload", evalPayload))
-			sessionContextBlock = processResult.IsBlocked
-		}
+	if outcome.fromSession {
+		s.logger.Info("ValidateResponse - session summary payload validated",
+			zap.String("sessionID", sessionID),
+			zap.String("evalPayload", evalPayload))
 	}
 
 	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, evalPayload, preRedactionPayload, "ValidateResponse", sessionID)
@@ -2705,34 +2748,27 @@ func (s *Service) ValidateRequestWithPolicy(
 
 	matchersByPolicy := compileIgnorePhraseMatchersByPolicy(policies)
 
-	validate := func(candidatePayload string) (*mcp.ProcessResult, string, string, error) {
+	validate := func(vc *mcp.ValidationContext, candidatePayload string) (*mcp.ProcessResult, string, string, error) {
 		eval, pre := s.redactIgnorePhrasesForEvaluationWithMatchers(candidatePayload, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
-		result, err := s.processor.ProcessRequest(ctx, eval, valCtx, policies, auditPolicies, hasAuditRules)
+		result, err := s.processor.ProcessRequest(ctx, eval, vc, policies, auditPolicies, hasAuditRules)
 		return result, eval, pre, err
 	}
+	summaryPayload := func() (string, bool) {
+		rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+		return rawWithSummary, rawWithSummary != payload
+	}
 
-	valCtx.SessionID = ""
-	processResult, payloadToValidate, preRedactionPayload, err := validate(payload)
+	// Bare and session-summary passes run concurrently; a blocking bare verdict wins.
+	outcome, sessionDrivenBlock := s.validateWithSessionPass(valCtx, sessionID, payload, summaryPayload, validate)
+	processResult, payloadToValidate, preRedactionPayload, err := outcome.result, outcome.evalPayload, outcome.preRedactionPayload, outcome.err
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
 	}
-
-	sessionDrivenBlock := false
-	if !processResult.IsBlocked && s.config != nil && s.config.SessionEnabled {
-		if rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID); rawWithSummary != payload {
-			valCtx.SessionID = sessionID
-			processResult, payloadToValidate, preRedactionPayload, err = validate(rawWithSummary)
-			if err != nil {
-				s.logger.Error("ProcessRequest failed", zap.Error(err))
-				return nil, fmt.Errorf("failed to process request: %w", err)
-			}
-			s.logger.Info("ValidateRequestWithPolicy - session summary payload validated",
-				zap.String("sessionID", sessionID),
-				zap.String("rawWithSummary", rawWithSummary),
-				zap.String("payloadToValidate", payloadToValidate))
-			sessionDrivenBlock = processResult.IsBlocked
-		}
+	if outcome.fromSession {
+		s.logger.Info("ValidateRequestWithPolicy - session summary payload validated",
+			zap.String("sessionID", sessionID),
+			zap.String("payloadToValidate", payloadToValidate))
 	}
 
 	// Log detailed ProcessRequest result
