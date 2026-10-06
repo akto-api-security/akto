@@ -8,12 +8,10 @@ function DataSection({ data }) {
     // render as an agent that handles no sensitive data.
     if (data.available === false) {
         return (
-            <Card>
-                <Box padding="4">
-                    <Text variant="bodyMd" color="subdued" alignment="center">
-                        Guardrail activity is unavailable, so sensitive data could not be determined.
-                    </Text>
-                </Box>
+            <Card padding="5">
+                <Text variant="bodyMd" color="subdued" alignment="center">
+                    Guardrail activity is unavailable, so sensitive data could not be determined.
+                </Text>
             </Card>
         )
     }
@@ -25,19 +23,17 @@ function DataSection({ data }) {
     ]
 
     return (
-        <Card>
-            <Box padding="4">
-                <VerticalStack gap="4">
-                    {types.length > 0 ? (
-                        <HorizontalStack gap="2" wrap>
-                            {types.map((type) => <Badge key={type}>{type}</Badge>)}
-                        </HorizontalStack>
-                    ) : (
-                        <Text variant="bodyMd" color="subdued">No sensitive data detected.</Text>
-                    )}
-                    <DetailGrid items={items} columns={2} />
-                </VerticalStack>
-            </Box>
+        <Card padding="5">
+            <VerticalStack gap="4">
+                {types.length > 0 ? (
+                    <HorizontalStack gap="2" wrap>
+                        {types.map((type) => <Badge key={type}>{type}</Badge>)}
+                    </HorizontalStack>
+                ) : (
+                    <Text variant="bodyMd" color="subdued">No sensitive data detected.</Text>
+                )}
+                <DetailGrid items={items} columns={2} />
+            </VerticalStack>
         </Card>
     )
 }
