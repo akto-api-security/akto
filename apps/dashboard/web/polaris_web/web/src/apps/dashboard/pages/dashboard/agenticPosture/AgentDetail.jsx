@@ -1,19 +1,17 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Banner, Box, Text, VerticalStack } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 import postureDataSource from './postureDataSource'
 import AgentHeaderCard from './agentDetail/AgentHeaderCard'
-import StepNav from './agentDetail/StepNav'
-import DangerousPathCallout from './agentDetail/DangerousPathCallout'
-import OwnerSection from './agentDetail/OwnerSection'
-import IdentitySection from './agentDetail/IdentitySection'
-import PermissionsSection from './agentDetail/PermissionsSection'
 import ToolsSection from './agentDetail/ToolsSection'
 import DataSection from './agentDetail/DataSection'
 import ProtectionSection from './agentDetail/ProtectionSection'
-import RuntimeActivitySection from './agentDetail/RuntimeActivitySection'
+
+// StepNav, OwnerSection, IdentitySection and DangerousPathCallout are intentionally not rendered.
+// The sections have no data source in the Argus context; the step nav is hidden for now. All are
+// kept in the codebase.
 
 function Section({ id, title, children }) {
     return (
@@ -27,7 +25,9 @@ function Section({ id, title, children }) {
 }
 
 function AgentDetail() {
-    const { groupKey } = useParams()
+    const { collectionId } = useParams()
+    const [searchParams] = useSearchParams()
+    const finding = searchParams.get('finding')
     const [detail, setDetail] = useState(null)
     const [loading, setLoading] = useState(true)
 
@@ -36,7 +36,7 @@ function AgentDetail() {
         async function load() {
             setLoading(true)
             try {
-                const resp = await postureDataSource.fetchAgentDetail(groupKey, 0, 0)
+                const resp = await postureDataSource.fetchAgentDetail(collectionId, finding)
                 if (!cancelled) setDetail(resp)
             } catch (error) {
                 console.error('Error fetching agent detail:', error)
@@ -47,7 +47,7 @@ function AgentDetail() {
         }
         load()
         return () => { cancelled = true }
-    }, [groupKey])
+    }, [collectionId, finding])
 
     if (loading) {
         return (
@@ -60,7 +60,9 @@ function AgentDetail() {
     if (!detail) {
         return (
             <Box padding="8">
-                <Text variant="bodyMd" color="subdued" alignment="center">No posture data found for "{groupKey}".</Text>
+                <Text variant="bodyMd" color="subdued" alignment="center">
+                    This agent isn't available.
+                </Text>
             </Box>
         )
     }
@@ -69,31 +71,15 @@ function AgentDetail() {
         <VerticalStack gap="6">
             {detail.openedFromFinding && (
                 <Banner status="critical">
-                    Opened from finding: <Text as="span" fontWeight="semibold">{detail.openedFromFinding}</Text>
+                    Opened from finding: <Text as="span" fontWeight="semibold">{detail.openedFromFinding.title}</Text>
                 </Banner>
             )}
 
-            <Section id="agent" title="Agent">
+            <Box id="agent">
                 <AgentHeaderCard header={detail.header} />
-            </Section>
+            </Box>
 
-            <StepNav />
-
-            <DangerousPathCallout dangerousPath={detail.dangerousPath} />
-
-            <Section id="owner" title="Owner">
-                <OwnerSection owner={detail.owner} />
-            </Section>
-
-            <Section id="identity" title="Identity">
-                <IdentitySection identity={detail.identity} />
-            </Section>
-
-            <Section id="permissions" title="Permissions">
-                <PermissionsSection permissions={detail.permissions} />
-            </Section>
-
-            <Section id="tools" title="Tools">
+            <Section id="tools" title="Tools & Capabilities">
                 <ToolsSection tools={detail.tools} />
             </Section>
 
@@ -103,10 +89,6 @@ function AgentDetail() {
 
             <Section id="protection" title="Protection">
                 <ProtectionSection protection={detail.protection} />
-            </Section>
-
-            <Section id="runtime" title="Runtime Activity">
-                <RuntimeActivitySection runtimeActivity={detail.runtimeActivity} />
             </Section>
         </VerticalStack>
     )

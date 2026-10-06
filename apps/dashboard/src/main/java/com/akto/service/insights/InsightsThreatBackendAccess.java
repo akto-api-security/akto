@@ -20,7 +20,7 @@ import java.util.Map;
  * directly for its business logic. The three methods below just re-expose protected
  * members as public so a non-subclass caller (InsightDataLoader) can call them.
  */
-class InsightsThreatBackendAccess extends AbstractThreatDetectionAction {
+public class InsightsThreatBackendAccess extends AbstractThreatDetectionAction {
 
     List<HostSeverityCount> hostSeverityCounts(int startTs, int endTs) {
         return fetchHostSeverityCounts(startTs, endTs);
@@ -53,7 +53,7 @@ class InsightsThreatBackendAccess extends AbstractThreatDetectionAction {
     /** Same as violationEvents, minimalFields=true — for a caller (ArgusPostureService's card
      *  breakdowns) that only reads apiCollectionId/filterId/severity/label/timestamp off each
      *  event, never the heavy payload/metadata/owaspCategories/remediation fields. */
-    List<DashboardMaliciousEvent> violationEventsMinimal(int startTs, int endTs, int limit, Map<String, Object> filters) {
+    public List<DashboardMaliciousEvent> violationEventsMinimal(int startTs, int endTs, int limit, Map<String, Object> filters) {
         return fetchAllMaliciousEvents(startTs, endTs, limit, filters, null, true);
     }
 }

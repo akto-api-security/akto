@@ -349,6 +349,13 @@ const api = {
         return await request({ url: '/api/fetchArgusPostureRegenerateStatus', method: 'post', data: {} })
     },
 
+    fetchArgusAgentDetail: async (collectionId, finding) => {
+        return await request({
+            url: '/api/fetchArgusAgentDetail',
+            method: 'post',
+            data: { collectionId, finding: finding || '' }
+        })
+    },
     fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, environment, skip, limit) => {
         return await request({
             url: '/api/fetchArgusPostureDrill',

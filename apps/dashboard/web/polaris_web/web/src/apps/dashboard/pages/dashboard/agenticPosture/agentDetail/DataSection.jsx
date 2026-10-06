@@ -1,23 +1,40 @@
-import { Badge, Box, Card, HorizontalStack, VerticalStack } from '@shopify/polaris'
+import { Badge, Box, Card, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import DetailGrid from '../../../observe/agentic/DetailGrid'
 
 function DataSection({ data }) {
     if (!data) return null
+
+    // Unavailable is not the same as no detections: an unreadable guardrail backend must not
+    // render as an agent that handles no sensitive data.
+    if (data.available === false) {
+        return (
+            <Card>
+                <Box padding="4">
+                    <Text variant="bodyMd" color="subdued" alignment="center">
+                        Guardrail activity is unavailable, so sensitive data could not be determined.
+                    </Text>
+                </Box>
+            </Card>
+        )
+    }
+
+    const types = data.types || []
     const items = [
-        { label: 'Sensitive data access', value: data.sensitiveAccess ? 'Yes' : 'No' },
-        {
-            label: 'Can send externally',
-            value: data.canSendExternally ? `Yes — ${data.canSendExternallyDetail || ''}` : 'No',
-            isWarning: data.canSendExternally,
-        },
+        { label: 'Sensitive data access', value: data.sensitiveDataAccess ? 'Yes' : 'No' },
+        { label: 'Guardrail Violations, 90d', value: String(data.detections || 0) },
     ]
+
     return (
         <Card>
             <Box padding="4">
                 <VerticalStack gap="4">
-                    <HorizontalStack gap="2" wrap>
-                        {(data.categories || []).map((cat) => <Badge key={cat}>{cat}</Badge>)}
-                    </HorizontalStack>
+                    {types.length > 0 ? (
+                        <HorizontalStack gap="2" wrap>
+                            {types.map((type) => <Badge key={type}>{type}</Badge>)}
+                        </HorizontalStack>
+                    ) : (
+                        <Text variant="bodyMd" color="subdued">No sensitive data detected.</Text>
+                    )}
                     <DetailGrid items={items} columns={2} />
                 </VerticalStack>
             </Box>
