@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Page, VerticalStack, HorizontalStack } from '@shopify/polaris';
 import AgenticWelcomeHeader from './components/AgenticWelcomeHeader';
 import AgenticSearchInput from './components/AgenticSearchInput';
@@ -16,20 +17,22 @@ function AgenticMainPage() {
     // In a real app, this might come from a context or prop
     const username = (window.USER_FULL_NAME?.length > 0) ? window.USER_FULL_NAME : func.extractEmailDetails(window.USER_NAME)?.username || ""
 
+    const [searchParams, setSearchParams] = useSearchParams();
+    // Open conversation is kept in the URL so reloads, shared links and back/forward work
+    const activeConversationId = searchParams.get('conversation');
+
     const [searchValue, setSearchValue] = useState('');
-    const [showConversation, setShowConversation] = useState(false);
-    const [currentQuery, setCurrentQuery] = useState('');
-    const [loadConversationId, setLoadConversationId] = useState(null);
+    // Query of a new conversation that has no id yet
+    const [newConversationQuery, setNewConversationQuery] = useState(null);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [historyItems, setHistoryItems] = useState([]);
     const [historySearchQuery, setHistorySearchQuery] = useState('');
     const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-    const [pendingConversationId, setPendingConversationId] = useState(null);
+
+    const showConversation = Boolean(activeConversationId) || newConversationQuery !== null;
 
     const handleSearchSubmit = useCallback((query) => {
-        setCurrentQuery(query);
-        setLoadConversationId(null); // Clear conversation ID for new search
-        setShowConversation(true);
+        setNewConversationQuery(query);
     }, []);
 
     const handleSuggestionClick = useCallback((suggestion) => {
@@ -38,14 +41,21 @@ function AgenticMainPage() {
     }, [handleSearchSubmit]);
 
     const handleHistoryClick = useCallback((conversationId) => {
-        setLoadConversationId(conversationId); // Load existing conversation
-        setCurrentQuery(''); // Clear query for history load
-        setShowConversation(true);
-        // Clear the URL query parameter if present
-        const url = new URL(window.location);
-        url.searchParams.delete('conversation');
-        window.history.replaceState({}, '', url);
-    }, []);
+        setNewConversationQuery(null);
+        setSearchParams({ conversation: conversationId });
+    }, [setSearchParams]);
+
+    // New conversation got its id; push it so browser back returns to the Ask Akto home page
+    const handleConversationCreated = useCallback((conversationId) => {
+        setSearchParams({ conversation: conversationId });
+        setNewConversationQuery(null);
+    }, [setSearchParams]);
+
+    const handleBack = useCallback(() => {
+        setNewConversationQuery(null);
+        setSearchValue(''); // Clear search input when going back
+        setSearchParams({});
+    }, [setSearchParams]);
 
     const handleViewAllClick = useCallback(() => {
         setShowHistoryModal(true);
@@ -55,13 +65,11 @@ function AgenticMainPage() {
         setIsLoadingHistory(true);
         try {
             const conversations = await getConversationsList(limit, searchQuery);
-            if(conversations.history && conversations.history.length > 0) {
-                const sortedHistory = [...conversations.history].sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
-                setHistoryItems(sortedHistory.map(item => ({
-                    ...item,
-                    id: item._id._id
-                })));
-            }
+            const sortedHistory = [...(conversations?.history || [])].sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
+            setHistoryItems(sortedHistory.map(item => ({
+                ...item,
+                id: item._id?._id || item._id
+            })));
         } catch (error) {
             console.error('Error loading conversation history:', error);
             setHistoryItems([]);
@@ -70,50 +78,23 @@ function AgenticMainPage() {
     }, []);
 
     useEffect(() => {
+        if (showConversation) return;
         if (showHistoryModal) {
             loadHistory(50, historySearchQuery);
-        } else if (pendingConversationId) {
-            // Load more history to find the conversation from URL
-            loadHistory(50, "");
         } else {
             loadHistory(3, "");
         }
-    }, [showHistoryModal, historySearchQuery, pendingConversationId, loadHistory]);
-
-    // Check URL for conversation parameter on mount
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const conversationId = urlParams.get('conversation');
-
-        if (conversationId) {
-            // Set as pending until history is loaded
-            setPendingConversationId(conversationId);
-        }
-    }, []); // Run only on mount
-
-    // Load pending conversation after history is loaded
-    useEffect(() => {
-        if (pendingConversationId && historyItems.length > 0 && !isLoadingHistory) {
-            handleHistoryClick(pendingConversationId);
-            setPendingConversationId(null); // Clear after loading
-        }
-    }, [pendingConversationId, historyItems, isLoadingHistory, handleHistoryClick]);
+    }, [showConversation, showHistoryModal, historySearchQuery, loadHistory]);
 
     // If conversation is active, show the conversation page
     if (showConversation) {
         return (
             <AgenticConversationPage
-                initialQuery={currentQuery}
-                existingConversationId={loadConversationId}
-                existingMessages={historyItems.filter(item => item.id === loadConversationId).map(item => ({
-                    messages: item.messages,
-                    title: item.title
-                }))}
-                onBack={() => {
-                    setShowConversation(false);
-                    setSearchValue(''); // Clear search input when going back
-                }}
+                initialQuery={newConversationQuery || ''}
+                existingConversationId={activeConversationId}
+                onBack={handleBack}
                 onLoadConversation={handleHistoryClick}
+                onConversationCreated={handleConversationCreated}
                 conversationType="ASK_AKTO"
             />
         );
@@ -138,7 +119,7 @@ function AgenticMainPage() {
                         />
                     </VerticalStack>    
                     <AgenticHistoryCards
-                        historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt).slice(0, 3)}
+                        historyItems={historyItems.slice(0, 3)}
                         onHistoryClick={handleHistoryClick}
                         onViewAllClick={handleViewAllClick}
                     />
@@ -152,12 +133,12 @@ function AgenticMainPage() {
                     setHistorySearchQuery(''); // Reset search query when closing
                 }}
                 onHistoryClick={handleHistoryClick}
-                historyItems={historyItems.sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt)}
+                historyItems={historyItems}
                 searchQuery={historySearchQuery}
                 onSearchQueryChange={setHistorySearchQuery}
                 isLoading={isLoadingHistory}
                 onDelete={(conversationId) => {
-                    setHistoryItems(historyItems.filter(item => item.id !== conversationId).sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt));
+                    setHistoryItems(prev => prev.filter(item => item.id !== conversationId));
                 }}
             />
             </div>
