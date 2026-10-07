@@ -24,11 +24,13 @@ _BODY = b'{"messages":[{"role":"user","content":[{"text":"hi"}]}]}'
 _CREDS = aws_auth.AwsCredentials("AKIDEXAMPLE", "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
 
 
-def _botocore_authorization(url: str, headers: dict[str, str], creds: aws_auth.AwsCredentials, monkeypatch) -> str:
+def _botocore_authorization(
+    url: str, headers: dict[str, str], creds: aws_auth.AwsCredentials, monkeypatch, service: str = "bedrock"
+) -> str:
     monkeypatch.setattr(bc_auth, "get_current_datetime", lambda: _NOW.replace(tzinfo=None))
     request = AWSRequest(method="POST", url=url, data=_BODY, headers=dict(headers))
     bc_creds = Credentials(creds.access_key_id, creds.secret_access_key, creds.session_token or None)
-    bc_auth.SigV4Auth(bc_creds, "bedrock", _REGION).add_auth(request)
+    bc_auth.SigV4Auth(bc_creds, service, _REGION).add_auth(request)
     return request.headers["Authorization"]
 
 
@@ -54,6 +56,18 @@ def test_matches_botocore(model_path, creds, monkeypatch):
         url, {**base, "X-Amz-Content-Sha256": ours["X-Amz-Content-Sha256"]}, creds, monkeypatch
     )
     assert ours["Authorization"] == reference
+
+
+def test_mantle_signing_service_matches_botocore(monkeypatch):
+    # Gemma 4 lives on bedrock-mantle, which signs under its own service name.
+    url = f"https://bedrock-mantle.{_REGION}.api.aws/openai/v1/chat/completions"
+    base = {"Content-Type": "application/json"}
+    ours = aws_auth.sign_headers("POST", url, base, _BODY, _CREDS, _REGION, service="bedrock-mantle", now=_NOW)
+    reference = _botocore_authorization(
+        url, {**base, "X-Amz-Content-Sha256": ours["X-Amz-Content-Sha256"]}, _CREDS, monkeypatch, "bedrock-mantle"
+    )
+    assert ours["Authorization"] == reference
+    assert f"/{_REGION}/bedrock-mantle/aws4_request" in ours["Authorization"]
 
 
 def test_canonical_uri_double_encodes_path():
@@ -121,9 +135,10 @@ _STS_XML = """<AssumeRoleWithWebIdentityResponse xmlns="https://sts.amazonaws.co
 
 
 class _FakeResponse:
-    def __init__(self, payload=None, text=""):
+    def __init__(self, payload=None, text="", status_code=200):
         self._payload = payload
         self.text = text
+        self.status_code = status_code
 
     def raise_for_status(self):
         pass
@@ -135,11 +150,15 @@ class _FakeResponse:
 class _FakeClient:
     calls: list[dict] = []
     get_payload: dict = {}
+    get_status = 200
+    get_text = ""
     post_text = ""
 
     async def get(self, url, headers=None, timeout=None):
         _FakeClient.calls.append({"method": "GET", "url": url, "headers": headers})
-        return _FakeResponse(payload=_FakeClient.get_payload)
+        return _FakeResponse(
+            payload=_FakeClient.get_payload, text=_FakeClient.get_text, status_code=_FakeClient.get_status
+        )
 
     async def post(self, url, headers=None, data=None, timeout=None):
         _FakeClient.calls.append({"method": "POST", "url": url, "headers": headers, "data": data})
@@ -151,6 +170,8 @@ def role_env(monkeypatch):
     for var in _ROLE_ENV:
         monkeypatch.delenv(var, raising=False)
     _FakeClient.calls = []
+    _FakeClient.get_status = 200
+    _FakeClient.get_text = ""
     _FakeClient.get_payload = {
         "AccessKeyId": "ASIAPOD",
         "SecretAccessKey": "pod-secret",
@@ -268,4 +289,13 @@ async def test_irsa_response_without_credentials_raises(role_env, tmp_path):
 
 async def test_no_role_configured_raises(role_env):
     with pytest.raises(RuntimeError, match="no IAM role credentials"):
+        await aws_auth.get_role_credentials("us-east-1")
+
+
+async def test_container_error_body_is_surfaced(role_env):
+    # The agent's 400 body carries the real reason; a bare status would hide it.
+    role_env.setenv("AWS_CONTAINER_CREDENTIALS_FULL_URI", "http://169.254.170.23/v1/credentials")
+    _FakeClient.get_status = 400
+    _FakeClient.get_text = "(AccessDeniedException): EKS does not have permissions to assume the associated role."
+    with pytest.raises(RuntimeError, match="HTTP 400.*does not have permissions to assume"):
         await aws_auth.get_role_credentials("us-east-1")
