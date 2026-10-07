@@ -429,12 +429,6 @@ public class ConsumerUtil {
                 if (processed != lastSeenProcessed) {
                     lastSeenProcessed = processed;
                     lastProgressTs = Context.now();
-                } else if (workRemaining > 0 && Context.now() - lastProgressTs > STALL_TIMEOUT_SECONDS) {
-                    stopReason = TestRunMetrics.StopReason.STALLED;
-                    loggerMaker.errorAndAddToDb("No progress for " + STALL_TIMEOUT_SECONDS + "s summaryId="
-                            + summaryIdForTest + " workRemaining=" + workRemaining);
-                    executor.shutdownNow();
-                    break;
                 }
                 // Only actually calls Kafka at the heartbeat's own cadence (tick decides
                 // internally), not once per ~100ms loop iteration.
@@ -448,13 +442,22 @@ public class ConsumerUtil {
                  * them, zero means every record has been processed and committed.
                  */
                 if (workRemaining == 0) {
-                    long lag = KafkaAdminClient.getConsumerLag(topicName, groupId);
+                    // expectedRecords == 0: nothing was produced, so the group never commits and lag stays -1
+                    long lag = expectedRecords == 0 ? 0 : KafkaAdminClient.getConsumerLag(topicName, groupId);
                     if (lag == 0) {
                         stopReason = TestRunMetrics.StopReason.ALL_PROCESSED;
                         int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
                         shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
                         break;
                     }
+                }
+                // records finish or time out within maxRunTimeForTests, so this is stuck even with no work held
+                if (Context.now() - lastProgressTs > STALL_TIMEOUT_SECONDS) {
+                    stopReason = TestRunMetrics.StopReason.STALLED;
+                    loggerMaker.errorAndAddToDb("No progress for " + STALL_TIMEOUT_SECONDS + "s summaryId="
+                            + summaryIdForTest + " workRemaining=" + workRemaining);
+                    executor.shutdownNow();
+                    break;
                 }
                 Thread.sleep(100);
             }
