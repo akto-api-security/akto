@@ -17,7 +17,11 @@ RUN python3 -m pip install --no-cache-dir torch --index-url https://download.pyt
 ARG EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ENV EMBED_MODEL=${EMBED_MODEL}
 ENV EMBED_MODEL_PATH=/app/model
-RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBED_MODEL}').save('${EMBED_MODEL_PATH}')"
+# save() writes model.safetensors as 0600, so open up read access for non-root
+# users; drop the HF cache copy, which is now an unused duplicate.
+RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBED_MODEL}').save('${EMBED_MODEL_PATH}')" \
+    && chmod -R a+rX ${EMBED_MODEL_PATH} \
+    && rm -rf /root/.cache/huggingface
 # Regional clusters have no internet: never contact the HF Hub at runtime, or
 # every pod start blocks on hub requests that can only time out.
 ENV HF_HUB_OFFLINE=1
