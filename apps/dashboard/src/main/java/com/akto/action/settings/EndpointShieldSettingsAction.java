@@ -54,9 +54,10 @@ public class EndpointShieldSettingsAction extends UserAction {
     private static final String PLATFORMS_PREFIX =
         AccountSettings.ENDPOINT_SHIELD_SETTINGS + "." + EndpointShieldSettings.PLATFORMS + ".";
 
-    private static final String S3_BASE = "https://akto-endpoint-agents.s3.us-east-1.amazonaws.com/atlas-installers";
     private static final String S3_BUCKET = System.getenv().getOrDefault("AKTO_ENDPOINT_AGENTS_BUCKET", "akto-endpoint-agents");
     private static final String S3_REGION = System.getenv().getOrDefault("AKTO_ENDPOINT_AGENTS_REGION", "us-east-1");
+    /** Local-only: point installer S3 feeds at another account (e.g. nginx-demo) without changing login account. */
+    private static final String INSTALLER_ACCOUNT_ID_ENV = "AKTO_ENDPOINT_SHIELD_ACCOUNT_ID";
 
     private static final Pattern S3_HTTPS = Pattern.compile(
         "^https://([^.]+)\\.s3[.-][^/]+\\.amazonaws\\.com/(.+)$");
@@ -77,12 +78,55 @@ public class EndpointShieldSettingsAction extends UserAction {
         }
     }
 
-    // Account-scoped feeds: atlas-installers/<accountId>/<type>/latest.json
-    private static String defaultManifestUrl(String platformKey) {
-        int accountId = Context.accountId.get();
+    /**
+     * Account id used in installer S3 paths.
+     * Production: session {@link Context#accountId}.
+     * Local: optional {@code AKTO_ENDPOINT_SHIELD_ACCOUNT_ID} (e.g. nginx-demo 1726615470).
+     */
+    static int installerAccountId() {
+        String override = System.getenv(INSTALLER_ACCOUNT_ID_ENV);
+        if (override != null && !override.trim().isEmpty()) {
+            try {
+                return Integer.parseInt(override.trim());
+            } catch (NumberFormatException ignored) {
+                // fall through to session account
+            }
+        }
+        return Context.accountId.get();
+    }
+
+    private static boolean installerAccountOverrideActive() {
+        String override = System.getenv(INSTALLER_ACCOUNT_ID_ENV);
+        return override != null && !override.trim().isEmpty();
+    }
+
+    /**
+     * Legacy published layout: atlas-installers/&lt;type&gt;/&lt;accountId&gt;/
+     * New layout: atlas-installers/&lt;accountId&gt;/&lt;type&gt;/
+     * Local nginx-demo feeds still use legacy; auto-enable when account override is set.
+     */
+    private static boolean useLegacyInstallerS3Layout() {
+        String v = System.getenv("AKTO_ENDPOINT_SHIELD_LEGACY_S3_LAYOUT");
+        if (v != null && !v.trim().isEmpty()) {
+            return "1".equals(v.trim()) || "true".equalsIgnoreCase(v.trim());
+        }
+        return installerAccountOverrideActive();
+    }
+
+    private static String defaultInstallerPrefix(String platformKey) {
         String folder = platformFolder(platformKey);
         if (folder == null) return null;
-        return S3_BASE + "/" + accountId + "/" + folder + "/latest.json";
+        if (useLegacyInstallerS3Layout()) {
+            return "atlas-installers/" + folder + "/" + installerAccountId();
+        }
+        return "atlas-installers/" + installerAccountId() + "/" + folder;
+    }
+
+    // Account-scoped feeds (new or legacy layout depending on local env).
+    private static String defaultManifestUrl(String platformKey) {
+        String prefix = defaultInstallerPrefix(platformKey);
+        if (prefix == null) return null;
+        return "https://" + S3_BUCKET + ".s3." + S3_REGION + ".amazonaws.com/" + prefix + "/latest.json";
     }
 
     @Getter @Setter private EndpointShieldSettings endpointShieldSettings;
@@ -109,17 +153,22 @@ public class EndpointShieldSettingsAction extends UserAction {
         Map<String, PlatformShieldConfig> platforms = existing.getPlatforms();
         if (platforms == null) platforms = new HashMap<>();
 
-        // Seed defaults for any platform missing or lacking a manifest URL
+        // Seed defaults for any platform missing or lacking a manifest URL.
+        // When AKTO_ENDPOINT_SHIELD_ACCOUNT_ID is set (local), remap URLs to that account's feeds.
+        boolean remapToInstallerAccount = installerAccountOverrideActive();
         for (String key : EndpointShieldSettings.ALL_PLATFORMS) {
             PlatformShieldConfig existing_cfg = platforms.get(key);
             boolean missingUrl = existing_cfg == null || existing_cfg.getManifestUrl() == null || existing_cfg.getManifestUrl().isEmpty();
-            if (missingUrl) {
+            String desiredUrl = defaultManifestUrl(key);
+            boolean shouldSet = missingUrl || (remapToInstallerAccount && desiredUrl != null
+                && (existing_cfg == null || !desiredUrl.equals(existing_cfg.getManifestUrl())));
+            if (shouldSet) {
                 if (existing_cfg == null) {
                     existing_cfg = new PlatformShieldConfig();
                     existing_cfg.setAutoUpdateEnabled(true);
                     platforms.put(key, existing_cfg);
                 }
-                existing_cfg.setManifestUrl(defaultManifestUrl(key));
+                existing_cfg.setManifestUrl(desiredUrl);
                 AccountSettingsDao.instance.updateOne(
                     AccountSettingsDao.generateFilter(),
                     Updates.set(PLATFORMS_PREFIX + key + "." + PlatformShieldConfig.MANIFEST_URL, existing_cfg.getManifestUrl())
@@ -224,7 +273,7 @@ public class EndpointShieldSettingsAction extends UserAction {
 
         String prefix = prefixFromManifestUrl(manifestUrl);
         if (prefix == null) {
-            prefix = "atlas-installers/" + Context.accountId.get() + "/" + platformFolder(platformKey);
+            prefix = defaultInstallerPrefix(platformKey);
         }
 
         releases = new ArrayList<>();
@@ -302,7 +351,7 @@ public class EndpointShieldSettingsAction extends UserAction {
         }
         String prefix = prefixFromManifestUrl(manifestUrl);
         if (prefix == null) {
-            prefix = "atlas-installers/" + Context.accountId.get() + "/" + platformFolder(platformKey);
+            prefix = defaultInstallerPrefix(platformKey);
         }
         prefix = trimSlash(prefix);
 
@@ -327,7 +376,7 @@ public class EndpointShieldSettingsAction extends UserAction {
             }
             releaseMeta.put("version", releaseMeta.optString("version", deployVersion));
             if (!releaseMeta.has("customer")) {
-                releaseMeta.put("customer", String.valueOf(Context.accountId.get()));
+                releaseMeta.put("customer", String.valueOf(installerAccountId()));
             }
             if (!releaseMeta.has("released_at")) {
                 releaseMeta.put("released_at",
@@ -551,7 +600,7 @@ public class EndpointShieldSettingsAction extends UserAction {
         JSONObject o = new JSONObject();
         o.put("version", ver);
         o.put(artifactField(key), url);
-        o.put("customer", String.valueOf(Context.accountId.get()));
+        o.put("customer", String.valueOf(installerAccountId()));
         return o;
     }
 

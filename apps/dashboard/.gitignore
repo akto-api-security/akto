@@ -7,3 +7,5 @@ web/dist
 .classpath
 .idea/
 .vscode/launch.json
+scripts/config.env
+scripts/dify-local.env

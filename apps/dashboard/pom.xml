@@ -13,6 +13,9 @@
     <groupId>com.akto.apps.dashboard</groupId>
     <artifactId>dashboard</artifactId>
     <packaging>war</packaging>
+    <properties>
+        <jetty.port>8081</jetty.port>
+    </properties>
     <dependencyManagement>
         <dependencies>
             <!-- AWS SDK bumped 1.12.405 -> 1.12.640 to drop the transitive vulnerable
@@ -356,6 +359,7 @@
                 <version>12.0.37</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
+                    <httpPort>${jetty.port}</httpPort>
                     <webApp>
                         <contextPath>/</contextPath>
                     </webApp>
