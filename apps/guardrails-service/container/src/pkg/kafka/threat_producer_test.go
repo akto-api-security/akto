@@ -76,10 +76,9 @@ func TestSink_ErrorsWhenBrokerAndBackendBothDown(t *testing.T) {
 	}
 }
 
-// With enrichment buffering off (the default), an enrichment update never
-// touches Kafka and goes straight to update_remediation, as it did before the
-// buffer existed.
-func TestSink_EnrichmentGoesDirectWhenNotBuffered(t *testing.T) {
+// An enrichment update that cannot be buffered falls back to update_remediation,
+// not record_malicious_event.
+func TestSink_EnrichmentFallsBackToUpdateRemediation(t *testing.T) {
 	var gotPath string
 	withThreatAPI(t, func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
@@ -90,9 +89,9 @@ func TestSink_EnrichmentGoesDirectWhenNotBuffered(t *testing.T) {
 	sink := unreachableProducer(t).Sink()
 	update := mcp.ThreatMessage{Kind: mcp.ThreatMessageEnrichment, Key: "sess-1", Body: []byte(`{"refId":"r"}`)}
 	if err := sink(context.Background(), update); err != nil {
-		t.Fatalf("sink: %v", err)
+		t.Fatalf("sink should have recovered via the direct POST, got: %v", err)
 	}
 	if gotPath != "/api/threat_detection/update_remediation" {
-		t.Fatalf("enrichment posted to %q", gotPath)
+		t.Fatalf("enrichment fell back to %q", gotPath)
 	}
 }

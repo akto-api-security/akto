@@ -11,15 +11,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// ThreatProducer buffers malicious events, and optionally their enrichment
-// updates, onto Kafka so they survive a threat backend outage. It is installed
+// ThreatProducer buffers malicious events and their enrichment updates onto
+// Kafka so they survive a threat backend outage. It is installed
 // as the endpoint-shield ThreatSink, which hands it the exact JSON body that
 // would otherwise have been POSTed — the threat client re-POSTs those bytes
 // unchanged, to the endpoint named by the MessageTypeHeader.
 type ThreatProducer struct {
-	writer           *kafka.Writer
-	logger           *zap.Logger
-	bufferEnrichment bool
+	writer *kafka.Writer
+	logger *zap.Logger
 }
 
 // NewThreatProducer creates a producer against cfg.ThreatKafka. It does not
@@ -54,13 +53,12 @@ func NewThreatProducer(cfg *config.Config, logger *zap.Logger) (*ThreatProducer,
 		Async: false,
 	})
 
-	p := &ThreatProducer{writer: writer, logger: logger, bufferEnrichment: tk.BufferEnrichment}
+	p := &ThreatProducer{writer: writer, logger: logger}
 
 	logger.Info("Threat event Kafka producer created",
 		zap.String("broker", tk.BrokerURL),
 		zap.String("topic", tk.Topic),
-		zap.Bool("tls", tk.UseTLS),
-		zap.Bool("bufferEnrichment", tk.BufferEnrichment))
+		zap.Bool("tls", tk.UseTLS))
 
 	return p, nil
 }
@@ -78,10 +76,6 @@ const MessageTypeHeader = "akto-msg-type"
 // than not having it.
 func (p *ThreatProducer) Sink() mcp.ThreatSink {
 	return func(ctx context.Context, msg mcp.ThreatMessage) error {
-		if msg.Kind == mcp.ThreatMessageEnrichment && !p.bufferEnrichment {
-			return mcp.PostThreatMessage(ctx, msg)
-		}
-
 		err := p.write(ctx, msg)
 		if err == nil {
 			return nil
