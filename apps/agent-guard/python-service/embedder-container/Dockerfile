@@ -11,11 +11,17 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 RUN python3 -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
     && python3 -m pip install --no-cache-dir -r requirements.txt
 
-# Pre-bake the model into the image so the first request isn't blocked on a
-# HuggingFace download (mirrors anonymizer-container's spacy download step).
+# Pre-bake the model into a fixed path in the image (mirrors anonymizer-container's
+# spacy download step). Loading from a path rather than the HF cache keeps it
+# independent of $HOME / runAsUser. Swap models with --build-arg EMBED_MODEL=...
 ARG EMBED_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ENV EMBED_MODEL=${EMBED_MODEL}
-RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBED_MODEL}')"
+ENV EMBED_MODEL_PATH=/app/model
+RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${EMBED_MODEL}').save('${EMBED_MODEL_PATH}')"
+# Regional clusters have no internet: never contact the HF Hub at runtime, or
+# every pod start blocks on hub requests that can only time out.
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
 
 COPY src/ .
 
