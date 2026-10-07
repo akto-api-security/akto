@@ -91,7 +91,9 @@ public class TestExecutor {
     private static final AtomicInteger totalTestsCount = new AtomicInteger(0);
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
     // rollout toggle for the consolidated bulkRecordTestingRunResults flow (cyborg); default keeps the old per-call flow.
-    private static final boolean USE_BULK_RECORD_TESTING_RUN_RESULTS = "true".equalsIgnoreCase(System.getenv("USE_BULK_RECORD_TESTING_RUN_RESULTS"));
+    private static final boolean USE_BULK_RECORD_TESTING_RUN_RESULTS =
+        Boolean.parseBoolean(System.getenv().getOrDefault(
+                "USE_BULK_RECORD_TESTING_RUN_RESULTS", "true"));
     private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
     
     // Current execution fallback flag - used when Kafka fails during current test run
