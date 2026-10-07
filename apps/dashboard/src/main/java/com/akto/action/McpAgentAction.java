@@ -41,6 +41,7 @@ public class McpAgentAction extends UserAction {
     private int limit;
     private String conversationType;
     private String searchQuery;
+    private boolean includeMessages = true;
 
     private Map<String, Object> metaData;
 
@@ -248,6 +249,10 @@ public class McpAgentAction extends UserAction {
             GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
+                // Later turns reuse the first turn's title, so never store the agent's placeholder title
+                if (isFirstRequest && isPlaceholderTitle(responseFromMcpServer.getTitle())) {
+                    responseFromMcpServer.setTitle(titleFromPrompt(message));
+                }
                 AgentConversationDao.instance.insertOne(responseFromMcpServer);
             }
             this.response = new BasicDBObject();
@@ -266,29 +271,44 @@ public class McpAgentAction extends UserAction {
     public String fetchHistory() {
         try {
             int fetchLimit = limit > 0 ? limit : 5;
+            boolean singleConversation = StringUtils.isNotEmpty(conversationId);
 
             List<Bson> matchFilters = new ArrayList<>();
             matchFilters.add(AgentConversationDao.instance.getContextSourceFilter());
-            if (StringUtils.isNotEmpty(searchQuery)) {
+            if (singleConversation) {
+                matchFilters.add(Filters.eq(GenericAgentConversation._CONVERSATION_ID, conversationId));
+            } else if (StringUtils.isNotEmpty(searchQuery)) {
                 matchFilters.add(Filters.regex("title", Pattern.compile(Pattern.quote(searchQuery), Pattern.CASE_INSENSITIVE)));
             }
 
             List<Bson> pipeline = new ArrayList<>();
 
             pipeline.add(Aggregates.match(Filters.and(matchFilters)));
-            pipeline.add(Aggregates.sort(Sorts.descending("lastUpdatedAt")));
+            // One document per turn: oldest first for a single conversation (chat order), newest first for the list
+            pipeline.add(Aggregates.sort(singleConversation
+                ? Sorts.ascending("createdAt", "lastUpdatedAt")
+                : Sorts.descending("lastUpdatedAt")));
             BasicDBObject groupedId = new BasicDBObject("_id", "$conversationId");
             List<BsonField> groupAccumulators = new ArrayList<>();
-            groupAccumulators.add(Accumulators.first("lastUpdatedAt", "$lastUpdatedAt"));
-            groupAccumulators.add(Accumulators.last("title", "$title"));
+            groupAccumulators.add(Accumulators.max("lastUpdatedAt", "$lastUpdatedAt"));
+            groupAccumulators.add(singleConversation
+                ? Accumulators.first("title", "$title")
+                : Accumulators.last("title", "$title"));
             groupAccumulators.add(Accumulators.sum("tokensUsed", "$tokensUsed"));
-            groupAccumulators.add(Accumulators.push("messages", new BasicDBObject()
-                .append("prompt", "$prompt")
-                .append("response", "$response")
-            ));
-            
+            if (singleConversation || includeMessages) {
+                groupAccumulators.add(Accumulators.push("messages", new BasicDBObject()
+                    .append("prompt", "$prompt")
+                    .append("response", "$response")
+                    .append("createdAt", "$createdAt")
+                ));
+            }
+
             pipeline.add(Aggregates.group(groupedId, groupAccumulators.toArray(new BsonField[0])));
-            pipeline.add(Aggregates.limit(fetchLimit));
+            // $group doesn't preserve order, so re-sort before limiting to keep the latest conversations
+            pipeline.add(Aggregates.sort(Sorts.descending("lastUpdatedAt")));
+            if (!singleConversation) {
+                pipeline.add(Aggregates.limit(fetchLimit));
+            }
             MongoCursor<BasicDBObject> cursor = AgentConversationDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class)
                 .cursor();
@@ -335,6 +355,22 @@ public class McpAgentAction extends UserAction {
         }
     }
 
+    private static final int MAX_TITLE_LENGTH = 60;
+
+    // Blank, "Untitled", or the "null" text AgentClient produces for a JSON null title
+    private static boolean isPlaceholderTitle(String title) {
+        return StringUtils.isBlank(title) || "Untitled".equalsIgnoreCase(title.trim())
+            || "null".equalsIgnoreCase(title.trim());
+    }
+
+    private static String titleFromPrompt(String prompt) {
+        String title = prompt == null ? "" : prompt.replaceAll("\\s+", " ").trim();
+        if (title.isEmpty()) {
+            return "Untitled";
+        }
+        return title.length() > MAX_TITLE_LENGTH ? title.substring(0, MAX_TITLE_LENGTH - 3).trim() + "..." : title;
+    }
+
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }
     public String getConversationId() { return conversationId; }
@@ -351,6 +387,8 @@ public class McpAgentAction extends UserAction {
     public void setConversationType(String conversationType) { this.conversationType = conversationType; }
     public String getSearchQuery() { return searchQuery; }
     public void setSearchQuery(String searchQuery) { this.searchQuery = searchQuery; }
+    public boolean isIncludeMessages() { return includeMessages; }
+    public void setIncludeMessages(boolean includeMessages) { this.includeMessages = includeMessages; }
     public Map<String, Object> getMetaData() { return metaData; }
     public void setMetaData(Map<String, Object> metaData) {
         this.metaData = metaData;
