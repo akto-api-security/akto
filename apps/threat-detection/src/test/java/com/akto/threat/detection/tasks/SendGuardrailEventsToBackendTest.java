@@ -174,6 +174,23 @@ public class SendGuardrailEventsToBackendTest {
     }
   }
 
+  /**
+   * guardrails-service gains fields before this image is upgraded. A field this
+   * build's proto does not know must still be forwarded, not dropped here.
+   */
+  @Test
+  public void forwardsEventWithFieldUnknownToThisBuild() {
+    String withNewerField = VALID_EVENT.replace("\"sessionId\"", "\"fieldFromNewerGuardrails\":\"x\",\"sessionId\"");
+    try (MockedStatic<ApiExecutor> api = mockStatic(ApiExecutor.class)) {
+      stubResponse(api, 202, "");
+
+      task.processRecords(recordsOf(withNewerField));
+
+      api.verify(() -> ApiExecutor.sendRequest(any(), anyBoolean(), eq(null), anyBoolean(), eq(null)));
+      assertEquals(1L, consumer.committed(Collections.singleton(PARTITION)).get(PARTITION).offset());
+    }
+  }
+
   /** A transport failure is retryable, not a rejection. */
   @Test
   public void treatsTransportFailureAsRetryable() {

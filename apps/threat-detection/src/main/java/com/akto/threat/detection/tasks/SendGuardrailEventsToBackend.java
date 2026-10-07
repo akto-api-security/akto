@@ -1,6 +1,5 @@
 package com.akto.threat.detection.tasks;
 
-import com.akto.ProtoMessageUtils;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.kafka.KafkaConfig;
@@ -9,6 +8,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.testing.ApiExecutor;
 import com.akto.threat.detection.utils.Utils;
+import com.google.protobuf.util.JsonFormat;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -43,6 +43,8 @@ public class SendGuardrailEventsToBackend extends AbstractKafkaConsumerTask<byte
 
   private static final String RECORD_MALICIOUS_EVENT_PATH =
       "/api/threat_detection/record_malicious_event";
+
+  private static final JsonFormat.Parser EVENT_PARSER = JsonFormat.parser().ignoringUnknownFields();
 
   /**
    * Retry backoff ceiling. Must stay well under max.poll.interval.ms (Kafka's
@@ -123,16 +125,21 @@ public class SendGuardrailEventsToBackend extends AbstractKafkaConsumerTask<byte
   private ForwardResult forward(ConsumerRecord<String, byte[]> record) {
     String body = new String(record.value(), StandardCharsets.UTF_8);
 
-    // Validate with the same strict parser the backend uses
-    // (ThreatDetectionRouter -> ProtoMessageUtils). Anything rejected here
-    // would come back as a 400 anyway, so dropping it now costs nothing and
-    // keeps a malformed body from blocking the partition forever.
-    if (!ProtoMessageUtils.toProtoMessage(RecordMaliciousEventRequest.class, body).isPresent()) {
+    // Drop bodies that are not a RecordMaliciousEventRequest at all, so a
+    // malformed body cannot block the partition forever. Unknown fields are
+    // NOT a reason to drop: guardrails-service and the backend gain fields
+    // before this image is upgraded, and the backend is the authority on them.
+    // A body the backend truly rejects still comes back 4xx and is dropped there.
+    try {
+      EVENT_PARSER.merge(body, RecordMaliciousEventRequest.newBuilder());
+    } catch (Exception e) {
       logger.error(
           "Dropping unparseable guardrail event at offset "
               + record.offset()
               + " partition "
-              + record.partition());
+              + record.partition()
+              + ": "
+              + e.getMessage());
       return ForwardResult.DROP;
     }
 
