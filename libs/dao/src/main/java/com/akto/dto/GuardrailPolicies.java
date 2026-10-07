@@ -142,6 +142,9 @@ public class GuardrailPolicies {
     // (e.g. match type, per-entry behaviour) without a data migration.
     private List<BlockedHostEntry> blockedHosts;
 
+    // When true, blockedHosts is an allow-list: hosts matching none of the entries are blocked.
+    private boolean blockedHostsAllowOnly;
+
     // Exception phrases — stripped from the text (for evaluation only, never forwarded
     // downstream) before every detector in this policy runs, to avoid false positives on
     // known-safe strings (e.g. sample data, internal keywords). Applied as a union across
