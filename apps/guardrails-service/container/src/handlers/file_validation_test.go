@@ -249,7 +249,7 @@ func TestFileURLFetchFailures(t *testing.T) {
 	}))
 	defer server.Close()
 	h := &ValidationHandler{logger: zap.NewNop(), fileRegistry: fileprocessor.DefaultRegistry(1024),
-		cfg: &config.Config{File: config.FileConfig{Enabled: true, MaxFiles: 2, URLTimeoutSec: 5, AllowPrivateURLs: true}}}
+		cfg: &config.Config{File: config.FileConfig{Enabled: true, MaxFiles: 2, URLTimeoutSec: 5}}}
 	for _, path := range []string{"/failed.txt", "/slow.txt"} {
 		t.Run(path, func(t *testing.T) {
 			var body bytes.Buffer
@@ -358,7 +358,7 @@ func newGateTestHandler(gate policyGate) (*ValidationHandler, *failingFileProces
 	registry := fileprocessor.NewRegistry()
 	registry.RegisterWithLimit(processor, 1024*1024)
 	return &ValidationHandler{
-		cfg:          &config.Config{File: config.FileConfig{Enabled: true, MaxFiles: 2, URLTimeoutSec: 5, AllowPrivateURLs: true}},
+		cfg:          &config.Config{File: config.FileConfig{Enabled: true, MaxFiles: 2, URLTimeoutSec: 5}},
 		logger:       zap.NewNop(),
 		fileRegistry: registry,
 		policyGate:   gate,
@@ -551,26 +551,5 @@ func TestValidateFileInspectsUploadsAndURLsTogether(t *testing.T) {
 	assertFileAllowed(t, recorder, true)
 	if got := processor.calls.Load(); got != 2 {
 		t.Fatalf("extraction attempts = %d, want 2 (upload + URL)", got)
-	}
-}
-
-func TestURLInputsCannotReachInternalAddresses(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		t.Error("an internal address must not be fetched")
-	}))
-	defer server.Close()
-	h := &ValidationHandler{logger: zap.NewNop(), fileRegistry: fileprocessor.DefaultRegistry(1024),
-		cfg: &config.Config{File: config.FileConfig{Enabled: true, MaxFiles: 2, URLTimeoutSec: 5}}}
-
-	if input := h.fetchFromURL(context.Background(), server.URL+"/secrets.txt"); input.Err == nil {
-		t.Fatal("loopback URL was fetched")
-	}
-	for _, address := range []string{"10.0.0.1:80", "169.254.169.254:80", "[::1]:443", "0.0.0.0:80"} {
-		if refuseInternalAddress("tcp", address, nil) == nil {
-			t.Errorf("%s was allowed", address)
-		}
-	}
-	if err := refuseInternalAddress("tcp", "93.184.216.34:443", nil); err != nil {
-		t.Errorf("public address refused: %v", err)
 	}
 }

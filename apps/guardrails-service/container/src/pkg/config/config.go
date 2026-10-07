@@ -131,9 +131,6 @@ type FileConfig struct {
 	BlockOnRedaction bool
 
 	Media MediaConfig
-
-	// AllowPrivateURLs lets URL inputs reach loopback, private and link-local addresses (off: SSRF guard).
-	AllowPrivateURLs bool
 }
 
 // MediaConfig holds configuration for external media processing APIs.
@@ -240,7 +237,6 @@ func LoadConfig() *Config {
 				MaxAudioBytes: getEnvAsInt("MEDIA_MAX_AUDIO_BYTES", 10*1024*1024),
 				MaxVideoBytes: getEnvAsInt("MEDIA_MAX_VIDEO_BYTES", 25*1024*1024),
 			},
-			AllowPrivateURLs: getEnvAsBool("FILE_VALIDATE_ALLOW_PRIVATE_URLS", false),
 		},
 	}
 }

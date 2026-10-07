@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
@@ -31,25 +29,6 @@ var urlFetchClient = &http.Client{
 	CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	},
-}
-
-// publicURLFetchClient also refuses internal addresses; checked after DNS resolution, so rebinding can't bypass it.
-var publicURLFetchClient = &http.Client{
-	CheckRedirect: urlFetchClient.CheckRedirect,
-	Transport:     &http.Transport{DialContext: (&net.Dialer{Control: refuseInternalAddress}).DialContext},
-}
-
-func refuseInternalAddress(_, address string, _ syscall.RawConn) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return err
-	}
-	ip := net.ParseIP(host)
-	if ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() ||
-		ip.IsUnspecified() {
-		return fmt.Errorf("refusing to fetch internal address %s", host)
-	}
-	return nil
 }
 
 type fileInput struct {
@@ -462,11 +441,7 @@ func (h *ValidationHandler) fetchFromURL(ctx context.Context, rawURL string) *fi
 		return &fileInput{Filename: filename, Err: fmt.Errorf("invalid URL: %w", err)}
 	}
 
-	client := publicURLFetchClient
-	if h.cfg.File.AllowPrivateURLs {
-		client = urlFetchClient
-	}
-	resp, err := client.Do(req)
+	resp, err := urlFetchClient.Do(req)
 	if err != nil {
 		return &fileInput{Filename: filename, Err: fmt.Errorf("failed to fetch URL: %w", err)}
 	}

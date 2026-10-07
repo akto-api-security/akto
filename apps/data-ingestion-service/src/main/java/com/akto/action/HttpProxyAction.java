@@ -66,9 +66,9 @@ public class HttpProxyAction extends ActionSupport {
     private String activityId;
     // Raw request from endpoint shield, used for account-type detection.
     private String fullRequest;
-    // LiteLLM guardrail entry's JSON: policy_name, context_source, other keys become tags.
+    // LiteLLM guardrail entry's JSON: policy_name picks policies, other keys become tags.
     private String akto_metadata;
-    // Files to validate when file_guardrails=true: [{filename, type, content (base64) or url}].
+    // Files a user uploaded, validated when file_guardrails=true: [{filename, type, content (base64)}].
     private List<Map<String, Object>> files;
     // "true" validates files instead of proxying the request.
     private String file_guardrails;

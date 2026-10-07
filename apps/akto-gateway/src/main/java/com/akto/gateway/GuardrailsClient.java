@@ -157,9 +157,8 @@ public class GuardrailsClient {
         return send(httpClient, RequestBody.create(jsonRequest, JSON), endpoint, request);
     }
 
-    /** Validates files with /validate/file: fields go as form values, each file as a "file" part, each url as a
-     * "url" value the guardrails service fetches. */
-    public Map<String, Object> callValidateFile(Map<String, Object> fields, List<FileUpload> files, List<String> urls) {
+    /** Validates files with /validate/file: fields go as form values and each file as a "file" part. */
+    public Map<String, Object> callValidateFile(Map<String, Object> fields, List<FileUpload> files) {
         MultipartBody.Builder body = new MultipartBody.Builder().setType(MultipartBody.FORM);
         for (Map.Entry<String, Object> field : fields.entrySet()) {
             if (field.getValue() != null) {
@@ -168,9 +167,6 @@ public class GuardrailsClient {
         }
         for (FileUpload file : files) {
             body.addFormDataPart("file", file.filename, RequestBody.create(file.content, OCTET_STREAM));
-        }
-        for (String url : urls) {
-            body.addFormDataPart("url", url);
         }
         return send(fileHttpClient, body.build(), VALIDATE_FILE_ENDPOINT, fields);
     }
