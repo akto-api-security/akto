@@ -110,6 +110,10 @@ type ThreatKafkaConfig struct {
 	UseTLS    bool
 	Username  string
 	Password  string
+	// BufferEnrichment also buffers the async remediation/evidence-line update
+	// behind its event. Off by default: a threat client that predates it drops
+	// these messages, losing enrichment the direct POST would have delivered.
+	BufferEnrichment bool
 }
 
 type FileConfig struct {
@@ -251,9 +255,10 @@ func loadThreatKafkaConfig() ThreatKafkaConfig {
 	return ThreatKafkaConfig{
 		Enabled: getEnvAsBool("GUARDRAILS_THREAT_KAFKA_ENABLED", false),
 		// Falls back to the traffic consumer's broker: most installs run one.
-		BrokerURL: getEnv("GUARDRAILS_THREAT_KAFKA_BROKER_URL", getEnv("KAFKA_BROKER_URL", "")),
-		Topic:     getEnv("GUARDRAILS_THREAT_KAFKA_TOPIC", DefaultThreatTopic),
-		UseTLS:    getEnvAsBool("GUARDRAILS_THREAT_KAFKA_USE_TLS", false),
+		BrokerURL:        getEnv("GUARDRAILS_THREAT_KAFKA_BROKER_URL", getEnv("KAFKA_BROKER_URL", "")),
+		Topic:            getEnv("GUARDRAILS_THREAT_KAFKA_TOPIC", DefaultThreatTopic),
+		UseTLS:           getEnvAsBool("GUARDRAILS_THREAT_KAFKA_USE_TLS", false),
+		BufferEnrichment: getEnvAsBool("GUARDRAILS_THREAT_KAFKA_BUFFER_ENRICHMENT", false),
 		// AKTO_KAFKA_* are the names the Helm charts and the Java modules
 		// already use. Deliberately not chained to KAFKA_USERNAME/PASSWORD,
 		// which belong to the traffic consumer and may target another cluster.
