@@ -1,8 +1,11 @@
-"""Bedrock provider — Converse request shaping, auth selection, response parsing.
+"""Bedrock provider — request shaping, auth selection, response parsing.
 
-Network mocked. The Converse API is model-agnostic, so one provider covers
-every Bedrock model; auth is a Bedrock API key (Bearer), static IAM keys, or
-the pod's IAM role (EKS Pod Identity / IRSA) — the latter two SigV4-signed.
+Network mocked. The one "bedrock" provider uses the model-agnostic Converse
+API on bedrock-runtime, except for models AWS serves only on bedrock-mantle
+(Gemma 4), which go through Mantle's OpenAI-compatible chat completions. Auth
+is a Bedrock API key (Bearer), static IAM keys, or the pod's IAM role (EKS Pod
+Identity / IRSA) — the latter two SigV4-signed, under "bedrock" and
+"bedrock-mantle" respectively.
 """
 
 import hashlib
@@ -15,7 +18,8 @@ import pytest
 import providers
 from aws_auth import AwsCredentials
 from llm_scanner import LLMScanner
-from providers import BedrockProvider, _converse_text, build_provider_from_config
+from prompts import ban_topics
+from providers import BedrockMantleProvider, BedrockProvider, _converse_text, build_provider_from_config
 
 _REGION = "us-east-1"
 _MODEL = "anthropic.claude-3-haiku-20240307-v1:0"
@@ -245,3 +249,78 @@ def test_build_prefers_static_keys_over_pod_role(pod_role, monkeypatch):
     p = build_provider_from_config({"provider": "bedrock", "model": _MODEL})
     assert isinstance(p, BedrockProvider)
     assert p.credentials == AwsCredentials("AKID", "secret")
+
+
+# ── Gemma 4: routed to bedrock-mantle ─────────────────────────────────────────
+
+_GEMMA = "google.gemma-4-26b-a4b"
+
+
+def _chat(text: str) -> dict:
+    return {"choices": [{"message": {"role": "assistant", "content": text}}]}
+
+
+def test_gemma_4_routes_to_mantle_other_models_to_converse(pod_role):
+    fast = build_provider_from_config({"provider": "bedrock", "model": "google.gemma-4-e2b"})
+    arbiter = build_provider_from_config({"provider": "bedrock", "model": _GEMMA})
+    nova = build_provider_from_config({"provider": "bedrock", "model": "us.amazon.nova-lite-v1:0"})
+    assert isinstance(fast, BedrockMantleProvider) and isinstance(arbiter, BedrockMantleProvider)
+    assert type(nova) is BedrockProvider
+    assert (fast.model, arbiter.model) == ("google.gemma-4-e2b", _GEMMA)
+    assert fast.name == nova.name == "bedrock"  # one provider name: results/stems match the config entry
+
+
+def test_gemma_4_env_model_also_routes_to_mantle(pod_role, monkeypatch):
+    monkeypatch.setattr(providers.settings, "BEDROCK_MODEL", "google.gemma-4-31b")
+    p = build_provider_from_config({"provider": "bedrock"})
+    assert isinstance(p, BedrockMantleProvider) and p.model == "google.gemma-4-31b"
+
+
+def test_mantle_default_url_is_openai_route():
+    p = BedrockMantleProvider(_GEMMA, _REGION, api_key="k")
+    assert p.base_url == "https://bedrock-mantle.us-east-1.api.aws/openai/v1"
+
+
+async def test_mantle_posts_chat_completions_signed_for_mantle(pod_role):
+    _FakeClient.payload = _chat("ok")
+    assert await BedrockMantleProvider(_GEMMA, _REGION).complete("hello") == "ok"
+    (post,) = _FakeClient.posts
+    assert post["url"] == "https://bedrock-mantle.us-east-1.api.aws/openai/v1/chat/completions"
+    assert json.loads(post["content"]) == {
+        "model": _GEMMA,
+        "messages": [{"role": "user", "content": "hello"}],
+        "max_tokens": 512,
+        "temperature": 0.1,
+    }
+    auth = post["headers"]["Authorization"]
+    assert auth.startswith("AWS4-HMAC-SHA256 Credential=ASIAROLE/")
+    assert f"/{_REGION}/bedrock-mantle/aws4_request" in auth
+    assert post["headers"]["X-Amz-Content-Sha256"] == hashlib.sha256(post["content"]).hexdigest()
+
+
+async def test_mantle_api_key_sends_bearer():
+    _FakeClient.payload = _chat("ok")
+    await BedrockMantleProvider(_GEMMA, _REGION, api_key="br-key").complete("hello")
+    assert _FakeClient.posts[0]["headers"]["Authorization"] == "Bearer br-key"
+
+
+async def test_mantle_empty_choices_raises():
+    _FakeClient.payload = {"choices": []}
+    with pytest.raises(ValueError, match="no 'choices'"):
+        await BedrockMantleProvider(_GEMMA, _REGION, api_key="k").complete("hello")
+
+
+async def test_gemma_model_gets_gemma_ban_topics_prompt(pod_role):
+    _FakeClient.payload = _chat('{"isBanned": false, "confidence": 0.1, "reason": "ok"}')
+    config = {"topics": ["violence"]}
+    provider = build_provider_from_config({"provider": "bedrock", "model": _GEMMA})
+    result = await LLMScanner(provider).scan("BanTopics", "prompt", "hello", config)
+    sent = json.loads(_FakeClient.posts[0]["content"])["messages"][0]["content"]
+    assert sent == ban_topics.build(config, "gemma_bedrock", "hello")
+    assert sent != ban_topics.build(config, "bedrock", "hello")  # i.e. the Gemma template, not the default
+    assert result["details"]["llm_provider"] == "bedrock"
+    assert result["is_valid"] is True
+
+
+def test_non_gemma_model_keeps_default_prompt_name():
+    assert BedrockProvider("us.amazon.nova-lite-v1:0", _REGION, api_key="k").prompt_name == "bedrock"

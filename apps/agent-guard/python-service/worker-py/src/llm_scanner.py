@@ -98,7 +98,9 @@ class LLMScanner:
             raw, logprobs = await self.provider.complete_with_logprobs(text)
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
         else:
-            prompt = build_scan_prompt(scanner_name, scanner_type, config, text, provider_name=self.provider.name)
+            prompt = build_scan_prompt(
+                scanner_name, scanner_type, config, text, provider_name=self.provider.prompt_name
+            )
             if prompt is None:
                 raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
             raw = await self.provider.complete(prompt)

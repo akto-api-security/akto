@@ -115,6 +115,12 @@ async def _post_json_logged(
 class LLMProvider(ABC):
     name: str = ""
 
+    @property
+    def prompt_name(self) -> str:
+        """Name the prompt builders key their model-specific templates on
+        (e.g. the Gemma-tuned BanTopics prompt for any "gemma*" name)."""
+        return self.name
+
     @abstractmethod
     async def complete(self, prompt: str) -> str: ...
 
@@ -479,18 +485,17 @@ def _converse_text(body: dict) -> str:
     raise ValueError(f"Converse response has no text content block: {body!r}"[:500])
 
 
-class BedrockProvider(LLMProvider):
-    """Any AWS Bedrock model via the model-agnostic Converse API.
+class _BedrockAuthProvider(LLMProvider):
+    """Shared AWS Bedrock auth + transport for the bedrock-runtime (Converse)
+    and bedrock-mantle (OpenAI chat completions) providers.
 
     Auth, in precedence order: a Bedrock API key (sent as Bearer); static IAM
     credentials; else the pod's IAM role (EKS Pod Identity / IRSA), fetched
-    and refreshed by aws_auth. Both IAM modes are SigV4-signed per request.
-    The model id may be a foundation
-    model id, a cross-region inference profile (us.anthropic.…) or an ARN —
-    it is percent-encoded into the path either way."""
+    and refreshed by aws_auth. Both IAM modes are SigV4-signed per request,
+    under the endpoint's own signing service name."""
 
-    name = "bedrock"
     _log_tag = "[Bedrock]"
+    _signing_service = "bedrock"
 
     def __init__(
         self,
@@ -507,16 +512,25 @@ class BedrockProvider(LLMProvider):
         elif source := aws_auth.role_credentials_source():
             auth = f"iam role via {source}"
         else:
-            raise ValueError("BedrockProvider needs an api_key, IAM credentials or an IAM role in the environment")
+            raise ValueError(
+                f"{type(self).__name__} needs an api_key, IAM credentials or an IAM role in the environment"
+            )
         self.model = model
         self.region = region
         self.api_key = api_key
         self.credentials = credentials
-        self.base_url = (base_url or f"https://bedrock-runtime.{region}.amazonaws.com").rstrip("/")
+        self.base_url = (base_url or self._default_base_url(region)).rstrip("/")
         logger.info(f"{self._log_tag} model={self.model} region={self.region} base_url={self.base_url} {auth}")
 
-    def _converse_url(self) -> str:
-        return f"{self.base_url}/model/{quote(self.model, safe='')}/converse"
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        raise NotImplementedError
+
+    @property
+    def prompt_name(self) -> str:
+        # One "bedrock" provider name serves every model, so Gemma-tuned
+        # prompts are keyed on the model instead.
+        return "gemma_bedrock" if "gemma" in self.model.lower() else self.name
 
     async def _headers(self, url: str, payload: bytes) -> dict[str, str]:
         headers = dict(_IDENTITY, **{"Content-Type": "application/json", "Accept": "application/json"})
@@ -524,21 +538,16 @@ class BedrockProvider(LLMProvider):
             headers["Authorization"] = f"Bearer {self.api_key}"
             return headers
         creds = self.credentials or await aws_auth.get_role_credentials(self.region)
-        headers.update(aws_auth.sign_headers("POST", url, headers, payload, creds, self.region))
+        headers.update(
+            aws_auth.sign_headers("POST", url, headers, payload, creds, self.region, service=self._signing_service)
+        )
         return headers
 
-    async def complete(self, prompt: str) -> str:
-        payload = json.dumps(
-            {
-                "messages": [{"role": "user", "content": [{"text": prompt}]}],
-                "inferenceConfig": {"maxTokens": 512, "temperature": 0.1},
-            },
-            separators=(",", ":"),
-        ).encode()
-        url = self._converse_url()
-        client = http_client.get_client()
-        body = await _post_json_logged(
-            client,
+    async def _post(self, url: str, body: dict[str, Any]) -> dict:
+        # Serialized once: SigV4 signs these exact bytes, so they must be what's sent.
+        payload = json.dumps(body, separators=(",", ":")).encode()
+        return await _post_json_logged(
+            http_client.get_client(),
             url,
             await self._headers(url, payload),
             None,
@@ -546,7 +555,64 @@ class BedrockProvider(LLMProvider):
             f"model={self.model} region={self.region}",
             content=payload,
         )
+
+
+class BedrockProvider(_BedrockAuthProvider):
+    """Any AWS Bedrock model via the model-agnostic Converse API (bedrock-runtime).
+
+    The model id may be a foundation model id, a cross-region inference
+    profile (us.anthropic.…) or an ARN — it is percent-encoded into the path
+    either way."""
+
+    name = "bedrock"
+    _log_tag = "[Bedrock]"
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        return f"https://bedrock-runtime.{region}.amazonaws.com"
+
+    def _converse_url(self) -> str:
+        return f"{self.base_url}/model/{quote(self.model, safe='')}/converse"
+
+    async def complete(self, prompt: str) -> str:
+        body = await self._post(
+            self._converse_url(),
+            {
+                "messages": [{"role": "user", "content": [{"text": prompt}]}],
+                "inferenceConfig": {"maxTokens": 512, "temperature": 0.1},
+            },
+        )
         return _converse_text(body)
+
+
+class BedrockMantleProvider(_BedrockAuthProvider):
+    """Bedrock models served only on the bedrock-mantle endpoint (Gemma 4),
+    through its OpenAI-compatible chat completions route (Gemma 4 lives under
+    /openai/v1, not /v1). Picked automatically by the "bedrock" provider for
+    _MANTLE_ONLY_MODEL_PREFIXES, so it reports the same "bedrock" name. Same
+    auth as BedrockProvider, but SigV4 is signed for the "bedrock-mantle"
+    service and IAM needs bedrock-mantle:CreateInference."""
+
+    name = "bedrock"
+    _log_tag = "[BedrockMantle]"
+    _signing_service = "bedrock-mantle"
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        return f"https://bedrock-mantle.{region}.api.aws/openai/v1"
+
+    async def complete(self, prompt: str) -> str:
+        body = await self._post(
+            f"{self.base_url}/chat/completions",
+            {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 512,
+                "temperature": 0.1,
+            },
+        )
+        content, _ = _choice_content_and_logprobs(body)
+        return content
 
 
 # ── Qwen3Guard parser (ported verbatim — sync) ────────────────────────────────
@@ -782,27 +848,38 @@ def _build_foundry(provider_name: str, model: str, base_url: str, deployment: st
     )
 
 
+# Model ids AWS serves only on bedrock-mantle (not bedrock-runtime / Converse);
+# the "bedrock" provider routes these to BedrockMantleProvider.
+_MANTLE_ONLY_MODEL_PREFIXES = ("google.gemma-4",)
+
+
+def _bedrock_class_for(model: str) -> type[_BedrockAuthProvider]:
+    return BedrockMantleProvider if model.lower().startswith(_MANTLE_ONLY_MODEL_PREFIXES) else BedrockProvider
+
+
 def _build_bedrock(model: str, base_url: str) -> LLMProvider | None:
     """Region + model are required; auth prefers the Bedrock API key, then
     static IAM access keys, then the pod's IAM role (EKS Pod Identity / IRSA —
     no keys configured at all). model/baseUrl may come per-entry, the
-    credentials and region only from env."""
+    credentials and region only from env. The model picks the endpoint:
+    Gemma 4 goes to bedrock-mantle, everything else to Converse."""
     env = _require(
         {"BEDROCK_REGION": settings.BEDROCK_REGION, "BEDROCK_MODEL": model or settings.BEDROCK_MODEL},
         label="[Providers] bedrock",
     )
     if env is None:
         return None
+    cls = _bedrock_class_for(env["BEDROCK_MODEL"])
     common = {"model": env["BEDROCK_MODEL"], "region": env["BEDROCK_REGION"], "base_url": base_url}
     if settings.BEDROCK_API_KEY:
-        return BedrockProvider(api_key=settings.BEDROCK_API_KEY, **common)
+        return cls(api_key=settings.BEDROCK_API_KEY, **common)
     if settings.BEDROCK_ACCESS_KEY_ID and settings.BEDROCK_SECRET_ACCESS_KEY:
         creds = aws_auth.AwsCredentials(
             settings.BEDROCK_ACCESS_KEY_ID, settings.BEDROCK_SECRET_ACCESS_KEY, settings.BEDROCK_SESSION_TOKEN
         )
-        return BedrockProvider(credentials=creds, **common)
+        return cls(credentials=creds, **common)
     if aws_auth.role_credentials_source():
-        return BedrockProvider(**common)
+        return cls(**common)
     logger.warning(
         "[Providers] bedrock: no credentials (set BEDROCK_API_KEY, or BEDROCK_ACCESS_KEY_ID + "
         "BEDROCK_SECRET_ACCESS_KEY, or run with an IAM role via EKS Pod Identity / IRSA); skipping"
