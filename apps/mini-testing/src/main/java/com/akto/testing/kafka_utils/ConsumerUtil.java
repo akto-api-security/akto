@@ -4,16 +4,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.time.Duration;
@@ -28,7 +27,6 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
-import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
@@ -39,10 +37,10 @@ import com.akto.test_editor.execution.TestPhaseTimer;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.testing.kafka_utils.TestRunMetrics.Stage;
+import com.akto.testing.kafka_utils.TestRunMetrics.StopReason;
 import com.akto.util.Constants;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.mongodb.BasicDBObject;
 
 import bz.stub.parallelconsumer.ParallelConsumerOptions;
 import bz.stub.parallelconsumer.ParallelStreamProcessor;
@@ -83,6 +81,35 @@ public class ConsumerUtil {
     /** For per-test CPU accounting (compute vs I/O). Unsupported -> CPU reported as 0. */
     private static final ThreadMXBean THREAD_MX = ManagementFactory.getThreadMXBean();
     private static final boolean CPU_TIME_SUPPORTED = THREAD_MX.isThreadCpuTimeSupported();
+
+
+    // ----- ports: the only places init() touches the outside world, injectable for tests -----
+
+    /** Kafka consumer-group lag for a (topic, group); -1 when unknown. */
+    @FunctionalInterface
+    interface LagSource {
+        long lag(String topic, String groupId);
+    }
+
+    private final IntSupplier clock;
+    private final Predicate<ObjectId> runStatus;
+    private final LagSource lagSource;
+    private final RunCleanup.ExitHandler exitHandler;
+
+    public ConsumerUtil() {
+        this(Context::now,
+             summaryId -> GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId),
+             KafkaAdminClient::getConsumerLag,
+             System::exit);
+    }
+
+    ConsumerUtil(IntSupplier clock, Predicate<ObjectId> runStatus, LagSource lagSource,
+                 RunCleanup.ExitHandler exitHandler) {
+        this.clock = clock;
+        this.runStatus = runStatus;
+        this.lagSource = lagSource;
+        this.exitHandler = exitHandler;
+    }
 
     public static SingleTestPayload parseTestMessage(String message) {
         JSONObject jsonObject = JSON.parseObject(message);
@@ -291,208 +318,217 @@ public class ConsumerUtil {
     }
 
     public void init(int maxRunTimeInSeconds) {
-        BasicDBObject currentTestInfo = TestingStateStore.read();
-        final String summaryIdForTest = currentTestInfo != null
-                ? currentTestInfo.getString(TestingStateStore.SUMMARY_ID)
-                : null;
-        if (summaryIdForTest == null) {
+        TestingConfigurations config = TestingConfigurations.getInstance();
+        int fallbackAccountId = Context.accountId.get() != null ? Context.accountId.get() : -1;
+        Optional<RunPlan> maybePlan = RunPlan.from(TestingStateStore.read(), config.getMaxConcurrentRequest(),
+                maxRunTimeInSeconds, clock.getAsInt(), fallbackAccountId);
+        if (maybePlan.isEmpty()) {
             loggerMaker.errorAndAddToDb("No testing state available, skipping consumer init.");
             return;
         }
+        RunPlan plan = maybePlan.get();
+        if (plan.accountId() > 0) {
+            Context.accountId.set(plan.accountId());
+        }
 
-        TestingConfigurations instance = TestingConfigurations.getInstance();
-        int concurrency = instance.getMaxConcurrentRequest();
         shutdownExecutorQuietly(5, true);
-        executor = Executors.newFixedThreadPool(concurrency, workerThreadFactory);
-
-        final ObjectId summaryObjectId = new ObjectId(summaryIdForTest);
-        int startTime = Context.now();
-        int effectiveMaxRunTime = maxRunTimeInSeconds;
-        if (currentTestInfo.containsField(TestingRun.PICKED_UP_TIMESTAMP)) {
-            startTime = currentTestInfo.getInt(TestingRun.PICKED_UP_TIMESTAMP, startTime);
-        }
-        if (currentTestInfo.containsField(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS)) {
-            effectiveMaxRunTime = currentTestInfo.getInt(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, maxRunTimeInSeconds);
-        }
-        final int expectedRecords = currentTestInfo.containsField(TestingStateStore.EXPECTED_RECORDS)
-                ? currentTestInfo.getInt(TestingStateStore.EXPECTED_RECORDS)
-                : -1;
-        final int accountId = currentTestInfo.containsField(TestingStateStore.ACCOUNT_ID)
-                ? currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID)
-                : (Context.accountId.get() != null ? Context.accountId.get() : -1);
-        if (accountId > 0) {
-            Context.accountId.set(accountId);
-        }
-        final String topicName = Constants.getTestResultsTopicName(summaryIdForTest);
-        final String groupId = Constants.getKafkaGroupIdConfig(summaryIdForTest);
-        AtomicInteger processedRecords = new AtomicInteger(0);
+        executor = Executors.newFixedThreadPool(plan.concurrency(), workerThreadFactory);
 
         // Fresh observability for this run (replaces any previous run's state).
-        metrics = new TestRunMetrics(summaryIdForTest, startTime, expectedRecords, executor);
-        int apiCount = (instance.getTestingUtil() != null && instance.getTestingUtil().getSampleMessages() != null)
-                ? instance.getTestingUtil().getSampleMessages().size() : -1;
-        int testCount = instance.getTestConfigMap() != null ? instance.getTestConfigMap().size() : -1;
-        metrics.logStart(accountId, apiCount, testCount, concurrency,
-                maxRunTimeForTests, effectiveMaxRunTime);
+        metrics = new TestRunMetrics(plan.summaryId(), plan.startTime(), plan.expectedRecords(), executor);
+        metrics.logStart(plan.accountId(), apiCount(config), testCount(config), plan.concurrency(),
+                maxRunTimeForTests, plan.maxRunTimeSec());
 
+        AtomicInteger processedRecords = new AtomicInteger(0);
+        RecordProcessor processor = new RecordProcessor(executor, maxRunTimeForTests, this::runTestFromMessage);
         ParallelStreamProcessor<String, String> parallelConsumer = null;
-
-        TestRunMetrics.StopReason stopReason = TestRunMetrics.StopReason.UNKNOWN;
+        StopReason stopReason = StopReason.UNKNOWN;
         try {
             closeKafkaConsumerQuietly(consumer, "previous run");
-            parallelConsumer = createParallelConsumer(summaryIdForTest, concurrency);
-            parallelConsumer.subscribe(Arrays.asList(topicName));
+            parallelConsumer = createParallelConsumer(plan.summaryId(), plan.concurrency());
+            parallelConsumer.subscribe(Arrays.asList(plan.topic()));
             metrics.logConsumerUp(1);
 
             parallelConsumer.poll(record -> {
-                    String threadName = Thread.currentThread().getName();
-                    String message = record.value();
-                    String recordId = record.getSingleConsumerRecord().topic() + "-p" + record.getSingleConsumerRecord().partition() + "-o" + record.offset();
-                    metrics.onPolled();
-                    loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
-                    debugLogToDb(accountId, "picked up recordId=" + recordId + " polled=" + metrics.polled());
-                    try {
-                        if(!executor.isShutdown()){
-                            metrics.onSubmit(recordId, threadName);
-                            Future<?> future = executor.submit(() -> runTestFromMessage(message, recordId));
-                            try {
-                                future.get(maxRunTimeForTests, TimeUnit.SECONDS);
-                            } catch (TimeoutException e) {
-                                metrics.markTimedOut();
-                                String errMsg = "Task timed out recordId=" + recordId
-                                        + " after " + maxRunTimeForTests + "s";
-                                loggerMaker.errorAndAddToDb(e, errMsg);
-                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
-                                future.cancel(true);
-                                createTimedOutResultFromMessage(message);
-                            } catch (InterruptedException e) {
-                                metrics.markTimedOut();
-                                Thread.currentThread().interrupt();
-                                String errMsg = "Task interrupted recordId=" + recordId;
-                                loggerMaker.errorAndAddToDb(e, errMsg);
-                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
-                                future.cancel(true);
-                                createTimedOutResultFromMessage(message);
-                            } catch(RejectedExecutionException e){
-                                metrics.markRejected();
-                                String errMsg = "Task rejected recordId=" + recordId
-                                        + " (executor shutdown or saturated)";
-                                loggerMaker.errorAndAddToDb(e, errMsg);
-                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
-                                future.cancel(true);
-                            } catch (Exception e) {
-                                metrics.markErrored();
-                                future.cancel(true);
-                                String errMsg = "Error in task execution recordId=" + recordId + "cause=" + e.getMessage();
-                                loggerMaker.errorAndAddToDb(e, errMsg);
-                                debugLogToDb(accountId, errMsg + " cause=" + e.getMessage());
-                            }
-                        }
-                    } catch (Exception err) {
-                        String errMsg = "Thread [" + threadName + "] error executing recordId=" + recordId;
-                        loggerMaker.errorAndAddToDb(err, errMsg);
-                        debugLogToDb(accountId, errMsg + " cause=" + err.getMessage());
-                    } finally {
-                        metrics.onComplete(recordId);
-                        processedRecords.incrementAndGet();
-                        loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
-                        debugLogToDb(accountId, "finished recordId=" + recordId + " executed=" + processedRecords.get());
-                    }
-                });
+                var raw = record.getSingleConsumerRecord();
+                String recordId = raw.topic() + "-p" + raw.partition() + "-o" + record.offset();
+                handleRecord(recordId, record.value(), processor, plan.accountId(), processedRecords);
+            });
 
-            int lastSeenProcessed = -1;
-            int lastProgressTs = Context.now();
-
-            while (parallelConsumer != null) {
-                if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId)){
-                    stopReason = TestRunMetrics.StopReason.STOPPED;
-                    loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
-                    executor.shutdownNow();
-                    break;
-                }
-                else if ((Context.now() - startTime >= effectiveMaxRunTime)) {
-                    stopReason = TestRunMetrics.StopReason.MAX_RUNTIME;
-                    loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
-                    executor.shutdownNow();
-                    break;
-                }
-                else if (parallelConsumer.isClosedOrFailed()) {
-                    stopReason = TestRunMetrics.StopReason.CONSUMER_FAILED;
-                    loggerMaker.errorAndAddToDb("Consumer engine closed/failed summaryId=" + summaryIdForTest);
-                    executor.shutdownNow();
-                    break;
-                }
-
-                int processed = processedRecords.get();
-                long workRemaining = parallelConsumer.workRemaining();
-
-                if (processed != lastSeenProcessed) {
-                    lastSeenProcessed = processed;
-                    lastProgressTs = Context.now();
-                } else if (workRemaining > 0 && Context.now() - lastProgressTs > STALL_TIMEOUT_SECONDS) {
-                    stopReason = TestRunMetrics.StopReason.STALLED;
-                    loggerMaker.errorAndAddToDb("No progress for " + STALL_TIMEOUT_SECONDS + "s summaryId="
-                            + summaryIdForTest + " workRemaining=" + workRemaining);
-                    executor.shutdownNow();
-                    break;
-                }
-                // Only actually calls Kafka at the heartbeat's own cadence (tick decides
-                // internally), not once per ~100ms loop iteration.
-                metrics.tick(processed, workRemaining, () -> KafkaAdminClient.getConsumerLag(topicName, groupId));
-
-                /*
-                 * Completion is decided by kafka, not by counting locally. The old check compared
-                 * processedRecords - which restarts at zero on every init() - against a total that
-                 * does not, so a resumed drain could never satisfy it and simply spun until max
-                 * runtime. Lag is absolute: whoever produced the messages and whoever consumed
-                 * them, zero means every record has been processed and committed.
-                 */
-                if (workRemaining == 0) {
-                    long lag = KafkaAdminClient.getConsumerLag(topicName, groupId);
-                    if (lag == 0) {
-                        stopReason = TestRunMetrics.StopReason.ALL_PROCESSED;
-                        int remainingTime = Math.min(Math.max(0, effectiveMaxRunTime - (Context.now() - startTime)), maxRunTimeForTests);
-                        shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
-                        break;
-                    }
-                }
-                Thread.sleep(100);
-            }
-
+            stopReason = drainUntilStopped(plan, parallelConsumer, processedRecords);
         } catch (Exception e) {
-            stopReason = TestRunMetrics.StopReason.ERROR;
-            String errMsg = "Error in polling records summaryId=" + summaryIdForTest
+            stopReason = StopReason.ERROR;
+            loggerMaker.errorAndAddToDb(e, "Error in polling records summaryId=" + plan.summaryId()
                     + " polled=" + metrics.polled()
                     + " executed=" + processedRecords.get()
-                    + " expected=" + expectedRecords
+                    + " expected=" + plan.expectedRecords()
                     + " errorType=" + e.getClass().getName()
-                    + " cause=" + (e.getCause() != null ? e.getCause().getClass().getName() + ": " + e.getCause().getMessage() : e.getMessage());
-            loggerMaker.errorAndAddToDb(e, errMsg);
-        }finally{
-            // Single source of truth: cleanup style is a deterministic function of stopReason,
-            // not a second, separately-tracked flag that has to be kept in sync by hand.
-            boolean abruptClose = stopReason == TestRunMetrics.StopReason.ERROR
-                    || stopReason == TestRunMetrics.StopReason.CONSUMER_FAILED
-                    || stopReason == TestRunMetrics.StopReason.STALLED;
-
-            metrics.logEnd(stopReason, abruptClose, processedRecords.get());
-
-            flushLastTestedUpdates();
-            shutdownExecutorQuietly(abruptClose ? 5 : 30, abruptClose);
-
-            closeParallelConsumerQuietly(parallelConsumer, abruptClose);
-            parallelConsumer = null;
-            closeKafkaConsumerQuietly(consumer, "shutdown");
-
-            if (stopReason == TestRunMetrics.StopReason.CONSUMER_FAILED
-                    || stopReason == TestRunMetrics.StopReason.STALLED) {
-                // state file/topic left intact for restart to resume
-                loggerMaker.errorAndAddToDb("Exiting process summaryId=" + summaryIdForTest + " reason=" + stopReason);
-                System.exit(1);
-            }
-
-            Producer.deleteTestResultsTopic(summaryIdForTest);
-            TestingStateStore.clear();
+                    + " cause=" + (e.getCause() != null ? e.getCause().getClass().getName() + ": " + e.getCause().getMessage() : e.getMessage()));
+        } finally {
+            metrics.logEnd(stopReason, RunCleanup.isAbrupt(stopReason), processedRecords.get());
+            cleanupFor(plan, parallelConsumer).run(stopReason, executor);
         }
+    }
+
+    // ----- poll callback -----
+
+    /** Body of the parallel-consumer poll callback: run one record, then map its outcome to side effects. */
+    private void handleRecord(String recordId, String message, RecordProcessor processor,
+                              int accountId, AtomicInteger processedRecords) {
+        String threadName = Thread.currentThread().getName();
+        metrics.onPolled();
+        loggerMaker.infoAndAddToDb("Thread [" + threadName + "] picked up record recordId=" + recordId + " " + message);
+        debugLogToDb(accountId, "picked up recordId=" + recordId + " polled=" + metrics.polled());
+        try {
+            if (executor.isShutdown()) {
+                return;
+            }
+            metrics.onSubmit(recordId, threadName);
+            RecordProcessor.Result result = processor.process(recordId, message);
+            applyOutcome(result, recordId, message, accountId);
+        } catch (Exception err) {
+            String errMsg = "Thread [" + threadName + "] error executing recordId=" + recordId;
+            loggerMaker.errorAndAddToDb(err, errMsg);
+            debugLogToDb(accountId, errMsg + " cause=" + err.getMessage());
+        } finally {
+            metrics.onComplete(recordId);
+            processedRecords.incrementAndGet();
+            loggerMaker.infoAndAddToDb("Thread [" + threadName + "] finished processing record recordId=" + recordId);
+            debugLogToDb(accountId, "finished recordId=" + recordId + " executed=" + processedRecords.get());
+        }
+    }
+
+    private void applyOutcome(RecordProcessor.Result result, String recordId, String message, int accountId) {
+        String errMsg;
+        switch (result.outcome) {
+            case COMPLETED:
+                return;
+            case TIMED_OUT:
+                metrics.markTimedOut();
+                errMsg = "Task timed out recordId=" + recordId + " after " + maxRunTimeForTests + "s";
+                loggerMaker.errorAndAddToDb(result.error, errMsg);
+                debugLogToDb(accountId, errMsg + " cause=" + result.error.getMessage());
+                createTimedOutResultFromMessage(message);
+                return;
+            case INTERRUPTED:
+                metrics.markTimedOut();
+                errMsg = "Task interrupted recordId=" + recordId;
+                loggerMaker.errorAndAddToDb(result.error, errMsg);
+                debugLogToDb(accountId, errMsg + " cause=" + result.error.getMessage());
+                createTimedOutResultFromMessage(message);
+                return;
+            case REJECTED:
+                metrics.markRejected();
+                errMsg = "Task rejected recordId=" + recordId + " (executor shutdown or saturated)";
+                loggerMaker.errorAndAddToDb(result.error, errMsg);
+                debugLogToDb(accountId, errMsg + " cause=" + result.error.getMessage());
+                return;
+            case ERRORED:
+            default:
+                metrics.markErrored();
+                errMsg = "Error in task execution recordId=" + recordId + " cause=" + result.error.getMessage();
+                loggerMaker.errorAndAddToDb(result.error, errMsg);
+                debugLogToDb(accountId, errMsg + " cause=" + result.error.getMessage());
+        }
+    }
+
+    // ----- drain loop -----
+
+    /**
+     * Polls the stop policy every ~100ms until it yields a reason. Completion is decided by Kafka
+     * lag, not a local counter: processedRecords restarts at zero on every init(), so a resumed
+     * drain could never satisfy a count-based check and simply spun until max runtime. Lag is
+     * absolute - zero means every record has been processed and committed, whoever produced or
+     * consumed them.
+     */
+    private StopReason drainUntilStopped(RunPlan plan, ParallelStreamProcessor<String, String> parallelConsumer,
+                                         AtomicInteger processedRecords) throws InterruptedException {
+        StopPolicy policy = new StopPolicy(plan.maxRunTimeSec(),
+                new StopPolicy.ProgressTracker(STALL_TIMEOUT_SECONDS, clock.getAsInt()));
+        ObjectId summaryObjectId = new ObjectId(plan.summaryId());
+
+        while (true) {
+            int now = clock.getAsInt();
+            int processed = processedRecords.get();
+            long workRemaining = parallelConsumer.workRemaining();
+
+            StopReason reason = policy.evaluate(new StopPolicy.Signals(
+                    runStatus.test(summaryObjectId),
+                    now - plan.startTime(),
+                    parallelConsumer.isClosedOrFailed(),
+                    processed,
+                    workRemaining,
+                    () -> lagSource.lag(plan.topic(), plan.groupId())), now);
+
+            if (reason != null) {
+                logStop(reason, plan, workRemaining);
+                stopExecutorFor(reason, plan, now);
+                return reason;
+            }
+            // Only actually calls Kafka at the heartbeat's own cadence (tick decides
+            // internally), not once per ~100ms loop iteration.
+            metrics.tick(processed, workRemaining, () -> lagSource.lag(plan.topic(), plan.groupId()));
+            Thread.sleep(100);
+        }
+    }
+
+    private void logStop(StopReason reason, RunPlan plan, long workRemaining) {
+        switch (reason) {
+            case STOPPED:
+                loggerMaker.infoAndAddToDb("Tests have been marked stopped.");
+                break;
+            case MAX_RUNTIME:
+                loggerMaker.infoAndAddToDb("Max run time reached. Stopping consumer.");
+                break;
+            case CONSUMER_FAILED:
+                loggerMaker.errorAndAddToDb("Consumer engine closed/failed summaryId=" + plan.summaryId());
+                break;
+            case STALLED:
+                loggerMaker.errorAndAddToDb("No progress for " + STALL_TIMEOUT_SECONDS + "s summaryId="
+                        + plan.summaryId() + " workRemaining=" + workRemaining);
+                break;
+            default:
+                break;
+        }
+    }
+
+    /** ALL_PROCESSED gets a short bounded grace for in-flight work; every other reason reaps immediately. */
+    private void stopExecutorFor(StopReason reason, RunPlan plan, int now) {
+        if (reason == StopReason.ALL_PROCESSED) {
+            int remainingTime = Math.min(plan.remainingSec(now), maxRunTimeForTests);
+            shutdownExecutorQuietly(Math.min(remainingTime, 5), true);
+        } else {
+            executor.shutdownNow();
+        }
+    }
+
+    // ----- cleanup -----
+
+    private RunCleanup cleanupFor(RunPlan plan, ParallelStreamProcessor<String, String> parallelConsumer) {
+        return new RunCleanup(
+                TestingExecutorLifecycle::shutdownQuietly,
+                this::flushLastTestedUpdates,
+                abrupt -> {
+                    closeParallelConsumerQuietly(parallelConsumer, abrupt);
+                    closeKafkaConsumerQuietly(consumer, "shutdown");
+                },
+                () -> {
+                    Producer.deleteTestResultsTopic(plan.summaryId());
+                    TestingStateStore.clear();
+                },
+                code -> {
+                    loggerMaker.errorAndAddToDb("Exiting process summaryId=" + plan.summaryId()
+                            + " (state kept for resume)");
+                    exitHandler.exit(code);
+                });
+    }
+
+    private static int apiCount(TestingConfigurations config) {
+        return (config.getTestingUtil() != null && config.getTestingUtil().getSampleMessages() != null)
+                ? config.getTestingUtil().getSampleMessages().size() : -1;
+    }
+
+    private static int testCount(TestingConfigurations config) {
+        return config.getTestConfigMap() != null ? config.getTestConfigMap().size() : -1;
     }
 }
