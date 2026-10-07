@@ -10,6 +10,7 @@ const STEPS = [
     { id: 'identity', label: 'Identity', hidden: true },
     { id: 'permissions', label: 'Permissions', hidden: true },
     { id: 'tools', label: 'Tools & Capabilities' },
+    { id: 'redTeam', label: 'Red Teaming' },
     { id: 'data', label: 'Data' },
     { id: 'protection', label: 'Protection' },
     { id: 'runtime', label: 'Runtime Activity', hidden: true },

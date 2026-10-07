@@ -14,9 +14,7 @@ function ToolRow({ tool }) {
                         <Icon source={ToolsMajor} color={tone.icon} />
                     </Box>
                     <VerticalStack gap="05">
-                        <div className="ad-mono">
-                            <Text variant="bodyMd" fontWeight="semibold" breakWord>{tool.name}</Text>
-                        </div>
+                        <Text variant="bodyMd" fontWeight="semibold" breakWord>{tool.name}</Text>
                         {tool.detail && <Text variant="bodySm" color="subdued">{tool.detail}</Text>}
                     </VerticalStack>
                 </HorizontalStack>

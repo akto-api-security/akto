@@ -2,6 +2,7 @@ import { Badge, Box, Card, HorizontalStack, Icon, Text, Tooltip, VerticalStack }
 import { AutomationMajor } from '@shopify/polaris-icons'
 import func from '@/util/func'
 import { severityTone } from './tones'
+import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
 import './AgentDetail.css'
 
 const DESCRIPTION_LIMIT = 255
@@ -21,9 +22,6 @@ function AgentHeaderCard({ header }) {
     if (!header) return null
 
     const tone = severityTone(header.severity)
-    const severityLabel = header.severity
-        ? header.severity.charAt(0) + header.severity.slice(1).toLowerCase()
-        : null
 
     const metadata = [
         header.createdAt ? `Created · ${func.prettifyEpoch(header.createdAt)}` : null,
@@ -40,12 +38,8 @@ function AgentHeaderCard({ header }) {
                         </Box>
                         <VerticalStack gap="2">
                             <HorizontalStack align="start" gap="2" blockAlign="center">
-                                <div className="ad-mono">
-                                    <Text variant="headingLg" as="h1">{header.name}</Text>
-                                </div>
-                                {severityLabel && (
-                                    <Badge status={tone.badge} progress="complete">{severityLabel}</Badge>
-                                )}
+                                <Text variant="headingLg" as="h1">{header.name}</Text>
+                                {header.severity && <SeverityBadge severity={header.severity} />}
                                 {header.environment && <Badge>{header.environment.toLowerCase()}</Badge>}
                             </HorizontalStack>
                             {header.description && <Description text={header.description} />}

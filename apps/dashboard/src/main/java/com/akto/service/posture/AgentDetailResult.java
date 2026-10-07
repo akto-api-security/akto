@@ -1,5 +1,6 @@
 package com.akto.service.posture;
 
+import com.akto.service.insights.InsightResult;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -16,6 +17,7 @@ public class AgentDetailResult {
     private List<Tool> tools = new ArrayList<>();
     private SensitiveData data = new SensitiveData();
     private List<Rule> protection = new ArrayList<>();
+    private RedTeam redTeam = new RedTeam();
     private Finding openedFromFinding;
 
     @Getter
@@ -81,5 +83,34 @@ public class AgentDetailResult {
     public static class Finding {
         private String title;
         private String severity;
+    }
+
+    /** scanned=false means no red-team run has ever touched this agent — openFindings and the
+     *  findings list are then meaningless and the UI shows a not-scanned state instead. */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RedTeam {
+        private boolean scanned;
+        private Integer lastScannedAt;
+        private long openFindings;
+        /** "2 critical · 2 high · 3 medium" — built server-side from the same severity
+         *  counts the posture score cron already groups by collection, in CRITICAL..LOW order,
+         *  skipping zero counts. */
+        private String severityBreakdown;
+        private List<RedTeamFinding> findings = new ArrayList<>();
+        private List<InsightResult.Cta> ctas = new ArrayList<>();
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RedTeamFinding {
+        private String test;
+        /** The test's own description from its YAML template — null when the template has none. */
+        private String description;
+        private String endpoint;
+        private String severity;
+        private int lastSeen;
     }
 }

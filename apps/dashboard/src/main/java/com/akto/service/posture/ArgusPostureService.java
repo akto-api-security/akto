@@ -419,7 +419,7 @@ public class ArgusPostureService {
         return context;
     }
 
-    private static String testDisplayName(String type, Map<String, Info> testInfoByType) {
+    static String testDisplayName(String type, Map<String, Info> testInfoByType) {
         Info info = testInfoByType.get(type);
         return info != null && info.getName() != null ? info.getName() : type;
     }

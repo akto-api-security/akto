@@ -256,7 +256,7 @@ function AgenticPosture() {
                 description="Ranked by blast radius — privilege held, data reached, and controls missing."
                 action={<Button onClick={() => openDrill('highRiskAgents')}>View all agents</Button>}
             >
-                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={(groupKey) => openDrill('highRiskAgents', groupKey)} />
+                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={openAgent} />
             </Section>
 
             <Section title="Insights" description="Red-team, guardrail activity, and observability — the account-wide picture, each with an AI summary.">

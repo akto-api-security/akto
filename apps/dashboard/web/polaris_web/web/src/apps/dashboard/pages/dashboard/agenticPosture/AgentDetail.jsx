@@ -6,6 +6,7 @@ import SpinnerCentered from '../../../components/progress/SpinnerCentered'
 import postureDataSource from './postureDataSource'
 import AgentHeaderCard from './agentDetail/AgentHeaderCard'
 import ToolsSection from './agentDetail/ToolsSection'
+import RedTeamSection from './agentDetail/RedTeamSection'
 import DataSection from './agentDetail/DataSection'
 import ProtectionSection from './agentDetail/ProtectionSection'
 
@@ -82,7 +83,6 @@ function AgentDetail() {
             <Section id="tools" title="Tools & Capabilities">
                 <ToolsSection tools={detail.tools} />
             </Section>
-
             <Section id="data" title="Data">
                 <DataSection data={detail.data} />
             </Section>
@@ -90,6 +90,7 @@ function AgentDetail() {
             <Section id="protection" title="Protection">
                 <ProtectionSection protection={detail.protection} />
             </Section>
+            <RedTeamSection redTeam={detail.redTeam} />
         </VerticalStack>
     )
 

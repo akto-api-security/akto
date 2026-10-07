@@ -13,24 +13,32 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.mcp.McpSchema;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightResult;
+import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightService;
 import com.akto.service.insights.InsightUtil;
 import com.akto.service.insights.InsightsThreatBackendAccess;
 import com.akto.gpt.handlers.gpt_prompts.ToolCapabilityClassifier;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.crons.ToolClassificationCron;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Locale;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.Collections;
@@ -48,6 +56,7 @@ public class ArgusAgentDetailService {
 
     private static final int GUARDRAIL_WINDOW_SECONDS = 90 * 86400;
     private static final int EVENT_FETCH_LIMIT = 10000;
+    private static final int RED_TEAM_FINDINGS_CAP = 5;
     // The gateway writes exactly "PII-"; the other two mirror guardrailRuleDefinitions.js, which
     // already recognises them, so an event written by an older or different producer still counts.
     private static final List<String> PII_PREFIXES = Arrays.asList("PII-", "PII_", "PII");
@@ -64,6 +73,7 @@ public class ArgusAgentDetailService {
         result.setTools(buildTools(agent));
         result.setData(buildSensitiveData(agent));
         result.setProtection(buildProtection(agent));
+        result.setRedTeam(buildRedTeam(agent));
         result.setOpenedFromFinding(resolveFinding(collectionId, finding));
         return result;
     }
@@ -273,6 +283,117 @@ public class ArgusAgentDetailService {
         return rules;
     }
 
+    /**
+     * scanned comes from the agent's own postureGaps — AgenticPostureScoreCron already decided
+     * collectionEverTested (an open finding OR a stamped ApiInfo.lastTested) when it scored this
+     * agent, so this reuses that decision rather than re-deriving it.
+     */
+    private AgentDetailResult.RedTeam buildRedTeam(ApiCollection agent) {
+        AgentDetailResult.RedTeam redTeam = new AgentDetailResult.RedTeam();
+        String scanGap = agent.getPostureGaps() == null ? null
+                : agent.getPostureGaps().get(PostureScoreCategory.RED_TEAM.key);
+        boolean scanned = scanGap == null;
+        redTeam.setScanned(scanned);
+
+        Bson issueFilter = Filters.and(
+                Filters.eq(TestingRunIssues.ID_API_COLLECTION_ID, agent.getId()),
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()));
+        long openIssues = TestingRunIssuesDao.instance.count(issueFilter);
+        redTeam.setOpenFindings(openIssues);
+        redTeam.getCtas().add(runRedTeamScanCta());
+        if (!scanned) return redTeam;
+
+        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(issueFilter, 0, RED_TEAM_FINDINGS_CAP,
+                Sorts.descending(TestingRunIssues.LAST_SEEN));
+        issues.sort(Comparator.comparingInt(
+                i -> InsightUtil.severityRank(i.getSeverity() == null ? null : i.getSeverity().name())));
+
+        redTeam.setLastScannedAt(lastScannedAt(agent.getId(), issues));
+        redTeam.setSeverityBreakdown(severityBreakdown(agent.getId()));
+
+        Map<String, Info> infoByType = findingInfoFor(issues);
+        List<AgentDetailResult.RedTeamFinding> findings = new ArrayList<>();
+        for (TestingRunIssues issue : issues) {
+            String testSubCategory = issue.getId() == null ? null : issue.getId().getTestSubCategory();
+            AgentDetailResult.RedTeamFinding finding = new AgentDetailResult.RedTeamFinding();
+            Info info = testSubCategory == null ? null : infoByType.get(testSubCategory);
+            finding.setTest(testSubCategory == null ? "-" : ArgusPostureService.testDisplayName(testSubCategory, infoByType));
+            finding.setDescription(info == null ? null : info.getDescription());
+            finding.setEndpoint(issue.getId() == null || issue.getId().getApiInfoKey() == null ? "-"
+                    : issue.getId().getApiInfoKey().getMethod() + " " + issue.getId().getApiInfoKey().getUrl());
+            finding.setSeverity(issue.getSeverity() == null ? null : issue.getSeverity().name());
+            finding.setLastSeen(issue.getLastSeen());
+            findings.add(finding);
+        }
+        redTeam.setFindings(findings);
+        if (openIssues > findings.size()) redTeam.getCtas().add(viewAllFindingsCta(agent.getId(), openIssues));
+        return redTeam;
+    }
+
+    /** Open-issue counts by severity for this one agent — the same aggregation
+     *  AgenticPostureScoreCron groups by collection when it scores redTeam, scoped here to a single
+     *  collection instead of re-deriving the count-by-severity logic. */
+    private String severityBreakdown(int collectionId) {
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID,
+                "$" + TestingRunIssues.ID_API_COLLECTION_ID).append(TestingRunIssues.KEY_SEVERITY,
+                "$" + TestingRunIssues.KEY_SEVERITY);
+        Map<Integer, Map<String, Integer>> bySeverity = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(
+                Filters.eq(TestingRunIssues.ID_API_COLLECTION_ID, collectionId), false, groupedId);
+        Map<String, Integer> counts = bySeverity.getOrDefault(collectionId, Collections.emptyMap());
+
+        List<String> parts = new ArrayList<>();
+        for (String severity : Arrays.asList("CRITICAL", "HIGH", "MEDIUM", "LOW")) {
+            Integer count = counts.get(severity);
+            if (count != null && count > 0) parts.add(count + " " + severity.toLowerCase(Locale.ROOT));
+        }
+        return parts.isEmpty() ? null : String.join(" · ", parts);
+    }
+
+    /** One batched lookup for every distinct test type among the shown findings, rather than one
+     *  YamlTemplateDao call per row. */
+    private Map<String, Info> findingInfoFor(List<TestingRunIssues> issues) {
+        Set<String> testSubCategories = new HashSet<>();
+        for (TestingRunIssues issue : issues) {
+            if (issue.getId() != null && issue.getId().getTestSubCategory() != null) {
+                testSubCategories.add(issue.getId().getTestSubCategory());
+            }
+        }
+        if (testSubCategories.isEmpty()) return Collections.emptyMap();
+        return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(Constants.ID, new ArrayList<>(testSubCategories)));
+    }
+
+    private static InsightResult.Cta runRedTeamScanCta() {
+        return new InsightResult.Cta("run_red_team", "Run red-team scan", "NAVIGATE",
+                InsightRoutes.TESTING, new HashMap<>(), false);
+    }
+
+    private static InsightResult.Cta viewAllFindingsCta(int collectionId, long openIssues) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("filters", "activeCollections__true&apiCollectionId__" + collectionId);
+        return new InsightResult.Cta("view_findings", "View all " + openIssues + " findings", "NAVIGATE",
+                InsightRoutes.ISSUES, params, false);
+    }
+
+    /** Latest ApiInfo.lastTested stamp across the agent's endpoints, or — when a scan ran but
+     *  nothing was stamped (collectionEverTested's open-finding branch) — the most recent open
+     *  finding's lastSeen as the closest available signal. */
+    private Integer lastScannedAt(int collectionId, List<TestingRunIssues> issues) {
+        Integer maxTested = null;
+        for (ApiInfo api : ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, collectionId),
+                Projections.include(ApiInfo.LAST_TESTED))) {
+            if (api.getLastTested() > 0 && (maxTested == null || api.getLastTested() > maxTested)) {
+                maxTested = api.getLastTested();
+            }
+        }
+        if (maxTested != null) return maxTested;
+
+        Integer latestIssueSeen = null;
+        for (TestingRunIssues issue : issues) {
+            if (latestIssueSeen == null || issue.getLastSeen() > latestIssueSeen) latestIssueSeen = issue.getLastSeen();
+        }
+        return latestIssueSeen;
+    }
+
     private static <T> List<String> names(List<T> items, Function<T, String> extractor) {
         List<String> names = new ArrayList<>();
         if (items == null) return names;
@@ -359,7 +480,6 @@ public class ArgusAgentDetailService {
         Map<String, Info> infoByType = YamlTemplateDao.instance.fetchTestInfoMap(
                 Filters.in(Constants.ID, new ArrayList<>(new HashSet<>(
                         java.util.Collections.singletonList(testSubCategory)))));
-        Info info = infoByType.get(testSubCategory);
-        return info != null && info.getName() != null ? info.getName() : testSubCategory;
+        return ArgusPostureService.testDisplayName(testSubCategory, infoByType);
     }
 }
