@@ -41,19 +41,21 @@ RUN go test ./...
 # Build the application with cross-compilation
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -a -installsuffix cgo -ldflags="-w -s" -o guardrails-service .
 
-# Final stage - use distroless for smaller image and better security
-FROM gcr.io/distroless/static-debian11:nonroot
+# Final stage - alpine so a shell (/bin/sh, bash) is available for pre-start steps
+FROM alpine:3.22
 
-# Copy ca-certificates from builder
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# CA certs for outbound TLS; nonroot user keeps distroless's UID/GID (65532) and
+# writable /home/nonroot (endpoint-shield writes ~/.akto-endpoint-shield)
+RUN apk add --no-cache ca-certificates bash \
+    && addgroup -S -g 65532 nonroot \
+    && adduser -S -D -h /home/nonroot -u 65532 -G nonroot -s /bin/bash nonroot
 
 # Set working directory
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/guardrails-service .
+COPY --from=builder --chown=nonroot:nonroot /app/guardrails-service .
 
-# Create directory for mcp-endpoint-shield data
 USER nonroot:nonroot
 
 # Expose port

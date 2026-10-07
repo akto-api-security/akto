@@ -4,9 +4,11 @@ import PasswordTextField from "@/apps/dashboard/components/layouts/PasswordTextF
 import { useEffect, useState } from "react"
 import settingFunctions from "../module"
 import func from "@/util/func"
+import { usePermissions, whenAllowed } from "@/util/permissions"
 
 function NewRelic() {
     
+    const { canCall } = usePermissions()
     const [apiKey, setApiKey] = useState('')
     const [isSaving, setIsSaving] = useState(false)
     const [isRemoveable, setIsRemoveable] = useState(false)
@@ -82,12 +84,14 @@ function NewRelic() {
                 content: isSaving ? 'Saving...' : 'Save',
                 onAction: addNewRelicIntegration,
                 disabled: isSaveDisabled(),
-                loading: isSaving
+                loading: isSaving,
+                ...whenAllowed(canCall('api/addNewRelicIntegration'))
             }}
             secondaryFooterActions={[{
                 content: 'Remove',
                 onAction: removeNewRelicIntegration,
-                disabled: !isRemoveable || isSaving
+                disabled: !isRemoveable || isSaving,
+                ...whenAllowed(canCall('api/removeNewRelicIntegration'))
             }]}
         >
             <LegacyCard.Section>
@@ -118,6 +122,7 @@ function NewRelic() {
             cardContent={cardContent}
             component={newRelicCard}
             docsUrl="https://docs.akto.io/integrations/new-relic"
+            readOnly={!canCall('api/addNewRelicIntegration')}
         />
     )
 }

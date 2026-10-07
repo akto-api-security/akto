@@ -2,6 +2,7 @@ package com.akto.dto.rbac;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
@@ -58,8 +59,16 @@ public class UsersCollectionsList {
         }
     }
 
+    /** Clears every user's cached collections for an account, e.g. after a custom role's collections change. */
+    public static void deleteAccountCollectionIdsFromCache(int accountId) {
+        String accountPart = "|" + accountId + "|";
+        usersCollectionMap.keySet().removeIf(key -> key.contains(accountPart));
+        assignedCollectionsMap.keySet().removeIf(key -> key.contains(accountPart));
+    }
+
     /** Cached RBACDao.getUserCollectionsById for the current product scope: null for admin, empty when no collections are assigned. */
     public static List<Integer> getAssignedCollectionIds(int userId, int accountId) {
+        RbacCacheVersionDao.syncIfChanged(accountId);
         String key = usersCollectionKey(userId, accountId, Context.contextSource.get());
         Pair<List<Integer>, Integer> entry = assignedCollectionsMap.get(key);
         if (entry == null || Context.now() - entry.getSecond() > ASSIGNED_EXPIRY_TIME) {
@@ -81,6 +90,7 @@ public class UsersCollectionsList {
      * 4. If rbac feature not available, then, full access.
      */
     public static List<Integer> getCollectionsIdForUser(int userId, int accountId) {
+        RbacCacheVersionDao.syncIfChanged(accountId);
         String key = usersCollectionKey(userId, accountId, Context.contextSource.get());
         Pair<List<Integer>, Integer> collectionIdEntry = usersCollectionMap.get(key);
         List<Integer> collectionList = new ArrayList<>();

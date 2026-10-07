@@ -44,6 +44,7 @@ import {
     resolveStoredPolicyBehaviour
 } from '../utils';
 import func from "@/util/func";
+import { withPermissions } from "@/util/permissions";
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
@@ -998,7 +999,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 open={isOpen}
                 onClose={handleClose}
                 title={`${isEditMode ? 'Edit' : 'Create'} guardrail`}
-                primaryAction={getPrimaryAction()}
+                primaryAction={withPermissions({ ...getPrimaryAction(), requires: 'api/createGuardrailPolicy' })}
                 secondaryActions={[
                     {
                         content: "Cancel",

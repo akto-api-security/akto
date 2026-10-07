@@ -1,5 +1,7 @@
 package com.akto.threat.backend.router;
 
+import com.akto.threat.backend.utils.ThreatUtils;
+
 import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
@@ -522,7 +524,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLatestAttackList(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -551,7 +554,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLatestAttackList(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -693,7 +697,8 @@ public class DashboardRouter implements ARouter {
                         contextSource,
                         req.getStatus(),
                         ctx.request().getHeader("x-skill-eval-mode"),
-                        ctx.request().getHeader("x-config-eval-mode")
+                        ctx.request().getHeader("x-config-eval-mode"),
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -751,7 +756,8 @@ public class DashboardRouter implements ARouter {
                         ctx.get("accountId"),
                         req.getStartTs(),
                         req.getEndTs(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -807,7 +813,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLimit(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

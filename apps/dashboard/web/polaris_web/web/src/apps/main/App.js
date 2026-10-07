@@ -20,6 +20,7 @@ import Integrations from "../dashboard/pages/settings/integrations/Integrations"
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Roles from "../dashboard/pages/settings/roles/Roles";
+import RoleDetails from "../dashboard/pages/settings/roles/RoleDetails";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
@@ -449,6 +450,10 @@ const router = createBrowserRouter([
                     {
                         path: "roles",
                         element: <Roles/>
+                    },
+                    {
+                        path: "roles/details",
+                        element: <RoleDetails/>
                     },
                     {
                         path: "threat-configuration",

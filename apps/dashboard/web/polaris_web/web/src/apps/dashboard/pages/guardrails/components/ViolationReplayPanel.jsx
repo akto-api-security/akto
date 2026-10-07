@@ -16,6 +16,8 @@ import { REPLAY_SOURCE_TABS } from '../utils';
 import PolicyDiffModal from './PolicyDiffModal';
 import guardrailApi from '../api';
 import Store from '../../../store';
+import { usePermissions } from '@/util/permissions';
+import AllowedAction from '../../../components/shared/AllowedAction';
 
 const ENABLED_ACCOUNT_IDS = ['1726615470', '1779231193'];
 
@@ -73,6 +75,8 @@ const POLL_TIMEOUT_MS = 10 * 60 * 1000;
 const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, seedVersion = 0,
     isNewPolicy = false }) => {
     const activeAccount = Store(state => state.activeAccount);
+    const { canCallAll } = usePermissions();
+    const canReplay = canCallAll('api/startPolicyReplay', 'api/pollPolicyReplay');
     // Run state is kept PER SOURCE so switching tabs shows that tab's own last result instead of
     // discarding it. Sharing one slot meant flipping to Traffic and back threw away a completed
     // Violations comparison.
@@ -220,7 +224,7 @@ const ViolationReplayPanel = ({ policyName, hexId, buildPolicy, policyState, see
                             : "Re-runs a recent sample through the saved policy and your unsaved draft, then shows which prompts changed verdict."} />
                     </HorizontalStack>
                     {/* Renaming or rewording a message cannot move a verdict. */}
-                    {canRun ? compareButton : (
+                    {(canRun || !canReplay) ? <AllowedAction allowed={canReplay}>{compareButton}</AllowedAction> : (
                         <Tooltip content={blockedReason}>
                             <div>{compareButton}</div>
                         </Tooltip>

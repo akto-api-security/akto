@@ -5,6 +5,7 @@ import CollectionComponent from "../../../components/CollectionComponent";
 import React, { useState, useReducer, useCallback, useMemo } from 'react'
 import { produce } from "immer"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
+import { usePermissions, whenAllowed } from "@/util/permissions";
 
 function CreateNewCollectionModal(props) {
 
@@ -12,6 +13,7 @@ function CreateNewCollectionModal(props) {
 
     const [newCollectionName, setNewCollectionName] = useState('');
     const [showApiSelector, setShowApiSelector] = useState(false);
+    const { canCall } = usePermissions()
 
     const isCreateButtonDisabled = useMemo(() => {
         return newCollectionName.trim().length === 0;
@@ -102,7 +104,8 @@ function CreateNewCollectionModal(props) {
             id: "create-new-collection",
             content: 'Create',
             onAction: createNewCollection,
-            disabled: isCreateButtonDisabled
+            disabled: isCreateButtonDisabled,
+            ...whenAllowed(canCall(showApiSelector ? 'api/createCustomCollection' : 'api/createCollection'))
         }}
         secondaryActions={showApiSelector ? [{
             id: "verify-new-collection",

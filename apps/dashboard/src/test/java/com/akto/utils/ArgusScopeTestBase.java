@@ -60,6 +60,10 @@ public abstract class ArgusScopeTestBase extends MongoBasedTest {
         McpAuditInfoDao.instance.getMCollection().drop();
         UsersDao.instance.getMCollection().drop();
         SSOConfigsDao.instance.getMCollection().drop();
+        // access cached by an earlier test must not leak into this one
+        RBACDao.clearAccountCache(ACCOUNT_ID);
+        UsersCollectionsList.deleteAccountCollectionIdsFromCache(ACCOUNT_ID);
+        CustomRoleDao.clearRoleCache();
 
         insertAgentCollection(1, OWN_HOST);
         insertAgentCollection(2, OWN_CLAUDE_HOST);
@@ -91,6 +95,7 @@ public abstract class ArgusScopeTestBase extends MongoBasedTest {
         role.setBaseRole(baseRole);
         role.setApiCollectionsId(Arrays.asList(1, 2));
         CustomRoleDao.instance.insertOne(role);
+        CustomRoleDao.clearRoleCache();
     }
 
     protected void insertUser(int userId, String agenticRole) {

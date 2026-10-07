@@ -30,6 +30,8 @@ import { redactSampleDataByKeywords } from "@/apps/dashboard/pages/threat_detect
 import issuesApi from "@/apps/dashboard/pages/issues/api";
 import settingFunctions from "@/apps/dashboard/pages/settings/module";
 import issuesFunctions from "@/apps/dashboard/pages/issues/module";
+import { usePermissions, withPermissions } from "@/util/permissions";
+import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
 
 import {
     ChatSessionSection,
@@ -199,17 +201,17 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
 
     const items = [
         (eventStatus === "UNDER_REVIEW" || eventStatus === "TRIAGE")
-            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE") }
-            : { content: "Mark for Review", onAction: () => handleStatusChange("UNDER_REVIEW") },
+            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE"), requires: "api/updateMaliciousEventStatus" }
+            : { content: "Mark for Review", onAction: () => handleStatusChange("UNDER_REVIEW"), requires: "api/updateMaliciousEventStatus" },
         eventStatus === "IGNORED"
-            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE") }
-            : { content: "Ignore", onAction: () => handleStatusChange("IGNORED") },
+            ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE"), requires: "api/updateMaliciousEventStatus" }
+            : { content: "Ignore", onAction: () => handleStatusChange("IGNORED"), requires: "api/updateMaliciousEventStatus" },
         jiraTicketUrl
             ? { content: "View Jira Ticket", onAction: () => window.open(jiraTicketUrl, "_blank") }
-            : { content: "Create Jira Ticket", onAction: handleJiraClick, disabled: window.JIRA_INTEGRATED !== "true" },
+            : { content: "Create Jira Ticket", onAction: handleJiraClick, disabled: window.JIRA_INTEGRATED !== "true", requires: ["api/fetchIntegration", "api/createGeneralJiraTicket"] },
         azureBoardsUrl
             ? { content: "View Work Item", onAction: () => window.open(azureBoardsUrl, "_blank") }
-            : { content: "Create Work Item", onAction: handleAzureClick, disabled: window.AZURE_BOARDS_INTEGRATED !== "true" },
+            : { content: "Create Work Item", onAction: handleAzureClick, disabled: window.AZURE_BOARDS_INTEGRATED !== "true", requires: ["api/fetchAzureBoardsIntegration", "api/createGeneralAzureBoardsWorkItem"] },
     ];
 
     return (
@@ -226,7 +228,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
                 preferredAlignment="right"
             >
                 <Box minWidth="180px">
-                    <ActionList actionRole="menuitem" items={items} />
+                    <ActionList actionRole="menuitem" items={withPermissions(items)} />
                 </Box>
             </Popover>
 
@@ -262,6 +264,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
 // ─── Approve server button (for "approval" behaviour policies) ─────────────────
 
 function ApproveServerButton({ row }) {
+    const { canCall } = usePermissions();
     const [modalActive, setModalActive] = useState(false);
     const [mode, setMode]               = useState("ALWAYS"); // ALWAYS | DURATION
     const [days, setDays]               = useState("7");
@@ -303,7 +306,9 @@ function ApproveServerButton({ row }) {
 
     return (
         <>
-            <Button size="slim" onClick={openModal}>Approve server</Button>
+            <AllowedAction allowed={canCall("api/approveServerForPolicy")}>
+                <Button size="slim" onClick={openModal}>Approve server</Button>
+            </AllowedAction>
             <Modal
                 open={modalActive}
                 onClose={() => setModalActive(false)}
@@ -346,6 +351,7 @@ function ApproveServerButton({ row }) {
 // ─── Header ─────────────────────────────────────────────────────────────────────
 
 function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
+    const { canCall } = usePermissions();
     const isHumanApprovalEvent = String(row?._status || "").toUpperCase() === "HUMAN_APPROVAL";
     const humanResponse = String(row?.humanResponse || "PENDING").toUpperCase();
     const pending = isHumanApprovalEvent && isHumanApprovalPending(humanResponse);
@@ -378,6 +384,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
                         {isHumanApprovalEvent && pending && (
                             <HumanApprovalActions
                                 pending
+                                allowed={canCall("api/updateMaliciousEventStatus")}
                                 onApprove={() => onHumanApproval?.("APPROVED")}
                                 onBlock={() => onHumanApproval?.("BLOCKED")}
                             />
@@ -467,7 +474,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
     function renderTabContent(id) {
         switch (id) {
             case "overview":        return <OverviewSection row={violation} detail={detail} />;
-            case "promptResponse":  return <PromptResponseSection detail={detail} />;
+            case "promptResponse":  return <PromptResponseSection detail={detail} host={violation.host} anchorTimestamp={violation.detected} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
                 if (violation.type === "Tool") {

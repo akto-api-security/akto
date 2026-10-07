@@ -14,6 +14,7 @@ import com.akto.service.insights.InsightResult;
 import com.akto.service.insights.InsightRoutes;
 import com.akto.service.insights.InsightUtil;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.utils.crons.AgenticPostureScoreCron;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -25,10 +26,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 // Flyout drills for the Argus posture score and the agent list, sharing one per-agent profile level.
 public class ArgusAgentPostureDrillService {
@@ -88,6 +91,10 @@ public class ArgusAgentPostureDrillService {
     }
 
     private PostureDrillResult postureScoreRoot(InsightDataBundle bundle, List<ApiCollection> agents, int skip, int limit) {
+        List<ApiCollection> slice = AgenticPostureScoreCron.worstSlice(agents, ApiCollection::getPostureScore);
+        Set<Integer> sliceIds = new HashSet<>();
+        for (ApiCollection agent : slice) sliceIds.add(agent.getId());
+
         List<Map<String, Object>> rows = new ArrayList<>();
         Map<PostureScoreCategory, Integer> affectedByCategory = new HashMap<>();
         double composite = 0;
@@ -98,14 +105,14 @@ public class ArgusAgentPostureDrillService {
             double topSubScore = 0;
             for (ApiCollection agent : agents) {
                 double sub = category.subScore(agent.getPostureSubScores());
-                subScoreSum += sub;
+                if (sliceIds.contains(agent.getId())) subScoreSum += sub;
                 if (sub > 0) affected++;
                 if (sub > topSubScore) {
                     topSubScore = sub;
                     top = agent;
                 }
             }
-            double avg = agents.isEmpty() ? 0 : subScoreSum / agents.size();
+            double avg = slice.isEmpty() ? 0 : subScoreSum / slice.size();
             double points = category.weight * avg / 100d;
             composite += points;
             affectedByCategory.put(category, affected);
@@ -131,8 +138,9 @@ public class ArgusAgentPostureDrillService {
                         col("topContributor", "Top contributor"), col("remediation", "Remediation")),
                 true);
         result.setSummary(Arrays.asList(
-                new InsightResult.Metric("postureScore", "Posture score", round1(composite), "count",
-                        Math.round(composite) + " / 100"),
+                new InsightResult.Metric("postureScore",
+                        "Posture score · Calculated based on worst " + slice.size() + " agent(s)",
+                        round1(composite), "count", Math.round(composite) + " / 100"),
                 new InsightResult.Metric("agentsScored", "Agents scored", agents.size(), "count",
                         InsightUtil.grouped(agents.size())),
                 new InsightResult.Metric("topCategory", "Biggest contributor", null, "text",
@@ -203,11 +211,9 @@ public class ArgusAgentPostureDrillService {
     private PostureDrillResult agentList(List<ApiCollection> agents, List<PostureDrillResult.BreadcrumbItem> trail,
                                          int skip, int limit) {
         long highOrCritical = 0;
-        double scoreSum = 0;
         List<Map<String, Object>> rows = new ArrayList<>();
         for (ApiCollection agent : agents) {
             long score = Math.round(agent.getPostureScore());
-            scoreSum += agent.getPostureScore();
             if (score >= ArgusPostureService.SEVERITY_HIGH_AT) highOrCritical++;
 
             Map<String, Object> row = new LinkedHashMap<>();
@@ -224,12 +230,10 @@ public class ArgusAgentPostureDrillService {
         PostureDrillResult result = base("Agents by posture score", trail, Arrays.asList(
                 col("agent", "Agent"), col("type", "Type"), col("environment", "Environment"),
                 col("score", "Score"), col("severity", "Severity"), col("topIssue", "Top issue")), true);
-        double avg = agents.isEmpty() ? 0 : scoreSum / agents.size();
         result.setSummary(Arrays.asList(
                 new InsightResult.Metric("agents", "Agents scored", agents.size(), "count", InsightUtil.grouped(agents.size())),
                 new InsightResult.Metric("highOrCritical", "High or critical", highOrCritical, agents.size(), "count",
-                        InsightUtil.grouped(highOrCritical), null),
-                new InsightResult.Metric("averageScore", "Average score", round1(avg), "count", Math.round(avg) + " / 100")));
+                        InsightUtil.grouped(highOrCritical), null)));
         result.setEmptyMessage("No agents have been scored in this environment yet.");
         return page(result, rows, skip, limit);
     }
@@ -270,7 +274,8 @@ public class ArgusAgentPostureDrillService {
         List<ApiInfo> tools = ApiInfoDao.instance.findAll(toolFilter, 0, PROFILE_SECTION_CAP, null,
                 Projections.include(ApiInfo.TOOL_INFO));
 
-        List<String> sensitiveTypes = bundle.sensitiveByCollection.get(agent.getId());
+        Map<Integer, Map<String, Integer>> sensitiveData = bundle.sensitiveDataCounts(agentIds, eventsSince);
+        Map<String, Integer> agentSensitiveData = sensitiveData == null ? null : sensitiveData.get(agent.getId());
         List<String> coveringPolicies = coveringPolicyNames(bundle.policies, agent);
         String scanGap = agent.getPostureGaps() == null ? null : agent.getPostureGaps().get(PostureScoreCategory.RED_TEAM.key);
 
@@ -295,7 +300,9 @@ public class ArgusAgentPostureDrillService {
                         coveringPolicies.isEmpty() ? "critical" : null),
                 new PostureDrillResult.Fact("Red-team scan", scanGap == null ? "Scanned" : scanGap, scanGap == null ? null : "critical"),
                 new PostureDrillResult.Fact("Sensitive data",
-                        sensitiveTypes == null || sensitiveTypes.isEmpty() ? "None detected" : String.join(", ", sensitiveTypes), null)));
+                        sensitiveData == null ? "Unavailable"
+                                : agentSensitiveData == null || agentSensitiveData.isEmpty() ? "None flagged in the last 90 days"
+                                : InsightUtil.sensitiveDataLine(agentSensitiveData), null)));
         List<PostureDrillResult.Section> sections = new ArrayList<>(Arrays.asList(
                 scoreBreakdownSection(subScores), remediationSection(subScores), redTeamSection(issues, openIssues)));
         if (events != null) sections.add(maliciousEventsSection(events, eventCount));
@@ -442,6 +449,7 @@ public class ArgusAgentPostureDrillService {
         private final InsightDataBundle bundle;
         private final Map<Integer, Map<String, Integer>> redTeam;
         private final Map<Integer, Map<String, Integer>> malicious;
+        private final Map<Integer, Map<String, Integer>> sensitive;
         private final ArgusPostureService.GuardrailsCoverageBreakdown coverage;
 
         CategoryEvidence(InsightDataBundle bundle, List<ApiCollection> agents) {
@@ -456,6 +464,9 @@ public class ArgusAgentPostureDrillService {
             Map<Integer, Map<String, Integer>> counts = ids.isEmpty() ? null
                     : bundle.maliciousSeverityCounts(ids, Context.now() - MALICIOUS_EVENTS_WINDOW_SECONDS);
             this.malicious = counts == null ? new HashMap<>() : counts;
+            Map<Integer, Map<String, Integer>> sensitiveCounts = ids.isEmpty() ? null
+                    : bundle.sensitiveDataCounts(ids, Context.now() - MALICIOUS_EVENTS_WINDOW_SECONDS);
+            this.sensitive = sensitiveCounts == null ? new HashMap<>() : sensitiveCounts;
             this.coverage = ArgusPostureService.computeCoverage(agents, bundle.policies);
         }
 
@@ -464,7 +475,9 @@ public class ArgusAgentPostureDrillService {
             switch (category) {
                 case RED_TEAM: {
                     Map<String, Integer> bySeverity = redTeam.get(agent.getId());
-                    return bySeverity == null || bySeverity.isEmpty() ? "Open findings" : severityLine(bySeverity) + " open";
+                    if (bySeverity != null && !bySeverity.isEmpty()) return severityLine(bySeverity) + " open";
+                    String notScanned = agent.getPostureGaps() == null ? null : agent.getPostureGaps().get(PostureScoreCategory.RED_TEAM.key);
+                    return notScanned != null ? notScanned : "Open findings";
                 }
                 case GUARDRAIL_MALICIOUS: {
                     // Same threat-backend aggregation the score is computed from.
@@ -480,8 +493,9 @@ public class ArgusAgentPostureDrillService {
                     return gaps.isEmpty() ? "Partially covered" : String.join(" · ", gaps);
                 }
                 case SENSITIVE_DATA: {
-                    List<String> types = bundle.sensitiveByCollection.get(agent.getId());
-                    return types == null || types.isEmpty() ? "Sensitive data detected" : String.join(", ", types);
+                    Map<String, Integer> byData = sensitive.get(agent.getId());
+                    if (byData == null || byData.isEmpty()) return "Sensitive data in guardrail violations";
+                    return InsightUtil.sensitiveDataLine(byData) + " in the last 90 days";
                 }
                 case ACCESS_AUTH:
                     return category.subScore(subScores) >= 100 ? "Public and unauthenticated" : "Public or unauthenticated";

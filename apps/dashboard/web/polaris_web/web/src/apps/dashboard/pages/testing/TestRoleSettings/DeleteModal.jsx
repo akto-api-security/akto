@@ -2,6 +2,7 @@ import React from "react";
 import api from "../api";
 import func from "@/util/func";
 import { Modal, Text } from "@shopify/polaris";
+import { usePermissions, whenAllowed } from "@/util/permissions";
 
 const DeleteModal = ({
   showAuthDeleteModal,
@@ -11,6 +12,7 @@ const DeleteModal = ({
   deletedIndex,
   initialItems,
 }) => {
+  const { canCallAll } = usePermissions();
   const handleDeleteAuth = async () => {
     const resp = await api.deleteAuthFromRole(initialItems.name, deletedIndex);
     setShowAuthDeleteModal(false);
@@ -34,6 +36,8 @@ const DeleteModal = ({
       primaryAction={{
         content: "Delete auth mechanism",
         onAction: handleDeleteAuth,
+        // deleting an auth also re-saves the role
+        ...whenAllowed(canCallAll("api/deleteAuthFromRole", "api/updateTestRoles")),
       }}
     >
       <Modal.Section>

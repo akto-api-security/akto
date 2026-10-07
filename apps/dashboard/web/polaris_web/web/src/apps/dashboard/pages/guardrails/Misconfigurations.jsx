@@ -16,6 +16,8 @@ import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import api from "./api";
 import func from "@/util/func";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../components/shared/AllowedAction";
 
 import { editor } from "monaco-editor/esm/vs/editor/editor.api";
 import 'monaco-editor/esm/vs/editor/contrib/find/browser/findController';
@@ -220,6 +222,7 @@ function PolicyFormModal({ open, onClose, editingPolicy, onSaved }) {
 }
 
 function Misconfigurations() {
+    const { canCall } = usePermissions();
     const [policies, setPolicies] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -279,6 +282,7 @@ function Misconfigurations() {
         if (selectedIds.length === 1) {
             actions.push({
                 content: "Edit",
+                requires: "api/createConfigFieldPolicy",
                 onAction: () => {
                     const rawPolicy = policies.find((p) => p.hexId === selectedIds[0]);
                     setEditingPolicy(rawPolicy || null);
@@ -290,14 +294,17 @@ function Misconfigurations() {
         actions.push({
             content: "Activate",
             onAction: () => setPolicyStatus(selectedIds, "ACTIVE"),
+            requires: "api/createConfigFieldPolicy",
         });
         actions.push({
             content: "Deactivate",
             onAction: () => setPolicyStatus(selectedIds, "INACTIVE"),
+            requires: "api/createConfigFieldPolicy",
         });
 
         actions.push({
             content: `Delete ${selectedIds.length} polic${selectedIds.length > 1 ? "ies" : "y"}`,
+            requires: "api/deleteConfigFieldPolicies",
             onAction: async () => {
                 try {
                     await api.deleteConfigFieldPolicies(selectedIds);
@@ -335,9 +342,11 @@ function Misconfigurations() {
         <Box key="policies-header" paddingBlockEnd="4">
             <HorizontalStack align="space-between" blockAlign="center">
                 <Text variant="headingMd">Config Field Policies</Text>
-                <Button primary onClick={() => { setEditingPolicy(null); setShowCreateModal(true); }}>
-                    New Policy
-                </Button>
+                <AllowedAction allowed={canCall("api/createConfigFieldPolicy")}>
+                    <Button primary onClick={() => { setEditingPolicy(null); setShowCreateModal(true); }}>
+                        New Policy
+                    </Button>
+                </AllowedAction>
             </HorizontalStack>
         </Box>,
         <GithubSimpleTable

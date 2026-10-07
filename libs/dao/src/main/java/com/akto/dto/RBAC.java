@@ -1,5 +1,7 @@
 package com.akto.dto;
 
+import com.akto.dao.context.Context;
+
 
 import org.bson.types.ObjectId;
 
@@ -44,6 +46,22 @@ public class RBAC {
     @Setter
     private List<String> allowedFeaturesForUser;
 
+    // Epoch seconds after which the user has no access in this account (0 = never). Set per user for time-bound access.
+    public static final String ACCESS_EXPIRES_AT = "accessExpiresAt";
+    @Getter
+    @Setter
+    private int accessExpiresAt;
+
+    /** Short description of the user's roles for audit logs, e.g. "{API=ADMIN, AGENTIC=TEAM_A}" plus any expiry. */
+    public String accessSummary() {
+        String roles = (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) ? new java.util.TreeMap<>(scopeRoleMapping).toString() : String.valueOf(role);
+        return accessExpiresAt > 0 ? roles + " expiresAt=" + accessExpiresAt : roles;
+    }
+
+    public boolean hasAccessExpired() {
+        return accessExpiresAt > 0 && accessExpiresAt <= Context.now();
+    }
+
     public static final String SCOPE_ROLE_MAPPING = "scopeRoleMapping";
     @Getter
     @Setter
@@ -71,6 +89,10 @@ public class RBAC {
         }
 
         public ReadWriteAccess getReadWriteAccessForFeature(Feature feature) {
+            if (feature == Feature.THREAT_SETTINGS) {
+                // same as threat protection unless a custom role overrides it
+                feature = Feature.THREAT_PROTECTION;
+            }
             // change default for dev and and feature label to NO_ACCESS
             ReadWriteAccess defaultAccess = ReadWriteAccess.READ;
             if(this.name.equals(Role.DEVELOPER.name()) || this.name.equals(Role.GUEST.name())){
@@ -83,6 +105,20 @@ public class RBAC {
 
         public String getName() {
             return name;
+        }
+
+        /** Role for a stored role string: the enum name, or the display name some older records store (e.g. "SECURITY ENGINEER"), in any case. Null if neither. */
+        public static Role fromName(String roleName) {
+            if (roleName == null) {
+                return null;
+            }
+            String trimmed = roleName.trim();
+            for (Role role : values()) {
+                if (role.name().equalsIgnoreCase(trimmed) || role.getName().equalsIgnoreCase(trimmed)) {
+                    return role;
+                }
+            }
+            return null;
         }
     }
 
@@ -287,22 +323,19 @@ public class RBAC {
             return null;
         }
 
-        try {
-            return Role.valueOf(roleStr);
-        } catch (IllegalArgumentException e) {
+        Role role = Role.fromName(roleStr);
+        if (role != null) {
+            return role;
         }
 
         try {
-            CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
-            if (customRole != null && customRole.getBaseRole() != null) {
-                try {
-                    return Role.valueOf(customRole.getBaseRole());
-                } catch (IllegalArgumentException e) {
-                    return Role.GUEST;
-                }
+            CustomRole customRole = CustomRoleDao.instance.findRoleByNameCached(roleStr);
+            if (customRole != null && Role.fromName(customRole.getBaseRole()) != null) {
+                return Role.fromName(customRole.getBaseRole());
             }
         } catch (Exception e) {
         }
-        return Role.GUEST;
+        // unknown or deleted role: no access, the same as RBACDao.getCurrentRoleForUser
+        return Role.NO_ACCESS;
     }
 }

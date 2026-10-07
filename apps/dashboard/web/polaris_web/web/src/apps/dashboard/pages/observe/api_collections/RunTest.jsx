@@ -17,7 +17,9 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
 import settingsApi from "../../settings/api";
+import { usePermissions, whenAllowed } from "@/util/permissions";
 import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories } from "../../test_editor/tests_table/categoryUtil";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const initialAutoTicketingDetails = {
     shouldCreateTickets: false,
@@ -59,6 +61,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         slackChannel: ""
     }
     const navigate = useNavigate()
+    const { canCall } = usePermissions()
 
     const [testRun, setTestRun] = useState({
         ...initialState
@@ -374,7 +377,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">{mapLabel('Run test', getDashboardCategory())}</div></Button>
+            <AllowedAction allowed={canCall('api/startTest')}><Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">{mapLabel('Run test', getDashboardCategory())}</div></Button></AllowedAction>
         </div>
     );
 
@@ -852,6 +855,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
             primaryAction={{
                 content: 'Save',
                 onAction: () => { handleModifyConfig(); },
+                ...whenAllowed(canCall('api/modifyTestingRunConfig'))
             }}
         >
             <Modal.Section>
@@ -882,7 +886,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                 primaryAction={{
                     content: activeFromTesting ? "Save" : scheduleString(),
                     onAction: activeFromTesting ? handleModifyConfig : handleRun,
-                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0  ) || !testRun.authMechanismPresent
+                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0  ) || !testRun.authMechanismPresent,
+                    ...whenAllowed(canCall(activeFromTesting ? 'api/modifyTestingRunConfig' : 'api/startTest'))
                 }}
                 secondaryActions={[
                     countAllSelectedTests() && testMode ? {

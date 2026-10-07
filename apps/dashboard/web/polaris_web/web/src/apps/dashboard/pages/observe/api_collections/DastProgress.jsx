@@ -153,6 +153,7 @@ function getActions(item, fetchAllDastScans, navigate, setDuplicateScanData) {
                     icon: CircleCancelMajor,
                     destructive: true,
                     disabled: isStopDisabled,
+                    requires: 'api/stopCrawler',
                     onAction: async () => {
                         try {
                             await api.stopCrawler(item.crawlId)

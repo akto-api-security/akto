@@ -653,6 +653,13 @@ prettifyEpoch(epoch) {
       return acc;
     }, {});
   },
+  // Some captured samples (e.g. guardrail events) store only the raw request body, like
+  // {"messages":[...]}, instead of the usual {method, path, requestPayload, ...} envelope.
+  isSampleEnvelope: function (message) {
+    if (!message || typeof message !== "object") return false
+    return ["request", "response", "method", "path", "requestHeaders", "requestPayload",
+      "responseHeaders", "responsePayload", "statusCode"].some((key) => message[key] !== undefined)
+  },
   requestJson: function (message, highlightPaths, metadata = []) {
     if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
@@ -675,7 +682,9 @@ prettifyEpoch(epoch) {
       queryParamsString = urlSplit?.length > 1 ? urlSplit[1] : ""
 
       requestHeadersString = message["requestHeaders"] || "{}"
-      requestPayloadString = message["requestPayload"] || "{}"
+      requestPayloadString = func.isSampleEnvelope(message)
+        ? (message["requestPayload"] || "{}")
+        : JSON.stringify(message)
     }
 
     const queryParams = {}
@@ -738,7 +747,7 @@ prettifyEpoch(epoch) {
   },
   responseJson: function (message, highlightPaths, metadata = []) {
 
-    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0 || !func.isSampleEnvelope(message)){
       return {}
     }
     let result = {}
@@ -799,16 +808,20 @@ prettifyEpoch(epoch) {
     }
     return result
   },
+  // Joins only the parts that were captured, so a missing method/type/status never renders as "undefined".
+  joinFirstLineParts(...parts) {
+    return parts.filter((part) => part !== undefined && part !== null && part !== "").join(" ")
+  },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
       let url = message["request"]["url"] || ""
-      return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
+      return func.joinFirstLineParts(message["request"]["method"], url + func.convertQueryParamsToUrl(queryParams), message["request"]["type"])
     } else {
       let pathString = ""
       if(message.path !== null && message?.path !== undefined){
         pathString = message.path.split("?")[0];
       }
-      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
+      return func.joinFirstLineParts(message?.method, pathString + func.convertQueryParamsToUrl(queryParams), message?.type)
     }
   },
   webSocketRequestFirstLine(message, queryParams) {
@@ -827,9 +840,9 @@ prettifyEpoch(epoch) {
   },
   responseFirstLine(message) {
     if (message["response"]) {
-      return message["response"]["statusCode"] + ""
+      return func.joinFirstLineParts(message["response"]["statusCode"])
     } else {
-      return message.statusCode + " " + message.status
+      return func.joinFirstLineParts(message.statusCode, message.status)
     }
   },
   isWebSocketApiType(apiType) {
@@ -2311,8 +2324,17 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return allowedAccountsForPosture.some(x => x === activeAccount)
   },
 
+  // Base role in the product being viewed (custom roles resolved by the server); USER_ROLE is for the product the page loaded in
+  currentProductBaseRole(){
+    return window.SCOPE_BASE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]] || window.USER_ROLE
+  },
   hasThreatAccess(){
-    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(window.USER_ROLE)
+    // threat access with custom role changes applied, when the server sent it; otherwise from the base role
+    const threatAccess = window.SCOPE_THREAT_ACCESS?.[categoryToShortName[getDashboardCategory()]]
+    if (threatAccess) {
+      return threatAccess !== 'NO_ACCESS'
+    }
+    return !['MEMBER', 'DEVELOPER', 'GUEST', 'NO_ACCESS'].includes(this.currentProductBaseRole())
   },
   // Argus only: only Admin and Threat Engineer can create, edit, delete or approve guardrail policies (when RBAC is enabled)
   canManageGuardrailPolicies(){
@@ -2320,11 +2342,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     if (!isArgus || this.checkLocal() || !(this.checkForRbacFeature() || this.checkForRbacFeatureBasic()) || this.isUserAdmin()) {
       return true
     }
-    // Role for the current product; a custom role name is not a base role, so use the resolved base role then
-    const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]
-    const baseRoles = ['ADMIN', 'MEMBER', 'DEVELOPER', 'GUEST', 'THREAT_ENGINEER', 'THREAT_VIEWER', 'NO_ACCESS']
-    const role = baseRoles.includes(scopeRole) ? scopeRole : window.USER_ROLE
-    return ['ADMIN', 'THREAT_ENGINEER'].includes(role)
+    return ['ADMIN', 'THREAT_ENGINEER'].includes(this.currentProductBaseRole())
   },
   isUserAdmin(){
     const scopeRole = window.SCOPE_ROLE_MAPPING?.[categoryToShortName[getDashboardCategory()]]

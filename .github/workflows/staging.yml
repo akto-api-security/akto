@@ -343,6 +343,11 @@ jobs:
         working-directory: ./libs/utils/src/main/resources/maxmind
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
+      - name: Download Merged IP (VPN/Tor) database (utils)
+        if: needs.resolve-modules.outputs.threat_detection == 'true' || needs.resolve-modules.outputs.threat_detection_backend == 'true' || needs.resolve-modules.outputs.dashboard == 'true'
+        working-directory: ./libs/utils/src/main/resources/maxmind
+        run: |
+          wget -O Merged-IP.mmdb https://github.com/NetworkCats/Merged-IP-Data/releases/latest/download/Merged-IP.mmdb
       - name: Configure AWS Credentials (dashboard only)
         if: needs.resolve-modules.outputs.dashboard == 'true'
         uses: aws-actions/configure-aws-credentials@v4

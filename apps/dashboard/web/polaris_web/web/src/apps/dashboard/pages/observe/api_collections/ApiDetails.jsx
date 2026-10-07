@@ -24,6 +24,7 @@ import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import { usePermissions, permissions, withPermissions } from "@/util/permissions";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -71,6 +72,7 @@ function ApiDetails(props) {
     // const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
+    const { canCall } = usePermissions()
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const allCollections = PersistStore(state => state.allCollections)
     const [disabledTabs, setDisabledTabs] = useState([])
@@ -331,7 +333,7 @@ function ApiDetails(props) {
             }, 100)
             headers.forEach((header) => {
                 if (header.value === "description") {
-                    header.action = () => setIsEditingDescription(true)
+                    header.action = permissions.canCall('api/saveEndpointDescription') ? () => setIsEditingDescription(true) : undefined
                 }
             })
 
@@ -925,7 +927,7 @@ function ApiDetails(props) {
                             filtered={true}
                             useLocalSubCategoryData={useLocalSubCategoryData}
                             preActivator={false}
-                            disabled={window.USER_ROLE === "GUEST"}
+                            disabled={!canCall('api/startTest')}
                         />
                     )}
                     {!isEndpointSecurityCategory() && (
@@ -946,10 +948,10 @@ function ApiDetails(props) {
                         >
                             <Popover.Pane fixed>
                                 <ActionList
-                                    items={[
+                                    items={withPermissions([
                                         // isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
-                                        isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : {},
-                                    ]}
+                                        isDemergingActive ? { content: "De-merge", onAction: deMergeApis, requires: 'api/deMergeApi' } : {},
+                                    ])}
                                 />
                             </Popover.Pane>
                         </Popover> : null

@@ -429,6 +429,9 @@ public abstract class Config {
          */
         public static final String SYNC_GROUPS_TO_USER_TAGS = "syncGroupsToUserTags";
         private boolean syncGroupsToUserTags = false;
+        // Opt-in: users in none of the mapped groups get no access at login, instead of keeping their current role
+        public static final String REMOVE_ACCESS_WITHOUT_GROUP = "removeAccessWithoutGroup";
+        private boolean removeAccessWithoutGroup;
 
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
@@ -551,6 +554,13 @@ public abstract class Config {
         }
         public void setSyncGroupsToUserTags(boolean syncGroupsToUserTags) {
             this.syncGroupsToUserTags = syncGroupsToUserTags;
+        }
+
+        public boolean isRemoveAccessWithoutGroup() {
+            return removeAccessWithoutGroup;
+        }
+        public void setRemoveAccessWithoutGroup(boolean removeAccessWithoutGroup) {
+            this.removeAccessWithoutGroup = removeAccessWithoutGroup;
         }
     }
 

@@ -22,10 +22,12 @@ import org.junit.Test;
 import com.akto.MongoBasedTest;
 import com.akto.action.AuditDataAction;
 import com.akto.action.GuardrailPoliciesAction;
-import com.akto.action.SignupAction;
 import com.akto.action.user.AzureSsoAction;
+import com.akto.action.ApiCollectionsAction;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.RuleCollections;
 import com.akto.dao.CustomRoleDao;
+import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.SSOConfigsDao;
@@ -43,6 +45,7 @@ import com.akto.dto.Setup;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.rbac.CollectionRule;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.traffic.CollectionTags;
@@ -228,15 +231,55 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         assertNull(policyAccessError(THREAT_ENGINEER_ALL, CONTEXT_SOURCE.AGENTIC, policy(false, OTHER_HOST)));
     }
 
+    private static List<String> visiblePolicies(int userId, int skip, int limit, long expectedTotal) {
+        as(userId, CONTEXT_SOURCE.AGENTIC);
+        GuardrailPoliciesAction action = new GuardrailPoliciesAction();
+        action.setSession(session(userId));
+        action.setSkip(skip);
+        action.setLimit(limit);
+        assertEquals("SUCCESS", action.fetchGuardrailPolicies());
+        assertEquals(expectedTotal, action.getTotal());
+        List<String> names = new ArrayList<>();
+        for (GuardrailPolicies p : action.getGuardrailPolicies()) names.add(p.getName());
+        return names;
+    }
+
+    @Test
+    public void testPolicyListHidesOtherTeamsPolicies() {
+        GuardrailPoliciesDao.instance.getMCollection().drop();
+        GuardrailPolicies own = policy(false, OWN_HOST), other = policy(false, OTHER_HOST), global = policy(true),
+                mixed = policy(false, OWN_HOST, OTHER_HOST), excludeOther = policy(false, OTHER_HOST);
+        excludeOther.setNegatedAgentServers(true);
+        GuardrailPolicies legacyOther = new GuardrailPolicies();
+        legacyOther.setSelectedMcpServers(Collections.singletonList(OTHER_HOST));
+        GuardrailPolicies[] all = {own, other, global, mixed, excludeOther, legacyOther};
+        String[] names = {"own", "other", "global", "mixed", "excludeOther", "legacyOther"};
+        for (int i = 0; i < all.length; i++) {
+            all[i].setName(names[i]);
+            all[i].setCreatedTimestamp(100 - i);
+            GuardrailPoliciesDao.instance.insertOne(all[i]);
+        }
+
+        // limited user: own, global and exclude-mode policies, plus ones that also cover an own agent
+        assertEquals(Arrays.asList("own", "global", "mixed", "excludeOther"), visiblePolicies(TEAM_A, 0, 20, 4));
+        assertEquals(Arrays.asList("mixed", "excludeOther"), visiblePolicies(TEAM_A, 2, 2, 4));
+        assertTrue(visiblePolicies(TEAM_A, 10, 20, 4).isEmpty());
+
+        // admin and unlimited users: everything, unchanged
+        assertEquals(Arrays.asList(names), visiblePolicies(ADMIN, 0, 20, 6));
+        assertEquals(Arrays.asList(names), visiblePolicies(THREAT_ENGINEER_ALL, 0, 20, 6));
+        GuardrailPoliciesDao.instance.getMCollection().drop();
+    }
+
     // ── Account-wide settings ──────────────────────────────────────────────────
 
     private static String collectionScopeError(String collectionScope, Object action, int userId) throws Exception {
         as(userId, CONTEXT_SOURCE.AGENTIC);
         RoleAccessInterceptor interceptor = new RoleAccessInterceptor();
         interceptor.setCollectionScope(collectionScope);
-        Method method = RoleAccessInterceptor.class.getDeclaredMethod("checkCollectionScope", Object.class, User.class);
+        Method method = RoleAccessInterceptor.class.getDeclaredMethod("checkCollectionScope", Object.class, User.class, int.class);
         method.setAccessible(true);
-        return (String) method.invoke(interceptor, action, user(userId));
+        return (String) method.invoke(interceptor, action, user(userId), ACCOUNT_ID);
     }
 
     @Test
@@ -258,19 +301,14 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         }
     }
 
-    // ── Azure group -> role ────────────────────────────────────────────────────
+    // ── SSO group -> role (shared by every SSO provider) ───────────────────────
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, String> resolveGroupRole(Map<String, String> mapping, List<String> groups) throws Exception {
-        SAMLConfig samlConfig = new SAMLConfig(ConfigType.AZURE, ACCOUNT_ID);
-        samlConfig.setGroupRoleMapping(mapping);
-        Method method = SignupAction.class.getDeclaredMethod("resolveSamlGroupScopeRoleMapping", SAMLConfig.class, List.class, int.class);
-        method.setAccessible(true);
-        return (Map<String, String>) method.invoke(new SignupAction(), samlConfig, groups, ACCOUNT_ID);
+    private static Map<String, String> rolesForLogin(Map<String, String> mapping, List<String> groups) {
+        return SsoRoleMapping.rolesForLogin("new-user@example.com", ACCOUNT_ID, mapping, groups, false, true);
     }
 
     @Test
-    public void testAzureGroupRole() throws Exception {
+    public void testSsoGroupRole() {
         Map<String, String> mapping = new HashMap<>();
         mapping.put("g-guest", "GUEST");
         mapping.put("g-team-a", "TEAM_A_ADMIN");
@@ -278,27 +316,41 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         mapping.put("g-deleted-role", "NO_SUCH_ROLE");
 
         // most privileged wins; custom role ranked by its base role (Threat Engineer > Developer > Guest)
-        Map<String, String> result = resolveGroupRole(mapping, Arrays.asList("g-guest", "g-team-a", "g-dev"));
+        Map<String, String> result = rolesForLogin(mapping, Arrays.asList("g-guest", "g-team-a", "g-dev"));
         assertFalse(result.isEmpty());
         assertTrue(result.values().stream().allMatch("TEAM_A_ADMIN"::equals));
-        assertTrue(resolveGroupRole(mapping, Arrays.asList("g-guest", "g-dev")).values().stream().allMatch("DEVELOPER"::equals));
+        assertTrue(rolesForLogin(mapping, Arrays.asList("g-guest", "g-dev")).values().stream().allMatch("DEVELOPER"::equals));
 
         // no match, unknown role, no groups, no mapping -> null (login unchanged)
-        assertNull(resolveGroupRole(mapping, Collections.singletonList("g-unknown")));
-        assertNull(resolveGroupRole(mapping, Collections.singletonList("g-deleted-role")));
-        assertNull(resolveGroupRole(mapping, new ArrayList<>()));
-        assertNull(resolveGroupRole(new HashMap<>(), Collections.singletonList("g-team-a")));
-        assertNull(resolveGroupRole(null, Collections.singletonList("g-team-a")));
+        assertNull(rolesForLogin(mapping, Collections.singletonList("g-unknown")));
+        assertNull(rolesForLogin(mapping, Collections.singletonList("g-deleted-role")));
+        assertNull(rolesForLogin(mapping, new ArrayList<>()));
+        assertNull(rolesForLogin(new HashMap<>(), Collections.singletonList("g-team-a")));
+        assertNull(rolesForLogin(null, Collections.singletonList("g-team-a")));
+
+        // existing admins are never changed
+        assertNull(SsoRoleMapping.rolesForLogin(user(ADMIN).getLogin(), ACCOUNT_ID, mapping, Collections.singletonList("g-guest"), true, true));
+        assertTrue(SsoRoleMapping.isExistingAdmin(user(ADMIN).getLogin(), ACCOUNT_ID));
+        assertFalse(SsoRoleMapping.isExistingAdmin(user(TEAM_A).getLogin(), ACCOUNT_ID));
+        assertFalse(SsoRoleMapping.isExistingAdmin("new-user@example.com", ACCOUNT_ID));
     }
 
     @Test
-    public void testExistingAdminNotChangedByGroups() throws Exception {
-        Method method = SignupAction.class.getDeclaredMethod("isExistingAdmin", String.class, int.class);
-        method.setAccessible(true);
-        SignupAction action = new SignupAction();
-        assertTrue((Boolean) method.invoke(action, user(ADMIN).getLogin(), ACCOUNT_ID));
-        assertFalse((Boolean) method.invoke(action, user(TEAM_A).getLogin(), ACCOUNT_ID));
-        assertFalse((Boolean) method.invoke(action, "new-user@example.com", ACCOUNT_ID));
+    public void testSsoRemoveAccessWithoutGroup() {
+        Map<String, String> mapping = Collections.singletonMap("group-a", "MEMBER");
+        List<String> noMappedGroup = Collections.singletonList("some-other-group");
+        String email = user(TEAM_A).getLogin();
+
+        // off by default: users keep their role
+        assertNull(SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, mapping, noMappedGroup, false, true));
+        // on, with the full group list: no access in every product (never an empty mapping, which means the old single role)
+        Map<String, String> removed = SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, mapping, noMappedGroup, true, true);
+        assertFalse(removed.isEmpty());
+        for (String role : removed.values()) assertEquals("NO_ACCESS", role);
+        // on, but the IdP did not send the full group list (claim missing or too many groups): keep the role
+        assertNull(SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, mapping, noMappedGroup, true, false));
+        // on, but no mapping set: nothing to reconcile against
+        assertNull(SsoRoleMapping.rolesForLogin(email, ACCOUNT_ID, new HashMap<>(), noMappedGroup, true, true));
     }
 
     @Test
@@ -316,6 +368,10 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         SSOConfigsDao.instance.insertOne(new SAMLConfig(ConfigType.AZURE, ACCOUNT_ID));
         assertEquals("SUCCESS", action.saveSamlGroupRoleMapping());
         assertEquals(mapping, SSOConfigsDao.getSAMLConfigByAccountId(ACCOUNT_ID).getGroupRoleMapping());
+        assertFalse(SSOConfigsDao.getSAMLConfigByAccountId(ACCOUNT_ID).isRemoveAccessWithoutGroup());
+        action.setRemoveAccessWithoutGroup(true);
+        assertEquals("SUCCESS", action.saveSamlGroupRoleMapping());
+        assertTrue(SSOConfigsDao.getSAMLConfigByAccountId(ACCOUNT_ID).isRemoveAccessWithoutGroup());
 
         for (Map.Entry<String, String> invalid : new HashMap<String, String>() {{
             put("g.dotted", "ADMIN");
@@ -351,5 +407,134 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         insertAudit(3, "other-team-server");
         assertEquals(1, fetchAudit(TEAM_A).size());
         assertEquals(2, fetchAudit(ADMIN).size());
+    }
+
+    // ── Collection rules on custom roles ───────────────────────────────────────
+
+    private void insertRuleRole(String name, CollectionRule rule) {
+        CustomRole role = new CustomRole();
+        role.setName(name);
+        role.setBaseRole("THREAT_ENGINEER");
+        role.setApiCollectionsId(new ArrayList<>());
+        role.setCollectionRules(Collections.singletonList(rule));
+        CustomRoleDao.instance.insertOne(role);
+        CustomRoleDao.clearRoleCache();
+    }
+
+    @Test
+    public void testCollectionRules() {
+        insertAgentCollection(4, "team-a-new-agent.example.com"); // added later, matches the host rule
+        // a collection made by hand has no host: its name is matched instead
+        ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(5, "team-a-manual"));
+        // a collection with a host is matched by its host only, so renaming it can't move it into a team
+        ApiCollection renamed = ApiCollection.createManualCollection(6, "team-a-renamed");
+        renamed.setHostName("team-b-other.example.com");
+        ApiCollectionsDao.instance.insertOne(renamed);
+        insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
+        insertUser(106, "TEAM_A_BY_HOST");
+        as(106, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(new HashSet<>(Arrays.asList(1, 4, 5)), new HashSet<>(ArgusCollectionScope.getRestrictedCollectionIds(user(106))));
+        assertEquals(new HashSet<>(Arrays.asList(OWN_HOST, "team-a-new-agent.example.com")), ArgusCollectionScope.getRestrictedHosts(user(106)));
+
+        insertRuleRole("TEAM_BY_TAG", new CollectionRule(null, Constants.AKTO_GEN_AI_TAG, "Gen AI"));
+        insertUser(107, "TEAM_BY_TAG");
+        as(107, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(new HashSet<>(Arrays.asList(1, 2, 3, 4)), new HashSet<>(ArgusCollectionScope.getRestrictedCollectionIds(user(107))));
+
+        // rules that match nothing yet: the user sees nothing, never everything
+        insertRuleRole("TEAM_NONE_YET", new CollectionRule("^no-such-agent-", null, null));
+        insertUser(108, "TEAM_NONE_YET");
+        as(108, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), ArgusCollectionScope.getRestrictedCollectionIds(user(108)));
+        assertTrue(ArgusCollectionScope.getRestrictedHosts(user(108)).isEmpty());
+
+        // screens that edit per-user grants only see explicit grants, never rule matches or the sentinel
+        for (int userId : new int[]{106, 108}) {
+            UsersDao.instance.updateOne(com.mongodb.client.model.Filters.eq("_id", userId),
+                    com.mongodb.client.model.Updates.set(User.ACCOUNTS + "." + ACCOUNT_ID, new com.akto.dto.UserAccountEntry(ACCOUNT_ID, "account")));
+        }
+        assertTrue(RBACDao.instance.getAllUsersCollections(ACCOUNT_ID).get(106).isEmpty());
+        assertTrue(RBACDao.instance.getAllUsersCollections(ACCOUNT_ID).get(108).isEmpty());
+
+        // a pattern Mongo cannot run matches nothing: the user stays limited instead of seeing everything
+        insertRuleRole("TEAM_BAD_PATTERN", new CollectionRule("\\p{javaLowerCase}+", null, null));
+        insertUser(109, "TEAM_BAD_PATTERN");
+        as(109, CONTEXT_SOURCE.AGENTIC);
+        assertEquals(Collections.singletonList(RBACDao.NO_COLLECTION_ID), ArgusCollectionScope.getRestrictedCollectionIds(user(109)));
+    }
+
+    @Test
+    public void testNewCollectionReachesRuleRoles() throws InterruptedException {
+        // users already browsing see a matching collection as soon as it is created, not after their cache expires
+        insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
+        insertUser(106, "TEAM_A_BY_HOST");
+        HashMap<String, FeatureAccess> features = new HashMap<>();
+        features.put(UsersCollectionsList.RBAC_FEATURE, new FeatureAccess(true));
+        Organization org = new Organization("org-rule-test", "org", "admin@example.com", new HashSet<>(Collections.singletonList(ACCOUNT_ID)), false);
+        org.setFeatureWiseAllowed(features);
+        OrganizationsDao.instance.insertOne(org);
+        try {
+            as(106, CONTEXT_SOURCE.AGENTIC);
+            assertFalse(UsersCollectionsList.getCollectionsIdForUser(106, ACCOUNT_ID).isEmpty());
+
+            as(ADMIN, CONTEXT_SOURCE.AGENTIC);
+            ApiCollectionsAction action = new ApiCollectionsAction();
+            action.setCollectionName("team-a-created");
+            assertEquals("SUCCESS", action.createCollection());
+            int created = action.getApiCollections().get(0).getId();
+
+            // matched again in the background
+            as(106, CONTEXT_SOURCE.AGENTIC);
+            boolean seen = false;
+            for (int i = 0; i < 50 && !seen; i++) {
+                seen = UsersCollectionsList.getCollectionsIdForUser(106, ACCOUNT_ID).contains(created);
+                if (!seen) Thread.sleep(100);
+            }
+            assertTrue(seen);
+        } finally {
+            OrganizationsDao.instance.getMCollection().deleteMany(new org.bson.Document("_id", "org-rule-test"));
+            UsersCollectionsList.deleteAccountCollectionIdsFromCache(ACCOUNT_ID);
+        }
+    }
+
+    @Test
+    public void testRuleMatchesAreSavedNotRunPerRequest() {
+        insertRuleRole("TEAM_A_BY_HOST", new CollectionRule("^team-a-", null, null));
+        insertUser(106, "TEAM_A_BY_HOST");
+        as(106, CONTEXT_SOURCE.AGENTIC);
+        // the first use matches the rules once and saves the result on the role
+        assertTrue(RBACDao.instance.getUserCollectionsById(106, ACCOUNT_ID).contains(1));
+        assertEquals(Collections.singletonList(1), CustomRoleDao.instance.findRoleByName("TEAM_A_BY_HOST").getRuleCollectionIds());
+
+        // a collection found in traffic is not seen until the rules are matched again: requests only read the saved ids
+        insertAgentCollection(7, "team-a-from-traffic.example.com");
+        assertFalse(RBACDao.instance.getUserCollectionsById(106, ACCOUNT_ID).contains(7));
+
+        RuleCollections.refresh(ACCOUNT_ID);
+        assertEquals(Arrays.asList(1, 7), CustomRoleDao.instance.findRoleByName("TEAM_A_BY_HOST").getRuleCollectionIds());
+        assertTrue(RBACDao.instance.getUserCollectionsById(106, ACCOUNT_ID).contains(7));
+    }
+
+    @Test
+    public void testRuleQueriesHaveIndexes() {
+        // without them every rule match reads every collection document
+        ApiCollectionsDao.instance.createIndicesIfAbsent();
+        List<String> keys = new ArrayList<>();
+        for (org.bson.Document index : ApiCollectionsDao.instance.getMCollection().listIndexes()) {
+            keys.add(((org.bson.Document) index.get("key")).keySet().toString());
+        }
+        assertTrue(keys.toString(), keys.contains("[hostName]"));
+        assertTrue(keys.toString(), keys.contains("[tagsList.keyName, tagsList.value]"));
+    }
+
+    @Test
+    public void testCollectionRuleValidation() {
+        assertNull(new CollectionRule("^team-a-", null, null).validate());
+        assertNull(new CollectionRule(null, "team", "a").validate());
+        assertNotNull(new CollectionRule("([bad", null, null).validate());
+        assertNotNull(new CollectionRule(null, null, null).validate());
+        assertNotNull(new CollectionRule("^x", "team", "a").validate());
+        assertNotNull(new CollectionRule(null, "team", "").validate()); // a tag rule needs a value
+        assertNotNull(new CollectionRule(new String(new char[201]).replace('\0', 'a'), null, null).validate());
     }
 }

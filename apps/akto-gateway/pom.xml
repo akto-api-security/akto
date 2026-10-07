@@ -32,6 +32,16 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Micrometer core only: guardrails/proxy call metrics are emitted to the global
+             registry (Metrics.globalRegistry). The data-ingestion-service that bundles this jar
+             binds a PrometheusMeterRegistry to the global registry, so these meters surface on
+             its /metrics scrape. If no registry is bound, the global registry is a no-op. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-core</artifactId>
+            <version>1.17.1</version>
+        </dependency>
+
     </dependencies>
 
     <build>
