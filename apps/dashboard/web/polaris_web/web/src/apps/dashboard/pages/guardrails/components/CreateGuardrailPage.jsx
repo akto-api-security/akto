@@ -614,12 +614,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             });
         }
 
-        steps.push({
-            number: BlockedHostsConfig.number,
-            title: BlockedHostsConfig.title,
-            summary: BlockedHostsConfig.getSummary(storedStateData),
-            ...BlockedHostsConfig.validate(storedStateData)
-        });
+        if (isEndpointSecurityCategory()) {
+            steps.push({
+                number: BlockedHostsConfig.number,
+                title: BlockedHostsConfig.title,
+                summary: BlockedHostsConfig.getSummary(storedStateData),
+                ...BlockedHostsConfig.validate(storedStateData)
+            });
+        }
 
         steps.push({
             number: ExceptionsConfig.number,
