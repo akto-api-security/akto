@@ -2194,9 +2194,12 @@ public class ClientActor extends DataActor {
     public void insertTestingRunResultSummary(TestingRunResultSummary trrs) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
+        trrs.setTestingRunHexId(trrs.getTestingRunHexId());
+        trrs.setOriginalTestingRunResultSummaryHexId(trrs.getOriginalTestingRunResultSummaryHexId());
         obj.put("trrs", trrs);
+        obj.put("summaryId", trrs.getHexId());
         String objString = gson.toJson(obj);
-        
+
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResultSummary", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
