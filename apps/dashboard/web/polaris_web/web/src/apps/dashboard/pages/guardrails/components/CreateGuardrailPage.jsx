@@ -263,9 +263,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
     const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
 
-    // Step 11: Blocked hosts/paths (block-only)
+    // Step 11: Blocked hosts/paths (block list, or allow-list when blockedHostsAllowOnly)
     // Host + path suggestions are sourced from the browser extension configs.
     const [blockedHosts, setBlockedHosts] = useState([]);
+    const [blockedHostsAllowOnly, setBlockedHostsAllowOnly] = useState(false);
     const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
     const [blockPublicShare, setBlockPublicShare] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
@@ -503,6 +504,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        blockedHostsAllowOnly,
         blockPublicShare,
         blockPersonalAccounts,
         // Step 13
@@ -829,6 +831,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedAgentServers([]);
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
+        setBlockedHostsAllowOnly(false);
         setBlockPersonalAccounts(false);
         setBlockPublicShare(false);
         setIgnorePhrases([]);
@@ -997,6 +1000,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setBlockedHosts((policy.blockedHosts || []).map(entry => ({
             pattern: entry.pattern || ""
         })));
+        setBlockedHostsAllowOnly(policy.blockedHostsAllowOnly || false);
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
         setBlockPublicShare(policy.blockPublicShare || false);
 
@@ -1159,6 +1163,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedAgentServersV2: transformedAgentServers,
                 selectedLlmServersV2: transformedLlmServers,
                 blockedHosts: cleanedBlockedHosts,
+                blockedHostsAllowOnly,
                 blockPersonalAccounts,
                 blockPublicShare,
                 ignorePhrases: cleanedIgnorePhrases,
@@ -1360,6 +1365,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <BlockedHostsStep
                         blockedHosts={blockedHosts}
                         setBlockedHosts={setBlockedHosts}
+                        blockedHostsAllowOnly={blockedHostsAllowOnly}
+                        setBlockedHostsAllowOnly={setBlockedHostsAllowOnly}
                         blockPersonalAccounts={blockPersonalAccounts}
                         setBlockPersonalAccounts={setBlockPersonalAccounts}
                         blockPublicShare={blockPublicShare}
@@ -1526,6 +1533,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             blockedHosts: (blockedHosts || [])
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
+            blockedHostsAllowOnly,
             blockPersonalAccounts,
             blockPublicShare,
             ignorePhrases: (ignorePhrases || [])
