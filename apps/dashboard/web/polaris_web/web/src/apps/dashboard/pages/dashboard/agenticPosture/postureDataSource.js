@@ -1,13 +1,6 @@
 import postureSummaryMock from './mockData/postureSummary.mock.json'
 import dashboardApi from '../api'
 
-// Only sections rendered under a "Coming soon" overlay use sample data; real sections never fall back to it.
-const MOCK_DELAY_MS = 250
-
-function delay(value) {
-    return new Promise((resolve) => setTimeout(() => resolve(value), MOCK_DELAY_MS))
-}
-
 // Posture score never falls back to mock; a failed/missing response renders as a data gap.
 const POSTURE_SCORE_FETCH_ERROR = {
     value: null,
