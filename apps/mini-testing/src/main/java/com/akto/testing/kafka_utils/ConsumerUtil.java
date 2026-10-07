@@ -314,6 +314,9 @@ public class ConsumerUtil {
         if (currentTestInfo.containsField(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS)) {
             effectiveMaxRunTime = currentTestInfo.getInt(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, maxRunTimeInSeconds);
         }
+        final int expectedRecords = currentTestInfo.containsField(TestingStateStore.EXPECTED_RECORDS)
+                ? currentTestInfo.getInt(TestingStateStore.EXPECTED_RECORDS)
+                : -1;
         final int accountId = currentTestInfo.containsField(TestingStateStore.ACCOUNT_ID)
                 ? currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID)
                 : (Context.accountId.get() != null ? Context.accountId.get() : -1);
@@ -325,9 +328,6 @@ public class ConsumerUtil {
         AtomicInteger processedRecords = new AtomicInteger(0);
 
         // Fresh observability for this run (replaces any previous run's state).
-        final int expectedRecords = currentTestInfo.containsField(TestingStateStore.EXPECTED_RECORDS)
-                ? currentTestInfo.getInt(TestingStateStore.EXPECTED_RECORDS)
-                : -1;
         metrics = new TestRunMetrics(summaryIdForTest, startTime, expectedRecords, executor);
         int apiCount = (instance.getTestingUtil() != null && instance.getTestingUtil().getSampleMessages() != null)
                 ? instance.getTestingUtil().getSampleMessages().size() : -1;
