@@ -68,6 +68,7 @@ public class TestingRunResultSummary {
 
     public void setId(ObjectId id) {
         this.id = id;
+        this.hexId = id == null ? null : id.toHexString();
     }
 
     public int getStartTimestamp() {

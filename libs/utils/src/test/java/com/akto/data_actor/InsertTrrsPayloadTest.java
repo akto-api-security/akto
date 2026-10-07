@@ -2,6 +2,8 @@ package com.akto.data_actor;
 
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.bson.types.ObjectId;
@@ -36,6 +38,24 @@ public class InsertTrrsPayloadTest {
         JsonObject trrs = body.getAsJsonObject("trrs");
         assertEquals(testingRunId.toHexString(), trrs.get("testingRunHexId").getAsString());
         assertFalse(trrs.has("originalTestingRunResultSummaryHexId"));
+    }
+
+    @Test
+    public void retryOfFetchedSummarySendsNewIdNotFetchedOne() throws Exception {
+        ObjectId fetchedId = new ObjectId();
+        ObjectId testingRunId = new ObjectId();
+        // decoded the way ClientActor.parseTestingRunResultSummary does, then given a new id as Main's retry does
+        TestingRunResultSummary trrs = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .readValue("{\"hexId\":\"" + fetchedId.toHexString() + "\",\"testingRunHexId\":\"" + testingRunId.toHexString() + "\",\"state\":\"RUNNING\"}", TestingRunResultSummary.class);
+        trrs.setId(fetchedId);
+        trrs.setTestingRunId(testingRunId);
+        ObjectId retryId = new ObjectId();
+        trrs.setId(retryId);
+
+        JsonObject body = send(trrs);
+
+        assertEquals(retryId.toHexString(), body.get("summaryId").getAsString());
+        assertEquals(testingRunId.toHexString(), body.getAsJsonObject("trrs").get("testingRunHexId").getAsString());
     }
 
     @Test
