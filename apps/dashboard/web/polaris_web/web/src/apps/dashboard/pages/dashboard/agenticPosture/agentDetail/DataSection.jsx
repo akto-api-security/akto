@@ -19,7 +19,7 @@ function DataSection({ data }) {
     const types = data.types || []
     const items = [
         { label: 'Sensitive data access', value: data.sensitiveDataAccess ? 'Yes' : 'No' },
-        { label: 'Guardrail Violations, 90d', value: String(data.detections || 0) },
+        { label: 'Sensitive data detections, 90d', value: String(data.detections || 0) },
     ]
 
     return (

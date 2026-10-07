@@ -6,6 +6,7 @@ import './AgentDetail.css'
 // and this step stays out of the nav. The entry is kept so turning the section back on is one flag.
 const STEPS = [
     { id: 'agent', label: 'Agent' },
+    { id: 'scoreBreakdown', label: 'Score breakdown' },
     { id: 'owner', label: 'Owner', hidden: true },
     { id: 'identity', label: 'Identity', hidden: true },
     { id: 'permissions', label: 'Permissions', hidden: true },
@@ -13,6 +14,7 @@ const STEPS = [
     { id: 'redTeam', label: 'Red Teaming' },
     { id: 'data', label: 'Data' },
     { id: 'protection', label: 'Protection' },
+    { id: 'guardrailActivity', label: 'Guardrail & malicious activity' },
     { id: 'runtime', label: 'Runtime Activity', hidden: true },
 ]
 

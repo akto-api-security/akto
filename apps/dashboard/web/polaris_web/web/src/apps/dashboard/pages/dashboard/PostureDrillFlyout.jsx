@@ -16,6 +16,7 @@ import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, GapHint, NumberCard
 import { DUMMY_RISK_SCORE_TREND } from './securityPostureDummyData'
 import dashboardApi from './api'
 import func from '@/util/func'
+import { ctaHref } from './agenticPosture/agentDetail/cta'
 
 // How many times to re-poll a PENDING narrative before giving up silently (no more network
 // calls, but the "Generating summary…" line stays as-is rather than flipping to an error state —
@@ -29,6 +30,8 @@ const NARRATIVE_POLL_INTERVAL_MS = 3000
 // AgGridTable every other drill/level uses (see PostureDrillResult#riskScoreBreakdown's own
 // javadoc for why).
 const DRILL_RISK_SCORE = 'riskScoreBreakdown'
+// Must match ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS on the backend.
+const DRILL_HIGH_RISK_AGENTS = 'highRiskAgents'
 
 // Same relative-time rendering LLMCellRenderers.jsx's TimeCell uses, minus its /1000 — every
 // drill row field named one of these (see PostureService#fetchDrill/ProfileBuilder's own row
@@ -36,18 +39,6 @@ const DRILL_RISK_SCORE = 'riskScoreBreakdown'
 // this was the "AI summary/table shows raw seconds" bug this level's build fixed.
 const EPOCH_FIELDS = new Set(['detectedAt', 'firstSeen', 'lastSeen', 'lastScannedAt', 'timestamp'])
 const TOKEN_FIELDS = new Set(['inputTokens', 'outputTokens', 'totalTokens'])
-
-// A CTA's own `params` (e.g. Critical alerts' "View all" -> {severity: "CRITICAL"}) has to land
-// as a URL query param, not router `state` — the destination pages this app already has (e.g.
-// ThreatDetectionPage.jsx's own severity filter) read their own pre-filters off `searchParams`,
-// never off `location.state`. Appending here, once, is what makes a CTA's `params` do anything at
-// all — passing them as `state` would have silently gone nowhere on arrival.
-function ctaHref(cta) {
-    if (!cta.params) return cta.route
-    const qs = new URLSearchParams(cta.params).toString()
-    if (!qs) return cta.route
-    return cta.route + (cta.route.includes('?') ? '&' : '?') + qs
-}
 
 function EpochCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(value || 0)}</Text>
@@ -678,9 +669,16 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
 
     const handleRowClicked = useCallback((e) => {
         if (!drill?.drillable || e?.data?.id === undefined || e?.data?.id === null) return
+        // highRiskAgents has no nested category level (unlike riskScoreBreakdown's category/agentId
+        // path) — every root-level row click already resolves to a bare agent id, so send it to
+        // the full agent-detail page instead of drilling in-place inside the flyout.
+        if (drillState.drillId === DRILL_HIGH_RISK_AGENTS && !drillState.path) {
+            navigate(`/dashboard/agentic-posture/agent/${encodeURIComponent(e.data.id)}`)
+            return
+        }
         const nextPath = drillState.path ? `${drillState.path}/${e.data.id}` : String(e.data.id)
         onNavigate({ drillId: drillState.drillId, path: nextPath })
-    }, [drill?.drillable, drillState, onNavigate])
+    }, [drill?.drillable, drillState, onNavigate, navigate])
 
     const handleSubScoreClick = useCallback((subScoreId) => {
         if (!drillState) return

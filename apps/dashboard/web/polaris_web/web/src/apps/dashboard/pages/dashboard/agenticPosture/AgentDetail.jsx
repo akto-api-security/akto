@@ -9,6 +9,9 @@ import ToolsSection from './agentDetail/ToolsSection'
 import RedTeamSection from './agentDetail/RedTeamSection'
 import DataSection from './agentDetail/DataSection'
 import ProtectionSection from './agentDetail/ProtectionSection'
+import ScoreBreakdownSection from './agentDetail/ScoreBreakdownSection'
+import RemediationSection from './agentDetail/RemediationSection'
+import GuardrailActivitySection from './agentDetail/GuardrailActivitySection'
 
 // StepNav, OwnerSection, IdentitySection and DangerousPathCallout are intentionally not rendered.
 // The sections have no data source in the Argus context; the step nav is hidden for now. All are
@@ -77,8 +80,20 @@ function AgentDetail() {
             )}
 
             <Box id="agent">
-                <AgentHeaderCard header={detail.header} />
+                <AgentHeaderCard
+                    header={detail.header}
+                    redTeam={detail.redTeam}
+                    guardrailActivity={detail.guardrailActivity}
+                    tools={detail.tools}
+                />
             </Box>
+
+            <Section id="scoreBreakdown" title="Score breakdown">
+                <VerticalStack gap="4">
+                    <ScoreBreakdownSection rows={detail.scoreBreakdown} totalScore={detail.header?.riskScore} />
+                    <RemediationSection rows={detail.remediation} />
+                </VerticalStack>
+            </Section>
 
             <Section id="tools" title="Tools & Capabilities">
                 <ToolsSection tools={detail.tools} />
@@ -91,6 +106,10 @@ function AgentDetail() {
                 <ProtectionSection protection={detail.protection} />
             </Section>
             <RedTeamSection redTeam={detail.redTeam} />
+
+            <Section id="guardrailActivity" title="Guardrail & malicious activity">
+                <GuardrailActivitySection activity={detail.guardrailActivity} />
+            </Section>
         </VerticalStack>
     )
 

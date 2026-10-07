@@ -18,6 +18,9 @@ public class AgentDetailResult {
     private SensitiveData data = new SensitiveData();
     private List<Rule> protection = new ArrayList<>();
     private RedTeam redTeam = new RedTeam();
+    private List<ScoreBreakdownRow> scoreBreakdown = new ArrayList<>();
+    private List<RemediationRow> remediation = new ArrayList<>();
+    private GuardrailActivity guardrailActivity = new GuardrailActivity();
     private Finding openedFromFinding;
 
     @Getter
@@ -32,6 +35,11 @@ public class AgentDetailResult {
         private String environment;
         private Integer createdAt;
         private Integer lastActive;
+        private String host;
+        private String topIssue;
+        /** Covering guardrail policy names joined by ", ", or "Not covered". */
+        private String guardrailCoverage;
+        private List<InsightResult.Cta> ctas = new ArrayList<>();
     }
 
     @Getter
@@ -112,5 +120,48 @@ public class AgentDetailResult {
         private String endpoint;
         private String severity;
         private int lastSeen;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class ScoreBreakdownRow {
+        private String category;
+        private int weight;
+        private double subScore;
+        private double points;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RemediationRow {
+        private String category;
+        private double points;
+        private String remediation;
+    }
+
+    /** available=false means the guardrail activity could not be read — not the same as no events. */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class GuardrailActivity {
+        private boolean available = true;
+        private long total;
+        private List<GuardrailEvent> events = new ArrayList<>();
+        private List<InsightResult.Cta> ctas = new ArrayList<>();
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class GuardrailEvent {
+        private long timestamp;
+        /** The policy/rule name — DashboardMaliciousEvent.getFilterId(). */
+        private String guardrail;
+        private String event;
+        /** "Blocked" or "Flagged" — derived from the matching policy's current behaviour. A
+         *  renamed or deleted policy reads "Flagged" even if it blocked at the time. */
+        private String action;
     }
 }

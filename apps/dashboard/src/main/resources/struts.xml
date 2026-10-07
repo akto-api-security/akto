@@ -14109,7 +14109,7 @@
             </result>
         </action>
 
-        <action name="api/fetchArgusAgentDetail" class="com.akto.action.ArgusAgentDetailAction" method="fetchArgusAgentDetail">
+        <action name="api/fetchArgusAgentDetail" class="com.akto.action.ArgusPostureAction" method="fetchArgusAgentDetail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

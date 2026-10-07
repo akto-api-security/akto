@@ -1,17 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { Box, Button, Card, DataTable, HorizontalGrid, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
-import { RefreshMajor } from '@shopify/polaris-icons'
+import { Box, Button, Card, HorizontalGrid, Text, VerticalStack } from '@shopify/polaris'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import { ctaHref } from './cta'
+import SimpleIndexTable from '../../../../components/tables/SimpleIndexTable'
 import func from '@/util/func'
 import './AgentDetail.css'
-
-function Heading({ children }) {
-    return (
-        <span className="ad-label">
-            <Text as="span" variant="bodySm" fontWeight="semibold" color="subdued">{children}</Text>
-        </span>
-    )
-}
 
 // Neither DetailGrid (a compact label/value pair) nor RuntimeActivitySection's own StatTile (a
 // card-wrapped single value) carries a muted subtitle under the number — this section's stat row
@@ -28,38 +21,27 @@ function Stat({ label, value, secondary }) {
     )
 }
 
-// Same shape InsightResult.Cta already carries everywhere else a drill builds one — route plus a
-// flat params map turned into a query string, never a second URL-building convention.
-function ctaHref(cta) {
-    if (!cta.params) return cta.route
-    const qs = new URLSearchParams(cta.params).toString()
-    if (!qs) return cta.route
-    return cta.route + (cta.route.includes('?') ? '&' : '?') + qs
-}
-
 function absoluteDate(epoch) {
     if (!epoch) return null
     return new Date(epoch * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+const FINDINGS_HEADINGS = [
+    { title: 'Test' },
+    { title: 'Severity' },
+    { title: 'Last seen' },
+]
+
 function RedTeamSection({ redTeam }) {
     const navigate = useNavigate()
     if (!redTeam) return null
 
-    const runScanCta = (redTeam.ctas || []).find((c) => c.id === 'run_red_team')
     const viewAllCta = (redTeam.ctas || []).find((c) => c.id === 'view_findings')
 
     return (
         <Box id="redTeam" paddingBlockStart="2">
             <VerticalStack gap="4">
-                <HorizontalStack align="space-between" blockAlign="center">
-                    <Text variant="headingMd">Red Teaming</Text>
-                    {runScanCta && (
-                        <Button icon={RefreshMajor} onClick={() => navigate(ctaHref(runScanCta))}>
-                            {runScanCta.label}
-                        </Button>
-                    )}
-                </HorizontalStack>
+                <Text variant="headingMd">Red Teaming</Text>
 
                 {!redTeam.scanned ? (
                     <Card padding="5">
@@ -84,21 +66,15 @@ function RedTeamSection({ redTeam }) {
                             </HorizontalGrid>
                         </Box>
                         {(redTeam.findings || []).length > 0 && (
-                            <DataTable
-                                columnContentTypes={['text', 'text', 'text']}
-                                headings={[
-                                    <Heading key="test">Test</Heading>,
-                                    <Heading key="severity">Severity</Heading>,
-                                    <Heading key="lastSeen">Last seen</Heading>,
-                                ]}
+                            <SimpleIndexTable
+                                resourceName={{ singular: 'finding', plural: 'findings' }}
+                                headings={FINDINGS_HEADINGS}
                                 rows={redTeam.findings.map((finding) => [
-                                    <Text as="span" variant="bodyMd" fontWeight="medium">{finding.test}</Text>,
+                                    <Text variant="bodyMd" fontWeight="medium">{finding.test}</Text>,
                                     <SeverityBadge severity={finding.severity} />,
-                                    <Text as="span" variant="bodyMd" color="subdued">{func.prettifyEpoch(finding.lastSeen)}</Text>,
+                                    <Text variant="bodyMd" color="subdued">{func.prettifyEpoch(finding.lastSeen)}</Text>,
                                 ])}
-                                verticalAlign="middle"
-                                increasedTableDensity
-                                hideScrollIndicator
+                                getRowId={(cells, index) => `${redTeam.findings[index].test}-${index}`}
                             />
                         )}
                         {viewAllCta && (

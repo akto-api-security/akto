@@ -1,15 +1,15 @@
-import { Badge, Card, DataTable, HorizontalStack, Text } from '@shopify/polaris'
+import { Badge, Card, HorizontalStack, Text } from '@shopify/polaris'
+import SimpleIndexTable from '../../../../components/tables/SimpleIndexTable'
 import './AgentDetail.css'
 
 const MAX_TAGS = 5
 
-function Heading({ children }) {
-    return (
-        <span className="ad-label">
-            <Text as="span" variant="bodySm" fontWeight="semibold" color="subdued">{children}</Text>
-        </span>
-    )
-}
+const HEADINGS = [
+    { title: 'Rule' },
+    { title: 'Status' },
+    { title: 'Details' },
+    { title: 'Applies on' },
+]
 
 // A rule nobody enabled is a gap, so it reads critical rather than muted.
 function Status({ enabled }) {
@@ -44,23 +44,16 @@ function ProtectionSection({ protection }) {
 
     return (
         <Card padding="0">
-            <DataTable
-                columnContentTypes={['text', 'text', 'text', 'text']}
-                headings={[
-                    <Heading key="rule">Rule</Heading>,
-                    <Heading key="status">Status</Heading>,
-                    <Heading key="details">Details</Heading>,
-                    <Heading key="appliesOn">Applies on</Heading>,
-                ]}
+            <SimpleIndexTable
+                resourceName={{ singular: 'rule', plural: 'rules' }}
+                headings={HEADINGS}
                 rows={rows.map((rule) => [
-                    <Text as="span" variant="bodyMd" fontWeight="medium">{rule.name}</Text>,
+                    <Text variant="bodyMd" fontWeight="medium">{rule.name}</Text>,
                     <Status enabled={rule.enabled} />,
                     <Details rule={rule} />,
-                    <Text as="span" variant="bodyMd" color="subdued">{rule.appliesOn || '—'}</Text>,
+                    <Text variant="bodyMd" color="subdued">{rule.appliesOn || '—'}</Text>,
                 ])}
-                verticalAlign="middle"
-                increasedTableDensity
-                hideScrollIndicator
+                getRowId={(cells, index) => rows[index].name}
             />
         </Card>
     )
