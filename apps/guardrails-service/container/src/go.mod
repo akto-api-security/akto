@@ -12,8 +12,8 @@ require (
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/tsawler/tabula v1.6.6
 	go.uber.org/zap v1.27.1
-	golang.org/x/image v0.43.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/image v0.45.0
+	golang.org/x/sync v0.22.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -120,8 +120,8 @@ require (
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20251209150349-8475f28825e9 // indirect
 	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.39.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
