@@ -2568,7 +2568,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
   shouldShowIpReputation() {
-    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662 || window.ACTIVE_ACCOUNT === 1786100206
   },
 
   isSameDateAsToday (givenDate) {
