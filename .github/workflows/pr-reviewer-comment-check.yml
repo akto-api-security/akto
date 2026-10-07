@@ -1,8 +1,13 @@
 name: PR reviewer comment check
 
 on:
-  pull_request:
-    types: [ opened, synchronize, reopened ]
+  # Deliberately no `pull_request:` trigger. That would run (and fail) the instant a PR
+  # opens, before any review exists - and since that trigger type never refires on its own,
+  # the resulting failed check-run can never be superseded by itself, only worked around by
+  # manually re-running it (see #6579, #6609). Evaluating only on review activity means the
+  # check simply doesn't exist until a review happens - GitHub shows that as "waiting on
+  # status", not a stuck failure - and the native required-approving-review rule already
+  # forces a review to happen before merge regardless.
   pull_request_review:
     types: [ submitted, edited, dismissed ]
   pull_request_review_comment:
