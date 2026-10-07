@@ -2735,6 +2735,16 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResultSummary() {
         try {
+            // ObjectIds don't survive JSON binding; restore them from the hex strings sent by the client
+            if (summaryId != null) {
+                trrs.setId(new ObjectId(summaryId));
+            }
+            if (trrs.getTestingRunHexId() != null) {
+                trrs.setTestingRunId(new ObjectId(trrs.getTestingRunHexId()));
+            }
+            if (trrs.getOriginalTestingRunResultSummaryHexId() != null) {
+                trrs.setOriginalTestingRunResultSummaryId(new ObjectId(trrs.getOriginalTestingRunResultSummaryHexId()));
+            }
             DbLayer.insertTestingRunResultSummary(trrs);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResultSummary " + e.toString());
