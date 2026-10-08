@@ -3,7 +3,7 @@
 # Run frontend separately: cd apps/dashboard/web/polaris_web && npm run hot
 #
 # Env: apps/dashboard/scripts/config.env (copy from config.env.example if missing)
-# Port: set JETTY_PORT (or jetty.port) externally — default 8081.
+# Port: set JETTY_PORT externally — default 8081. Passed only to this local Jetty run.
 
 set -euo pipefail
 
@@ -36,5 +36,5 @@ mvn --projects :dashboard --also-make package -DskipTests
 # Use the fully-qualified plugin (prefix "jetty-ee8" is not in Maven's default pluginGroups).
 cd "${DASHBOARD_DIR}"
 exec mvn org.eclipse.jetty.ee8:jetty-ee8-maven-plugin:12.0.37:run \
-  -Djetty.port="${PORT}" \
+  -Djetty.http.port="${PORT}" \
   -DskipTests
