@@ -514,7 +514,7 @@ public class ArgusAgentPostureDrillService {
         List<TestingRunIssues> issues = openFindingsFor(agent.getId(), RED_TEAM_FINDINGS_CAP);
 
         redTeam.setLastScannedAt(agentLastScannedAt(agent.getId(), issues));
-        redTeam.setSeverityBreakdown(agentSeverityBreakdown(agent.getId()));
+        redTeam.setSeverityCounts(agentSeverityCounts(agent.getId()));
 
         Map<String, Info> infoByType = findingInfoFor(issues);
         List<AgentDetailResult.RedTeamFinding> findings = new ArrayList<>();
@@ -538,7 +538,7 @@ public class ArgusAgentPostureDrillService {
     /** Open-issue counts by severity for this one agent — the same aggregation
      *  AgenticPostureScoreCron groups by collection when it scores redTeam, scoped here to a single
      *  collection instead of re-deriving the count-by-severity logic. */
-    private String agentSeverityBreakdown(int collectionId) {
+    private List<AgentDetailResult.SeverityCount> agentSeverityCounts(int collectionId) {
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID,
                 "$" + TestingRunIssues.ID_API_COLLECTION_ID).append(TestingRunIssues.KEY_SEVERITY,
                 "$" + TestingRunIssues.KEY_SEVERITY);
@@ -546,12 +546,16 @@ public class ArgusAgentPostureDrillService {
                 Filters.eq(TestingRunIssues.ID_API_COLLECTION_ID, collectionId), false, groupedId);
         Map<String, Integer> counts = bySeverity.getOrDefault(collectionId, Collections.emptyMap());
 
-        List<String> parts = new ArrayList<>();
+        List<AgentDetailResult.SeverityCount> result = new ArrayList<>();
         for (String severity : Arrays.asList("CRITICAL", "HIGH", "MEDIUM", "LOW")) {
             Integer count = counts.get(severity);
-            if (count != null && count > 0) parts.add(count + " " + severity.toLowerCase(Locale.ROOT));
+            if (count == null || count <= 0) continue;
+            AgentDetailResult.SeverityCount sc = new AgentDetailResult.SeverityCount();
+            sc.setSeverity(severity);
+            sc.setCount(count);
+            result.add(sc);
         }
-        return parts.isEmpty() ? null : String.join(" · ", parts);
+        return result;
     }
 
     /** One batched lookup for every distinct test type among the shown findings, rather than one
@@ -625,13 +629,8 @@ public class ArgusAgentPostureDrillService {
         return rows;
     }
 
-    /**
-     * Guardrail/policy name is DashboardMaliciousEvent.getFilterId() — distinct from
-     * category/subCategory (the "Event" column, same field maliciousEventsSection's "title" uses).
-     * There is no stored block/flag verdict on the event itself: Action is derived by matching
-     * filterId to a currently-named policy and reading its behaviour. A renamed or deleted policy
-     * reads "Flagged" even if it blocked at the time — a known approximation, not an exact record.
-     */
+    /** Same row shape agentProfile's own maliciousEventsSection timeline already uses — event
+     *  (subCategory, else category), url, severity — so both render identically. */
     private AgentDetailResult.GuardrailActivity buildGuardrailActivity(ApiCollection agent, InsightDataBundle bundle) {
         AgentDetailResult.GuardrailActivity activity = new AgentDetailResult.GuardrailActivity();
         AgentEvents agentEvents = maliciousEventsFor(bundle, agent, GUARDRAIL_ACTIVITY_CAP);
@@ -641,20 +640,13 @@ public class ArgusAgentPostureDrillService {
         }
         activity.setTotal(agentEvents.total);
 
-        Map<String, GuardrailPolicies> policyByLowerName = new HashMap<>();
-        for (GuardrailPolicies p : bundle.policies) {
-            if (p != null && p.getName() != null) policyByLowerName.put(p.getName().trim().toLowerCase(Locale.ROOT), p);
-        }
-
         List<AgentDetailResult.GuardrailEvent> rows = new ArrayList<>();
         for (DashboardMaliciousEvent event : agentEvents.events) {
             AgentDetailResult.GuardrailEvent row = new AgentDetailResult.GuardrailEvent();
             row.setTimestamp(event.getTimestamp());
-            row.setGuardrail(event.getFilterId());
             row.setEvent(event.getSubCategory() != null ? event.getSubCategory() : event.getCategory());
-            GuardrailPolicies policy = event.getFilterId() == null ? null
-                    : policyByLowerName.get(event.getFilterId().trim().toLowerCase(Locale.ROOT));
-            row.setAction(policy != null && InsightUtil.isBlockingPolicy(policy) ? "Blocked" : "Flagged");
+            row.setUrl(event.getUrl());
+            row.setSeverity(event.getSeverity());
             rows.add(row);
         }
         activity.setEvents(rows);

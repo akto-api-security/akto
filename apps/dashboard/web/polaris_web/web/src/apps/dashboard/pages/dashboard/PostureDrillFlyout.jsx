@@ -10,6 +10,7 @@ import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
 import AgGridTable from '../../components/tables/AgGridTable'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import MarkdownViewer from '@/apps/dashboard/components/shared/MarkdownViewer'
+import ProfileTimeline from '@/apps/dashboard/components/shared/ProfileTimeline'
 import CustomProgressBar from './new_components/CustomProgressBar'
 import SmoothAreaChart from './new_components/SmoothChart'
 import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, GapHint, NumberCardsRow, riskBand, RiskScoreRing } from './new_components/PostureShared'
@@ -194,48 +195,6 @@ function ProfileFacts({ facts }) {
     )
 }
 
-function ProfileTimeline({ section }) {
-    const rows = section.rows || []
-    return (
-                <VerticalStack gap="4">
-                    <VerticalStack gap="05">
-                        <Text variant="headingSm">{section.title}</Text>
-                        {section.subtitle && <Text variant="bodySm" color="subdued">{section.subtitle}</Text>}
-                    </VerticalStack>
-                    {rows.length === 0 ? (
-                        <Text variant="bodySm" color="subdued">Nothing recorded in this window.</Text>
-                    ) : (
-                        // time | rail | content. Grid cells stretch to the row's height, so the rail's
-                        // border runs from under the dot to the next row — rows have no gap, the
-                        // content's bottom padding is the spacing, which keeps the line unbroken.
-                        <VerticalStack gap="0">
-                            {rows.map((r, i) => (
-                                <HorizontalGrid key={i} columns="96px 8px minmax(0, 1fr)" gap="3">
-                                    <Text variant="bodySm" color="subdued" alignment="end">{func.prettifyEpoch(r.timestamp || 0)}</Text>
-                                    <Box position="relative">
-                                        <Box paddingBlockStart="1">
-                                            <Box className="agentic-dot" style={{ '--dot-color': func.getHexColorForSeverity(String(r.severity || '').toUpperCase()) }} />
-                                        </Box>
-                                        {i < rows.length - 1 && (
-                                            <Box position="absolute" insetBlockStart="4" insetBlockEnd="0" width="4px" borderInlineEndWidth="1" borderColor="border-subdued" />
-                                        )}
-                                    </Box>
-                                    <Box paddingBlockEnd="5">
-                                        <VerticalStack gap="05">
-                                            <Text variant="bodyMd" fontWeight="semibold">{r.title}</Text>
-                                            {r.detail && <Text variant="bodySm" color="subdued">{r.detail}</Text>}
-                                        </VerticalStack>
-                                    </Box>
-                                </HorizontalGrid>
-                            ))}
-                        </VerticalStack>
-                    )}
-                    {section.total > rows.length && (
-                        <Text variant="bodySm" color="subdued">Showing {rows.length} of {section.total}.</Text>
-                    )}
-                </VerticalStack>
-    )
-}
 
 function ProfileTable({ section }) {
     const columns = section.columns || []
@@ -297,7 +256,9 @@ function DrillProfileBody({ drill, onCtaClick }) {
             {(drill.sections || []).map((s) => (
                 <VerticalStack key={s.id} gap="4">
                     <Divider />
-                    {s.kind === 'timeline' ? <ProfileTimeline section={s} /> : <ProfileTable section={s} />}
+                    {s.kind === 'timeline'
+                        ? <ProfileTimeline title={s.title} subtitle={s.subtitle} rows={s.rows} total={s.total} />
+                        : <ProfileTable section={s} />}
                 </VerticalStack>
             ))}
         </VerticalStack>

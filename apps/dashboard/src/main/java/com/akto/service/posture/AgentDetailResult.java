@@ -102,12 +102,19 @@ public class AgentDetailResult {
         private boolean scanned;
         private Integer lastScannedAt;
         private long openFindings;
-        /** "2 critical · 2 high · 3 medium" — built server-side from the same severity
-         *  counts the posture score cron already groups by collection, in CRITICAL..LOW order,
-         *  skipping zero counts. */
-        private String severityBreakdown;
+        /** One entry per non-zero severity among the same counts the posture score cron already
+         *  groups by collection, in CRITICAL..LOW order. */
+        private List<SeverityCount> severityCounts = new ArrayList<>();
         private List<RedTeamFinding> findings = new ArrayList<>();
         private List<InsightResult.Cta> ctas = new ArrayList<>();
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class SeverityCount {
+        private String severity;
+        private int count;
     }
 
     @Getter
@@ -157,11 +164,9 @@ public class AgentDetailResult {
     @NoArgsConstructor
     public static class GuardrailEvent {
         private long timestamp;
-        /** The policy/rule name — DashboardMaliciousEvent.getFilterId(). */
-        private String guardrail;
+        /** subCategory, else category — same field agentProfile's own maliciousEventsSection uses. */
         private String event;
-        /** "Blocked" or "Flagged" — derived from the matching policy's current behaviour. A
-         *  renamed or deleted policy reads "Flagged" even if it blocked at the time. */
-        private String action;
+        private String url;
+        private String severity;
     }
 }

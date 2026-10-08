@@ -1,29 +1,23 @@
 import { useNavigate } from 'react-router-dom'
-import { Box, Button, Card, HorizontalGrid, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Card, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
 import { ctaHref } from './cta'
 import SimpleIndexTable from '../../../../components/tables/SimpleIndexTable'
 import func from '@/util/func'
 import './AgentDetail.css'
 
-// Neither DetailGrid (a compact label/value pair) nor RuntimeActivitySection's own StatTile (a
-// card-wrapped single value) carries a muted subtitle under the number — this section's stat row
-// needs both a big number and a breakdown line beneath it, side by side in one shared card.
-function Stat({ label, value, secondary }) {
+function SeverityCounts({ counts }) {
+    if (!counts || counts.length === 0) return null
     return (
-        <VerticalStack gap="1">
-            <span className="ad-label">
-                <Text variant="bodySm" color="subdued">{label}</Text>
-            </span>
-            <Text variant="headingXl" fontWeight="bold">{value}</Text>
-            {secondary && <Text variant="bodySm" color="subdued">{secondary}</Text>}
-        </VerticalStack>
+        <HorizontalStack gap="3">
+            {counts.map((sc) => (
+                <HorizontalStack key={sc.severity} gap="1" blockAlign="center">
+                    <SeverityBadge severity={sc.severity} />
+                    <Text variant="bodyMd" color="subdued">{sc.count}</Text>
+                </HorizontalStack>
+            ))}
+        </HorizontalStack>
     )
-}
-
-function absoluteDate(epoch) {
-    if (!epoch) return null
-    return new Date(epoch * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 const FINDINGS_HEADINGS = [
@@ -52,18 +46,13 @@ function RedTeamSection({ redTeam }) {
                 ) : (
                     <Card padding="0">
                         <Box padding="5">
-                            <HorizontalGrid columns={2} gap="8">
-                                <Stat
-                                    label="Open findings"
-                                    value={String(redTeam.openFindings || 0)}
-                                    secondary={redTeam.severityBreakdown}
-                                />
-                                <Stat
-                                    label="Last scanned"
-                                    value={redTeam.lastScannedAt ? func.prettifyEpoch(redTeam.lastScannedAt) : '-'}
-                                    secondary={absoluteDate(redTeam.lastScannedAt)}
-                                />
-                            </HorizontalGrid>
+                            <VerticalStack gap="2">
+                                <span className="ad-label">
+                                    <Text variant="bodySm" color="subdued">Open findings</Text>
+                                </span>
+                                <Text variant="headingXl" fontWeight="bold">{redTeam.openFindings || 0}</Text>
+                                <SeverityCounts counts={redTeam.severityCounts} />
+                            </VerticalStack>
                         </Box>
                         {(redTeam.findings || []).length > 0 && (
                             <SimpleIndexTable
