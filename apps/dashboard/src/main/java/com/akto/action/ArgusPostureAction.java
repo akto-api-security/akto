@@ -21,6 +21,7 @@ import com.akto.service.posture.AgentDetailResult;
 import com.akto.service.posture.ArgusAgentPostureDrillService;
 import com.akto.service.posture.ArgusPostureChangesService;
 import com.akto.service.posture.ArgusPostureService;
+import com.akto.service.posture.ArgusPostureUtils;
 import com.akto.service.posture.PostureDrillNarrativeService;
 import com.akto.service.posture.PostureDrillResult;
 import com.akto.util.Constants;
@@ -174,7 +175,7 @@ public class ArgusPostureAction extends UserAction {
             if (BUNDLE_ONLY_DRILLS.contains(drillId)) {
                 InsightDataBundle bundle = getOrEmpty(EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                         () -> insightService.getOrLoadBundle(ctx))), null, "bundle");
-                String envScopeKey = "env=" + ArgusPostureService.environmentKey(environment);
+                String envScopeKey = "env=" + ArgusPostureUtils.environmentKey(environment);
                 switch (drillId) {
                     case ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE:
                         postureDrill = agentPostureDrillService.fetchPostureScoreDrill(bundle, path, skip, limit);

@@ -13,7 +13,6 @@ import com.akto.dto.insights.InsightNarrativeCache;
 import com.akto.dto.insights.agentic.AgentFindingGroup;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.testing.AgentConversationResult;
-import com.akto.dto.traffic.CollectionTags;
 import com.akto.gpt.handlers.gpt_prompts.AbstractGroundedNarrativeHandler;
 import com.akto.gpt.handlers.gpt_prompts.ArgusAttackFlowNarrativeHandler;
 import com.akto.gpt.handlers.gpt_prompts.ArgusInsightCardNarrativeHandler;
@@ -39,13 +38,9 @@ import org.bson.conversions.Bson;
 import java.util.*;
 import java.util.function.Function;
 import java.util.concurrent.*;
-import java.util.Objects;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class ArgusPostureService {
-
-    private static final String UNKNOWN_AGENT = "Unknown agent";
 
     private static final String KEY_KPIS = "kpis";
     private static final String KEY_ENVIRONMENTS = "environments";
@@ -56,20 +51,6 @@ public class ArgusPostureService {
     private static final String KPI_PRIVILEGED_TOOLS    = "privilegedTools";
     private static final String KPI_SENSITIVE_DATA      = "sensitiveData";
     private static final String KPI_PROTECTION_COVERAGE = "protectionCoverage";
-
-    // Display buckets/tag-value lists moved to InsightUtil (environmentBucket/envTagValue) so any
-    // AGENTIC insight provider can group by environment too, without depending on this package.
-    private static final String ENV_PRODUCTION  = InsightUtil.ENV_PRODUCTION;
-    private static final String ENV_STAGING     = InsightUtil.ENV_STAGING;
-    private static final String ENV_DEVELOPMENT = InsightUtil.ENV_DEVELOPMENT;
-
-    private static final String ENV_ID_ALL         = "all";
-    private static final String ENV_ID_PRODUCTION  = "production";
-    private static final String ENV_ID_STAGING     = "staging";
-    private static final String ENV_ID_DEVELOPMENT = "development";
-
-    private static final List<String> DEV_ENVS     = Arrays.asList("DEV");
-    private static final List<String> STAGING_ENVS = Arrays.asList("STAGING", "PREPROD", "UAT", "QA", "INTEG");
 
     private static final double TONE_SUCCESS_AT = 100d;
     private static final double TONE_WARNING_AT = 70d;
@@ -92,7 +73,7 @@ public class ArgusPostureService {
             if (c.isDeactivated()) deactivatedIds.add(c.getId());
             else assets.add(c);
         }
-        List<ApiCollection> scoped = assetsIn(assets, environment);
+        List<ApiCollection> scoped = ArgusPostureUtils.assetsIn(assets, environment);
 
         List<BasicDBObject> kpis = new ArrayList<>();
         kpis.add(assetsKpi(scoped, environment));
@@ -367,7 +348,7 @@ public class ArgusPostureService {
 
         if (stats.topFinding != null) {
             String agentName = agentName(stats.topFinding.getCollectionId(), collectionsById);
-            String vulnType = testDisplayName(stats.topFinding.getType(), testInfoByType);
+            String vulnType = ArgusPostureUtils.testDisplayName(stats.topFinding.getType(), testInfoByType);
             BasicDBObject top = new BasicDBObject("agentName", agentName)
                     .append("vulnType", vulnType)
                     .append("severity", stats.topFinding.getSecondary())
@@ -403,7 +384,7 @@ public class ArgusPostureService {
 
         Info info = testInfoByType.get(worst.getType());
         if (info != null) {
-            String label = testDisplayName(worst.getType(), testInfoByType);
+            String label = ArgusPostureUtils.testDisplayName(worst.getType(), testInfoByType);
             StringBuilder text = new StringBuilder("Most critical open issue — ").append(label)
                     .append(" on ").append(agentName).append(" (").append(worst.getSecondary()).append("). ");
             if (info.getDescription() != null) text.append(info.getDescription()).append(" ");
@@ -417,11 +398,6 @@ public class ArgusPostureService {
                     .append("text", "Validated red-team outcome on " + agentName + ": " + conversation.getValidationMessage()));
         }
         return context;
-    }
-
-    static String testDisplayName(String type, Map<String, Info> testInfoByType) {
-        Info info = testInfoByType.get(type);
-        return info != null && info.getName() != null ? info.getName() : type;
     }
 
     private AgentConversationResult firstResolved(List<String> conversationIds, Map<String, AgentConversationResult> conversationsById) {
@@ -679,7 +655,7 @@ public class ArgusPostureService {
         for (AgentFindingGroup g : groups) {
             totalOpenIssues += g.getCount();
             rows.add(PostureService.row("agentName", agentName(g.getCollectionId(), collectionsById),
-                    "vulnType", testDisplayName(g.getType(), testInfoByType), "severity", g.getSecondary(), "count", g.getCount(),
+                    "vulnType", ArgusPostureUtils.testDisplayName(g.getType(), testInfoByType), "severity", g.getSecondary(), "count", g.getCount(),
                     "lastSeen", g.getLastSeen()));
         }
         result.getSummary().add(new InsightResult.Metric("issueGroups", "Distinct issue groups",
@@ -798,9 +774,9 @@ public class ArgusPostureService {
     }
 
     private static String agentName(Integer collectionId, Map<Integer, ApiCollection> collectionsById) {
-        if (collectionId == null) return UNKNOWN_AGENT;
+        if (collectionId == null) return ArgusPostureUtils.UNKNOWN_AGENT;
         ApiCollection c = collectionsById.get(collectionId);
-        return c != null ? agentDisplayName(c) : UNKNOWN_AGENT;
+        return c != null ? ArgusPostureUtils.agentDisplayName(c) : ArgusPostureUtils.UNKNOWN_AGENT;
     }
 
     // An event's apiCollectionId is not a real collection id for guardrail traffic, so attribute it by host, then actor
@@ -859,10 +835,10 @@ public class ArgusPostureService {
     private BasicDBObject assetsKpi(List<ApiCollection> assets, String environment) {
         BasicDBObject kpi = kpi(KPI_ASSETS, "Assets", (long) assets.size());
 
-        if (isAllEnvironments(environment)) {
+        if (ArgusPostureUtils.isAllEnvironments(environment)) {
             long production = 0;
             for (ApiCollection asset : assets) {
-                if (ENV_PRODUCTION.equals(envBucket(envTagValue(asset)))) production++;
+                if (InsightUtil.ENV_PRODUCTION.equals(ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(asset)))) production++;
             }
             kpi.put("footnote", countLine(production, "production", "None in production"));
         }
@@ -874,8 +850,8 @@ public class ArgusPostureService {
     private BasicDBObject highRiskAgentsKpi(List<ApiCollection> assets) {
         long highRisk = 0;
         for (ApiCollection c : assets) {
-            if (c == null || !isAgenticInScope(c) || c.getPostureScore() == null) continue;
-            if (Math.round(c.getPostureScore()) >= SEVERITY_HIGH_AT) highRisk++;
+            if (c == null || !ArgusPostureUtils.isAgenticInScope(c) || c.getPostureScore() == null) continue;
+            if (Math.round(c.getPostureScore()) >= ArgusPostureUtils.SEVERITY_HIGH_AT) highRisk++;
         }
         BasicDBObject kpi = kpi(KPI_HIGH_RISK_AGENTS, "High-Risk Agents", highRisk);
         // No per-agent history is stored, so a week-over-week delta isn't available yet.
@@ -910,7 +886,7 @@ public class ArgusPostureService {
     private static List<DashboardMaliciousEvent> scopedWindowEvents(InsightDataBundle bundle, List<ApiCollection> scoped,
                                                                    String environment) {
         List<DashboardMaliciousEvent> events = bundle.windowEvents();
-        if (events == null || isAllEnvironments(environment)) return events;
+        if (events == null || ArgusPostureUtils.isAllEnvironments(environment)) return events;
         Set<Integer> ids = new HashSet<>();
         for (ApiCollection a : scoped) ids.add(a.getId());
         List<DashboardMaliciousEvent> out = new ArrayList<>();
@@ -927,7 +903,7 @@ public class ArgusPostureService {
         for (ApiCollection c : bundle.collections) {
             if (c != null && !c.isDeactivated()) assets.add(c);
         }
-        List<DashboardMaliciousEvent> events = scopedWindowEvents(bundle, assetsIn(assets, environment), environment);
+        List<DashboardMaliciousEvent> events = scopedWindowEvents(bundle, ArgusPostureUtils.assetsIn(assets, environment), environment);
         List<DashboardMaliciousEvent> sorted = events == null ? new ArrayList<>() : new ArrayList<>(events);
         sorted.sort(Comparator
                 .comparingInt((DashboardMaliciousEvent e) -> InsightUtil.severityRank(e.getSeverity()))
@@ -941,7 +917,7 @@ public class ArgusPostureService {
             List<Integer> resolved = bundle.hostResolver().resolveEvent(e.getHost(), e.getActor());
             ApiCollection agent = resolved.isEmpty() ? null : byId.get(resolved.get(0));
             Map<String, Object> row = new HashMap<>();
-            row.put("agentName", agent != null ? agentDisplayName(agent) : (e.getHost() != null ? e.getHost() : "-"));
+            row.put("agentName", agent != null ? ArgusPostureUtils.agentDisplayName(agent) : (e.getHost() != null ? e.getHost() : "-"));
             row.put("policy", e.getCategory() != null ? e.getCategory() : e.getFilterId());
             row.put("rule", e.getSubCategory());
             row.put("severity", e.getSeverity());
@@ -1010,7 +986,7 @@ public class ArgusPostureService {
 
     private static Bson scopeFilter(List<ApiCollection> assets, String environment,
                                     List<Integer> deactivatedIds) {
-        if (isAllEnvironments(environment)) {
+        if (ArgusPostureUtils.isAllEnvironments(environment)) {
             if (deactivatedIds.isEmpty()) return Filters.empty();
             return Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedIds);
         }
@@ -1072,7 +1048,7 @@ public class ArgusPostureService {
             return kpi;
         }
 
-        GuardrailsCoverageBreakdown breakdown = computeCoverage(assets, policies);
+        ArgusPostureUtils.GuardrailsCoverageBreakdown breakdown = ArgusPostureUtils.computeCoverage(assets, policies);
         long notCovered = breakdown.uncovered.size();
         double percent = percentOf(breakdown.covered(), assets.size());
 
@@ -1082,39 +1058,6 @@ public class ArgusPostureService {
         kpi.put("secondaryFootnote", countLine(notCovered, "asset(s) not covered", "All asset(s) covered"));
         kpi.put("secondaryTone", toneForPercent(percent));
         return kpi;
-    }
-
-    public static class GuardrailsCoverageBreakdown {
-        public final List<ApiCollection> uncovered = new ArrayList<>();
-        public final List<ApiCollection> alertOnly = new ArrayList<>();
-        public final List<ApiCollection> enforcing = new ArrayList<>();
-        public final Map<Integer, List<GuardrailPolicies>> coveringPolicies = new HashMap<>();
-
-        public int covered() {
-            return alertOnly.size() + enforcing.size();
-        }
-    }
-
-    static GuardrailsCoverageBreakdown computeCoverage(List<ApiCollection> assets, List<GuardrailPolicies> policies) {
-        GuardrailsCoverageBreakdown breakdown = new GuardrailsCoverageBreakdown();
-        for (ApiCollection asset : assets) {
-            List<GuardrailPolicies> covering = new ArrayList<>();
-            boolean blocking = false;
-            for (GuardrailPolicies p : policies) {
-                if (p == null) continue;
-                if (!InsightUtil.policyCoversHost(p, InsightUtil.assetIdentity(asset))) continue;
-                covering.add(p);
-                if (InsightUtil.isBlockingPolicy(p)) blocking = true;
-            }
-            if (covering.isEmpty()) {
-                breakdown.uncovered.add(asset);
-                continue;
-            }
-            breakdown.coveringPolicies.put(asset.getId(), covering);
-            if (blocking) breakdown.enforcing.add(asset);
-            else breakdown.alertOnly.add(asset);
-        }
-        return breakdown;
     }
 
     private static String enforcingLine(long enforcing, long total) {
@@ -1132,7 +1075,7 @@ public class ArgusPostureService {
             if (c == null || c.isDeactivated()) continue;
             assets.add(c);
         }
-        List<ApiCollection> scoped = assetsIn(assets, environment);
+        List<ApiCollection> scoped = ArgusPostureUtils.assetsIn(assets, environment);
         Map<Integer, Map<String, Integer>> violationsByAsset = sensitiveViolationsByAsset(bundle, scoped);
         Map<Integer, Map<String, Integer>> dataByAsset = sensitiveCountsByAsset(bundle, scoped, InsightUtil::sensitiveDataLabel);
 
@@ -1181,7 +1124,7 @@ public class ArgusPostureService {
             Map<String, Object> row = new HashMap<>();
             row.put("asset", InsightUtil.assetIdentity(asset));
             row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
-            row.put("environment", envBucket(envTagValue(asset)));
+            row.put("environment", ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(asset)));
             Map<String, Integer> data = dataByAsset == null ? null : dataByAsset.get(asset.getId());
             row.put("dataTypes", data == null || data.isEmpty() ? "-" : InsightUtil.sensitiveDataLine(data));
             row.put("violations", violationCount.get(asset.getId()));
@@ -1226,7 +1169,7 @@ public class ArgusPostureService {
             if (c.isDeactivated()) deactivatedIds.add(c.getId());
             else assets.add(c);
         }
-        List<ApiCollection> scoped = assetsIn(assets, environment);
+        List<ApiCollection> scoped = ArgusPostureUtils.assetsIn(assets, environment);
 
         PostureDrillResult result = new PostureDrillResult();
         result.setTitle("Privileged tools");
@@ -1323,7 +1266,7 @@ public class ArgusPostureService {
         row.put("capability", InsightUtil.humanizeToolCapability(
                 tool.getToolInfo() == null ? null : tool.getToolInfo().getCapability()));
         row.put("asset", collection == null ? "-" : InsightUtil.assetIdentity(collection));
-        row.put("environment", collection == null ? "-" : envBucket(envTagValue(collection)));
+        row.put("environment", collection == null ? "-" : ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(collection)));
         row.put("lastSeen", tool.getLastSeen());
         return row;
     }
@@ -1338,8 +1281,8 @@ public class ArgusPostureService {
             if (c == null || c.isDeactivated()) continue;
             assets.add(c);
         }
-        List<ApiCollection> scoped = assetsIn(assets, environment);
-        GuardrailsCoverageBreakdown breakdown = computeCoverage(scoped, bundle.policies);
+        List<ApiCollection> scoped = ArgusPostureUtils.assetsIn(assets, environment);
+        ArgusPostureUtils.GuardrailsCoverageBreakdown breakdown = ArgusPostureUtils.computeCoverage(scoped, bundle.policies);
 
         List<Integer> uncoveredIds = new ArrayList<>();
         for (ApiCollection c : breakdown.uncovered) uncoveredIds.add(c.getId());
@@ -1390,7 +1333,7 @@ public class ArgusPostureService {
     }
 
     private static List<InsightResult.Metric> protectionCoverageSummary(int inScope,
-                                                                        GuardrailsCoverageBreakdown breakdown) {
+                                                                        ArgusPostureUtils.GuardrailsCoverageBreakdown breakdown) {
         double percent = percentOf(breakdown.covered(), inScope);
         return Arrays.asList(
                 new InsightResult.Metric("coverage", "Coverage", percent, "percent", formatPercent(percent)),
@@ -1403,7 +1346,7 @@ public class ArgusPostureService {
     }
 
     private static Map<String, Object> protectionCoverageRow(ApiCollection asset, InsightDataBundle bundle,
-                                                             GuardrailsCoverageBreakdown breakdown,
+                                                             ArgusPostureUtils.GuardrailsCoverageBreakdown breakdown,
                                                              Map<Integer, Integer> toolCounts) {
         List<GuardrailPolicies> covering = breakdown.coveringPolicies.get(asset.getId());
         List<String> policyNames = new ArrayList<>();
@@ -1417,7 +1360,7 @@ public class ArgusPostureService {
         Map<String, Object> row = new HashMap<>();
         row.put("asset", InsightUtil.assetIdentity(asset));
         row.put("type", AgenticObserveUtil.getTypeFromCollection(asset));
-        row.put("environment", envBucket(envTagValue(asset)));
+        row.put("environment", ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(asset)));
         row.put("protection", policyNames.isEmpty()
                 ? PROTECTION_NONE
                 : PROTECTION_ALERT_ONLY + " (" + String.join(", ", policyNames) + ")");
@@ -1431,86 +1374,13 @@ public class ArgusPostureService {
         return count > 0 ? count + " " + whenSome : whenNone;
     }
 
-    // Package-private (not private): TestArgusPostureService exercises this wrapper directly, and
-    // ArgusAgentPostureDrillService calls InsightUtil.envTagValue directly instead — same package,
-    // same convention PostureService's own paginate/worstSeverity helpers already use.
-    static String envTagValue(ApiCollection c) {
-        return InsightUtil.envTagValue(c);
-    }
-
-    static List<ApiCollection> assetsIn(List<ApiCollection> assets, String environment) {
-        if (isAllEnvironments(environment)) return assets;
-
-        String bucket = bucketForId(environment);
-        if (bucket == null) return assets;
-
-        List<ApiCollection> out = new ArrayList<>();
-        for (ApiCollection asset : assets) {
-            if (bucket.equals(envBucket(envTagValue(asset)))) out.add(asset);
-        }
-        return out;
-    }
-
     private static Map<String, Integer> countByEnvironment(List<ApiCollection> assets) {
         Map<String, Integer> counts = new LinkedHashMap<>();
         for (ApiCollection asset : assets) {
-            String bucket = envBucket(envTagValue(asset));
+            String bucket = ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(asset));
             counts.put(bucket, counts.getOrDefault(bucket, 0) + 1);
         }
         return counts;
-    }
-
-    private static String bucketForId(String environment) {
-        if (StringUtils.isBlank(environment)) return null;
-        switch (environment.trim().toLowerCase(Locale.ROOT)) {
-            case ENV_ID_PRODUCTION:
-                return ENV_PRODUCTION;
-            case ENV_ID_STAGING:
-                return ENV_STAGING;
-            case ENV_ID_DEVELOPMENT:
-                return ENV_DEVELOPMENT;
-            default:
-                return null;
-        }
-    }
-
-    public static String envBucket(String envTagValue) {
-        return InsightUtil.environmentBucket(envTagValue);
-    }
-
-    private static boolean isAllEnvironments(String environment) {
-        return StringUtils.isBlank(environment) || ENV_ID_ALL.equalsIgnoreCase(environment.trim());
-    }
-
-    public static String environmentKey(String environment) {
-        return isAllEnvironments(environment) ? ENV_ID_ALL : environment.trim().toLowerCase(Locale.ROOT);
-    }
-
-    public static Bson filterForEnvironment(String environment) {
-        if (StringUtils.isBlank(environment)) return Filters.empty();
-        switch (environment.trim().toLowerCase(Locale.ROOT)) {
-            case ENV_ID_DEVELOPMENT:
-                return envTagIn(DEV_ENVS);
-            case ENV_ID_STAGING:
-                return envTagIn(STAGING_ENVS);
-            case ENV_ID_PRODUCTION:
-                List<String> nonProd = new ArrayList<>(DEV_ENVS);
-                nonProd.addAll(STAGING_ENVS);
-                return Filters.nor(envTagIn(nonProd));
-            default:
-                return Filters.empty();
-        }
-    }
-
-    private static Bson envTagIn(List<String> values) {
-        List<Pattern> patterns = new ArrayList<>(values.size());
-        for (String value : values) {
-            patterns.add(Pattern.compile("^" + Pattern.quote(value) + "$", Pattern.CASE_INSENSITIVE));
-        }
-        return Filters.elemMatch(ApiCollection.TAGS_STRING,
-                Filters.and(
-                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENV_TYPE_TAG),
-                        Filters.in(CollectionTags.VALUE, patterns)));
     }
 
     private static BasicDBObject kpi(String id, String label, Long value) {
@@ -1523,10 +1393,10 @@ public class ArgusPostureService {
 
     private static List<BasicDBObject> environments(Map<String, Integer> counts) {
         List<BasicDBObject> out = new ArrayList<>();
-        out.add(environment(ENV_ID_ALL, "All environments", null));
-        out.add(environment(ENV_ID_PRODUCTION, ENV_PRODUCTION, counts.getOrDefault(ENV_PRODUCTION, 0)));
-        out.add(environment(ENV_ID_STAGING, ENV_STAGING, counts.getOrDefault(ENV_STAGING, 0)));
-        out.add(environment(ENV_ID_DEVELOPMENT, ENV_DEVELOPMENT, counts.getOrDefault(ENV_DEVELOPMENT, 0)));
+        out.add(environment(ArgusPostureUtils.ENV_ID_ALL, "All environments", null));
+        out.add(environment(ArgusPostureUtils.ENV_ID_PRODUCTION, InsightUtil.ENV_PRODUCTION, counts.getOrDefault(InsightUtil.ENV_PRODUCTION, 0)));
+        out.add(environment(ArgusPostureUtils.ENV_ID_STAGING, InsightUtil.ENV_STAGING, counts.getOrDefault(InsightUtil.ENV_STAGING, 0)));
+        out.add(environment(ArgusPostureUtils.ENV_ID_DEVELOPMENT, InsightUtil.ENV_DEVELOPMENT, counts.getOrDefault(InsightUtil.ENV_DEVELOPMENT, 0)));
         return out;
     }
 
@@ -1600,75 +1470,21 @@ public class ArgusPostureService {
     public List<BasicDBObject> buildHighestRiskAgents(InsightDataBundle bundle, String environment) {
         List<BasicDBObject> rows = new ArrayList<>();
         int rank = 1;
-        for (ApiCollection c : assetsIn(scoredAgents(bundle.collections), environment)) {
+        for (ApiCollection c : ArgusPostureUtils.assetsIn(ArgusPostureUtils.scoredAgents(bundle.collections), environment)) {
             if (rank > HIGHEST_RISK_AGENTS_LIMIT) break;
             long score = Math.round(c.getPostureScore());
 
             BasicDBObject row = new BasicDBObject();
             row.put("rank", rank++);
             row.put("groupKey", String.valueOf(c.getId()));
-            row.put("name", agentDisplayName(c));
-            row.put("environment", envBucket(envTagValue(c)));
+            row.put("name", ArgusPostureUtils.agentDisplayName(c));
+            row.put("environment", ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(c)));
             row.put("score", score);
-            row.put("issue", worstIssue(c.getPostureSubScores()));
-            row.put("severity", severityForScore(score));
+            row.put("issue", ArgusPostureUtils.worstIssue(c));
+            row.put("severity", ArgusPostureUtils.severityForScore(score));
             rows.add(row);
         }
         return rows;
-    }
-
-    // In-scope, active agents with a cron-computed score, highest score first.
-    static List<ApiCollection> scoredAgents(List<ApiCollection> collections) {
-        List<ApiCollection> scored = new ArrayList<>();
-        for (ApiCollection c : collections) {
-            if (c == null || c.isDeactivated() || c.getPostureScore() == null) continue;
-            if (isAgenticInScope(c)) scored.add(c);
-        }
-        scored.sort(Comparator.comparingDouble(ApiCollection::getPostureScore).reversed());
-        return scored;
-    }
-
-    // Mirrors UsersCollectionsList#getContextCollections(AGENTIC); must match AgenticPostureScoreCron's gate.
-    static boolean isAgenticInScope(ApiCollection c) {
-        return (c.isMcpCollection() || c.isGenAICollection()) && !c.isEndpointCollection();
-    }
-
-    static String agentDisplayName(ApiCollection c) {
-        // Not extractServiceName(hostName): it mis-parses real DNS hosts ("mcp.kite.trade" -> "trade").
-        String assetValue = AgenticObserveUtil.getAssetTagValue(c);
-        if (assetValue != null && !assetValue.trim().isEmpty()) return AgenticObserveUtil.formatDisplayName(assetValue);
-        if (c.getName() != null && !c.getName().trim().isEmpty()) return c.getName();
-        return c.getHostName() != null ? c.getHostName() : UNKNOWN_AGENT;
-    }
-
-    // Category contributing the most weighted points, not the highest raw sub-score.
-    static PostureScoreCategory worstCategory(Map<String, Object> subScores) {
-        PostureScoreCategory worst = null;
-        double worstPoints = 0;
-        for (PostureScoreCategory category : PostureScoreCategory.values()) {
-            double points = category.points(subScores);
-            if (points > worstPoints) {
-                worstPoints = points;
-                worst = category;
-            }
-        }
-        return worst;
-    }
-
-    static String worstIssue(Map<String, Object> subScores) {
-        PostureScoreCategory worst = worstCategory(subScores);
-        return worst != null ? worst.issue : "No significant issues detected";
-    }
-
-    private static final int SEVERITY_CRITICAL_AT = 75;
-    static final int SEVERITY_HIGH_AT = 50;
-    private static final int SEVERITY_MEDIUM_AT = 25;
-
-    static String severityForScore(long score) {
-        if (score >= SEVERITY_CRITICAL_AT) return "CRITICAL";
-        if (score >= SEVERITY_HIGH_AT) return "HIGH";
-        if (score >= SEVERITY_MEDIUM_AT) return "MEDIUM";
-        return "LOW";
     }
 
     // Same shape as InsightResult.Gap so the frontend's GapHint renders it.

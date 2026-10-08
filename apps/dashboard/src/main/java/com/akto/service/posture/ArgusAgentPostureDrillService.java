@@ -61,6 +61,9 @@ public class ArgusAgentPostureDrillService {
     private static final int RED_TEAM_FINDINGS_CAP = 5;
     private static final int GUARDRAIL_ACTIVITY_CAP = 5;
 
+    private static final String REMEDIATION_RED_TEAM_NEVER_SCANNED =
+            "Schedule a red-team scan for this agent — it has never been scanned.";
+
     private static final Map<Integer, String> CAPABILITY_FOR_POINTS = new HashMap<>();
     static {
         CAPABILITY_FOR_POINTS.put(100, "Can delete resources");
@@ -80,7 +83,7 @@ public class ArgusAgentPostureDrillService {
     // path "" = category breakdown, "<category>" = agents driving it, "<category>/<collectionId>" = agent profile.
     public PostureDrillResult fetchPostureScoreDrill(InsightDataBundle bundle, String path, int skip, int limit) {
         // Account-wide on purpose: the hero score it explains isn't environment-scoped.
-        List<ApiCollection> agents = ArgusPostureService.scoredAgents(bundle.collections);
+        List<ApiCollection> agents = ArgusPostureUtils.scoredAgents(bundle.collections);
         String[] segments = splitPath(path);
         if (segments.length == 0) return postureScoreRoot(bundle, agents, skip, limit);
 
@@ -96,8 +99,8 @@ public class ArgusAgentPostureDrillService {
     // path "" = every scored agent by score, "<collectionId>" = agent profile.
     public PostureDrillResult fetchHighRiskAgentsDrill(InsightDataBundle bundle, String environment, String path,
                                                        int skip, int limit) {
-        List<ApiCollection> agents = ArgusPostureService.assetsIn(
-                ArgusPostureService.scoredAgents(bundle.collections), environment);
+        List<ApiCollection> agents = ArgusPostureUtils.assetsIn(
+                ArgusPostureUtils.scoredAgents(bundle.collections), environment);
         String[] segments = splitPath(path);
         List<PostureDrillResult.BreadcrumbItem> trail = new ArrayList<>(Collections.singletonList(
                 new PostureDrillResult.BreadcrumbItem("", "Agents by risk")));
@@ -139,7 +142,7 @@ public class ArgusAgentPostureDrillService {
             row.put("averageScore", round1(avg));
             row.put("points", round1(points));
             row.put("agentsAffected", affected + " of " + agents.size());
-            row.put("topContributor", top == null ? "-" : ArgusPostureService.agentDisplayName(top));
+            row.put("topContributor", top == null ? "-" : ArgusPostureUtils.agentDisplayName(top));
             row.put("remediation", affected == 0 ? "No action needed" : category.remediation);
             rows.add(row);
         }
@@ -161,7 +164,7 @@ public class ArgusAgentPostureDrillService {
                 new InsightResult.Metric("topCategory", "Biggest contributor", null, "text",
                         agents.isEmpty() ? "-" : String.valueOf(rows.get(0).get("category")))));
         result.setEmptyMessage("No agents have been scored yet.");
-        int withoutPolicy = ArgusPostureService.computeCoverage(agents, bundle.policies).uncovered.size();
+        int withoutPolicy = ArgusPostureUtils.computeCoverage(agents, bundle.policies).uncovered.size();
         result.setCtas(rootCtas(affectedByCategory, withoutPolicy));
         if (agents.isEmpty()) {
             result.addDataGap(new InsightResult.Gap("AGENTIC_ASSETS", "NO_ROWS",
@@ -193,8 +196,8 @@ public class ArgusAgentPostureDrillService {
         for (ApiCollection agent : pageAgents) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", agent.getId());
-            row.put("agent", ArgusPostureService.agentDisplayName(agent));
-            row.put("environment", ArgusPostureService.envBucket(InsightUtil.envTagValue(agent)));
+            row.put("agent", ArgusPostureUtils.agentDisplayName(agent));
+            row.put("environment", ArgusPostureUtils.envBucket(InsightUtil.envTagValue(agent)));
             row.put("subScore", round1(category.subScore(agent.getPostureSubScores())));
             row.put("points", round1(category.points(agent.getPostureSubScores())));
             row.put("postureScore", Math.round(agent.getPostureScore()));
@@ -229,16 +232,16 @@ public class ArgusAgentPostureDrillService {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (ApiCollection agent : agents) {
             long score = Math.round(agent.getPostureScore());
-            if (score >= ArgusPostureService.SEVERITY_HIGH_AT) highOrCritical++;
+            if (score >= ArgusPostureUtils.SEVERITY_HIGH_AT) highOrCritical++;
 
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", agent.getId());
-            row.put("agent", ArgusPostureService.agentDisplayName(agent));
+            row.put("agent", ArgusPostureUtils.agentDisplayName(agent));
             row.put("type", AgenticObserveUtil.getTypeFromCollection(agent));
-            row.put("environment", ArgusPostureService.envBucket(InsightUtil.envTagValue(agent)));
+            row.put("environment", ArgusPostureUtils.envBucket(InsightUtil.envTagValue(agent)));
             row.put("score", score);
-            row.put("severity", ArgusPostureService.severityForScore(score));
-            row.put("topIssue", ArgusPostureService.worstIssue(agent.getPostureSubScores()));
+            row.put("severity", ArgusPostureUtils.severityForScore(score));
+            row.put("topIssue", ArgusPostureUtils.worstIssue(agent));
             rows.add(row);
         }
 
@@ -258,10 +261,10 @@ public class ArgusAgentPostureDrillService {
         ApiCollection agent = findAgent(agents, idSegment);
         if (agent == null) return notFound(trail.get(0).getLabel(), "This agent isn't in scope or hasn't been scored.");
 
-        String name = ArgusPostureService.agentDisplayName(agent);
+        String name = ArgusPostureUtils.agentDisplayName(agent);
         long score = Math.round(agent.getPostureScore());
-        String severity = ArgusPostureService.severityForScore(score);
-        String environment = ArgusPostureService.envBucket(InsightUtil.envTagValue(agent));
+        String severity = ArgusPostureUtils.severityForScore(score);
+        String environment = ArgusPostureUtils.envBucket(InsightUtil.envTagValue(agent));
         String type = AgenticObserveUtil.getTypeFromCollection(agent);
         Map<String, Object> subScores = agent.getPostureSubScores();
         int now = Context.now();
@@ -310,7 +313,7 @@ public class ArgusAgentPostureDrillService {
         result.setSummary(summary);
         result.setFacts(Arrays.asList(
                 new PostureDrillResult.Fact("Host", agent.getHostName() == null ? "-" : agent.getHostName(), null),
-                new PostureDrillResult.Fact("Top issue", ArgusPostureService.worstIssue(subScores), null),
+                new PostureDrillResult.Fact("Top issue", ArgusPostureUtils.worstIssue(agent), null),
                 new PostureDrillResult.Fact("Guardrail coverage",
                         coveringPolicies.isEmpty() ? "Not covered" : String.join(", ", coveringPolicies),
                         coveringPolicies.isEmpty() ? "critical" : null),
@@ -320,7 +323,7 @@ public class ArgusAgentPostureDrillService {
                                 : agentSensitiveData == null || agentSensitiveData.isEmpty() ? "None flagged in the last 90 days"
                                 : InsightUtil.sensitiveDataLine(agentSensitiveData), null)));
         List<PostureDrillResult.Section> sections = new ArrayList<>(Arrays.asList(
-                scoreBreakdownSection(subScores), remediationSection(subScores), redTeamSection(issues, openIssues)));
+                scoreBreakdownSection(subScores), remediationSection(agent), redTeamSection(issues, openIssues)));
         if (events != null) sections.add(maliciousEventsSection(events, eventCount));
         sections.add(privilegedToolsSection(tools, toolCount));
         result.setSections(sections);
@@ -340,7 +343,7 @@ public class ArgusAgentPostureDrillService {
     // for every in-scope agent regardless of score or environment.
     public AgentDetailResult fetchAgentDetail(InsightDataBundle bundle, int collectionId, String finding) {
         ApiCollection agent = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, collectionId));
-        if (agent == null || agent.isDeactivated() || !ArgusPostureService.isAgenticInScope(agent)) return null;
+        if (agent == null || agent.isDeactivated() || !ArgusPostureUtils.isAgenticInScope(agent)) return null;
 
         AgentDetailResult result = new AgentDetailResult();
         result.setHeader(buildAgentHeader(agent, bundle));
@@ -349,7 +352,7 @@ public class ArgusAgentPostureDrillService {
         result.setProtection(buildAgentProtection(agent, bundle));
         result.setRedTeam(buildAgentRedTeam(agent));
         result.setScoreBreakdown(buildScoreBreakdown(agent.getPostureSubScores()));
-        result.setRemediation(buildRemediation(agent.getPostureSubScores()));
+        result.setRemediation(buildRemediation(agent));
         result.setGuardrailActivity(buildGuardrailActivity(agent, bundle));
         result.setOpenedFromFinding(resolveAgentFinding(collectionId, finding));
 
@@ -364,16 +367,16 @@ public class ArgusAgentPostureDrillService {
     private AgentDetailResult.Header buildAgentHeader(ApiCollection agent, InsightDataBundle bundle) {
         AgentDetailResult.Header header = new AgentDetailResult.Header();
         header.setCollectionId(agent.getId());
-        header.setName(ArgusPostureService.agentDisplayName(agent));
+        header.setName(ArgusPostureUtils.agentDisplayName(agent));
         header.setDescription(agent.getDescription());
         long score = agent.getPostureScore() == null ? 0 : Math.round(agent.getPostureScore());
         header.setRiskScore(score);
-        header.setSeverity(ArgusPostureService.severityForScore(score));
+        header.setSeverity(ArgusPostureUtils.severityForScore(score));
         header.setEnvironment(InsightUtil.environmentBucket(InsightUtil.envTagValue(agent)));
         header.setCreatedAt(agent.getStartTs() == 0 ? null : agent.getStartTs());
         header.setLastActive(agentLastActive(agent.getId()));
         header.setHost(agent.getHostName());
-        header.setTopIssue(ArgusPostureService.worstIssue(agent.getPostureSubScores()));
+        header.setTopIssue(ArgusPostureUtils.worstIssue(agent));
         List<String> coveringPolicies = coveringPolicyNames(bundle.policies, agent);
         header.setGuardrailCoverage(coveringPolicies.isEmpty() ? "Not covered" : String.join(", ", coveringPolicies));
         return header;
@@ -522,7 +525,7 @@ public class ArgusAgentPostureDrillService {
             String testSubCategory = issue.getId() == null ? null : issue.getId().getTestSubCategory();
             AgentDetailResult.RedTeamFinding finding = new AgentDetailResult.RedTeamFinding();
             Info info = testSubCategory == null ? null : infoByType.get(testSubCategory);
-            finding.setTest(testSubCategory == null ? "-" : ArgusPostureService.testDisplayName(testSubCategory, infoByType));
+            finding.setTest(testSubCategory == null ? "-" : ArgusPostureUtils.testDisplayName(testSubCategory, infoByType));
             finding.setDescription(info == null ? null : info.getDescription());
             finding.setEndpoint(issue.getId() == null || issue.getId().getApiInfoKey() == null ? "-"
                     : issue.getId().getApiInfoKey().getMethod() + " " + issue.getId().getApiInfoKey().getUrl());
@@ -616,14 +619,26 @@ public class ArgusAgentPostureDrillService {
         return rows;
     }
 
-    private List<AgentDetailResult.RemediationRow> buildRemediation(Map<String, Object> subScores) {
+    // Same "never scanned" override as ArgusPostureUtils.worstIssue, for the per-category remediation text.
+    private static String remediationFor(PostureScoreCategory category, ApiCollection agent) {
+        if (category == PostureScoreCategory.RED_TEAM) {
+            Map<String, String> gaps = agent.getPostureGaps();
+            if (gaps != null && gaps.containsKey(PostureScoreCategory.RED_TEAM.key)) {
+                return REMEDIATION_RED_TEAM_NEVER_SCANNED;
+            }
+        }
+        return category.remediation;
+    }
+
+    private List<AgentDetailResult.RemediationRow> buildRemediation(ApiCollection agent) {
+        Map<String, Object> subScores = agent.getPostureSubScores();
         List<AgentDetailResult.RemediationRow> rows = new ArrayList<>();
         for (PostureScoreCategory category : byPointsDesc(subScores)) {
             if (category.points(subScores) <= 0) continue;
             AgentDetailResult.RemediationRow row = new AgentDetailResult.RemediationRow();
             row.setCategory(category.label);
             row.setPoints(round1(category.points(subScores)));
-            row.setRemediation(category.remediation);
+            row.setRemediation(remediationFor(category, agent));
             rows.add(row);
         }
         return rows;
@@ -720,7 +735,7 @@ public class ArgusAgentPostureDrillService {
     private static String agentFindingTitle(String testSubCategory) {
         Map<String, Info> infoByType = YamlTemplateDao.instance.fetchTestInfoMap(
                 Filters.in(Constants.ID, new ArrayList<>(Collections.singletonList(testSubCategory))));
-        return ArgusPostureService.testDisplayName(testSubCategory, infoByType);
+        return ArgusPostureUtils.testDisplayName(testSubCategory, infoByType);
     }
 
     private static PostureDrillResult.Section scoreBreakdownSection(Map<String, Object> subScores) {
@@ -740,14 +755,15 @@ public class ArgusAgentPostureDrillService {
                 rows, rows.size());
     }
 
-    private static PostureDrillResult.Section remediationSection(Map<String, Object> subScores) {
+    private static PostureDrillResult.Section remediationSection(ApiCollection agent) {
+        Map<String, Object> subScores = agent.getPostureSubScores();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (PostureScoreCategory category : byPointsDesc(subScores)) {
             if (category.points(subScores) <= 0) continue;
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("category", category.label);
             row.put("points", String.valueOf(round1(category.points(subScores))));
-            row.put("remediation", category.remediation);
+            row.put("remediation", remediationFor(category, agent));
             rows.add(row);
         }
         return new PostureDrillResult.Section("remediation", "Recommended fixes",
@@ -860,7 +876,7 @@ public class ArgusAgentPostureDrillService {
         private final Map<Integer, Map<String, Integer>> redTeam;
         private final Map<Integer, Map<String, Integer>> malicious;
         private final Map<Integer, Map<String, Integer>> sensitive;
-        private final ArgusPostureService.GuardrailsCoverageBreakdown coverage;
+        private final ArgusPostureUtils.GuardrailsCoverageBreakdown coverage;
 
         CategoryEvidence(InsightDataBundle bundle, List<ApiCollection> agents) {
             this.bundle = bundle;
@@ -877,7 +893,7 @@ public class ArgusAgentPostureDrillService {
             Map<Integer, Map<String, Integer>> sensitiveCounts = ids.isEmpty() ? null
                     : bundle.sensitiveDataCounts(ids, Context.now() - MALICIOUS_EVENTS_WINDOW_SECONDS);
             this.sensitive = sensitiveCounts == null ? new HashMap<>() : sensitiveCounts;
-            this.coverage = ArgusPostureService.computeCoverage(agents, bundle.policies);
+            this.coverage = ArgusPostureUtils.computeCoverage(agents, bundle.policies);
         }
 
         String detail(PostureScoreCategory category, ApiCollection agent) {
