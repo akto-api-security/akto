@@ -21,7 +21,6 @@ import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.CommonPrefix;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
@@ -34,8 +33,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -276,53 +275,25 @@ public class EndpointShieldSettingsAction extends UserAction {
             prefix = defaultInstallerPrefix(platformKey);
         }
 
-        releases = new ArrayList<>();
+        String previousVersion = null;
         try (S3Client s3 = s3Client()) {
-            String releasesPrefix = trimSlash(prefix) + "/releases/";
-            ListObjectsV2Request req = ListObjectsV2Request.builder()
-                .bucket(S3_BUCKET)
-                .prefix(releasesPrefix)
-                .delimiter("/")
-                .build();
-            ListObjectsV2Response resp;
-            do {
-                resp = s3.listObjectsV2(req);
-                for (CommonPrefix cp : resp.commonPrefixes()) {
-                    String folder = cp.prefix();
-                    String ver = folder.substring(releasesPrefix.length()).replaceAll("/$", "");
-                    if (ver.isEmpty()) continue;
-                    Map<String, Object> entry = new LinkedHashMap<>();
-                    entry.put("version", ver);
-                    JSONObject releaseMeta = readReleaseJson(s3, trimSlash(prefix) + "/releases/" + ver + "/release.json");
-                    if (releaseMeta != null) {
-                        entry.put("sha256", releaseMeta.optString("sha256", null));
-                        entry.put("artifactUrl", firstArtifactUrl(releaseMeta));
-                        entry.put("releasedAt", releaseMeta.optString("released_at", null));
-                    } else {
-                        String artifactKey = findArtifactKey(s3, folder);
-                        if (artifactKey != null) {
-                            entry.put("artifactUrl", "https://" + S3_BUCKET + ".s3." + S3_REGION + ".amazonaws.com/" + artifactKey);
-                        }
-                    }
-                    releases.add(entry);
-                }
-                req = req.toBuilder().continuationToken(resp.nextContinuationToken()).build();
-            } while (Boolean.TRUE.equals(resp.isTruncated()));
+            releases = collectReleases(s3, prefix);
         } catch (Exception e) {
             addActionError("Failed to list releases from S3: " + e.getMessage());
             return ERROR.toUpperCase();
         }
 
-        releases.sort(Comparator.comparing((Map<String, Object> m) -> String.valueOf(m.get("version"))).reversed());
-        newestPublishedVersion = releases.isEmpty() ? null : String.valueOf(releases.get(0).get("version"));
+        newestPublishedVersion = newestVersionOf(releases);
 
         JSONObject live = fetchManifestJson(manifestUrl);
         targetVersionLive = live != null ? live.optString("version", null) : null;
+        previousVersion = previousVersionOf(live);
         if (targetVersionLive != null && !targetVersionLive.isEmpty()) {
             refreshPlatformFromManifest(platformKey, manifestUrl);
         }
 
         versionControl = buildVersionControl(platformKey, targetVersionLive, newestPublishedVersion);
+        versionControl.put("previousVersion", previousVersion);
 
         endpointShieldSettings = AccountSettingsDao.instance
             .findOne(AccountSettingsDao.generateFilter())
@@ -354,6 +325,7 @@ public class EndpointShieldSettingsAction extends UserAction {
             prefix = defaultInstallerPrefix(platformKey);
         }
         prefix = trimSlash(prefix);
+        String replacedVersion = null;
 
         try (S3Client s3 = s3Client()) {
             JSONObject releaseMeta = readReleaseJson(s3, prefix + "/releases/" + deployVersion + "/release.json");
@@ -367,6 +339,7 @@ public class EndpointShieldSettingsAction extends UserAction {
 
             JSONObject current = fetchManifestJson(manifestUrl);
             if (current != null && current.has("version")) {
+                replacedVersion = emptyToNull(current.optString("version", ""));
                 JSONObject previous = new JSONObject();
                 previous.put("version", current.optString("version", ""));
                 String art = firstArtifactUrl(current);
@@ -374,13 +347,18 @@ public class EndpointShieldSettingsAction extends UserAction {
                 if (current.has("sha256")) previous.put("sha256", current.optString("sha256", ""));
                 releaseMeta.put("previous", previous);
             }
+            releases = collectReleases(s3, prefix);
+            newestPublishedVersion = newestVersionOf(releases);
+            if (newestPublishedVersion == null) {
+                newestPublishedVersion = deployVersion;
+            }
+            releaseMeta.put("newest", newestPublishedVersion);
             releaseMeta.put("version", releaseMeta.optString("version", deployVersion));
             if (!releaseMeta.has("customer")) {
                 releaseMeta.put("customer", String.valueOf(installerAccountId()));
             }
             if (!releaseMeta.has("released_at")) {
-                releaseMeta.put("released_at",
-                    java.time.Instant.now().toString().replaceAll("\\.\\d+Z$", "Z"));
+                releaseMeta.put("released_at", Instant.now().toString().replaceAll("\\.\\d+Z$", "Z"));
             }
 
             String body = releaseMeta.toString(2) + "\n";
@@ -423,10 +401,131 @@ public class EndpointShieldSettingsAction extends UserAction {
 
         targetVersionLive = deployVersion;
         versionControl = buildVersionControl(platformKey, deployVersion, newestPublishedVersion);
+        versionControl.put("previousVersion", replacedVersion);
         endpointShieldSettings = AccountSettingsDao.instance
             .findOne(AccountSettingsDao.generateFilter())
             .getEndpointShieldSettings();
         return SUCCESS.toUpperCase();
+    }
+
+    private static final class ReleaseFolder {
+        String artifactKey;
+        Instant artifactModified;
+        boolean hasReleaseJson;
+    }
+
+    /** Releases ordered by publish time, newest first. Time is release.json released_at, else artifact LastModified. */
+    private List<Map<String, Object>> collectReleases(S3Client s3, String prefix) {
+        String releasesPrefix = trimSlash(prefix) + "/releases/";
+        Map<String, ReleaseFolder> folders = new LinkedHashMap<>();
+        ListObjectsV2Request req = ListObjectsV2Request.builder()
+            .bucket(S3_BUCKET)
+            .prefix(releasesPrefix)
+            .build();
+        ListObjectsV2Response resp;
+        do {
+            resp = s3.listObjectsV2(req);
+            for (S3Object obj : resp.contents()) {
+                noteReleaseObject(folders, releasesPrefix, obj);
+            }
+            req = req.toBuilder().continuationToken(resp.nextContinuationToken()).build();
+        } while (Boolean.TRUE.equals(resp.isTruncated()));
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map.Entry<String, ReleaseFolder> entry : folders.entrySet()) {
+            out.add(toReleaseEntry(s3, releasesPrefix, entry.getKey(), entry.getValue()));
+        }
+        out.sort(EndpointShieldSettingsAction::compareByReleasedAtDesc);
+        return out;
+    }
+
+    private static void noteReleaseObject(Map<String, ReleaseFolder> folders, String releasesPrefix, S3Object obj) {
+        String key = obj.key();
+        if (key == null || !key.startsWith(releasesPrefix)) return;
+        String rest = key.substring(releasesPrefix.length());
+        int slash = rest.indexOf('/');
+        if (slash <= 0) return;
+        String ver = rest.substring(0, slash);
+        String leaf = rest.substring(slash + 1);
+        if (ver.isEmpty() || leaf.isEmpty() || leaf.indexOf('/') >= 0) return;
+
+        ReleaseFolder folder = folders.computeIfAbsent(ver, ignored -> new ReleaseFolder());
+        if ("release.json".equals(leaf)) {
+            folder.hasReleaseJson = true;
+            return;
+        }
+        if (!isArtifactLeaf(leaf)) return;
+        Instant modified = obj.lastModified();
+        if (folder.artifactKey == null
+                || (modified != null && (folder.artifactModified == null || modified.isAfter(folder.artifactModified)))) {
+            folder.artifactKey = key;
+            folder.artifactModified = modified;
+        }
+    }
+
+    private Map<String, Object> toReleaseEntry(S3Client s3, String releasesPrefix, String version, ReleaseFolder folder) {
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("version", version);
+        String releasedAt = null;
+        if (folder.hasReleaseJson) {
+            JSONObject releaseMeta = readReleaseJson(s3, releasesPrefix + version + "/release.json");
+            if (releaseMeta != null) {
+                entry.put("sha256", emptyToNull(releaseMeta.optString("sha256", "")));
+                entry.put("artifactUrl", firstArtifactUrl(releaseMeta));
+                releasedAt = emptyToNull(releaseMeta.optString("released_at", ""));
+            }
+        }
+        if ((releasedAt == null || parseReleasedAt(releasedAt) == null) && folder.artifactModified != null) {
+            releasedAt = folder.artifactModified.toString();
+        }
+        if (entry.get("artifactUrl") == null && folder.artifactKey != null) {
+            entry.put("artifactUrl", "https://" + S3_BUCKET + ".s3." + S3_REGION + ".amazonaws.com/" + folder.artifactKey);
+        }
+        entry.put("releasedAt", releasedAt);
+        return entry;
+    }
+
+    private static int compareByReleasedAtDesc(Map<String, Object> a, Map<String, Object> b) {
+        Instant ia = parseReleasedAt(a.get("releasedAt"));
+        Instant ib = parseReleasedAt(b.get("releasedAt"));
+        if (ia == null && ib == null) return 0;
+        if (ia == null) return 1;
+        if (ib == null) return -1;
+        return ib.compareTo(ia);
+    }
+
+    private static Instant parseReleasedAt(Object value) {
+        if (value == null) return null;
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty() || "null".equals(text)) return null;
+        try {
+            return Instant.parse(text);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String newestVersionOf(List<Map<String, Object>> catalog) {
+        if (catalog == null || catalog.isEmpty()) return null;
+        Object version = catalog.get(0).get("version");
+        return version == null ? null : String.valueOf(version);
+    }
+
+    private static String previousVersionOf(JSONObject live) {
+        if (live == null) return null;
+        JSONObject previous = live.optJSONObject("previous");
+        if (previous == null) return null;
+        return emptyToNull(previous.optString("version", ""));
+    }
+
+    private static String emptyToNull(String value) {
+        if (value == null || value.isEmpty()) return null;
+        return value;
+    }
+
+    private static boolean isArtifactLeaf(String leaf) {
+        String lower = leaf.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".exe") || lower.endsWith(".zip") || lower.endsWith(".pkg");
     }
 
     private Map<String, Object> buildVersionControl(String key, String target, String newest) {
@@ -584,8 +683,8 @@ public class EndpointShieldSettingsAction extends UserAction {
             .bucket(S3_BUCKET).prefix(prefix).maxKeys(50).build());
         for (S3Object obj : resp.contents()) {
             String k = obj.key();
-            String leaf = k.substring(k.lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
-            if (leaf.endsWith(".exe") || leaf.endsWith(".zip") || leaf.endsWith(".pkg")) {
+            String leaf = k.substring(k.lastIndexOf('/') + 1);
+            if (isArtifactLeaf(leaf)) {
                 return k;
             }
         }

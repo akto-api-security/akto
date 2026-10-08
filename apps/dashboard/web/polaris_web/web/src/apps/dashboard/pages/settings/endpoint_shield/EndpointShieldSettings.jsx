@@ -27,6 +27,7 @@ const EMPTY_CONFIG = {
     releases: [],
     newestPublishedVersion: '',
     targetVersionLive: '',
+    previousVersion: '',
     pinnedToOlder: false,
     fleetCounts: null,
     fleetByVersion: null,
@@ -70,6 +71,7 @@ function applyVersionControl(patch, res) {
         releases: res?.releases || [],
         newestPublishedVersion: res?.newestPublishedVersion || vc.newestPublishedVersion || '',
         targetVersionLive: res?.targetVersionLive || vc.targetVersion || '',
+        previousVersion: vc.previousVersion || '',
         pinnedToOlder: !!vc.pinnedToOlder,
         fleetCounts: vc.fleetCounts || null,
         fleetByVersion: vc.fleetByVersion || null,
@@ -83,7 +85,7 @@ function PlatformPanel({ platformKey, config, onChange, isAdmin }) {
     const {
         manifestUrl, savedManifestUrl, autoUpdateEnabled, targetVersion,
         latestVersion, checkedAgo, checkedAt, refreshing, saving,
-        releases, newestPublishedVersion, targetVersionLive, pinnedToOlder,
+        releases, newestPublishedVersion, targetVersionLive, previousVersion, pinnedToOlder,
         fleetCounts, listing, deploying, selectedDeployVersion,
     } = config
 
@@ -208,6 +210,10 @@ function PlatformPanel({ platformKey, config, onChange, isAdmin }) {
                                 <Text fontWeight="semibold">{targetVersionLive || latestVersion || 'N/A'}</Text>
                                 {pinnedToOlder && <Badge status="attention">pinned to older build</Badge>}
                             </HorizontalStack>
+                        </Box>
+                        <Box>
+                            <Text color="subdued">Previously live</Text>
+                            <Text fontWeight="semibold">{previousVersion || 'N/A'}</Text>
                         </Box>
                         <Box>
                             <Text color="subdued">Newest published</Text>
