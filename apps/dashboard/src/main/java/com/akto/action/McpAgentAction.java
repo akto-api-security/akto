@@ -6,6 +6,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.testing.AgentConversationDao;
 import com.akto.dto.testing.GenericAgentConversation;
 import com.akto.dto.testing.GenericAgentConversation.ConversationType;
+import com.akto.dao.UsersDao;
+import com.akto.dto.User;
 import com.akto.util.Constants;
 import com.akto.util.McpTokenGenerator;
 import com.mongodb.BasicDBObject;
@@ -14,6 +16,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BsonField;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import org.bson.conversions.Bson;
 
@@ -23,8 +26,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -39,9 +47,13 @@ public class McpAgentAction extends UserAction {
     private String mcpToken;
     private String agentEndpoint;
     private int limit;
+    private int skip;
     private String conversationType;
     private String searchQuery;
     private boolean includeMessages = true;
+    // Optional user filter, and whether to also return the users that have conversations (to fill the filter)
+    private List<Integer> userIds;
+    private boolean includeUsers;
 
     private Map<String, Object> metaData;
 
@@ -244,11 +256,35 @@ public class McpAgentAction extends UserAction {
                 }
             }
 
+            // A follow-up message (or a chat reopened from history) often arrives without metaData; reuse the context
+            // stored with the conversation instead of answering without it.
+            boolean contextSuppliedThisTurn = StringUtils.isNotEmpty(contextString);
+            if (!contextSuppliedThisTurn && !isFirstRequest) {
+                // Read only the two fields needed: a stored turn also holds the full response and prompt
+                GenericAgentConversation stored = AgentConversationDao.instance.getMCollection()
+                    .find(Filters.and(
+                        Filters.eq(GenericAgentConversation._CONVERSATION_ID, conversationId),
+                        Filters.exists(GenericAgentConversation._CONTEXT_STRING, true),
+                        Filters.ne(GenericAgentConversation._CONTEXT_STRING, "")))
+                    .projection(Projections.include(GenericAgentConversation._CONTEXT_STRING, "tokensLimit"))
+                    .sort(Sorts.descending("createdAt"))
+                    .first();
+                if (stored != null) {
+                    contextString = stored.getContextString();
+                    tokensLimit = Math.max(tokensLimit, stored.getTokensLimit());
+                }
+            }
+
             String userEmail = getSUser() != null ? getSUser().getLogin() : null;
             String contextSource = Context.contextSource.get() != null ? Context.contextSource.get().toString() : null;
             GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
+                responseFromMcpServer.setUserId(getSUser().getId());
+                // Store only context that came with this turn; reused context already sits on an earlier turn
+                if (contextSuppliedThisTurn) {
+                    responseFromMcpServer.setContextString(contextString);
+                }
                 // Later turns reuse the first turn's title, so never store the agent's placeholder title
                 if (isFirstRequest && isPlaceholderTitle(responseFromMcpServer.getTitle())) {
                     responseFromMcpServer.setTitle(titleFromPrompt(message));
@@ -280,6 +316,9 @@ public class McpAgentAction extends UserAction {
             } else if (StringUtils.isNotEmpty(searchQuery)) {
                 matchFilters.add(Filters.regex("title", Pattern.compile(Pattern.quote(searchQuery), Pattern.CASE_INSENSITIVE)));
             }
+            if (!singleConversation && userIds != null && !userIds.isEmpty()) {
+                matchFilters.add(Filters.in(GenericAgentConversation.USER_ID, userIds));
+            }
 
             List<Bson> pipeline = new ArrayList<>();
 
@@ -295,6 +334,14 @@ public class McpAgentAction extends UserAction {
                 ? Accumulators.first("title", "$title")
                 : Accumulators.last("title", "$title"));
             groupAccumulators.add(Accumulators.sum("tokensUsed", "$tokensUsed"));
+            groupAccumulators.add(Accumulators.sum("turns", 1));
+            // Stored titles are cut to ~50 chars; the list is sorted newest-first, so last() is the opening prompt
+            groupAccumulators.add(singleConversation
+                ? Accumulators.first("firstPrompt", "$prompt")
+                : Accumulators.last("firstPrompt", "$prompt"));
+            // $max skips documents without the field, so conversations stored before userId existed still resolve
+            groupAccumulators.add(Accumulators.max("userId", "$" + GenericAgentConversation.USER_ID));
+            groupAccumulators.add(Accumulators.first("conversationType", "$conversationType"));
             if (singleConversation || includeMessages) {
                 groupAccumulators.add(Accumulators.push("messages", new BasicDBObject()
                     .append("prompt", "$prompt")
@@ -307,6 +354,9 @@ public class McpAgentAction extends UserAction {
             // $group doesn't preserve order, so re-sort before limiting to keep the latest conversations
             pipeline.add(Aggregates.sort(Sorts.descending("lastUpdatedAt")));
             if (!singleConversation) {
+                if (skip > 0) {
+                    pipeline.add(Aggregates.skip(skip));
+                }
                 pipeline.add(Aggregates.limit(fetchLimit));
             }
             MongoCursor<BasicDBObject> cursor = AgentConversationDao.instance.getMCollection()
@@ -319,8 +369,20 @@ public class McpAgentAction extends UserAction {
                 conversations.add(doc);
             }
 
+            attachUserEmails(conversations);
+
             BasicDBObject result = new BasicDBObject();
             result.put("history", conversations);
+            if (!singleConversation) {
+                // A non-empty page shorter than the limit is the last one, so the total is known without another query
+                boolean lastPage = !conversations.isEmpty() && conversations.size() < fetchLimit;
+                result.put("total", lastPage
+                    ? skip + conversations.size()
+                    : countConversations(Filters.and(matchFilters)));
+            }
+            if (includeUsers) {
+                result.put("users", fetchConversationUsers());
+            }
             this.response = result;
 
             return SUCCESS.toUpperCase();
@@ -329,6 +391,57 @@ public class McpAgentAction extends UserAction {
             addActionError("Failed to fetch history: " + e.getMessage());
             return ERROR.toUpperCase();
         }
+    }
+
+    /** Replaces each row's stored user id with that user's login (as userEmail). */
+    private static void attachUserEmails(List<BasicDBObject> conversations) {
+        Set<Integer> userIds = new HashSet<>();
+        for (BasicDBObject conversation : conversations) {
+            Object id = conversation.get("userId");
+            if (id instanceof Number) {
+                userIds.add(((Number) id).intValue());
+            }
+        }
+        Map<Integer, String> loginById = loginsById(userIds);
+        for (BasicDBObject conversation : conversations) {
+            Object id = conversation.remove("userId");
+            String login = id instanceof Number ? loginById.get(((Number) id).intValue()) : null;
+            if (login != null) {
+                conversation.put("userEmail", login);
+            }
+        }
+    }
+
+    /** Users who have conversations in the current context, as {id, email}, for the user filter. */
+    private static List<BasicDBObject> fetchConversationUsers() {
+        Set<Integer> ids = AgentConversationDao.instance.getMCollection()
+            .distinct(GenericAgentConversation.USER_ID, AgentConversationDao.instance.getContextSourceFilter(), Integer.class)
+            .into(new HashSet<>());
+        List<BasicDBObject> users = new ArrayList<>();
+        loginsById(ids).forEach((id, login) -> users.add(new BasicDBObject("id", id).append("email", login)));
+        users.sort(Comparator.comparing(user -> user.getString("email")));
+        return users;
+    }
+
+    private static Map<Integer, String> loginsById(Set<Integer> userIds) {
+        Map<Integer, String> loginById = new HashMap<>();
+        if (!userIds.isEmpty()) {
+            for (User user : UsersDao.instance.findAll(Filters.in(User.ID, userIds), Projections.include(User.LOGIN))) {
+                loginById.put(user.getId(), user.getLogin());
+            }
+        }
+        return loginById;
+    }
+
+    /** Number of matching conversations (not turns). */
+    private static int countConversations(Bson matchFilter) {
+        BasicDBObject countDoc = AgentConversationDao.instance.getMCollection()
+            .aggregate(Arrays.asList(
+                Aggregates.match(matchFilter),
+                Aggregates.group("$conversationId"),
+                Aggregates.count("total")), BasicDBObject.class)
+            .first();
+        return countDoc != null ? countDoc.getInt("total") : 0;
     }
 
     public String deleteConversationHistory() {
@@ -383,10 +496,16 @@ public class McpAgentAction extends UserAction {
     public void setAgentEndpoint(String agentEndpoint) { this.agentEndpoint = agentEndpoint; }
     public int getLimit() { return limit; }
     public void setLimit(int limit) { this.limit = limit; }
+    public int getSkip() { return skip; }
+    public void setSkip(int skip) { this.skip = skip; }
     public String getConversationType() { return conversationType; }
     public void setConversationType(String conversationType) { this.conversationType = conversationType; }
     public String getSearchQuery() { return searchQuery; }
     public void setSearchQuery(String searchQuery) { this.searchQuery = searchQuery; }
+    public List<Integer> getUserIds() { return userIds; }
+    public void setUserIds(List<Integer> userIds) { this.userIds = userIds; }
+    public boolean isIncludeUsers() { return includeUsers; }
+    public void setIncludeUsers(boolean includeUsers) { this.includeUsers = includeUsers; }
     public boolean isIncludeMessages() { return includeMessages; }
     public void setIncludeMessages(boolean includeMessages) { this.includeMessages = includeMessages; }
     public Map<String, Object> getMetaData() { return metaData; }
