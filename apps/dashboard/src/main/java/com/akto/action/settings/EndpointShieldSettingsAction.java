@@ -100,16 +100,13 @@ public class EndpointShieldSettingsAction extends UserAction {
     }
 
     /**
-     * Legacy published layout: atlas-installers/&lt;type&gt;/&lt;accountId&gt;/
-     * New layout: atlas-installers/&lt;accountId&gt;/&lt;type&gt;/
-     * Local nginx-demo feeds still use legacy; auto-enable when account override is set.
+     * Default layout: atlas-installers/&lt;accountId&gt;/&lt;type&gt;/.
+     * Set AKTO_ENDPOINT_SHIELD_LEGACY_S3_LAYOUT=true only for the old
+     * atlas-installers/&lt;type&gt;/&lt;accountId&gt;/ feeds.
      */
     private static boolean useLegacyInstallerS3Layout() {
         String v = System.getenv("AKTO_ENDPOINT_SHIELD_LEGACY_S3_LAYOUT");
-        if (v != null && !v.trim().isEmpty()) {
-            return "1".equals(v.trim()) || "true".equalsIgnoreCase(v.trim());
-        }
-        return installerAccountOverrideActive();
+        return v != null && ("1".equals(v.trim()) || "true".equalsIgnoreCase(v.trim()));
     }
 
     private static String defaultInstallerPrefix(String platformKey) {
