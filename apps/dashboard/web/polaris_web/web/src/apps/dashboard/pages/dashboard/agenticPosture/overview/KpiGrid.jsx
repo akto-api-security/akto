@@ -1,26 +1,25 @@
 import { HorizontalGrid } from '@shopify/polaris'
-import { CustomersMajor, IdentityCardMajor, KeyMajor, NoteMajor, RiskMajor, SecureMajor } from '@shopify/polaris-icons'
+import { CustomersMajor, DiamondAlertMajor, KeyMajor, NoteMajor, RiskMajor, SecureMajor } from '@shopify/polaris-icons'
 import { ComingSoonOverlay, KpiTile } from '../../agenticPostureShared'
 
 const ICONS = {
     assets: CustomersMajor,
     highRiskAgents: RiskMajor,
-    identityAccess: IdentityCardMajor,
+    guardrailViolations: DiamondAlertMajor,
     privilegedTools: KeyMajor,
     sensitiveData: NoteMajor,
     protectionCoverage: SecureMajor,
 }
 
-// Illustrative values shown blurred until the identity resolver exists.
-const COMING_SOON_KPIS = {
-    identityAccess: { value: 7, secondaryFootnote: '2 shared · 3 orphaned', secondaryTone: 'warning' },
-}
+// Illustrative values shown blurred for tiles whose data source doesn't exist yet (none at the moment).
+const COMING_SOON_KPIS = {}
 
 const KPI_DRILL_ID = {
     protectionCoverage: 'protectionCoverage',
     highRiskAgents: 'highRiskAgents',
     privilegedTools: 'privilegedTools',
     sensitiveData: 'sensitiveData',
+    guardrailViolations: 'guardrailViolations',
 }
 
 // Assets has no drill of its own — the inventory page already lists every asset, so the tile

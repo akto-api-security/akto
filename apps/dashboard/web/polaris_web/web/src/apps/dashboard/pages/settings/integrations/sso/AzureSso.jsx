@@ -17,6 +17,7 @@ function AzureSso() {
     const [loginUrl, setLoginUrl] = useState('')
     const [azureIdentity, setAzureIdentity] = useState('')
     const [groupRoleMapping, setGroupRoleMapping] = useState({})
+    const [removeAccessWithoutGroup, setRemoveAccessWithoutGroup] = useState(false)
 
 
     const cardContent = "Enable Login via Azure AD on your Akto dashboard";
@@ -67,6 +68,7 @@ function AzureSso() {
                 setLoginUrl(resp.loginUrl)
                 setAzureIdentity(resp.ssoEntityId)
                 setGroupRoleMapping(resp.groupRoleMapping || {})
+                setRemoveAccessWithoutGroup(resp.removeAccessWithoutGroup === true)
             })
             setLoading(false)
         } catch (error) {
@@ -97,7 +99,7 @@ function AzureSso() {
             pageTitle={"Azure AD SSO SAML"}
             loading={loading}
             certificateName={"Federation Metadata XML"}
-            additionalComponent={<SamlGroupRoleMapping configType={"AZURE"} savedMapping={groupRoleMapping} />}
+            additionalComponent={<SamlGroupRoleMapping configType={"AZURE"} savedMapping={groupRoleMapping} savedRemoveAccessWithoutGroup={removeAccessWithoutGroup} />}
         />
     )
 }

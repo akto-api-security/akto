@@ -1,6 +1,7 @@
-import { Badge, Box, Button, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
 import { ArrowDownMinor, ArrowUpMinor } from '@shopify/polaris-icons'
-import { GapHint, BAND_LABEL_FOR_TONE, TONE_TEXT_COLOR, riskBand } from '../../agenticPostureShared'
+import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import { GapHint, RISK_LABEL_FOR_SEVERITY, TONE_TEXT_COLOR, riskBand } from '../../agenticPostureShared'
 
 const TONE_STROKE_VAR = {
     critical: 'var(--p-color-icon-critical)',
@@ -42,13 +43,13 @@ function Sparkline({ points, tone }) {
 // Fleet-wide posture score hero; shows "Not computed yet" instead of falling back to mock data.
 function PostureScoreCard({ postureScore, onOpenBreakdown }) {
     if (!postureScore) return null
-    const { value, agentsScored, agentsWithNoSignal, dataGaps, trend, delta, deltaTone } = postureScore
+    const { value, agentsScored, dataGaps, trend, delta, deltaTone } = postureScore
     const hasValue = value !== null && value !== undefined
     const hasDelta = delta !== null && delta !== undefined
     const deltaPositive = delta > 0
     const band = hasValue ? riskBand(value) : null
     const bandTone = band ? band.tone : null
-    const bandLabel = bandTone ? BAND_LABEL_FOR_TONE[bandTone] : null
+    const bandLabel = band ? RISK_LABEL_FOR_SEVERITY[band.severity] : null
     const clickable = hasValue && !!onOpenBreakdown
 
     return (
@@ -61,7 +62,7 @@ function PostureScoreCard({ postureScore, onOpenBreakdown }) {
                             <Text variant="bodySm" fontWeight="semibold" color="subdued">POSTURE SCORE</Text>
                             <GapHint gaps={dataGaps} />
                         </HorizontalStack>
-                        {bandLabel && <Badge status={bandTone}>{bandLabel}</Badge>}
+                        {bandLabel && <SeverityBadge severity={band.severity}>{bandLabel}</SeverityBadge>}
                     </HorizontalStack>
                     {hasValue ? (
                         <HorizontalStack gap="4" blockAlign="center" wrap={false}>
@@ -85,9 +86,7 @@ function PostureScoreCard({ postureScore, onOpenBreakdown }) {
                     {hasValue && agentsScored > 0 && (
                         <HorizontalStack align="space-between" blockAlign="center">
                             <Text variant="bodySm" color="subdued">
-                                {agentsWithNoSignal > 0
-                                    ? `Based on ${agentsScored - agentsWithNoSignal} of ${agentsScored} agents`
-                                    : `Based on ${agentsScored} agent${agentsScored === 1 ? '' : 's'}`}
+                                Based on agents with highest scores
                             </Text>
                             {clickable && <Button plain>How is this calculated?</Button>}
                         </HorizontalStack>

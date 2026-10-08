@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Dropdown from "../../../components/layouts/Dropdown";
 import api from "../../../pages/agent_team/api";
 import func from "../../../../../util/func";
+import { usePermissions, whenAllowed } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const MODEL_TYPES = {
   ANTHROPIC: "ANTHROPIC",
@@ -247,6 +249,7 @@ function getModelSections(type, data, setData, isEdit=false) {
 
 function AgentConfig() {
 
+  const { canCall } = usePermissions()
   let cardContent = "Configure agents to unlock the magical power of LLMs and make your security team more efficient. Akto's agents can be used to look for false positives, analyze traffic and much more."
 
   const [addModelPopOverActive, setAddModelPopOverActive] = useState(false)
@@ -282,6 +285,7 @@ function AgentConfig() {
             content: "Delete",
             destructive: true,
             onClick: () => deleteModel(name),
+            ...whenAllowed(canCall('api/deleteAgentModel')),
           },
         ]}
         persistActions
@@ -323,6 +327,7 @@ function AgentConfig() {
             func.setToast(true, false, "Successfully added model")
             setAddModelPopOverActive(false)
           },
+          ...whenAllowed(canCall('api/saveAgentModel')),
         }}
         secondaryActions={[
           {
@@ -391,12 +396,14 @@ function AgentConfig() {
   )
 
   const secondaryAction = (
+    <AllowedAction allowed={canCall('api/saveAgentModel')}>
     <Button onClick={() => {
       setData({})
       setAddModelPopOverActive(true)
     }} primary>
       Add model
     </Button>
+    </AllowedAction>
   )
 
   return (
@@ -404,6 +411,7 @@ function AgentConfig() {
       cardContent={cardContent}
       component={Card}
       secondaryAction={secondaryAction}
+      readOnly={!canCall('api/saveAgentModel')}
     />
   )
 }

@@ -34,6 +34,8 @@ import { findAssetTag } from '../../observe/agentic/mcpClientHelper';
 import { isEndpointSecurityCategory } from '../../../../main/labelHelper';
 import { isVisibilityOnly, buildAgentFilterOptions, getClientTagVariants, resolveClientKey, splitPolicyServers } from '../serverTargetingUtils';
 import func from "@/util/func";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import {
     PolicyDetailsStep,
     PolicyDetailsConfig,
@@ -164,6 +166,7 @@ const buildRedactionRules = (enabled, rules) => {
 };
 
 const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode = false, isPreset = false, initialStep = 1 }) => {
+    const { canCall } = usePermissions();
     // Step management
     const [currentStep, setCurrentStep] = useState(initialStep);
     const [loading, setLoading] = useState(false);
@@ -260,9 +263,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableMaliciousTools, setEnableMaliciousTools] = useState(true);
     const [enableToolNameDescriptionMismatch, setEnableToolNameDescriptionMismatch] = useState(true);
 
-    // Step 11: Blocked hosts/paths (block-only)
+    // Step 11: Blocked hosts/paths (block list, or allow-list when blockedHostsAllowOnly)
     // Host + path suggestions are sourced from the browser extension configs.
     const [blockedHosts, setBlockedHosts] = useState([]);
+    const [blockedHostsAllowOnly, setBlockedHostsAllowOnly] = useState(false);
     const [blockPersonalAccounts, setBlockPersonalAccounts] = useState(false);
     const [blockPublicShare, setBlockPublicShare] = useState(false);
     const [browserConfigs, setBrowserConfigs] = useState([]);
@@ -500,6 +504,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         enableToolNameDescriptionMismatch,
         // Step 11
         blockedHosts,
+        blockedHostsAllowOnly,
         blockPublicShare,
         blockPersonalAccounts,
         // Step 13
@@ -609,12 +614,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             });
         }
 
-        steps.push({
-            number: BlockedHostsConfig.number,
-            title: BlockedHostsConfig.title,
-            summary: BlockedHostsConfig.getSummary(storedStateData),
-            ...BlockedHostsConfig.validate(storedStateData)
-        });
+        if (isEndpointSecurityCategory()) {
+            steps.push({
+                number: BlockedHostsConfig.number,
+                title: BlockedHostsConfig.title,
+                summary: BlockedHostsConfig.getSummary(storedStateData),
+                ...BlockedHostsConfig.validate(storedStateData)
+            });
+        }
 
         steps.push({
             number: ExceptionsConfig.number,
@@ -826,6 +833,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setSelectedAgentServers([]);
         setSelectedBrowserLlms([]);
         setBlockedHosts([]);
+        setBlockedHostsAllowOnly(false);
         setBlockPersonalAccounts(false);
         setBlockPublicShare(false);
         setIgnorePhrases([]);
@@ -994,6 +1002,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setBlockedHosts((policy.blockedHosts || []).map(entry => ({
             pattern: entry.pattern || ""
         })));
+        setBlockedHostsAllowOnly(policy.blockedHostsAllowOnly || false);
         setBlockPersonalAccounts(policy.blockPersonalAccounts || false);
         setBlockPublicShare(policy.blockPublicShare || false);
 
@@ -1156,6 +1165,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 selectedAgentServersV2: transformedAgentServers,
                 selectedLlmServersV2: transformedLlmServers,
                 blockedHosts: cleanedBlockedHosts,
+                blockedHostsAllowOnly,
                 blockPersonalAccounts,
                 blockPublicShare,
                 ignorePhrases: cleanedIgnorePhrases,
@@ -1357,6 +1367,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     <BlockedHostsStep
                         blockedHosts={blockedHosts}
                         setBlockedHosts={setBlockedHosts}
+                        blockedHostsAllowOnly={blockedHostsAllowOnly}
+                        setBlockedHostsAllowOnly={setBlockedHostsAllowOnly}
                         blockPersonalAccounts={blockPersonalAccounts}
                         setBlockPersonalAccounts={setBlockPersonalAccounts}
                         blockPublicShare={blockPublicShare}
@@ -1523,6 +1535,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
             blockedHosts: (blockedHosts || [])
                 .filter(entry => entry && (entry.pattern || "").trim())
                 .map(entry => ({ pattern: entry.pattern.trim() })),
+            blockedHostsAllowOnly,
             blockPersonalAccounts,
             blockPublicShare,
             ignorePhrases: (ignorePhrases || [])
@@ -1790,14 +1803,16 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                                 <Button onClick={handleNext} disabled={steps.findIndex(s => s.number === currentStep) >= steps.length - 1}>
                                     Next
                                 </Button>
-                                <Button
-                                    primary
-                                    onClick={handleSave}
-                                    loading={loading}
-                                    disabled={!allStepsValid}
-                                >
-                                    {isEditMode ? "Update policy" : "Create policy"}
-                                </Button>
+                                <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                                    <Button
+                                        primary
+                                        onClick={handleSave}
+                                        loading={loading}
+                                        disabled={!allStepsValid}
+                                    >
+                                        {isEditMode ? "Update policy" : "Create policy"}
+                                    </Button>
+                                </AllowedAction>
                             </HorizontalStack>
                         </HorizontalStack>
                     </div>

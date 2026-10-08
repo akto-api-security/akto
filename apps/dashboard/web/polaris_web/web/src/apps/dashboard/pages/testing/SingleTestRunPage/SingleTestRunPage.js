@@ -62,6 +62,7 @@ import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGe
 import { saveAs } from 'file-saver';
 import SeveritySelector from '../../issues/components/SeveritySelector';
 import { buildResponseCodeFilterChoices, getHttpStatusIssueList, HTTP_CODE_LABELS } from "../TestRunsPage/runStatusUtils";
+import { usePermissions, withPermissions } from "@/util/permissions";
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -137,6 +138,7 @@ function SingleTestRunPage() {
   const [selectedTestRun, setSelectedTestRun] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const params = useParams()
+  const { canCall } = usePermissions()
   const [loading, setLoading] = useState(false);
   const [tempLoading, setTempLoading] = useState({ vulnerable: false, no_vulnerability_found: false, skipped: false, running: false, need_configurations: false, ignored_issues: false })
   const [selectedTab, setSelectedTab] = useState("vulnerable")
@@ -615,6 +617,7 @@ function SingleTestRunPage() {
             openSeverityUpdateModal([...totalSelectedItemsSet]);
           }
         },
+        requires: 'api/bulkUpdateTestResultsSeverity',
       },
       {
         content: `Rerun ${totalSelectedItemsSet.size} test${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
@@ -623,6 +626,7 @@ function SingleTestRunPage() {
             transform.rerunTest(selectedTestRun.id, null, false, [...totalSelectedItemsSet], selectedTestRun.testingRunResultSummaryHexId)
           }
         },
+        requires: 'api/startTest',
       },
       {
         content: 'Export selected Test Results as Markdown',
@@ -833,7 +837,7 @@ function SingleTestRunPage() {
         parentAdvanceSettingsConfig={conditions}
         useLocalSubCategoryData={useLocalSubCategoryData}
         testRunType={testingRunResultSummariesObj?.testingRunType}
-        disabled={window.USER_ROLE === "GUEST"}
+        disabled={!canCall('api/startTest')}
         shouldDisable={selectedTestRun.type === "CI_CD" || selectedTestRun.type === "RECURRING"}
       />
       <TestingRunEndpointsModal
@@ -1257,12 +1261,14 @@ function SingleTestRunPage() {
       {
         content: mapLabel("More Tests", getDashboardCategory()),
         icon: PlusMinor,
-        onAction: () => { setActiveFromTesting(true) }
+        onAction: () => { setActiveFromTesting(true) },
+        requires: 'api/modifyTestingRunConfig'
       },
       {
         content: 'Configurations',
         icon: SettingsMinor,
-        onAction: () => { setShowEditableSettings(true); handleAddSettings() }
+        onAction: () => { setShowEditableSettings(true); handleAddSettings() },
+        requires: 'api/modifyTestingRunConfig'
       }
     ]
   })
@@ -1284,7 +1290,8 @@ function SingleTestRunPage() {
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
-        onAction: () => { setConfirmationModal(true) }
+        onAction: () => { setConfirmationModal(true) },
+        requires: 'api/handleRefreshTableCount'
       },
       ...(currentSummary?.hexId ? [{
         content: 'View logs',
@@ -1302,7 +1309,7 @@ function SingleTestRunPage() {
     >
       <ActionList
         actionRole="menuitem"
-        sections={moreActionsList}
+        sections={withPermissions(moreActionsList)}
       />
 
     </Popover>

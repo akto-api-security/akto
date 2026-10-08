@@ -4,9 +4,11 @@ import IntegrationsLayout from './IntegrationsLayout'
 import { Divider, LegacyCard, Text, TextField, VerticalStack } from '@shopify/polaris'
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import func from "@/util/func"
+import { usePermissions, whenAllowed } from "@/util/permissions"
 
 const AzureDataExplorer = () => {
     
+    const { canCall } = usePermissions()
     const [clusterEndpoint, setClusterEndpoint] = useState('')
     const [databaseName, setDatabaseName] = useState('')
     const [tenantId, setTenantId] = useState('')
@@ -53,8 +55,8 @@ const AzureDataExplorer = () => {
     
     const AzureDataExplorerCard = (
         <LegacyCard
-            primaryFooterAction={{content: 'Save', onAction: addAdxIntegration }}
-            secondaryFooterActions={[{content: 'Remove', onAction: removeAdxIntegration, disabled: !isRemoveable}]}
+            primaryFooterAction={{content: 'Save', onAction: addAdxIntegration, ...whenAllowed(canCall('api/addAdxIntegration')) }}
+            secondaryFooterActions={[{content: 'Remove', onAction: removeAdxIntegration, disabled: !isRemoveable, ...whenAllowed(canCall('api/removeAdxIntegration'))}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate Azure Data Explorer</Text>
@@ -111,7 +113,7 @@ const AzureDataExplorer = () => {
     let cardContent = "Export guardrail activity data to Azure Data Explorer (ADX) for advanced analytics and insights. Configure once and export data anytime with a single click."
 
     return (
-        <IntegrationsLayout title="Azure Data Explorer" cardContent={cardContent} component={AzureDataExplorerCard} docsUrl="https://docs.akto.io/integrations/azure-data-explorer"/> 
+        <IntegrationsLayout title="Azure Data Explorer" cardContent={cardContent} component={AzureDataExplorerCard} docsUrl="https://docs.akto.io/integrations/azure-data-explorer" readOnly={!canCall('api/addAdxIntegration')}/> 
     )
 }
 

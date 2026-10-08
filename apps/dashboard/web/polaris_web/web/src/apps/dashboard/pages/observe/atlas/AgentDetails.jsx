@@ -13,6 +13,7 @@ import { DEFAULT_VALUE, isExtensionAgent } from "../api_collections/endpointShie
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
 import DetailGrid from "../agentic/DetailGrid";
+import { usePermissions } from "@/util/permissions";
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
@@ -200,6 +201,7 @@ function AgentDetails({
     endTimestamp,
 }) {
     const navigate = useNavigate();
+    const { canCall } = usePermissions();
     const copyRef = useRef(null);
     const isVulnStatusEnabled = window?.ACTIVE_ACCOUNT === VULN_STATUS_ENABLED_ACCOUNT_ID;
 
@@ -627,6 +629,7 @@ function AgentDetails({
                     module={selectedAgent?._moduleData}
                     allowedEnvFields={configureEnvFields}
                     onSaveEnv={onSaveEnv}
+                    readOnly={!canCall('api/updateModuleEnvAndReboot')}
                 />
             </Box>
         ),

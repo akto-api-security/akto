@@ -126,13 +126,18 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatCategoryCount() {
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       this.categoryCounts = ownAgentStats().subCategoryCounts(getCategoryDisplayNames());
       return SUCCESS.toUpperCase();
     }
     Map<String, String> categoryDisplayNames = getCategoryDisplayNames();
-    this.categoryCounts = fetchSubcategoryWiseCounts(startTs, endTs, latestAttack, severityStatusFilter).stream()
+    List<ThreatCategoryCount> counts = fetchSubcategoryWiseCounts(startTs, endTs, latestAttack, severityStatusFilter, hostScope);
+    if (counts == null) {
+      return fetchThreatCategoryCount(); // the backend rejected the host scope
+    }
+    this.categoryCounts = counts.stream()
         .map(c -> new ThreatCategoryCount(
             categoryDisplayNames.getOrDefault(c.getCategory(), c.getCategory()),
             c.getSubCategory(), c.getCount()))
@@ -141,8 +146,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchCountBySeverity() {
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       this.categoryCounts = ownAgentStats().severityCounts();
       return SUCCESS.toUpperCase();
     }
@@ -162,6 +168,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if (severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
           put("status", severityStatusFilter);
         }
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -169,6 +178,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return fetchCountBySeverity();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatSeverityWiseCountResponse>toProtoMessage(
@@ -191,8 +203,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String getDailyThreatActorsCount() {
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       OwnAgentThreatStats stats = ownAgentStats();
       this.actorsCounts = stats.dailyActors();
       this.totalAnalysed = stats.getEvents().size();
@@ -214,6 +227,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -222,6 +238,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return getDailyThreatActorsCount();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<DailyActorsCountResponse>toProtoMessage(
@@ -253,8 +272,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String getThreatActivityTimeline() {
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       this.threatActivityTimelines = ownAgentStats().activityTimeline();
       return SUCCESS.toUpperCase();
     }
@@ -268,6 +288,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -276,6 +299,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return getThreatActivityTimeline();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActivityTimelineResponse>toProtoMessage(
@@ -303,8 +329,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatApis() {
-    // Users limited to specific collections: built from their own events (backend lists the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend lists only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       List<DashboardThreatApi> ownApis = ownAgentStats().threatApis();
       this.total = ownApis.size();
       this.apis = new ArrayList<>(ownApis.subList(Math.min(skip, ownApis.size()), Math.min(skip + LIMIT, ownApis.size())));
@@ -327,6 +354,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if(!filters.isEmpty()) {
           put("filter", filters);
         }
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -335,6 +365,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return fetchThreatApis();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ListThreatApiResponse>toProtoMessage(
@@ -363,8 +396,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatTopNData() {
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       OwnAgentThreatStats stats = ownAgentStats();
       this.topApis = stats.topApis(8);
       this.topHosts = stats.topHosts(8);
@@ -385,6 +419,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         if (severityStatusFilter != null && !severityStatusFilter.isEmpty()) {
           put("status", severityStatusFilter);
         }
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -393,6 +430,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return fetchThreatTopNData();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<FetchTopNDataResponse>toProtoMessage(
@@ -444,8 +484,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   // skill's declaring collection is shared with the agent/device that invoked it), so this is
   // keyed by the skill name extracted server-side from the /skills/<name> endpoint instead.
   public String fetchSkillSeverityCounts() {
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
       this.skillSeverityCounts = ownAgentStats().skillSeverityCounts();
       return SUCCESS.toUpperCase();
     }
@@ -458,6 +499,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -466,6 +510,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return fetchSkillSeverityCounts();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<FetchSkillSeverityCountsResponse>toProtoMessage(
@@ -561,6 +608,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchDashboardTopData() {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    boolean ownEvents = hostScope == null && isLimitedToOwnAgents();
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_dashboard_top_data", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -572,39 +622,44 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("limit", limit);
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
     post.setEntity(requestEntity);
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
-
-      ProtoMessageUtils.<FetchDashboardTopDataResponse>toProtoMessage(
-          FetchDashboardTopDataResponse.class, responseBody)
-          .ifPresent(m -> {
-            this.dashboardTopActors = m.getTopActorsList().stream()
-                .map(a -> new DashboardTopActorData(
-                    a.getActor(), a.getAttackCount(), a.getCountry(), a.getLatestAttack()))
-                .collect(Collectors.toList());
-            this.dashboardTopApis = m.getTopApisList().stream()
-                .map(a -> new DashboardTopApiData(
-                    a.getEndpoint(), a.getMethod(), a.getHost(), a.getRequestsCount(), a.getActorsCount()))
-                .collect(Collectors.toList());
-            this.recentMaliciousCount = m.getRecentMaliciousCount();
-          });
-    } catch (Exception e) {
-      e.printStackTrace();
-      return ERROR.toUpperCase();
-    }
-
-    // Users limited to specific collections: built from their own events (backend aggregates the whole account)
-    if (isLimitedToOwnAgents()) {
+    if (ownEvents) {
       OwnAgentThreatStats stats = ownAgentStats();
       this.dashboardTopActors = stats.dashboardTopActors(limit);
       this.dashboardTopApis = stats.dashboardTopApis(limit);
       this.recentMaliciousCount = stats.countSince(Context.now() - 300);
+    } else {
+      try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+        if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+          return fetchDashboardTopData();
+        }
+        String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
+
+        ProtoMessageUtils.<FetchDashboardTopDataResponse>toProtoMessage(
+            FetchDashboardTopDataResponse.class, responseBody)
+            .ifPresent(m -> {
+              this.dashboardTopActors = m.getTopActorsList().stream()
+                  .map(a -> new DashboardTopActorData(
+                      a.getActor(), a.getAttackCount(), a.getCountry(), a.getLatestAttack()))
+                  .collect(Collectors.toList());
+              this.dashboardTopApis = m.getTopApisList().stream()
+                  .map(a -> new DashboardTopApiData(
+                      a.getEndpoint(), a.getMethod(), a.getHost(), a.getRequestsCount(), a.getActorsCount()))
+                  .collect(Collectors.toList());
+              this.recentMaliciousCount = m.getRecentMaliciousCount();
+            });
+      } catch (Exception e) {
+        e.printStackTrace();
+        return ERROR.toUpperCase();
+      }
     }
 
     // Query metrics_data for TD_KAFKA_RECORD_COUNT in last 5 mins (dashboard mongo)

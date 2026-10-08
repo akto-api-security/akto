@@ -1,5 +1,6 @@
 package com.akto.dao.monitoring;
 
+import com.akto.dto.api_protection_parse_layer.Condition;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.ExecutorConfigParserResult;
 import org.junit.Test;
@@ -114,5 +115,34 @@ public class FilterConfigYamlParserTest {
         assertNotNull("FilterConfig should not be null", config);
         assertEquals("SIMPLE_FILTER", config.getId());
         assertNull("Executor should be null when no execute section", config.getExecutor());
+    }
+
+    @Test
+    public void testAggregationRuleParsesGroupByAndDistinctIdentifier() throws Exception {
+        String yaml =
+                "id: COUNTRY_CHANGE\n" +
+                "filter:\n" +
+                "  url:\n" +
+                "    regex: \".*\"\n" +
+                "aggregation_rules:\n" +
+                "  - rule:\n" +
+                "      name: Rule 1\n" +
+                "      condition:\n" +
+                "        windowThreshold: 30\n" +
+                "        groupBy:\n" +
+                "          source: request_headers\n" +
+                "          key: x-user-id\n" +
+                "        distinctIdentifier:\n" +
+                "          attribute: country_code\n" +
+                "          count: 2\n";
+
+        FilterConfig config = FilterConfigYamlParser.parseTemplate(yaml, false);
+
+        Condition condition = config.getAggregationRules().getRule().get(0).getCondition();
+        assertEquals(30, condition.getWindowThreshold());
+        assertEquals("request_headers", condition.getGroupBy().getSource());
+        assertEquals("x-user-id", condition.getGroupBy().getKey());
+        assertEquals("country_code", condition.getDistinctIdentifier().getAttribute());
+        assertEquals(2, condition.getDistinctIdentifier().getCount());
     }
 }

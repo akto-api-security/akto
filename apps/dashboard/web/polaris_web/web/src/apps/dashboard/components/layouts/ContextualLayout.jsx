@@ -4,7 +4,7 @@ import "./ContextualLayoutStyle.css"
 
 function ContextualLayout(props){
 
-    const {saveAction, discardAction, isDisabled, pageMarkup } = props
+    const {saveAction, discardAction, isDisabled, pageMarkup, isSaving } = props
 
     const logo = {
         width: 124,
@@ -18,7 +18,7 @@ function ContextualLayout(props){
             message="Unsaved changes"
             saveAction={{
             onAction: () => saveAction(),
-            loading: false,
+            loading: isSaving === true,
             disabled: disabledActive,
             content: "Save"
             }}

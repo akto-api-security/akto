@@ -3,11 +3,14 @@ import { useState } from "react"
 import SampleData from "../../../components/shared/SampleData"
 import api from "../api";
 import func from "@/util/func"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 function LoginForm({ step, setSteps, miniTestingServiceName = '' }) {
 
     const [ selectedApiResponseTab, setSelectedApiResponseTab] = useState(0)
     const [testDisable, setTestDisable] = useState(false)
+    const { canCall } = usePermissions()
 
     function updateForm(field, value) {
         setSteps(prev => prev.map((s) => s.id === step.id ? {
@@ -97,7 +100,7 @@ function LoginForm({ step, setSteps, miniTestingServiceName = '' }) {
                 <LegacyCard subdued>
                     <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px", alignItems: "center", padding: "20px" }}>
                         <Text variant="headingMd">Test Response</Text>
-                        <Button id={"test-button"} onClick={handleLoginFlowTest} disabled={testDisable}>Test</Button>
+                        <AllowedAction allowed={canCall('api/triggerSingleLoginFlow')}><Button id={"test-button"} onClick={handleLoginFlowTest} disabled={testDisable}>Test</Button></AllowedAction>
                     </div>
                     {step.testResponse ?
                         <div>

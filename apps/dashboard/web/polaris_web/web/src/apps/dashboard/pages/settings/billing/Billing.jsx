@@ -14,12 +14,15 @@ import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import billingApi from './api'
 import func from "@/util/func"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 import "./billing.css"
 
 function Billing() {
 
     const { stigg, refreshData } = useStiggContext();
+    const { canCall } = usePermissions()
 
     const searchParams = new URLSearchParams(document.location.search)
 
@@ -76,9 +79,11 @@ function Billing() {
                 <Box>
                     <Text variant="headingMd">Your plan</Text>
                 </Box>
-                <Button onClick={() => refreshUsageData()}>
-                    Sync usage data
-                </Button>
+                <AllowedAction allowed={canCall('api/refreshUsageDataForOrg')}>
+                    <Button onClick={() => refreshUsageData()}>
+                        Sync usage data
+                    </Button>
+                </AllowedAction>
             </HorizontalStack>
         </Box>
     )

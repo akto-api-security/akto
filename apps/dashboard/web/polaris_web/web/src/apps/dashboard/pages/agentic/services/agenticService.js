@@ -25,10 +25,21 @@ export const clearConversationFromLocal = async (conversationId) => {
     }
 };
 
+// History list: titles and timestamps only, without messages
 export const getConversationsList = async (limit = 10, searchQuery = "") => {
     return await request({
         url: '/api/fetchHistory',
         method: 'post',
-        data: {limit, searchQuery}
+        data: {limit, searchQuery, includeMessages: false}
     })
+};
+
+// Single conversation with all turns, oldest first; null if not found
+export const getConversationById = async (conversationId) => {
+    const res = await request({
+        url: '/api/fetchHistory',
+        method: 'post',
+        data: {conversationId}
+    })
+    return res?.history?.[0] || null;
 };

@@ -3,9 +3,12 @@ import React, { useState } from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
 import { DeleteMajor, ViewMinor, HideMinor, CircleTickMajor, CircleAlertMajor } from "@shopify/polaris-icons"
 import { COPILOT_OAUTH } from "./TestRoleConstants"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 function ParamsCard({dataObj, handleDelete, showEdit}) {
     const [hideValues, setHideValues] = useState(true)
+    const { canCallAll } = usePermissions()
     const authMechanism = dataObj.authMechanism
     const headerConditions = dataObj.headerKVPairs || {}
     const headerKey = Object.keys(headerConditions).length > 0 ? Object.keys(headerConditions)[0] : ''
@@ -107,8 +110,8 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
 
                 </VerticalStack>
                 <HorizontalStack gap={"2"} align="end">
-                    <Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button>
-                    <Button size="slim" primary onClick={() => showEdit()}>Edit</Button>
+                    <AllowedAction allowed={canCallAll('api/deleteAuthFromRole', 'api/updateTestRoles')}><Button size="slim" onClick={handleDelete} icon={DeleteMajor}><div data-testid="delete_button">Delete</div></Button></AllowedAction>
+                    <AllowedAction allowed={canCallAll('api/updateAuthInRole', 'api/updateTestRoles')}><Button size="slim" primary onClick={() => showEdit()}>Edit</Button></AllowedAction>
                 </HorizontalStack>
             </VerticalStack>
         </Box>

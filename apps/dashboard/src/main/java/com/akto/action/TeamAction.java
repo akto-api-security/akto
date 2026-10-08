@@ -1,22 +1,24 @@
 package com.akto.action;
 
-import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.UsersDao;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.context.Context;
-import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.User;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.password_reset.PasswordResetUtils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Pair;
-import com.akto.utils.Utils;
+import com.akto.utils.RoleAssignment;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -129,6 +131,9 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             if (rbac != null && rbac.getScopeRoleMapping() != null && !rbac.getScopeRoleMapping().isEmpty()) {
                 userObj.append("scopeRoleMapping", rbac.getScopeRoleMapping());
             }
+            if (rbac != null && rbac.getAccessExpiresAt() > 0) {
+                userObj.append("accessExpiresAt", rbac.getAccessExpiresAt());
+            }
 
             try {
                 String login = userObj.getString(User.LOGIN);
@@ -180,238 +185,216 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         }
         return SUCCESS.toUpperCase();
     }
-    private enum ActionType {
-        REMOVE_USER,
-        UPDATE_USER_ROLE
-    }
-    
     String email;
-    public String performAction(ActionType action, String reqUserRole) {
-        int currUserId = getSUser().getId();
-        int accId = Context.accountId.get();
 
-        Bson findQ = Filters.eq(User.LOGIN, email);
-        User userDetails = UsersDao.instance.findOne(findQ);
-        boolean userExists =  userDetails != null;
+    private User findAccountUser(int accountId) {
+        return email == null ? null : UsersDao.instance.findOne(Filters.and(Filters.eq(User.LOGIN, email), Filters.exists(User.ACCOUNTS + "." + accountId)));
+    }
 
-        Bson filterRbac = Filters.and(
-            Filters.eq(RBAC.USER_ID, userDetails.getId()),
-            Filters.eq(RBAC.ACCOUNT_ID, accId));
+    private static Bson rbacFilter(int userId, int accountId) {
+        return Filters.and(Filters.eq(RBAC.USER_ID, userId), Filters.eq(RBAC.ACCOUNT_ID, accountId));
+    }
 
-        if (userExists && userDetails.getId() == currUserId) {
-            addActionError("You cannot perform this action on yourself");
-            return Action.ERROR.toUpperCase();
+    /*
+     * Checks shared by every change to another user's access (role change, removal). newScopeRoleMapping null
+     * means the user is removed. Returns the message to show, or null when the change is allowed.
+     */
+    private String validateAccessChange(User target, int accountId, Map<String, String> newScopeRoleMapping, int newExpiresAt) {
+        int callerId = getSUser().getId();
+        if (target == null) {
+            return "This user is not in your account.";
         }
-
-        Role currentUserRole = RBACDao.getCurrentRoleForUser(currUserId, accId);
-        Role userRole = RBACDao.getCurrentRoleForUser(userDetails.getId(), accId); // current role of the user whose role is changing
-
-        CustomRole customRole = CustomRoleDao.instance.findRoleByName(reqUserRole);
-
-        Role requestedRole = null;
-        try {
-            if (customRole != null) {
-                requestedRole = Role.valueOf(customRole.getBaseRole());
-            } else {
-                if(reqUserRole != null && !action.equals(ActionType.REMOVE_USER)){
-                    requestedRole = Role.valueOf(reqUserRole);
+        if (target.getId() == callerId) {
+            return "You can't change your own access. Ask another admin.";
+        }
+        if (!RoleAssignment.canChangeOthersAccess(callerId, accountId)) {
+            return "Your role can't change other users' access.";
+        }
+        // fresh read, not the cached entry, so a role given moments ago is respected
+        RBAC targetRbac = RBACDao.instance.findOne(rbacFilter(target.getId(), accountId));
+        if (!RoleAssignment.canManage(callerId, accountId, targetRbac)) {
+            return "You can't change access for " + email + ": they have a role you can't give.";
+        }
+        if (newScopeRoleMapping != null) {
+            Map<String, String> currentRoles = targetRbac == null ? null : targetRbac.getScopeRoleMapping();
+            for (Map.Entry<String, String> entry : newScopeRoleMapping.entrySet()) {
+                // roles left as they are need no new check (e.g. in a product the account no longer has)
+                if (currentRoles != null && entry.getValue() != null && entry.getValue().equals(currentRoles.get(entry.getKey()))) {
+                    continue;
+                }
+                String error = validateGivenRole(callerId, accountId, entry.getKey(), entry.getValue());
+                if (error != null) {
+                    return error;
                 }
             }
-        } catch (Exception e) {
-            addActionError("Invalid user role");
-            return Action.ERROR.toUpperCase();
         }
-
-        switch (action) {
-            case REMOVE_USER:
-                if (userExists) {
-                    UsersDao.instance.updateOne(findQ, Updates.unset("accounts." + accId));
-                    RBACDao.instance.deleteAll(filterRbac);
-                    return Action.SUCCESS.toUpperCase();
-                } else {
-                    DeleteResult delResult = PendingInviteCodesDao.instance.getMCollection().deleteMany(Filters.eq("inviteeEmailId", email));
-                    if (delResult.getDeletedCount() > 0) {
-                        return Action.SUCCESS.toUpperCase();
-                    } else {
-                        return Action.ERROR.toUpperCase();
-                    }
-                }
-
-            case UPDATE_USER_ROLE:
-                if (userExists) {
-                    try {
-                        Role[] rolesHierarchy = currentUserRole.getRoleHierarchy();
-                        boolean isValidUpdateRole = false; // cannot change for a user role higher than yourself
-                        boolean shouldChangeRole = false; // cannot change to a role higher than yourself
-
-                        for(Role role: rolesHierarchy){
-                            if(role.equals(userRole)){
-                                isValidUpdateRole = true;
-                            }
-                            if(role.equals(requestedRole)){
-                                shouldChangeRole = true;
-                            }
-                        }
-                        if(isValidUpdateRole && shouldChangeRole){
-                            /*
-                             * Update the role only. Product scopes are managed through scope-role mapping.
-                             */
-
-                            if (this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty()) {
-                                for (Map.Entry<String, String> entry : this.scopeRoleMapping.entrySet()) {
-                                    String entryRole = entry.getValue();
-                                    try {
-                                        Role entryBaseRole = RBAC.Role.valueOf(entryRole);
-                                        if (!entryBaseRole.equals(Role.NO_ACCESS) && !Arrays.asList(Role.ADMIN.getRoleHierarchy()).contains(entryBaseRole)) {
-                                            addActionError("Invalid role: " + entryRole);
-                                            return Action.ERROR.toUpperCase();
-                                        }
-                                    } catch (IllegalArgumentException ex) {
-                                        CustomRole entryCustomRole = CustomRoleDao.instance.findRoleByName(entryRole);
-                                        if (entryCustomRole == null) {
-                                            addActionError("Invalid role: " + entryRole);
-                                            return Action.ERROR.toUpperCase();
-                                        }
-                                    }
-                                }
-                                // Update both primary role and scope-role mapping
-                                RBACDao.instance.updateOneNoUpsert(
-                                        filterRbac,
-                                        Updates.combine(
-                                                Updates.set(RBAC.SCOPE_ROLE_MAPPING, this.scopeRoleMapping)
-                                        )
-                                );
-                            } else {
-                                // Update only primary role (backward compatibility)
-                                RBACDao.instance.updateOneNoUpsert(
-                                        filterRbac,
-                                        Updates.set(RBAC.ROLE, reqUserRole)
-                                );
-                            }
-
-                            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
-                            UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
-                            return Action.SUCCESS.toUpperCase();
-                        }else{
-                            addActionError("User doesn't have access to modify this role.");
-                            return Action.ERROR.toUpperCase();
-                        }
-                    } catch (Exception e) {
-                        addActionError("User role doesn't exist.");
-                        return Action.ERROR.toUpperCase();
-                    }
-
-                } else {
-                    addActionError("User doesn't exist");
-                    return Action.ERROR.toUpperCase();
-                }
-
-            default:
-                break;
+        List<String> losingAdmin = RoleAssignment.productsLosingLastAdmin(accountId, target.getId(), newScopeRoleMapping, newExpiresAt);
+        if (!losingAdmin.isEmpty()) {
+            return email + " is the only admin of " + getScopeDisplayLabel(losingAdmin.get(0)) + ". Make someone else an admin first.";
         }
-        RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
-        UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
-        return Action.SUCCESS.toUpperCase();
+        return null;
     }
 
+    private String validateGivenRole(int callerId, int accountId, String scope, String role) {
+        if (role == null || !RoleAssignment.isExistingRole(role)) {
+            return "The role " + role + " doesn't exist anymore. Pick another role.";
+        }
+        if (Role.fromName(role) == Role.NO_ACCESS) {
+            return null;
+        }
+        if (!isValidProductScope(scope)) {
+            return "Your account doesn't include " + getScopeDisplayLabel(scope) + ".";
+        }
+        if (!RoleAssignment.canAssign(callerId, accountId, scope, role)) {
+            return "You can't give the " + role + " role.";
+        }
+        return null;
+    }
+
+    // built-in roles in their stored form, so every check that compares names sees them
+    private static Map<String, String> normalized(Map<String, String> scopeRoleMapping) {
+        Map<String, String> result = new HashMap<>();
+        for (Map.Entry<String, String> entry : scopeRoleMapping.entrySet()) {
+            result.put(entry.getKey(), RoleAssignment.normalizeRoleName(entry.getValue()));
+        }
+        return result;
+    }
+
+    private void accessChanged(int userId, int accountId) {
+        RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userId, accountId));
+        UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+        RbacCacheVersionDao.accessChanged(accountId);
+    }
+
+    @Audit(description = "User removed a user from the account", resource = Resource.USER_ACCESS, operation = Operation.DELETE, metadataGenerators = {"auditAccessChange"})
     public String removeUser() {
-        return performAction(ActionType.REMOVE_USER, null);
+        int accountId = Context.accountId.get();
+        User target = findAccountUser(accountId);
+        if (target == null) {
+            // not a member yet: revoke the pending invite in this account only
+            DeleteResult deleted = PendingInviteCodesDao.instance.getMCollection().deleteMany(Filters.and(
+                    Filters.eq(PendingInviteCode.ACCOUNT_ID, accountId), Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email)));
+            if (deleted.getDeletedCount() > 0) {
+                return Action.SUCCESS.toUpperCase();
+            }
+            addActionError("This user is not in your account.");
+            return Action.ERROR.toUpperCase();
+        }
+        String error = validateAccessChange(target, accountId, null, 0);
+        if (error != null) {
+            addActionError(error);
+            return Action.ERROR.toUpperCase();
+        }
+        UsersDao.instance.updateOne(Filters.eq(User.LOGIN, email), Updates.unset("accounts." + accountId));
+        RBACDao.instance.deleteAll(rbacFilter(target.getId(), accountId));
+        accessChanged(target.getId(), accountId);
+        return Action.SUCCESS.toUpperCase();
     }
 
     private String userRole;
 
+    // older API: one role for every product (or per-product roles when scopeRoleMapping is sent)
+    @Audit(description = "User changed another user's role", resource = Resource.USER_ACCESS, operation = Operation.UPDATE, metadataGenerators = {"auditAccessChange"})
     public String makeAdmin(){
-        return performAction(ActionType.UPDATE_USER_ROLE, this.userRole.toUpperCase());
+        int accountId = Context.accountId.get();
+        User target = findAccountUser(accountId);
+        boolean perProduct = this.scopeRoleMapping != null && !this.scopeRoleMapping.isEmpty();
+        if (!perProduct && (this.userRole == null || this.userRole.trim().isEmpty())) {
+            addActionError("Pick a role.");
+            return Action.ERROR.toUpperCase();
+        }
+        Map<String, String> newMapping = new HashMap<>();
+        if (perProduct) {
+            this.scopeRoleMapping = normalized(this.scopeRoleMapping);
+            newMapping.putAll(this.scopeRoleMapping);
+        } else {
+            for (String scope : RoleAssignment.productScopes(accountId)) {
+                newMapping.put(scope, RoleAssignment.normalizeRoleName(this.userRole.toUpperCase()));
+            }
+        }
+        RBAC current = target == null ? null : RBACDao.instance.findOne(rbacFilter(target.getId(), accountId));
+        String error = validateAccessChange(target, accountId, newMapping, current == null ? 0 : current.getAccessExpiresAt());
+        if (error != null) {
+            addActionError(error);
+            return Action.ERROR.toUpperCase();
+        }
+        // per-product roles win over the single role, so users who have them get the role in every product
+        boolean hasPerProductRoles = current != null && current.getScopeRoleMapping() != null && !current.getScopeRoleMapping().isEmpty();
+        RBACDao.instance.updateOneNoUpsert(rbacFilter(target.getId(), accountId), perProduct || hasPerProductRoles
+                ? Updates.set(RBAC.SCOPE_ROLE_MAPPING, newMapping)
+                : Updates.set(RBAC.ROLE, RoleAssignment.normalizeRoleName(this.userRole.toUpperCase())));
+        accessChanged(target.getId(), accountId);
+        return Action.SUCCESS.toUpperCase();
     }
 
     private Map<String, String> scopeRoleMapping;
 
+    // optional: epoch seconds when the user's access ends (0 = never, null = unchanged)
+    private Integer accessExpiresAt;
+
+    public void setAccessExpiresAt(Integer accessExpiresAt) {
+        this.accessExpiresAt = accessExpiresAt;
+    }
+
+    // audit: the user's roles before this request and what was asked for (read before the action runs)
+    public String auditAccessChange() {
+        String before = "none";
+        User target = email == null ? null : UsersDao.instance.findOne(Filters.eq(User.LOGIN, email));
+        if (target != null) {
+            RBAC rbac = RBACDao.instance.findOne(Filters.and(Filters.eq(RBAC.USER_ID, target.getId()), Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get())));
+            before = rbac == null ? "none" : rbac.accessSummary();
+        }
+        String after = scopeRoleMapping != null && !scopeRoleMapping.isEmpty() ? new TreeMap<>(scopeRoleMapping).toString() : String.valueOf(userRole);
+        return "user=" + email + " before=" + before + " requested=" + after + (accessExpiresAt != null ? " accessExpiresAt=" + accessExpiresAt : "");
+    }
+
+    @Audit(description = "User changed another user's product roles", resource = Resource.USER_ACCESS, operation = Operation.UPDATE, metadataGenerators = {"auditAccessChange"})
     public String updateUserScopeRoleMapping() {
         int accId = Context.accountId.get();
-        Bson findQ = Filters.eq(User.LOGIN, email);
-        User userDetails = UsersDao.instance.findOne(findQ);
+        int callerId = getSUser().getId();
+        User userDetails = findAccountUser(accId);
 
-        if (userDetails == null) {
-            addActionError("User not found");
+        // products left out get no access; an empty request used to give the default role everywhere instead
+        if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
+            addActionError("Pick at least one product, or remove the user.");
+            return Action.ERROR.toUpperCase();
+        }
+        this.scopeRoleMapping = normalized(this.scopeRoleMapping);
+
+        RBAC current = userDetails == null ? null : RBACDao.instance.findOne(rbacFilter(userDetails.getId(), accId));
+        // null keeps the current expiry, 0 removes it; only admins of all collections set or remove it
+        boolean changeExpiry = accessExpiresAt != null && RoleAssignment.isUnlimitedAdmin(callerId, accId);
+        int newExpiresAt = changeExpiry ? Math.max(accessExpiresAt, 0) : (current == null ? 0 : current.getAccessExpiresAt());
+        if (changeExpiry && newExpiresAt > 0 && newExpiresAt <= Context.now()) {
+            addActionError("Pick an expiry date in the future.");
             return Action.ERROR.toUpperCase();
         }
 
-        loggerMaker.debugAndAddToDb("scopeRoleMapping before init: " + scopeRoleMapping);
-        if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
-
-            String defaultRole = RBAC.Role.MEMBER.name();
-            if (UsageMetricCalculator.isRbacFeatureAvailable(Context.accountId.get())) {
-                defaultRole = Utils.fetchDefaultInviteRole(Context.accountId.get(), Role.MEMBER.name());
-            }
-            this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(
-                    this.scopeRoleMapping, defaultRole, Context.accountId.get(), email);
-        }
-        loggerMaker.debugAndAddToDb("scopeRoleMapping after init: " + scopeRoleMapping);
-
-        // Validate that all scopes in scopeRoleMappingToSave are valid product scopes
-        // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
-        if (scopeRoleMapping != null && !scopeRoleMapping.isEmpty()) {
-            for (Map.Entry<String, String> entry : scopeRoleMapping.entrySet()) {
-                String scope = entry.getKey();
-                String roleStr = entry.getValue();
-
-                // Allow NO_ACCESS assignments for any scope (NO_ACCESS is explicit deny, not a privilege)
-                // Only validate scope accessibility for actual role assignments (non-NO_ACCESS)
-                try {
-                    Role baseRole = RBAC.Role.valueOf(roleStr);
-                    if (!baseRole.equals(RBAC.Role.NO_ACCESS) && !isValidProductScope(scope)) {
-                        addActionError(INVALID_PRODUCT_SCOPE + scope);
-                        loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
-                        return Action.ERROR.toUpperCase();
-                    }
-                    if (!baseRole.equals(Role.NO_ACCESS) && !Arrays.asList(Role.ADMIN.getRoleHierarchy()).contains(baseRole)) {
-                        addActionError("Invalid role: " + roleStr);
-                        loggerMaker.errorAndAddToDb("Invalid role attempted in scope-role mapping: " + roleStr + " for user: " + email);
-                        return Action.ERROR.toUpperCase();
-                    }
-                } catch (IllegalArgumentException e) {
-                    // roleStr is not a standard role, check if it's a custom role
-                    CustomRole customRole = CustomRoleDao.instance.findRoleByName(roleStr);
-                    if (customRole != null) {
-                        Role baseRole = RBAC.Role.valueOf(customRole.getBaseRole());
-                        if (!baseRole.equals(RBAC.Role.NO_ACCESS) && !isValidProductScope(scope)) {
-                            addActionError(INVALID_PRODUCT_SCOPE + scope);
-                            loggerMaker.errorAndAddToDb("Invalid product scope attempted in scope-role mapping: " + scope + " for user: " + email);
-                            return Action.ERROR.toUpperCase();
-                        }
-                    } else {
-                        addActionError("Invalid role: " + roleStr);
-                        loggerMaker.errorAndAddToDb("Invalid role attempted in scope-role mapping: " + roleStr + " for user: " + email);
-                        return Action.ERROR.toUpperCase();
-                    }
-                }
-            }
+        String error = validateAccessChange(userDetails, accId, this.scopeRoleMapping, newExpiresAt);
+        if (error != null) {
+            addActionError(error);
+            return Action.ERROR.toUpperCase();
         }
 
         try {
-            Bson filterRbac = Filters.and(
-                Filters.eq(RBAC.USER_ID, userDetails.getId()),
-                Filters.eq(RBAC.ACCOUNT_ID, accId)
-            );
-
+            List<Bson> updates = new ArrayList<>(Arrays.asList(
+                    Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping),
+                    Updates.setOnInsert(RBAC.USER_ID, userDetails.getId()),
+                    Updates.setOnInsert(RBAC.ACCOUNT_ID, accId)
+            ));
+            if (changeExpiry) {
+                updates.add(Updates.set(RBAC.ACCESS_EXPIRES_AT, newExpiresAt));
+            }
             RBACDao.instance.getMCollection().updateOne(
-                    filterRbac,
-                    Updates.combine(
-                            Updates.set(RBAC.SCOPE_ROLE_MAPPING, scopeRoleMapping),
-                            Updates.setOnInsert(RBAC.USER_ID, userDetails.getId()),
-                            Updates.setOnInsert(RBAC.ACCOUNT_ID, accId)
-                    ),
+                    rbacFilter(userDetails.getId(), accId),
+                    Updates.combine(updates),
                     new UpdateOptions().upsert(true)
             );
-
-            // Clear cache
-            RBACDao.instance.deleteUserEntryFromCache(new Pair<>(userDetails.getId(), accId));
-            UsersCollectionsList.deleteCollectionIdsFromCache(userDetails.getId(), accId);
-
+            accessChanged(userDetails.getId(), accId);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error updating scope-role mapping: " + e.getMessage());
-            addActionError("Failed to update scope-role mapping");
+            addActionError("Couldn't save access. Please try again.");
             return Action.ERROR.toUpperCase();
         }
     }
@@ -429,6 +412,19 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         }
     }
 
+    private List<String> assignableRoles;
+
+    // roles a team admin may give in this product; null for everyone else (the role hierarchy applies)
+    public String fetchAssignableRoles() {
+        Set<String> assignable = RoleAssignment.limitedAssignableRoles(getSUser().getId(), Context.accountId.get());
+        this.assignableRoles = assignable == null ? null : new ArrayList<>(assignable);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public List<String> getAssignableRoles() {
+        return assignableRoles;
+    }
+
     String userEmail;
     String passwordResetToken;
     public String resetUserPassword() {
@@ -443,9 +439,15 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
             return Action.ERROR.toUpperCase();
         }
 
-        User forgotPasswordUser = UsersDao.instance.findOne(Filters.eq(User.LOGIN, userEmail));
+        User forgotPasswordUser = UsersDao.instance.findOne(Filters.and(Filters.eq(User.LOGIN, userEmail), Filters.exists(User.ACCOUNTS + "." + Context.accountId.get())));
         if(forgotPasswordUser == null) {
             addActionError("User not found.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        // passwords are shared across accounts, so an admin of one account must not get a login to the user's other accounts
+        if (forgotPasswordUser.getAccounts() != null && forgotPasswordUser.getAccounts().size() > 1) {
+            addActionError("This user belongs to other accounts too. Ask them to use 'Forgot password' on the login page.");
             return Action.ERROR.toUpperCase();
         }
 
@@ -470,6 +472,7 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         passwordResetToken = PasswordResetUtils.insertPasswordResetToken(userEmail, websiteHostName);
 
         if(passwordResetToken == null || passwordResetToken.isEmpty()) {
+            addActionError("Couldn't create the reset link. Please try again.");
             return Action.ERROR.toUpperCase();
         }
 
@@ -479,25 +482,25 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
 
 
     public String removeInvitation() {
-        User sUser = getSUser();
-
-        PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email));
-        Role currentRole = RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get());
-
-        boolean isIssuer = pendingInviteCode.getIssuer() == sUser.getId();
-        boolean isAdmin = Role.ADMIN.name().equals(currentRole.name());
-
-        if(isIssuer || isAdmin) {
-            Bson filters = Filters.and(
-                    Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
-                    Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email)
-            );
-            PendingInviteCodesDao.instance.getMCollection().deleteOne(filters);
-            return SUCCESS.toUpperCase();
-        } else {
-            addActionError("User is not allowed to remove this invitation.");
+        int accountId = Context.accountId.get();
+        PendingInviteCode pendingInviteCode = PendingInviteCodesDao.instance.findOne(Filters.and(
+                Filters.eq(PendingInviteCode.ACCOUNT_ID, accountId), Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email)));
+        if (pendingInviteCode == null) {
+            addActionError("This invite was already accepted or revoked.");
             return Action.ERROR.toUpperCase();
         }
+
+        int callerId = getSUser().getId();
+        boolean isIssuer = pendingInviteCode.getIssuer() == callerId;
+        boolean canRevoke = isIssuer || RoleAssignment.isUnlimitedAdmin(callerId, accountId)
+                || RoleAssignment.canManage(callerId, accountId, pendingInviteCode.getScopeRoleMapping(), pendingInviteCode.getInviteeRole());
+        if (!canRevoke) {
+            addActionError("You can't revoke this invite: it gives a role you can't give.");
+            return Action.ERROR.toUpperCase();
+        }
+        PendingInviteCodesDao.instance.getMCollection().deleteOne(Filters.and(
+                Filters.eq(PendingInviteCode.ACCOUNT_ID, accountId), Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email)));
+        return SUCCESS.toUpperCase();
     }
 
     public int getId() {

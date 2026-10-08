@@ -6,6 +6,7 @@ import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleC
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
 import settingRequests from '../api'
 import func from '@/util/func'
+import { usePermissions, NO_PERMISSION_REASON } from '@/util/permissions'
 
 const PLATFORMS = [
     { key: 'windows_direct', label: 'Windows - Standalone' },
@@ -88,6 +89,8 @@ function PlatformPanel({ platformKey, config, onChange, isAdmin }) {
         releases, newestPublishedVersion, targetVersionLive, previousVersion, pinnedToOlder,
         fleetCounts, listing, deploying, selectedDeployVersion,
     } = config
+    const { canCall } = usePermissions()
+    const canRefresh = canCall('api/refreshEndpointShieldLatestVersion')
 
     const manifestUrlDirty = manifestUrl !== savedManifestUrl
     const manifestUrlError = validateManifestUrl(manifestUrl)
@@ -176,8 +179,10 @@ function PlatformPanel({ platformKey, config, onChange, isAdmin }) {
         }
     }
 
-    const refreshDisabled = manifestUrlDirty || !!manifestUrlError
-    const refreshTooltip  = manifestUrlDirty
+    const refreshDisabled = manifestUrlDirty || !!manifestUrlError || !canRefresh
+    const refreshTooltip  = !canRefresh
+        ? NO_PERMISSION_REASON
+        : manifestUrlDirty
         ? 'Save the Manifest URL before refreshing'
         : manifestUrlError
             ? 'Enter a valid Manifest URL first'
@@ -326,7 +331,8 @@ function EndpointShieldSettings() {
         return null
     }
 
-    const isAdmin = window.USER_ROLE === 'ADMIN'
+    const { canCall } = usePermissions()
+    const isAdmin = canCall('api/saveEndpointShieldSettings')
     const [platforms, setPlatforms] = useState(
         () => Object.fromEntries(PLATFORMS.map(p => [p.key, { ...EMPTY_CONFIG }]))
     )

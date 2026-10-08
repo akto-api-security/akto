@@ -13,6 +13,8 @@ import GetPrettifyEndpoint from "../GetPrettifyEndpoint";
 import TooltipText from "../../../components/shared/TooltipText";
 import SaveAsCollectionModal from "../api_collections/api_query_component/SaveAsCollectionModal";
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 
 const headings = [
     {
@@ -151,6 +153,7 @@ function SensitiveDataExposure() {
     const subType = params.subType;
     const apiCollectionMap = PersistStore(state => state.collectionsMap)
     const [modal, setModal] = useState(false)
+    const { canCall } = usePermissions()
 
     const filtersMap = PersistStore(state => state.filtersMap)
 
@@ -255,9 +258,9 @@ const handleReset = async () => {
 
 const primaryActions = (
     <HorizontalStack gap={"2"}>
-        <Button id={"reset-data-type"} onClick={handleReset}>Reset</Button>
+        <AllowedAction allowed={canCall('api/resetDataTypeRetro')}><Button id={"reset-data-type"} onClick={handleReset}>Reset</Button></AllowedAction>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-        <Button id={"all-data-types"} primary onClick={() => setModal(!modal)}>Create API group</Button>
+        <AllowedAction allowed={canCall('api/addApisToCustomCollection')}><Button id={"all-data-types"} primary onClick={() => setModal(!modal)}>Create API group</Button></AllowedAction>
     </HorizontalStack>
 )
 

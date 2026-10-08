@@ -45,8 +45,13 @@ in docker-compose, the internal FQDN on Azure Container Apps).
 
 | Env var       | Default                                          | Purpose                  |
 |---------------|--------------------------------------------------|--------------------------|
-| `EMBED_MODEL` | `sentence-transformers/all-MiniLM-L6-v2`         | Model to load and serve  |
+| `EMBED_MODEL` | `sentence-transformers/all-MiniLM-L6-v2`         | Model name (build arg in the image) |
+| `EMBED_MODEL_PATH` | `/app/model` in the image; else `EMBED_MODEL` | Where the model is loaded from |
 | `PORT`        | `8094`                                           | Listen port              |
+
+The image bakes the model into `/app/model` and sets `HF_HUB_OFFLINE=1`, so it
+runs with no internet (regional clusters). To switch models, rebuild with
+`--build-arg EMBED_MODEL=...`; setting `EMBED_MODEL` at runtime has no effect.
 
 > Changing `EMBED_MODEL` changes the vector dimension (`EMBEDDING_DIM`). If you
 > do, update `EMBEDDING_DIM` in `worker-py/src/cache_store.py` to match, and let

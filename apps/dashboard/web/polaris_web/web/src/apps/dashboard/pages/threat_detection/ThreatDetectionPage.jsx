@@ -33,6 +33,7 @@ import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "./u
 import { resolveComplianceClauseMap, extractBehaviour } from "./utils/formatUtils";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
+import { withPermissions } from "@/util/permissions";
 
 // Opened in a fresh tab (e.g. "View All"), so apply ?category= before first render, same as ThreatReport.jsx.
 const categoryOverride = shortNameToCategory[getReportCategoryShortName()]
@@ -861,13 +862,14 @@ function ThreatDetectionPage() {
                     <ActionList
                         actionRole="menuitem"
                         sections={
-                            [
+                            withPermissions([
                                 {
                                     title: 'Export',
                                     items: [
                                         {
                                             content: 'Download Threat Report',
                                             onAction: () => downloadThreatReport(),
+                                            requires: 'api/generateThreatReport',
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
@@ -883,6 +885,7 @@ function ThreatDetectionPage() {
                                         {
                                             content: 'Export to ADX(Azure Data Explorer)',
                                             onAction: exportToAdx,
+                                            requires: ['api/exportGuardrailActivityToAdx', 'api/getAdxExportStatus'],
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
@@ -910,6 +913,7 @@ function ThreatDetectionPage() {
                                                 }
                                                 setWebhookIntegrationModalOpen(true);
                                             },
+                                            requires: ['api/fetchThreatActivityWebhookIntegration', 'api/addThreatActivityWebhookIntegration'],
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
@@ -924,7 +928,7 @@ function ThreatDetectionPage() {
                                         }
                                     ]
                                 },
-                            ]
+                            ])
                         }
                     />
                 </Popover.Pane>

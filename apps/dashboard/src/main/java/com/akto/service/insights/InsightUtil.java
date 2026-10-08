@@ -1,5 +1,6 @@
 package com.akto.service.insights;
 
+import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.GuardrailPolicies.SelectedServer;
@@ -184,6 +185,39 @@ public final class InsightUtil {
         return p != null && p.getPiiTypes() != null && !p.getPiiTypes().isEmpty();
     }
 
+    private static final String PII_RULE_PREFIX = "pii-";
+    private static final List<String> LLM_DATA_RULES = Arrays.asList("userdefinedllmrule", "userdefinedllmredactionrule");
+
+    /** True when the rule that fired (a guardrail event's subCategory == rule_violated) is a data check:
+     *  a PII detection ("PII-<type>") or a custom LLM (DLP) rule. A policy's other checks, such as prompt
+     *  injection, don't count even when the same policy also detects PII. */
+    public static boolean isSensitiveDataEvent(DashboardMaliciousEvent e) {
+        if (e == null || e.getSubCategory() == null) return false;
+        // With no rule_violated the producer falls back to the policy name, which isn't a rule (e.g. "pii-policy").
+        if (e.getSubCategory().equalsIgnoreCase(e.getCategory())) return false;
+        String rule = e.getSubCategory().trim().toLowerCase(Locale.ROOT);
+        return rule.startsWith(PII_RULE_PREFIX) || LLM_DATA_RULES.contains(rule);
+    }
+
+    /** What was flagged, for display: the PII type ("PII-email" -> "email"), or the firing policy's
+     *  name for a custom LLM rule. Null for non-sensitive events. */
+    public static String sensitiveDataLabel(DashboardMaliciousEvent e) {
+        if (!isSensitiveDataEvent(e)) return null;
+        String rule = e.getSubCategory().trim();
+        if (rule.toLowerCase(Locale.ROOT).startsWith(PII_RULE_PREFIX)) return rule.substring(PII_RULE_PREFIX.length()).toLowerCase(Locale.ROOT);
+        String policy = StringUtils.isNotBlank(e.getCategory()) ? e.getCategory() : e.getFilterId();
+        return (StringUtils.isNotBlank(policy) ? policy : "Custom") + " (LLM rule)";
+    }
+
+    /** "email (12), password (3)" — most frequent first. */
+    public static String sensitiveDataLine(Map<String, Integer> countsByLabel) {
+        List<Map.Entry<String, Integer>> entries = new ArrayList<>(countsByLabel.entrySet());
+        entries.sort((x, y) -> Integer.compare(y.getValue(), x.getValue()));
+        List<String> parts = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : entries) parts.add(entry.getKey() + " (" + entry.getValue() + ")");
+        return String.join(", ", parts);
+    }
+
     public static boolean policyHasPromptInjectionDetection(GuardrailPolicies p) {
         return p != null && p.getContentFiltering() != null && p.getContentFiltering().get("promptAttacks") != null;
     }
@@ -316,7 +350,10 @@ public final class InsightUtil {
 
     public static String agenticVendorOf(ApiCollection c) {
         if (c == null) return null;
-        String vendor = agenticVendorToken(c.getHostName());
+        // The saas-agent tag is authoritative (e.g. copilot-studio) — the host of a SaaS agent is
+        // user-named and carries no vendor token.
+        String vendor = agenticVendorToken(AgenticObserveUtil.getSaasAgentTagValue(c));
+        if (vendor == null) vendor = agenticVendorToken(c.getHostName());
         if (vendor == null) vendor = agenticVendorToken(c.getName());
         if (vendor == null) vendor = agenticVendorToken(AgenticObserveUtil.getAssetTagValue(c));
         return vendor;
@@ -432,6 +469,11 @@ public final class InsightUtil {
             return "OpenAI";
         }
     
+        // Microsoft Copilot Studio — must precede the generic "copilot" match below
+        if (v.contains(Constants.COPILOT_STUDIO_AI_AGENT_NAME)) {
+            return "microsoft-copilot-studio";
+        }
+
         // GitHub Copilot
         if (v.contains("copilot") ||
             v.contains("github")) {
@@ -561,7 +603,10 @@ public final class InsightUtil {
      *  the parsed token isn't a real vendor ("not-attached") — nothing to classify from it. */
     public static String endpointVendorName(ApiCollection c) {
         if (c == null) return null;
-        return endpointVendorNameOfHost(c.getHostName());
+        // A SaaS agent's host is "<id>.ai-agent.<user-chosen bot name>", so parts[2] is not a vendor;
+        // its saas-agent tag (e.g. copilot-studio) is.
+        String saasVendor = agenticVendorToken(AgenticObserveUtil.getSaasAgentTagValue(c));
+        return saasVendor != null ? saasVendor : endpointVendorNameOfHost(c.getHostName());
     }
 
     /** Same as {@link #endpointVendorName(ApiCollection)}, taking a raw hostName directly — for

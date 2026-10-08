@@ -1,6 +1,14 @@
-import { Badge, Box, Card, HorizontalStack, IndexTable, Link, ProgressBar, Text } from '@shopify/polaris'
+import { Badge, Box, Card, HorizontalStack, IndexTable, Link, Text } from '@shopify/polaris'
 import { riskBand } from '../../agenticPostureShared'
 import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import func from '@/util/func'
+import CustomProgressBar from '../../new_components/CustomProgressBar'
+
+const BAR_COLOR_FOR_TONE = {
+    critical: 'var(--p-color-bg-critical-strong)',
+    warning: 'var(--p-color-bg-warning-strong-experimental)',
+    success: 'var(--p-color-bg-success-strong)',
+}
 
 const HEADINGS = [
     { title: 'Rank' },
@@ -34,12 +42,14 @@ function HighestRiskAgentsTable({ agents, onOpenAgent }) {
             {rows.map((agent, index) => {
                 const band = riskBand(agent.score)
                 return (
-                    <IndexTable.Row id={agent.groupKey} key={agent.groupKey} position={index}>
+                    <IndexTable.Row id={agent.groupKey} key={agent.groupKey} position={index}
+                        onClick={() => onOpenAgent(agent.groupKey)}>
                         <IndexTable.Cell>
                             <Text variant="bodySm" color="subdued">{agent.rank}</Text>
                         </IndexTable.Cell>
                         <IndexTable.Cell>
-                            <Link onClick={() => onOpenAgent(agent.groupKey)} removeUnderline>
+                            {/* Polaris only makes a non-selectable row clickable when it contains a primary link. */}
+                            <Link dataPrimaryLink removeUnderline monochrome>
                                 <Text variant="bodyMd" fontWeight="semibold">{agent.name}</Text>
                             </Link>
                         </IndexTable.Cell>
@@ -50,7 +60,10 @@ function HighestRiskAgentsTable({ agents, onOpenAgent }) {
                             <Box minWidth="140px">
                                 <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                                     <Box width="90px">
-                                        <ProgressBar progress={agent.score} size="small" color={band ? band.tone : 'primary'} />
+                                        <CustomProgressBar progress={agent.score} height="8px" borderRadius="var(--p-border-radius-1)"
+                                            backgroundColor="var(--p-color-bg-strong)"
+                                            topColor={agent.severity ? func.getHexColorForSeverity(String(agent.severity).toUpperCase())
+                                                : band ? BAR_COLOR_FOR_TONE[band.tone] : 'var(--p-color-bg-primary)'} />
                                     </Box>
                                     <Text variant="bodySm" fontWeight="semibold">{agent.score}</Text>
                                 </HorizontalStack>

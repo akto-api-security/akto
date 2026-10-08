@@ -4,9 +4,11 @@ import PasswordTextField from "@/apps/dashboard/components/layouts/PasswordTextF
 import { useEffect, useState } from "react"
 import settingFunctions from "../module"
 import func from "@/util/func"
+import { usePermissions, whenAllowed } from "@/util/permissions"
 
 function Wiz() {
 
+    const { canCall } = usePermissions()
     const [tenantDataCenter, setTenantDataCenter] = useState('')
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
@@ -92,12 +94,14 @@ function Wiz() {
                 content: isSaving ? 'Saving...' : 'Save',
                 onAction: addWizIntegration,
                 disabled: isSaveDisabled(),
-                loading: isSaving
+                loading: isSaving,
+                ...whenAllowed(canCall('api/addWizIntegration'))
             }}
             secondaryFooterActions={[{
                 content: 'Remove',
                 onAction: removeWizIntegration,
-                disabled: !isRemoveable || isSaving
+                disabled: !isRemoveable || isSaving,
+                ...whenAllowed(canCall('api/removeWizIntegration'))
             }]}
         >
             <LegacyCard.Section>
@@ -141,6 +145,7 @@ function Wiz() {
             cardContent={cardContent}
             component={wizCard}
             docsUrl="https://docs.akto.io/integrations/wiz"
+            readOnly={!canCall('api/addWizIntegration')}
         />
     )
 }
