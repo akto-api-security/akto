@@ -256,12 +256,35 @@ public class McpAgentAction extends UserAction {
                 }
             }
 
+            // A follow-up message (or a chat reopened from history) often arrives without metaData; reuse the context
+            // stored with the conversation instead of answering without it.
+            boolean contextSuppliedThisTurn = StringUtils.isNotEmpty(contextString);
+            if (!contextSuppliedThisTurn && !isFirstRequest) {
+                // Read only the two fields needed: a stored turn also holds the full response and prompt
+                GenericAgentConversation stored = AgentConversationDao.instance.getMCollection()
+                    .find(Filters.and(
+                        Filters.eq(GenericAgentConversation._CONVERSATION_ID, conversationId),
+                        Filters.exists(GenericAgentConversation._CONTEXT_STRING, true),
+                        Filters.ne(GenericAgentConversation._CONTEXT_STRING, "")))
+                    .projection(Projections.include(GenericAgentConversation._CONTEXT_STRING, "tokensLimit"))
+                    .sort(Sorts.descending("createdAt"))
+                    .first();
+                if (stored != null) {
+                    contextString = stored.getContextString();
+                    tokensLimit = Math.max(tokensLimit, stored.getTokensLimit());
+                }
+            }
+
             String userEmail = getSUser() != null ? getSUser().getLogin() : null;
             String contextSource = Context.contextSource.get() != null ? Context.contextSource.get().toString() : null;
             GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 responseFromMcpServer.setUserId(getSUser().getId());
+                // Store only context that came with this turn; reused context already sits on an earlier turn
+                if (contextSuppliedThisTurn) {
+                    responseFromMcpServer.setContextString(contextString);
+                }
                 // Later turns reuse the first turn's title, so never store the agent's placeholder title
                 if (isFirstRequest && isPlaceholderTitle(responseFromMcpServer.getTitle())) {
                     responseFromMcpServer.setTitle(titleFromPrompt(message));
