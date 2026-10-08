@@ -11,7 +11,6 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 
@@ -33,10 +32,6 @@ public class Gateway {
     private static final List<String> FILE_CONTEXT_FIELDS = Arrays.asList("contextSource", "path", "method",
         "akto_account_id", "akto_vxlan_id", "ip", "requestHeaders", "time", "statusCode", "status", "tag", "metadata",
         GUARDRAILS_POLICY_NAME);
-    // Image validation is not enabled yet, so images are dropped rather than validated.
-    private static final String IMAGE_TYPE = "image";
-    private static final List<String> IMAGE_EXTENSIONS = Arrays.asList(".jpg", ".jpeg", ".png", ".gif", ".webp",
-        ".bmp", ".tif", ".tiff", ".heic", ".svg");
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -334,8 +329,8 @@ public class Gateway {
 
     /**
      * Validates the files a user uploaded ([{filename, type, content (base64)}]) with the guardrails service's
-     * /validate/file, using the request's context. Entries without inline content (a url) and images are not
-     * validated. The verdict comes back as guardrailsResult, absent when there was nothing to validate.
+     * /validate/file, using the request's context. Entries without inline content (a url) are not validated.
+     * The verdict comes back as guardrailsResult, absent when there was nothing to validate.
      */
     public Map<String, Object> validateFile(Map<String, Object> requestData, List<Map<String, Object>> files) {
         Map<String, Object> result = new HashMap<>();
@@ -361,10 +356,6 @@ public class Gateway {
             if (content.isEmpty()) {
                 continue;
             }
-            if (isImage(filename, asString(file.get("type")))) {
-                loggerMaker.info("Skipping image attachment, image validation is not enabled: {}", filename);
-                continue;
-            }
             try {
                 uploads.add(new GuardrailsClient.FileUpload(filename.isEmpty() ? "attachment" : filename,
                     Base64.getDecoder().decode(content)));
@@ -373,11 +364,6 @@ public class Gateway {
             }
         }
         return uploads;
-    }
-
-    private static boolean isImage(String filename, String type) {
-        String lower = filename.toLowerCase(Locale.ROOT);
-        return IMAGE_TYPE.equalsIgnoreCase(type) || IMAGE_EXTENSIONS.stream().anyMatch(lower::endsWith);
     }
 
     public void setDataPublisher(DataPublisher dataPublisher) {

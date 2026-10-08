@@ -96,15 +96,12 @@ public class GuardrailsFileValidationTest {
     }
 
     @Test
-    public void imagesAreDroppedByTypeOrExtensionAndDocumentsAreKept() {
+    public void imagesArePassedOnLikeAnyOtherUpload() {
         List<GuardrailsClient.FileUpload> uploads = Gateway.uploadsToValidate(Arrays.asList(
             file("attachment-1.png", "image", "png bytes", null),
-            file("Screenshot.JPEG", "file", "jpeg bytes", null),
-            file("photo", "IMAGE", "typed image without extension", null),
-            file("contract.pdf", "file", "pdf bytes", null),
-            file("notes.txt", "audio", "text bytes", null)));
+            file("contract.pdf", "file", "pdf bytes", null)));
 
-        assertEquals(Arrays.asList("notes.txt", "contract.pdf"), filenames(uploads));
+        assertEquals(Arrays.asList("contract.pdf", "attachment-1.png"), filenames(uploads));
     }
 
     @Test

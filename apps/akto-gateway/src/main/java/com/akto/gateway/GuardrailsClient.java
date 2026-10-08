@@ -22,6 +22,7 @@ import java.net.SocketTimeoutException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
@@ -38,7 +39,7 @@ public class GuardrailsClient {
     // 200 + Allowed=true shape as a healthy validation, so LiteLLM/k6 keep flowing.
     private static final int TIMEOUT_MS = resolveTimeoutMs();
     // File validation extracts and scans whole documents, so it gets a longer timeout than a prompt check.
-    private static final int FILE_TIMEOUT_MS = resolveTimeoutMs("GUARDRAILS_FILE_TIMEOUT_MS", 30_000);
+    private static final int FILE_TIMEOUT_MS = resolveTimeoutMs("GUARDRAILS_FILE_TIMEOUT_MS", 15_000);
 
     private static final OkHttpClient HTTP_CLIENT = buildHttpClient(TIMEOUT_MS);
 
@@ -143,18 +144,8 @@ public class GuardrailsClient {
         return false;
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
-        String jsonRequest;
-        try {
-            jsonRequest = objectMapper.writeValueAsString(request);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Could not serialize guardrails request: {}", e.getMessage());
-            Map<String, Object> result = buildFailOpenResponse(e.getMessage());
-            recordDecision(endpoint, result);
-            return result;
-        }
-        return send(httpClient, RequestBody.create(jsonRequest, JSON), endpoint, request);
+        return send(httpClient, endpoint, request, () -> RequestBody.create(objectMapper.writeValueAsString(request), JSON));
     }
 
     /** Validates files with /validate/file: fields go as form values and each file as a "file" part. */
@@ -168,11 +159,12 @@ public class GuardrailsClient {
         for (FileUpload file : files) {
             body.addFormDataPart("file", file.filename, RequestBody.create(file.content, OCTET_STREAM));
         }
-        return send(fileHttpClient, body.build(), VALIDATE_FILE_ENDPOINT, fields);
+        return send(fileHttpClient, VALIDATE_FILE_ENDPOINT, fields, body::build);
     }
 
-    /** POSTs body to the guardrails service, failing open on any error; context is only used for logs. */
-    private Map<String, Object> send(OkHttpClient client, RequestBody body, String endpoint, Map<String, Object> context) {
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> send(OkHttpClient client, String endpoint, Map<String, Object> request,
+            Callable<RequestBody> body) {
         // Single result reference assigned on every return path, so the decision counter is
         // recorded exactly once (in finally) regardless of which branch we exit through.
         Map<String, Object> result = null;
@@ -183,7 +175,7 @@ public class GuardrailsClient {
 
             Request.Builder requestBuilder = new Request.Builder()
                     .url(url)
-                    .post(body);
+                    .post(body.call());
 
             String authToken = loadGuardrailsAuthToken();
             if (authToken == null || authToken.trim().isEmpty()) {
@@ -206,14 +198,14 @@ public class GuardrailsClient {
                     } catch (Exception parseEx) {
                         loggerMaker.warnAndAddToDb(
                             "Guardrails response not parseable, failing open - path: {}, error: {}",
-                            context.get("path"), parseEx.getMessage());
+                            request.get("path"), parseEx.getMessage());
                         result = buildFailOpenResponse("invalid guardrails response: " + parseEx.getMessage());
                         return result;
                     }
                 }
                 loggerMaker.warnAndAddToDb(
                     "Guardrails service returned error status {}, failing open - path: {}",
-                    response.code(), context.get("path"));
+                    response.code(), request.get("path"));
                 result = buildFailOpenResponse("Guardrails service error: HTTP " + response.code());
                 return result;
             }
@@ -223,7 +215,7 @@ public class GuardrailsClient {
                 // Preserve fail-open behavior; notifications are asynchronous and rate limited.
                 loggerMaker.warnAndAddToDb(
                     "Guardrails unavailable ({}), failing open - path: {}, method: {}, account: {}",
-                    e.getMessage(), context.get("path"), context.get("method"), context.get("akto_account_id"));
+                    e.getMessage(), request.get("path"), request.get("method"), request.get("akto_account_id"));
             } else {
                 loggerMaker.errorAndAddToDb(e, "Unexpected error calling guardrails service: {}", e.getMessage());
             }

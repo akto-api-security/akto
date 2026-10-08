@@ -60,11 +60,10 @@
             </result>
         </action>
 
-        <!-- Limits fit base64 files sent with file_guardrails=true. -->
         <action name="api/http-proxy" class="com.akto.action.HttpProxyAction" method="httpProxy">
             <interceptor-ref name="json">
-                <param name="maxStringLength">15728640</param>
-                <param name="maxLength">31457280</param>
+                <param name="maxStringLength">5242880</param>
+                <param name="maxLength">10485760</param>
             </interceptor-ref>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
