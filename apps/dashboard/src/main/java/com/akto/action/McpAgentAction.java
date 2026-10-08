@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,6 +42,9 @@ public class McpAgentAction extends UserAction {
     private static final Logger logger = LoggerFactory.getLogger(McpAgentAction.class);
     /** Guardrail: very large context breaks MCP /chat or gateway limits and yields 422 (ERROR). */
     private static final int MAX_TEST_RESULT_CONTEXT_CHARS = 120_000;
+    // Earlier turns sent with a follow-up so the agent can rebuild the chat if it lost its saved history
+    private static final int HISTORY_TURNS_FOR_AGENT = 5;
+    private static final int HISTORY_TEXT_MAX_CHARS = 4000;
     private String message;
     private String conversationId;
     private BasicDBObject response;
@@ -256,35 +260,14 @@ public class McpAgentAction extends UserAction {
                 }
             }
 
-            // A follow-up message (or a chat reopened from history) often arrives without metaData; reuse the context
-            // stored with the conversation instead of answering without it.
-            boolean contextSuppliedThisTurn = StringUtils.isNotEmpty(contextString);
-            if (!contextSuppliedThisTurn && !isFirstRequest) {
-                // Read only the two fields needed: a stored turn also holds the full response and prompt
-                GenericAgentConversation stored = AgentConversationDao.instance.getMCollection()
-                    .find(Filters.and(
-                        Filters.eq(GenericAgentConversation._CONVERSATION_ID, conversationId),
-                        Filters.exists(GenericAgentConversation._CONTEXT_STRING, true),
-                        Filters.ne(GenericAgentConversation._CONTEXT_STRING, "")))
-                    .projection(Projections.include(GenericAgentConversation._CONTEXT_STRING, "tokensLimit"))
-                    .sort(Sorts.descending("createdAt"))
-                    .first();
-                if (stored != null) {
-                    contextString = stored.getContextString();
-                    tokensLimit = Math.max(tokensLimit, stored.getTokensLimit());
-                }
-            }
+            List<Map<String, String>> history = isFirstRequest ? null : recentTurns(conversationId);
 
             String userEmail = getSUser() != null ? getSUser().getLogin() : null;
             String contextSource = Context.contextSource.get() != null ? Context.contextSource.get().toString() : null;
-            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource);
+            GenericAgentConversation responseFromMcpServer = agentClient.getResponseFromMcpServer(message, conversationId, tokensLimit, storedTitle, conversationTypeEnum, accessTokenForRequest, contextString, userEmail, contextSource, history);
             if(responseFromMcpServer != null) {
                 responseFromMcpServer.setCreatedAt(timeNow);
                 responseFromMcpServer.setUserId(getSUser().getId());
-                // Store only context that came with this turn; reused context already sits on an earlier turn
-                if (contextSuppliedThisTurn) {
-                    responseFromMcpServer.setContextString(contextString);
-                }
                 // Later turns reuse the first turn's title, so never store the agent's placeholder title
                 if (isFirstRequest && isPlaceholderTitle(responseFromMcpServer.getTitle())) {
                     responseFromMcpServer.setTitle(titleFromPrompt(message));
@@ -302,6 +285,32 @@ public class McpAgentAction extends UserAction {
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
+    }
+
+    /**
+     * The last few prompt/response pairs of a conversation, oldest first. The agent keeps its own history in a
+     * local file and only uses these when that file is gone (restart, redeploy, another replica).
+     */
+    private static List<Map<String, String>> recentTurns(String conversationId) {
+        List<GenericAgentConversation> turns = AgentConversationDao.instance.getMCollection()
+            .find(Filters.eq(GenericAgentConversation._CONVERSATION_ID, conversationId))
+            .projection(Projections.include("prompt", "response"))
+            .sort(Sorts.descending("createdAt"))
+            .limit(HISTORY_TURNS_FOR_AGENT)
+            .into(new ArrayList<>());
+        Collections.reverse(turns);
+
+        List<Map<String, String>> history = new ArrayList<>();
+        for (GenericAgentConversation turn : turns) {
+            if (StringUtils.isBlank(turn.getPrompt()) || StringUtils.isBlank(turn.getResponse())) {
+                continue;
+            }
+            Map<String, String> pair = new HashMap<>();
+            pair.put("prompt", StringUtils.abbreviate(turn.getPrompt(), HISTORY_TEXT_MAX_CHARS));
+            pair.put("response", StringUtils.abbreviate(turn.getResponse(), HISTORY_TEXT_MAX_CHARS));
+            history.add(pair);
+        }
+        return history;
     }
 
     public String fetchHistory() {
