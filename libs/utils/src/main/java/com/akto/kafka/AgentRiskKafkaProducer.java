@@ -73,14 +73,6 @@ public class AgentRiskKafkaProducer {
         }
     }
 
-    public static int getApiInfoDecaySecs() {
-        try {
-            return Integer.parseInt(getEnvOrDefault("AGENT_RISK_APIINFO_DECAY_SECS", "86400"));
-        } catch (NumberFormatException e) {
-            return 86400;
-        }
-    }
-
     public static double getKnnDistanceThreshold() {
         try {
             return Double.parseDouble(getEnvOrDefault("AGENT_RISK_KNN_DISTANCE_THRESHOLD", "0.15"));

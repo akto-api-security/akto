@@ -172,6 +172,7 @@ public class ElasticSearchClient {
                     .put("composite", s.getComposite())
                     .put("dataRisk", s.getDataRisk())
                     .put("toolRisk", s.getToolRisk())
+                    .put("guardrailRisk", s.getGuardrailRisk())
                     .put("dataClassMax", s.getDataClassMax())
                     .put("agentKey", emptyIfNull(s.getAgentKey()))
                     .put("toolFingerprint", emptyIfNull(s.getToolFingerprint()))
@@ -308,6 +309,7 @@ public class ElasticSearchClient {
             neighbor.setComposite(source.optInt("composite", 0));
             neighbor.setDataRisk(source.optInt("dataRisk", 0));
             neighbor.setToolRisk(source.optInt("toolRisk", 0));
+            neighbor.setGuardrailRisk(source.optInt("guardrailRisk", 0));
             neighbor.setDataClassMax(source.optInt("dataClassMax", 0));
             neighbor.setSource(AgentRiskScore.Source.REUSED);
             double similarity = hit.optDouble("_score", 0d);

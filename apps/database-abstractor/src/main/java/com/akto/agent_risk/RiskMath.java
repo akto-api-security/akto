@@ -13,6 +13,6 @@ public final class RiskMath {
         if (s == null) {
             return 0;
         }
-        return Math.max(s.getDataRisk(), s.getToolRisk());
+        return Math.max(s.getDataRisk(), Math.max(s.getToolRisk(), s.getGuardrailRisk()));
     }
 }

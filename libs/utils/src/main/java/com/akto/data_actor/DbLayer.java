@@ -3136,6 +3136,7 @@ public class DbLayer {
             if (!filters.isEmpty()) {
                 finalFilter = Filters.and(filters);
             }
+            loggerMaker.infoAndAddToDb(String.format("The contextSource will be %s (account %s)", contextSource, filters), LogDb.DB_ABS);
 
             return GuardrailPoliciesDao.instance.findAll(finalFilter);
         } catch (Exception e) {

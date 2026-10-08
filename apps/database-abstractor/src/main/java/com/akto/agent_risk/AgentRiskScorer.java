@@ -3,6 +3,8 @@ package com.akto.agent_risk;
 import java.util.List;
 
 import com.akto.kafka.AgentRiskKafkaProducer;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.elasticsearch.ElasticSearchClient;
 import com.akto.utils.elasticsearch.ElasticSearchClient.KnnHit;
@@ -10,6 +12,7 @@ import com.akto.utils.elasticsearch.ElasticSearchClient.KnnHit;
 
 public class AgentRiskScorer {
 
+    private static final LoggerMaker logger = new LoggerMaker(AgentRiskScorer.class, LogDb.DB_ABS);
     private static final AgentRiskScorer INSTANCE = new AgentRiskScorer();
 
     public static AgentRiskScorer instance() {
@@ -31,6 +34,8 @@ public class AgentRiskScorer {
 
         AgentRiskScore cached = cache.get(ctx.getAccountId(), hash);
         if (canReuse(ctx, cached)) {
+            logger.info("agent-risk cache hit hash=" + hash + " composite=" + cached.getComposite()
+                    + " traceId=" + ctx.getTraceId());
             return copyForTrace(cached, ctx, hash, AgentRiskScore.Source.REUSED, cached.getHash(), false);
         }
 
@@ -40,7 +45,13 @@ public class AgentRiskScorer {
             embedding = embedClient.embed(prompt);
             KnnHit hit = ElasticSearchClient.instance().knnSearchAgentRiskScores(
                     embedding, ctx.getAccountId(), ctx.getAgentKey());
-            if (reusableNeighbor(ctx, hit)) {
+            boolean reuse = reusableNeighbor(ctx, hit);
+            logger.info("agent-risk knn hash=" + hash
+                    + " embedDim=" + embedDim(embedding)
+                    + " neighbor=" + neighborSummary(hit)
+                    + " reusable=" + reuse
+                    + " traceId=" + ctx.getTraceId());
+            if (reuse) {
                 AgentRiskScore reused = copyForTrace(hit.neighbor, ctx, hash, AgentRiskScore.Source.REUSED,
                         hit.neighbor.getHash(), true);
                 reused.setEmbedding(embedding);
@@ -48,11 +59,23 @@ public class AgentRiskScorer {
                 cache.put(ctx.getAccountId(), hash, reused);
                 return reused;
             }
+        } else {
+            logger.info("agent-risk skip-embed hash=" + hash
+                    + " promptChars=" + prompt.length()
+                    + " embedConfigured=" + embedClient.isConfigured()
+                    + " traceId=" + ctx.getTraceId());
         }
 
         AgentRiskScore scored = applyRules(ctx, hash);
         scored.setEmbedding(embedding);
         cache.put(ctx.getAccountId(), hash, scored);
+        logger.info("agent-risk rules hash=" + hash
+                + " composite=" + scored.getComposite()
+                + " dataRisk=" + scored.getDataRisk()
+                + " toolRisk=" + scored.getToolRisk()
+                + " guardrailRisk=" + scored.getGuardrailRisk()
+                + " embedDim=" + embedDim(embedding)
+                + " traceId=" + ctx.getTraceId());
         return scored;
     }
 
@@ -101,6 +124,20 @@ public class AgentRiskScorer {
         return canReuse(ctx, hit.neighbor);
     }
 
+    private static int embedDim(List<Double> embedding) {
+        return embedding == null ? 0 : embedding.size();
+    }
+
+    private static String neighborSummary(KnnHit hit) {
+        if (hit == null || hit.neighbor == null) {
+            return "none";
+        }
+        return "hash=" + hit.neighbor.getHash()
+                + " composite=" + hit.neighbor.getComposite()
+                + " distance=" + hit.distance
+                + " dataClassMax=" + hit.neighbor.getDataClassMax();
+    }
+
     private static boolean eq(String a, String b) {
         return (a == null ? "" : a).equals(b == null ? "" : b);
     }
@@ -112,7 +149,9 @@ public class AgentRiskScorer {
         out.setComposite(src.getComposite());
         out.setDataRisk(src.getDataRisk());
         out.setToolRisk(src.getToolRisk());
+        out.setGuardrailRisk(Math.max(src.getGuardrailRisk(), GuardrailRisk.detect(ctx)));
         out.setDataClassMax(Math.max(src.getDataClassMax(), DataRisk.detect(ctx)));
+        out.setDataOperation(Math.max(src.getDataOperation(), DataRisk.operation(ctx)));
         out.setSource(source);
         out.setHash(hash);
         out.setNeighborId(neighborId);
@@ -127,6 +166,7 @@ public class AgentRiskScorer {
         out.setEmbedding(src.getEmbedding());
         out.setApiCollectionId(ctx.getApiCollectionId());
         out.setKnnDistance(src.getKnnDistance());
+        out.recomputeComposite();
         return out;
     }
 }

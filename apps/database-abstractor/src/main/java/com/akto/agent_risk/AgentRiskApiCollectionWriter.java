@@ -9,7 +9,8 @@ import java.util.TreeMap;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.kafka.AgentRiskKafkaProducer;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
@@ -24,6 +25,7 @@ import org.bson.conversions.Bson;
  * bulkWrite per account. upsert=false: skip collections that do not exist yet.
  */
 public class AgentRiskApiCollectionWriter {
+    private static final LoggerMaker logger = new LoggerMaker(AgentRiskScorer.class, LogDb.DB_ABS);
 
     private AgentRiskApiCollectionWriter() {}
 
@@ -49,7 +51,6 @@ public class AgentRiskApiCollectionWriter {
         }
 
         int now = Context.now();
-        int decayBefore = now - AgentRiskKafkaProducer.getApiInfoDecaySecs();
         Integer previous = Context.accountId.get();
         try {
             for (Map.Entry<Integer, Map<Integer, AgentRiskScore>> accountEntry : byAccount.entrySet()) {
@@ -58,14 +59,11 @@ public class AgentRiskApiCollectionWriter {
                 for (Map.Entry<Integer, AgentRiskScore> collectionEntry : accountEntry.getValue().entrySet()) {
                     AgentRiskScore s = collectionEntry.getValue();
                     int incoming = s.getComposite();
+                    logger.info("The final score which was calculated is " + incoming);
                     Bson idFilter = Filters.eq(ApiCollection.ID, collectionEntry.getKey());
-                    Bson shouldWrite = Filters.or(
-                            Filters.exists(ApiCollection.AGENT_RISK_SCORE, false),
-                            Filters.lt(ApiCollection.AGENT_RISK_SCORE, incoming),
-                            Filters.lt(ApiCollection.AGENT_RISK_LAST_CALCULATED_TIME, decayBefore)
-                    );
+                    logger.info("The idFilter will be " + idFilter);
                     updates.add(new UpdateOneModel<>(
-                            Filters.and(idFilter, shouldWrite),
+                            idFilter,
                             Updates.combine(
                                     Updates.set(ApiCollection.AGENT_RISK_SCORE, incoming),
                                     Updates.set(ApiCollection.AGENT_RISK_LAST_CALCULATED_TIME, now),
@@ -74,6 +72,8 @@ public class AgentRiskApiCollectionWriter {
                             new UpdateOptions().upsert(false)
                     ));
                 }
+                logger.info("The accountId will be " + Context.accountId.get());
+                logger.info("The updates will be " + updates);
                 if (!updates.isEmpty()) {
                     ApiCollectionsDao.instance.getMCollection().bulkWrite(updates, new BulkWriteOptions().ordered(true));
                 }

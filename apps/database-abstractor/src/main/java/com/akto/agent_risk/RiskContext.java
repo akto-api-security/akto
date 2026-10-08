@@ -35,6 +35,7 @@ public class RiskContext {
     private String traceId;
     private String spanId;
     private Integer apiCollectionId;
+    private Boolean guardrailViolated;
 
     public static RiskContext from(AgentQueryRecord record) {
         RiskContext ctx = new RiskContext();
@@ -53,6 +54,7 @@ public class RiskContext {
         ctx.toolFingerprint = ToolRisk.fingerprint(combined);
         ctx.privilegeClass = privilegeClass(combined);
         ctx.rawText = nullToEmpty(record.getQueryPayload()) + "\n" + nullToEmpty(record.getResponsePayload());
+        ctx.guardrailViolated = record.getGuardrailViolated();
         return ctx;
     }
 

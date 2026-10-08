@@ -16,7 +16,9 @@ public class AgentRiskScore {
     private int composite;
     private int dataRisk;
     private int toolRisk;
+    private int guardrailRisk;
     private int dataClassMax;
+    private int dataOperation;
     private Source source;
     private String hash;
     private String neighborId;
