@@ -4,6 +4,7 @@ import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.action.threat_detection.SkillSeverityCount;
 import com.akto.action.threat_detection.ThreatCategoryCount;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.GuardrailPolicies;
@@ -11,9 +12,16 @@ import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * One immutable snapshot of every Mongo/threat-backend read the 10 providers need,
@@ -137,6 +145,76 @@ public class InsightDataBundle {
         }
     }
 
+    private static final int HOST_COUNTS_BUCKET_SECONDS = 300;
+    // Rounded startTs -> account-wide events. Lives as long as this (60s-cached) bundle, so repeated drill/profile
+    // opens share one threat-backend call per window instead of one per request or per agent.
+    private final Map<Integer, List<DashboardMaliciousEvent>> hostCountsSince = new ConcurrentHashMap<>();
+    private volatile HostCollectionResolver hostResolver;
+
+    // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host, then actor
+    // (event collection ids aren't reliable); null when the threat backend is unavailable.
+    public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs) {
+        return maliciousSeverityCounts(collectionIds, startTs, null);
+    }
+
+    // Same, counting only the events that pass eventFilter (null = all events).
+    public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs,
+                                                                        Predicate<DashboardMaliciousEvent> eventFilter) {
+        return countsByCollection(collectionIds, startTs, eventFilter,
+                e -> e.getSeverity() == null ? "UNKNOWN" : e.getSeverity().toUpperCase(Locale.ROOT));
+    }
+
+    // collectionId -> {flagged data ("email", "<policy> (LLM rule)") -> count} since startTs; null when unavailable.
+    public Map<Integer, Map<String, Integer>> sensitiveDataCounts(List<Integer> collectionIds, int startTs) {
+        return countsByCollection(collectionIds, startTs, InsightUtil::isSensitiveDataEvent, InsightUtil::sensitiveDataLabel);
+    }
+
+    private Map<Integer, Map<String, Integer>> countsByCollection(List<Integer> collectionIds, int startTs,
+                                                                 Predicate<DashboardMaliciousEvent> eventFilter,
+                                                                 Function<DashboardMaliciousEvent, String> keyOf) {
+        List<DashboardMaliciousEvent> hostCounts = cachedEventsSince(startTs);
+        if (hostCounts == null) return null;
+        List<DashboardMaliciousEvent> events = eventFilter == null ? hostCounts
+                : hostCounts.stream().filter(eventFilter).collect(Collectors.toList());
+        Map<Integer, Map<String, Integer>> byCollection = hostResolver().countByCollection(events, keyOf);
+        byCollection.keySet().retainAll(new HashSet<>(collectionIds));
+        return byCollection;
+    }
+
+    private List<DashboardMaliciousEvent> cachedEventsSince(int startTs) {
+        if (!threatBackendAvailable || threatAccess == null) return null;
+        int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
+        List<DashboardMaliciousEvent> events = hostCountsSince.get(since);
+        if (events == null) {
+            events = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
+            hostCountsSince.putIfAbsent(since, events);
+        }
+        return events;
+    }
+
+    /** Events inside the page's date range (ctx start..end), from the same cache; null when the threat
+     *  backend is unavailable. */
+    public List<DashboardMaliciousEvent> windowEvents() {
+        List<DashboardMaliciousEvent> events = cachedEventsSince(ctx.getStartTs());
+        if (events == null) return null;
+        long start = ctx.getStartTs();
+        long end = ctx.getEndTs() > 0 ? ctx.getEndTs() : Long.MAX_VALUE;
+        return events.stream().filter(e -> e != null && e.getTimestamp() >= start && e.getTimestamp() <= end)
+                .collect(Collectors.toList());
+    }
+
+    /** Attributes events to this bundle's collections (host, then actor). */
+    public HostCollectionResolver hostResolver() {
+        if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);
+        return hostResolver;
+    }
+
+    // Newest-first events for these collections; null when the threat backend is unavailable.
+    public List<DashboardMaliciousEvent> listMaliciousEvents(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        if (!threatBackendAvailable || threatAccess == null) return null;
+        return threatAccess.violationEvents(startTs, endTs, limit, Collections.singletonMap("apiCollectionId", collectionIds), null);
+    }
+
     private static final long MALICIOUS_INVOCATION_WINDOW_MS = 15L * 24 * 3600 * 1000;
     private static final int MALICIOUS_INVOCATION_LIMIT_PER_TERM = 3;
 
@@ -154,7 +232,7 @@ public class InsightDataBundle {
             long endMs = ctx.getEndTs() * 1000L;
             long startMs = endMs - MALICIOUS_INVOCATION_WINDOW_MS;
             return com.akto.utils.search.SearchClientFactory.instance()
-                    .searchMaliciousComponentInvocations(1779231193, maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
+                    .searchMaliciousComponentInvocations(Context.accountId.get(), maliciousTermNames, startMs, endMs, MALICIOUS_INVOCATION_LIMIT_PER_TERM);
         } catch (Exception e) {
             return null;
         }

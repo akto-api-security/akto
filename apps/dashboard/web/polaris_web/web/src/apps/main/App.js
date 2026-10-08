@@ -20,6 +20,7 @@ import Integrations from "../dashboard/pages/settings/integrations/Integrations"
 import Settings from "../dashboard/pages/settings/Settings";
 import Users from "../dashboard/pages/settings/users/Users";
 import Roles from "../dashboard/pages/settings/roles/Roles";
+import RoleDetails from "../dashboard/pages/settings/roles/RoleDetails";
 import Postman from "../dashboard/pages/settings/integrations/Postman";
 import Jira from "../dashboard/pages/settings/integrations/Jira";
 import ApiTokens from "../dashboard/pages/settings/integrations/ApiTokens";
@@ -140,6 +141,8 @@ import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.js
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
 import EndpointPosture from "../dashboard/pages/dashboard/EndpointPosture.jsx";
 import SecurityPosture from "../dashboard/pages/dashboard/SecurityPosture.jsx";
+import AgenticPosture from "../dashboard/pages/dashboard/agenticPosture/AgenticPosture.jsx";
+import AgenticPostureAgentDetail from "../dashboard/pages/dashboard/agenticPosture/AgentDetail.jsx";
 import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx";
 import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
@@ -176,6 +179,14 @@ const router = createBrowserRouter([
                     {
                         path: "security-posture",
                         element: <SecurityPosture/>,
+                    },
+                    {
+                        path: "agentic-posture",
+                        element: <AgenticPosture/>,
+                    },
+                    {
+                        path: "agentic-posture/agents/:groupKey",
+                        element: <AgenticPostureAgentDetail/>,
                     },
                     {
                         path: "view",
@@ -439,6 +450,10 @@ const router = createBrowserRouter([
                     {
                         path: "roles",
                         element: <Roles/>
+                    },
+                    {
+                        path: "roles/details",
+                        element: <RoleDetails/>
                     },
                     {
                         path: "threat-configuration",

@@ -21,6 +21,8 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import func from "@/util/func"
 import api from '../api';
 import Dropdown from "../../../components/layouts/Dropdown";
+import { usePermissions, whenAllowed } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
 import {
   useJiraReducer,
   initialEmptyMapping,
@@ -30,6 +32,7 @@ import {
 
 function Jira() {
     const { state, actions } = useJiraReducer();
+    const { canCall, canCallAll } = usePermissions();
 
     const {
         credentials: { baseUrl, apiToken, userEmail },
@@ -671,7 +674,9 @@ function Jira() {
                         <VerticalStack gap={4}>
                             <HorizontalStack align='space-between'>
                                 <Text fontWeight='semibold' variant='headingSm'>{`Project ${index + 1}`}</Text>
+                                <AllowedAction allowed={!existingProjectIds.includes(project?.projectId) || canCall('api/jira/delete')}>
                                 <Button plain removeUnderline destructive size='slim' disabled={projects.length <= 1} onClick={() => deleteProject(index)}>Delete Project</Button>
+                                </AllowedAction>
                             </HorizontalStack>
                             <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"} requiredIndicator
                                 onChange={(val)=> projectKeyChangeHandler(index,val)} />
@@ -749,13 +754,16 @@ function Jira() {
                                             Cancel
                                         </Button>
                                     ) : project.hasSavedMapping ? (
+                                        <AllowedAction allowed={canCallAll('api/jira/fetchAvailableFieldsForMapping', 'api/jira/savePriorityFieldMapping')}>
                                         <Button
                                             size='slim'
                                             onClick={() => handleStartPriorityMapping(index, project)}
                                         >
                                             Edit Mapping
                                         </Button>
+                                        </AllowedAction>
                                     ) : (
+                                        <AllowedAction allowed={canCallAll('api/jira/fetchAvailableFieldsForMapping', 'api/jira/savePriorityFieldMapping')}>
                                         <Button
                                             size='slim'
                                             disabled={!project?.projectId?.trim()}
@@ -763,6 +771,7 @@ function Jira() {
                                         >
                                             Configure Mapping
                                         </Button>
+                                        </AllowedAction>
                                     )}
                                 </HorizontalStack>
 
@@ -962,12 +971,14 @@ function Jira() {
                                         {/* Save Button */}
                                         {project.priorityFieldMapping?.fieldId && project.availableFieldValues && project.availableFieldValues.length > 0 && (
                                             <HorizontalStack gap={2}>
+                                                <AllowedAction allowed={canCall('api/jira/savePriorityFieldMapping')}>
                                                 <Button
                                                     primary
                                                     onClick={() => handleSavePriorityMapping(index, project)}
                                                 >
                                                     Save Mapping
                                                 </Button>
+                                                </AllowedAction>
                                             </HorizontalStack>
                                         )}
                                     </VerticalStack>
@@ -1104,7 +1115,8 @@ function Jira() {
                 content: isSaving ? 'Saving...' : 'Save',
                 onAction: addJiraIntegrationV2,
                 disabled: isSaveButtonDisabled(),
-                loading: isSaving
+                loading: isSaving,
+                ...whenAllowed(canCall('api/jira/add'))
             }}
         >
           <LegacyCard.Section>
@@ -1176,7 +1188,7 @@ function Jira() {
 
     let cardContent = "Seamlessly enhance your web application security with Jira integration. Create jira tickets for api vulnerability issues and view them on the tap of a button"
     return (
-        <IntegrationsLayout title="Jira" cardContent={cardContent} component={JCard} docsUrl="https://docs.akto.io/traffic-connections/postman" />
+        <IntegrationsLayout title="Jira" cardContent={cardContent} component={JCard} docsUrl="https://docs.akto.io/traffic-connections/postman" readOnly={!canCall('api/jira/add')} />
     )
 }
 

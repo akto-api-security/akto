@@ -5,6 +5,7 @@ import './settings.css'
 import SettingsLeftNav from "./nav/SettingsLeftNav";
 import { useEffect } from "react";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
+import PageAccessGuard from "../../components/shared/PageAccessGuard";
 
 function SettingsHeader({ onHandleClose }) {
     const buttonComp = (
@@ -53,7 +54,7 @@ const Settings = () => {
     return (
         <Frame navigation={<SettingsLeftNav />} topBar={<SettingsHeader onHandleClose={handleSettingsClose} />}>
             <Box paddingBlockEnd={"20"}>
-                <Outlet />
+                <PageAccessGuard><Outlet /></PageAccessGuard>
             </Box>
         </Frame>
     )

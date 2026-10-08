@@ -29,7 +29,7 @@ function ConfirmationModal(props) {
                     primaryAction()
                     closeModal()
                 },
-                destructive: /delete/i.test(String(primaryActionContent))
+                destructive: /delete|remove|revoke/i.test(String(primaryActionContent))
             }}
         >
             <Modal.Section>

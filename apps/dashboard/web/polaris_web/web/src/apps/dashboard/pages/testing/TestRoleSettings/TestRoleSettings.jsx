@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useReducer } from 'react'
-import { LegacyCard } from '@shopify/polaris'
+import { LegacyCard, Banner } from '@shopify/polaris'
 import { useLocation, useNavigate } from 'react-router-dom'
 import TestRolesConditionsPicker from '../../../components/TestRolesConditionsPicker';
 import func from "@/util/func";
@@ -15,6 +15,7 @@ import AuthComponent from "./AuthComponent";
 import SavedParamComponent from "./SavedParamComponent";
 import { HARDCODED } from "./TestRoleConstants";
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { usePermissions } from '@/util/permissions';
 
 const selectOptions = [
   {
@@ -54,6 +55,8 @@ function TestRoleSettings() {
   const isDataInSearch = searchParams.get("name")
   const isNew = !isDataInState && !isDataInSearch
   const pageTitle = isNew ? "Add " + mapLabel("test", getDashboardCategory()) + " role" : "Configure " + mapLabel("test", getDashboardCategory()) + " role"
+  const { canCallAll } = usePermissions()
+  const canSave = canCallAll(isNew ? 'api/addTestRoles' : 'api/updateTestRoles', ...(func.checkForFeatureSaas("TEST_ROLE_SCOPE_ROLES") ? ['api/saveTestRoleMeta'] : []))
   const [initialItems, setInitialItems] = useState({ name: "" });
   const [conditions, dispatchConditions] = useReducer(
     produce((draft, action) => conditionsReducer(draft, action)),
@@ -171,7 +174,7 @@ function TestRoleSettings() {
   }, [scopeRoles]);
 
   const compareFunc = () => {
-    return !change
+    return !change || !canSave
   }
 
   const testRoleMetaInfo = async () => {
@@ -357,6 +360,9 @@ function TestRoleSettings() {
     authComponent,
     savedParamComponent,
   ];
+  if (!canSave) {
+    components = [<Banner key="read-only" status="info">Read-only: your role can't save changes to test roles. Ask an admin if you need it.</Banner>, ...components]
+  }
 
   return (
     <DetailsPage

@@ -296,6 +296,75 @@ const api = {
         })
     },
 
+    fetchArgusPostureSummary: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureSummary',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                environment
+            }
+        })
+    },
+
+    fetchArgusPostureChanges: async (startTimestamp, endTimestamp, environment) => {
+        return await request({
+            url: '/api/fetchArgusPostureChanges',
+            method: 'post',
+            data: { startTimestamp, endTimestamp, environment }
+        })
+    },
+
+    // The 5 Argus posture insight cards — fast, Java-only data, no LLM call.
+    fetchArgusPostureInsights: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsights',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    // Meant to be called after fetchArgusPostureInsights has already rendered — this one does a
+    // real LLM call per card on a cache miss, so it must never block the card data itself.
+    fetchArgusPostureInsightSummaries: async (startTimestamp, endTimestamp) => {
+        return await request({
+            url: '/api/fetchArgusPostureInsightSummaries',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp
+            }
+        })
+    },
+
+    triggerArgusPostureRegenerate: async () => {
+        return await request({ url: '/api/triggerArgusPostureRegenerate', method: 'post', data: {} })
+    },
+
+    fetchArgusPostureRegenerateStatus: async () => {
+        return await request({ url: '/api/fetchArgusPostureRegenerateStatus', method: 'post', data: {} })
+    },
+
+    fetchArgusPostureDrill: async (drillId, path, startTimestamp, endTimestamp, environment, skip, limit) => {
+        return await request({
+            url: '/api/fetchArgusPostureDrill',
+            method: 'post',
+            data: {
+                drillId,
+                path: path || '',
+                startTimestamp,
+                endTimestamp,
+                environment,
+                skip: skip || 0,
+                limit: limit || 20
+            }
+        })
+    },
+
     fetchPostureSummary: async (startTimestamp, endTimestamp) => {
         return await request({
             url: '/api/fetchPostureSummary',
@@ -307,18 +376,25 @@ const api = {
         })
     },
 
-    // The risk score flyout's own detail (sub-scores + vendor table) — fetched only when the
-    // flyout opens, not as part of fetchPostureSummary. See SecurityPostureAction's javadoc.
-    fetchRiskScoreBreakdown: async (startTimestamp, endTimestamp) => {
+    // One page of one panel's drilldown flyout — see PostureService#fetchDrill's own javadoc.
+    // The risk score breakdown (formerly its own fetchRiskScoreBreakdown call) is now just
+    // drillId=PostureService.DRILL_RISK_SCORE on this same endpoint.
+    // `path` is empty/undefined for the root (group) level, or one prior level's row id to drill
+    // into its members.
+    fetchPostureDrill: async (drillId, path, startTimestamp, endTimestamp, skip, limit) => {
         return await request({
-            url: '/api/fetchRiskScoreBreakdown',
+            url: '/api/fetchPostureDrill',
             method: 'post',
             data: {
+                drillId,
+                path: path || '',
                 startTimestamp,
-                endTimestamp
+                endTimestamp,
+                skip: skip || 0,
+                limit: limit || 20
             }
         })
-    }
+    },
 }
 
 export default api;

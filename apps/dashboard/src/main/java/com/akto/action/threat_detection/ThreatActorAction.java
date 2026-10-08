@@ -1,5 +1,6 @@
 package com.akto.action.threat_detection;
 
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.ProtoMessageUtils;
 import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.action.waf.CloudflareWafAction;
@@ -95,6 +96,15 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchActorsCountPerCounty() {
+    // Users limited to specific collections: the backend counts only their agents (from their own events if it cannot)
+    Map<String, Object> hostScope = backendHostScope();
+    if (hostScope == null && isLimitedToOwnAgents()) {
+      Map<String, Object> filters = new HashMap<>();
+      if (latestAttack != null && !latestAttack.isEmpty()) filters.put("latestAttack", latestAttack);
+      this.actorsCountPerCountry = new OwnAgentThreatStats(
+          fetchAllMaliciousEvents(startTs, endTs, OWN_EVENTS_LIMIT, filters, null, true)).actorsPerCountry();
+      return SUCCESS.toUpperCase();
+    }
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
@@ -110,6 +120,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         put("start_ts", startTs);
         put("end_ts", endTs);
         put("latestAttack", latestAttack);
+        if (hostScope != null) {
+          put("hostScope", hostScope);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -118,6 +131,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     post.setEntity(requestEntity);
 
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      if (hostScopeRejected(hostScope, resp.getStatusLine().getStatusCode())) {
+        return fetchActorsCountPerCounty();
+      }
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActorByCountryResponse>toProtoMessage(
@@ -138,6 +154,15 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatActorFilters() {
+    // Users limited to specific collections: filter values from their own events only
+    List<DashboardMaliciousEvent> ownEvents = fetchOwnEventsIfLimited();
+    if (ownEvents != null) {
+      this.country = ownEvents.stream().map(DashboardMaliciousEvent::getCountry).filter(c -> c != null && !c.isEmpty()).distinct().collect(Collectors.toList());
+      this.actorId = ownEvents.stream().map(DashboardMaliciousEvent::getActor).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+      this.host = ownEvents.stream().map(DashboardMaliciousEvent::getHost).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+      this.latestAttack = ownEvents.stream().map(DashboardMaliciousEvent::getFilterId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+      return SUCCESS.toUpperCase();
+    }
     HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters_for_threat_actors", this.getBackendUrl()));
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
@@ -185,6 +210,17 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
     if(this.host != null && !this.host.isEmpty()){
       filter.put("hosts", this.host);
+    }
+    // Users limited to specific collections only see actors of their own agents
+    Set<String> allowedHosts = ArgusCollectionScope.getRestrictedHosts(getSUser());
+    if (allowedHosts != null) {
+      List<String> scopedHosts = ArgusCollectionScope.scopeValues(this.host, allowedHosts);
+      if (scopedHosts.isEmpty()) {
+        this.actors = new ArrayList<>();
+        this.total = 0;
+        return SUCCESS.toUpperCase();
+      }
+      filter.put("hosts", scopedHosts);
     }
     Map<String, Object> body =
         new HashMap<String, Object>() {
@@ -284,12 +320,32 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       return ERROR.toUpperCase();
     }
 
+    // Users limited to specific collections only see the actor's activity on their own agents
+    List<DashboardMaliciousEvent> ownEvents = fetchOwnEventsIfLimited();
+    if (ownEvents != null && this.actorActivities != null) {
+      Set<String> ownHosts = ownEvents.stream().map(DashboardMaliciousEvent::getHost).filter(Objects::nonNull).collect(Collectors.toSet());
+      this.actorActivities = this.actorActivities.stream().filter(a -> ownHosts.contains(a.getHost())).collect(Collectors.toList());
+    }
+
     return SUCCESS.toUpperCase();
   }
 
   public String fetchAggregateMaliciousRequests() {
     long t0 = System.currentTimeMillis();
     loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests START ts=" + t0 + " refId=" + refId + " eventType=" + eventType, LogDb.DASHBOARD);
+
+    // Users limited to specific collections only see events of their own agents
+    List<DashboardMaliciousEvent> ownEvents = fetchOwnEventsIfLimited();
+    if (ownEvents != null) {
+      boolean ownEvent = ownEvents.stream().anyMatch(e ->
+          (refId != null && !refId.isEmpty())
+              ? refId.equals(e.getRefId())
+              : (actor != null && actor.equals(e.getActor()) && filterId != null && filterId.equals(e.getFilterId())));
+      if (!ownEvent) {
+        this.maliciousPayloadsResponses = new ArrayList<>();
+        return SUCCESS.toUpperCase();
+      }
+    }
 
     HttpPost post =
         new HttpPost(String.format("%s/api/dashboard/fetchAggregateMaliciousRequests", this.getBackendUrl()));

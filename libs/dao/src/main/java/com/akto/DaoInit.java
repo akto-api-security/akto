@@ -28,6 +28,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.SourceCodeVulnerabilitiesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.threat_detection.ComplianceClauseCoverageDao;
 import com.akto.dao.threat_detection.IpReputationScoreDao;
 import com.akto.dao.tracing.TraceDao;
 import com.akto.dao.tracing.SpanDao;
@@ -499,7 +500,7 @@ public class DaoInit {
                 .codecRegistry(codecRegistry)
                 .build();
 
-        clients[0] = MongoClients.create(clientSettings);
+        clients[0] = com.akto.util.DbNames.wrap(MongoClients.create(clientSettings));
     }
     public static void init(ConnectionString connectionString) {
         init(connectionString, ReadPreference.secondary(), WriteConcern.ACKNOWLEDGED);
@@ -540,6 +541,7 @@ public class DaoInit {
         TestingRunPlaygroundDao.instance.createIndicesIfAbsent();
         TestingRunIssuesDao.instance.createIndicesIfAbsent();
         ApiCollectionsDao.instance.createIndicesIfAbsent();
+        AgenticPostureScoreHistoryDao.instance.createIndicesIfAbsent();
         ActivitiesDao.instance.createIndicesIfAbsent();
         DependencyNodeDao.instance.createIndicesIfAbsent();
         DependencyFlowNodesDao.instance.createIndicesIfAbsent();
@@ -568,6 +570,7 @@ public class DaoInit {
         McpReconRequestDao.instance.createIndicesIfAbsent();
         GuardrailPoliciesDao.instance.createIndicesIfAbsent();
         McpAllowlistDao.instance.createIndicesIfAbsent();
+        AllowVendorAllowlistDao.instance.createIndicesIfAbsent();
         McpRegistryConfigDao.instance.createIndicesIfAbsent();
         HistoricalDataDao.instance.createIndicesIfAbsent();
         EndpointInfoViewDao.instance.createIndicesIfAbsent();
@@ -585,5 +588,6 @@ public class DaoInit {
         CopilotStudioIntegrationDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusQueueDao.instance.createIndicesIfAbsent();
+        ComplianceClauseCoverageDao.instance.createIndicesIfAbsent();
     }
 }

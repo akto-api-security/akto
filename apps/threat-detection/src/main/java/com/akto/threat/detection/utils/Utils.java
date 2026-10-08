@@ -10,13 +10,19 @@ import com.akto.threat.detection.cache.AccountConfig;
 import com.akto.threat.detection.cache.AccountConfigurationCache;
 import com.akto.utils.RedactParser;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApiMetadata;
+import com.akto.dto.api_protection_parse_layer.Condition.DistinctIdentifier;
+import com.akto.dto.api_protection_parse_layer.Condition.ValueSource;
+import com.akto.util.JSONUtils;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
@@ -29,6 +35,8 @@ import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.threat.detection.constants.RedisKeyInfo;
 
 public class Utils {
+
+    private static final int MAX_REASON_MEMBERS = 10;
 
     /**
      * Applies redaction to HttpResponseParams and converts to HttpResponseParam protobuf string
@@ -143,9 +151,17 @@ public class Utils {
     }
 
     public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, RedactionType redactionType) {
+        return buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, ignoredEvent, redactionType, null);
+    }
+
+    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, boolean ignoredEvent, RedactionType redactionType, String reason) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if (errors != null && !errors.isEmpty()) {
             metadataBuilder.addAllSchemaErrors(errors);
+        }
+        boolean hasReason = reason != null && !reason.isEmpty();
+        if (hasReason) {
+            metadataBuilder.setReason(reason);
         }
 
         // Determine status based on ignoredEvent flag
@@ -175,6 +191,9 @@ public class Utils {
         if (metadata != null) {
             metadataBuilder.setCountryCode(metadata.getCountryCode());
             metadataBuilder.setDestCountryCode(metadata.getDestCountryCode() != null ? metadata.getDestCountryCode() : "");
+        }
+        // Keep the reason even when geo metadata couldn't be built
+        if (metadata != null || hasReason) {
             maliciousReqBuilder.setMetadata(metadataBuilder.build());
         }
         return maliciousReqBuilder.build();
@@ -237,6 +256,54 @@ public class Utils {
             logger.errorAndAddToDb(e, "Error determining redaction type, defaulting to NONE");
             return RedactionType.NONE;
         }
+    }
+
+    public static String extractIdentity(HttpResponseParams responseParam, ValueSource valueSource) {
+        if (valueSource == null || valueSource.getSource() == null || valueSource.getKey() == null) return null;
+        try {
+            switch (valueSource.getSource()) {
+                case "request_headers":
+                    List<String> headerVals = responseParam.getRequestParams().getHeaders().get(valueSource.getKey());
+                    return (headerVals != null && !headerVals.isEmpty()) ? headerVals.get(0) : null;
+                case "request_payload":
+                    return JSONUtils.extractValueForKey(responseParam.getRequestParams().getPayload(), valueSource.getKey());
+                case "response_payload":
+                    return JSONUtils.extractValueForKey(responseParam.getPayload(), valueSource.getKey());
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Returns defaultAggKey when groupBy is unset, null when the identity is missing, else "<identity>|<groupKey>". */
+    public static String buildAggKey(String defaultAggKey, ValueSource groupBy, HttpResponseParams responseParam, String groupKey) {
+        if (groupBy == null) return defaultAggKey;
+        String group = extractIdentity(responseParam, groupBy);
+        return (group == null || group.isEmpty()) ? null : group + "|" + groupKey;
+    }
+
+    public static String buildDistinctReason(String groupLabel, DistinctIdentifier distinct, Set<String> members, int windowMinutes) {
+        List<String> sorted = new ArrayList<>(new TreeSet<>(members));
+        String shown = String.join(", ", sorted.subList(0, Math.min(sorted.size(), MAX_REASON_MEMBERS)));
+        if (sorted.size() > MAX_REASON_MEMBERS) {
+            shown += " +" + (sorted.size() - MAX_REASON_MEMBERS) + " more";
+        }
+        String dimension = distinct.getAttribute() != null ? distinct.getAttribute() : distinct.getKey();
+        return groupLabel + ": " + sorted.size() + " distinct " + dimension + " within " + windowMinutes + " min (" + shown + ")";
+    }
+
+    public static SampleMaliciousRequest withReason(SampleMaliciousRequest request, String reason) {
+        return request.toBuilder().setMetadata(request.getMetadata().toBuilder().setReason(reason)).build();
+    }
+
+    public static String extractDistinctValue(HttpResponseParams responseParam, RawApiMetadata metadata, DistinctIdentifier distinct) {
+        if (distinct == null) return null;
+        if ("country_code".equals(distinct.getAttribute())) {
+            return metadata != null ? metadata.getCountryCode() : null;
+        }
+        return extractIdentity(responseParam, distinct);
     }
 
 }

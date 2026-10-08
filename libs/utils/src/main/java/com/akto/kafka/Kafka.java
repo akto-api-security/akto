@@ -18,8 +18,13 @@ public class Kafka {
   private static final String DEFAULT_MAX_REQUEST_SIZE = "5242880";
 
   private static LoggerMaker logger = new LoggerMaker(Kafka.class, LogDb.TESTING);
-  private KafkaProducer<String, String> producer;
+  private Producer<String, String> producer;
   public boolean producerReady;
+
+  Kafka(Producer<String, String> producer, boolean ready) {
+    this.producer = producer;
+    this.producerReady = ready;
+  }
 
   public Kafka(KafkaConfig kafkaConfig) {
     this(
@@ -127,13 +132,36 @@ public class Kafka {
   }
 
   public void send(String message, String topic) {
+    send(message, topic, null);
+  }
+
+  /** Optional delivery observer, including not-ready and synchronous send failures. */
+  public void send(String message, String topic, Callback observer) {
     if (!this.producerReady) {
       logger.errorAndAddToDb("Producer not ready. Cannot send message.");
+      notifyObserver(observer, null, new IllegalStateException("Kafka producer not ready"));
       return;
     };
 
     ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
-    producer.send(record, new DemoProducerCallback());
+    try {
+      producer.send(record, (metadata, error) -> {
+        notifyObserver(observer, metadata, error);
+        new DemoProducerCallback().onCompletion(metadata, error);
+      });
+    } catch (RuntimeException error) {
+      notifyObserver(observer, null, error);
+      throw error;
+    }
+  }
+
+  private void notifyObserver(Callback observer, RecordMetadata metadata, Exception error) {
+    if (observer == null) return;
+    try {
+      observer.onCompletion(metadata, error);
+    } catch (Exception observerError) {
+      logger.warn("Kafka delivery observer failed: " + observerError.getClass().getSimpleName());
+    }
   }
 
   public void close() {

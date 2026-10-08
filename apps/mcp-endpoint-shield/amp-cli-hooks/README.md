@@ -51,6 +51,7 @@ AKTO_API_TOKEN=your-akto-api-token
 AKTO_SYNC_MODE=true      # true = enforce, false = observe only (still ingests)
 MODE=argus               # argus (default) or atlas
 DEVICE_ID=               # optional: custom device ID in atlas mode
+AKTO_HEARTBEAT_ENABLED=false  # true registers this device with the abstractor (off by default)
 EOF
 chmod 600 ~/.config/amp/akto/config
 ```

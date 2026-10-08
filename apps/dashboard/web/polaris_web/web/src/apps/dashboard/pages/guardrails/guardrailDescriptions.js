@@ -72,7 +72,11 @@ export const LANGUAGE_SAFETY_DESCRIPTIONS = {
     },
     sentimentDetection: {
         description: "Blocks negative, toxic, or hostile emotional tone in prompts.",
-        examples: []
+        examples: [{ text: "I would like to express my dissatisfaction with the recent service changes, as they have negatively impacted our team's productivity." }]
+    },
+    multiLingualBlock: {
+        description: "Blocks prompts written in a language other than English.",
+        examples: [{ text: "Por favor, proporcione un resumen del informe financiero trimestral de la empresa." }]
     }
 };
 

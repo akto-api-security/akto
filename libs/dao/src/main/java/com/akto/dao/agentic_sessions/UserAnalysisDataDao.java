@@ -71,6 +71,14 @@ public class UserAnalysisDataDao extends AccountsContextDao<UserAnalysisData> {
         instance.updateOne(filter, update);
     }
 
+    // Argus (AGENTIC) observability no longer reads this DAO at all — UserAnalysisDataDao's own
+    // Mongo collection is a lifetime counter maintained by UserAnalysisCron (see its own javadoc),
+    // not scoped to the dashboard's date range, which is exactly the "must bucket over the page's
+    // own range" trap this file's sibling posture code warns about elsewhere. The AGENTIC read
+    // goes straight to SearchClientFactory.instance().fetchAgenticServiceObservability(...)
+    // instead (see SearchClient's own javadoc) — a real, date-ranged ES/ADX aggregation, the same
+    // pattern fetchUserAnalysisTokenTotals already established for ENDPOINT.
+
     private static String sanitizeKey(String raw) {
         if (raw == null) return "";
         return raw.replace('.', '_').replace('$', '_').trim();

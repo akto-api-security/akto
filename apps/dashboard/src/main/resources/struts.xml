@@ -324,6 +324,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Create a custom role</param>
@@ -348,6 +349,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Update a custom role</param>
@@ -372,6 +374,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Delete a custom role</param>
@@ -396,6 +399,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Removed a user from Akto</param>
@@ -417,6 +421,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">Admin changed the role of the user in Akto dashboard</param>
@@ -448,6 +453,50 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchUserPermissions" class="com.akto.action.UserPermissionsAction" method="fetchUserPermissions">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^featureAccess.*, ^deniedActions.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAssignableRoles" class="com.akto.action.TeamAction" method="fetchAssignableRoles">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^assignableRoles.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1260,6 +1309,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted Github SSO settings</param>
@@ -1290,6 +1340,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added Github SSO settings</param>
@@ -1341,6 +1392,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added Okta SSO settings</param>
@@ -1371,6 +1423,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted Okta SSO settings</param>
@@ -1449,6 +1502,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User saved Okta group role mapping</param>
@@ -1479,6 +1533,7 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added Azure SSO settings</param>
@@ -1508,9 +1563,41 @@
                 <param name="featureLabel">AKTO_SSO</param>
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted Azure SSO settings</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/saveSamlGroupRoleMapping" class="com.akto.action.user.AzureSsoAction" method="saveSamlGroupRoleMapping">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AKTO_SSO</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated SAML SSO group to role mapping</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -2437,6 +2524,38 @@
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User started a guardrail policy backfill replay</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/startComplianceClauseScan" class="com.akto.action.threat_detection.ComplianceClauseScanAction" method="startComplianceClauseScan">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User started a compliance clause scan</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -4801,7 +4920,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">MCP_SECURITY</param>
+                <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User initiated MCP reconnaissance</param>
             </interceptor-ref>
@@ -4860,7 +4979,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">AWS_API_GATEWAY</param>
+                <param name="featureLabel">INTEGRATIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added AWS account IDs for API Gateway logging</param>
             </interceptor-ref>
@@ -4889,8 +5008,8 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">AWS_API_GATEWAY</param>
-                <param name="accessType">READ_WRITE</param>
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
                 <param name="actionDescription">AWS account IDs for API Gateway logging</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
@@ -5061,6 +5180,7 @@
                 <param name="featureLabel">API_TOKENS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added an API token</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -5086,6 +5206,7 @@
                 <param name="featureLabel">API_TOKENS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted an API token</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -5447,6 +5568,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated collection access for a user</param>
@@ -6042,6 +6164,7 @@
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added a custom auth type</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6063,6 +6186,7 @@
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated a custom auth type</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6085,6 +6209,7 @@
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User resets all custom auth types</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6106,6 +6231,7 @@
                 <param name="featureLabel">AUTH_TYPE</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated the active status of a custom auth type</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -6851,6 +6977,7 @@
                 <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added an auth mechanism</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7378,6 +7505,7 @@
                 <param name="featureLabel">DEFAULT_PAYLOADS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated the redundant URL settings</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7741,6 +7869,7 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User created a test role</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7763,6 +7892,7 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated test role meta</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">TEST_ROLE_SCOPE_ROLES</param>
@@ -7792,6 +7922,7 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted a test role</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7814,6 +7945,7 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated a test role</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7836,6 +7968,7 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted an auth mechanism from a test role</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7858,6 +7991,7 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated an auth mechanism in a test role</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7880,6 +8014,7 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added an auth mechanism to a test role</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -8621,6 +8756,16 @@
         <action name="api/uploadWorkflowJson" class="com.akto.action.testing.WorkflowTestAction" method="uploadWorkflowJson">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">START_TEST_RUN</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User uploaded a workflow test</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -11323,6 +11468,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ</param>
+                <param name="collectionScope">OWN_COLLECTION</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -11344,6 +11490,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ</param>
+                <param name="collectionScope">OWN_COLLECTION</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -11635,6 +11782,7 @@
                 <param name="featureLabel">DEFAULT_PAYLOADS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User saved a default payload</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -11894,6 +12042,7 @@
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User generated a threat report</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">THREAT_DETECTION</param>
@@ -12471,9 +12620,10 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="featureLabel">THREAT_SETTINGS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted all malicious events</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -12497,6 +12647,11 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
+            </interceptor-ref>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User reset collection access types</param>
             </interceptor-ref>
             <result name="UNAUTHORIZED" type="json">
                  <param name="statusCode">403</param>
@@ -12906,9 +13061,10 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="featureLabel">THREAT_SETTINGS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User modified a threat actor status</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -12939,9 +13095,10 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="featureLabel">THREAT_SETTINGS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User toggled archival enabled</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -13041,6 +13198,7 @@
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User modified a threat actor status</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -13073,6 +13231,7 @@
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User modified a threat actor status</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -13105,6 +13264,7 @@
                 <param name="featureLabel">THREAT_PROTECTION</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User bulk modified threat actor status via Cloudflare</param>
+                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -13805,7 +13965,7 @@
             </result>
         </action>
 
-        <action name="api/fetchRiskScoreBreakdown" class="com.akto.action.SecurityPostureAction" method="fetchRiskScoreBreakdown">
+        <action name="api/fetchArgusPostureSummary" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureSummary">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -13813,7 +13973,151 @@
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="SUCCESS" type="json">
-                <param name="root">riskScoreBreakdown</param>
+                <param name="root">response</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchArgusPostureChanges" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureChanges">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchArgusPostureInsights" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureInsights">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">insights</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchArgusPostureInsightSummaries" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureInsightSummaries">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">insightSummaries</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/triggerArgusPostureRegenerate" class="com.akto.action.ArgusPostureAction" method="triggerArgusPostureRegenerate">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchArgusPostureRegenerateStatus" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureRegenerateStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchArgusPostureDrill" class="com.akto.action.ArgusPostureAction" method="fetchArgusPostureDrill">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">postureDrill</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchPostureDrill" class="com.akto.action.SecurityPostureAction" method="fetchPostureDrill">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">postureDrill</param>
             </result>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -14639,6 +14943,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ALL_COLLECTIONS</param>
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User reset another user's password</param>
@@ -15416,6 +15721,11 @@
             class="com.akto.action.waf.AwsWafAction" method="addAwsWafIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added an AWS WAF integration</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15435,6 +15745,10 @@
             class="com.akto.action.waf.AwsWafAction" method="fetchAwsWafIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15454,6 +15768,11 @@
             class="com.akto.action.siem.SplunkAction" method="addSplunkIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added a Splunk integration</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15473,6 +15792,10 @@
             class="com.akto.action.siem.SplunkAction" method="fetchSplunkIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15492,6 +15815,10 @@
             class="com.akto.action.siem.DatadogAction" method="fetchDatadogIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15509,6 +15836,11 @@
             class="com.akto.action.siem.DatadogAction" method="addDatadogIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added a Datadog integration</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15526,6 +15858,11 @@
             class="com.akto.action.siem.DatadogAction" method="deleteDatadogIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted the Datadog integration</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15543,6 +15880,11 @@
             class="com.akto.action.siem.DatadogAction" method="testDatadogIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User tested the Datadog integration</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -15560,6 +15902,11 @@
             class="com.akto.action.McpRegistryAction" method="addMcpRegistryIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added an MCP registry integration</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -17284,6 +17631,10 @@
                 class="com.akto.action.waf.CloudflareWafAction" method="fetchCloudflareWafIntegration">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">INTEGRATIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>

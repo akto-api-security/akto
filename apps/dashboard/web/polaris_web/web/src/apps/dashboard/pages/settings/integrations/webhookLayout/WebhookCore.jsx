@@ -12,6 +12,8 @@ import SampleDataList from "../../../../components/shared/SampleDataList"
 import SampleData from '../../../../components/shared/SampleData'
 import func from "@/util/func"
 import TitleWithInfo from "../../../../components/shared/TitleWithInfo"
+import { usePermissions, whenAllowed } from "@/util/permissions"
+import AllowedAction from "../../../../components/shared/AllowedAction"
 
 const testingOptionsObj = {
     "type":"TESTING",
@@ -34,6 +36,7 @@ const resultTab = {
 function WebhookCore(props) {
 
     const {webhookType, defaultPayload} = props
+    const { canCall } = usePermissions()
 
     const initialState = {
         name: "",
@@ -474,22 +477,26 @@ function WebhookCore(props) {
                 <ButtonGroup>
                     <Button onClick={handleDiscard} disabled={!hasChanges}>Discard</Button>
                     {webhookId ?
+                        <AllowedAction allowed={canCall('api/updateCustomWebhook')}>
                         <Button
                             primary
                             onClick={saveWebhook}
                             connectedDisclosure={{
                                 accessibilityLabel: 'Other save actions',
-                                actions: [{ content: 'Run once', onAction: () => runOnce() }],
+                                actions: [{ content: 'Run once', onAction: () => runOnce(), ...whenAllowed(canCall('api/runOnce')) }],
                             }}
                         >
                             Save
                         </Button>
-                        : <Button
+                        </AllowedAction>
+                        : <AllowedAction allowed={canCall('api/addCustomWebhook')}>
+                        <Button
                             primary
                             onClick={saveWebhook}
                         >
                             Save
                         </Button>
+                        </AllowedAction>
                     }
                 </ButtonGroup>
             }

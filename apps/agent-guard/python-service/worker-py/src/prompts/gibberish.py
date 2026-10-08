@@ -1,5 +1,7 @@
 """Gibberish detection prompt (Gemma-tuned; used for all providers today)."""
 
+from ._abcd import to_abcd
+
 GEMMA = """You are a security system that detects gibberish or nonsensical input.
 
 Gibberish is text from which a competent reader cannot extract any intent or content. Examples:
@@ -41,12 +43,24 @@ Analyze this text and respond ONLY with valid JSON:
 {
   "isGibberish": <true if this text is gibberish, false otherwise>,
   "confidence": <float 0.0 to 1.0 — your estimated p(boolean-above-is-true). Use ~0.9+ when sure it is true, ~0.1 or lower when sure it is false. NEVER invert.>,
-  "reason": "<one sentence explanation>"
+  "reason": "<one sentence explanation; refer to any PII, secret or personal data by category only, never quote the values>"
 }
 
 Text to analyze:
 %s"""
 
 
-def build(text: str) -> str:
-    return GEMMA % text
+# Single-letter variant, derived from GEMMA so the rules stay in one place.
+GEMMA_ABCD = to_abcd(
+    GEMMA,
+    flag_key="isGibberish",
+    safe="NOT GIBBERISH",
+    flag="GIBBERISH",
+    near_miss="unusual-looking but meaningful text (code, hashes, identifiers, other scripts, typos)",
+    label="gibberish",
+)
+
+
+def build(text: str, response_format: str = "") -> str:
+    template = GEMMA_ABCD if response_format == "abcd" else GEMMA
+    return template % text

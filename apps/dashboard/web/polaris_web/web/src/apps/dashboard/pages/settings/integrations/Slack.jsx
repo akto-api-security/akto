@@ -5,9 +5,11 @@ import func from '@/util/func';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import settingRequests from '../api';
+import { usePermissions, whenAllowed } from '@/util/permissions';
 
 function Slack() {
     
+    const { canCall } = usePermissions()
     const [slackWebhooks, setSlackWebhooks] = useState([])
     const [slackWebhookUrl, setSlackWebhookUrl] = useState("")
     const [slackWebhookName, setSlackWebhookName] = useState("")
@@ -47,7 +49,7 @@ function Slack() {
     const listComponent = (
         slackWebhooks.map((slackWebhook, index) => (
             <LegacyCard.Section title={slackWebhook?.name || `Slack webhook ${index}`} key={index}
-                actions={[{ content: 'Delete', destructive: true, onAction: () => handleDeleteSlackWebhook(slackWebhook.id) }]}>
+                actions={[{ content: 'Delete', destructive: true, onAction: () => handleDeleteSlackWebhook(slackWebhook.id), ...whenAllowed(canCall('api/deleteSlackWebhook')) }]}>
                 <p>{func.prettifyEpoch(slackWebhook.timestamp)}</p>
                 <PasswordTextField field={slackWebhook.key} />
             </LegacyCard.Section>
@@ -69,14 +71,14 @@ function Slack() {
     
     const SlackCard = (
         <LegacyCard title="Slack Webhooks"
-            primaryFooterAction={{ content: 'Add Slack Webhook', onAction: handleAddSlackWebhook }} 
+            primaryFooterAction={{ content: 'Add Slack Webhook', onAction: handleAddSlackWebhook, ...whenAllowed(canCall('api/addSlackWebhook')) }} 
         >
             {listComponent}
             {slackFormComponent}
         </LegacyCard>
     )
     return (
-        <IntegrationsLayout title="Slack" cardContent={cardContent} component={SlackCard} docsUrl="" />
+        <IntegrationsLayout title="Slack" cardContent={cardContent} component={SlackCard} docsUrl="" readOnly={!canCall('api/addSlackWebhook')} />
     )
 }
 

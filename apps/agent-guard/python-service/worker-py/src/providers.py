@@ -4,18 +4,24 @@ Differences from the container version:
   - httpx.AsyncClient + async complete()
   - every request sets Accept-Encoding: identity (Pyodide double-gunzip fix)
   - Vertex auth uses gcp_auth.get_token() instead of google-auth credentials
+  - Bedrock IAM auth uses aws_auth.sign_headers() instead of botocore
 """
 
 import asyncio
+import json
 import logging
 import math
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, Optional
+from urllib.parse import quote, urlparse
 
 import httpx
 
+import aws_auth
 import gcp_auth
 import http_client
 from settings import settings
@@ -23,6 +29,24 @@ from settings import settings
 logger = logging.getLogger(__name__)
 
 DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
+_DEFAULT_MAX_TOKENS = 256
+_ASYNC_MAX_TOKENS = 4096
+_relaxed_limits: ContextVar[bool] = ContextVar("relaxed_limits", default=False)
+
+
+@contextmanager
+def relaxed_limits(enabled: bool = True):
+    token = _relaxed_limits.set(enabled)
+    try:
+        yield
+    finally:
+        _relaxed_limits.reset(token)
+
+
+def _max_tokens() -> int:
+    return _ASYNC_MAX_TOKENS if _relaxed_limits.get() else _DEFAULT_MAX_TOKENS
+
+
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 _IDENTITY = {"Accept-Encoding": "identity"}
@@ -63,7 +87,14 @@ def _cached_provider(
 
 
 async def _post_json_logged(
-    client: httpx.AsyncClient, url: str, headers: dict, json_body: dict, log_tag: str, extra: str = ""
+    client: httpx.AsyncClient,
+    url: str,
+    headers: dict,
+    json_body: dict | None,
+    log_tag: str,
+    extra: str = "",
+    *,
+    content: bytes | None = None,
 ) -> dict:
     """POST + parse JSON, logging enough on failure to diagnose without a debugger.
 
@@ -73,10 +104,14 @@ async def _post_json_logged(
     deployment, quota exceeded), and non-JSON/malformed bodies. Callers still
     see the same exceptions as before (nothing swallowed), just with a log
     line alongside so a client-only failure doesn't require a repro to debug.
+
+    Pass pre-serialized `content` instead of `json_body` when the request is
+    signed over its body bytes (SigV4) — those exact bytes must be what's sent.
     """
     ctx = f" ({extra})" if extra else ""
+    body_kwargs: dict[str, Any] = {"content": content} if content is not None else {"json": json_body}
     try:
-        resp = await client.post(url, headers=headers, json=json_body)
+        resp = await client.post(url, headers=headers, **body_kwargs)
     except httpx.RequestError as exc:
         logger.error(f"{log_tag} request to {url} failed{ctx}: {exc!r}")
         raise
@@ -97,8 +132,34 @@ async def _post_json_logged(
         raise ValueError(f"{log_tag} non-JSON response from {url}: {body[:200]!r}") from exc
 
 
+def _log_vllm_metrics(provider: str, model: str, base_url: str, body: Any, client_ms: float) -> None:
+    metrics = body.get("metrics") if isinstance(body, dict) else None
+    if isinstance(metrics, dict):
+        fields = " ".join(f"{key}={value}" for key, value in metrics.items())
+        ttft = metrics.get("time_to_first_token_ms")
+        generation = metrics.get("generation_time_ms")
+        if isinstance(ttft, (int, float)) and isinstance(generation, (int, float)):
+            llm_ms = ttft + generation
+            fields += f" llm_ms={llm_ms:.1f} network_ms={client_ms - llm_ms:.1f}"
+    elif metrics is None:
+        fields = "metrics=missing"
+    else:
+        fields = "metrics=invalid"
+    req_id = body.get("id") if isinstance(body, dict) else None
+    logger.info(
+        f"[vllm-metrics] provider={provider} model={model} host={urlparse(base_url).netloc} "
+        f"req_id={req_id} client_ms={client_ms:.1f} {fields}"
+    )
+
+
 class LLMProvider(ABC):
     name: str = ""
+
+    @property
+    def prompt_name(self) -> str:
+        """Name the prompt builders key their model-specific templates on
+        (e.g. the Gemma-tuned BanTopics prompt for any "gemma*" name)."""
+        return self.name
 
     @abstractmethod
     async def complete(self, prompt: str) -> str: ...
@@ -114,23 +175,29 @@ class OpenAIProvider(LLMProvider):
         self.name = "openai" if "openai.com" in self.base_url else "openai_compatible"
         logger.info(f"[OpenAI] model={self.model} base_url={self.base_url} api_key={_redact_secret(self.api_key)}")
 
+    include_metrics = False
+
     async def complete(self, prompt: str) -> str:
         headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        payload = {
+            "model": self.model,
+            "temperature": 0.1,
+            "max_tokens": _max_tokens(),
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if self.include_metrics:
+            payload["include_metrics"] = True
         client = http_client.get_client()
-        resp = await client.post(
-            f"{self.base_url}/chat/completions",
-            headers=headers,
-            json={
-                "model": self.model,
-                "temperature": 0.1,
-                "max_tokens": 256,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-        )
+        started = time.perf_counter()
+        resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+        client_ms = (time.perf_counter() - started) * 1000
         resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+        body = resp.json()
+        if self.include_metrics:
+            _log_vllm_metrics(self.name, self.model, self.base_url, body, client_ms)
+        return body["choices"][0]["message"]["content"]
 
 
 class AnthropicProvider(LLMProvider):
@@ -176,7 +243,7 @@ class AnthropicProvider(LLMProvider):
             self._headers(),
             {
                 "model": self.model,
-                "max_tokens": 256,
+                "max_tokens": _max_tokens(),
                 "messages": [{"role": "user", "content": prompt}],
             },
             self._log_tag,
@@ -442,6 +509,158 @@ class Qwen3GuardFoundryProvider(Qwen3GuardOutput, AzureFoundryProvider):
         return _choice_content_and_logprobs(body)
 
 
+# Converse stopReasons meaning Bedrock itself withheld the answer — surfaced as
+# errors so the cascade counts them as a provider failure, not a verdict.
+_BEDROCK_BLOCKED_STOP_REASONS = {"guardrail_intervened", "content_filtered"}
+
+
+def _converse_text(body: dict) -> str:
+    """Extract the first text block from a Bedrock Converse response.
+
+    Skips non-text blocks (e.g. reasoningContent from reasoning models, which
+    precede the answer) and raises a descriptive ValueError with the body
+    attached — same rationale as _choice_content_and_logprobs.
+    """
+    stop_reason = body.get("stopReason")
+    if stop_reason in _BEDROCK_BLOCKED_STOP_REASONS:
+        raise ValueError(f"Bedrock withheld the response (stopReason={stop_reason}): {body!r}"[:500])
+    message = (body.get("output") or {}).get("message") or {}
+    for block in message.get("content") or []:
+        if "text" in block:
+            return block["text"]
+    raise ValueError(f"Converse response has no text content block: {body!r}"[:500])
+
+
+class _BedrockAuthProvider(LLMProvider):
+    """Shared AWS Bedrock auth + transport for the bedrock-runtime (Converse)
+    and bedrock-mantle (OpenAI chat completions) providers.
+
+    Auth, in precedence order: a Bedrock API key (sent as Bearer); static IAM
+    credentials; else the pod's IAM role (EKS Pod Identity / IRSA), fetched
+    and refreshed by aws_auth. Both IAM modes are SigV4-signed per request,
+    under the endpoint's own signing service name."""
+
+    _log_tag = "[Bedrock]"
+    _signing_service = "bedrock"
+
+    def __init__(
+        self,
+        model: str,
+        region: str,
+        api_key: str = "",
+        credentials: aws_auth.AwsCredentials | None = None,
+        base_url: str = "",
+    ):
+        if api_key:
+            auth = f"api_key={_redact_secret(api_key)}"
+        elif credentials is not None:
+            auth = f"iam access_key_id={_redact_secret(credentials.access_key_id)}"
+        elif source := aws_auth.role_credentials_source():
+            auth = f"iam role via {source}"
+        else:
+            raise ValueError(
+                f"{type(self).__name__} needs an api_key, IAM credentials or an IAM role in the environment"
+            )
+        self.model = model
+        self.region = region
+        self.api_key = api_key
+        self.credentials = credentials
+        self.base_url = (base_url or self._default_base_url(region)).rstrip("/")
+        logger.info(f"{self._log_tag} model={self.model} region={self.region} base_url={self.base_url} {auth}")
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        raise NotImplementedError
+
+    @property
+    def prompt_name(self) -> str:
+        # One "bedrock" provider name serves every model, so Gemma-tuned
+        # prompts are keyed on the model instead.
+        return "gemma_bedrock" if "gemma" in self.model.lower() else self.name
+
+    async def _headers(self, url: str, payload: bytes) -> dict[str, str]:
+        headers = dict(_IDENTITY, **{"Content-Type": "application/json", "Accept": "application/json"})
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            return headers
+        creds = self.credentials or await aws_auth.get_role_credentials(self.region)
+        headers.update(
+            aws_auth.sign_headers("POST", url, headers, payload, creds, self.region, service=self._signing_service)
+        )
+        return headers
+
+    async def _post(self, url: str, body: dict[str, Any]) -> dict:
+        # Serialized once: SigV4 signs these exact bytes, so they must be what's sent.
+        payload = json.dumps(body, separators=(",", ":")).encode()
+        return await _post_json_logged(
+            http_client.get_client(),
+            url,
+            await self._headers(url, payload),
+            None,
+            self._log_tag,
+            f"model={self.model} region={self.region}",
+            content=payload,
+        )
+
+
+class BedrockProvider(_BedrockAuthProvider):
+    """Any AWS Bedrock model via the model-agnostic Converse API (bedrock-runtime).
+
+    The model id may be a foundation model id, a cross-region inference
+    profile (us.anthropic.…) or an ARN — it is percent-encoded into the path
+    either way."""
+
+    name = "bedrock"
+    _log_tag = "[Bedrock]"
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        return f"https://bedrock-runtime.{region}.amazonaws.com"
+
+    def _converse_url(self) -> str:
+        return f"{self.base_url}/model/{quote(self.model, safe='')}/converse"
+
+    async def complete(self, prompt: str) -> str:
+        body = await self._post(
+            self._converse_url(),
+            {
+                "messages": [{"role": "user", "content": [{"text": prompt}]}],
+                "inferenceConfig": {"maxTokens": 512, "temperature": 0.1},
+            },
+        )
+        return _converse_text(body)
+
+
+class BedrockMantleProvider(_BedrockAuthProvider):
+    """Bedrock models served only on the bedrock-mantle endpoint (Gemma 4),
+    through its OpenAI-compatible chat completions route (Gemma 4 lives under
+    /openai/v1, not /v1). Picked automatically by the "bedrock" provider for
+    _MANTLE_ONLY_MODEL_PREFIXES, so it reports the same "bedrock" name. Same
+    auth as BedrockProvider, but SigV4 is signed for the "bedrock-mantle"
+    service and IAM needs bedrock-mantle:CreateInference."""
+
+    name = "bedrock"
+    _log_tag = "[BedrockMantle]"
+    _signing_service = "bedrock-mantle"
+
+    @staticmethod
+    def _default_base_url(region: str) -> str:
+        return f"https://bedrock-mantle.{region}.api.aws/openai/v1"
+
+    async def complete(self, prompt: str) -> str:
+        body = await self._post(
+            f"{self.base_url}/chat/completions",
+            {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 512,
+                "temperature": 0.1,
+            },
+        )
+        content, _ = _choice_content_and_logprobs(body)
+        return content
+
+
 # ── Qwen3Guard parser (ported verbatim — sync) ────────────────────────────────
 
 
@@ -641,6 +860,103 @@ def _build_qwen3guard() -> LLMProvider | None:
     )
 
 
+# ── Faster per-role alternates — old provider is the fallback on failure ──────
+# Own model/baseUrl per modelConfigs entry, same as "openai_compatible"; on any
+# error, each calls the existing builder for its role's original provider.
+
+# Fast leg's own budget — bounds how long an unreachable/hung host can delay
+# the fallback (asyncio.CancelledError from the caller's own timeout isn't an
+# Exception, so an unreachable host must fail from inside our own except).
+_FAST_LEG_TIMEOUT_S = 1.5
+
+
+class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
+    """Faster Qwen3Guard-hosting endpoint; falls back to qwen3guard (Vertex AI) on failure.
+
+    Same contract as the real qwen3guard (raw text in, Safety:/Categories: out) —
+    the model always answers that way regardless of prompt, on Vertex or here, so
+    this can't take the ABCD path gemma_fast/gemma_fast_arbiter use.
+    """
+
+    name = "qwen3guard_fast"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        # OpenAIProvider.__init__ overwrites self.name — reassert it.
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "qwen3guard_fast"
+
+    async def complete_with_logprobs(
+        self, text: str, top_logprobs: int = 5, temperature: float = 0.0
+    ) -> tuple[str, list | None]:
+        try:
+            headers = dict(_IDENTITY, **{"Content-Type": "application/json"})
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            client = http_client.get_client()
+            body = await asyncio.wait_for(
+                _post_json_logged(
+                    client,
+                    f"{self.base_url}/chat/completions",
+                    headers,
+                    {"model": self.model, **_qwen3guard_params(text, top_logprobs, temperature)},
+                    "[Qwen3GuardFast]",
+                ),
+                timeout=_FAST_LEG_TIMEOUT_S,
+            )
+            return _choice_content_and_logprobs(body)
+        except Exception as exc:
+            logger.warning(f"[Qwen3GuardFast] fast endpoint failed ({exc!r}), falling back to qwen3guard")
+            fallback = _build_qwen3guard()
+            if not isinstance(fallback, Qwen3GuardOutput):
+                raise
+            return await fallback.complete_with_logprobs(text, top_logprobs, temperature)
+
+
+class GemmaFastProvider(OpenAIProvider):
+    """Faster Gemma endpoint; falls back to gemma_foundry on failure."""
+
+    name = "gemma_fast"
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast"
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await asyncio.wait_for(super().complete(prompt), timeout=_FAST_LEG_TIMEOUT_S)
+        except Exception as exc:
+            logger.warning(f"[GemmaFast] fast endpoint failed ({exc!r}), falling back to gemma_foundry")
+            fallback = _build_foundry("gemma_foundry", "", "", "")
+            if fallback is None:
+                raise
+            return await fallback.complete(prompt)
+
+
+class GemmaFastArbiterProvider(OpenAIProvider):
+    """Faster (Gemma) arbiter endpoint. No built-in fallback and no time bound of its own: a slow answer is
+    waited for, and a backup is a FINAL_ARBITER_BACKUP modelConfigs entry."""
+
+    name = "gemma_fast_arbiter"
+    include_metrics = True
+
+    def __init__(self, api_key: str, model: str, base_url: str = ""):
+        super().__init__(api_key, model, base_url=base_url)
+        self.name = "gemma_fast_arbiter"
+
+
+_FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
+
+# Fast provider name → settings attr holding its default endpoint. An entry's
+# own "baseUrl" always overrides this; when the entry omits it, this is how
+# the code knows which host to hit — add one more pair here for a new "_fast"
+# provider, no other wiring needed.
+_FAST_PROVIDER_BASE_URL_SETTING: dict[str, str] = {
+    "qwen3guard_fast": "QWEN3GUARD_VLLM_BASE_URL",
+    "gemma_fast": "GEMMA_VLLM_BASE_URL",
+    "gemma_fast_arbiter": "GEMMA_VLLM_ARBITER_BASE_URL",
+}
+
+
 # Foundry provider name → (class, settings-var prefix). BASE_URL/API_KEY are
 # required (entry baseUrl overrides the env); DEPLOYMENT/MODEL are optional.
 # All classes take the same (base_url, api_key, deployment, model) constructor:
@@ -675,6 +991,45 @@ def _build_foundry(provider_name: str, model: str, base_url: str, deployment: st
     )
 
 
+# Model ids AWS serves only on bedrock-mantle (not bedrock-runtime / Converse);
+# the "bedrock" provider routes these to BedrockMantleProvider.
+_MANTLE_ONLY_MODEL_PREFIXES = ("google.gemma-4",)
+
+
+def _bedrock_class_for(model: str) -> type[_BedrockAuthProvider]:
+    return BedrockMantleProvider if model.lower().startswith(_MANTLE_ONLY_MODEL_PREFIXES) else BedrockProvider
+
+
+def _build_bedrock(model: str, base_url: str) -> LLMProvider | None:
+    """Region + model are required; auth prefers the Bedrock API key, then
+    static IAM access keys, then the pod's IAM role (EKS Pod Identity / IRSA —
+    no keys configured at all). model/baseUrl may come per-entry, the
+    credentials and region only from env. The model picks the endpoint:
+    Gemma 4 goes to bedrock-mantle, everything else to Converse."""
+    env = _require(
+        {"BEDROCK_REGION": settings.BEDROCK_REGION, "BEDROCK_MODEL": model or settings.BEDROCK_MODEL},
+        label="[Providers] bedrock",
+    )
+    if env is None:
+        return None
+    cls = _bedrock_class_for(env["BEDROCK_MODEL"])
+    common = {"model": env["BEDROCK_MODEL"], "region": env["BEDROCK_REGION"], "base_url": base_url}
+    if settings.BEDROCK_API_KEY:
+        return cls(api_key=settings.BEDROCK_API_KEY, **common)
+    if settings.BEDROCK_ACCESS_KEY_ID and settings.BEDROCK_SECRET_ACCESS_KEY:
+        creds = aws_auth.AwsCredentials(
+            settings.BEDROCK_ACCESS_KEY_ID, settings.BEDROCK_SECRET_ACCESS_KEY, settings.BEDROCK_SESSION_TOKEN
+        )
+        return cls(credentials=creds, **common)
+    if aws_auth.role_credentials_source():
+        return cls(**common)
+    logger.warning(
+        "[Providers] bedrock: no credentials (set BEDROCK_API_KEY, or BEDROCK_ACCESS_KEY_ID + "
+        "BEDROCK_SECRET_ACCESS_KEY, or run with an IAM role via EKS Pod Identity / IRSA); skipping"
+    )
+    return None
+
+
 _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "openai": lambda model, _b, _d: _build_openai_compatible(model, base_url=""),
     "openai_compatible": lambda model, base_url, _d: _build_openai_compatible(model, base_url),
@@ -690,6 +1045,22 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "anthropic_foundry": lambda model, base_url, deployment: _build_foundry(
         "anthropic_foundry", model, base_url, deployment
     ),
+    "qwen3guard_fast": lambda model, base_url, _d: (
+        Qwen3GuardFastProvider(settings.QWEN_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast": lambda model, base_url, _d: (
+        GemmaFastProvider(settings.GEMMA_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "gemma_fast_arbiter": lambda model, base_url, _d: (
+        GemmaFastArbiterProvider(settings.GEMMA_26B_VLLM_KEY, model or DEFAULT_OPENAI_MODEL, base_url=base_url)
+        if base_url
+        else None
+    ),
+    "bedrock": lambda model, base_url, _d: _build_bedrock(model, base_url),
 }
 
 
@@ -699,6 +1070,25 @@ def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "
         logger.warning(f"[Providers] Unknown provider '{provider_name}'; skipping")
         return None
     return _cached_provider((provider_name, model, base_url, deployment), lambda: builder(model, base_url, deployment))
+
+
+class FallbackProvider(LLMProvider):
+    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any]):
+        self.primary = primary
+        self.backup_entry = backup_entry
+        self.name = primary.name
+
+    async def complete(self, prompt: str) -> str:
+        try:
+            return await self.primary.complete(prompt)
+        except Exception as exc:
+            backup = build_provider_from_config(self.backup_entry)
+            if backup is None:
+                raise
+            logger.warning(
+                f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}"
+            )
+            return await backup.complete(prompt)
 
 
 def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:
@@ -716,6 +1106,9 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
     if name in ("openai", "ollama", "openai_compatible"):
         base_url = (entry.get("baseUrl") or "").strip() or settings.OPENAI_COMPATIBLE_BASE_URL
         return _dispatch("openai_compatible", model, base_url)
+    if name in _FAST_PROVIDERS:
+        base_url = (entry.get("baseUrl") or "").strip() or getattr(settings, _FAST_PROVIDER_BASE_URL_SETTING[name], "")
+        return _dispatch(name, model, base_url)
     if name in _FOUNDRY_PROVIDERS:
         # deployment (azureml-model-deployment header) is a routing label, not a
         # secret — safe to allow per-entry, unlike apiKey. This lets two
@@ -723,6 +1116,10 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
         # roles) against two different deployments on the same Foundry
         # resource/endpoint, without needing separate env-var prefixes.
         return _dispatch(name, model, (entry.get("baseUrl") or "").strip(), (entry.get("deployment") or "").strip())
+    if name == "bedrock":
+        # model/baseUrl (e.g. a VPC interface endpoint) are routing, not secrets;
+        # credentials and region stay env-only.
+        return _dispatch(name, model, (entry.get("baseUrl") or "").strip())
     return _dispatch(name, model, "")
 
 

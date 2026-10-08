@@ -12,6 +12,8 @@ import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import useTable from "../../../components/tables/TableContext"
 import TooltipText from "../../../components/shared/TooltipText"
 import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper"
+import { usePermissions } from "@/util/permissions"
+import AllowedAction from "../../../components/shared/AllowedAction"
 
 
 const sortOptions = [
@@ -72,6 +74,7 @@ function TestRolesPage(){
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const navigate = useNavigate()
     const [searchParams] = useSearchParams()
+    const { canCall } = usePermissions()
 
     const [data, setData] = useState({ 'all': [], 'system': [], 'custom': []})
 
@@ -94,7 +97,8 @@ function TestRolesPage(){
                     fetchData()
                     func.setToast(true, false, "Test role has been deleted successfully.")
                 },
-                destructive: true
+                destructive: true,
+                requires: 'api/deleteTestRole'
             }
             actionItems[0].items.push(removeActionItem)
         }
@@ -177,7 +181,7 @@ function TestRolesPage(){
                 titleText={mapLabel("Test", getDashboardCategory()) + " roles"}
                 tooltipContent={`Test roles define specific access permissions and authentication methods for API ${mapLabel('security testing', getDashboardCategory())} scenarios.`}
             />}
-        primaryAction = {<Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button>}
+        primaryAction = {<AllowedAction allowed={canCall('api/addTestRoles')}><Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button></AllowedAction>}
         isFirstPage={true}
         components={[
             showEmptyScreen ? 

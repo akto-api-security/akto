@@ -5,8 +5,10 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.HttpMessage;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -22,6 +24,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class AbstractThreatDetectionAction extends UserAction {
+
+  // Skills Evaluations / Misconfigured Settings partition modes ("only" | "exclude"), sent to
+  // the threat backend as headers.
+  @Getter @Setter String skillEvaluationMode;
+  @Getter @Setter String configEvaluationMode;
 
   private Map<Integer, String> tokens = new HashMap<>();
   private static final ObjectMapper objectMapper = new ObjectMapper();
@@ -154,14 +161,76 @@ public class AbstractThreatDetectionAction extends UserAction {
       Map<String, Object> additionalFilters,
       String skillEvalMode,
       boolean minimalFields) {
+    // Users limited to specific collections only see activity of their own agents. Applied before the
+    // cache key, so the key carries the user's hosts and one user's results are never served to another.
+    if (isLimitedToOwnAgents()) {
+      Map<String, Object> scopedFilters = additionalFilters == null ? new HashMap<>() : new HashMap<>(additionalFilters);
+      if (!ArgusCollectionScope.scopeActivityFilters(getSUser(), scopedFilters)) {
+        return new MaliciousEventResponse(new ArrayList<>(), 0);
+      }
+      additionalFilters = scopedFilters;
+    }
     String cacheKey = maliciousEventsCacheKey(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
     CachedMaliciousEventResponse cached = maliciousEventsCache.get(cacheKey);
     if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < MALICIOUS_EVENTS_CACHE_TTL_MS) {
       return cached.response;
     }
     MaliciousEventResponse fresh = fetchAllMaliciousReqUncached(startTimestamp, endTimestamp, limit, additionalFilters, skillEvalMode, minimalFields);
+    if (fresh == null) {
+      // a failed fetch is not "no events": don't cache it, so the next request tries again
+      return new MaliciousEventResponse(new ArrayList<>(), 0);
+    }
     maliciousEventsCache.put(cacheKey, new CachedMaliciousEventResponse(fresh, System.currentTimeMillis()));
     return fresh;
+  }
+
+  /** Users limited to specific collections (Argus) - see ArgusCollectionScope. */
+  protected boolean isLimitedToOwnAgents() {
+    return ArgusCollectionScope.isLimited(getSUser());
+  }
+
+  protected static final int OWN_EVENTS_LIMIT = 100_000;
+
+  // when an older threat backend last rejected the host scope field (400); limited users then use their own events
+  // for a while and the field is tried again after HOST_SCOPE_RETRY_SECONDS, so an upgraded backend is picked up
+  private static volatile int hostScopeRejectedAt = 0;
+  private static final int HOST_SCOPE_RETRY_SECONDS = 10 * 60;
+
+  private static boolean backendAcceptsHostScope() {
+    return hostScopeRejectedAt == 0 || Context.now() - hostScopeRejectedAt > HOST_SCOPE_RETRY_SECONDS;
+  }
+
+  /*
+   * Host scope for a user limited to specific collections, so the threat backend counts only their agents.
+   * Null when the user isn't limited, sees nothing, or the backend doesn't accept the field yet.
+   */
+  protected Map<String, Object> backendHostScope() {
+    if (!backendAcceptsHostScope() || !isLimitedToOwnAgents()) {
+      return null;
+    }
+    Map<String, Object> scope = new HashMap<>();
+    return ArgusCollectionScope.scopeActivityFilters(getSUser(), scope) ? scope : null;
+  }
+
+  /** True when an older threat backend rejected the host scope; remembered for a while, so the caller (and later requests) use own events. */
+  protected static boolean hostScopeRejected(Map<String, Object> hostScope, int statusCode) {
+    if (hostScope != null && statusCode == 400) {
+      hostScopeRejectedAt = Context.now();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * All-time events of the user's own agents (host-scoped, minimal fields, cached), or null if the
+   * user is not limited to specific collections. Used to check that an event opened or changed by id
+   * belongs to the user.
+   */
+  protected List<DashboardMaliciousEvent> fetchOwnEventsIfLimited() {
+    if (!isLimitedToOwnAgents()) {
+      return null;
+    }
+    return fetchAllMaliciousEvents(0, 0, OWN_EVENTS_LIMIT, null, null, true);
   }
 
   /** accountId (the cache is static/shared across every action instance) + every param that
@@ -230,7 +299,8 @@ public class AbstractThreatDetectionAction extends UserAction {
         );
       }
     } catch (Exception e) {
-      // Error handling is left to the caller - return empty list on error
+      // null tells the caller the fetch failed, so the failure is not cached as "no events"
+      return null;
     }
     return new MaliciousEventResponse(result, total);
   }
@@ -244,6 +314,15 @@ public class AbstractThreatDetectionAction extends UserAction {
    *     asset's hostNames) instead of the whole account.
    * @return one count per monthBoundaries entry, or an empty list on any error/empty input.
    */
+  protected void addEvaluationModeHeaders(HttpMessage request) {
+    if (this.skillEvaluationMode != null && !this.skillEvaluationMode.isEmpty()) {
+      request.addHeader("x-skill-eval-mode", this.skillEvaluationMode);
+    }
+    if (this.configEvaluationMode != null && !this.configEvaluationMode.isEmpty()) {
+      request.addHeader("x-config-eval-mode", this.configEvaluationMode);
+    }
+  }
+
   protected List<Integer> fetchViolationsMonthlyTotals(
       int startTimestamp, int endTimestamp, List<Integer> monthBoundaries, List<String> hostFilter) {
     if (monthBoundaries == null || monthBoundaries.isEmpty()) return new ArrayList<>();
@@ -338,6 +417,12 @@ public class AbstractThreatDetectionAction extends UserAction {
    */
   protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
       int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter) {
+    return fetchSubcategoryWiseCounts(startTimestamp, endTimestamp, latestAttack, statusFilter, null);
+  }
+
+  // hostScope: see backendHostScope(); null counts the whole account. Null result when the backend rejected the host scope.
+  protected List<com.akto.action.threat_detection.ThreatCategoryCount> fetchSubcategoryWiseCounts(
+      int startTimestamp, int endTimestamp, List<String> latestAttack, String statusFilter, Map<String, Object> hostScope) {
     try {
       String url = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
       MediaType JSON = MediaType.parse("application/json; charset=utf-8");
@@ -348,6 +433,7 @@ public class AbstractThreatDetectionAction extends UserAction {
           put("end_ts", endTimestamp);
           put("latestAttack", latestAttack);
           if (statusFilter != null && !statusFilter.isEmpty()) put("status", statusFilter);
+          if (hostScope != null) put("hostScope", hostScope);
         }
       };
       String msg = objectMapper.valueToTree(body).toString();
@@ -363,6 +449,9 @@ public class AbstractThreatDetectionAction extends UserAction {
           .build();
 
       try (Response resp = httpClient.newCall(request).execute()) {
+        if (hostScopeRejected(hostScope, resp.code())) {
+          return null;
+        }
         String responseBody = resp.body() != null ? resp.body().string() : "";
         return ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse>toProtoMessage(
             com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse.class,

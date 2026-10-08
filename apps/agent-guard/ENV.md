@@ -34,10 +34,50 @@ cp .env.example .env   # edit once — never commit .env
 | `AGENT_GUARD_ANONYMIZER_TAG` | yes (current stack) | no |
 | `AGENT_GUARD_EXECUTOR_TAG` | yes (legacy ONNX only) | no |
 | `FORCE_LLM_MODE` / `SCANNER_LLM_PROVIDER` | legacy ONNX only | no |
+| `SCANNER_RESPONSE_FORMAT` | yes | yes |
+| `LLM_VALIDATOR_RESPONSE_FORMAT` | gateway-side (akto-gateway), not agent-guard | no |
 | `VERTEX_AI_*` | legacy ONNX (generic Vertex provider) | rarely |
 | `ANONYMIZER_URL` | set in compose | leave empty |
 | Vertex / Slack / model map keys | yes | yes |
 | `*_FOUNDRY_*` (Azure AI Foundry providers) | yes | yes |
+| `BEDROCK_*` (AWS Bedrock provider) | yes | yes |
+
+## AWS Bedrock (`bedrock` provider)
+
+One provider covers every Bedrock model through the model-agnostic Converse API
+(`POST /model/{modelId}/converse`).
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `BEDROCK_REGION` | yes | e.g. `us-east-1`; also the SigV4 signing region |
+| `BEDROCK_MODEL` | if an entry sets no `model` | foundation model id, cross-region inference profile (`us.anthropic...`) or ARN |
+| `BEDROCK_API_KEY` | one auth mode | Bedrock API key, sent as Bearer; **takes precedence** over IAM keys |
+| `BEDROCK_ACCESS_KEY_ID` / `BEDROCK_SECRET_ACCESS_KEY` | other auth mode | IAM user keys, SigV4-signed in pure Python (botocore can't load in the Worker) |
+| `BEDROCK_SESSION_TOKEN` | no | only for temporary STS credentials |
+| `BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC` | no | pod IAM-role mode only: refresh credentials this many seconds before they expire (default `1800` = 30 min; capped at half their lifetime) |
+| *(none)* | third auth mode | **IAM role on EKS/ECS**: with no key set, the pod's role is used via EKS Pod Identity, IRSA or an ECS task role — detected from the `AWS_*` vars EKS injects, refreshed automatically |
+
+Auth precedence: `BEDROCK_API_KEY` → `BEDROCK_ACCESS_KEY_ID`/`BEDROCK_SECRET_ACCESS_KEY` → pod IAM role.
+On EKS, leave all three credential vars unset and attach the role to the pod's
+service account (Pod Identity association or IRSA `eks.amazonaws.com/role-arn`
+annotation). The pod then needs egress to `bedrock-runtime.<region>` and, for
+IRSA, `sts.<region>` (VPC interface endpoints keep both private), plus
+`169.254.170.23:80` for the Pod Identity agent.
+
+- IAM needs `bedrock:InvokeModel` on the model (or inference-profile) ARN, and
+  model access must be enabled for that model in the Bedrock console.
+- **Gemma 4** (`google.gemma-4-*`) is routed automatically: AWS serves it only
+  on the `bedrock-mantle` endpoint (OpenAI-compatible chat completions at
+  `https://bedrock-mantle.<region>.api.aws/openai/v1`), so the `bedrock`
+  provider sends those models there and everything else to Converse. Same
+  region and credentials, but IAM needs **`bedrock-mantle:CreateInference`** on
+  the default project (`arn:aws:bedrock-mantle:<region>:<account>:project/default`),
+  and the region must offer Gemma 4 (us-east-1, us-east-2, us-west-2,
+  eu-central-1 at the time of writing — not ap-south-1). Use plain ids.
+- A `modelConfigs` entry may set its own `model` and `baseUrl` (e.g. a VPC
+  interface endpoint); credentials and region are env-only.
+- Converse returns no logprobs, so Bedrock suits the LLM-judge roles (JSON
+  verdict prompts), not the Qwen3Guard logprob-confidence path.
 
 > The per-scanner semantic cache has moved out of agent-guard to
 > guardrails-service (which now owns the Redis vector store + embedder in front of

@@ -10,6 +10,9 @@ import org.bson.conversions.Bson;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.AggregateIterable;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.DeleteManyModel;
 import com.mongodb.client.model.Filters;
@@ -77,6 +80,17 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
 
     protected Bson addRbacFilter(Bson originalQuery) {
         return modifyFilters(originalQuery, false);
+    }
+
+    /** Aggregation scoped the same way findAll/count are. MongoCollection#aggregate is not
+     *  overridable, so a raw aggregate() call silently skips RBAC and context scoping — use this
+     *  instead. The prepended $match is countRbacFilter's collection-id scoping only, which is
+     *  what applies to a collection-level pipeline. */
+    public AggregateIterable<BasicDBObject> aggregateWithRbac(List<Bson> pipeline) {
+        List<Bson> scoped = new ArrayList<>();
+        scoped.add(Aggregates.match(countRbacFilter(Filters.empty())));
+        if (pipeline != null) scoped.addAll(pipeline);
+        return getMCollection().withDocumentClass(BasicDBObject.class).aggregate(scoped);
     }
 
     @Override

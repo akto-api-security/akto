@@ -68,6 +68,7 @@ public class ThreatApiService {
     if (!match.isEmpty()) {
       base.add(new Document("$match", match));
     }
+    ThreatUtils.addHostScope(base, request.hasHostScope() ? ThreatUtils.hostScopeMatch(request.getHostScope()) : null);
 
     base.add(new Document("$sort", new Document("detectedAt", -1))); // sort
     base.add(
@@ -138,7 +139,8 @@ public class ThreatApiService {
     String cacheKey = "subCategoryCount|get_subcategory_wise_count|" + accountId + "|" + contextSource
         + "|" + DashboardFilterCache.bucketDay(req.getStartTs())
         + "|" + DashboardFilterCache.bucketDay(req.getEndTs())
-        + "|" + statusKey;
+        + "|" + statusKey
+        + (req.hasHostScope() ? "|" + req.getHostScope().toString() : "");
 
     return subCategoryCountCache.get(cacheKey,
         () -> computeSubCategoryWiseCount(accountId, req, contextSource));
@@ -171,6 +173,7 @@ public class ThreatApiService {
     match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
 
     pipeline.add(new Document("$match", match));
+    ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
 
     // 3. Collapse misconfiguration re-detections.
     pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
@@ -209,6 +212,11 @@ public class ThreatApiService {
 
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
     String accountId, ThreatSeverityWiseCountRequest req, String contextSource) {
+    return getSeverityWiseCount(accountId, req, contextSource, null, null);
+  }
+
+  public ThreatSeverityWiseCountResponse getSeverityWiseCount(
+    String accountId, ThreatSeverityWiseCountRequest req, String contextSource, String skillEvalMode, String configEvalMode) {
 
     List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
 
@@ -234,9 +242,14 @@ public class ThreatApiService {
           match.putAll(contextFilter);
       }
       match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
+      List<Document> evaluationModeConditions = ThreatUtils.evaluationModeConditions(contextSource, skillEvalMode, configEvalMode);
+      if (!evaluationModeConditions.isEmpty()) {
+          match.append("$and", evaluationModeConditions);
+      }
 
       List<Document> pipeline = new ArrayList<>();
       pipeline.add(new Document("$match", match));
+      ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
       pipeline.add(new Document("$group", new Document("_id", "$severity")
           .append("count", new Document("$sum", 1))));
 

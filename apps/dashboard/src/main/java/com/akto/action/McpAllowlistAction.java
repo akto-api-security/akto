@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.AllowVendorAllowlistDao;
 import com.akto.dao.McpAllowlistDao;
 import com.akto.dao.McpRegistryConfigDao;
 import com.akto.dao.context.Context;
@@ -328,7 +329,7 @@ public class McpAllowlistAction extends UserAction {
                     new UpdateOptions().upsert(true)
             ));
         }
-        McpAllowlistDao.instance.getMCollection().bulkWrite(bulkOps);
+        AllowVendorAllowlistDao.instance.getMCollection().bulkWrite(bulkOps);
         loggerMaker.infoAndAddToDb("Upserted " + nameSet.size() + " vendor allowlist entries");
 
         return Action.SUCCESS.toUpperCase();
@@ -339,7 +340,7 @@ public class McpAllowlistAction extends UserAction {
             addActionError("vendorName is required");
             return Action.ERROR.toUpperCase();
         }
-        McpAllowlistDao.instance.getMCollection().deleteOne(Filters.and(
+        AllowVendorAllowlistDao.instance.getMCollection().deleteOne(Filters.and(
                 Filters.eq(McpAllowlist.NAME, vendorName.trim().toLowerCase(Locale.ROOT)),
                 Filters.eq(McpAllowlist.REGISTRY_ID, VENDOR_REGISTRY_ID)));
         loggerMaker.infoAndAddToDb("Removed vendor allowlist entry: " + vendorName);
@@ -363,7 +364,7 @@ public class McpAllowlistAction extends UserAction {
         }
 
         Set<String> allowlistNamesLower = new HashSet<>();
-        for (McpAllowlist a : McpAllowlistDao.instance.findAll(Filters.empty(), Projections.include(McpAllowlist.NAME))) {
+        for (McpAllowlist a : AllowVendorAllowlistDao.instance.findAll(Filters.empty(), Projections.include(McpAllowlist.NAME))) {
             if (a.getName() != null) allowlistNamesLower.add(a.getName().toLowerCase(Locale.ROOT));
         }
 

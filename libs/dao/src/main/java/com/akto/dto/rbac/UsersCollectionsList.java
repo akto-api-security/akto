@@ -2,6 +2,7 @@ package com.akto.dto.rbac;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.RBACDao;
+import com.akto.dao.RbacCacheVersionDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
@@ -30,12 +31,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class UsersCollectionsList {
-    private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<List<Integer>, Integer>> usersCollectionMap = new ConcurrentHashMap<>();
+    // Keyed per product scope too: the list comes from the user's role in the current scope, which can differ per scope
+    private static final ConcurrentHashMap<String, Pair<List<Integer>, Integer>> usersCollectionMap = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Pair<Integer, CONTEXT_SOURCE>, Pair<Set<Integer>, Integer>> contextCollectionsMap = new ConcurrentHashMap<>();
     private static final Set<Integer> RBAC_DEBUG_ACCOUNT_IDS = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList(1737014476, 1726615470, 1000000)));
     private static final int EXPIRY_TIME = 15 * 60;
     private static final int CONTEXT_EXPIRY_TIME = 120;
+    // Collections assigned to the user (RBACDao.getUserCollectionsById) per product scope, before narrowing to the scope's collections
+    private static final ConcurrentHashMap<String, Pair<List<Integer>, Integer>> assignedCollectionsMap = new ConcurrentHashMap<>();
+    private static final int ASSIGNED_EXPIRY_TIME = 120;
 
     private static final Logger logger = LoggerFactory.getLogger(UsersCollectionsList.class);
 
@@ -43,9 +48,34 @@ public class UsersCollectionsList {
         return RBAC_DEBUG_ACCOUNT_IDS.contains(accountId);
     }
 
+    private static String usersCollectionKey(int userId, int accountId, CONTEXT_SOURCE source) {
+        return userId + "|" + accountId + "|" + (source == null ? CONTEXT_SOURCE.API : source);
+    }
+
     public static void deleteCollectionIdsFromCache(int userId, int accountId) {
-        Pair<Integer, Integer> key = new Pair<>(userId, accountId);
-        usersCollectionMap.remove(key);
+        for (CONTEXT_SOURCE source : CONTEXT_SOURCE.values()) {
+            usersCollectionMap.remove(usersCollectionKey(userId, accountId, source));
+            assignedCollectionsMap.remove(usersCollectionKey(userId, accountId, source));
+        }
+    }
+
+    /** Clears every user's cached collections for an account, e.g. after a custom role's collections change. */
+    public static void deleteAccountCollectionIdsFromCache(int accountId) {
+        String accountPart = "|" + accountId + "|";
+        usersCollectionMap.keySet().removeIf(key -> key.contains(accountPart));
+        assignedCollectionsMap.keySet().removeIf(key -> key.contains(accountPart));
+    }
+
+    /** Cached RBACDao.getUserCollectionsById for the current product scope: null for admin, empty when no collections are assigned. */
+    public static List<Integer> getAssignedCollectionIds(int userId, int accountId) {
+        RbacCacheVersionDao.syncIfChanged(accountId);
+        String key = usersCollectionKey(userId, accountId, Context.contextSource.get());
+        Pair<List<Integer>, Integer> entry = assignedCollectionsMap.get(key);
+        if (entry == null || Context.now() - entry.getSecond() > ASSIGNED_EXPIRY_TIME) {
+            entry = new Pair<>(RBACDao.instance.getUserCollectionsById(userId, accountId), Context.now());
+            assignedCollectionsMap.put(key, entry);
+        }
+        return entry.getFirst() == null ? null : new ArrayList<>(entry.getFirst());
     }
 
     public static final String RBAC_FEATURE = "RBAC_FEATURE";
@@ -60,7 +90,8 @@ public class UsersCollectionsList {
      * 4. If rbac feature not available, then, full access.
      */
     public static List<Integer> getCollectionsIdForUser(int userId, int accountId) {
-        Pair<Integer, Integer> key = new Pair<>(userId, accountId);
+        RbacCacheVersionDao.syncIfChanged(accountId);
+        String key = usersCollectionKey(userId, accountId, Context.contextSource.get());
         Pair<List<Integer>, Integer> collectionIdEntry = usersCollectionMap.get(key);
         List<Integer> collectionList = new ArrayList<>();
         boolean fromCache = true;

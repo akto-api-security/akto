@@ -4,10 +4,12 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
+import { usePermissions, whenAllowed } from '@/util/permissions'
 import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function AWSWaf() {
+    const { canCall } = usePermissions()
     const [accessKey, setAccessKey] = useState('');
     const [secretKey, setSecretKey] = useState('');
     const [region, setRegion] = useState('');
@@ -18,7 +20,7 @@ function AWSWaf() {
     const [threatPolicies, setThreatPolicies] = useState([]);
     const wafCard = (
         <LegacyCard
-            primaryFooterAction={{content: 'Save', onAction: () => addAwsWafIntegration()}}
+            primaryFooterAction={{content: 'Save', onAction: () => addAwsWafIntegration(), ...whenAllowed(canCall('api/addAwsWafIntegration'))}}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate AWS-WAF</Text>
@@ -72,7 +74,7 @@ function AWSWaf() {
 
     let cardContent = "Seamlessly enhance your web application security with AWS-WAF integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
     return (
-        <IntegrationsLayout title= "AWS WAF" cardContent={cardContent} component={wafCard} docsUrl=""/> 
+        <IntegrationsLayout title= "AWS WAF" cardContent={cardContent} component={wafCard} docsUrl="" readOnly={!canCall('api/addAwsWafIntegration')}/> 
     )
 }
 

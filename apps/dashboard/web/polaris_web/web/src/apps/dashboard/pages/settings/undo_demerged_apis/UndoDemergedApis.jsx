@@ -6,12 +6,16 @@ import PersistStore from '../../../../main/PersistStore'
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import TitleWithInfo from '../../../components/shared/TitleWithInfo'
+import { usePermissions, whenAllowed } from '@/util/permissions'
+import AllowedAction from '../../../components/shared/AllowedAction'
 
 const UndoDemergedApis = () => {
     const [mergedApis, setMergedApis] = useState([])
     const [loading, setLoading] = useState(false)
     
     const collectionsMap = PersistStore(state => state.collectionsMap)
+    const { canCall } = usePermissions()
+    const canUndo = canCall('api/undoDemergedApis')
 
     const fetchMergedApis = async () => {
         setLoading(true)
@@ -50,8 +54,9 @@ const UndoDemergedApis = () => {
 
         const shortcutActions = [
             {
-                content: <Button plain>Undo</Button>,
-                onAction: () => undoDemergedApis([item])
+                content: <Button plain disabled={!canUndo}>Undo</Button>,
+                onAction: () => undoDemergedApis([item]),
+                ...whenAllowed(canUndo)
             }
         ]
 
@@ -92,8 +97,8 @@ const UndoDemergedApis = () => {
 
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
-            <Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged APIs</Button>
-                {window.USER_NAME?.toLowerCase()?.includes("@akto.io") ? <Button onClick={() => deleteDuplicateEntries()}>Delete duplicates</Button> : null}
+            <AllowedAction allowed={canUndo}><Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged APIs</Button></AllowedAction>
+                {window.USER_NAME?.toLowerCase()?.includes("@akto.io") ? <AllowedAction allowed={canCall('api/deleteDuplicateEntries')}><Button onClick={() => deleteDuplicateEntries()}>Delete duplicates</Button></AllowedAction> : null}
         </HorizontalStack>
         
     )

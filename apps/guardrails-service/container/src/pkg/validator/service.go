@@ -2,9 +2,11 @@ package validator
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -89,6 +91,7 @@ type Service struct {
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
 	threatAPIClient       *threatapi.Client
+	orgEmailDomains       []string // this account's work email domains, see orgEmailDomainsByAccount
 }
 
 // NewService creates a new validator service
@@ -169,7 +172,11 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		schemaFetcher:       schemaFetcher,
 		skipPaths:           skipPaths,
 		threatAPIClient:     threatapi.NewClient(),
+		orgEmailDomains:     orgEmailDomainsByAccount[auth.AccountIDFromServiceToken()],
 	}
+	logger.Info("Work email domains for personal-account policies",
+		zap.String("accountId", auth.AccountIDFromServiceToken()),
+		zap.Strings("orgEmailDomains", svc.orgEmailDomains))
 	bp := mcp.GetScanBackpressureSnapshot()
 	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
 		zap.Bool("enabled", bp.Enabled),
@@ -543,24 +550,205 @@ func (s *Service) filterApprovedServers(policies []types.Policy, mcpServerName s
 	return filtered
 }
 
+// browserUserEmail returns the browser-user-email tag value; "" when missing, null or unparseable.
+func browserUserEmail(tag string) string {
+	var m map[string]json.RawMessage
+	if tag == "" || json.Unmarshal([]byte(tag), &m) != nil {
+		return ""
+	}
+	var email string
+	_ = json.Unmarshal(m[tagKeyBrowserUserEmail], &email)
+	return strings.TrimSpace(email)
+}
+
+// browserAccountType classifies a browser request by browser-user-email only.
+func (s *Service) browserAccountType(tag string) (accountType, source, domain string) {
+	email := browserUserEmail(tag)
+	return s.classifyEmail(email), "browserUserEmail", emailDomain(email)
+}
+
+// emailDomain returns the lowercased domain of an email for logging, so full addresses never reach the logs.
+func emailDomain(email string) string {
+	if i := strings.LastIndex(email, "@"); i >= 0 {
+		return strings.ToLower(email[i+1:])
+	}
+	return ""
+}
+
+// proxyRequest returns the host and Authorization header from fullRequest.
+func proxyRequest(fullRequest string) (host, authorization string) {
+	if fullRequest == "" {
+		return "", ""
+	}
+	var fr struct {
+		Host    string     `json:"host"`
+		Headers [][]string `json:"headers"`
+	}
+	_ = json.Unmarshal([]byte(fullRequest), &fr)
+	for _, h := range fr.Headers {
+		if len(h) == 2 && strings.EqualFold(h[0], "authorization") {
+			return fr.Host, h[1]
+		}
+	}
+	return fr.Host, ""
+}
+
+// openAITokenEmail reads the profile email from an OpenAI JWT; unverified as OpenAI rejects forged tokens.
+func openAITokenEmail(authorization string) string {
+	scheme, token, ok := strings.Cut(strings.TrimSpace(authorization), " ")
+	parts := strings.Split(token, ".")
+	if !ok || !strings.EqualFold(scheme, "Bearer") || len(parts) != 3 {
+		return ""
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
+	if err != nil {
+		return ""
+	}
+	var claims struct {
+		Profile struct {
+			Email string `json:"email"`
+		} `json:"https://api.openai.com/profile"`
+	}
+	if json.Unmarshal(raw, &claims) != nil {
+		return ""
+	}
+	return strings.TrimSpace(claims.Profile.Email)
+}
+
+// orgEmailDomainsByAccount maps an Akto accountId to its company email domains; only these count as work emails.
+var orgEmailDomainsByAccount = map[string][]string{
+	"1786073624": {"supremelending.com"},
+	"1783981503": {"lguplus.co.kr"},
+	"1726615470": {"akto.io"},
+}
+
+// requestAccountType resolves browser requests via browser-user-email and everything else via the proxy token email.
+func (s *Service) requestAccountType(tag, fullRequest string) (accountType, source, domain string, browser bool) {
+	if mcp.IsBrowserExtensionRequest(tag) {
+		accountType, source, domain = s.browserAccountType(tag)
+		return accountType, source, domain, true
+	}
+	accountType, domain = s.proxyTokenAccountType(fullRequest)
+	return accountType, "proxyToken", domain, false
+}
+
+// proxyTokenAccountType classifies the OpenAI token email in endpoint shield's fullRequest; ChatGPT without a token is personal.
+func (s *Service) proxyTokenAccountType(fullRequest string) (accountType, domain string) {
+	host, authorization := proxyRequest(fullRequest)
+	if authorization == "" && strings.EqualFold(host, "chatgpt.com") {
+		return accountTypePersonal, ""
+	}
+	email := openAITokenEmail(authorization)
+	return s.classifyEmail(email), emailDomain(email)
+}
+
+// classifyEmail: an email on this account's mapped org domain is work, any other email is personal, no email is work.
+func (s *Service) classifyEmail(email string) string {
+	local, domain, ok := strings.Cut(email, "@")
+	if !ok || local == "" || domain == "" || strings.Contains(domain, "@") {
+		return accountTypeEnterprise
+	}
+	if slices.Contains(s.orgEmailDomains, strings.ToLower(domain)) {
+		return accountTypeEnterprise
+	}
+	return accountTypePersonal
+}
+
+// filterPoliciesByAccountType keeps SkipEnterpriseAccounts policies only for requests resolved as personal.
+func (s *Service) filterPoliciesByAccountType(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
+	if !slices.ContainsFunc(policies, func(p types.Policy) bool { return p.SkipEnterpriseAccounts }) {
+		return policies
+	}
+	accountType, source, domain, browser := s.requestAccountType(valCtx.Tag, valCtx.FullRequest)
+	skip := accountType != accountTypePersonal
+	filtered := make([]types.Policy, 0, len(policies))
+	var scoped []string
+	for _, p := range policies {
+		if p.SkipEnterpriseAccounts {
+			scoped = append(scoped, p.Info.Name)
+			if skip {
+				continue
+			}
+		}
+		filtered = append(filtered, p)
+	}
+	decision := "apply"
+	if skip {
+		decision = "skip"
+	}
+	s.logger.Info("[ACCOUNT_TYPE] Work & Personal Accounts - decision",
+		zap.String("decision", decision),
+		zap.String("path", valCtx.Endpoint),
+		zap.Bool("browser", browser),
+		zap.String("accountType", accountType),
+		zap.String("accountTypeSource", source),
+		zap.String("emailDomain", domain),
+		zap.Bool("orgDomainsConfigured", len(s.orgEmailDomains) > 0),
+		zap.Strings("personalOnlyPolicies", scoped))
+	return filtered
+}
+
+// policiesByName returns the policies named in the comma-separated policyName (case-insensitive).
+func policiesByName(policies []types.Policy, policyName string) []types.Policy {
+	wanted := make(map[string]struct{})
+	for _, name := range strings.Split(policyName, ",") {
+		if name = strings.ToLower(strings.TrimSpace(name)); name != "" {
+			wanted[name] = struct{}{}
+		}
+	}
+	if len(wanted) == 0 {
+		return nil
+	}
+	named := make([]types.Policy, 0, len(wanted))
+	for _, p := range policies {
+		if _, ok := wanted[strings.ToLower(strings.TrimSpace(p.Info.Name))]; ok {
+			named = append(named, p)
+		}
+	}
+	return named
+}
+
+// enforcedPolicies returns the policies to enforce on a request, and false when the request names
+// policies (policyName, e.g. from a LiteLLM akto_vxlan_id directive) but none of them is an active
+// policy: the caller then applies no guardrails at all. Named active policies are always enforced,
+// whatever their context source or server/device/user/account/approval scope. Without a name it is
+// the policies in scope for the request.
+func (s *Service) enforcedPolicies(policies []types.Policy, valCtx *mcp.ValidationContext, policyName string) ([]types.Policy, bool) {
+	if strings.TrimSpace(policyName) == "" {
+		return s.applicablePolicies(policies, valCtx), true
+	}
+	// s.cache.policies holds every active policy, across context sources.
+	s.cache.mu.RLock()
+	named := policiesByName(s.cache.policies, policyName)
+	s.cache.mu.RUnlock()
+	if len(named) == 0 {
+		s.logger.Warn("enforcedPolicies - no active policy matches the requested names, applying no guardrails",
+			zap.String("policyName", policyName))
+		return nil, false
+	}
+	return named, true
+}
+
 func (s *Service) applicablePolicies(policies []types.Policy, valCtx *mcp.ValidationContext) []types.Policy {
 	policies = s.filterPoliciesByMcpServer(policies, valCtx.McpServerName)
 	policies = s.filterPoliciesByDevice(policies, valCtx.McpServerName, valCtx.RequestHeaders)
+	policies = s.filterPoliciesByAccountType(policies, valCtx)
 	// Bypass "approval" policies whose server is already approved (allow, no threat).
 	return s.filterApprovedServers(policies, valCtx.McpServerName)
 }
 
-func (s *Service) HasApplicablePolicies(contextSource, requestHeaders string) (bool, error) {
+func (s *Service) HasApplicablePolicies(contextSource, requestHeaders, tag string) (bool, error) {
 	policies, _, compiledRules, _, err := s.getCachedPolicies(contextSource)
 	if err != nil {
 		return false, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	// Only McpServerName and RequestHeaders are read by the filters; the rest of the
+	// Only McpServerName, RequestHeaders and Tag are read by the filters; the rest of the
 	// context is irrelevant to which policies apply.
 	valCtx := s.validationContextFromParams(&models.ValidateRequestParams{
 		ContextSource:  contextSource,
 		RequestHeaders: requestHeaders,
+		Tag:            tag,
 	}, "", "", "", "HasApplicablePolicies", nil, compiledRules)
 
 	applicable := s.applicablePolicies(policies, valCtx)
@@ -879,6 +1067,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 const (
 	tagKeyLoginUserEmailType = "login-user-email-type"
 	tagKeyBrowserLLMAccount  = "browser-llm-account-type" // browser extension only
+	tagKeyBrowserUserEmail   = "browser-user-email"       // browser extension only
 
 	accountTypePersonal   = "personal"
 	accountTypeEnterprise = "enterprise"
@@ -1026,83 +1215,31 @@ func normalizeAccountType(raw string) string {
 	return strings.ToLower(strings.TrimSpace(raw))
 }
 
-// accountTypeFromRequestTag resolves the account type from the request's own tag JSON
-// (a map[string]string, e.g. {"browser-llm-account-type":"enterprise"}). Browser-
-// extension traffic carries the account-type tag on the request itself rather than on a
-// stored collection, so this is consulted for those requests. Returns "" if the tag is
-// absent, unparseable, or carries no recognised account-type key — the same precedence
-// as the collection-based resolveAccountType.
-func accountTypeFromRequestTag(tag string) string {
-	if tag == "" {
-		return ""
-	}
-	var m map[string]string
-	if err := json.Unmarshal([]byte(tag), &m); err != nil {
-		return ""
-	}
-	accountType, _ := resolveAccountType(m)
-	return accountType
-}
-
 // resolvePersonalAccountBlock decides whether a request must be blocked by the
-// personal-account guardrail. It is the single source of truth for that decision,
-// shared by both the single-request path (ValidateRequest) and the batch/ingest
-// path (ValidateBatch) so the two can never drift.
-//
-// It returns the offending policy name and true only when a BlockPersonalAccounts
-// policy applies AND the account type resolves to exactly "personal". Detection
-// precedence: browser-extension requests read the account type from their own tag;
-// everything else falls back to the collection-tag cache. enterprise/unknown/empty
-// and any unrecognised value are allowed, so an unclassified login never blocks.
-func (s *Service) resolvePersonalAccountBlock(policies []types.Policy, tag string, reqHeaders map[string]string, path, sessionID string) (string, bool) {
+// personal-account guardrail, for both ValidateRequest and ValidateBatch. It uses the
+// same requestAccountType as the personal-accounts-only filter, so both always agree.
+func (s *Service) resolvePersonalAccountBlock(policies []types.Policy, tag, fullRequest, path, sessionID string) (string, bool) {
 	policyName, ok := blockPersonalAccountPolicyName(policies)
 	if !ok {
 		return "", false
 	}
 
-	var accountType, accountTypeSource string
-	// Browser-extension requests carry the account-type tag on the request itself
-	// (the extension host is usually absent from the collection cache), so read it
-	// straight from the request tag when present.
-	if mcp.IsBrowserExtensionRequest(tag) {
-		if at := accountTypeFromRequestTag(tag); at != "" {
-			accountType = at
-			accountTypeSource = "requestTag"
-		}
-	}
-	// Fall back to the collection-tag lookup (existing behaviour) when the request
-	// tag did not supply an account type.
-	if accountType == "" {
-		s.refreshCollectionTagsIfNeeded()
-		accountType = s.getLoginUserEmailType(reqHeaders)
-		accountTypeSource = "collection"
-	}
-	s.logger.Info("resolvePersonalAccountBlock - account type check",
+	accountType, source, domain, browser := s.requestAccountType(tag, fullRequest)
+	fields := []zap.Field{
 		zap.String("path", path),
 		zap.String("sessionID", sessionID),
+		zap.Bool("browser", browser),
 		zap.String("accountType", accountType),
-		zap.String("accountTypeSource", accountTypeSource),
-		zap.String("policyName", policyName))
-
-	// Match explicitly: only "personal" blocks. "enterprise" is allowed, and any
-	// other value ("unknown", a missing tag, or a value this build does not know)
-	// is treated as not-personal so an unclassified login never blocks traffic.
-	switch accountType {
-	case accountTypePersonal:
-		s.logger.Warn("resolvePersonalAccountBlock - blocking personal account",
-			zap.String("path", path),
-			zap.String("accountType", accountType),
-			zap.String("policyName", policyName),
-			zap.String("sessionID", sessionID))
-		return policyName, true
-	case accountTypeEnterprise, accountTypeUnknown, "":
-		// Explicitly allowed.
-	default:
-		s.logger.Info("resolvePersonalAccountBlock - unrecognised account type, allowing",
-			zap.String("accountType", accountType),
-			zap.String("policyName", policyName),
-			zap.String("sessionID", sessionID))
+		zap.String("accountTypeSource", source),
+		zap.String("emailDomain", domain),
+		zap.Bool("orgDomainsConfigured", len(s.orgEmailDomains) > 0),
+		zap.String("policyName", policyName),
 	}
+	if accountType == accountTypePersonal {
+		s.logger.Warn("[ACCOUNT_TYPE] Block personal accounts - decision", append(fields, zap.String("decision", "block"))...)
+		return policyName, true
+	}
+	s.logger.Info("[ACCOUNT_TYPE] Block personal accounts - decision", append(fields, zap.String("decision", "allow"))...)
 	return "", false
 }
 
@@ -1119,7 +1256,7 @@ func personalAccountReason(behaviour string) string {
 // reportPersonalAccountThreat asynchronously reports a personal-account block to the
 // dashboard threat feed. Shared by the single-request and batch/ingest paths so both
 // report identically. It is a no-op when skipThreat is set.
-func (s *Service) reportPersonalAccountThreat(payloadToValidate string, reqHeaders map[string]string, ip, path, method, statusCodeStr, contextSource, host, sessionID, policyName, behaviour, blockReason string, skipThreat bool) {
+func (s *Service) reportPersonalAccountThreat(payloadToValidate string, reqHeaders map[string]string, ip, path, method, statusCodeStr, contextSource, host, sessionID, policyName, behaviour, severity, blockReason string, skipThreat bool) {
 	if skipThreat {
 		return
 	}
@@ -1135,7 +1272,7 @@ func (s *Service) reportPersonalAccountThreat(payloadToValidate string, reqHeade
 			types.ThreatMetadata{
 				PolicyName:   policyName,
 				RuleViolated: "BlockPersonalAccounts",
-				Severity:     "MEDIUM",
+				Severity:     severity,
 				Reason:       blockReason,
 			},
 			ip,
@@ -1157,7 +1294,7 @@ func (s *Service) reportPersonalAccountThreat(payloadToValidate string, reqHeade
 
 // TODO: move reportAndBlockPersonalAccount to mcp library so threat reporting
 // and validation live in one place alongside other policy enforcement.
-func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour string) *mcp.ValidationResult {
+func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour, severity string) *mcp.ValidationResult {
 	blockReason := personalAccountReason(behaviour)
 
 	if s.sessionMgr != nil && sessionID != "" {
@@ -1170,7 +1307,7 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
 	}
 	s.reportPersonalAccountThreat(payloadToValidate, reqHeaders, params.IP, params.Path, params.Method,
-		params.StatusCode, params.ContextSource, extractHostHeader(reqHeaders), sessionID, policyName, behaviour, blockReason, params.EffectiveSkipThreat())
+		params.StatusCode, params.ContextSource, extractHostHeader(reqHeaders), sessionID, policyName, behaviour, severity, blockReason, params.EffectiveSkipThreat())
 
 	return &mcp.ValidationResult{
 		Allowed:   false,
@@ -1179,7 +1316,181 @@ func (s *Service) reportAndBlockPersonalAccount(_ context.Context, params *model
 		Metadata: types.ThreatMetadata{
 			PolicyName:   policyName,
 			RuleViolated: "BlockPersonalAccounts",
-			Severity:     "MEDIUM",
+			Severity:     severity,
+			Reason:       blockReason,
+		},
+	}
+}
+
+// publicSharePolicyName returns the first policy name with BlockPublicShare enabled.
+func publicSharePolicyName(policies []types.Policy) (string, bool) {
+	for _, p := range policies {
+		if p.BlockPublicShare {
+			return p.Info.Name, true
+		}
+	}
+	return "", false
+}
+
+// isVisibilityPublic matches claude.ai's chat-share body shape: {"visibility":"public"}.
+func isVisibilityPublic(payload string) bool {
+	var body struct {
+		Visibility string `json:"visibility"`
+	}
+	return json.Unmarshal([]byte(payload), &body) == nil && body.Visibility == "public"
+}
+
+// isReadModePublic matches claude.ai's artifact-permission body shape: {"read":{"mode":"public"}}.
+func isReadModePublic(payload string) bool {
+	var body struct {
+		Read struct {
+			Mode string `json:"mode"`
+		} `json:"read"`
+	}
+	return json.Unmarshal([]byte(payload), &body) == nil && body.Read.Mode == "public"
+}
+
+// shareEndpoint is one app's share/permission-change endpoint; add a row per new app.
+// No host field: ENDPOINT traffic carries a synthetic device host, not a real one, so path+method match instead.
+type shareEndpoint struct {
+	app      string
+	method   string
+	path     *regexp.Regexp
+	isPublic func(payload string) bool
+	evidence *regexp.Regexp // the field that names the share public, for the Evidence column
+}
+
+// shareEndpoints — confirmed against real HAR captures of claude.ai's share flows.
+var shareEndpoints = []shareEndpoint{
+	{"claude", "POST", regexp.MustCompile(`/chat_conversations/[0-9a-fA-F-]{36}/share$`), isVisibilityPublic, regexp.MustCompile(`"visibility"\s*:\s*"public"`)},
+	{"claude", "PATCH", regexp.MustCompile(`/api/frame/perm/[0-9a-fA-F-]{36}$`), isReadModePublic, regexp.MustCompile(`"mode"\s*:\s*"public"`)},
+}
+
+// matchShareEndpoint finds the shareEndpoints row for this path+method, or nil.
+func matchShareEndpoint(path, method string) *shareEndpoint {
+	path = strings.SplitN(path, "?", 2)[0]
+	for i := range shareEndpoints {
+		if shareEndpoints[i].method == method && shareEndpoints[i].path.MatchString(path) {
+			return &shareEndpoints[i]
+		}
+	}
+	return nil
+}
+
+// publicShareVerdict returns the matched app name and whether its body is public.
+func publicShareVerdict(path, method, payload string) (string, bool) {
+	e := matchShareEndpoint(path, method)
+	if e == nil {
+		return "", false
+	}
+	return e.app, e.isPublic(payload)
+}
+
+// publicShareEvidence locates the "public" field so the Evidence column shows it, not "-".
+func publicShareEvidence(path, method, payload string) []types.SchemaError {
+	e := matchShareEndpoint(path, method)
+	if e == nil {
+		return nil
+	}
+	loc := e.evidence.FindStringIndex(payload)
+	if loc == nil {
+		return nil
+	}
+	return []types.SchemaError{{
+		Start: loc[0], End: loc[1], Phrase: payload[loc[0]:loc[1]],
+		Message: "Public sharing of chat/artifact", Location: "LOCATION_BODY",
+	}}
+}
+
+// resolvePublicShareBlock returns the offending policy name when a public share is blocked.
+func (s *Service) resolvePublicShareBlock(policies []types.Policy, path, method, payload, sessionID string) (string, bool) {
+	policyName, ok := publicSharePolicyName(policies)
+	if !ok {
+		return "", false
+	}
+	app, blocked := publicShareVerdict(path, method, payload)
+	if !blocked {
+		return "", false
+	}
+	s.logger.Warn("resolvePublicShareBlock - blocking public share",
+		zap.String("app", app),
+		zap.String("path", path),
+		zap.String("method", method),
+		zap.String("policyName", policyName),
+		zap.String("sessionID", sessionID))
+	return policyName, true
+}
+
+// publicShareReason mirrors personalAccountReason's alert/block wording split.
+func publicShareReason(behaviour string) string {
+	if strings.ToLower(strings.TrimSpace(behaviour)) == "alert" {
+		return "Alert: public sharing of chats/artifacts is not permitted by guardrail policy"
+	}
+	return "Blocked: public sharing of chats/artifacts is not permitted by guardrail policy"
+}
+
+// reportPublicShareThreat mirrors reportPersonalAccountThreat; no-op when skipThreat is set.
+func (s *Service) reportPublicShareThreat(payloadToValidate string, reqHeaders map[string]string, ip, path, method, statusCodeStr, contextSource, host, sessionID, policyName, behaviour, severity, blockReason string, skipThreat bool) {
+	if skipThreat {
+		return
+	}
+	statusCode := 0
+	if statusCodeStr != "" {
+		fmt.Sscanf(statusCodeStr, "%d", &statusCode)
+	}
+	go func() {
+		if err := mcp.ReportThreat(
+			context.Background(),
+			payloadToValidate,
+			"",
+			types.ThreatMetadata{
+				PolicyName:   policyName,
+				RuleViolated: "BlockPublicShare",
+				Severity:     severity,
+				Reason:       blockReason,
+				SchemaErrors: publicShareEvidence(path, method, payloadToValidate),
+			},
+			ip,
+			path,
+			method,
+			reqHeaders,
+			nil,
+			statusCode,
+			types.ContextSource(contextSource),
+			host,
+			sessionID,
+			behaviour,
+			"",
+		); err != nil {
+			s.logger.Warn("Failed to report threat for public share block", zap.String("policyName", policyName), zap.Error(err))
+		}
+	}()
+}
+
+// reportAndBlockPublicShare mirrors reportAndBlockPersonalAccount.
+func (s *Service) reportAndBlockPublicShare(params *models.ValidateRequestParams, payloadToValidate, sessionID, requestID, policyName, behaviour, severity string) *mcp.ValidationResult {
+	blockReason := publicShareReason(behaviour)
+
+	if s.sessionMgr != nil && sessionID != "" {
+		s.sessionMgr.TrackResponse(sessionID, requestID, blockReason, true)
+		s.sessionMgr.UpdateBlockedReason(sessionID, blockReason)
+	}
+
+	reqHeaders := make(map[string]string)
+	if params.RequestHeaders != "" {
+		json.Unmarshal([]byte(params.RequestHeaders), &reqHeaders)
+	}
+	s.reportPublicShareThreat(payloadToValidate, reqHeaders, params.IP, params.Path, params.Method,
+		params.StatusCode, params.ContextSource, extractHostHeader(reqHeaders), sessionID, policyName, behaviour, severity, blockReason, params.EffectiveSkipThreat())
+
+	return &mcp.ValidationResult{
+		Allowed:   false,
+		Reason:    blockReason,
+		Behaviour: behaviour,
+		Metadata: types.ThreatMetadata{
+			PolicyName:   policyName,
+			RuleViolated: "BlockPublicShare",
+			Severity:     severity,
 			Reason:       blockReason,
 		},
 	}
@@ -1249,6 +1560,19 @@ func behaviourForPolicy(policies []types.Policy, policyName string) string {
 		}
 	}
 	return "block"
+}
+
+// severityForPolicy returns the named policy's configured severity, defaulting to "MEDIUM".
+func severityForPolicy(policies []types.Policy, policyName string) string {
+	for _, p := range policies {
+		if p.Info.Name == policyName {
+			if sev := strings.TrimSpace(p.Severity); sev != "" {
+				return strings.ToUpper(sev)
+			}
+			break
+		}
+	}
+	return "MEDIUM"
 }
 
 func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string) *mcp.ValidationResult {
@@ -1713,6 +2037,7 @@ func (s *Service) validationContextFromParams(
 		Tag:                params.Tag,
 		AllowedLists:       mcpAllowedHostList,
 		CompiledRegexRules: compiledRules,
+		FullRequest:        params.FullRequest,
 	}
 }
 
@@ -1813,6 +2138,117 @@ func (s *Service) withValidationDeadline(ctx context.Context) (context.Context, 
 	return context.WithTimeout(ctx, time.Duration(s.config.ValidationTimeoutMs)*time.Millisecond)
 }
 
+// passOutcome is one validation pass's result.
+type passOutcome struct {
+	result              *mcp.ProcessResult
+	evalPayload         string
+	preRedactionPayload string
+	err                 error
+	ran                 bool
+	// fromSession is set when this is the session-summary pass's outcome.
+	fromSession bool
+}
+
+// validateWithSessionPass runs the bare pass (single prompt, no session) and, when
+// session guardrails are enabled, the session-summary pass concurrently. A blocking
+// bare verdict wins without waiting on the session pass; otherwise the session
+// verdict is used if a summary applied. sessionDrivenBlock reports whether the block
+// came from the session pass.
+//
+// Each pass gets its own copy of valCtx since the processor writes to it; the winning
+// copy is written back so callers see the same context state as the sequential flow.
+//
+// The session pass runs muted (SkipThreat) so a request the bare pass blocks is not
+// reported twice; when the session verdict wins, reportSessionVerdict reports it.
+func (s *Service) validateWithSessionPass(
+	valCtx *mcp.ValidationContext,
+	sessionID, barePayload string,
+	summaryPayload func() (string, bool),
+	validate func(vc *mcp.ValidationContext, payload string) (*mcp.ProcessResult, string, string, error),
+) (out passOutcome, sessionDrivenBlock bool) {
+	bareCtx := *valCtx
+	bareCtx.SessionID = ""
+
+	sessionEnabled := s.config != nil && s.config.SessionEnabled
+	sessCtx := *valCtx
+	sessCtx.SessionID = sessionID
+	sessCtx.SkipThreat = true
+	// Keeps request-side redaction results on ProcessResult.PendingThreatReports
+	// instead of sending them, so a winning session pass can report them exactly.
+	sessCtx.DeferRequestThreatReport = true
+	// Buffered so the goroutine never blocks when a blocking bare verdict returns early.
+	sessCh := make(chan passOutcome, 1)
+	if sessionEnabled {
+		go func() {
+			defer func() {
+				if p := recover(); p != nil {
+					s.logger.Error("Session summary validation pass panicked",
+						zap.String("sessionID", sessionID),
+						zap.Any("panic", p))
+					sessCh <- passOutcome{ran: true, fromSession: true, err: fmt.Errorf("session summary pass panicked: %v", p)}
+				}
+			}()
+			withSummary, ok := summaryPayload()
+			if !ok {
+				sessCh <- passOutcome{}
+				return
+			}
+			s.logger.Info("Session summary changed payload, running summary validation pass",
+				zap.String("sessionID", sessionID))
+			result, eval, pre, err := validate(&sessCtx, withSummary)
+			sessCh <- passOutcome{result: result, evalPayload: eval, preRedactionPayload: pre, err: err, ran: true, fromSession: true}
+		}()
+	}
+
+	result, eval, pre, err := validate(&bareCtx, barePayload)
+	bare := passOutcome{result: result, evalPayload: eval, preRedactionPayload: pre, err: err, ran: true}
+	if err != nil || result.IsBlocked || !sessionEnabled {
+		*valCtx = bareCtx
+		return bare, false
+	}
+
+	sess := <-sessCh
+	if !sess.ran {
+		*valCtx = bareCtx
+		return bare, false
+	}
+	// Restore the reporting flags so callers that report from valCtx behave as before.
+	sessCtx.SkipThreat = valCtx.SkipThreat
+	sessCtx.DeferRequestThreatReport = valCtx.DeferRequestThreatReport
+	*valCtx = sessCtx
+	if sess.err != nil {
+		return sess, false
+	}
+	s.reportSessionVerdict(valCtx, sess.result, result.ModifiedPayload != "")
+	return sess, sess.result.IsBlocked
+}
+
+// reportSessionVerdict reports what a winning (muted) session pass found: its block,
+// or else its redactions. Redactions are skipped when the bare pass already redacted,
+// since the bare pass reported that finding itself. reportCtx is the session pass's
+// context, which already carries the payloads that pass evaluated and produced.
+func (s *Service) reportSessionVerdict(reportCtx *mcp.ValidationContext, result *mcp.ProcessResult, bareRedacted bool) {
+	if s.processor == nil || result == nil {
+		return
+	}
+	var reports []*mcp.ValidationResult
+	switch {
+	case result.IsBlocked:
+		reports = []*mcp.ValidationResult{{Allowed: false, Metadata: result.Metadata, Behaviour: result.Behaviour}}
+	case bareRedacted:
+	case len(result.PendingThreatReports) > 0:
+		reports = result.PendingThreatReports
+	case result.ModifiedPayload != "" && result.Metadata.PolicyName != "":
+		// Response-side redactions are never deferred; rebuild from the merged result.
+		// reportCtx.ResponsePayload already holds the redacted response.
+		reports = []*mcp.ValidationResult{{Allowed: true, Modified: true, Metadata: result.Metadata, Behaviour: result.Behaviour}}
+	}
+	if len(reports) == 0 {
+		return
+	}
+	s.processor.ReportPendingRequestThreats(reportCtx, reports)
+}
+
 // ValidateRequest validates a request against guardrail policies. Returns (result,
 // activityID, err); activityID is non-empty only for a pending Human Approval verdict.
 func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRequestParams, sessionID string, requestID string) (*mcp.ValidationResult, string, error) {
@@ -1836,7 +2272,8 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
-	if s.skipPaths.enabled() {
+	// A request that names policies is never path-skipped: named policies are always enforced.
+	if s.skipPaths.enabled() && strings.TrimSpace(params.PolicyName) == "" {
 		host := hostFromRequestHeaders(params.RequestHeaders)
 		if s.skipPaths.shouldSkip(host, params.Path) {
 			s.logger.Info("ValidateRequest - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
@@ -1854,23 +2291,15 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// 	return result, "", nil
 	// }
 
-	// Track request and generate summary asynchronously
-	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
-
-	// Inject session summary into payload if available
-	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
-	if payloadToValidate != payload {
-		s.logger.Info("ValidateRequest - payload modified by session summary injection",
-			zap.String("sessionID", sessionID))
-	}
+	session.TrackRequestOnly(s.sessionMgr, sessionID, requestID, payload)
 
 	s.schemaFetcher.RefreshIfNeeded()
 
-	payloadToValidate = s.extractPayloadForValidation(payloadToValidate, params.Method, params.Path, true)
+	payloadBare := s.extractPayloadForValidation(payload, params.Method, params.Path, true)
 	s.logger.Info("ValidateRequest - payload prepared for validation",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
-		zap.String("payloadToValidate", payloadToValidate))
+		zap.String("payloadBare", payloadBare))
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
@@ -1906,11 +2335,14 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int64("latencyMs", time.Since(policiesStart).Milliseconds()))
 
 	// Create validation context with full request metadata (matching batch flow)
-	valCtx := s.validationContextFromParams(params, sessionID, payloadToValidate, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
+	valCtx := s.validationContextFromParams(params, sessionID, payloadBare, params.ResponsePayload, "ValidateRequest", mcpAllowedHostList, compiledRules)
 
-	// Narrow to the policies that apply to this server/device/user so all subsequent
-	// checks only fire for rules that belong to them.
-	policies = s.applicablePolicies(policies, valCtx)
+	// Narrow to the policies that apply to this server/device/user (or that the request names)
+	// so all subsequent checks only fire for rules that belong to them.
+	policies, ok := s.enforcedPolicies(policies, valCtx, params.PolicyName)
+	if !ok {
+		return &mcp.ValidationResult{Allowed: true, ModifiedPayload: payload}, "", nil
+	}
 
 	// [GUARDRAIL_FLOW] 2/3 — policies that APPLY to this request after server/device/approval filtering.
 	s.logger.Info("[GUARDRAIL_FLOW] policies applied to request",
@@ -1922,16 +2354,23 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
 	// not block requests arriving on server B).
-	if policyName, blocked := s.resolvePersonalAccountBlock(policies, valCtx.Tag, valCtx.RequestHeaders, params.Path, sessionID); blocked {
-		result := s.reportAndBlockPersonalAccount(ctx, params, payloadToValidate, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName))
-		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+	if policyName, blocked := s.resolvePersonalAccountBlock(policies, valCtx.Tag, valCtx.FullRequest, params.Path, sessionID); blocked {
+		result := s.reportAndBlockPersonalAccount(ctx, params, payloadBare, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName), severityForPolicy(policies, policyName))
+		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadBare, sessionID)
+		return result, activityID, nil
+	}
+
+	// Public-share guardrail: block a share request that sets public visibility.
+	if policyName, blocked := s.resolvePublicShareBlock(policies, params.Path, params.Method, payloadBare, sessionID); blocked {
+		result := s.reportAndBlockPublicShare(params, payloadBare, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName), severityForPolicy(policies, policyName))
+		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadBare, sessionID)
 		return result, activityID, nil
 	}
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
 	// policies scoped to this server are considered.
-	if blockResult := s.checkBlockedHost(params, valCtx, payloadToValidate, sessionID, requestID, policies); blockResult != nil {
-		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadToValidate, sessionID)
+	if blockResult := s.checkBlockedHost(params, valCtx, payloadBare, sessionID, requestID, policies); blockResult != nil {
+		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadBare, sessionID)
 		return blockResult, activityID, nil
 	}
 
@@ -1956,30 +2395,40 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	// Redact any configured ignore-phrases before the enforcement library ever sees the
-	// text — see ValidateRequest's plan-doc note on the shared-payload trade-off. Shared
-	// with ValidateResponse via redactIgnorePhrasesForEvaluation/reconcileIgnorePhraseRedaction.
-	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(payloadToValidate, policies, "ValidateRequest", sessionID)
-	payloadToValidate = payloadForEvaluation
-
-	// Use the default processor - skipThreat is passed via ValidationContext
 	processStart := time.Now()
 	procCtx, cancelProc := s.withValidationDeadline(ctx)
 	defer cancelProc()
-	processResult, err := s.processor.ProcessRequestParallel(procCtx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+
+	validate := func(vc *mcp.ValidationContext, extractedPayload string) (*mcp.ProcessResult, string, string, error) {
+		eval, pre := s.redactIgnorePhrasesForEvaluation(extractedPayload, policies, "ValidateRequest", sessionID)
+		vc.RequestPayload = eval
+		result, err := s.processor.ProcessRequestParallel(procCtx, eval, vc, policies, auditPolicies, hasAuditRules)
+		return result, eval, pre, err
+	}
+	summaryPayload := func() (string, bool) {
+		rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+		if rawWithSummary == payload {
+			return "", false
+		}
+		return s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, true), true
+	}
+
+	// Bare and session-summary passes run concurrently; a blocking bare verdict wins.
+	outcome, sessionDrivenBlock := s.validateWithSessionPass(valCtx, sessionID, payloadBare, summaryPayload, validate)
+	processResult, evalPayload, preRedactionPayload, err := outcome.result, outcome.evalPayload, outcome.preRedactionPayload, outcome.err
 	if err != nil {
 		s.logger.Error("ValidateRequest - ProcessRequestParallel failed",
-			zap.String("path", params.Path),
-			zap.String("method", params.Method),
-			zap.String("account", params.AktoAccountID),
 			zap.String("sessionID", sessionID),
 			zap.Int64("latencyMs", time.Since(processStart).Milliseconds()),
 			zap.Error(err))
 		return nil, "", fmt.Errorf("failed to process request: %w", err)
 	}
-
-	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, payloadToValidate, preRedactionPayload, "ValidateRequest", sessionID)
+	if outcome.fromSession {
+		s.logger.Info("ValidateRequest - session summary payload validated",
+			zap.String("sessionID", sessionID),
+			zap.String("evalPayload", evalPayload))
+	}
+	finalPayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, evalPayload, preRedactionPayload, "ValidateRequest", sessionID)
 
 	s.logger.Info("ValidateRequest - ProcessRequestParallel result",
 		zap.String("path", params.Path),
@@ -2001,7 +2450,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	}
 
 	// Track blocked response if request was blocked
-	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult)
+	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult, sessionDrivenBlock)
 
 	// Convert ProcessResult to ValidationResult. finalPayload is processResult.ModifiedPayload
 	// with any ignore-phrase placeholders reconciled back to real text (or discarded in
@@ -2050,12 +2499,17 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 			zap.Bool("allowed", result.Allowed))
 	}
 
-	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadToValidate, sessionID)
+	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadBare, sessionID)
 	// Browser-extension traffic that inlined file-attachment content can only be enforced by
 	// blocking — a mask or alert verdict is unenforceable on that payload shape. Skipped for a
 	// pending approval, which owns its own response. See upgradeBrowserAttachmentVerdict.
 	if activityID == "" {
 		s.upgradeBrowserAttachmentVerdict(result, params, sessionID)
+	}
+	if activityID == "" && session.ShouldGenerateRequestSummary(result) {
+		if text := session.RequestSummaryInput(payload, finalPayload, result); text != "" {
+			session.GenerateSummaryAsync(s.sessionMgr, s.logger, sessionID, text, true)
+		}
 	}
 	return result, activityID, nil
 }
@@ -2082,7 +2536,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("aktoVxlanId", params.AktoVxlanID),
 		zap.Bool("skipThreat", params.EffectiveSkipThreat()))
 
-	if s.skipPaths.enabled() {
+	// A request that names policies is never path-skipped: named policies are always enforced.
+	if s.skipPaths.enabled() && strings.TrimSpace(params.PolicyName) == "" {
 		host := hostFromRequestHeaders(params.RequestHeaders)
 		if s.skipPaths.shouldSkip(host, params.Path) {
 			s.logger.Info("ValidateResponse - host+path in GUARDRAILS_SKIP_PATHS, skipping guardrails",
@@ -2129,8 +2584,11 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 	// Create validation context with full request metadata (matching batch flow)
 	valCtx := s.validationContextFromParams(params, sessionID, params.RequestPayload, responseBody, "ValidateResponse", mcpAllowedHostList, compiledRules)
 
-	// Narrow to the policies that apply to this server/device/user.
-	policies = s.applicablePolicies(policies, valCtx)
+	// Narrow to the policies that apply to this server/device/user (or that the request names).
+	policies, ok := s.enforcedPolicies(policies, valCtx, params.PolicyName)
+	if !ok {
+		return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, "", nil
+	}
 
 	s.logger.Info("ValidateResponse - calling ProcessResponse",
 		zap.String("path", params.Path),
@@ -2143,22 +2601,32 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.Int("reqHeadersCount", len(valCtx.RequestHeaders)),
 		zap.Int("respHeadersCount", len(valCtx.ResponseHeaders)))
 
-	responseBodyForValidation := s.extractPayloadForValidation(responseBody, params.Method, params.Path, false)
+	responseBodyBare := s.extractPayloadForValidation(responseBody, params.Method, params.Path, false)
 	s.logger.Info("ValidateResponse - payload prepared for validation",
 		zap.String("path", params.Path),
 		zap.String("method", params.Method),
-		zap.String("payloadToValidate", responseBodyForValidation))
+		zap.String("payloadToValidate", responseBodyBare))
 
-	// Redact any configured ignore-phrases before the enforcement library ever sees the
-	// text — see ValidateRequest for the full rationale and the shared-payload trade-off.
-	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluation(responseBodyForValidation, policies, "ValidateResponse", sessionID)
-	responseBodyForValidation = payloadForEvaluation
-
-	// Use processor's ProcessResponse method with external policies
 	processStart := time.Now()
 	procCtx, cancelProc := s.withValidationDeadline(ctx)
 	defer cancelProc()
-	processResult, err := s.processor.ProcessResponseParallel(procCtx, responseBodyForValidation, valCtx, policies)
+
+	validate := func(vc *mcp.ValidationContext, extractedPayload string) (*mcp.ProcessResult, string, string, error) {
+		eval, pre := s.redactIgnorePhrasesForEvaluation(extractedPayload, policies, "ValidateResponse", sessionID)
+		result, err := s.processor.ProcessResponseParallel(procCtx, eval, vc, policies)
+		return result, eval, pre, err
+	}
+	summaryPayload := func() (string, bool) {
+		rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, responseBody, sessionID)
+		if rawWithSummary == responseBody {
+			return "", false
+		}
+		return s.extractPayloadForValidation(rawWithSummary, params.Method, params.Path, false), true
+	}
+
+	// Bare and session-summary passes run concurrently; a blocking bare verdict wins.
+	outcome, sessionContextBlock := s.validateWithSessionPass(valCtx, sessionID, responseBodyBare, summaryPayload, validate)
+	processResult, evalPayload, preRedactionPayload, err := outcome.result, outcome.evalPayload, outcome.preRedactionPayload, outcome.err
 	if err != nil {
 		s.logger.Error("ValidateResponse - ProcessResponseParallel failed",
 			zap.String("path", params.Path),
@@ -2169,9 +2637,13 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			zap.Error(err))
 		return nil, "", fmt.Errorf("failed to process response: %w", err)
 	}
+	if outcome.fromSession {
+		s.logger.Info("ValidateResponse - session summary payload validated",
+			zap.String("sessionID", sessionID),
+			zap.String("evalPayload", evalPayload))
+	}
 
-	// Reconcile ignore-phrase redaction: the real origin must never see a placeholder.
-	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, responseBodyForValidation, preRedactionPayload, "ValidateResponse", sessionID)
+	finalResponsePayload := s.reconcileIgnorePhraseRedaction(processResult.ModifiedPayload, evalPayload, preRedactionPayload, "ValidateResponse", sessionID)
 
 	s.logger.Info("ValidateResponse - ProcessResponseParallel result",
 		zap.String("path", params.Path),
@@ -2180,9 +2652,13 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.Bool("isBlocked", processResult.IsBlocked),
 		zap.Int64("latencyMs", time.Since(processStart).Milliseconds()))
 
-	// Track response and generate summary
-	isMalicious := processResult.IsBlocked
-	session.TrackResponseAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, responseBody, isMalicious)
+	responseAllowed := !processResult.IsBlocked
+	responseModified := finalResponsePayload != "" && finalResponsePayload != responseBody
+	session.TrackResponseAndGenerateSummary(
+		s.sessionMgr, s.logger, sessionID, requestID, responseBody,
+		sessionContextBlock, processResult,
+		finalResponsePayload, responseAllowed, responseModified,
+	)
 
 	// Anomaly detection: record error if tool call returned error status (4xx/5xx).
 	// Uses the same filtered policies from the request path.
@@ -2192,8 +2668,8 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 
 	// Convert ProcessResult to ValidationResult for backward compatibility
 	result := &mcp.ValidationResult{
-		Allowed:         !processResult.IsBlocked,
-		Modified:        finalResponsePayload != "" && finalResponsePayload != responseBody,
+		Allowed:         responseAllowed,
+		Modified:        responseModified,
 		ModifiedPayload: finalResponsePayload,
 		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
 		Metadata:        processResult.Metadata,
@@ -2212,7 +2688,7 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 		zap.String("reason", result.Reason),
 		zap.Int64("totalLatencyMs", time.Since(start).Milliseconds()))
 
-	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, responseBodyForValidation, sessionID)
+	result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, responseBodyBare, sessionID)
 	return result, activityID, nil
 }
 
@@ -2239,11 +2715,7 @@ func (s *Service) ValidateRequestWithPolicy(
 	// 	return result, nil
 	// }
 
-	// Track request and generate summary asynchronously
-	session.TrackRequestAndGenerateSummary(s.sessionMgr, s.logger, sessionID, requestID, payload)
-
-	// Inject session summary into payload if available
-	payloadToValidate := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+	session.TrackRequestOnly(s.sessionMgr, sessionID, requestID, payload)
 
 	// Log the provided policy structure before conversion
 	policyJSON, _ := json.Marshal(providedPolicy)
@@ -2316,23 +2788,32 @@ func (s *Service) ValidateRequestWithPolicy(
 		zap.Int("auditPoliciesCount", len(auditPolicies)),
 		zap.Bool("hasAuditRules", hasAuditRules),
 		zap.Bool("skipThreat", skipThreat),
-		zap.String("payload", payloadToValidate),
 		zap.Int("requestFiltersCount", len(providedPolicyConverted.Filters.RequestPayload)),
 		zap.Int("responseFiltersCount", len(providedPolicyConverted.Filters.ResponsePayload)))
 
-	// Redact any configured ignore-phrases before the enforcement library ever sees the
-	// text — same rationale as ValidateRequest, but the playground evaluates a single
-	// one-off provided policy that never goes through the policy cache, so matchers are
-	// compiled fresh for just this one policy rather than looked up from it.
 	matchersByPolicy := compileIgnorePhraseMatchersByPolicy(policies)
-	payloadForEvaluation, preRedactionPayload := s.redactIgnorePhrasesForEvaluationWithMatchers(payloadToValidate, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
-	payloadToValidate = payloadForEvaluation
 
-	// Use the default processor - skipThreat is passed via ValidationContext
-	processResult, err := s.processor.ProcessRequest(ctx, payloadToValidate, valCtx, policies, auditPolicies, hasAuditRules)
+	validate := func(vc *mcp.ValidationContext, candidatePayload string) (*mcp.ProcessResult, string, string, error) {
+		eval, pre := s.redactIgnorePhrasesForEvaluationWithMatchers(candidatePayload, policies, matchersByPolicy, "ValidateRequestWithPolicy", sessionID)
+		result, err := s.processor.ProcessRequest(ctx, eval, vc, policies, auditPolicies, hasAuditRules)
+		return result, eval, pre, err
+	}
+	summaryPayload := func() (string, bool) {
+		rawWithSummary := session.GetModifiedPayloadWithSummary(s.sessionMgr, s.logger, payload, sessionID)
+		return rawWithSummary, rawWithSummary != payload
+	}
+
+	// Bare and session-summary passes run concurrently; a blocking bare verdict wins.
+	outcome, sessionDrivenBlock := s.validateWithSessionPass(valCtx, sessionID, payload, summaryPayload, validate)
+	processResult, payloadToValidate, preRedactionPayload, err := outcome.result, outcome.evalPayload, outcome.preRedactionPayload, outcome.err
 	if err != nil {
 		s.logger.Error("ProcessRequest failed", zap.Error(err))
 		return nil, fmt.Errorf("failed to process request: %w", err)
+	}
+	if outcome.fromSession {
+		s.logger.Info("ValidateRequestWithPolicy - session summary payload validated",
+			zap.String("sessionID", sessionID),
+			zap.String("payloadToValidate", payloadToValidate))
 	}
 
 	// Log detailed ProcessRequest result
@@ -2353,16 +2834,24 @@ func (s *Service) ValidateRequestWithPolicy(
 		Allowed:         !processResult.IsBlocked,
 		Modified:        finalPayload != "" && finalPayload != preRedactionPayload,
 		ModifiedPayload: finalPayload,
-		Reason:          "",                     // TODO: Extract from BlockedResponse when library is updated
-		Metadata:        types.ThreatMetadata{}, // Empty for now - library will populate later
+		Reason:          extractReasonFromBlockedResponse(processResult.BlockedResponse),
+		Metadata:        processResult.Metadata,
 		Behaviour:       processResult.Behaviour,
 	}
+
+	session.TrackBlockedResponse(s.sessionMgr, s.logger, sessionID, requestID, processResult, sessionDrivenBlock)
 
 	s.logger.Info("Request validation completed with provided policy",
 		zap.Bool("allowed", result.Allowed),
 		zap.Bool("modified", result.Modified),
 		zap.String("behaviour", result.Behaviour),
 		zap.String("sessionID", sessionID))
+
+	if session.ShouldGenerateRequestSummary(result) {
+		if text := session.RequestSummaryInput(payload, finalPayload, result); text != "" {
+			session.GenerateSummaryAsync(s.sessionMgr, s.logger, sessionID, text, true)
+		}
+	}
 
 	return result, nil
 }
@@ -2477,6 +2966,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		// Filter policies by MCP server name for this specific batch item
 		itemPolicies := s.filterPoliciesByMcpServer(policies, mcpServerName)
 		itemPolicies = s.filterPoliciesByDevice(itemPolicies, mcpServerName, reqHeaders)
+		itemPolicies = s.filterPoliciesByAccountType(itemPolicies, valCtx)
 		// Bypass "approval" policies whose server is already approved (allow, no threat).
 		itemPolicies = s.filterApprovedServers(itemPolicies, mcpServerName)
 		s.logger.Debug("ValidateBatch - applicable policies for server",
@@ -2500,8 +2990,9 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			// Personal-account guardrail — shared with ValidateRequest via
 			// resolvePersonalAccountBlock so the inline and ingest paths enforce it
 			// identically. Blocking here bypasses the normal payload processing below.
-			if policyName, blocked := s.resolvePersonalAccountBlock(itemPolicies, data.Tag, reqHeaders, data.Path, ""); blocked {
+			if policyName, blocked := s.resolvePersonalAccountBlock(itemPolicies, data.Tag, valCtx.FullRequest, data.Path, ""); blocked {
 				behaviour := behaviourForPolicy(itemPolicies, policyName)
+				severity := severityForPolicy(itemPolicies, policyName)
 				blockReason := personalAccountReason(behaviour)
 				reqResult = &mcp.ValidationResult{
 					Allowed:   false,
@@ -2510,7 +3001,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 					Metadata: types.ThreatMetadata{
 						PolicyName:   policyName,
 						RuleViolated: "BlockPersonalAccounts",
-						Severity:     "MEDIUM",
+						Severity:     severity,
 						Reason:       blockReason,
 					},
 				}
@@ -2518,7 +3009,32 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 				result.RequestReason = blockReason
 				result.RequestBehaviour = behaviour
 				s.reportPersonalAccountThreat(reqPayload, reqHeaders, data.IP, data.Path, data.Method,
-					data.StatusCode, itemContextSource, mcpServerName, "", policyName, behaviour, blockReason, skipThreat)
+					data.StatusCode, itemContextSource, mcpServerName, "", policyName, behaviour, severity, blockReason, skipThreat)
+				results = append(results, result)
+				continue
+			}
+
+			// Public-share guardrail — shared with ValidateRequest via resolvePublicShareBlock.
+			if policyName, blocked := s.resolvePublicShareBlock(itemPolicies, data.Path, data.Method, reqPayload, ""); blocked {
+				behaviour := behaviourForPolicy(itemPolicies, policyName)
+				severity := severityForPolicy(itemPolicies, policyName)
+				blockReason := publicShareReason(behaviour)
+				reqResult = &mcp.ValidationResult{
+					Allowed:   false,
+					Reason:    blockReason,
+					Behaviour: behaviour,
+					Metadata: types.ThreatMetadata{
+						PolicyName:   policyName,
+						RuleViolated: "BlockPublicShare",
+						Severity:     severity,
+						Reason:       blockReason,
+					},
+				}
+				result.RequestAllowed = false
+				result.RequestReason = blockReason
+				result.RequestBehaviour = behaviour
+				s.reportPublicShareThreat(reqPayload, reqHeaders, data.IP, data.Path, data.Method,
+					data.StatusCode, itemContextSource, mcpServerName, "", policyName, behaviour, severity, blockReason, skipThreat)
 				results = append(results, result)
 				continue
 			}

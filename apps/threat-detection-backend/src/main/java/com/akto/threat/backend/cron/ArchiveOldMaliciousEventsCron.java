@@ -3,6 +3,7 @@ package com.akto.threat.backend.cron;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dao.context.Context;
+import com.akto.util.DbNames;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatConfigurationDao;
 import com.mongodb.client.MongoClient;
@@ -61,7 +62,8 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
         try (MongoCursor<String> dbNames = mongoClient.listDatabaseNames().cursor()) {
             while (dbNames.hasNext()) {
-                String dbName = dbNames.next();
+                // Physical name -> the name the code uses; null if it is not one of ours.
+                String dbName = com.akto.util.DbNames.logical(dbNames.next());
                 if (shouldSkipDatabase(dbName)) continue;
 
                 Integer accId = null;
@@ -91,6 +93,8 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                 || "admin".equals(dbName)
                 || "local".equals(dbName)
                 || "config".equals(dbName)
+                || DbNames.COMMON.equals(dbName)
+                || DbNames.BILLING.equals(dbName)
                 || "1669322524".equals(dbName);
     }
 

@@ -192,9 +192,20 @@ public class ProfileAction extends UserAction {
         ));
 
         BasicDBObject scopeRoleMapping = new BasicDBObject();
+        // base role per product (custom roles resolved), so the UI checks the role of the product it is in
+        BasicDBObject scopeBaseRoleMapping = new BasicDBObject();
+        // threat access per product with custom role changes applied, so the UI shows threat pages a custom role allows
+        BasicDBObject scopeThreatAccess = new BasicDBObject();
         if(userRbac.getScopeRoleMapping() != null){
             for(String key : userRbac.getScopeRoleMapping().keySet()){
                 scopeRoleMapping.append(key, userRbac.getScopeRoleMapping().get(key));
+                try {
+                    RBAC.Role baseRole = userRbac.getRoleForScope(GlobalEnums.CONTEXT_SOURCE.valueOf(key));
+                    if (baseRole != null) scopeBaseRoleMapping.append(key, baseRole.name());
+                    scopeThreatAccess.append(key, RBACDao.accessFor(userRbac.getScopeRoleMapping().get(key),
+                            com.akto.dto.rbac.RbacEnums.Feature.THREAT_PROTECTION, false).name());
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -220,7 +231,9 @@ public class ProfileAction extends UserAction {
                 .append("organizationName", orgName)
                 .append("isAwsWafIntegrated", awsWafCount != 0)
                 .append("isCloudflareWafIntegrated", cloudflareWafCount != 0)
-                .append("scopeRoleMapping", scopeRoleMapping);
+                .append("scopeRoleMapping", scopeRoleMapping)
+                .append("scopeBaseRoleMapping", scopeBaseRoleMapping)
+                .append("scopeThreatAccess", scopeThreatAccess);
 
         boolean inviteDisabledForSSO = com.akto.utils.Utils.allowNewUserInviteViaDashboard(sessionAccId, user);
         userDetails.append("inviteDisabledForSSO", inviteDisabledForSSO);

@@ -18,6 +18,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
@@ -103,6 +105,17 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
+
+        // Partial: only classified tool rows are indexed, so the Argus posture tile's capability
+        // counts walk an index sized by tools rather than by every api_info document.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.ascending(ApiInfo.TOOL_INFO_CAPABILITY),
+            new IndexOptions()
+                .name("capability_1_partial_exists")
+                .partialFilterExpression(Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY, true)));
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] {ApiInfo.TOOL_INFO_CALCULATED_AT }, true);
     }
     
 
@@ -243,6 +256,30 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 BasicDBObject id = (BasicDBObject) doc.get("_id");
                 int lastSeen = doc.get(ApiInfo.LAST_SEEN) != null ? doc.getInt(ApiInfo.LAST_SEEN) : 0;
                 result.put(id.getInt("apiCollectionId"), lastSeen);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
+    public Map<Integer, Integer> getCountsByCollection(List<Integer> collectionIds, Bson extraFilter) {
+        Map<Integer, Integer> result = new HashMap<>();
+        if (collectionIds == null || collectionIds.isEmpty()) return result;
+        Bson match = Filters.in(ApiInfo.ID_API_COLLECTION_ID, collectionIds);
+        if (extraFilter != null) match = Filters.and(match, extraFilter);
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(match));
+        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$" + ApiInfo.ID_API_COLLECTION_ID);
+        pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+
+        MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            try {
+                BasicDBObject doc = cursor.next();
+                BasicDBObject id = (BasicDBObject) doc.get("_id");
+                result.put(id.getInt("apiCollectionId"), doc.getInt("count", 0));
             } catch (Exception e) {
                 e.printStackTrace();
             }

@@ -29,6 +29,7 @@ import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.sso.SAMLConfig;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -49,6 +50,7 @@ import com.akto.utils.billing.OrganizationUtils;
 import com.akto.utils.crons.OrganizationCache;
 import com.akto.utils.sso.CustomSamlSettings;
 import com.akto.util.Pair;
+import com.akto.utils.SsoRoleMapping;
 import com.akto.utils.Utils;
 import com.akto.utils.sso.SsoUtils;
 import com.auth0.Tokens;
@@ -294,7 +296,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping before init: " + this.scopeRoleMapping);
                 if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName(), pendingInviteCode.getAccountId(), email);
+                    this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, inviteRoleOrMember(pendingInviteCode), pendingInviteCode.getAccountId(), email);
                     logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after init: " + this.scopeRoleMapping);
                 }
                 logger.infoAndAddToDb("[registerViaAuth0] scopeRoleMapping after ensuring complete: " + this.scopeRoleMapping);
@@ -383,7 +385,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping before init: " + this.scopeRoleMapping);
             if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName(), invitedToAccountId, email);
+                this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, inviteRoleOrMember(pendingInviteCode), invitedToAccountId, email);
                 logger.infoAndAddToDb("[registerViaEmail] scopeRoleMapping after init: " + this.scopeRoleMapping);
             }
             // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -603,7 +605,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping before init: " + this.scopeRoleMapping);
                     if (this.scopeRoleMapping == null || this.scopeRoleMapping.isEmpty()) {
 
-                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, RBAC.Role.MEMBER.getName(), accountId, email);
+                        this.scopeRoleMapping = RBAC.initializeScopeRoleMapping(this.scopeRoleMapping, inviteRoleOrMember(pendingInviteCode), accountId, email);
                         logger.infoAndAddToDb("[registerViaOkta] scopeRoleMapping after init: " + this.scopeRoleMapping);
                     }
                     // Ensure all scopes are present with NO_ACCESS as default for unmapped scopes
@@ -620,7 +622,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             logger.infoAndAddToDb("[Okta SSO] email=" + email + ", username=" + username + ", oktaGroups=" + oktaGroups
                     + ", dashboardRole=" + resolvedRole);
 
-            createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
+            /*
+             * Opt-in: with "remove access for users in none of the mapped groups" on, roles come from the explicit
+             * group mapping the same way as every other SSO provider. Off (default), Okta logins work exactly as before.
+             */
+            Map<String, String> groupScopeRoleMapping = null;
+            if (oktaConfig.isRemoveAccessWithoutGroup() && accountId == oktaConfig.getAccountId() && oktaGroups != null) {
+                groupScopeRoleMapping = SsoRoleMapping.rolesForLogin(email, accountId, oktaGroupToAktoUserRoleMap, oktaGroups,
+                        true, !oktaGroups.isEmpty());
+            }
+            if (groupScopeRoleMapping != null) {
+                boolean rolesChanged = SsoRoleMapping.auditRoleChange(email, accountId, groupScopeRoleMapping, "authorization-code/callback", servletRequest);
+                this.scopeRoleMapping = groupScopeRoleMapping;
+                createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), null, groupScopeRoleMapping);
+                if (rolesChanged) SsoRoleMapping.clearUserCache(email, accountId);
+            } else {
+                createUserAndRedirect(email, username, new SignupInfo.OktaSignupInfo(accessToken, username), accountId, Config.ConfigType.OKTA.toString(), resolvedRole, this.scopeRoleMapping);
+            }
             code = "";
         } catch (Exception e) {
             logger.errorAndAddToDb("Error while signing in via okta sso: " + e.getMessage(), LogDb.DASHBOARD);
@@ -782,6 +800,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
         }
         return result;
     }
+
+    // SAML attributes that carry the user's groups (Azure AD sends the first one)
+    private static final List<String> SAML_GROUPS_ATTRIBUTES = Arrays.asList(
+            "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups", "groups");
 
     private String resolveHighestPriorityRole(List<String> keys, Map<String, String> mapping) {
         if (keys == null || keys.isEmpty() || mapping == null || mapping.isEmpty()) return null;
@@ -1144,6 +1166,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             }
             String useremail = null;
             String username = null;
+            List<String> samlGroups = new ArrayList<>();
+            boolean samlGroupsComplete = false;
             List<String> errors = auth.getErrors();
             if (!errors.isEmpty()) {
                 logger.errorAndAddToDb("Error in authenticating azure user \n" + auth.getLastErrorReason(), LogDb.DASHBOARD);
@@ -1153,6 +1177,18 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 if (attributes.isEmpty()) {
                     logger.error("Returning as attributes were not found");
                     return ERROR.toUpperCase();
+                }
+                for (String groupsAttribute : SAML_GROUPS_ATTRIBUTES) {
+                    if (attributes.get(groupsAttribute) != null) {
+                        samlGroups.addAll(attributes.get(groupsAttribute));
+                        samlGroupsComplete = true;
+                    }
+                }
+                // over 150 groups Azure AD sends a link instead of the groups, so the list is not complete
+                for (String attribute : attributes.keySet()) {
+                    if (attribute.endsWith("groups.link")) {
+                        samlGroupsComplete = false;
+                    }
                 }
                 String nameId = auth.getNameId();
                 useremail = nameId;
@@ -1165,7 +1201,23 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if(invitedToAccountId > 0){
                 setAccountId(invitedToAccountId);
             }
-            createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null);
+
+            // Role from the SSO group -> role mapping. Only for the account this SSO config belongs to.
+            Map<String, String> groupScopeRoleMapping = null;
+            if (this.accountId == resolvedAccountId) {
+                groupScopeRoleMapping = SsoRoleMapping.rolesForLogin(useremail, resolvedAccountId, samlConfig.getGroupRoleMapping(),
+                        samlGroups, samlConfig.isRemoveAccessWithoutGroup(), samlGroupsComplete);
+            }
+            logger.infoAndAddToDb("[Azure SSO] email=" + useremail + ", groups=" + samlGroups + ", groupScopeRoleMapping=" + groupScopeRoleMapping);
+
+            if (groupScopeRoleMapping != null) {
+                boolean rolesChanged = SsoRoleMapping.auditRoleChange(useremail, this.accountId, groupScopeRoleMapping, "signup-azure-saml", servletRequest);
+                this.scopeRoleMapping = groupScopeRoleMapping;
+                createUserAndRedirect(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null, groupScopeRoleMapping);
+                if (rolesChanged) SsoRoleMapping.clearUserCache(useremail, this.accountId);
+            } else {
+                createUserAndRedirectWithDefaultRole(useremail, username, signUpInfo, this.accountId, Config.ConfigType.AZURE.toString(), null);
+            }
         } catch (Exception e1) {
             logger.errorAndAddToDb("Error while signing in via azure sso \n" + e1.getMessage(), LogDb.DASHBOARD);
             servletResponse.sendRedirect("/login");
@@ -1296,6 +1348,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 //
 //        return "SUCCESS";
 //    }
+
+    // older invites keep a single role instead of per-product roles; use it for every product
+    private static String inviteRoleOrMember(PendingInviteCode pendingInviteCode) {
+        String role = pendingInviteCode == null ? null : pendingInviteCode.getInviteeRole();
+        return role == null || role.trim().isEmpty() ? RBAC.Role.MEMBER.name() : role;
+    }
 
     private void createUserAndRedirect(String userEmail, String username, SignupInfo signupInfo,
                                        int invitationToAccount, String method, Map<String,String> scopeRoleMapping) throws IOException {

@@ -19,7 +19,9 @@ import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
 import AdvancedPayloadSearch from "../../guardrails/violations/AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "../../guardrails/violations/attributeSearch";
-import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../../components/shared/AllowedAction";
+import { HumanApprovalActions, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
 
 const resourceName = {
   singular: "activity",
@@ -278,6 +280,7 @@ const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLO
 
 function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, onRegisterExport, refreshNonce = 0 }) {
   const location = useLocation();
+  const { canCall } = usePermissions();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -507,7 +510,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
   if (isAgenticSecurityCategory()) {
     guardrailExtraTabs.push({
-      content: <HumanApprovalTabLabel count={pendingHumanApprovalCount} />,
+      // IndexFilters calls .trim() on tab content, so it must be a string (not a node).
+      content: pendingHumanApprovalCount > 0
+        ? `Human Approval (${pendingHumanApprovalCount.toLocaleString()})`
+        : 'Human Approval',
+      badge: 'Beta',
       accessibilityLabel: humanApprovalTabAccessibilityLabel(pendingHumanApprovalCount),
       onAction: () => { setCurrentTab('human_approval'); },
       id: 'human_approval',
@@ -799,6 +806,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
       return {
         content: `${label} ${displayText}`,
+        requires: actionType === 'delete' ? 'api/deleteMaliciousEvents' : 'api/updateMaliciousEventStatus',
         onAction: () => {
           if (useFilters) {
             if (!validateFiltersForBulkOperation(validationType)) return;
@@ -1183,7 +1191,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         // the row's anchor navigation (the "reload"), plus stopPropagation for the row click.
         approveAction: (
           <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
-            <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
+            <AllowedAction allowed={canCall('api/approveServerForPolicy')}>
+              <Button size="slim" onClick={() => openInlineApprove(x)}>Approve</Button>
+            </AllowedAction>
           </div>
         ),
         ...(isHumanApproval && {
@@ -1195,6 +1205,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
                   <HumanApprovalActions
                     pending
                     subtle
+                    allowed={canCall('api/updateMaliciousEventStatus')}
                     onApprove={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.APPROVED)}
                     onBlock={() => handleBulkHumanApproval([x.id], HUMAN_RESPONSE.BLOCKED)}
                   />
@@ -1421,7 +1432,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
   const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
   const headers = getHeaders();
-  if (currentTab === 'needs_approval') {
+  if (currentTab === 'needs_approval' && func.canManageGuardrailPolicies()) {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
   if (currentTab === 'human_approval') {

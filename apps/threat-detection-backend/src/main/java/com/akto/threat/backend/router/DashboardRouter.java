@@ -1,10 +1,13 @@
 package com.akto.threat.backend.router;
 
+import com.akto.threat.backend.utils.ThreatUtils;
+
 import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListGuardrailViolationPayloadsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
@@ -166,6 +169,29 @@ public class DashboardRouter implements ARouter {
 
                 ProtoMessageUtils.toString(
                     dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode, humanResponseFilter)
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/list_guardrail_violation_payloads")
+            .blockingHandler(ctx -> {
+                String contextSource = getContextSourceHeader(ctx);
+
+                RequestBody reqBody = ctx.body();
+                ListGuardrailViolationPayloadsRequest req = ProtoMessageUtils.<
+                    ListGuardrailViolationPayloadsRequest
+                >toProtoMessage(
+                    ListGuardrailViolationPayloadsRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    dsService.listGuardrailViolationPayloads(ctx.get("accountId"), req, contextSource)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
@@ -371,7 +397,9 @@ public class DashboardRouter implements ARouter {
                     threatApiService.getSeverityWiseCount(
                         ctx.get("accountId"),
                         req,
-                        contextSource
+                        contextSource,
+                        ctx.request().getHeader("x-skill-eval-mode"),
+                        ctx.request().getHeader("x-config-eval-mode")
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -496,7 +524,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLatestAttackList(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -525,7 +554,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLatestAttackList(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -664,7 +694,11 @@ public class DashboardRouter implements ARouter {
                         req.getEndTs(),
                         req.getLatestAttackList(),
                         req.getLimit(),
-                        contextSource
+                        contextSource,
+                        req.getStatus(),
+                        ctx.request().getHeader("x-skill-eval-mode"),
+                        ctx.request().getHeader("x-config-eval-mode"),
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -722,7 +756,8 @@ public class DashboardRouter implements ARouter {
                         ctx.get("accountId"),
                         req.getStartTs(),
                         req.getEndTs(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -778,7 +813,8 @@ public class DashboardRouter implements ARouter {
                         req.getStartTs(),
                         req.getEndTs(),
                         req.getLimit(),
-                        contextSource
+                        contextSource,
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

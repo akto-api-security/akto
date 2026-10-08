@@ -11,6 +11,7 @@
 # Controlled by flags in config.env:
 #   ENABLE_PROMPT_HOOKS_VSCODE_COPILOT=true  -- installs UserPromptSubmit/Stop hooks
 #   ENABLE_MCP_HOOKS_VSCODE_COPILOT=true     -- installs PreToolUse/PostToolUse hooks
+#   AKTO_HEARTBEAT_ENABLED=true              -- registers the device with the abstractor (default off)
 #
 # Mirrors: mcp-endpoint-shield/misc/windows/install_vscode_copilot_hooks.ps1 (master branch, full hook set)
 # ========================================================================================

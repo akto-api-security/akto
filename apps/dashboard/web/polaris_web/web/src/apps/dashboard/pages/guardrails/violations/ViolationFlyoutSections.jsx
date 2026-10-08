@@ -18,6 +18,7 @@ import { NoteMinor } from "@shopify/polaris-icons";
 import AssetTopologyGraph from "@/apps/dashboard/pages/observe/agentic/AssetTopologyGraph";
 import DetailGrid from "@/apps/dashboard/pages/observe/agentic/DetailGrid";
 import SampleData from "@/apps/dashboard/components/shared/SampleData";
+import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
 import MarkdownViewer from "@/apps/dashboard/components/shared/MarkdownViewer";
 import { HighlightedText } from "@/apps/dashboard/components/shared/MarkdownComponents";
 import ConversationHistory from "@/apps/dashboard/pages/testing/TestRunResultPage/components/ConversationHistory";
@@ -26,6 +27,8 @@ import { getDashboardCategory, categoryToShortName, isEndpointSecurityCategory }
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import OwaspTag from "@/apps/dashboard/pages/guardrails/components/OwaspTag";
+import { selectContextTurns, useContextWindow } from "@/apps/dashboard/pages/threat_detection/components/NearbyMessages";
+import { promptTextFromPayload } from "./violationsData";
 import ComplianceTags from "@/apps/dashboard/pages/guardrails/components/ComplianceTags";
 
 export function HumanResponseBadge({ response }) {
@@ -74,14 +77,18 @@ export function HumanApprovalTabLabel({ count }) {
     );
 }
 
-export function HumanApprovalActions({ pending, response, onApprove, onBlock, loading, subtle }) {
+export function HumanApprovalActions({ pending, response, onApprove, onBlock, loading, subtle, allowed = true }) {
     if (!pending) {
         return <HumanResponseBadge response={response} />;
     }
     return (
         <>
-            <Button size="slim" primary={!subtle} plain={!!subtle} loading={loading} onClick={onApprove}>Approve</Button>
-            <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Deny</Button>
+            <AllowedAction allowed={allowed}>
+                <Button size="slim" primary={!subtle} plain={!!subtle} loading={loading} onClick={onApprove}>Approve</Button>
+            </AllowedAction>
+            <AllowedAction allowed={allowed}>
+                <Button size="slim" destructive plain={!!subtle} loading={loading} onClick={onBlock}>Deny</Button>
+            </AllowedAction>
         </>
     );
 }
@@ -358,21 +365,67 @@ export function OverviewSection({ row, detail }) {
     );
 }
 
+// ─── Nearby messages ─────────────────────────────────────────────────────────────
+// Same messages as the Threat Activity flyout (shared fetch + selection), but rendered the way
+// this tab renders the flagged prompt: just the prompt text, no chat bubbles or responses.
+
+function NearbyMessagesSection({ host, anchorTimestamp }) {
+    const { contextWindow, loading } = useContextWindow(host, anchorTimestamp);
+    const prompts = useMemo(
+        () => selectContextTurns(contextWindow)
+            .map(({ turn, isAnchor }) => ({ turn, isAnchor, text: promptTextFromPayload(turn?.queryPayload) }))
+            .filter(({ text }) => text),
+        [contextWindow],
+    );
+
+    if (!loading && prompts.length === 0) return null;
+
+    return (
+        <>
+            <Divider />
+            <Box padding="4">
+                <VerticalStack gap="3">
+                    <Text variant="headingMd" color="subdued">Nearby Messages</Text>
+                    {loading
+                        ? <Text variant="bodySm" color="subdued">Loading nearby messages...</Text>
+                        : prompts.map(({ turn, isAnchor, text }, idx) => (
+                            <VerticalStack gap="1" key={idx}>
+                                <HorizontalStack gap="2" blockAlign="center">
+                                    {turn.latestTimestamp ? (
+                                        <Text variant="bodySm" color="subdued">
+                                            {func.epochToDateTime(Math.floor(turn.latestTimestamp / 1000))}
+                                        </Text>
+                                    ) : null}
+                                    {isAnchor && <Badge size="small" status="critical">Current Message</Badge>}
+                                </HorizontalStack>
+                                <HighlightedText text={text} mono />
+                            </VerticalStack>
+                        ))}
+                </VerticalStack>
+            </Box>
+        </>
+    );
+}
+
 // ─── Prompt & Response tab ────────────────────────────────────────────────────────
 
-export function PromptResponseSection({ detail }) {
+export function PromptResponseSection({ detail, host, anchorTimestamp }) {
     const pr = detail?.promptResponse;
     const hasPrompt = !!pr?.promptBody;
     const hasResponse = !!(pr && (pr.behaviour || pr.blockedBy || pr.blockedAt || pr.reason || pr.message));
+    const nearbyMessages = <NearbyMessagesSection host={host} anchorTimestamp={anchorTimestamp} />;
 
     if (!hasPrompt && !hasResponse) {
         return (
-            <Box padding="8">
-                <VerticalStack gap="1" inlineAlign="center">
-                    <Text variant="bodySm" fontWeight="semibold">No prompt or response data</Text>
-                    <Text variant="bodySm" color="subdued">This violation has no captured prompt or response payload.</Text>
-                </VerticalStack>
-            </Box>
+            <VerticalStack gap="0">
+                <Box padding="8">
+                    <VerticalStack gap="1" inlineAlign="center">
+                        <Text variant="bodySm" fontWeight="semibold">No prompt or response data</Text>
+                        <Text variant="bodySm" color="subdued">This violation has no captured prompt or response payload.</Text>
+                    </VerticalStack>
+                </Box>
+                {nearbyMessages}
+            </VerticalStack>
         );
     }
 
@@ -445,6 +498,8 @@ export function PromptResponseSection({ detail }) {
                     )}
                 </VerticalStack>
             </Box>
+
+            {nearbyMessages}
         </VerticalStack>
     );
 }

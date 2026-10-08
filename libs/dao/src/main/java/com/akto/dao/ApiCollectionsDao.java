@@ -73,6 +73,11 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.START_TS }, false);
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.NAME }, true);
+
+        // custom roles' host and tag rules (RuleCollections) read these instead of every collection document
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.HOST_NAME }, true);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ApiCollection.TAGS_STRING + "." + CollectionTags.KEY_NAME, ApiCollection.TAGS_STRING + "." + CollectionTags.VALUE }, true);
     }
 
     public ApiCollection getMeta(int apiCollectionId) {

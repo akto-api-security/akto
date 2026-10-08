@@ -29,6 +29,8 @@ import {
     splitPolicyServers,
     resolveClientKey,
 } from "./serverTargetingUtils";
+import { usePermissions } from "@/util/permissions";
+import AllowedAction from "../../components/shared/AllowedAction";
 
 // Apply ?category= override synchronously before first render — mirrors ThreatReport.jsx/
 // VulnerabilityReport.jsx. A deep-link opened in a fresh tab (e.g. from a violation's
@@ -162,6 +164,8 @@ const sortPinnedSystemPolicies = (systemRows) =>
   });
 
 function GuardrailPolicies() {
+    const canManagePolicies = func.canManageGuardrailPolicies();
+    const { canCall } = usePermissions();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [policyData, setPolicyData] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -615,6 +619,7 @@ function GuardrailPolicies() {
         return [
             {
                 content: `Backfill histor${selectedPolicies.length > 1 ? "ies" : "y"} for ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
+                requires: 'api/startPolicyBackfillReplay',
                 onAction: () => {
                     const selectedRows = tablePolicyData.filter(row => selectedPolicies.includes(row.id));
                     setBackfillPolicies(selectedRows.map(row => ({
@@ -623,8 +628,9 @@ function GuardrailPolicies() {
                     })));
                 },
             },
-            {
+            canManagePolicies && {
                 content: `Delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}`,
+                requires: 'api/deleteGuardrailPolicies',
                 onAction: async () => {
                     const deleteConfirmationMessage = `Are you sure you want to delete ${selectedPolicies.length} polic${selectedPolicies.length > 1 ? "ies" : "y"}?`;
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", async () => {
@@ -639,7 +645,7 @@ function GuardrailPolicies() {
                     });
                 },
             },
-        ];
+        ].filter(Boolean);
     };
 
     const getActionsList = (item) => {
@@ -647,20 +653,21 @@ function GuardrailPolicies() {
         const actionItems = [{
             title: 'Actions',
             items: [
-                {
+                canManagePolicies && {
                     content: isActive ?
                         <span style={{ color: '#D72C0D' }}>Disable policy</span> :
                         <span style={{ color: '#008060' }}>Enable policy</span>,
                     icon: isActive ? CancelMinor : ChecklistMajor,
                     onAction: () => handleToggleStatus(item),
-                    destructive: isActive
+                    destructive: isActive,
+                    requires: 'api/createGuardrailPolicy'
                 },
                 {
                     content: 'View details',
                     icon: ViewMinor,
                     onAction: () => handleEditPolicy(item),
                 }
-            ]
+            ].filter(Boolean)
         }];
         return actionItems;
     };
@@ -690,7 +697,9 @@ function GuardrailPolicies() {
                 negatedLlmServers: guardrailData.negatedLlmServers || false,
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
+                blockedHostsAllowOnly: guardrailData.blockedHostsAllowOnly || false,
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
+                blockPublicShare: guardrailData.blockPublicShare || false,
                 ignorePhrases: guardrailData.ignorePhrases || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 enterpriseLicenseComplianceCategories: guardrailData.enterpriseLicenseComplianceCategories || [],
@@ -739,7 +748,8 @@ function GuardrailPolicies() {
                     : null,
                 url: guardrailData.url || '',
                 confidenceScore: guardrailData.confidenceScore || 0,
-                active: true
+                active: true,
+                skipEnterpriseAccounts: guardrailData.skipEnterpriseAccounts || false
             };
 
             // Prepare request payload with nested policy object
@@ -857,14 +867,16 @@ function GuardrailPolicies() {
             }
             isFirstPage={true}
             secondaryActions={<InsightsEntryButton granted={insights.granted} onClick={insights.handleOpen} label="Atlas Insights" />}
-            primaryAction={
+            primaryAction={canManagePolicies &&
                 <HorizontalStack gap="2">
                     <Popover
                         active={presetsPopoverActive}
                         activator={
-                            <Button disclosure onClick={() => setPresetsPopoverActive(!presetsPopoverActive)}>
-                                Presets
-                            </Button>
+                            <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                                <Button disclosure onClick={() => setPresetsPopoverActive(!presetsPopoverActive)}>
+                                    Presets
+                                </Button>
+                            </AllowedAction>
                         }
                         onClose={() => setPresetsPopoverActive(false)}
                     >
@@ -889,7 +901,9 @@ function GuardrailPolicies() {
                             </Scrollable>
                         </Popover.Pane>
                     </Popover>
-                    <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                    <AllowedAction allowed={canCall('api/createGuardrailPolicy')}>
+                        <Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>
+                    </AllowedAction>
                 </HorizontalStack>
             }
             components={components}
