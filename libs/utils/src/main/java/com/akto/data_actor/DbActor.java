@@ -314,6 +314,10 @@ public class DbActor extends DataActor {
         return DbLayer.findPendingTestingRunResultSummary(now, delta);
     }
 
+    public ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds) {
+        throw new UnsupportedOperationException("claimNextTestWork is not supported via DbActor");
+    }
+
     public TestingRunConfig findTestingRunConfig(int testIdConfig) {
         return DbLayer.findTestingRunConfig(testIdConfig);
     }
