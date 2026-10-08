@@ -307,7 +307,7 @@ const GUARDRAIL_PRESETS = [
         icon: "OWASP Agentic Top 10",
         data: {
             name: "OWASP Top 10 for Agentic Applications",
-            description: "Covers all 10 OWASP Agentic risks: Goal Hijack (ASI01), Tool Misuse (ASI02), Privilege Abuse (ASI03), Supply Chain (ASI04), Code Execution (ASI05), Memory Poisoning (ASI06), Inter-Agent Communication (ASI07), Cascading Failures (ASI08), Trust Exploitation (ASI09) and Rogue Agents (ASI10).",
+            description: "Covers all OWASP Top 10 for Agentic Applications.",
             severity: "HIGH",
             behaviour: "block",
             blockedMessage: "This action has been blocked by Akto Policy for OWASP Top 10 for Agentic Applications compliance.",
@@ -391,7 +391,7 @@ const GUARDRAIL_PRESETS = [
         icon: "OWASP LLM",
         data: {
             name: "OWASP LLM Top 10 Compliance",
-            description: "Covers all 10 OWASP LLM risks (2025): Prompt Injection (LLM01), Data Leakage (LLM02), Supply Chain (LLM03), Poisoning (LLM04), Unsafe Output (LLM05), Excessive Agency (LLM06), Prompt Leakage (LLM07), RAG Abuse (LLM08), Misinformation (LLM09) and Unbounded Consumption (LLM10).",
+            description: "Covers all OWASP Top 10 for LLM Applications.",
             severity: "HIGH",
             behaviour: "block",
             blockedMessage: "This action has been blocked by Akto Policy for OWASP LLM Top 10 compliance.",
