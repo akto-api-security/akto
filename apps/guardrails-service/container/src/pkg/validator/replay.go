@@ -150,7 +150,7 @@ func preparePolicy(p *mcp.GuardrailsPolicy, logger *zap.Logger) preparedPolicy {
 //
 //   - skipThreat is forced on, so replays never write malicious_events.
 //   - sessionID is left empty, which makes CheckAndHandleMaliciousSession,
-//     TrackRequestAndGenerateSummary and GetModifiedPayloadWithSummary no-ops. Do not "improve
+//     TrackRequestOnly and GetModifiedPayloadWithSummary no-ops. Do not "improve
 //     fidelity" by forwarding the original event's session headers: the first item that tripped
 //     the malicious-session check would short-circuit every later item to blocked.
 //   - server/device/approved-server filtering is skipped, because the question is whether the

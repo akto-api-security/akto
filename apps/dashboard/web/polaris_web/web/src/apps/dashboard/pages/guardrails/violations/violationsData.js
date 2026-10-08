@@ -32,6 +32,18 @@ function _parseJson(str) {
     try { return JSON.parse(str); } catch { return null; }
 }
 
+// Some events capture only the raw request body (e.g. {"messages":[...]}) instead of the
+// {requestPayload, responsePayload, ...} envelope - that body itself is the request.
+function _isBareRequestBody(outer) {
+    return !!outer && typeof outer === "object" && !Array.isArray(outer)
+        && !func.isSampleEnvelope(outer)
+        && outer.request_body === undefined && outer.response_body === undefined;
+}
+
+function _requestFromOuter(outer) {
+    return _parseJson(outer?.requestPayload) ?? (_isBareRequestBody(outer) ? outer : null);
+}
+
 // requestPayload.body / .evidence aren't always strings — some tool calls store them as an
 // object (e.g. {toolName, toolArgs}). React crashes ("Objects are not valid as a React child")
 // if that object is rendered directly in a <Text>, so coerce to a displayable string here,
@@ -102,7 +114,7 @@ export function parseAktoPayload(payloadStr) {
         const safeJson = (s) => { try { return JSON.parse(s); } catch { return null; } };
         const reqStr = outer.requestPayload || outer.request_body;
         const respStr = outer.responsePayload || outer.response_body;
-        const req = reqStr ? safeJson(reqStr) : null;
+        const req = reqStr ? safeJson(reqStr) : (_isBareRequestBody(outer) ? outer : null);
         const resp = respStr ? safeJson(respStr) : null;
         return { req, resp, raw: outer };
     } catch {
@@ -188,6 +200,17 @@ export function prettyPrintIfJson(text) {
     return { text: JSON.stringify(unwrapped, null, 2), isJson: true };
 }
 
+// Display text for a single captured prompt payload (e.g. a nearby message's queryPayload),
+// extracted the same way the Values tab's Prompt section is: the last user message when the
+// payload is chat-shaped JSON, otherwise the payload itself, pretty-printed if it's JSON.
+export function promptTextFromPayload(payload) {
+    const raw = coerceToText(payload);
+    if (!raw || isEmptyJsonText(raw)) return null;
+    const prompt = coerceToText(extractPromptBody(_parseJson(raw)));
+    const { text } = prettyPrintIfJson(prompt || raw);
+    return sanitizeDisplayText(text, Infinity) || null;
+}
+
 // Some backends pre-combine metadata.reason as "<Title>: <message>" (e.g. "Blocked: personal
 // accounts are not permitted..." or "Sandbox Disabled: The sandbox.enabled field is not
 // present..."). That leading title just restates the action/status already shown elsewhere
@@ -258,7 +281,7 @@ export function buildFallbackDetail(row) {
 
         if (outer) {
             // Standard Akto payload: {requestPayload, responsePayload, ...}
-            const req = _parseJson(outer.requestPayload);
+            const req = _requestFromOuter(outer);
             const resp = _parseJson(outer.responsePayload);
 
             guardrailReason = _extractGuardrailReason(resp, req);
@@ -356,7 +379,7 @@ export function buildFallbackDetail(row) {
     const metaOverview = meta.overview || _metaField(row.metadata, "overview");
     const metaRemediation = meta.remediation || _metaField(row.metadata, "remediation");
     const outer = _parseAktoOuter(row.payload) || {};
-    const req = _parseJson(outer.requestPayload);
+    const req = _requestFromOuter(outer);
     const resp = _parseJson(outer.responsePayload);
 
     // metadata.reason is often empty — fall back to the guardrail's own explanation

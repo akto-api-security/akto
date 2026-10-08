@@ -697,6 +697,7 @@ function GuardrailPolicies() {
                 negatedLlmServers: guardrailData.negatedLlmServers || false,
                 // Block-only host blocklist
                 blockedHosts: guardrailData.blockedHosts || [],
+                blockedHostsAllowOnly: guardrailData.blockedHostsAllowOnly || false,
                 blockPersonalAccounts: guardrailData.blockPersonalAccounts || false,
                 blockPublicShare: guardrailData.blockPublicShare || false,
                 ignorePhrases: guardrailData.ignorePhrases || [],

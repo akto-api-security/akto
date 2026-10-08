@@ -653,6 +653,13 @@ prettifyEpoch(epoch) {
       return acc;
     }, {});
   },
+  // Some captured samples (e.g. guardrail events) store only the raw request body, like
+  // {"messages":[...]}, instead of the usual {method, path, requestPayload, ...} envelope.
+  isSampleEnvelope: function (message) {
+    if (!message || typeof message !== "object") return false
+    return ["request", "response", "method", "path", "requestHeaders", "requestPayload",
+      "responseHeaders", "responsePayload", "statusCode"].some((key) => message[key] !== undefined)
+  },
   requestJson: function (message, highlightPaths, metadata = []) {
     if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
@@ -675,7 +682,9 @@ prettifyEpoch(epoch) {
       queryParamsString = urlSplit?.length > 1 ? urlSplit[1] : ""
 
       requestHeadersString = message["requestHeaders"] || "{}"
-      requestPayloadString = message["requestPayload"] || "{}"
+      requestPayloadString = func.isSampleEnvelope(message)
+        ? (message["requestPayload"] || "{}")
+        : JSON.stringify(message)
     }
 
     const queryParams = {}
@@ -738,7 +747,7 @@ prettifyEpoch(epoch) {
   },
   responseJson: function (message, highlightPaths, metadata = []) {
 
-    if(!message || typeof message !== "object" || Object.keys(message).length === 0){
+    if(!message || typeof message !== "object" || Object.keys(message).length === 0 || !func.isSampleEnvelope(message)){
       return {}
     }
     let result = {}
@@ -799,16 +808,20 @@ prettifyEpoch(epoch) {
     }
     return result
   },
+  // Joins only the parts that were captured, so a missing method/type/status never renders as "undefined".
+  joinFirstLineParts(...parts) {
+    return parts.filter((part) => part !== undefined && part !== null && part !== "").join(" ")
+  },
   requestFirstLine(message, queryParams) {
     if (message["request"]) {
       let url = message["request"]["url"] || ""
-      return message["request"]["method"] + " " + url + func.convertQueryParamsToUrl(queryParams) + " " + message["request"]["type"]
+      return func.joinFirstLineParts(message["request"]["method"], url + func.convertQueryParamsToUrl(queryParams), message["request"]["type"])
     } else {
       let pathString = ""
       if(message.path !== null && message?.path !== undefined){
         pathString = message.path.split("?")[0];
       }
-      return message?.method + " " + pathString + func.convertQueryParamsToUrl(queryParams) + " " + message?.type
+      return func.joinFirstLineParts(message?.method, pathString + func.convertQueryParamsToUrl(queryParams), message?.type)
     }
   },
   webSocketRequestFirstLine(message, queryParams) {
@@ -827,9 +840,9 @@ prettifyEpoch(epoch) {
   },
   responseFirstLine(message) {
     if (message["response"]) {
-      return message["response"]["statusCode"] + ""
+      return func.joinFirstLineParts(message["response"]["statusCode"])
     } else {
-      return message.statusCode + " " + message.status
+      return func.joinFirstLineParts(message.statusCode, message.status)
     }
   },
   isWebSocketApiType(apiType) {
@@ -2555,7 +2568,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
 
   shouldShowIpReputation() {
-    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662
+    return this.isDemoAccount() || window.ACTIVE_ACCOUNT === 1767812031 || window.ACTIVE_ACCOUNT === 1767814409 || window.ACTIVE_ACCOUNT === 1745303931 || window.ACTIVE_ACCOUNT === 1758787662 || window.ACTIVE_ACCOUNT === 1786100206
   },
 
   isSameDateAsToday (givenDate) {

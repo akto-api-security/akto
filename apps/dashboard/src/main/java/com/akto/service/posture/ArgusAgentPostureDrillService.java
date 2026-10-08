@@ -274,7 +274,8 @@ public class ArgusAgentPostureDrillService {
         List<ApiInfo> tools = ApiInfoDao.instance.findAll(toolFilter, 0, PROFILE_SECTION_CAP, null,
                 Projections.include(ApiInfo.TOOL_INFO));
 
-        List<String> sensitiveTypes = bundle.sensitiveByCollection.get(agent.getId());
+        Map<Integer, Map<String, Integer>> sensitiveData = bundle.sensitiveDataCounts(agentIds, eventsSince);
+        Map<String, Integer> agentSensitiveData = sensitiveData == null ? null : sensitiveData.get(agent.getId());
         List<String> coveringPolicies = coveringPolicyNames(bundle.policies, agent);
         String scanGap = agent.getPostureGaps() == null ? null : agent.getPostureGaps().get(PostureScoreCategory.RED_TEAM.key);
 
@@ -299,7 +300,9 @@ public class ArgusAgentPostureDrillService {
                         coveringPolicies.isEmpty() ? "critical" : null),
                 new PostureDrillResult.Fact("Red-team scan", scanGap == null ? "Scanned" : scanGap, scanGap == null ? null : "critical"),
                 new PostureDrillResult.Fact("Sensitive data",
-                        sensitiveTypes == null || sensitiveTypes.isEmpty() ? "None detected" : String.join(", ", sensitiveTypes), null)));
+                        sensitiveData == null ? "Unavailable"
+                                : agentSensitiveData == null || agentSensitiveData.isEmpty() ? "None flagged in the last 90 days"
+                                : InsightUtil.sensitiveDataLine(agentSensitiveData), null)));
         List<PostureDrillResult.Section> sections = new ArrayList<>(Arrays.asList(
                 scoreBreakdownSection(subScores), remediationSection(subScores), redTeamSection(issues, openIssues)));
         if (events != null) sections.add(maliciousEventsSection(events, eventCount));
@@ -446,6 +449,7 @@ public class ArgusAgentPostureDrillService {
         private final InsightDataBundle bundle;
         private final Map<Integer, Map<String, Integer>> redTeam;
         private final Map<Integer, Map<String, Integer>> malicious;
+        private final Map<Integer, Map<String, Integer>> sensitive;
         private final ArgusPostureService.GuardrailsCoverageBreakdown coverage;
 
         CategoryEvidence(InsightDataBundle bundle, List<ApiCollection> agents) {
@@ -460,6 +464,9 @@ public class ArgusAgentPostureDrillService {
             Map<Integer, Map<String, Integer>> counts = ids.isEmpty() ? null
                     : bundle.maliciousSeverityCounts(ids, Context.now() - MALICIOUS_EVENTS_WINDOW_SECONDS);
             this.malicious = counts == null ? new HashMap<>() : counts;
+            Map<Integer, Map<String, Integer>> sensitiveCounts = ids.isEmpty() ? null
+                    : bundle.sensitiveDataCounts(ids, Context.now() - MALICIOUS_EVENTS_WINDOW_SECONDS);
+            this.sensitive = sensitiveCounts == null ? new HashMap<>() : sensitiveCounts;
             this.coverage = ArgusPostureService.computeCoverage(agents, bundle.policies);
         }
 
@@ -468,7 +475,9 @@ public class ArgusAgentPostureDrillService {
             switch (category) {
                 case RED_TEAM: {
                     Map<String, Integer> bySeverity = redTeam.get(agent.getId());
-                    return bySeverity == null || bySeverity.isEmpty() ? "Open findings" : severityLine(bySeverity) + " open";
+                    if (bySeverity != null && !bySeverity.isEmpty()) return severityLine(bySeverity) + " open";
+                    String notScanned = agent.getPostureGaps() == null ? null : agent.getPostureGaps().get(PostureScoreCategory.RED_TEAM.key);
+                    return notScanned != null ? notScanned : "Open findings";
                 }
                 case GUARDRAIL_MALICIOUS: {
                     // Same threat-backend aggregation the score is computed from.
@@ -484,8 +493,9 @@ public class ArgusAgentPostureDrillService {
                     return gaps.isEmpty() ? "Partially covered" : String.join(" · ", gaps);
                 }
                 case SENSITIVE_DATA: {
-                    List<String> types = bundle.sensitiveByCollection.get(agent.getId());
-                    return types == null || types.isEmpty() ? "Sensitive data detected" : String.join(", ", types);
+                    Map<String, Integer> byData = sensitive.get(agent.getId());
+                    if (byData == null || byData.isEmpty()) return "Sensitive data in guardrail violations";
+                    return InsightUtil.sensitiveDataLine(byData) + " in the last 90 days";
                 }
                 case ACCESS_AUTH:
                     return category.subScore(subScores) >= 100 ? "Public and unauthenticated" : "Public or unauthenticated";

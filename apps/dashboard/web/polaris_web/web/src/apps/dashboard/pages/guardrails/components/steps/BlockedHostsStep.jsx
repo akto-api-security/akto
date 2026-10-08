@@ -9,6 +9,7 @@ import {
     Autocomplete,
     Checkbox,
     Banner,
+    ButtonGroup,
 } from "@shopify/polaris";
 import { DeleteMajor } from "@shopify/polaris-icons";
 
@@ -56,15 +57,20 @@ export const BlockedHostsConfig = {
     number: 11,
     title: "Access restrictions",
 
-    validate: () => ({ isValid: true, errorMessage: null }),
+    validate: ({ blockedHosts, blockedHostsAllowOnly } = {}) => {
+        const hasRows = (blockedHosts || []).some((r) => (r.pattern || "").trim());
+        return blockedHostsAllowOnly && !hasRows
+            ? { isValid: false, errorMessage: "Add at least one allowed pattern" }
+            : { isValid: true, errorMessage: null };
+    },
 
-    getSummary: ({ blockedHosts, blockPersonalAccounts, blockPublicShare }) => {
+    getSummary: ({ blockedHosts, blockedHostsAllowOnly, blockPersonalAccounts, blockPublicShare }) => {
         const rows = (blockedHosts || []).filter((r) => (r.pattern || "").trim());
         const parts = [];
         if (rows.length > 0) {
             const names = rows.map((r) => r.pattern.trim()).slice(0, 2).join(", ");
             const more = rows.length > 2 ? ` +${rows.length - 2}` : "";
-            parts.push(`${rows.length} pattern${rows.length === 1 ? "" : "s"}: ${names}${more}`);
+            parts.push(`${blockedHostsAllowOnly ? "Allow only " : ""}${rows.length} pattern${rows.length === 1 ? "" : "s"}: ${names}${more}`);
         }
         if (blockPersonalAccounts) {
             parts.push("Block personal accounts");
@@ -90,17 +96,19 @@ const SectionCard = ({ title, description, beta, children }) => (
                     <Text variant="headingSm" as="h3">{title}</Text>
                     {beta && <Badge status="info">Beta</Badge>}
                 </HorizontalStack>
-                <Text variant="bodySm" tone="subdued">{description}</Text>
+                {description && <Text variant="bodySm" tone="subdued">{description}</Text>}
             </VerticalStack>
             {children}
         </VerticalStack>
     </Box>
 );
 
-const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts, setBlockPersonalAccounts, blockPublicShare, setBlockPublicShare, hostSuggestions = [] }) => {
+const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockedHostsAllowOnly, setBlockedHostsAllowOnly, blockPersonalAccounts, setBlockPersonalAccounts, blockPublicShare, setBlockPublicShare, hostSuggestions = [] }) => {
     const entries = blockedHosts || [];
     const [inputValue, setInputValue] = useState("");
     const [error, setError] = useState("");
+
+    const allowOnly = !!blockedHostsAllowOnly;
 
     const existingPatterns = entries.map((e) => (e.pattern || "").trim().toLowerCase());
 
@@ -117,7 +125,7 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
             return;
         }
         if (existingPatterns.includes(p)) {
-            setError("This pattern is already in the block list");
+            setError("This pattern is already in the list");
             return;
         }
         setBlockedHosts([...entries, createEntry(p)]);
@@ -144,17 +152,32 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
 
     return (
         <VerticalStack gap="5">
-            <SectionCard
-                title="Block host / path"
-                description={
-                    <>
-                        Block traffic by host or path pattern. Use <Text as="span" fontWeight="semibold">*</Text> as
-                        a wildcard. Examples: <Text as="span" fontWeight="semibold">chatgpt.com/*</Text>,{" "}
-                        <Text as="span" fontWeight="semibold">*/v1/chat/completions</Text>,{" "}
-                        <Text as="span" fontWeight="semibold">deepseek.com/api/v1/*</Text>
-                    </>
-                }
-            >
+            <SectionCard title={allowOnly ? "Allow host / path" : "Block host / path"}>
+                <ButtonGroup segmented>
+                    <Button primary={!allowOnly} onClick={() => setBlockedHostsAllowOnly(false)}>Block listed hosts</Button>
+                    <Button primary={allowOnly} onClick={() => setBlockedHostsAllowOnly(true)}>Allow only listed hosts</Button>
+                </ButtonGroup>
+                <Text variant="bodySm" tone="subdued">
+                    {allowOnly ? "Only traffic matching these host or path patterns is allowed." : "Block traffic by host or path pattern."} Use{" "}
+                    <Text as="span" fontWeight="semibold">*</Text> as a wildcard. Examples:{" "}
+                    {allowOnly ? (
+                        <>
+                            <Text as="span" fontWeight="semibold">*.claude.ai/*</Text>,{" "}
+                            <Text as="span" fontWeight="semibold">*/v1/chat/completions</Text>
+                        </>
+                    ) : (
+                        <>
+                            <Text as="span" fontWeight="semibold">chatgpt.com/*</Text>,{" "}
+                            <Text as="span" fontWeight="semibold">*/v1/chat/completions</Text>,{" "}
+                            <Text as="span" fontWeight="semibold">deepseek.com/api/v1/*</Text>
+                        </>
+                    )}
+                </Text>
+                {allowOnly && (
+                    <Banner status="warning" title="All other hosts will be blocked">
+                        Only the patterns below will be reachable. Traffic to any other host or path is denied.
+                    </Banner>
+                )}
                 <Autocomplete
                     options={options}
                     selected={[]}
@@ -184,14 +207,16 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
 
                 <VerticalStack gap="3">
                     <HorizontalStack gap="2" blockAlign="center">
-                        <Text variant="headingSm" as="h3">Blocked patterns</Text>
-                        {entries.length > 0 && <Badge status="critical">{`${entries.length}`}</Badge>}
+                        <Text variant="headingSm" as="h3">{allowOnly ? "Allowed patterns" : "Blocked patterns"}</Text>
+                        {entries.length > 0 && <Badge status={allowOnly ? "success" : "critical"}>{`${entries.length}`}</Badge>}
                     </HorizontalStack>
 
                     {entries.length === 0 ? (
                         <Box padding="4" borderColor="border" borderWidth="1" borderRadius="3" background="bg-subdued">
                             <Text variant="bodySm" tone="subdued" alignment="center">
-                                No patterns blocked yet. Add a host or path pattern above to start blocking traffic.
+                                {allowOnly
+                                    ? "No patterns allowed yet. Add at least one pattern, or this policy will not take effect."
+                                    : "No patterns blocked yet. Add a host or path pattern above to start blocking traffic."}
                             </Text>
                         </Box>
                     ) : (
@@ -212,10 +237,13 @@ const BlockedHostsStep = ({ blockedHosts, setBlockedHosts, blockPersonalAccounts
                                         <Text variant="bodyMd" fontWeight="semibold" alignment="start">{entry.pattern}</Text>
                                         <Button
                                             plain
+                                            destructive
                                             icon={DeleteMajor}
                                             onClick={() => removePattern(index)}
                                             accessibilityLabel={`Delete ${entry.pattern}`}
-                                        />
+                                        >
+                                            Remove
+                                        </Button>
                                     </HorizontalStack>
                                 </Box>
                             ))}
