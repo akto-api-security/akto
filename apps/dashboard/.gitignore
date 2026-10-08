@@ -8,4 +8,3 @@ web/dist
 .idea/
 .vscode/launch.json
 scripts/config.env
-scripts/dify-local.env
