@@ -33,6 +33,9 @@ const NARRATIVE_POLL_INTERVAL_MS = 3000
 const DRILL_RISK_SCORE = 'riskScoreBreakdown'
 // Must match ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS on the backend.
 const DRILL_HIGH_RISK_AGENTS = 'highRiskAgents'
+// Must match ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE on the backend — the agentic
+// page's own posture-score drill, distinct from the non-agentic DRILL_RISK_SCORE above.
+const DRILL_POSTURE_SCORE = 'postureScore'
 
 // Same relative-time rendering LLMCellRenderers.jsx's TimeCell uses, minus its /1000 — every
 // drill row field named one of these (see PostureService#fetchDrill/ProfileBuilder's own row
@@ -632,9 +635,20 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
         if (!drill?.drillable || e?.data?.id === undefined || e?.data?.id === null) return
         // highRiskAgents has no nested category level (unlike riskScoreBreakdown's category/agentId
         // path) — every root-level row click already resolves to a bare agent id, so send it to
-        // the full agent-detail page instead of drilling in-place inside the flyout.
+        // the full agent-detail page instead of drilling in-place inside the flyout. The current
+        // drilled URL is passed as router state so the agent page's own back arrow returns here
+        // (PageWithMultipleCards' backUrl prop) instead of its sessionStorage-stack fallback, which
+        // doesn't reliably collapse this page's own replace-based drill navigation.
         if (drillState.drillId === DRILL_HIGH_RISK_AGENTS && !drillState.path) {
-            navigate(`/dashboard/agentic-posture/agent/${encodeURIComponent(e.data.id)}`)
+            navigate(`/dashboard/agentic-posture/agent/${encodeURIComponent(e.data.id)}`,
+                { state: { backUrl: window.location.pathname + window.location.search } })
+            return
+        }
+        // postureScore's category-agents level (path="<category>", no nested segment yet) resolves
+        // to an agent id next — the same bare-agent-id destination highRiskAgents redirects to above.
+        if (drillState.drillId === DRILL_POSTURE_SCORE && drillState.path && !drillState.path.includes('/')) {
+            navigate(`/dashboard/agentic-posture/agent/${encodeURIComponent(e.data.id)}`,
+                { state: { backUrl: window.location.pathname + window.location.search } })
             return
         }
         const nextPath = drillState.path ? `${drillState.path}/${e.data.id}` : String(e.data.id)

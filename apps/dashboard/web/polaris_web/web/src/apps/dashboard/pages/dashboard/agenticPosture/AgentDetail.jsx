@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { Banner, Box, Text, VerticalStack } from '@shopify/polaris'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import SpinnerCentered from '../../../components/progress/SpinnerCentered'
@@ -30,6 +30,7 @@ function Section({ id, title, children }) {
 
 function AgentDetail() {
     const { collectionId } = useParams()
+    const location = useLocation()
     const [searchParams] = useSearchParams()
     const finding = searchParams.get('finding')
     const [detail, setDetail] = useState(null)
@@ -116,7 +117,7 @@ function AgentDetail() {
     return (
         <PageWithMultipleCards
             title={<Text variant="headingLg">{detail.header?.name}</Text>}
-            backUrl="/dashboard/agentic-posture"
+            backUrl={location.state?.backUrl || '/dashboard/agentic-posture'}
             components={[<Box key="body">{pageBody}</Box>]}
         />
     )
