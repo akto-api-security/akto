@@ -236,7 +236,7 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
 	}
 
-	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validatorService.ValidateRequest)
+	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validateFileChunk)
 	return h.applyFileChunkResults(fr, results)
 }
 

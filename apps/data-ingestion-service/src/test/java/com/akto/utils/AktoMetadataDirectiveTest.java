@@ -63,7 +63,8 @@ public class AktoMetadataDirectiveTest {
 
     @Test
     public void metadataWithoutAUsablePolicyNameChangesNothing() {
-        String[] noPolicy = { null, "", "{}", "not json", "{\"policy_name\": \" \"}", "{\"context_source\": \"ENDPOINT\"}" };
+        String[] noPolicy = { null, "", "{}", "not json", "{\"policy_name\": \" \"}", "{\"context_source\": \"ENDPOINT\"}",
+            "{\"policy_name\": [\"A\", \"B\"]}", "{\"policy_name\": 5}" };
         for (String metadata : noPolicy) {
             Map<String, Object> data = fromLitellm("0", "AGENTIC", metadata);
             assertEquals("AGENTIC", data.get("contextSource"));

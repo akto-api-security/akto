@@ -39,7 +39,7 @@ public class GuardrailsClient {
     // 200 + Allowed=true shape as a healthy validation, so LiteLLM/k6 keep flowing.
     private static final int TIMEOUT_MS = resolveTimeoutMs();
     // File validation extracts and scans whole documents, so it gets a longer timeout than a prompt check.
-    private static final int FILE_TIMEOUT_MS = resolveTimeoutMs("GUARDRAILS_FILE_TIMEOUT_MS", 15_000);
+    static final int FILE_TIMEOUT_MS = resolveTimeoutMs("GUARDRAILS_FILE_TIMEOUT_MS", 15_000);
 
     private static final OkHttpClient HTTP_CLIENT = buildHttpClient(TIMEOUT_MS);
 

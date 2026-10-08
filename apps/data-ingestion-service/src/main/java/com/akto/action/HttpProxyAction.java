@@ -19,6 +19,7 @@ import com.opensymphony.xwork2.ActionSupport;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 
 
 @lombok.Getter
@@ -31,6 +32,9 @@ public class HttpProxyAction extends ActionSupport {
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
     }
+
+    // Bounds the memory file checks hold: each keeps its files decoded while the guardrails service inspects them.
+    static final Semaphore FILE_CHECKS = new Semaphore(envInt("GUARDRAILS_FILE_MAX_CONCURRENT", 10));
 
     private String guardrails;
     private String response_guardrails;
@@ -139,12 +143,19 @@ public class HttpProxyAction extends ActionSupport {
      */
     private String validateFiles() {
         long start = System.currentTimeMillis();
+        data = new HashMap<>();
+        if (files == null || files.isEmpty()) {
+            success = true;
+            return Action.SUCCESS.toUpperCase();
+        }
+        if (!FILE_CHECKS.tryAcquire()) {
+            // Fails the call rather than queueing, so LiteLLM's unreachable_fallback decides.
+            loggerMaker.warn("[http-proxy] file guardrails at capacity, rejecting - account: {}", akto_account_id);
+            success = false;
+            message = "Too many file checks in progress";
+            return Action.ERROR.toUpperCase();
+        }
         try {
-            data = new HashMap<>();
-            if (files == null || files.isEmpty()) {
-                success = true;
-                return Action.SUCCESS.toUpperCase();
-            }
             Map<String, Object> requestData = buildRequestData();
             VxlanPolicyDirective.apply(requestData);
             AktoMetadataDirective.apply(requestData);
@@ -160,6 +171,20 @@ public class HttpProxyAction extends ActionSupport {
             message = "Unexpected error: " + e.getMessage();
             data = new HashMap<>();
             return Action.ERROR.toUpperCase();
+        } finally {
+            FILE_CHECKS.release();
+        }
+    }
+
+    private static int envInt(String name, int fallback) {
+        String raw = System.getenv(name);
+        if (raw == null || raw.trim().isEmpty()) {
+            return fallback;
+        }
+        try {
+            return Math.max(1, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return fallback;
         }
     }
 

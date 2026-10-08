@@ -44,6 +44,8 @@ type ValidationHandler struct {
 	fileRegistry     *fileprocessor.Registry
 	metrics          *metrics.Accumulator
 	policyGate       policyGate
+	// validateFileChunk mirrors validator.Service.ValidateRequest for /validate/file chunks.
+	validateFileChunk fileRequestValidator
 }
 
 // policyGate mirrors validator.Service.HasApplicablePolicies.
@@ -60,6 +62,7 @@ func NewValidationHandler(validatorService *validator.Service, logger *zap.Logge
 	}
 	if validatorService != nil {
 		h.policyGate = validatorService.HasApplicablePolicies
+		h.validateFileChunk = validatorService.ValidateRequest
 	}
 	return h
 }

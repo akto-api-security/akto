@@ -26,8 +26,9 @@ public final class AktoMetadataDirective {
         }
         String policyName;
         try {
+            // Only a string: a list or number would become names no policy matches, turning guardrails off.
             Object configured = BasicDBObject.parse(value).get(POLICY_NAME);
-            policyName = configured != null ? configured.toString().trim() : "";
+            policyName = configured instanceof String ? ((String) configured).trim() : "";
         } catch (Exception e) {
             return;
         }

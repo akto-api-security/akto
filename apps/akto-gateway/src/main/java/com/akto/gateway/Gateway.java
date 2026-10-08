@@ -332,7 +332,7 @@ public class Gateway {
      * /validate/file, using the request's context. Entries without inline content (a url) are not validated.
      * The verdict comes back as guardrailsResult, absent when there was nothing to validate.
      */
-    public Map<String, Object> validateFile(Map<String, Object> requestData, List<Map<String, Object>> files) {
+    public Map<String, Object> validateFile(Map<String, Object> requestData, List<?> files) {
         Map<String, Object> result = new HashMap<>();
         List<GuardrailsClient.FileUpload> uploads = uploadsToValidate(files);
         if (uploads.isEmpty()) {
@@ -346,14 +346,19 @@ public class Gateway {
         return result;
     }
 
-    static List<GuardrailsClient.FileUpload> uploadsToValidate(List<Map<String, Object>> files) {
+    static List<GuardrailsClient.FileUpload> uploadsToValidate(List<?> files) {
         List<GuardrailsClient.FileUpload> uploads = new ArrayList<>();
+        int withoutContent = 0;
         // Newest first, so the guardrails service's file cap drops old attachments rather than the latest.
         for (int i = files.size() - 1; i >= 0; i--) {
-            Map<String, Object> file = files.get(i);
+            if (!(files.get(i) instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> file = (Map<?, ?>) files.get(i);
             String filename = asString(file.get("filename"));
             String content = asString(file.get("content"));
             if (content.isEmpty()) {
+                withoutContent++;
                 continue;
             }
             try {
@@ -362,6 +367,9 @@ public class Gateway {
             } catch (IllegalArgumentException e) {
                 loggerMaker.warnAndAddToDb("Skipping file with invalid base64 content: " + filename);
             }
+        }
+        if (withoutContent > 0) {
+            loggerMaker.info("Skipping {} attachment(s) without inline content, e.g. a url", withoutContent);
         }
         return uploads;
     }

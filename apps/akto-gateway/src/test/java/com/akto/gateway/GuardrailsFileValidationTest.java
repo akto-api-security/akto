@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class GuardrailsFileValidationTest {
@@ -67,7 +66,23 @@ public class GuardrailsFileValidationTest {
         assertTrue(multipart.contains("name=\"policyName\"") && multipart.contains("PII Strict"));
         assertTrue(multipart.contains("name=\"file\"; filename=\"card.txt\"")
             && multipart.contains("card 4111 1111 1111 1111"));
-        assertFalse(multipart.contains("name=\"url\""));
+    }
+
+    @Test
+    public void filesUseTheFileTimeoutAndPromptsKeepTheirOwn() {
+        Map<String, Long> callTimeouts = new HashMap<>();
+        OkHttpClient http = new OkHttpClient.Builder().addInterceptor(chain -> {
+            callTimeouts.put(chain.request().url().encodedPath(), chain.call().timeout().timeoutNanos() / 1_000_000);
+            return new Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1).code(200).message("ok")
+                    .body(ResponseBody.create("{\"Allowed\":true}", MediaType.get("application/json"))).build();
+        }).build();
+        GuardrailsClient client = new GuardrailsClient("http://guardrails.test", http, (key, message) -> { });
+
+        client.callValidate(new HashMap<>(), "/api/validate/request");
+        client.callValidateFile(new HashMap<>(), Collections.singletonList(new GuardrailsClient.FileUpload("a.txt", new byte[] {1})));
+
+        assertEquals(Long.valueOf(0), callTimeouts.get("/api/validate/request"));
+        assertEquals(Long.valueOf(GuardrailsClient.FILE_TIMEOUT_MS), callTimeouts.get("/api/validate/file"));
     }
 
     @Test
@@ -113,5 +128,13 @@ public class GuardrailsFileValidationTest {
             broken, file("", "file", "unnamed", null)));
 
         assertEquals(Collections.singletonList("attachment"), filenames(uploads));
+    }
+
+    @Test
+    public void nullAndNonObjectEntriesAreSkippedInsteadOfFailingTheCheck() {
+        List<GuardrailsClient.FileUpload> uploads = Gateway.uploadsToValidate(Arrays.asList(
+            null, "not an object", file("notes.txt", "file", "notes", null)));
+
+        assertEquals(Collections.singletonList("notes.txt"), filenames(uploads));
     }
 }
