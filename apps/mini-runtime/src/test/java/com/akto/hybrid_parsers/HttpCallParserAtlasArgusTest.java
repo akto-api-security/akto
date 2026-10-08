@@ -188,12 +188,27 @@ class HttpCallParserAtlasArgusTest {
         );
     }
 
+    private HttpResponseParams bedrockRequest(String botName, String path) {
+        Map<String, List<String>> reqHeaders = new HashMap<>();
+        reqHeaders.put("host", Collections.singletonList("bedrock-runtime.us-east-1.amazonaws.com"));
+        reqHeaders.put("content-type", Collections.singletonList("application/json"));
+        HttpRequestParams requestParams = new HttpRequestParams("POST", path, "HTTP/1.1", reqHeaders, "{}", 0);
+        String tagsJson = "{\"" + Constants.AI_AGENT_TAG_SOURCE + "\":\"" + Constants.AI_AGENT_SOURCE_AWS_BEDROCK
+                + "\",\"" + Constants.AI_AGENT_TAG_BOT_NAME + "\":\"" + botName + "\"}";
+        return new HttpResponseParams(
+                "HTTP/1.1", 200, "OK", new HashMap<>(), "{\"id\":1}",
+                requestParams, 0, String.valueOf(ACCOUNT_ID), false, HttpResponseParams.Source.MIRRORING,
+                "", "10.0.1.15", "", "1", tagsJson, new ArrayList<>()
+        );
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Integer> getHostNameToIdMap(HttpCallParser parser) throws Exception {
         Field f = HttpCallParser.class.getDeclaredField("hostNameToIdMap");
         f.setAccessible(true);
         return (Map<String, Integer>) f.get(parser);
     }
+
 
     @Test
     void case1_freshHost_agenticMatch_noFork() throws Exception {
@@ -233,10 +248,32 @@ class HttpCallParserAtlasArgusTest {
         assertFalse(getHostNameToIdMap(parser).containsKey(host + "-agentic"));
     }
 
-    // case4 (fresh mixed collection actually forks on an agentic match) lives on the
-    // nayan/fix-apicollection-cache-sync branch - it depends on a fix not present here yet
-    // (apiCollectionsMap isn't updated immediately when createApiCollectionId creates a new
-    // collection, only hostNameToIdMap is, so a same-session follow-up request can't see it).
+    // case4 (fresh mixed collection actually forks on an agentic match) still lives on the
+    // nayan/fix-apicollection-cache-sync branch - it depends on a general apiCollectionsMap
+    // cache-staleness fix that's out of scope here (Bedrock's fork-exemption below doesn't need
+    // it: isDedicatedBotCollection bypasses the fork unconditionally, without consulting that
+    // cache at all).
+
+    @Test
+    void case7_bedrockSource_neverForks() throws Exception {
+        HttpCallParser parser = newParser();
+        String botName = "case7-bedrock-bot";
+
+        // First request: creates a plain, untagged collection for this bot (Bedrock gets no
+        // content-independent gen-ai tagging - it relies solely on the fork-exemption below).
+        int plainId = parser.createApiCollectionId(bedrockRequest(botName, "/invoke"));
+
+        // Now grant the feature and send MCP-shaped gateway traffic for the same bot (still
+        // source=AWS_BEDROCK + same bot-name) - isAgenticEndpoint flips true via mcp-server
+        // content detection. Bedrock is bot-isolated, so this must tag the existing collection
+        // in place, not fork a "-agentic" sibling.
+        grantSecurityTypeAgentic();
+        String bedrockMcpTags = "{\"" + Constants.AI_AGENT_TAG_SOURCE + "\":\"" + Constants.AI_AGENT_SOURCE_AWS_BEDROCK
+                + "\",\"" + Constants.AI_AGENT_TAG_BOT_NAME + "\":\"" + botName + "\"}";
+        int mcpId = parser.createApiCollectionId(mcpRequest("ignored-host.example.com", "/mcp", bedrockMcpTags));
+
+        assertEquals(plainId, mcpId, "a dedicated Bedrock bot collection must never fork");
+    }
 
     @Test
     void case5_alreadyTaggedCollection_neverReForks() throws Exception {
