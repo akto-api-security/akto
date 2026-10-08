@@ -512,29 +512,6 @@ public class TestArgusPostureService {
         return p;
     }
 
-    // ── assetIdentity: connector-created collections have a name but no hostName ──────
-
-    @Test
-    public void assetIdentity_prefersHostNameWhenPresent() {
-        ApiCollection c = host(1, "a.akto.io");
-        c.setName("ignored");
-
-        assertEquals("a.akto.io", ArgusPostureService.assetIdentity(c));
-    }
-
-    @Test
-    public void assetIdentity_fallsBackToNameWhenHostNameMissing() {
-        ApiCollection c = host(1, null);
-        c.setName("aria-agentic");
-
-        assertEquals("aria-agentic", ArgusPostureService.assetIdentity(c));
-    }
-
-    @Test
-    public void assetIdentity_nullSafe() {
-        assertNull(ArgusPostureService.assetIdentity(null));
-    }
-
     @Test
     public void computeCoverage_hostlessAssetIsCoveredByFleetWidePolicy() {
         ApiCollection hostless = host(1, null);

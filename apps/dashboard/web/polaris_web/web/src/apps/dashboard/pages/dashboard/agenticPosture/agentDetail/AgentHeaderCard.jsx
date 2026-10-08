@@ -36,6 +36,7 @@ function AgentHeaderCard({ header, redTeam, guardrailActivity, tools }) {
     const maliciousEvents = guardrailActivity && guardrailActivity.available !== false ? (guardrailActivity.total || 0) : null
     const privilegedToolCount = (tools || []).filter((t) => t.privileged).length
     const scanSummary = redTeamScanSummary(redTeam, (maliciousEvents || 0) > 0)
+    const headerCtas = (header.ctas || []).filter((cta) => cta.id !== 'run_red_team')
 
     return (
         <Card padding="6">
@@ -70,9 +71,9 @@ function AgentHeaderCard({ header, redTeam, guardrailActivity, tools }) {
                             </Text>
                             <Text variant="bodySm" color="subdued">risk score</Text>
                         </VerticalStack>
-                        {(header.ctas || []).length > 0 && (
+                        {headerCtas.length > 0 && (
                             <HorizontalStack gap="2" wrap>
-                                {header.ctas.map((cta) => (
+                                {headerCtas.map((cta) => (
                                     <Button key={cta.id} primary={cta.primary} onClick={() => navigate(ctaHref(cta))}>
                                         {cta.label}
                                     </Button>
