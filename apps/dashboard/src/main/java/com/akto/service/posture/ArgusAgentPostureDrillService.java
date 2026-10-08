@@ -620,7 +620,7 @@ public class ArgusAgentPostureDrillService {
     }
 
     // Same "never scanned" override as ArgusPostureUtils.worstIssue, for the per-category remediation text.
-    private static String remediationFor(PostureScoreCategory category, ApiCollection agent) {
+    static String remediationFor(PostureScoreCategory category, ApiCollection agent) {
         if (category == PostureScoreCategory.RED_TEAM) {
             Map<String, String> gaps = agent.getPostureGaps();
             if (gaps != null && gaps.containsKey(PostureScoreCategory.RED_TEAM.key)) {

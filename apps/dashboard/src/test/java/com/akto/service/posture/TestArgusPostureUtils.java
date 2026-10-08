@@ -9,7 +9,9 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -242,6 +244,62 @@ public class TestArgusPostureUtils {
                 Arrays.asList(host(1, null)), Arrays.asList(fleetWide("all", "block")));
 
         assertEquals(1, b.uncovered.size());
+    }
+
+    // ── worstIssue ─────────────────────────────────────────────────────────────
+
+    @Test
+    public void worstIssue_neverScannedWithMaliciousActivity_usesGapTextNotGenericFindingsText() {
+        ApiCollection agent = agentWithRedTeamGap(100,
+                "Red-teaming scan not run for this agent, and it has malicious activity");
+
+        assertEquals("Red-teaming scan not run for this agent, and it has malicious activity",
+                ArgusPostureUtils.worstIssue(agent));
+    }
+
+    @Test
+    public void worstIssue_neverScannedNoMaliciousActivity_usesGapTextWithoutMaliciousClause() {
+        ApiCollection agent = agentWithRedTeamGap(76, "Red-teaming scan not run for this agent");
+
+        assertEquals("Red-teaming scan not run for this agent", ArgusPostureUtils.worstIssue(agent));
+    }
+
+    @Test
+    public void worstIssue_realOpenFindings_usesFixedCategoryTextNotGapText() {
+        ApiCollection agent = new ApiCollection();
+        agent.setPostureSubScores(subScores(90, 0, 0, 0, 0, 0));
+        agent.setPostureGaps(null); // scanned agents never get a redTeam gap entry
+
+        assertEquals("Has open red-teaming findings", ArgusPostureUtils.worstIssue(agent));
+    }
+
+    @Test
+    public void worstIssue_noWorstCategory_fallsBackToNoSignificantIssues() {
+        ApiCollection agent = new ApiCollection();
+        agent.setPostureSubScores(subScores(0, 0, 0, 0, 0, 0));
+
+        assertEquals("No significant issues detected", ArgusPostureUtils.worstIssue(agent));
+    }
+
+    private static ApiCollection agentWithRedTeamGap(double redTeamSubScore, String gapText) {
+        ApiCollection agent = new ApiCollection();
+        agent.setPostureSubScores(subScores(redTeamSubScore, 0, 0, 0, 0, 0));
+        Map<String, String> gaps = new HashMap<>();
+        gaps.put(PostureScoreCategory.RED_TEAM.key, gapText);
+        agent.setPostureGaps(gaps);
+        return agent;
+    }
+
+    private static Map<String, Object> subScores(double redTeam, double guardrailMalicious, double coverage,
+                                                 double sensitiveData, double accessAuth, double overprivilegedTools) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("redTeam", redTeam);
+        m.put("guardrailMalicious", guardrailMalicious);
+        m.put("coverage", coverage);
+        m.put("sensitiveData", sensitiveData);
+        m.put("accessAuth", accessAuth);
+        m.put("overprivilegedTools", overprivilegedTools);
+        return m;
     }
 
     // ── assetsIn ───────────────────────────────────────────────────────────────
