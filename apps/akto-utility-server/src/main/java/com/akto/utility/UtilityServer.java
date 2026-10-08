@@ -57,6 +57,7 @@ public class UtilityServer {
             server.createContext("/utility/agentQueryValidationResult", new AgentQueryValidationResultHandler(jobStore, dataActor));
             server.createContext("/utility/sendHealthCheck", new SendHealthCheckHandler(dataActor));
             server.createContext("/utility/sendLogs", new SendLogsHandler(dataActor));
+            server.createContext("/utility/fetchAgentModels", new FetchAgentModelsHandler(dataActor));
             server.createContext("/utility/ingestTraffic", new TrafficIngestHandler());
             server.setExecutor(null);
             server.start();
