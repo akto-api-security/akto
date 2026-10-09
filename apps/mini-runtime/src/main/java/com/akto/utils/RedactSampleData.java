@@ -50,6 +50,22 @@ public class RedactSampleData {
 
     private static final String HOST = "host";
 
+    /*
+     * Headers kept in the clear under full redaction because they carry SERVICE IDENTITY, not user
+     * data. Without them an on-prem deployment that redacts everything has no way to attribute a
+     * call to its caller: pod labels are absent for traffic that entered through a gateway or from
+     * outside the mesh, and these headers are the only remaining signal.
+     *
+     * Deliberately names only. IPs, fingerprints, certs, auth and user-agent stay redacted - they
+     * are the data redaction exists to protect, and none of them identify a service.
+     */
+    private static final Set<String> SERVICE_IDENTITY_HEADERS = new HashSet<>(Arrays.asList(
+            "apc-source-service-name",
+            "source_service_name",
+            "destination_service_name",
+            "x-agoda-ssot-name",
+            "mcp-protocol-version"));
+
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
@@ -98,6 +114,9 @@ public class RedactSampleData {
         if(redactAll){
             for (String header : responseHeaders.keySet()) {
                 if(header.equals(HOST)){
+                    continue;
+                }
+                if (SERVICE_IDENTITY_HEADERS.contains(header.toLowerCase())) {
                     continue;
                 }
                 if (header.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
