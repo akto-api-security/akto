@@ -5,6 +5,7 @@ import com.akto.jobs.executors.AIAgentConnectorConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.publisher.KafkaDataPublisher;
 import com.akto.util.Constants;
+import com.akto.utils.AktoMetadataDirective;
 import com.akto.utils.LitellmAgentEndpointRewrite;
 import com.akto.utils.LitellmDeviceHeartbeat;
 import com.akto.utils.LitellmUserRegistry;
@@ -16,7 +17,9 @@ import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
 
 
 @lombok.Getter
@@ -29,6 +32,9 @@ public class HttpProxyAction extends ActionSupport {
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
     }
+
+    // Bounds the memory file checks hold: each keeps its files decoded while the guardrails service inspects them.
+    static final Semaphore FILE_CHECKS = new Semaphore(envInt("GUARDRAILS_FILE_MAX_CONCURRENT", 10));
 
     private String guardrails;
     private String response_guardrails;
@@ -64,12 +70,21 @@ public class HttpProxyAction extends ActionSupport {
     private String activityId;
     // Raw request from endpoint shield, used for account-type detection.
     private String fullRequest;
+    // LiteLLM guardrail entry's JSON; its policy_name picks the policies to enforce.
+    private String akto_metadata;
+    // Files a user uploaded, validated when file_guardrails=true: [{filename, type, content (base64)}].
+    private List<Map<String, Object>> files;
+    // "true" validates files instead of proxying the request.
+    private String file_guardrails;
 
     private Map<String, Object> data;
     private boolean success;
     private String message;
 
     public String httpProxy() {
+        if ("true".equalsIgnoreCase(file_guardrails)) {
+            return validateFiles();
+        }
         long start = System.currentTimeMillis();
         try {
             loggerMaker.infoAndAddToDb(
@@ -79,6 +94,7 @@ public class HttpProxyAction extends ActionSupport {
             Map<String, Object> requestData = buildRequestData();
             // Before the rewrite: a directive's ENDPOINT context source moves the traffic to Atlas.
             VxlanPolicyDirective.apply(requestData);
+            AktoMetadataDirective.apply(requestData);
             String litellmUserEmail = LitellmAgentEndpointRewrite.apply(requestData);
             if ("true".equalsIgnoreCase(ingest_data)) {
                 // Once per user per process, and only on ingest calls, so verdicts stay fast.
@@ -118,6 +134,57 @@ public class HttpProxyAction extends ActionSupport {
             data = new HashMap<>();
             data.put("error", e.getMessage());
             return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * file_guardrails=true: validates attached files with the same Atlas routing and policy scope as the
+     * request they came with (same envelope, plus files). Verdict only, no ingestion.
+     */
+    private String validateFiles() {
+        long start = System.currentTimeMillis();
+        data = new HashMap<>();
+        if (files == null || files.isEmpty()) {
+            success = true;
+            return Action.SUCCESS.toUpperCase();
+        }
+        if (!FILE_CHECKS.tryAcquire()) {
+            // Fails the call rather than queueing, so LiteLLM's unreachable_fallback decides.
+            loggerMaker.warn("[http-proxy] file guardrails at capacity, rejecting - account: {}", akto_account_id);
+            success = false;
+            message = "Too many file checks in progress";
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            Map<String, Object> requestData = buildRequestData();
+            VxlanPolicyDirective.apply(requestData);
+            AktoMetadataDirective.apply(requestData);
+            LitellmAgentEndpointRewrite.apply(requestData);
+            data = gateway.validateFile(requestData, files);
+            success = true;
+            loggerMaker.infoAndAddToDb("[http-proxy] file guardrails completed - files: {}, account: {}, latencyMs: {}",
+                files.size(), akto_account_id, System.currentTimeMillis() - start);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("[http-proxy] file guardrails unexpected error - account: " + akto_account_id + ", error: " + e.getMessage());
+            success = false;
+            message = "Unexpected error: " + e.getMessage();
+            data = new HashMap<>();
+            return Action.ERROR.toUpperCase();
+        } finally {
+            FILE_CHECKS.release();
+        }
+    }
+
+    private static int envInt(String name, int fallback) {
+        String raw = System.getenv(name);
+        if (raw == null || raw.trim().isEmpty()) {
+            return fallback;
+        }
+        try {
+            return Math.max(1, Integer.parseInt(raw.trim()));
+        } catch (NumberFormatException e) {
+            return fallback;
         }
     }
 
@@ -223,6 +290,7 @@ public class HttpProxyAction extends ActionSupport {
         requestData.put("client_hook", client_hook);
         requestData.put("activityId", activityId);
         requestData.put("fullRequest", fullRequest);
+        requestData.put(AktoMetadataDirective.FIELD, akto_metadata);
 
         return requestData;
     }

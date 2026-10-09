@@ -436,6 +436,22 @@ func TestValidateFilePolicyGate(t *testing.T) {
 		}
 	})
 
+	t.Run("named policies skip the gate and inspect", func(t *testing.T) {
+		h, processor := newGateTestHandler(func(string, string, string) (bool, error) {
+			t.Error("a request naming its policies must not consult the gate")
+			return false, nil
+		})
+		recorder := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(recorder)
+		c.Request = fileUploadRequest(t, "doc.pdf", "content", map[string]string{"policyName": "PII Strict"})
+		h.ValidateFile(c)
+
+		assertFileAllowed(t, recorder, true)
+		if got := processor.calls.Load(); got != 1 {
+			t.Fatalf("extraction attempts = %d, want 1", got)
+		}
+	})
+
 	t.Run("gate failure inspects rather than assuming no policies", func(t *testing.T) {
 		h, processor := newGateTestHandler(func(string, string, string) (bool, error) {
 			return false, errors.New("policy fetch failed")
@@ -535,5 +551,55 @@ func TestValidateFileInspectsUploadsAndURLsTogether(t *testing.T) {
 	assertFileAllowed(t, recorder, true)
 	if got := processor.calls.Load(); got != 2 {
 		t.Fatalf("extraction attempts = %d, want 2 (upload + URL)", got)
+	}
+}
+
+func TestValidateFileSendsTheNamedPoliciesToTheValidator(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		policyName string
+		gateCalls  int32
+	}{
+		{"named policies skip the gate", "PII Strict", 0},
+		{"no name keeps the gate and in-scope policies", "", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var gateCalls, validatorCalls atomic.Int32
+			var gotPolicy atomic.Value
+			h := &ValidationHandler{
+				cfg: &config.Config{File: config.FileConfig{
+					Enabled: true, MaxFiles: 2, ChunkSize: 1000, MaxConcurrent: 1, URLTimeoutSec: 5}},
+				logger:       zap.NewNop(),
+				fileRegistry: fileprocessor.DefaultRegistry(1024 * 1024),
+				policyGate: func(string, string, string) (bool, error) {
+					gateCalls.Add(1)
+					return true, nil
+				},
+				validateFileChunk: func(_ context.Context, meta *models.ValidateRequestParams, _, _ string) (*mcp.ValidationResult, string, error) {
+					validatorCalls.Add(1)
+					gotPolicy.Store(meta.PolicyName)
+					return &mcp.ValidationResult{Allowed: true}, "", nil
+				},
+			}
+			fields := map[string]string{}
+			if tc.policyName != "" {
+				fields["policyName"] = tc.policyName
+			}
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = fileUploadRequest(t, "notes.txt", "quarterly notes for the board", fields)
+			h.ValidateFile(c)
+
+			assertFileAllowed(t, recorder, true)
+			if got := validatorCalls.Load(); got != 1 {
+				t.Fatalf("validator calls = %d, want 1", got)
+			}
+			if got := gotPolicy.Load(); got != tc.policyName {
+				t.Errorf("validator got policyName %q, want %q", got, tc.policyName)
+			}
+			if got := gateCalls.Load(); got != tc.gateCalls {
+				t.Errorf("gate calls = %d, want %d", got, tc.gateCalls)
+			}
+		})
 	}
 }
