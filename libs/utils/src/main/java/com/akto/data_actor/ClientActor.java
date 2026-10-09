@@ -5140,21 +5140,27 @@ public class ClientActor extends DataActor {
 
     @Override
     public List<Map<String, Object>> fetchAgentModels() {
-        Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAgentModels", "", "POST", "{}", headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchAgentModels: " + response.getStatusCode(), LoggerMaker.LogDb.TESTING);
-                return null;
-            }
-            List<Map<String, Object>> models = gson.fromJson(responsePayload, new TypeToken<List<Map<String, Object>>>(){}.getType());
-            return models != null ? models : new ArrayList<>();
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(buildFetchAgentModelsRequest(), true, null, false, null);
+            return parseAgentModels(response.getStatusCode(), response.getBody());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchAgentModels: " + e, LoggerMaker.LogDb.TESTING);
             return null;
         }
+    }
+
+    static OriginalHttpRequest buildFetchAgentModelsRequest() {
+        return new OriginalHttpRequest(url + "/fetchAgentModels", "", "POST", "{}", buildHeaders(), "");
+    }
+
+    // null on a non-200 / empty response, so callers can tell an outage apart from "none saved"
+    static List<Map<String, Object>> parseAgentModels(int statusCode, String responsePayload) {
+        if (statusCode != 200 || responsePayload == null) {
+            loggerMaker.errorAndAddToDb("non 2xx response in fetchAgentModels: " + statusCode, LoggerMaker.LogDb.TESTING);
+            return null;
+        }
+        List<Map<String, Object>> models = gson.fromJson(responsePayload, new TypeToken<List<Map<String, Object>>>(){}.getType());
+        return models != null ? models : new ArrayList<>();
     }
 
 }
