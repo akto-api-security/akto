@@ -190,6 +190,7 @@ import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.notifications.SensitiveDataThresholdAlerts;
 import com.akto.notifications.TrafficUpdates;
 import com.akto.notifications.TrafficUpdates.AlertResult;
 import com.akto.notifications.TrafficUpdates.AlertType;
@@ -1114,6 +1115,7 @@ public class InitializerListener implements ServletContextListener {
          * 
          * TRAFFIC_ALERTS type webhooks have a separate cron.
          * PENDING_TESTS_ALERTS type webhooks have a separate job
+         * SENSITIVE_DATA_THRESHOLD_ALERTS type webhooks have a separate cron.
          */
 
 
@@ -1124,7 +1126,9 @@ public class InitializerListener implements ServletContextListener {
                         || webhook.getSelectedWebhookOptions()
                                 .contains(CustomWebhook.WebhookOptions.TRAFFIC_ALERTS)
             || webhook.getSelectedWebhookOptions()
-                .contains(WebhookOptions.PENDING_TESTS_ALERTS))) {
+                .contains(WebhookOptions.PENDING_TESTS_ALERTS)
+            || webhook.getSelectedWebhookOptions()
+                .contains(WebhookOptions.SENSITIVE_DATA_THRESHOLD_ALERTS))) {
             return;
         }
 
@@ -1579,6 +1583,20 @@ public class InitializerListener implements ServletContextListener {
                 }, "webhook-sender");
             }
         }, 0, 1, TimeUnit.HOURS);
+    }
+
+    /** Hourly: custom webhooks alerting on sensitive data event counts per collection. */
+    public void setUpSensitiveDataAlertScheduler() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        SensitiveDataThresholdAlerts.run();
+                    }
+                }, "sensitive-data-threshold-alerts");
+            }
+        }, 0, SensitiveDataThresholdAlerts.RUN_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
     public void setUpThreatDetectionRollingRebootScheduler() {
@@ -2684,6 +2702,7 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                     setUpWebhookScheduler();
+                    setUpSensitiveDataAlertScheduler();
                     logger.warn("Started threat detection rolling reboot scheduler", LogDb.DASHBOARD);
                     setUpThreatDetectionRollingRebootScheduler();
                     logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
