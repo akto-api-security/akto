@@ -866,6 +866,11 @@ public class DbActor extends DataActor {
         return new ArrayList<>();
     }
 
+    public List<Map<String, Object>> fetchAgentModels() {
+        // no-op: agent models are served by the database-abstractor (ClientActor); no local DAO here
+        return new ArrayList<>();
+    }
+
     public Map<String, String> fetchDeviceUserMap() {
         return new HashMap<>();
     }

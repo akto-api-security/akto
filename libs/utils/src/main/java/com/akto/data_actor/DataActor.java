@@ -379,6 +379,14 @@ public abstract class DataActor {
     public abstract void writeApiSequences(List<ApiSequences> sequences);
     public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
     public abstract List<AgentQueryRecord> fetchAgentQueryRecords(String messageId);
+
+    /**
+     * LLM models saved on the dashboard's Agents configuration page, as raw JSON objects
+     * ({name, type, params}) so new model types pass through without DTO changes here.
+     * Returns null when they couldn't be fetched, to tell an outage apart from "none saved".
+     */
+    public abstract List<Map<String, Object>> fetchAgentModels();
+
     public abstract Map<String, String> fetchDeviceUserMap();
 
     public abstract Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap();
