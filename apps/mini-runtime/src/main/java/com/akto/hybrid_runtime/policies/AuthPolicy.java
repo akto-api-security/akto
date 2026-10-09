@@ -136,6 +136,8 @@ public class AuthPolicy {
         }
 
 
+        // drop empty auth type sets persisted earlier
+        allAuthTypesFound.remove(Collections.emptySet());
         allAuthTypesFound.add(authTypes);
         apiInfo.setAllAuthTypesFound(allAuthTypesFound);
 
