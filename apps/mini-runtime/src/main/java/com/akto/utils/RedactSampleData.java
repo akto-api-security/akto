@@ -62,9 +62,7 @@ public class RedactSampleData {
     private static final Set<String> SERVICE_IDENTITY_HEADERS = new HashSet<>(Arrays.asList(
             "apc-source-service-name",
             "source_service_name",
-            "destination_service_name",
-            "x-agoda-ssot-name",
-            "mcp-protocol-version"));
+            "destination_service_name"));
 
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
