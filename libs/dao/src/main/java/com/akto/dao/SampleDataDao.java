@@ -87,6 +87,11 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
                     
                 }
             }
+        }else{
+            sampleData.setId(
+                new Key(apiCollectionId, url, method, apiCollectionId, 0, 0)
+            );
+            sampleData.setSamples(new ArrayList<>());
         }
         if (sensitiveSampleDataList != null && !sensitiveSampleDataList.isEmpty()) {
             for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
