@@ -3,7 +3,8 @@ import request from "@/util/request"
 const homeRequests = {
     getCollections: async () => {
         const resp = await request({
-            url: '/api/getAllCollections',
+            // the basic variant: same collections with their endpoint counts, without the heavy per collection fields
+            url: '/api/getAllCollectionsBasic',
             method: 'post',
             data: {}
         })

@@ -7,9 +7,10 @@ import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
 import { CollectionIcon } from "../../../components/shared/CollectionIcon"
-import React, { useEffect, useState, useRef, useMemo } from "react"
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
+import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable";
 import { CircleTickMajor } from '@shopify/polaris-icons';
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
@@ -28,7 +29,7 @@ import ResourceListModal from "../../../components/shared/ResourceListModal"
 import { saveAs } from 'file-saver'
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import ReactFlow, {
     Background,  useNodesState,
     useEdgesState,
@@ -36,7 +37,7 @@ import ReactFlow, {
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
-import useAgenticFilter, { FILTER_TYPES } from "./useAgenticFilter";
+import useAgenticFilter, { FILTER_TYPES, parseFilterFromUrl } from "./useAgenticFilter";
 import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData, fetchAndCacheAgenticTrafficRiskBundle, fetchAndCacheAgenticSensitiveInfo } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
@@ -52,8 +53,13 @@ const CenterViewType = {
     Graph: 2
   }
 
-const API_COLLECTIONS_CACHE_DURATION_SECONDS = 5 * 60; // 5 minutes
-const COLLECTIONS_LAZY_RENDER_THRESHOLD = 100; // Collections count above which we use lazy rendering optimization
+const TREE_VIEW_MAX_COLLECTIONS = 1000; // the tree view needs every row, so it loads the top collections by endpoint count only
+// how long a page waits for its coverage before showing the rows without them
+const DETAILS_GRACE_MS = 500
+const EMPTY_NARROWING = JSON.stringify({ queryValue: '', filters: {}, tagFilters: {} })
+const PAGE_FETCH_LIMIT = 100; // the most rows the backend returns per page
+const STATS_PENDING_RETRY_MS = 3000;
+const STATS_PENDING_MAX_RETRIES = 5;
 const allowedAccounts = [1736798101, 1718042191];
 
 
@@ -250,8 +256,6 @@ const tempSortOptions = [
 const sortOptions = [
     { label: mapLabel("Endpoints", getDashboardCategory()), value: 'urlsCount asc', directionLabel: 'More', sortKey: 'urlsCount', columnIndex: endpointColIndex },
     { label: mapLabel("Endpoints", getDashboardCategory()), value: 'urlsCount desc', directionLabel: 'Less', sortKey: 'urlsCount', columnIndex: endpointColIndex },
-    { label: 'Activity', value: 'deactivatedScore asc', directionLabel: 'Active', sortKey: 'deactivatedRiskScore' },
-    { label: 'Activity', value: 'deactivatedScore desc', directionLabel: 'Inactive', sortKey: 'activatedRiskScore' },
     { label: 'Risk Score', value: 'score asc', directionLabel: 'High risk', sortKey: 'riskScore', columnIndex: riskColIndex },
     { label: 'Risk Score', value: 'score desc', directionLabel: 'Low risk', sortKey: 'riskScore', columnIndex: riskColIndex },
     { label: 'Discovered', value: 'discovered asc', directionLabel: 'Recent first', sortKey: 'startTs', columnIndex: discoveredColIndex},
@@ -261,97 +265,75 @@ const sortOptions = [
 ];
 
 
+// the sort keys fetchApiCollectionsPage understands
+const SERVER_SORT_KEYS = {
+    endpoints: 'urlsCount',
+    riskScore: 'riskScore',
+    discovered: 'startTs',
+    lastSeen: 'detectedTimestamp',
+    name: 'customGroupsSort',
+}
+
+// the table's sort option value (first word) -> the server sort key
+const SORT_VALUE_TO_SERVER_KEY = {
+    urlsCount: SERVER_SORT_KEYS.endpoints,
+    score: SERVER_SORT_KEYS.riskScore,
+    discovered: SERVER_SORT_KEYS.discovered,
+    detected: SERVER_SORT_KEYS.lastSeen,
+    customGroupsSort: SERVER_SORT_KEYS.name,
+}
+
+// the selected tab id -> the tab name the backend filters on
+const SERVER_TABS = {
+    all: 'ALL',
+    hostname: 'HOSTNAME',
+    groups: 'GROUP',
+    custom: 'CUSTOM',
+    deactivated: 'DEACTIVATED',
+    untracked: 'UNTRACKED',
+}
+
 const resourceName = {
     singular: 'collection',
     plural: 'collections',
   };
 
-const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading, usernameMap = {}) => {
-    // Ensure collectionsArr is an array
-    if (!Array.isArray(collectionsArr)) {
-        return { prettify: [], normal: [] };
+// Tested apis come from another collection and so arrive after a page's rows: everything in a row that
+// derives from them. A query that failed shows "-".
+const coverageFields = (collection, coverageMap, unavailable = false) => {
+    const testedEndpoints = collection.urlsCount === 0 ? 0 : (coverageMap[collection.id] || 0);
+
+    let coverage = '0%';
+    if(!collection.isOutOfTestingScope && collection.urlsCount > 0){
+        if(collection.urlsCount < testedEndpoints){
+            coverage = '100%'
+        } else {
+            coverage = Math.ceil((testedEndpoints * 100)/collection.urlsCount) + '%'
+        }
+    } else if(collection.isOutOfTestingScope){
+        coverage = 'N/A'
+    }
+    return { testedEndpoints, coverage: unavailable ? '-' : coverage }
+}
+
+// Open issues, which come with the rows
+const issueFields = (collection, severityInfoMap) => {
+    const severityInfo = severityInfoMap[collection.id] || {};
+    // Build issuesArrVal in same format as transform.getIssuesListText
+    const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo);
+    let issuesArrVal = "-";
+    if(Object.keys(sortedSeverityInfo).length > 0){
+        issuesArrVal = "";
+        Object.keys(sortedSeverityInfo).forEach((key) => {
+            issuesArrVal += (key + ": " + sortedSeverityInfo[key] + " ");
+        });
     }
 
-    const newData = collectionsArr.map((c) => {
-        if(c.deactivated){
-            c.rowStatus = 'critical'
-            c.disableClick = true
-        }
-        const tagsList = JSON.stringify(c?.tagsList || c?.envType || "")
-
-        // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
-        // Pattern: <endpoint-id>.<source-id>.<service-name>
-        let displayText = c.displayName;
-        let endpointId = '';
-        let sourceId = '';
-        let serviceName = '';
-        // Always try to split if the name has dots (for agentic collections)
-        const splitResult = transform.splitCollectionNameForEndpointSecurity(c.displayName);
-        if (splitResult.endpointId) {
-            endpointId = splitResult.endpointId;
-            sourceId = splitResult.sourceId;
-            serviceName = splitResult.serviceName;
-        }
-        // Only modify displayText for Endpoint Security category
-        if (isEndpointSecurityCategory()) {
-            displayText = splitResult.apiCollectionName;
-        }
-
-        // Build result object directly without spread operator for better memory efficiency
-        return {
-            id: c.id,
-            displayName: c.displayName,
-            splitApiCollectionName: displayText,
-            endpointId: endpointId,
-            sourceId: sourceId,
-            serviceName: serviceName,
-            hostName: c.hostName,
-            type: c.type,
-            deactivated: c.deactivated,
-            urlsCount: c.urlsCount,
-            startTs: c.startTs,
-            tagsList: c.tagsList,
-            registryStatus: c.registryStatus,
-            description: c.description,
-            isOutOfTestingScope: c.isOutOfTestingScope,
-            accessType: (c.accessType && c.accessType !== "Unknown") ? c.accessType : "No Access Type",
-            rowStatus: c.rowStatus,
-            disableClick: c.disableClick,
-            icon: CircleTickMajor,
-            nextUrl: "/dashboard/observe/inventory/"+ c.id,
-            envTypeOriginal: c?.envType,
-            envType: c?.envType?.map(func.formatCollectionType),
-            skills: c?.skills,
-            displayNameComp: (
-                <HorizontalStack gap="2" align="start">
-                    <Box maxWidth="30vw"><Text truncate fontWeight="medium">{displayText}</Text></Box>
-                    {c.registryStatus === "available" && <RegistryBadge />}
-                </HorizontalStack>
-            ),
-            testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] || 0),
-            sensitiveInRespTypes: sensitiveInfoMap[c.id] || [],
-            severityInfo: severityInfoMap[c.id] || {},
-            detected: func.prettifyEpoch(trafficInfoMap[c.id] || 0),
-            detectedTimestamp: trafficInfoMap[c.id] || 0,
-            riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] || 0),
-            baseRiskScore: c.baseRiskScore,
-            baseRiskScoreReason: c.baseRiskScoreReason,
-            discovered: func.prettifyEpoch(c.startTs || 0),
-            descriptionComp: c.description ? (
-                <Tooltip content={c.description} dismissOnMouseOut>
-                    <Box maxWidth="350px"><Text truncate>{c.description}</Text></Box>
-                </Tooltip>
-            ) : null,
-            outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
-            username: getUsernameForCollection(c, usernameMap),
-        ...((tagsList.includes("mcp-server") || tagsList.includes("gen-ai") || tagsList.includes("browser-llm") || tagsList.includes("AWS_BEDROCK") || ((isApiSecurityCategory() || isDastCategory()) && c.hostName)) ? {
-            iconComp: (<Box><CollectionIcon hostName={c.hostName} displayName={c.displayName} tagsList={c.tagsList || c.envType} /></Box>)
-        } : {})
-        };
-    })
-
-    const prettifyData = transform.prettifyCollectionsData(newData, isLoading)
-    return { prettify: prettifyData, normal: newData }
+    return {
+        severityInfo,
+        issuesArrVal,
+        severityInfoCount: Object.keys(severityInfo).reduce((sum, key) => sum + (severityInfo[key] || 0), 0),
+    }
 }
 
 // Transform raw collection data to plain data (without JSX) for filtering/sorting
@@ -366,7 +348,6 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
 
     const detected = func.prettifyEpoch(trafficInfoMap[rawCollection.id] || 0);
     const discovered = func.prettifyEpoch(rawCollection.startTs || 0);
-    const testedEndpoints = rawCollection.urlsCount === 0 ? 0 : (coverageMap[rawCollection.id] || 0);
     const riskScore = rawCollection.urlsCount === 0 ? 0 : (riskScoreMap[rawCollection.id] || 0);
     const rawEnvType = rawCollection?.envType || null;
 
@@ -388,29 +369,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         });
     }
 
-    let calcCoverage = '0%';
-    if(!rawCollection.isOutOfTestingScope && rawCollection.urlsCount > 0){
-        if(rawCollection.urlsCount < testedEndpoints){
-            calcCoverage = '100%'
-        } else {
-            calcCoverage = Math.ceil((testedEndpoints * 100)/rawCollection.urlsCount) + '%'
-        }
-    } else if(rawCollection.isOutOfTestingScope){
-        calcCoverage = 'N/A'
-    }
-
-    const severityInfo = severityInfoMap[rawCollection.id] || {};
     const sensitiveTypes = sensitiveInfoMap[rawCollection.id] || [];
-
-    // Build issuesArrVal in same format as transform.getIssuesListText
-    const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo);
-    let issuesArrVal = "-";
-    if(Object.keys(sortedSeverityInfo).length > 0){
-        issuesArrVal = "";
-        Object.keys(sortedSeverityInfo).forEach((key) => {
-            issuesArrVal += (key + ": " + sortedSeverityInfo[key] + " ");
-        });
-    }
 
     // Split collection name - always extract endpointId/sourceId/serviceName for agentic collections
     // Pattern: <endpoint-id>.<source-id>.<service-name>
@@ -449,15 +408,14 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         registryStatus: rawCollection.registryStatus,
         description: rawCollection.description,
         isOutOfTestingScope: rawCollection.isOutOfTestingScope,
+        automated: rawCollection.automated,
         accessType: rawCollection.accessType ? rawCollection.accessType : "No Access Type",
         envType,
         envTypeOriginal: rawEnvType,
-        testedEndpoints,
+        ...coverageFields(rawCollection, coverageMap),
+        ...issueFields(rawCollection, severityInfoMap),
         sensitiveInRespTypes: sensitiveTypes,
         sensitiveSubTypesVal: sensitiveTypes.join(' ') || '-',
-        severityInfo,
-        issuesArrVal: issuesArrVal,
-        severityInfoCount: Object.keys(severityInfo).reduce((sum, key) => sum + (severityInfo[key] || 0), 0),
         sensitiveInRespCount: sensitiveTypes.length,
         detectedTimestamp: trafficInfoMap[rawCollection.id] || 0,
         riskScore,
@@ -465,7 +423,6 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         baseRiskScoreReason: rawCollection.baseRiskScoreReason,
         detected,
         discovered,
-        coverage: calcCoverage,
         nextUrl: '/dashboard/observe/inventory/' + rawCollection.id,
         lastTraffic: detected,
         rowStatus: rawCollection.deactivated ? 'critical' : undefined,
@@ -550,6 +507,17 @@ function ApiCollections(props) {
     // this scoped alternative; envType/tag-based filters still need the full account fetch to
     // match tag values, so they keep going through fetchData unchanged.
     const deviceHostNamesFilter = inventoryPageFilters?.filters?.find(f => f.key === 'hostName' && !f.value?.negated)?.value?.values;
+    // The collections table is served one page at a time by the backend. Three views still need every
+    // collection in the browser, because they filter on tags client side: the table embedded in another
+    // page, and the agentic drill-downs (a filter handed over from the Endpoints page, in the store or url).
+    const [urlSearchParams] = useSearchParams();
+    const urlFilters = parseFilterFromUrl(urlSearchParams);
+    const hasAgenticFilter = Boolean(
+        inventoryPageFilters?.filters?.some(f => (f.key === 'envType' || f.key === 'hostName') && f.value?.values?.length > 0)
+        || urlFilters.envTypeFilter || urlFilters.hostNameFilter
+    );
+    const scopedMode = Boolean(onlyShowCollectionsTable || customCollectionDataFilter || hasAgenticFilter);
+
     useEffect(() => {
         if (!onlyShowCollectionsTable && isEndpointSecurityCategory() && !inventoryPageFilters) {
             navigate("/dashboard/observe/agentic-assets", { replace: true });
@@ -606,7 +574,8 @@ function ApiCollections(props) {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated', 'Untracked']
+    // untracked collections are only served by the paginated view
+    const definedTableTabs = scopedMode ? ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated'] : ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated', 'Untracked']
 
     const { tabsInfo, selectItems } = useTable()
     const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
@@ -615,14 +584,15 @@ function ApiCollections(props) {
     let initialTabIdx = func.getTableTabIndexById(1, definedTableTabs, initialSelectedTab)
     const [selected, setSelected] = useState(initialTabIdx)
     
-    const tableCountObj = func.getTabsCount(definedTableTabs, data)
+    const [pageMeta, setPageMeta] = useState({ loaded: false, tabCounts: {}, tagChoices: {}, statsUpdatedAt: {}, statsPending: false })
+    // the backend names its tab counts like the table's tab ids
+    const tableCountObj = func.getTabsCount(definedTableTabs, scopedMode ? data : { _counts: pageMeta.tabCounts })
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
     const setInventoryFlyout = ObserveStore(state => state.setInventoryFlyout)
     const setFilteredItems = ObserveStore(state => state.setFilteredItems) 
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
-    const [deactivateCollections, setDeactivateCollections] = useState([])
 
     const resetFunc = () => {
         setInventoryFlyout(false)
@@ -639,573 +609,332 @@ function ApiCollections(props) {
         navigate("/dashboard/observe/query_mode")
     }
 
-    const allCollections = PersistStore(state => state.allCollections)
-    const setAllCollections = PersistStore(state => state.setAllCollections)
-    const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
-    const setCollectionsRegistryStatusMap = PersistStore(state => state.setCollectionsRegistryStatusMap)
-    const setTagCollectionsMap = PersistStore(state => state.setTagCollectionsMap)
-    const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
     const setTrafficMap = PersistStore(state => state.setTrafficMap)
 
-    // const lastFetchedResp = dummyData.lastFetchedResp
-    // const lastFetchedSeverityResp = dummyData.lastFetchedSeverityResp
-    // const lastFetchedSensitiveResp = dummyData.lastFetchedSensitiveResp
-    const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
-    const lastFetchedResp = PersistStore.getState().lastFetchedResp
-    const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
-    const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
-    const lastFetchedUntrackedResp = PersistStore.getState().lastFetchedUntrackedResp
-    const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
-    const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
-    const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
-    const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
-    const setLastFetchedUntrackedResp = PersistStore.getState().setLastFetchedUntrackedResp
     const totalAPIs = PersistStore(state => state.totalAPIs)
     const setTotalAPIs = PersistStore(state => state.setTotalAPIs)
     const [allEdges, setAllEdges, onAllEdgesChange] = useEdgesState([])
     const [allNodes, setAllNodes, onAllNodesChange] = useNodesState([])
 
-    // as riskScore cron runs every 5 min, we will cache the data and refresh in 5 mins
-    // similarly call sensitive and severityInfo
+    // Every row any loaded page returned, by id: bulk actions need the rows behind a selection, and
+    // a selection can span pages.
+    const rowsSeenRef = useRef(new Map())
+    const forceRefreshRef = useRef(false)
+    const statsRetriesRef = useRef(0)
+    // the search and filters the table was last asked for, as JSON
+    const narrowingRef = useRef(EMPTY_NARROWING)
+    const [treeData, setTreeData] = useState([])
+    const [treeLoading, setTreeLoading] = useState(false)
+    // bumped when a page's coverage lands, so the table swaps them in
+    const [detailsVersion, setDetailsVersion] = useState(0)
 
-    async function fetchData(isMountedRef = { current: true }, forceRefresh = false) {
+    const rowOf = (id) => normalDataById.get(id) || rowsSeenRef.current.get(id)
+
+    // ---- paginated view -------------------------------------------------------------------------
+
+    async function fetchPageMeta(isMountedRef = { current: true }) {
         try {
-            setLoading(true)
-            const now = func.timeNow();
-            // Check if we have fresh cached collections data
-            // Cache is valid if: not forcing refresh, have collections, timestamp exists, within duration, and caching enabled
-            const hasValidCache = !forceRefresh &&
-                                 allCollections.length > 0 &&
-                                 lastFetchedInfo.lastRiskScoreInfo > 0 && // Must have been fetched at least once
-                                 (now - lastFetchedInfo.lastRiskScoreInfo) < API_COLLECTIONS_CACHE_DURATION_SECONDS &&
-                                 func.isApiCollectionsCachingEnabled();
-
-            if (hasValidCache) {
-                try {
-                    // Use cached data to populate the UI
-                    const sensitiveInfoMap = lastFetchedSensitiveResp?.sensitiveInfoMap || {};
-                    const severityInfoMap = lastFetchedSeverityResp || {};
-                    const coverageMapCached = PersistStore.getState().coverageMap || {};
-                    const riskScoreMap = lastFetchedResp?.riskScoreMap || {};
-                    const trafficInfoMap = PersistStore.getState().trafficMap || {};
-
-                    // Fetch endpoint shield usernames even when using cache (for endpoint security only)
-                    let cachedUsernameMap = usernameMap || {};
-                    if (isEndpointSecurityCategory() && Object.keys(cachedUsernameMap).length === 0) {
-                        cachedUsernameMap = await fetchEndpointShieldUsernameMap();
-                        setUsernameMap(cachedUsernameMap);
-                    }
-
-                    let finalArr = allCollections;
-                    if(customCollectionDataFilter){
-                        finalArr = finalArr.filter(customCollectionDataFilter)
-                    }
-
-
-                    // Guard: Prevent state update after unmount
-                    if (!isMountedRef.current) {
-                        return;
-                    }
-
-                    // Use the centralized transformation function with cache-specific maps
-                    const cacheMaps = {
-                        trafficInfoMap,
-                        coverageMap: coverageMapCached,
-                        riskScoreMap,
-                        severityInfoMap,
-                        sensitiveInfoMap,
-                        usernameMap: cachedUsernameMap
-                    };
-
-                    // OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
-                    // Transformation happens on-demand in the table for each page (100 items at a time)
-                    const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
-
-                    let lightweightData;
-                    if (shouldOptimize) {
-                        // Store ONLY raw data + lookup maps - minimal memory footprint
-                        const rawData = finalArr;
-                        rawData._lazyTransform = true;
-                        rawData._transformMaps = cacheMaps;
-
-                        // Transform for categorization only (no JSX components yet)
-                        lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
-                        lightweightData._lazyTransform = true;
-                        lightweightData._transformMaps = cacheMaps;
-                        lightweightData._transformedCache = lightweightData;
-                    } else {
-                        // Small dataset - transform all upfront
-                        lightweightData = finalArr.map(c => transformRawCollectionData(c, cacheMaps));
-                    }
-
-                    const { categorized, envTypeObj } = categorizeCollections(lightweightData);
-
-                    // Use transform.getSummaryData to match master behavior (excludes API_GROUP and deactivated)
-                    const initialSummaryDataObj = transform.getSummaryData(lightweightData);
-                    initialSummaryDataObj.totalSensitiveEndpoints = lastFetchedSensitiveResp?.sensitiveUrls || 0;
-                    initialSummaryDataObj.totalCriticalEndpoints = lastFetchedResp?.criticalUrls || 0;
-
-                    // React 18+ automatically batches these state updates into a single re-render
-                    // IMPORTANT: Set data and summary BEFORE setting loading=false to avoid showing zeros
-                    // Use cached untracked data
-                    categorized.untracked = lastFetchedUntrackedResp || [];
-                    setData(categorized);
-                    setNormalData(lightweightData);
-                    setEnvTypeMap(envTypeObj);
-                    setSummaryData(initialSummaryDataObj);
-                    setHasUsageEndpoints(true);
-
-                    // Set loading to false AFTER all data is set
-                    setLoading(false);
-
-                    // Check if maps are already cached in PersistStore
-                    const cachedCollectionsMap = PersistStore.getState().collectionsMap;
-
-                    // Only calculate maps if they're not cached or cache is stale
-                    if (!cachedCollectionsMap || Object.keys(cachedCollectionsMap).length === 0) {
-                        // Calculate maps but DON'T call setters yet - do it asynchronously after render
-                        const collectionsMapNew = func.mapCollectionIdToName(finalArr);
-                        const hostNameMapNew = func.mapCollectionIdToHostName(finalArr);
-                        const tagCollectionsMapNew = func.mapCollectionIdsToTagName(finalArr);
-                        const registryStatusMapNew = func.mapCollectionIdToRegistryStatus(finalArr);
-
-                        // Store in PersistStore asynchronously AFTER the UI has rendered
-                        setTimeout(() => {
-                            if (!isMountedRef.current) return;
-                            setCollectionsMap(collectionsMapNew);
-                            setHostNameMap(hostNameMapNew);
-                            setTagCollectionsMap(tagCollectionsMapNew);
-                            setCollectionsRegistryStatusMap(registryStatusMapNew);
-                        }, 0);
-                    }
-
-                    return; // Exit early, no API calls!
-                } catch (error) {
-                    // Fall through to fetch fresh data if cache processing fails
-                    setLoading(true);
-                }
+            const meta = await collectionApi.fetchApiCollectionsPageMeta()
+            if (!isMountedRef.current) return
+            const summary = meta?.summary || {}
+            const tabCounts = meta?.tabCounts || {}
+            // the meta's counts are of the whole account; while the table is narrowed, its own counts stand
+            const narrowed = narrowingRef.current !== EMPTY_NARROWING
+            if (narrowed) loadTabCounts(JSON.parse(narrowingRef.current), isMountedRef)
+            setPageMeta(prev => ({
+                loaded: true,
+                tabCounts: narrowed ? prev.tabCounts : tabCounts,
+                tagChoices: meta?.tagChoices || {},
+                statsUpdatedAt: meta?.statsUpdatedAt || {},
+                statsPending: !!meta?.statsPending,
+            }))
+            setSummaryData({
+                totalEndpoints: 0,
+                totalTestedEndpoints: summary.totalTestedEndpoints || 0,
+                totalSensitiveEndpoints: summary.totalSensitiveEndpoints || 0,
+                totalCriticalEndpoints: summary.totalCriticalEndpoints || 0,
+                totalAllowedForTesting: summary.totalAllowedForTesting || 0,
+            })
+            setHasUsageEndpoints(meta?.hasUsageEndpoints !== false)
+            if ((tabCounts.hostname || 0) === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
+                setSelectedTab("custom")
+                setSelected(3)
             }
-            // Build all API promises to run in parallel
-            const shouldCallHeavyApis = (now - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
-
-            let apiPromises = [
-                api.getAllCollectionsBasic(),  // index 0
-                api.getUserEndpoints(),         // index 1
-                api.getLastTrafficSeen(),            // index 2
-                collectionApi.fetchCountForHostnameDeactivatedCollections(), // index 3
-                collectionApi.fetchCountForUningestedApis(), // index 4
-                collectionApi.fetchUningestedApis(),        // index 5
-            ];
-
-            // Conditionally add coverage API (skip for Endpoint Security)
-            if (!isEndpointSecurityCategory()) {
-                apiPromises.push(api.getCoverageInfoForCollections()); // index 6
-            }
-
-            if(shouldCallHeavyApis){
-                apiPromises.push(api.getRiskScoreInfo()); // index 6 or 7
-                apiPromises.push(api.getSeverityInfoForCollections()); // index 7 or 8
-            }
-
-            if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
-                apiPromises.push(api.getAllUsersCollections()); // index varies
-                apiPromises.push(settingRequests.getTeamData()); // index varies
-            }
-
-
-            let results = await Promise.allSettled(apiPromises);
-
-            // Extract collections response (index 0)
-            const apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : { apiCollections: [] };
-            // Extract user endpoints (index 1)
-            let hasUserEndpoints = results[1].status === 'fulfilled' ? results[1].value : false;
-
-
-            // Extract metadata responses (with corrected indices)
-            let trafficInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-            let deactivatedCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-            let uningestedApiCountInfo = results[4].status === 'fulfilled' ? results[4].value : {};
-            let uningestedApiDetails = results[5].status === 'fulfilled' ? results[5].value : {};
-
-            let coverageInfo = {};
-            let currentIndex = 6;
-
-            // Conditionally extract coverage info (skip for Endpoint Security)
-            if (!isEndpointSecurityCategory()) {
-                coverageInfo = results[6].status === 'fulfilled' ? results[6].value : {};
-                currentIndex = 7;
-            }
-
-            let riskScoreObj = lastFetchedResp
-            let sensitiveInfo = lastFetchedSensitiveResp
-            let severityObj = lastFetchedSeverityResp
-
-        if(shouldCallHeavyApis){
-            if(results[currentIndex]?.status === "fulfilled"){
-                const res = results[currentIndex].value
-                riskScoreObj = {
-                    criticalUrls: res.criticalEndpointsCount,
-                    riskScoreMap: res.riskScoreOfCollectionsMap
-                }
-            }
-            currentIndex++;
-
-            if(results[currentIndex]?.status === "fulfilled"){
-                const res = results[currentIndex].value
-                severityObj = res
-            }
-            currentIndex++;
-
-            // update the store which has the cached response
-            setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
-            setLastFetchedResp(riskScoreObj)
-            setLastFetchedSeverityResp(severityObj)
-        }
-        setCoverageMap(coverageInfo)
-        setTrafficMap(trafficInfo)
-
-        let usersCollectionList = []
-        let userList = []
-
-        if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
-            if(results[currentIndex]?.status === "fulfilled") {
-                const res = results[currentIndex].value
-                usersCollectionList = res
-            }
-            currentIndex++;
-
-            if(results[currentIndex]?.status === "fulfilled") {
-                const res = results[currentIndex].value
-                userList = res
-                if (userList) {
-                    userList = userList.filter(x => {
-                        if (x?.role === "ADMIN") {
-                            return false;
-                        }
-                        return true
-                    })
-                }
-            }
-            setUsersCollection(usersCollectionList)
-            setTeamData(userList)
-        }
-
-        // Fetch endpoint shield usernames (for endpoint security only)
-        let collectionToUsernameMap = {};
-        if (isEndpointSecurityCategory()) {
-            collectionToUsernameMap = await fetchEndpointShieldUsernameMap();
-            setUsernameMap(collectionToUsernameMap);
-        }
-
-        // Ensure all parameters are defined before calling convertToNewData
-        const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
-        const severityInfoMap = severityObj || {};
-        const coverageMap = coverageInfo || {};
-        const trafficInfoMap = trafficInfo || {};
-        const riskScoreMap = riskScoreObj?.riskScoreMap || {};
-
-        // Guard: Prevent state update after unmount
-        if (!isMountedRef.current) {
-            return;
-        }
-
-        setLoading(false);
-        let finalArr = apiCollectionsResp.apiCollections || [];
-        if(customCollectionDataFilter){
-            finalArr = finalArr.filter(customCollectionDataFilter)
-        }
-
-        // Process data - OPTIMIZATION: For large datasets (>COLLECTIONS_LAZY_RENDER_THRESHOLD items), store RAW data + transform function
-        // Transformation happens on-demand in the table for each page (100 items at a time)
-        const shouldOptimize = finalArr.length > COLLECTIONS_LAZY_RENDER_THRESHOLD;
-
-        let dataObj;
-        if (shouldOptimize) {
-            // Store ONLY raw data + lookup maps - minimal memory footprint
-            // Each item is just the raw API response (~10 properties), not the transformed object (~30 properties)
-            const rawData = finalArr;
-
-            // Attach metadata for lazy transformation
-            rawData._lazyTransform = true;
-            rawData._transformMaps = {
-                sensitiveInfoMap,
-                severityInfoMap,
-                coverageMap,
-                trafficInfoMap,
-                riskScoreMap,
-                usernameMap: collectionToUsernameMap
-            };
-
-            dataObj = { prettify: rawData, normal: rawData };
-        } else {
-            // Small dataset (<500 items) - use old approach with JSX components
-            dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false, collectionToUsernameMap);
-        }
-
-        // Ensure dataObj.prettify exists
-        if (!dataObj.prettify) {
-            return;
-        }
-
-        // For lazy transform, we need to transform the data first for categorization
-        // The table will transform again on-demand for JSX creation, but categorization needs plain data
-        let dataForCategorization = dataObj.prettify;
-        if (dataObj.prettify._lazyTransform) {
-            const maps = dataObj.prettify._transformMaps || {};
-
-            // Use the centralized transformation function
-            dataForCategorization = dataObj.prettify.map(c => transformRawCollectionData(c, maps));
-
-            // Store transformed data back for table to use
-            dataForCategorization._lazyTransform = true;
-            dataForCategorization._transformMaps = maps;
-            dataForCategorization._transformedCache = dataForCategorization;
-            dataObj.prettify = dataForCategorization;
-            dataObj.normal = dataForCategorization;
-        }
-
-        // Render first batch immediately to show UI fast
-        const { envTypeObj, collectionMap, activeCollections, categorized } = categorizeCollections(dataForCategorization);
-
-        setNormalData(dataObj.normal);
-        let res = categorized;
-
-        // Separate active and deactivated collections
-        const deactivatedCollectionsCopy = res.deactivated.map((c)=>{
-            if(deactivatedCountInfo.hasOwnProperty(c.id)){
-                c.urlsCount = deactivatedCountInfo[c.id]
-            }
-            return c
-        });
-
-        setDeactivateCollections(deactivatedCollectionsCopy)
-
-        // Initialize empty untracked array for immediate render
-        res['untracked'] = [];
-        setHasUsageEndpoints(hasUserEndpoints);
-
-        // Use transform.getSummaryData to match master behavior (excludes API_GROUP and deactivated)
-        const initialSummaryDataObj = transform.getSummaryData(dataObj.normal);
-        initialSummaryDataObj.totalSensitiveEndpoints = sensitiveInfo?.sensitiveUrls || 0;
-        initialSummaryDataObj.totalCriticalEndpoints = riskScoreObj?.criticalUrls || 0;
-
-        // Render first batch immediately WITHOUT untracked processing to show UI fast
-        setData(res);
-        setEnvTypeMap(envTypeObj);
-        setAllCollections(apiCollectionsResp.apiCollections || []);
-        setSummaryData(initialSummaryDataObj);
-
-        // Store untracked collections for use in async callbacks
-        let untrackedCollectionsCache = [];
-
-        // Process untracked API data asynchronously to avoid blocking UI
-        setTimeout(() => {
-            if (!isMountedRef.current) return;
-
-            const untrackedApiDataMap = {};
-            if (uningestedApiDetails && uningestedApiDetails.uningestedApiList) {
-                uningestedApiDetails.uningestedApiList.forEach(api => {
-                    const collectionId = api.apiCollectionId;
-                    if (!untrackedApiDataMap[collectionId]) {
-                        untrackedApiDataMap[collectionId] = [];
-                    }
-                    untrackedApiDataMap[collectionId].push(api);
-                });
-            }
-
-            untrackedCollectionsCache = Object.entries(uningestedApiCountInfo || {})
-                .filter(([_, count]) => count > 0)
-                .map(([collectionId, untrackedCount]) => {
-                    const collection = collectionMap.get(parseInt(collectionId));
-                    if (!collection) return null;
-
-                    const apisForCollection = untrackedApiDataMap[collectionId];
-                    const row = {
-                        id: collection.id,
-                        name: `untracked-${collection.id}`,
-                        displayName: collection.displayName,
-                        displayNameComp: collection.displayNameComp,
-                        urlsCount: untrackedCount,
-                        rowStatus: 'critical',
-                        nextUrl: null,
-                        deactivated: false,
-                        severityInfo: {},
-                        sensitiveInRespTypes: [],
-                        detectedTimestamp: 0,
-                        startTs: collection.startTs || 0,
-                        testedEndpoints: 0,
-                        riskScore: 0,
-                    };
-                    let builtCollapsibleRow;
-                    let builtCollapsibleRowText;
-                    Object.defineProperty(row, 'collapsibleRow', {
-                        enumerable: true,
-                        get() {
-                            if (builtCollapsibleRow === undefined) {
-                                builtCollapsibleRow = apisForCollection
-                                    ? transform.getUntrackedApisCollapsibleRow(apisForCollection)
-                                    : null;
-                            }
-                            return builtCollapsibleRow;
-                        },
-                    });
-                    Object.defineProperty(row, 'collapsibleRowText', {
-                        enumerable: true,
-                        get() {
-                            if (builtCollapsibleRowText === undefined) {
-                                builtCollapsibleRowText = apisForCollection
-                                    ? apisForCollection.map(x => x.url).join(", ")
-                                    : null;
-                            }
-                            return builtCollapsibleRowText;
-                        },
-                    });
-
-                    return row;
-                })
-                .filter(Boolean);
-
-            // Update data with untracked collections - Create a new object to ensure React detects the change
-            setData(prevData => ({
-                ...prevData,
-                untracked: untrackedCollectionsCache
-            }));
-
-            // Cache the untracked data for future use
-            setLastFetchedUntrackedResp(untrackedCollectionsCache);
-        }, 0); // Execute immediately but asynchronously
-
-        // Fetch endpoints count and sensitive info asynchronously
-        Promise.all([
-            dashboardApi.fetchEndpointsCount(0, 0),
-            shouldCallHeavyApis ? api.getSensitiveInfoForCollections() : Promise.resolve(null)
-        ]).then(([endpointsResponse, sensitiveResponse]) => {
-            // Guard: Prevent state updates if component is unmounted
-            if (!isMountedRef.current) {
-                return;
-            }
-
-            // Update endpoints count
-            if (endpointsResponse) {
-                setTotalAPIs(endpointsResponse.newCount);
-            }
-
-            // Update sensitive info if available
-            if(sensitiveResponse == null || sensitiveResponse === undefined){
-                sensitiveResponse = {
-                    sensitiveUrlsInResponse: lastFetchedSensitiveResp?.sensitiveUrls || 0,
-                    sensitiveSubtypesInCollection: lastFetchedSensitiveResp?.sensitiveInfoMap || {}
-                }
-
-            }
-            if (sensitiveResponse) {
-                const newSensitiveInfo = {
-                    sensitiveUrls: sensitiveResponse.sensitiveUrlsInResponse,
-                    sensitiveInfoMap: sensitiveResponse.sensitiveSubtypesInCollection
-                };
-
-                // Update the store with new sensitive info
-                setLastFetchedSensitiveResp(newSensitiveInfo);
-
-                
-                const sensitiveInfoChanged = !func.sensitiveInfoMapsLookEqual(sensitiveInfoMap, newSensitiveInfo.sensitiveInfoMap);
-
-                if (sensitiveInfoChanged) {
-                    const withUpdatedSensitiveInfo = (item) => {
-                        const tags = newSensitiveInfo.sensitiveInfoMap[item.id] || [];
-                        return {
-                            ...item,
-                            sensitiveInRespTypes: tags,
-                            sensitiveSubTypesVal: tags.join(' ') || '-',
-                        };
-                    };
-
-                    const updatedNormalData = dataObj.normal.map(withUpdatedSensitiveInfo);
-                    setNormalData(updatedNormalData);
-
-                  
-                    const updatedPrettifyData = dataObj.prettify === dataObj.normal
-                        ? updatedNormalData
-                        : dataObj.prettify.map(withUpdatedSensitiveInfo);
-
-                    // Re-categorize with updated data
-                    const { categorized: updatedCategorized } = categorizeCollections(updatedPrettifyData);
-
-                    // Update deactivated collections with counts
-                    const updatedDeactivatedCollections = updatedCategorized.deactivated.map((c) => {
-                        if(deactivatedCountInfo.hasOwnProperty(c.id)){
-                            c.urlsCount = deactivatedCountInfo[c.id]
-                        }
-                        return c
-                    });
-
-                    updatedCategorized.deactivated = updatedDeactivatedCollections;
-
-                    // Preserve existing untracked data or use cached version
-                    setData(prevData => ({
-                        ...updatedCategorized,
-                        untracked: prevData.untracked || untrackedCollectionsCache
-                    }));
-
-                    // Update summary with new sensitive endpoints count
-                    const updatedSummary = transform.getSummaryData(updatedNormalData);
-                    updatedSummary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
-                    updatedSummary.totalSensitiveEndpoints = newSensitiveInfo.sensitiveUrls;
-                    setSummaryData(updatedSummary);
-                }
-            }
-        }).catch(() => {
-        });
-
-        if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
-            setTimeout(() => {
-                if (!isMountedRef.current) return;
-                setSelectedTab("custom");
-                setSelected(3);
-            }, 100);
-        }
-        setCollectionsMap(func.mapCollectionIdToName(activeCollections))
-        setHostNameMap(func.mapCollectionIdToHostName(activeCollections))
-        setTagCollectionsMap(func.mapCollectionIdsToTagName(activeCollections))
-        setCollectionsRegistryStatusMap(func.mapCollectionIdToRegistryStatus(activeCollections))
         } catch (error) {
-            setLoading(false);
+            if (isMountedRef.current) setPageMeta(prev => ({ ...prev, loaded: true }))
         }
     }
 
-    async function fetchTargetedDeviceCollections(deviceHostNames, isMountedRef) {
+    // The Total APIs tile: its own call so it never holds the header or the table back
+    async function fetchTotalApis(isMountedRef) {
         try {
-            setLoading(true);
-            const [collectionsResp, trafficRiskBundle, sensitiveMap, endpointUsernameMap] = await Promise.all([
-                api.fetchCollectionsBasicForHostNames(deviceHostNames),
+            const resp = await dashboardApi.fetchEndpointsCount(0, 0)
+            if (resp && isMountedRef.current) setTotalAPIs(resp.newCount)
+        } catch (error) {
+            // the tile keeps its last known value
+        }
+    }
+
+    // Raw rows of a page response -> the plain rows the table and the bulk actions work with.
+    function toPlainRows(resp) {
+        const transformMaps = {
+            trafficInfoMap: resp.lastSeenMap || {},
+            // coverage arrives separately (loadDetails), after the rows are shown
+            coverageMap: {},
+            riskScoreMap: resp.riskScoreMap || {},
+            severityInfoMap: resp.severityInfoMap || {},
+            sensitiveInfoMap: resp.sensitiveInfoMap || {},
+            usernameMap,
+        }
+        return (resp.apiCollections || []).map(c => ({
+            ...transformRawCollectionData(c, transformMaps),
+            issuesUnavailable: !!resp.issuesUnavailable,
+        }))
+    }
+
+    function toUntrackedRows(resp) {
+        return (resp.untrackedRows || []).map(r => {
+            const apis = r.uningestedApiList || []
+            return {
+                id: r.id,
+                name: `untracked-${r.id}`,
+                displayName: r.displayName,
+                urlsCount: r.urlsCount,
+                rowStatus: 'critical',
+                nextUrl: null,
+                deactivated: false,
+                severityInfo: {},
+                sensitiveInRespTypes: [],
+                detectedTimestamp: 0,
+                startTs: r.startTs || 0,
+                testedEndpoints: 0,
+                riskScore: 0,
+                collapsibleRow: apis.length > 0 ? transform.getUntrackedApisCollapsibleRow(apis) : null,
+                collapsibleRowText: apis.map(x => x.url).join(", "),
+            }
+        })
+    }
+
+    // Coverage of these rows, which the backend serves apart from the rows so that a slow query never
+    // holds a page back: the same rows with that column filled in (or marked unavailable).
+    async function loadDetails(rows) {
+        const idChunks = []
+        for (let i = 0; i < rows.length; i += PAGE_FETCH_LIMIT) {
+            idChunks.push(rows.slice(i, i + PAGE_FETCH_LIMIT).map(r => r.id))
+        }
+        const responses = await Promise.all(idChunks.map(ids =>
+            collectionApi.fetchApiCollectionsPageDetails(ids).catch(() => ({ coverageUnavailable: true }))))
+
+        const coverageMap = Object.assign({}, ...responses.map(r => r.coverageMap || {}))
+        const unavailable = responses.some(r => r.coverageUnavailable)
+        if (!unavailable) {
+            setCoverageMap({ ...PersistStore.getState().coverageMap, ...coverageMap })
+        }
+        return rows.map(r => ({
+            ...r,
+            ...coverageFields(r, coverageMap, unavailable),
+            coverageUnavailable: unavailable,
+            detailsLoaded: true,
+        }))
+    }
+
+    // What narrows the table besides its tab: the search text, column filters and tag filters
+    const narrowingOf = (filtersObj, queryValue) => {
+        const filters = {}
+        ;['isOutOfTestingScope', 'accessType'].forEach(key => {
+            if (filtersObj?.[key]?.length) filters[key] = filtersObj[key]
+        })
+        const tagFilters = {}
+        Object.entries(tagFiltersApplied).forEach(([key, values]) => {
+            if (values?.length) tagFilters[key] = values
+        })
+        return { queryValue: queryValue || '', filters, tagFilters }
+    }
+
+    // The tab badges count what the search and filters leave; they change only when those change, not on sort or paging
+    function refreshTabCountsIfNarrowingChanged(narrowing) {
+        const signature = JSON.stringify(narrowing)
+        if (signature === narrowingRef.current) return
+        narrowingRef.current = signature
+        loadTabCounts(narrowing)
+    }
+
+    function loadTabCounts(narrowing, isMountedRef = { current: true }) {
+        const signature = JSON.stringify(narrowing)
+        collectionApi.fetchApiCollectionsTabCounts(narrowing).then(tabCounts => {
+            // a later change may have replaced this one while it was in flight
+            if (isMountedRef.current && narrowingRef.current === signature) {
+                setPageMeta(prev => ({ ...prev, tabCounts: tabCounts || prev.tabCounts }))
+            }
+        }).catch(() => {})
+    }
+
+    // The table's fetchData: one page, sorted and filtered by the backend.
+    const fetchPageRows = async (sortValue, sortOrder, skip, limit, filtersObj, filterOperators, queryValue) => {
+        const serverSortKey = SORT_VALUE_TO_SERVER_KEY[sortValue]
+        // the table passes -1 for the options labelled "asc" ("More", "High risk", "Recent first": largest
+        // value first, i.e. mongo descending). Names are the opposite: its "asc" is A-Z.
+        const mongoOrder = serverSortKey === SERVER_SORT_KEYS.name ? -sortOrder : sortOrder
+        const force = forceRefreshRef.current
+        forceRefreshRef.current = false
+
+        const narrowing = narrowingOf(filtersObj, queryValue)
+        refreshTabCountsIfNarrowingChanged(narrowing)
+
+        const resp = await collectionApi.fetchApiCollectionsPage({
+            skip, limit, sortKey: serverSortKey, sortOrder: mongoOrder, tab: SERVER_TABS[selectedTab],
+            ...narrowing, force,
+        })
+
+        if (resp?.statsPending && statsRetriesRef.current < STATS_PENDING_MAX_RETRIES) {
+            // the very first load of an account's numbers is still being computed: look again shortly
+            statsRetriesRef.current += 1
+            setTimeout(() => { fetchPageMeta(); setRefreshData(v => !v) }, STATS_PENDING_RETRY_MS)
+        }
+
+        let rows
+        if (selectedTab === 'untracked') {
+            rows = toUntrackedRows(resp)
+            return { value: transform.prettifyUntrackedCollectionsData(rows), total: resp?.total || 0 }
+        }
+        rows = toPlainRows(resp)
+        rows.forEach(r => rowsSeenRef.current.set(r.id, r))
+        // other pages (home) read this map; keep it current with what this page has shown
+        setTrafficMap({ ...PersistStore.getState().trafficMap, ...(resp.lastSeenMap || {}) })
+
+        // Coverage is given a short head start: when it lands in time the table renders once, complete.
+        // Only when they are slow do the rows show with "..." first and get patched in (a second render) later.
+        const detailsPromise = loadDetails(rows)
+        const grace = new Promise(resolve => setTimeout(() => resolve(null), DETAILS_GRACE_MS))
+        const loaded = await Promise.race([detailsPromise, grace])
+        if (loaded) {
+            loaded.forEach(r => rowsSeenRef.current.set(r.id, r))
+            return {
+                value: transform.prettifyCollectionsData(loaded, false, selectedTab, activeFilterType),
+                total: resp?.total || 0,
+            }
+        }
+        detailsPromise.then(late => {
+            late.forEach(r => rowsSeenRef.current.set(r.id, r))
+            setDetailsVersion(v => v + 1)
+        })
+        return {
+            value: transform.prettifyCollectionsData(rows, false, selectedTab, activeFilterType, true),
+            total: resp?.total || 0,
+        }
+    }
+
+    // A page of a tab with no search or filters, largest first by the given sort key
+    const fetchUnfilteredPage = (tab, sortKey, skip, limit) => collectionApi.fetchApiCollectionsPage({
+        skip, limit, sortKey, sortOrder: -1, tab, queryValue: '', filters: {}, tagFilters: {},
+    })
+
+    async function fetchAllRowsOfTab(tab) {
+        const rows = []
+        let total = Infinity
+        for (let skip = 0; skip < total; skip += PAGE_FETCH_LIMIT) {
+            const resp = await fetchUnfilteredPage(tab, SERVER_SORT_KEYS.endpoints, skip, PAGE_FETCH_LIMIT)
+            total = resp?.total || 0
+            const page = tab === SERVER_TABS.untracked ? toUntrackedRows(resp) : await loadDetails(toPlainRows(resp))
+            if (page.length === 0) break
+            rows.push(...page)
+        }
+        return rows
+    }
+
+    async function fetchTreeData() {
+        setTreeLoading(true)
+        try {
+            const requests = []
+            for (let skip = 0; skip < TREE_VIEW_MAX_COLLECTIONS; skip += PAGE_FETCH_LIMIT) {
+                requests.push(fetchUnfilteredPage(SERVER_TABS.all, SERVER_SORT_KEYS.endpoints, skip, PAGE_FETCH_LIMIT))
+            }
+            const rows = await loadDetails((await Promise.all(requests)).flatMap(resp => toPlainRows(resp)))
+            rows.forEach(r => rowsSeenRef.current.set(r.id, r))
+            setTreeData(rows)
+        } finally {
+            setTreeLoading(false)
+        }
+    }
+
+    // ---- scoped views: every collection, filtered in the browser ---------------------------------
+
+    async function fetchScopedData(isMountedRef = { current: true }) {
+        try {
+            setLoading(true)
+            const targeted = isEndpointSecurityCategory() && deviceHostNamesFilter?.length > 0
+            const withUsernames = targeted || isEndpointSecurityCategory()
+            const withCoverageAndIssues = !targeted && !isEndpointSecurityCategory()
+            const [collectionsResp, trafficRiskBundle, sensitiveMap, coverageInfo, severityInfo, endpointUsernameMap] = await Promise.all([
+                targeted ? api.fetchCollectionsBasicForHostNames(deviceHostNamesFilter) : api.getAllCollectionsBasic(),
                 fetchAndCacheAgenticTrafficRiskBundle({ api, PersistStore }),
                 fetchAndCacheAgenticSensitiveInfo({ api, PersistStore }),
-                fetchEndpointShieldUsernameMap(),
-            ]);
-            if (!isMountedRef.current) return;
+                withCoverageAndIssues ? api.getCoverageInfoForCollections().catch(() => ({})) : Promise.resolve({}),
+                withCoverageAndIssues ? api.getSeverityInfoForCollections().catch(() => ({})) : Promise.resolve({}),
+                withUsernames ? fetchEndpointShieldUsernameMap() : Promise.resolve({}),
+            ])
+            if (!isMountedRef.current) return
 
-            const cacheMaps = {
+            const allFetched = collectionsResp?.apiCollections || []
+            if (!targeted) func.applyCollectionMaps(allFetched)
+
+            const maps = {
                 trafficInfoMap: trafficRiskBundle?.trafficMap || {},
-                coverageMap: {},
+                coverageMap: coverageInfo || {},
                 riskScoreMap: trafficRiskBundle?.riskScoreMap || {},
-                severityInfoMap: {},
+                severityInfoMap: severityInfo || {},
                 sensitiveInfoMap: sensitiveMap || {},
                 usernameMap: endpointUsernameMap || {},
-            };
+            }
+            const finalArr = customCollectionDataFilter ? allFetched.filter(customCollectionDataFilter) : allFetched
+            const lightweightData = finalArr.map(c => transformRawCollectionData(c, maps))
+            const { categorized, envTypeObj } = categorizeCollections(lightweightData)
 
-            const lightweightData = (collectionsResp?.apiCollections || []).map(c => transformRawCollectionData(c, cacheMaps));
-            const { categorized, envTypeObj } = categorizeCollections(lightweightData);
+            categorized.untracked = []
+            setData(categorized)
+            setNormalData(lightweightData)
+            setEnvTypeMap(envTypeObj)
+            setUsernameMap(endpointUsernameMap || {})
+            setSummaryData(transform.getSummaryData(lightweightData))
+            setHasUsageEndpoints(true)
+            setLoading(false)
 
-            setData(categorized);
-            setNormalData(lightweightData);
-            setEnvTypeMap(envTypeObj);
-            setUsernameMap(endpointUsernameMap || {});
-            setSummaryData({ totalEndpoints: 0, totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0 });
-            setHasUsageEndpoints(true);
-            setLoading(false);
+            if (categorized.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
+                setSelectedTab("custom")
+                setSelected(3)
+            }
         } catch (error) {
-            if (isMountedRef.current) setLoading(false);
+            if (isMountedRef.current) setLoading(false)
+        }
+    }
+
+    // After a change (create, delete, tags, ...): load again whatever this view shows.
+    const refreshAll = () => {
+        if (scopedMode) {
+            return fetchScopedData({ current: true })
+        }
+        rowsSeenRef.current = new Map()
+        func.refreshCollectionMapsAsync()
+        fetchPageMeta()
+        setRefreshData(v => !v)
+    }
+
+    // The "Refresh" next to the stats age: ask the backend to recompute the numbers now.
+    const forceStatsRefresh = () => {
+        forceRefreshRef.current = true
+        setPageMeta(prev => ({ ...prev, statsPending: false }))
+        setRefreshData(v => !v)
+        setTimeout(() => fetchPageMeta(), 1500)
+    }
+
+    // Admin only: the member list and which collections each can see, for the Share action.
+    async function fetchShareData() {
+        if (!(userRole === 'ADMIN' && func.checkForRbacFeature())) return
+        const [usersCollectionResp, teamResp] = await Promise.allSettled([api.getAllUsersCollections(), settingRequests.getTeamData()])
+        if (usersCollectionResp.status === 'fulfilled') setUsersCollection(usersCollectionResp.value)
+        if (teamResp.status === 'fulfilled' && teamResp.value) {
+            setTeamData(teamResp.value.filter(x => x?.role !== "ADMIN"))
         }
     }
 
@@ -1265,11 +994,15 @@ function ApiCollections(props) {
     useEffect(() => {
         const isMountedRef = { current: true };
 
-        if (isEndpointSecurityCategory() && deviceHostNamesFilter?.length > 0) {
-            fetchTargetedDeviceCollections(deviceHostNamesFilter, isMountedRef);
+        if (scopedMode) {
+            fetchScopedData(isMountedRef);
         } else {
-            fetchData(isMountedRef, false); // Use cache on mount
+            // the table fetches its own pages; this is the header (tab counts, summary, tag choices)
+            fetchPageMeta(isMountedRef);
+            func.refreshCollectionMapsAsync();
         }
+        fetchTotalApis(isMountedRef);
+        fetchShareData();
         resetFunc();
 
         // Cleanup function to prevent state updates after unmount
@@ -1277,6 +1010,12 @@ function ApiCollections(props) {
             isMountedRef.current = false;
         };
     }, [])
+    useEffect(() => {
+        if (!scopedMode && centerView === CenterViewType.Tree) {
+            fetchTreeData();
+        }
+    }, [centerView])
+
     const createCollectionModalActivatorRef = useRef();
     const resetResourcesSelected = () => {
         TableStore.getState().setSelectedItems([])
@@ -1292,7 +1031,7 @@ function ApiCollections(props) {
             func.setToast(true, true, error.message || 'Something went wrong!')
         })
         resetResourcesSelected();
-        fetchData({ current: true }, true) // Force refresh after mutations
+        refreshAll() // reload after mutations
     }
 
     const getActiveSkillName = () => {
@@ -1316,7 +1055,7 @@ function ApiCollections(props) {
             })
             .catch((e) => func.setToast(true, true, e.message || 'Something went wrong!'));
         resetResourcesSelected();
-        fetchData({ current: true }, true);
+        refreshAll();
     }
 
     async function handleUntrackedDelete(apiCollectionIds) {
@@ -1326,7 +1065,7 @@ function ApiCollections(props) {
             func.setToast(true, true, error.message || 'Something went wrong!')
         })
         resetResourcesSelected();
-        fetchData({ current: true }, true)
+        refreshAll()
     }
     async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
         const userCollectionMap = {};
@@ -1341,37 +1080,41 @@ function ApiCollections(props) {
         func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collections have been updated successfully`);
     }
 
-    const exportCsv = (selectedResources = []) =>{
+    const exportCsv = async (selectedResources = []) =>{
         const csvFileName = definedTableTabs[selected] + " Collections.csv"
-        const selectedResourcesSet = new Set(selectedResources)
-        if (!loading) {
-            const wrapCsvValue = (value) => {
-                const s = (value === null || value === undefined) ? '-' : String(value);
-                return '"' + s.replace(/"/g, '""') + '"';
-            }
+        if (loading) return
 
-            let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
-            if(tableSelectedTab === "untracked"){
-                headerTextToValueMap['URLs'] = "collapsibleRowText"
-            }
-            let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-            
-            if(selectedResources.length === 0){
-                data[tableSelectedTab].forEach(i => {
-                    csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
-                })
-            }else{
-                data[tableSelectedTab].filter((i) => selectedResourcesSet.has(i.id)).forEach(i => {
-                    csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
-                })
-            }
-
-            let blob = new Blob([csv], {
-                type: "application/csvcharset=UTF-8"
-            });
-            saveAs(blob, csvFileName) ;
-            func.setToast(true, false,"CSV exported successfully")
+        const wrapCsvValue = (value) => {
+            const s = (value === null || value === undefined) ? '-' : String(value);
+            return '"' + s.replace(/"/g, '""') + '"';
         }
+
+        let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
+        if(tableSelectedTab === "untracked"){
+            headerTextToValueMap['URLs'] = "collapsibleRowText"
+        }
+
+        let rows
+        if (selectedResources.length > 0) {
+            rows = selectedResources.map(id => rowOf(id)).filter(Boolean)
+        } else if (scopedMode) {
+            rows = data[tableSelectedTab] || []
+        } else {
+            // the whole tab, a page at a time
+            func.setToast(true, false, "Exporting CSV, please wait...")
+            rows = await fetchAllRowsOfTab(SERVER_TABS[selectedTab])
+        }
+
+        let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
+        rows.forEach(i => {
+            csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
+        })
+
+        let blob = new Blob([csv], {
+            type: "application/csvcharset=UTF-8"
+        });
+        saveAs(blob, csvFileName) ;
+        func.setToast(true, false,"CSV exported successfully")
     }
 
 
@@ -1381,6 +1124,13 @@ function ApiCollections(props) {
         normalData.forEach(c => map.set(c.id, c));
         return map;
     }, [normalData]);
+
+    // id -> raw tags, for the rows this page has loaded
+    const tagsOfKnownRows = () => {
+        const tags = {}
+        rowsSeenRef.current.forEach((row, id) => { tags[id] = row.envTypeOriginal || [] })
+        return tags
+    }
 
     const promotedBulkActions = (selectedResourcesArr) => {
         let selectedResources;
@@ -1439,10 +1189,10 @@ function ApiCollections(props) {
             return actions;
         }
 
-        const defaultApiGroups = allCollections.filter(x => x.type === "API_GROUP" && x.automated).map(x => x.id);
-        const deactivated = deactivateCollections.map(x => x.id);
-        const activated = allCollections.filter(x => { return !x.deactivated }).map(x => x.id);
-        if (selectedResources.every(v => { return activated.includes(v) })) {
+        const isDefaultApiGroup = (id) => rowOf(id)?.type === "API_GROUP" && rowOf(id)?.automated;
+        const isActivated = (id) => rowOf(id) && !rowOf(id).deactivated;
+        const isDeactivated = (id) => rowOf(id)?.deactivated;
+        if (selectedResources.every(isActivated)) {
             actions.push(
                 {
                     content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
@@ -1453,7 +1203,7 @@ function ApiCollections(props) {
                     requires: 'api/deactivateCollections'
                 }
             )
-        } else if (selectedResources.every(v => { return deactivated.includes(v) })) {
+        } else if (selectedResources.every(isDeactivated)) {
             actions.push(
                 {
                     content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
@@ -1470,7 +1220,7 @@ function ApiCollections(props) {
                 content: `Delete collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => {
                     const deleteConfirmationMessage = `Are you sure, you want to delete collection${func.addPlurality(selectedResources.length)}?`
-                    func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleCollectionsAction(selectedResources.filter(v => !defaultApiGroups.includes(v)), api.deleteMultipleCollections, "deleted"))
+                    func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleCollectionsAction(selectedResources.filter(v => !isDefaultApiGroup(v)), api.deleteMultipleCollections, "deleted"))
                 },
                 requires: 'api/deleteMultipleCollections'
             }
@@ -1569,7 +1319,7 @@ function ApiCollections(props) {
                     <SetUserEnvPopupComponent
                         popover={popover}
                         setPopover={setPopover}
-                        tags={envTypeMap}
+                        tags={scopedMode ? envTypeMap : tagsOfKnownRows()}
                         updateTags={updateTags}
                         apiCollectionIds={selectedResources}
                     />
@@ -1684,8 +1434,12 @@ function ApiCollections(props) {
 
         await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then(() => {
             func.setToast(true, false, "Tags updated successfully")
-            setEnvTypeMap(copyObj)
-            updateData(copyObj)
+            if (scopedMode) {
+                setEnvTypeMap(copyObj)
+                updateData(copyObj)
+            } else {
+                refreshAll()
+            }
         })
 
         resetResourcesSelected();
@@ -1697,7 +1451,7 @@ function ApiCollections(props) {
         active={active}
         setActive={setActive}
         createCollectionModalActivatorRef={createCollectionModalActivatorRef}
-        fetchData={fetchData}
+        fetchData={refreshAll}
     />
 
     let coverage = '0%';
@@ -1833,9 +1587,17 @@ function ApiCollections(props) {
         }
     };
 
-    const handleAnalyzeDashboard = () => {
-        // Get all collections from current data, filter out deactivated and API_GROUP types
-        const allColl = (data['all'] || []).filter(c => !c.deactivated && c.type !== "API_GROUP" && c.urlsCount > 0 && c.displayName !== "juice_shop_demo" && c.displayName !== "vulnerable_apis" && c.displayName !== "Default");
+    const handleAnalyzeDashboard = async () => {
+        // Only the top collections by endpoints and by risk are analyzed, so the paginated view asks the
+        // backend for just those, with room for the ones filtered out below (groups, deactivated, demos).
+        let candidates = data['all'] || []
+        if (!scopedMode) {
+            const topBy = (sortKey) => fetchUnfilteredPage(SERVER_TABS.all, sortKey, 0, 50).then(toPlainRows)
+            candidates = await loadDetails((await Promise.all([topBy(SERVER_SORT_KEYS.endpoints), topBy(SERVER_SORT_KEYS.riskScore)])).flat())
+        }
+
+        // filter out deactivated and API_GROUP types
+        const allColl = candidates.filter(c => !c.deactivated && c.type !== "API_GROUP" && c.urlsCount > 0 && c.displayName !== "juice_shop_demo" && c.displayName !== "vulnerable_apis" && c.displayName !== "Default");
 
         const preparedCollections = allColl.map(c => ({
             id: c.id,
@@ -2068,6 +1830,16 @@ function ApiCollections(props) {
         const availableTagKeys = new Set();
         const values = {}; // Store unique values for each tag key
 
+        if (!scopedMode) {
+            // the backend lists the tag keys and values across every collection, not just the loaded page
+            Object.entries(pageMeta.tagChoices || {}).forEach(([keyName, choices]) => {
+                if (keyName === 'envType') return;
+                availableTagKeys.add(keyName);
+                values[keyName] = new Set(choices);
+            });
+            return { sortedTagKeys: Array.from(availableTagKeys).sort(), tagKeyValues: values };
+        }
+
         Object.values(envTypeMap || {}).forEach((envTypeArray) => {
             if (Array.isArray(envTypeArray)) {
                 envTypeArray.forEach(tagObj => {
@@ -2087,7 +1859,7 @@ function ApiCollections(props) {
         });
 
         return { sortedTagKeys: Array.from(availableTagKeys).sort(), tagKeyValues: values };
-    }, [envTypeMap]);
+    }, [envTypeMap, pageMeta.tagChoices, scopedMode]);
 
     // Create tag filter definitions for the Filters component
     const tagFilterDefinitions = sortedTagKeys.map(tagKeyName => ({
@@ -2170,6 +1942,31 @@ function ApiCollections(props) {
         });
     }, [centerView, data, selectedTab, tagFiltersApplied, envTypeMap]);
 
+    // The table's rows after a page's coverage landed: those rows built again from their updated plain rows
+    const withLoadedDetails = (tableRows) => tableRows.map(row => {
+        const plain = rowsSeenRef.current.get(row.id)
+        return plain?.detailsLoaded
+            ? transform.prettifyCollectionsData([plain], false, selectedTab, activeFilterType)[0]
+            : row
+    })
+
+    // Column filters the backend applies; the table asks it for matching rows
+    const serverFilters = [
+        {
+            key: 'isOutOfTestingScope',
+            label: 'Out of testing scope',
+            choices: [{ label: 'Yes', value: 'true' }, { label: 'No', value: 'false' }],
+        },
+    ];
+
+    // When the backend last recomputed the numbers the table is sorted by
+    const statsAgeText = (() => {
+        const refreshedAts = ['ENDPOINTS_COUNT', 'RISK_SCORE', 'LAST_SEEN'].map(m => pageMeta.statsUpdatedAt?.[m] || 0);
+        const oldest = Math.min(...refreshedAts);
+        if (!oldest) return pageMeta.statsPending ? 'Calculating the latest numbers...' : '';
+        return 'Updated ' + func.prettifyEpoch(oldest);
+    })();
+
     // For agentic filters, use the tree view component grouped by endpoint ID
     const getTableComponent = () => {
         // Tree view for AI Agent, MCP Server, and LLM (grouped by endpoint ID with expandable resources)
@@ -2187,9 +1984,12 @@ function ApiCollections(props) {
         
         // Standard tree view
         if (centerView === CenterViewType.Tree) {
+            if (!scopedMode && treeLoading) {
+                return <SpinnerCentered key="tree-loading" />;
+            }
             return (
                 <TreeViewTable
-                    collectionsArr={filterTreeViewData(normalData)}
+                    collectionsArr={filterTreeViewData(scopedMode ? normalData : treeData)}
                     sortOptions={dynamicSortOptions}
                     resourceName={resourceName}
                     tableHeaders={headingsWithIds.filter((x) => x.shouldMerge !== undefined)}
@@ -2231,7 +2031,38 @@ function ApiCollections(props) {
             </div>
         );
 
-        // Default table view
+        // Default view: the backend sorts, filters and pages; a new key re-fetches from the first page
+        if (!scopedMode) {
+            return (
+                <GithubServerTable
+                    key={`${selectedTab}-${String(refreshData)}-${JSON.stringify(tagFiltersApplied)}`}
+                    filterStateUrl={"/dashboard/observe/inventory/"}
+                    pageLimit={50}
+                    pageSizeOptions={[20, 50, PAGE_FETCH_LIMIT]}
+                    fetchData={fetchPageRows}
+                    sortOptions={dynamicSortOptions}
+                    resourceName={resourceName}
+                    filters={serverFilters}
+                    disambiguateLabel={disambiguateLabel}
+                    headers={headingsWithIds}
+                    headings={headingsWithIds}
+                    selectable={true}
+                    promotedBulkActions={promotedBulkActions}
+                    mode={IndexFiltersMode.Default}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    tableTabs={tableTabs}
+                    onSelect={handleSelectedTab}
+                    selected={selected}
+                    csvFileName={"Inventory"}
+                    onExportCsv={() => exportCsv()}
+                    customFilterContent={customFilterUI}
+                    clientSideDataUpdateKey={detailsVersion}
+                    clientSideDataTransformer={withLoadedDetails}
+                />
+            );
+        }
+
         return (
             <GithubSimpleTable
                 key={refreshData}
@@ -2265,7 +2096,14 @@ function ApiCollections(props) {
 
     // Hide summary card for tree view types (AI Agent, MCP Server, LLM)
     const showSummaryCard = !useTreeView;
-    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [(showSummaryCard ? <SummaryCardInfo summaryItems={summaryItems} key="summary"/> : null), (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
+    const statsFreshness = (!scopedMode && statsAgeText) ? (
+        <HorizontalStack key="stats-freshness" gap="2" align="end" blockAlign="center">
+            <Text variant="bodySm" color="subdued">{statsAgeText}</Text>
+            <Button plain onClick={forceStatsRefresh}>Refresh</Button>
+        </HorizontalStack>
+    ) : null
+    const summaryReady = scopedMode || pageMeta.loaded
+    const components = loading ? [<SpinnerCentered key={"loading"}/>]: [((showSummaryCard && summaryReady) ? <SummaryCardInfo summaryItems={summaryItems} key="summary"/> : null), statsFreshness, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
 
     if(onlyShowCollectionsTable){
         sendData(data)

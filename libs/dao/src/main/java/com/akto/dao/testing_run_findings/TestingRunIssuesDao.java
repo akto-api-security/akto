@@ -119,9 +119,14 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
+        return getSeveritiesMapForCollections((Bson) null);
+    }
+
+    /** Open issues per collection (api groups expanded to their collections) narrowed by the filter, which may be null. */
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter){
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                 .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
-        return getSeveritiesMapForCollections(null, true, groupedId);
+        return getSeveritiesMapForCollections(filter, true, groupedId);
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter, boolean expandApiGroups, BasicDBObject groupedId){

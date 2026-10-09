@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors ApiInfoDao.createIndicesIfAbsent, for api_collection_stats' refresh of the per
+        collection max riskScore / lastSeen.
+
+        {_id.apiCollectionId, riskScore} lets "$sort, $group by collection, $first" run as a
+        DISTINCT_SCAN: one index key per collection instead of reading every api_info document.
+        The two collectionIds indexes serve the same max lookup for api groups, which only exist
+        in the collectionIds array.
+
+        Names match ApiInfoDao, so these are no-ops where DaoInit already built them.
+    -->
+
+    <changeSet id="028-account-api-info-id-collection-risk-score-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_info"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ "_id.apiCollectionId": 1, "riskScore": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "_id.apiCollectionId_1_riskScore_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_info">
+                <mongodb:keys>{ "_id.apiCollectionId": 1, "riskScore": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="028-account-api-info-collection-ids-risk-score-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_info"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ "collectionIds": 1, "riskScore": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "collectionIds_1_riskScore_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_info">
+                <mongodb:keys>{ "collectionIds": 1, "riskScore": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="028-account-api-info-collection-ids-last-seen-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="api_info"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="api_info">
+            <mongodb:keys>{ "collectionIds": 1, "lastSeen": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "collectionIds_1_lastSeen_-1" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="api_info">
+                <mongodb:keys>{ "collectionIds": 1, "lastSeen": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

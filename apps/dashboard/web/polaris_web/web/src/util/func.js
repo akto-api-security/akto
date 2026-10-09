@@ -2158,6 +2158,22 @@ joinWordsWithUnderscores(input) {
     PersistStore.getState().setAllCollections(apiCollections);
     PersistStore.getState().setCollectionsMap(allCollectionsMap);
   },
+  // Fills the app wide collection lookups (id -> name / host / tags / registry status) from a list of collections.
+  applyCollectionMaps(apiCollections) {
+    const state = PersistStore.getState()
+    const active = apiCollections.filter(x => x?.deactivated !== true)
+    state.setAllCollections(apiCollections)
+    state.setCollectionsMap(func.mapCollectionIdToName(active))
+    state.setHostNameMap(func.mapCollectionIdToHostName(active))
+    state.setTagCollectionsMap(func.mapCollectionIdsToTagName(active))
+    state.setCollectionsRegistryStatusMap(func.mapCollectionIdToRegistryStatus(active))
+  },
+  // Fire and forget: nothing waits on it, the maps appear in PersistStore when the response lands.
+  refreshCollectionMapsAsync() {
+    homeFunctions.getAllCollections()
+      .then((apiCollections) => func.applyCollectionMaps(apiCollections || []))
+      .catch(() => {})
+  },
 
   convertParamToDotNotation(str) {
     return str.replace(/[#\$]+/g, '.');;
