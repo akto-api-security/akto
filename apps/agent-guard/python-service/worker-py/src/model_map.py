@@ -43,9 +43,13 @@ def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
     return next((m for m in (model_configs or []) if m.get("modelRole") == role), None)
 
 
-def _with_backup(provider: Any, model_configs: Any) -> Any:
+def _with_backup(provider: Any, model_configs: Any, arbiter_entry: dict[str, Any]) -> Any:
     backup_entry = _role_entry(model_configs, _ROLE_ARBITER_BACKUP)
-    return FallbackProvider(provider, backup_entry) if backup_entry else provider
+    if not backup_entry:
+        return provider
+    # Primary gets half the arbiter budget, leaving the rest for the backup.
+    budget_s = (arbiter_entry.get("timeoutMs") or _DEFAULT_ARBITER_TIMEOUT_MS) / 2000.0
+    return FallbackProvider(provider, backup_entry, budget_s)
 
 
 def build_arbiter(model_configs: Any, model_override: str = "") -> Any | None:
@@ -56,7 +60,7 @@ def build_arbiter(model_configs: Any, model_override: str = "") -> Any | None:
     if model_override:
         entry = {**entry, "model": model_override}
     provider = build_provider_from_config(entry)
-    return _with_backup(provider, model_configs) if provider is not None else None
+    return _with_backup(provider, model_configs, entry) if provider is not None else None
 
 
 def _classify(result: dict[str, Any], entry: dict[str, Any]) -> bool:
@@ -100,7 +104,7 @@ class ModelMapScanner:
             provider = build_provider_from_config(entry)
             if provider is not None:
                 if entry.get("modelRole") == _ROLE_ARBITER:
-                    provider = _with_backup(provider, model_map)
+                    provider = _with_backup(provider, model_map, entry)
                 scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
             else:
                 # build_provider_from_config already logged which env var was

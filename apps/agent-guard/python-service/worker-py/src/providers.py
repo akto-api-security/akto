@@ -1073,14 +1073,16 @@ def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "
 
 
 class FallbackProvider(LLMProvider):
-    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any]):
+    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any], primary_timeout_s: float | None = None):
         self.primary = primary
         self.backup_entry = backup_entry
+        self.primary_timeout_s = primary_timeout_s
         self.name = primary.name
 
     async def complete(self, prompt: str) -> str:
         try:
-            return await self.primary.complete(prompt)
+            # Own budget so a hung primary fails as TimeoutError (caught below), not the caller's CancelledError.
+            return await asyncio.wait_for(self.primary.complete(prompt), timeout=self.primary_timeout_s)
         except Exception as exc:
             backup = build_provider_from_config(self.backup_entry)
             if backup is None:
