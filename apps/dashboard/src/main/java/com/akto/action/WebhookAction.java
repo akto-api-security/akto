@@ -243,6 +243,12 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
 
     private boolean validateSensitiveDataAlertRules() {
         if (!sensitiveDataAlertsSelected()) return true;
+        if (selectedWebhookOptions.size() > 1) {
+            // The periodic sender skips webhooks with this option, so any other option on the same
+            // webhook would silently never send.
+            addActionError("Sensitive data threshold alerts can't be combined with other options in one webhook");
+            return false;
+        }
         if (sensitiveDataAlertRules == null || sensitiveDataAlertRules.isEmpty()) {
             addActionError("Add at least one data type for sensitive data threshold alerts");
             return false;

@@ -255,7 +255,7 @@ function WebhookCore(props) {
             return
         }
         if (sensitiveDataAlertsSelected) {
-            const ruleError = invalidRuleMessage(sensitiveDataAlertRules)
+            const ruleError = invalidRuleMessage(sensitiveDataAlertRules, selectedWebhookOptions)
             if (ruleError) {
                 setToastConfig({ isActive: true, isError: true, message: ruleError })
                 return

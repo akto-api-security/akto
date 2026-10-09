@@ -6,7 +6,11 @@ import observeApi from "../../../observe/api"
 export const MAX_WINDOW_DAYS = 30
 
 // Same validation the server applies, so a bad rule is caught before saving.
-export function invalidRuleMessage(rules) {
+export function invalidRuleMessage(rules, selectedOptions) {
+    if (selectedOptions && selectedOptions.length > 1) {
+        // The periodic sender skips webhooks with this option, so other options would never send.
+        return "Sensitive data threshold alerts can't be combined with other options in one webhook"
+    }
     if (!rules || rules.length === 0) {
         return "Add at least one data type for sensitive data threshold alerts"
     }
