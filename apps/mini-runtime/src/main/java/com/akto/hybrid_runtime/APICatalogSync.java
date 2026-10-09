@@ -2,13 +2,11 @@ package com.akto.hybrid_runtime;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 
-import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
-import com.akto.PayloadEncodeUtil;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
@@ -23,7 +21,6 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.monitoring.FilterConfig;
-import com.akto.dto.sql.SampleDataAlt;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -41,7 +38,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.utils.Utils;
-import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.akto.util.filter.DictionaryFilter;
@@ -79,8 +75,6 @@ public class APICatalogSync {
 
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls = new HashSet<>();
-    private static final ClientLayer clientLayer = new ClientLayer();
-    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
@@ -1643,43 +1637,8 @@ public class APICatalogSync {
         }
 
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
-        List<SampleDataAlt> unfilteredSamples = new ArrayList<>();
         loggerMaker.debug("Redacting sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
-        handleSampleDataRedaction(apiCollectionId, accountLevelRedact, apiCollectionLevelRedact, sampleData, bulkUpdates, unfilteredSamples);
-
-        loggerMaker.debug("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
-
-        if (accountLevelRedact || apiCollectionLevelRedact) {
-            if (publicKey == null) {
-                loggerMaker.errorAndAddToDb("acc: " + Context.accountId.get() + ", apiCollectionId: "
-                        + apiCollectionId + ", redaction is enabled but the public key is unavailable, "
-                        + "so samples are not stored in postgres rather than stored unencrypted. "
-                        + "Check PUBLIC_KEY / PUBLIC_KEY_FILE, then restart the pod: the key is read "
-                        + "once at startup.");
-            }
-            try {
-                long start = System.currentTimeMillis();
-                List<SampleDataAlt> samplesBatch = new ArrayList<>();
-                for (int i = 0; i < unfilteredSamples.size(); i++) {
-                    samplesBatch.add(unfilteredSamples.get(i));
-                    if ((i % 100) == 0) {
-                        clientLayer.bulkInsertSamples(samplesBatch);
-                        samplesBatch = new ArrayList<>();
-                    }
-                }
-                if (!samplesBatch.isEmpty()) {
-                    clientLayer.bulkInsertSamples(samplesBatch);
-                }
-                AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
-                AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
-
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres");
-            }
-        }
-        
-        loggerMaker.debug("Inserted bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
-
+        handleSampleDataRedaction(apiCollectionId, accountLevelRedact, apiCollectionLevelRedact, sampleData, bulkUpdates);
 
         return bulkUpdates;
     }
@@ -1697,7 +1656,7 @@ public class APICatalogSync {
     }
 
     private void handleSampleDataRedaction(int apiCollectionId, boolean accountLevelRedact, boolean apiCollectionLevelRedact, List<SampleData> sampleData,
-            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
+            List<BulkUpdates> bulkUpdates) {
         int batchSize = 100;
         for (int i = 0; i < sampleData.size(); i += batchSize) {
             int end = Math.min(i + batchSize, sampleData.size());
@@ -1707,7 +1666,7 @@ public class APICatalogSync {
             try {
                 runWithTimeout(() -> {
                     Context.accountId.set(accId);
-                    processSampleBatch(batch, accountLevelRedact, apiCollectionLevelRedact, bulkUpdates, unfilteredSamples, lastExecutedBatch); // explicitly pass accountId, threads don't share Context.
+                    processSampleBatch(batch, accountLevelRedact, apiCollectionLevelRedact, bulkUpdates, lastExecutedBatch); // explicitly pass accountId, threads don't share Context.
                     return null;
                 }, 10);
             } catch (Exception e) {
@@ -1718,7 +1677,7 @@ public class APICatalogSync {
     }
 
     private void processSampleBatch(List<SampleData> batch, boolean accountLevelRedact, boolean apiCollectionLevelRedact,
-            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples, List<SampleData> lastExecutedBatch) {
+            List<BulkUpdates> bulkUpdates, List<SampleData> lastExecutedBatch) {
         for (SampleData sample: batch) {
             if (sample.getSamples().size() == 0) {
                 continue;
@@ -1736,28 +1695,6 @@ public class APICatalogSync {
                         UUID uuid = UUID.randomUUID();
                         json.put(AKTO_UUID, uuid);
                         redactedSample = gson.toJson(json);
-                        int now = Context.now();
-                        Key id = sample.getId();
-                        int accountId = Context.accountId.get();
-                        String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
-                        // This copy is protected by encryption alone - redactIfRequired is
-                        // called with both flags false above - so if the key is missing or
-                        // encryption fails, the sample must be dropped rather than stored in
-                        // clear. Failing closed here keeps unencrypted payloads out of the
-                        // database when PUBLIC_KEY / PUBLIC_KEY_FILE is misconfigured.
-                        boolean encrypted = false;
-                        if (publicKey != null) {
-                            try {
-                                piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);
-                                encrypted = true;
-                            } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
-                            }
-                        }
-                        if (encrypted && sample.getId().getApiCollectionId() != 0) {
-                            unfilteredSamples.add(new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
-                                    id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId));
-                        }
                         sampleIds.add(uuid.toString());
 
                     }
