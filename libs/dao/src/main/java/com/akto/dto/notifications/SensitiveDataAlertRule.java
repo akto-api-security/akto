@@ -1,5 +1,7 @@
 package com.akto.dto.notifications;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
 /**
  * One rule of a sensitive data threshold alert: alert when a single API collection carries
  * {@link #subType} in more than {@link #threshold} events within the last {@link #windowDays} days.
@@ -27,6 +29,8 @@ public class SensitiveDataAlertRule {
         this.windowDays = windowDays;
     }
 
+    /** Not a stored field: the codec would otherwise persist it as "valid". */
+    @BsonIgnore
     public boolean isValid() {
         return subType != null && !subType.trim().isEmpty()
                 && threshold > 0
