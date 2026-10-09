@@ -129,6 +129,8 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_MICROSOFT_DEFENDER = "DEFENDER";
     public static final String AI_AGENT_SOURCE_AWS_BEDROCK="AWS_BEDROCK";
     public static final String AI_AGENT_SOURCE_AWS_QUICK="AWS_QUICK";
+    // AKTO Alibaba Cloud connector (AI Gateway, Model Studio, AgentRun); metadata in responsePayload.alibabaMetadata.
+    public static final String AI_AGENT_SOURCE_ALIBABA_CLOUD="ALIBABA_CLOUD";
     public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
     public static final String AI_AGENT_TAG_BOT_SCHEMA_NAME = "bot-schemaname";

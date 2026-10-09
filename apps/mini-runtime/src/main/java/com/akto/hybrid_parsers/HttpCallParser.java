@@ -48,6 +48,7 @@ import com.akto.tracing.copilot.CopilotInventoryParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
 import com.akto.tracing.bedrock.BedrockAgentTraceParser;
+import com.akto.tracing.alibaba.AlibabaCloudTraceParser;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
@@ -382,6 +383,7 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
                     && !source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
                     && !source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_ALIBABA_CLOUD)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -416,7 +418,8 @@ public class HttpCallParser {
                 }
             }
 
-            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK) || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)){
+            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK) || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
+                    || source.equals(Constants.AI_AGENT_SOURCE_ALIBABA_CLOUD)){
                 return botName;
             }
             // Reconstruct full hostname: bot-name.base-hostname
@@ -600,6 +603,10 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_SNOWFLAKE.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
+    private boolean isAlibabaCloudTraffic(Map<String, String> tagsMap) {
+        return tagsMap != null && Constants.AI_AGENT_SOURCE_ALIBABA_CLOUD.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
     private boolean isBedrockAgentTraffic(Map<String, String> tagsMap) {
         if (tagsMap == null) {
             return false;
@@ -702,8 +709,13 @@ public class HttpCallParser {
      * (what APICatalogSync.recordMessage() captures as the sample), avoids that outcome.
      */
     private void stripAwsMetadataFromSample(HttpResponseParams httpResponseParam) {
+        stripMetadataFromSample(httpResponseParam, "awsMetadata");
+    }
+
+    /** Same as stripAwsMetadataFromSample, for any connector's metadata key (e.g. alibabaMetadata). */
+    private void stripMetadataFromSample(HttpResponseParams httpResponseParam, String metadataKey) {
         try {
-            String updatedPayload = JSONUtils.removeKey(httpResponseParam.getPayload(), "awsMetadata");
+            String updatedPayload = JSONUtils.removeKey(httpResponseParam.getPayload(), metadataKey);
             if (updatedPayload == null || updatedPayload.equals(httpResponseParam.getPayload())) {
                 return;
             }
@@ -717,7 +729,7 @@ public class HttpCallParser {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error stripping awsMetadata from sample payload: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error stripping " + metadataKey + " from sample payload: " + e.getMessage());
         }
     }
 
@@ -923,6 +935,59 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Alibaba Cloud connector (source ALIBABA_CLOUD): responsePayload.alibabaMetadata → a trace with
+     * spans (traffic only) and service-graph edges (traffic and discovery) for the collection the
+     * record was stored under. Unlike Bedrock, edges refresh their hover metadata on every record,
+     * so a gateway's current plug-ins or an agent's current RAM policies show.
+     */
+    private void parseAlibabaCloudTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = gson.fromJson(payload, Map.class);
+            Object metadata = payloadMap == null ? null : payloadMap.get(AlibabaCloudTraceParser.METADATA_KEY);
+            if (metadata == null) {
+                return;
+            }
+            String json = gson.toJson(metadata);
+            AlibabaCloudTraceParser parser = AlibabaCloudTraceParser.getInstance();
+            if (!parser.canParse(json)) {
+                loggerMaker.info("alibabaMetadata found but not parseable", LogDb.RUNTIME);
+                return;
+            }
+            String botName = resolveAgentNameFromTags(httpResponseParam.getTags());
+            int apiCollectionId = httpResponseParam.getRequestParams() != null
+                ? httpResponseParam.getRequestParams().getApiCollectionId() : -1;
+
+            // Discovery records describe inventory: graph edges only, no trace.
+            if (!parser.isDiscovery(json)) {
+                TraceParseResult result = parser.parse(json, botName);
+                if (result.getTrace() != null) {
+                    result.getTrace().setApiCollectionId(apiCollectionId);
+                    dataActor.storeTrace(result.getTrace());
+                }
+                if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                    dataActor.storeSpans(result.getSpans());
+                }
+            }
+
+            if (apiCollectionId != -1) {
+                Map<String, ServiceGraphEdgeInfo> edges = parser.extractServiceGraph(json, botName);
+                if (edges != null && !edges.isEmpty()) {
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges, true);
+                    loggerMaker.info("Updated service graph for Alibaba Cloud " + botName + " (collection "
+                        + apiCollectionId + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Alibaba Cloud metadata: " + e.getMessage());
         }
     }
 
@@ -1964,6 +2029,12 @@ public class HttpCallParser {
             if (isBedrockAgentTraffic(tagsMap)) {
                 parseBedrockAgentTrace(httpResponseParam);
                 stripAwsMetadataFromSample(httpResponseParam);
+            }
+
+            // Alibaba Cloud connector: alibabaMetadata → trace, spans, service graph
+            if (isAlibabaCloudTraffic(tagsMap)) {
+                parseAlibabaCloudTrace(httpResponseParam);
+                stripMetadataFromSample(httpResponseParam, AlibabaCloudTraceParser.METADATA_KEY);
             }
 
             // Build service graph edges for Arcade traffic

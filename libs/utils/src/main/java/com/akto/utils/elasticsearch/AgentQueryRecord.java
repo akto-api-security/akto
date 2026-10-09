@@ -275,7 +275,9 @@ public class AgentQueryRecord {
         // BedrockAgentTraceParser — it can embed full tool-call outputs (file listings, page
         // dumps, etc.), so keeping a second raw copy here needlessly bloats the batch sent
         // to the agent-query-logs service.
-        String responsePayload = JSONUtils.removeKey(p.getPayload() != null ? p.getPayload() : "", "awsMetadata");
+        // The same holds for the Alibaba connector's alibabaMetadata (AlibabaCloudTraceParser).
+        String responsePayload = JSONUtils.removeKey(
+            JSONUtils.removeKey(p.getPayload() != null ? p.getPayload() : "", "awsMetadata"), "alibabaMetadata");
         int inputTokens  = resolveTokenCount(responsePayload, requestPayload, true);
         int outputTokens = resolveTokenCount(responsePayload, responsePayload, false);
 
