@@ -116,11 +116,10 @@ public class CustomAuthTypeAction extends UserAction {
         try {
             CustomAuthUtil.resetAllCustomAuthTypes();
             int accountId = Context.accountId.get();
-            SingleTypeInfo.fetchCustomAuthTypes(accountId);
-            executorService.schedule( new Runnable() {
+            List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(Filters.eq(CustomAuthType.ACTIVE, true));            executorService.schedule( new Runnable() {
                 public void run() {
                     Context.accountId.set(accountId);
-                    CustomAuthUtil.customAuthTypeUtil(SingleTypeInfo.getCustomAuthType(accountId));
+                    CustomAuthUtil.customAuthTypeUtil(customAuthTypes);
                 }
             }, 5 , TimeUnit.SECONDS);
             return SUCCESS.toUpperCase();
