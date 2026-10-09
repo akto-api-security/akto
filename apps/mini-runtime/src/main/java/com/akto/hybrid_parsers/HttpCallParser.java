@@ -1006,7 +1006,11 @@ public class HttpCallParser {
                 if (apiCollectionId != -1) {
                     Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson, fallbackBotName, tagsMap);
                     if (edges != null && !edges.isEmpty()) {
-                        ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                        // Depth-aware rather than the plain additive merge: these records vary in
+                        // how much of the call they can name (a tools/list request has no MCP
+                        // target, an unattributable caller has no agent), so the first one a
+                        // collection sees must not pin the graph to its shape.
+                        ServiceGraphBuilder.getInstance().updateServiceGraphPreferringDeeperChain(apiCollectionId, edges);
                         loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
                             + " (agentType: " + agentType + ", collection: " + apiCollectionId
                             + ") with " + edges.size() + " edges", LogDb.RUNTIME);

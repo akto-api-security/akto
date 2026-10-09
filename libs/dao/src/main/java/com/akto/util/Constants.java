@@ -130,6 +130,20 @@ public class Constants {
     // sub-fields (services, actions, resources, etc). Of those, "-resources" is the one
     // that actually identifies what the gateway's role can act on.
     public static final String AI_AGENT_TAG_GATEWAY_ROLE = "gateway-role-resources";
+    /**
+     * The calling agent behind a gateway request, resolved from the request principal.
+     * A gateway fronts many agents, so this — not "gateway-name" — is what tells them
+     * apart, and it is the only source for the AI Agent node when an MCP target has
+     * already claimed "bot-name".
+     */
+    public static final String AI_AGENT_TAG_AGENT_NAME = "agent-name";
+    /** The gateway's own execution role, as an ARN; the role name is its last path segment. */
+    public static final String AI_AGENT_TAG_GATEWAY_EXECUTION_ROLE_ARN = "gateway-execution-role-arn";
+    // The gateway's policy names. Inline first: an AgentCore gateway service role typically
+    // carries no attached managed policies and keeps every grant inline, so the attached
+    // list is empty exactly when the inline one is worth showing.
+    public static final String AI_AGENT_TAG_GATEWAY_INLINE_POLICIES = "gateway-role-inline-policies";
+    public static final String AI_AGENT_TAG_GATEWAY_POLICIES = "gateway-role-policies";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
