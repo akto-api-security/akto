@@ -45,6 +45,10 @@ HTTP_PROXY_PATH = "/api/http-proxy"
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 CALL_HEADERS_CACHE_TTL_SECONDS = float(os.getenv("CALL_HEADERS_CACHE_TTL_SECONDS", str(15 * 60)))
+# AGENTIC by default; ENDPOINT routes the traffic to Atlas.
+AKTO_CONTEXT_SOURCE = os.getenv("AKTO_CONTEXT_SOURCE", "AGENTIC").strip().upper()
+if AKTO_CONTEXT_SOURCE not in ("AGENTIC", "ENDPOINT"):
+    AKTO_CONTEXT_SOURCE = "AGENTIC"
 
 # The guardrails service reads message content only as a plain string. Anthropic
 # Messages style content BLOCKS - content: [{"type": "text", "text": "..."}] - are
@@ -1389,7 +1393,7 @@ class GuardrailsHandler(CustomLogger):
             "enabled_graph": None,
             "tag": json.dumps(tags),
             "metadata": json.dumps(tags),
-            "contextSource": "AGENTIC",
+            "contextSource": AKTO_CONTEXT_SOURCE,
         }
 
     def build_payload(self, data: dict, call_type: str, response_obj: Optional[Any], user_api_key_dict: Optional[UserAPIKeyAuth] = None, status_code: int = 200, kwargs: Optional[dict] = None) -> dict:
