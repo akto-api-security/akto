@@ -5,6 +5,7 @@ import com.akto.dao.SensitiveDataCountDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.SensitiveDataAlertRule;
 import com.akto.dto.traffic.SensitiveDataCount;
@@ -97,12 +98,13 @@ public class SensitiveDataThresholdAlerts {
         if (breaches.isEmpty()) return;
 
         List<String> errors = new ArrayList<>();
-        WebhookSender.sendCustomWebhook(webhook, buildPayload(breaches, collectionNames(breaches)),
-                errors, now, LogDb.DASHBOARD);
-        if (!errors.isEmpty()) {
+        OriginalHttpResponse response = WebhookSender.sendCustomWebhook(webhook,
+                buildPayload(breaches, collectionNames(breaches)), errors, now, LogDb.DASHBOARD);
+        int status = response == null ? 0 : response.getStatusCode();
+        if (status < 200 || status >= 300) {
             // Not marked as alerted, so the next run tries again.
             loggerMaker.errorAndAddToDb("sensitive data threshold alert for webhook " + webhook.getId()
-                    + " was not delivered: " + errors);
+                    + " was not delivered: status " + status + " " + errors);
             return;
         }
 
