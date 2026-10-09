@@ -38,6 +38,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
@@ -294,6 +295,12 @@ public abstract class DataActor {
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
 
     public abstract void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList);
+
+    /**
+     * Adds hourly per-collection counts of sensitive data events, at most once per idempotency key.
+     * Returns false if the write failed.
+     */
+    public abstract boolean bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments);
     public abstract List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId);
 
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();

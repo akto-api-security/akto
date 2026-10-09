@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 import com.akto.PayloadEncodeUtil;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.detection.SensitiveDataEvents;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -128,6 +129,20 @@ public class APICatalogSync {
     }
 
     public void processResponse(RequestTemplate requestTemplate, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
+        // Detection reports each tracked type it sees while this message is parsed; one message
+        // counts once per type, however many values of that type it carries.
+        try {
+            processResponseParams(requestTemplate, responseParams, deletedInfo);
+        } finally {
+            Set<String> seenTypes = SensitiveDataEvents.drain();
+            if (!seenTypes.isEmpty() && !responseParams.getIsPending()) {
+                SensitiveDataCounter.instance.record(responseParams.getRequestParams().getApiCollectionId(),
+                        seenTypes, responseParams.getTimeOrNow());
+            }
+        }
+    }
+
+    private void processResponseParams(RequestTemplate requestTemplate, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
         int timestamp = responseParams.getTimeOrNow();
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();

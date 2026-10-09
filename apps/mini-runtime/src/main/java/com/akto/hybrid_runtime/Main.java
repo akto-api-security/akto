@@ -15,6 +15,7 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.detection.DetectionCorrectorInstaller;
+import com.akto.detection.SensitiveDataEvents;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
@@ -384,6 +385,7 @@ public class Main {
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
         initializeRuntime();
+        SensitiveDataCounter.instance.start(dataActor::bulkIncSensitiveDataCounts);
 
         // Fast-Discovery Integration (optional) - Run as separate process from embedded classes
         if (isFastDiscoveryEnabled()) {
@@ -523,6 +525,9 @@ public class Main {
                     loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage());
                 }
                 
+                // The consumer has stopped, so nothing more will be counted: write what is pending.
+                SensitiveDataCounter.instance.flush();
+
                 // Close protobuf producer
                 if (protobufKafkaProducer != null) {
                     protobufKafkaProducer.close();
@@ -1300,6 +1305,7 @@ public class Main {
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
                 SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+                SensitiveDataEvents.setTrackedTypes(SensitiveDataEvents.customSensitiveTypeNames(customDataTypes));
 
                 // Refreshed alongside data types on purpose: the corrector may only return labels
                 // that already exist as data types, so the two must not drift apart.

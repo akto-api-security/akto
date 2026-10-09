@@ -38,6 +38,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
@@ -3847,6 +3848,28 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in bulkWriteDependencyNodes" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    public boolean bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments) {
+        // The body, key included, is built once: backoff retries resend it unchanged, so the
+        // abstractor can recognise a retry of a request it already applied.
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("idempotencyKey", idempotencyKey);
+        obj.put("sensitiveDataCounts", increments);
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkIncSensitiveDataCounts", "", "POST", gson.toJson(obj), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in bulkIncSensitiveDataCounts: " + response.getStatusCode(), LoggerMaker.LogDb.RUNTIME);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in bulkIncSensitiveDataCounts " + e, LoggerMaker.LogDb.RUNTIME);
+            return false;
         }
     }
 

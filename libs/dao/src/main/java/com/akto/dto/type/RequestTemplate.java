@@ -14,6 +14,7 @@ import java.util.function.BiConsumer;
 import com.akto.dao.context.Context;
 import com.akto.detection.DataTypeRefiner;
 import com.akto.detection.ParamLocation;
+import com.akto.detection.SensitiveDataEvents;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.SensitiveParamInfo;
@@ -124,6 +125,8 @@ public class RequestTemplate {
 
         SubType finalSubType = DataTypeRefiner.refine(new ParamLocation(apiCollectionId, url, method, param),
                 obj == null ? null : obj.toString(), localSubType);
+
+        SensitiveDataEvents.record(finalSubType);
 
         keyTypes.record(url, method, responseCode, isHeader, param, obj, userId, apiCollectionId, rawMessage,
                 sensitiveParamInfoBooleanMap, isUrlParam, timestamp, finalSubType);
