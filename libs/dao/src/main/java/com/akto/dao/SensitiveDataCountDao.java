@@ -4,6 +4,8 @@ import com.akto.dto.traffic.SensitiveDataCount;
 import com.mongodb.ErrorCategory;
 import com.mongodb.MongoWriteException;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
@@ -17,8 +19,11 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount> {
@@ -46,17 +51,17 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
     }
 
     /**
-     * The unique index is what the upsert matches on, and also serves window queries: one
-     * collection, a few types, hour >= start. The fields are flat rather than a compound _id
+     * The unique index is what the upsert matches on, and also serves the alert query: one type,
+     * hour >= start, grouped by collection. The fields are flat rather than a compound _id
      * because an _id index cannot serve a range on one of its sub-fields.
      */
     public void createIndicesIfAbsent() {
         createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
 
-        Bson key = Indexes.ascending(SensitiveDataCount.API_COLLECTION_ID, SensitiveDataCount.SUB_TYPE,
-                SensitiveDataCount.HOUR);
+        Bson key = Indexes.ascending(SensitiveDataCount.SUB_TYPE, SensitiveDataCount.HOUR,
+                SensitiveDataCount.API_COLLECTION_ID);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), key,
-                new IndexOptions().name("apiCollectionId_subType_hour").unique(true));
+                new IndexOptions().name("subType_hour_apiCollectionId").unique(true));
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 Indexes.ascending(SensitiveDataCount.EXPIRE_AT),
@@ -93,6 +98,30 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
             appliedRequests().deleteOne(Filters.eq("_id", idempotencyKey));
             throw e;
         }
+    }
+
+    /**
+     * Events of one type per collection from {@code fromHour} on, keeping only the collections whose
+     * total is above {@code moreThan}.
+     */
+    public Map<Integer, Long> countsByCollectionAbove(String subType, int fromHour, long moreThan) {
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(Filters.and(
+                        Filters.eq(SensitiveDataCount.SUB_TYPE, subType),
+                        Filters.gte(SensitiveDataCount.HOUR, fromHour))),
+                Aggregates.group("$" + SensitiveDataCount.API_COLLECTION_ID,
+                        Accumulators.sum("total", "$" + SensitiveDataCount.COUNT)),
+                Aggregates.match(Filters.gt("total", moreThan)));
+
+        Map<Integer, Long> totals = new HashMap<>();
+        for (Document doc : getMCollection().aggregate(pipeline, Document.class)) {
+            Object id = doc.get("_id");
+            Object total = doc.get("total");
+            if (id instanceof Number && total instanceof Number) {
+                totals.put(((Number) id).intValue(), ((Number) total).longValue());
+            }
+        }
+        return totals;
     }
 
     /** Adds each increment to its hourly bucket, creating the bucket if it does not exist yet. */
