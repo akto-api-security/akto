@@ -1312,6 +1312,20 @@ const settingRequests = {
             data: {platformKey}
         })
     },
+    listEndpointShieldReleases(platformKey) {
+        return request({
+            url: '/api/listEndpointShieldReleases',
+            method: 'post',
+            data: {platformKey}
+        })
+    },
+    deployEndpointShieldVersion(platformKey, version) {
+        return request({
+            url: '/api/deployEndpointShieldVersion',
+            method: 'post',
+            data: {platformKey, version}
+        })
+    },
     queueEndpointRemoteCommand(command, args, timeoutSec, expirySeconds, targetType, targetDeviceIds) {
         return request({
             url: '/api/queueEndpointRemoteCommand',
