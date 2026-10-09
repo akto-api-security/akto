@@ -22,6 +22,35 @@ public class ServiceGraphBuilder {
     }
 
     public boolean updateServiceGraph(int apiCollectionId, Map<String, ServiceGraphEdgeInfo> edges) {
+        return updateServiceGraph(apiCollectionId, edges, false);
+    }
+
+    /**
+     * @param refreshMetadata false (every parser except Alibaba's): an existing edge is kept as
+     *        first stored. true: an existing edge takes the incoming edge's values (source and
+     *        metadata keys it carries, e.g. a gateway's current plug-ins or an agent's current RAM
+     *        policies), keeping metadata keys the incoming edge doesn't have.
+     */
+    public boolean updateServiceGraph(int apiCollectionId, Map<String, ServiceGraphEdgeInfo> edges, boolean refreshMetadata) {
+        if (refreshMetadata) {
+            if (edges == null || edges.isEmpty()) return true;
+            try {
+                ApiCollection collection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+                if (collection == null) {
+                    logger.error("API Collection not found: {}", apiCollectionId);
+                    return false;
+                }
+                Map<String, ServiceGraphEdgeInfo> merged = refreshMerge(collection.getServiceGraphEdges(), edges);
+                boolean success = dataActor.updateServiceGraphEdges(apiCollectionId, merged);
+                if (!success) {
+                    logger.error("Failed to update service graph edges for collection: {}", apiCollectionId);
+                }
+                return success;
+            } catch (Exception e) {
+                logger.error("Failed to update service graph: {}", e.getMessage(), e);
+                return false;
+            }
+        }
         if (edges == null || edges.isEmpty()) {
             logger.info("No service graph edges to update for collection: {}", apiCollectionId);
             return true;
@@ -110,6 +139,23 @@ public class ServiceGraphBuilder {
             } else {
                 mergeMetadata(existing, entry.getValue());
             }
+        }
+        return result;
+    }
+
+    /** Pure refresh merge (see {@link #updateServiceGraph(int, Map, boolean)}), split out so it's testable without a DB. */
+    static Map<String, ServiceGraphEdgeInfo> refreshMerge(Map<String, ServiceGraphEdgeInfo> existingEdges,
+            Map<String, ServiceGraphEdgeInfo> freshEdges) {
+        Map<String, ServiceGraphEdgeInfo> result = existingEdges == null ? new HashMap<>() : new HashMap<>(existingEdges);
+        if (freshEdges == null) return result;
+        for (Map.Entry<String, ServiceGraphEdgeInfo> entry : freshEdges.entrySet()) {
+            ServiceGraphEdgeInfo incoming = entry.getValue();
+            if (incoming == null) continue;
+            ServiceGraphEdgeInfo existing = result.get(entry.getKey());
+            Map<String, Object> metadata = new HashMap<>();
+            if (existing != null && existing.getMetadata() != null) metadata.putAll(existing.getMetadata());
+            if (incoming.getMetadata() != null) metadata.putAll(incoming.getMetadata());
+            result.put(entry.getKey(), new ServiceGraphEdgeInfo(incoming.getSourceService(), incoming.getTargetService(), metadata));
         }
         return result;
     }
