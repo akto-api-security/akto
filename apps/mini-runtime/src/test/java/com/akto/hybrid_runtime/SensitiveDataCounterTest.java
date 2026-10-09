@@ -108,6 +108,59 @@ public class SensitiveDataCounterTest {
     }
 
     @Test
+    public void concurrentRecordingDuringFlushesLosesAndDoublesNothing() throws Exception {
+        SensitiveDataCounter counter = new SensitiveDataCounter();
+        List<List<SensitiveDataCount>> written = java.util.Collections.synchronizedList(new ArrayList<>());
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        // every third write fails, so put-back runs concurrently with recording too
+        counter.setWriter((key, batch) -> {
+            if (calls.incrementAndGet() % 3 == 0) return false;
+            written.add(new ArrayList<>(batch));
+            return true;
+        });
+
+        int threads = 8, perThread = 20_000;
+        java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean(false);
+        Thread flusher = new Thread(() -> { while (!done.get()) counter.flush(); });
+        flusher.start();
+        List<Thread> workers = new ArrayList<>();
+        for (int t = 0; t < threads; t++) {
+            final int collection = t % 3;
+            Thread w = new Thread(() -> {
+                for (int i = 0; i < perThread; i++) {
+                    counter.record(collection, Collections.singleton("EMAIL_X"), HOUR + (i % 2) * 3600);
+                }
+            });
+            workers.add(w);
+            w.start();
+        }
+        for (Thread w : workers) w.join();
+        done.set(true);
+        flusher.join();
+        counter.setWriter((key, batch) -> written.add(new ArrayList<>(batch)));
+        counter.flush();
+
+        long total = 0;
+        for (long v : totals(written).values()) total += v;
+        assertEquals((long) threads * perThread, total);
+        assertTrue(counter.snapshot().isEmpty());
+    }
+
+    @Test
+    public void eachBatchGetsItsOwnIdempotencyKey() {
+        SensitiveDataCounter counter = new SensitiveDataCounter();
+        List<String> keys = new ArrayList<>();
+        counter.setWriter((key, batch) -> keys.add(key));
+        for (int i = 0; i < SensitiveDataCounter.BATCH_SIZE + 1; i++) {
+            counter.record(i, Collections.singleton("EMAIL_X"), HOUR);
+        }
+        counter.flush();
+        assertEquals(2, keys.size());
+        assertEquals(2, new java.util.HashSet<>(keys).size());
+        assertTrue(keys.get(0) != null && !keys.get(0).isEmpty());
+    }
+
+    @Test
     public void flushWithoutAWriterKeepsCounts() {
         SensitiveDataCounter counter = new SensitiveDataCounter();
         counter.record(1, Collections.singleton("EMAIL_X"), HOUR);
