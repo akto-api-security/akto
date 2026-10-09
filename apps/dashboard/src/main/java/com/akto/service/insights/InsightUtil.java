@@ -718,4 +718,11 @@ public final class InsightUtil {
         if (remarks == null) return GovernanceBucket.SHADOW; // no allowlist entry, no audit row at all
         return GovernanceBucket.UNAPPROVED; // audit row exists with blank remarks -> pending
     }
+
+    /** Connector-created collections carry a name but no hostName; policies target them by that
+     *  name, so it is the identity used for both matching and display. */
+    public static String assetIdentity(ApiCollection c) {
+        if (c == null) return null;
+        return c.getHostName() != null ? c.getHostName() : c.getName();
+    }
 }

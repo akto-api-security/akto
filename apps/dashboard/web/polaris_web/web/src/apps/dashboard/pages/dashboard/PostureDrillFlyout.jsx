@@ -10,12 +10,14 @@ import { SeverityBadge } from '../observe/agentic/AgenticCellRenderers'
 import AgGridTable from '../../components/tables/AgGridTable'
 import SpinnerCentered from '../../components/progress/SpinnerCentered'
 import MarkdownViewer from '@/apps/dashboard/components/shared/MarkdownViewer'
+import ProfileTimeline from '@/apps/dashboard/components/shared/ProfileTimeline'
 import CustomProgressBar from './new_components/CustomProgressBar'
 import SmoothAreaChart from './new_components/SmoothChart'
 import { DELTA_TONE_TO_COLOR, DummyDataOverlay, formatDelta, GapHint, NumberCardsRow, riskBand, RiskScoreRing } from './new_components/PostureShared'
 import { DUMMY_RISK_SCORE_TREND } from './securityPostureDummyData'
 import dashboardApi from './api'
 import func from '@/util/func'
+import { ctaHref } from './agenticPosture/agentDetail/cta'
 
 // How many times to re-poll a PENDING narrative before giving up silently (no more network
 // calls, but the "Generating summary…" line stays as-is rather than flipping to an error state —
@@ -29,6 +31,11 @@ const NARRATIVE_POLL_INTERVAL_MS = 3000
 // AgGridTable every other drill/level uses (see PostureDrillResult#riskScoreBreakdown's own
 // javadoc for why).
 const DRILL_RISK_SCORE = 'riskScoreBreakdown'
+// Must match ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS on the backend.
+const DRILL_HIGH_RISK_AGENTS = 'highRiskAgents'
+// Must match ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE on the backend — the agentic
+// page's own posture-score drill, distinct from the non-agentic DRILL_RISK_SCORE above.
+const DRILL_POSTURE_SCORE = 'postureScore'
 
 // Same relative-time rendering LLMCellRenderers.jsx's TimeCell uses, minus its /1000 — every
 // drill row field named one of these (see PostureService#fetchDrill/ProfileBuilder's own row
@@ -36,18 +43,6 @@ const DRILL_RISK_SCORE = 'riskScoreBreakdown'
 // this was the "AI summary/table shows raw seconds" bug this level's build fixed.
 const EPOCH_FIELDS = new Set(['detectedAt', 'firstSeen', 'lastSeen', 'lastScannedAt', 'timestamp'])
 const TOKEN_FIELDS = new Set(['inputTokens', 'outputTokens', 'totalTokens'])
-
-// A CTA's own `params` (e.g. Critical alerts' "View all" -> {severity: "CRITICAL"}) has to land
-// as a URL query param, not router `state` — the destination pages this app already has (e.g.
-// ThreatDetectionPage.jsx's own severity filter) read their own pre-filters off `searchParams`,
-// never off `location.state`. Appending here, once, is what makes a CTA's `params` do anything at
-// all — passing them as `state` would have silently gone nowhere on arrival.
-function ctaHref(cta) {
-    if (!cta.params) return cta.route
-    const qs = new URLSearchParams(cta.params).toString()
-    if (!qs) return cta.route
-    return cta.route + (cta.route.includes('?') ? '&' : '?') + qs
-}
 
 function EpochCell({ value }) {
     return <Text variant="bodySm">{func.prettifyEpoch(value || 0)}</Text>
@@ -203,48 +198,6 @@ function ProfileFacts({ facts }) {
     )
 }
 
-function ProfileTimeline({ section }) {
-    const rows = section.rows || []
-    return (
-                <VerticalStack gap="4">
-                    <VerticalStack gap="05">
-                        <Text variant="headingSm">{section.title}</Text>
-                        {section.subtitle && <Text variant="bodySm" color="subdued">{section.subtitle}</Text>}
-                    </VerticalStack>
-                    {rows.length === 0 ? (
-                        <Text variant="bodySm" color="subdued">Nothing recorded in this window.</Text>
-                    ) : (
-                        // time | rail | content. Grid cells stretch to the row's height, so the rail's
-                        // border runs from under the dot to the next row — rows have no gap, the
-                        // content's bottom padding is the spacing, which keeps the line unbroken.
-                        <VerticalStack gap="0">
-                            {rows.map((r, i) => (
-                                <HorizontalGrid key={i} columns="96px 8px minmax(0, 1fr)" gap="3">
-                                    <Text variant="bodySm" color="subdued" alignment="end">{func.prettifyEpoch(r.timestamp || 0)}</Text>
-                                    <Box position="relative">
-                                        <Box paddingBlockStart="1">
-                                            <Box className="agentic-dot" style={{ '--dot-color': func.getHexColorForSeverity(String(r.severity || '').toUpperCase()) }} />
-                                        </Box>
-                                        {i < rows.length - 1 && (
-                                            <Box position="absolute" insetBlockStart="4" insetBlockEnd="0" width="4px" borderInlineEndWidth="1" borderColor="border-subdued" />
-                                        )}
-                                    </Box>
-                                    <Box paddingBlockEnd="5">
-                                        <VerticalStack gap="05">
-                                            <Text variant="bodyMd" fontWeight="semibold">{r.title}</Text>
-                                            {r.detail && <Text variant="bodySm" color="subdued">{r.detail}</Text>}
-                                        </VerticalStack>
-                                    </Box>
-                                </HorizontalGrid>
-                            ))}
-                        </VerticalStack>
-                    )}
-                    {section.total > rows.length && (
-                        <Text variant="bodySm" color="subdued">Showing {rows.length} of {section.total}.</Text>
-                    )}
-                </VerticalStack>
-    )
-}
 
 function ProfileTable({ section }) {
     const columns = section.columns || []
@@ -306,7 +259,9 @@ function DrillProfileBody({ drill, onCtaClick }) {
             {(drill.sections || []).map((s) => (
                 <VerticalStack key={s.id} gap="4">
                     <Divider />
-                    {s.kind === 'timeline' ? <ProfileTimeline section={s} /> : <ProfileTable section={s} />}
+                    {s.kind === 'timeline'
+                        ? <ProfileTimeline title={s.title} subtitle={s.subtitle} rows={s.rows} total={s.total} />
+                        : <ProfileTable section={s} />}
                 </VerticalStack>
             ))}
         </VerticalStack>
@@ -678,9 +633,27 @@ function PostureDrillFlyout({ drillState, onNavigate, onClose, riskScoreKpi, sta
 
     const handleRowClicked = useCallback((e) => {
         if (!drill?.drillable || e?.data?.id === undefined || e?.data?.id === null) return
+        // highRiskAgents has no nested category level (unlike riskScoreBreakdown's category/agentId
+        // path) — every root-level row click already resolves to a bare agent id, so send it to
+        // the full agent-detail page instead of drilling in-place inside the flyout. The current
+        // drilled URL is passed as router state so the agent page's own back arrow returns here
+        // (PageWithMultipleCards' backUrl prop) instead of its sessionStorage-stack fallback, which
+        // doesn't reliably collapse this page's own replace-based drill navigation.
+        if (drillState.drillId === DRILL_HIGH_RISK_AGENTS && !drillState.path) {
+            navigate(`/dashboard/agentic-posture/agent/${encodeURIComponent(e.data.id)}`,
+                { state: { backUrl: window.location.pathname + window.location.search } })
+            return
+        }
+        // postureScore's category-agents level (path="<category>", no nested segment yet) resolves
+        // to an agent id next — the same bare-agent-id destination highRiskAgents redirects to above.
+        if (drillState.drillId === DRILL_POSTURE_SCORE && drillState.path && !drillState.path.includes('/')) {
+            navigate(`/dashboard/agentic-posture/agent/${encodeURIComponent(e.data.id)}`,
+                { state: { backUrl: window.location.pathname + window.location.search } })
+            return
+        }
         const nextPath = drillState.path ? `${drillState.path}/${e.data.id}` : String(e.data.id)
         onNavigate({ drillId: drillState.drillId, path: nextPath })
-    }, [drill?.drillable, drillState, onNavigate])
+    }, [drill?.drillable, drillState, onNavigate, navigate])
 
     const handleSubScoreClick = useCallback((subScoreId) => {
         if (!drillState) return

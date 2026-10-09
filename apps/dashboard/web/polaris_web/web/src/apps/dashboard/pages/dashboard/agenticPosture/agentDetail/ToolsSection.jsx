@@ -1,29 +1,43 @@
 import { Badge, Box, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
-import { LockMajor } from '@shopify/polaris-icons'
+import { ToolsMajor } from '@shopify/polaris-icons'
+import { toolTone } from './tones'
+import './AgentDetail.css'
 
 function ToolRow({ tool }) {
+    const tone = toolTone(tool)
+
     return (
-        <Card>
-            <Box padding="4">
-                <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="4">
-                    <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                        {tool.privileged && <Box><Icon source={LockMajor} color="subdued" /></Box>}
-                        <VerticalStack gap="0">
-                            <Text variant="bodyMd" fontWeight="semibold">{tool.name}</Text>
-                            <Text variant="bodySm" color="subdued">{tool.detail}</Text>
-                        </VerticalStack>
-                    </HorizontalStack>
-                    <Badge status={tool.statusTone}>{tool.status}</Badge>
+        <Card padding="4">
+            <HorizontalStack align="space-between" blockAlign="center" gap="4" wrap={false}>
+                <HorizontalStack align="start" gap="4" blockAlign="center" wrap={false}>
+                    <Box background={tone.background} borderRadius="2" padding="2">
+                        <Icon source={ToolsMajor} color={tone.icon} />
+                    </Box>
+                    <VerticalStack gap="05">
+                        <Text variant="bodyMd" fontWeight="semibold" breakWord>{tool.name}</Text>
+                        {tool.detail && <Text variant="bodySm" color="subdued">{tool.detail}</Text>}
+                    </VerticalStack>
                 </HorizontalStack>
-            </Box>
+                {tool.privileged && (
+                    <Badge status={tone.badge} progress="complete">{tool.capabilityLabel}</Badge>
+                )}
+            </HorizontalStack>
         </Card>
     )
 }
 
 function ToolsSection({ tools }) {
+    const rows = tools || []
+    if (rows.length === 0) {
+        return (
+            <Card padding="4">
+                <Text variant="bodyMd" color="subdued" alignment="center">No tools discovered for this agent.</Text>
+            </Card>
+        )
+    }
     return (
         <VerticalStack gap="3">
-            {(tools || []).map((tool) => <ToolRow key={tool.name} tool={tool} />)}
+            {rows.map((tool) => <ToolRow key={`${tool.method} ${tool.url}`} tool={tool} />)}
         </VerticalStack>
     )
 }

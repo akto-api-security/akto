@@ -11,9 +11,14 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
+import org.apache.commons.lang3.StringUtils;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -209,10 +214,44 @@ public class InsightDataBundle {
         return hostResolver;
     }
 
-    // Newest-first events for these collections; null when the threat backend is unavailable.
+    /**
+     * Newest-first events for these collections; null when the threat backend is unavailable.
+     *
+     * Argus attributes malicious events by host, not apiCollectionId (see HostCollectionResolver's
+     * own javadoc) — an event's apiCollectionId is frequently unset or stale for agentic traffic,
+     * which is why maliciousSeverityCounts/countByCollection never filters by it either. This used
+     * to query by apiCollectionId directly, which silently returned nothing for agents whose events
+     * only carry a host match, while the severity-count sibling (host-resolved) reported a real
+     * total — the two disagreeing on the same agent is what surfaced this.
+     *
+     * Two queries unioned, not one with both fields set: the backend ANDs "hosts" and "actors"
+     * when both are present in one request, so a single call would ask for events whose host AND
+     * actor both match, not either — same reasoning HostCollectionResolver.resolveEvent's own
+     * host-then-actor fallback documents.
+     */
     public List<DashboardMaliciousEvent> listMaliciousEvents(int startTs, int endTs, int limit, List<Integer> collectionIds) {
         if (!threatBackendAvailable || threatAccess == null) return null;
-        return threatAccess.violationEvents(startTs, endTs, limit, Collections.singletonMap("apiCollectionId", collectionIds), null);
+        Set<Integer> wanted = new HashSet<>(collectionIds);
+        List<String> hosts = new ArrayList<>();
+        for (ApiCollection c : collections) {
+            if (c == null || !wanted.contains(c.getId())) continue;
+            String identity = InsightUtil.assetIdentity(c);
+            if (StringUtils.isNotBlank(identity)) hosts.add(identity);
+        }
+        if (hosts.isEmpty()) return new ArrayList<>();
+
+        Map<String, DashboardMaliciousEvent> byId = new LinkedHashMap<>();
+        for (String field : Arrays.asList("hosts", "actors")) {
+            List<DashboardMaliciousEvent> page = threatAccess.violationEvents(startTs, endTs, limit,
+                    Collections.singletonMap(field, hosts), null);
+            if (page == null) continue;
+            for (DashboardMaliciousEvent event : page) {
+                if (event != null && event.getId() != null) byId.put(event.getId(), event);
+            }
+        }
+        List<DashboardMaliciousEvent> events = new ArrayList<>(byId.values());
+        events.sort(Comparator.comparingLong(DashboardMaliciousEvent::getTimestamp).reversed());
+        return events.size() > limit ? events.subList(0, limit) : events;
     }
 
     private static final long MALICIOUS_INVOCATION_WINDOW_MS = 15L * 24 * 3600 * 1000;

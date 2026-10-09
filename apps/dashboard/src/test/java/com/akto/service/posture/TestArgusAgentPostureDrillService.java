@@ -64,6 +64,37 @@ public class TestArgusAgentPostureDrillService {
         assertTrue(result.getEmptyMessage() != null);
     }
 
+    @Test
+    public void remediationFor_neverScanned_suggestsSchedulingAScanNotReRunning() {
+        ApiCollection notScanned = agent(1, "a", 100.0, subScores(100, 0, 0, 0, 0, 0));
+        Map<String, String> gaps = new HashMap<>();
+        gaps.put(PostureScoreCategory.RED_TEAM.key, "Red-teaming scan not run for this agent, and it has malicious activity");
+        notScanned.setPostureGaps(gaps);
+
+        assertEquals("Schedule a red-team scan for this agent — it has never been scanned.",
+                ArgusAgentPostureDrillService.remediationFor(PostureScoreCategory.RED_TEAM, notScanned));
+    }
+
+    @Test
+    public void remediationFor_realOpenFindings_keepsTheFixOrAcceptText() {
+        ApiCollection scanned = agent(1, "a", 90.0, subScores(90, 0, 0, 0, 0, 0));
+        scanned.setPostureGaps(null);
+
+        assertEquals(PostureScoreCategory.RED_TEAM.remediation,
+                ArgusAgentPostureDrillService.remediationFor(PostureScoreCategory.RED_TEAM, scanned));
+    }
+
+    @Test
+    public void remediationFor_nonRedTeamCategory_alwaysUsesItsOwnFixedText() {
+        ApiCollection a = agent(1, "a", 50.0, subScores(0, 0, 0, 0, 100, 0));
+        Map<String, String> gaps = new HashMap<>();
+        gaps.put(PostureScoreCategory.RED_TEAM.key, "Red-teaming scan not run for this agent");
+        a.setPostureGaps(gaps);
+
+        assertEquals(PostureScoreCategory.ACCESS_AUTH.remediation,
+                ArgusAgentPostureDrillService.remediationFor(PostureScoreCategory.ACCESS_AUTH, a));
+    }
+
     private static Map<String, Object> subScores(double redTeam, double guardrailMalicious, double coverage,
                                                  double sensitiveData, double accessAuth, double overprivilegedTools) {
         Map<String, Object> m = new HashMap<>();
