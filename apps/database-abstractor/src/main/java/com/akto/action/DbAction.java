@@ -95,6 +95,7 @@ import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
 import com.akto.utils.TrafficCollectorAlert;
+import com.akto.utils.EndpointShieldInstallAlert;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -388,6 +389,7 @@ public class DbAction extends ActionSupport {
     List<String> hostNames;
     String hostName;
     BasicDBObject log;
+    List<BasicDBObject> logs;
     boolean isHybridSaas;
     Setup setup;
     Organization organization;
@@ -684,6 +686,7 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         TrafficCollectorAlert.checkOnHeartbeat(moduleInfoList);
+        EndpointShieldInstallAlert.checkOnHeartbeat(moduleInfoList);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -717,6 +720,7 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         TrafficCollectorAlert.checkOnHeartbeat(Collections.singletonList(moduleInfo));
+        EndpointShieldInstallAlert.checkOnHeartbeat(Collections.singletonList(moduleInfo));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -2112,6 +2116,85 @@ public class DbAction extends ActionSupport {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertEndpointShieldLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    // Upper bound on entries accepted per bulk request. Endpoint-shield clients
+    // send a few hundred lines at most (an install log, a diagnostic report, one
+    // shipper batch); the cap stops a misbehaving client from turning one request
+    // into an unbounded insert. Excess entries are rejected, not silently dropped,
+    // so the client can split and retry.
+    private static final int MAX_ENDPOINT_SHIELD_LOGS_PER_BULK = 2000;
+
+    /**
+     * Bulk counterpart of {@link #insertEndpointShieldLog()}: one request, many
+     * log entries, each stored as its own row.
+     *
+     * Exists because the single-entry API forced clients to choose between one
+     * HTTP round trip per log line (an installer diagnostic is ~1,000 lines, so
+     * minutes at a few hundred ms per request) and concatenating many lines into
+     * one record — which is what the agent's log shipper and the installers did,
+     * and why the dashboard showed one timestamp and one level for up to 64 lines.
+     *
+     * Entries are inserted in request order: in Kafka mode they are produced in
+     * order on the request thread; otherwise a single insertMany is used, whose
+     * driver-assigned ObjectIds follow list order even though the write itself is
+     * unordered. The dashboard sorts by _id, so lines read back in sequence.
+     */
+    public String bulkInsertEndpointShieldLogs() {
+        if (logs == null || logs.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
+        }
+        if (logs.size() > MAX_ENDPOINT_SHIELD_LOGS_PER_BULK) {
+            addActionError("too many logs in one request: " + logs.size() + " > " + MAX_ENDPOINT_SHIELD_LOGS_PER_BULK);
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            List<LogsEndpointShield> dbLogs = new ArrayList<>(logs.size());
+            for (BasicDBObject entry : logs) {
+                if (entry == null) {
+                    continue;
+                }
+                LogsEndpointShield dbLog = new LogsEndpointShield(
+                    entry.getString("agentId"),
+                    entry.getString("deviceId"),
+                    entry.getString("key"),
+                    entry.getString("level"),
+                    entry.getString("log"),
+                    entry.getInt("timestamp")
+                );
+                // Same debug hook as the single-entry path, so a bulk sender is
+                // not invisible to it.
+                if (matchesVetPartnersDebug(dbLog.getAgentId(), dbLog.getDeviceId(), dbLog.getLog())) {
+                    loggerMaker.infoAndAddToDb(
+                            "bulkInsertEndpointShieldLogs accountId=" + Context.accountId.get()
+                                    + " agentId=" + dbLog.getAgentId()
+                                    + " deviceId=" + dbLog.getDeviceId()
+                                    + " key=" + dbLog.getKey()
+                                    + " line=" + truncateForDebugLog(dbLog.getLog(), ENDPOINT_SHIELD_LOG_PREVIEW_CHARS),
+                            LogDb.DB_ABS);
+                }
+                dbLogs.add(dbLog);
+            }
+            if (dbLogs.isEmpty()) {
+                return Action.SUCCESS.toUpperCase();
+            }
+            // Producer mode mirrors insertEndpointShieldLog: hand off to Kafka and
+            // return; the consumer already batches these into one insertMany per
+            // poll (KafkaUtils.flushEndpointShieldLogs). Otherwise write them in a
+            // single round trip with the existing bulk DbLayer method.
+            if (kafkaUtils.isWriteEnabled()) {
+                int accountId = Context.accountId.get();
+                for (LogsEndpointShield dbLog : dbLogs) {
+                    kafkaUtils.insertEndpointShieldLog(dbLog, accountId);
+                }
+            } else {
+                DbLayer.insertEndpointShieldLogs(dbLogs);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in bulkInsertEndpointShieldLogs " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -5083,6 +5166,14 @@ public class DbAction extends ActionSupport {
 
     public void setLog(BasicDBObject log) {
         this.log = log;
+    }
+
+    public List<BasicDBObject> getLogs() {
+        return logs;
+    }
+
+    public void setLogs(List<BasicDBObject> logs) {
+        this.logs = logs;
     }
 
     public boolean getIsHybridSaas() {
