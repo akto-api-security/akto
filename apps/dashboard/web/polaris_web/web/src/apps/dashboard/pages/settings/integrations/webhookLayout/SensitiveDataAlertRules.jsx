@@ -27,20 +27,27 @@ export function invalidRuleMessage(rules) {
 
 function SensitiveDataAlertRules({ rules, setRules }) {
 
-    const [dataTypeOptions, setDataTypeOptions] = useState([])
+    const [dataTypeNames, setDataTypeNames] = useState([])
+    const [loadFailed, setLoadFailed] = useState(false)
 
     useEffect(() => {
         // Only custom sensitive data types are counted by the runtime.
         observeApi.fetchDataTypes().then((res) => {
             const customTypes = res?.dataTypes?.customDataTypes || []
-            const names = customTypes
+            setDataTypeNames(customTypes
                 .filter(type => type.active && (type.sensitiveAlways || (type.sensitivePosition || []).length > 0))
-                .map(type => type.name)
-            setDataTypeOptions(names.map(name => ({ label: name, value: name })))
-        }).catch(() => setDataTypeOptions([]))
+                .map(type => type.name))
+        }).catch(() => setLoadFailed(true))
     }, [])
 
     const currentRules = rules || []
+
+    // A saved type must stay selectable even if the list has not loaded, failed to load, or no
+    // longer includes it (say, the type was deactivated); otherwise the dropdown would show the
+    // placeholder and saving would silently drop the rule's type.
+    const dataTypeOptions = [...new Set([...dataTypeNames, ...currentRules.map(rule => rule.subType).filter(Boolean)])]
+        .sort()
+        .map(name => ({ label: name, value: name }))
 
     function updateRule(index, field, value) {
         setRules(currentRules.map((rule, i) => i === index ? { ...rule, [field]: value } : rule))
@@ -94,6 +101,9 @@ function SensitiveDataAlertRules({ rules, setRules }) {
             <div>
                 <Button onClick={addRule}>Add data type</Button>
             </div>
+            {loadFailed ?
+                <Text variant="bodySm" color="critical">Could not load data types. Saved rules are kept; reload the page to pick new ones.</Text>
+                : null}
             <Text variant="bodySm" color="subdued">
                 Custom sensitive data types only. Every API collection is checked hourly; an event is one request or response carrying the type.
                 Each data type and collection pair alerts once when it crosses its threshold, and again only after its window has passed.
