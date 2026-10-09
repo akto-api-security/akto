@@ -9,6 +9,11 @@ public enum ModelType {
     GEMINI,
     GITHUB_COPILOT,
     OLLAMA,
-    CLOUDFLARE
+    CLOUDFLARE,
+    // Saved from the dashboard's Agents configuration page; must exist here too or
+    // fetchAgentModels (which queries per known type) never returns those models.
+    DATABRICKS,
+    VERTEX_AI,
+    BEDROCK
 
 }
