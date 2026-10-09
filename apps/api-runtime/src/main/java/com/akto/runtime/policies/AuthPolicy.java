@@ -10,18 +10,14 @@ import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.regex.Pattern;
 import static com.akto.runtime.utils.Utils.parseCookie;
 
 public class AuthPolicy {
 
     public static final String AUTHORIZATION_HEADER_NAME = "authorization";
     public static final String COOKIE_NAME = "cookie";
-    private static final Logger logger = LoggerFactory.getLogger(AuthPolicy.class);
 
     private static boolean isApiKeyHeader(String headerName) {
         if (headerName == null || headerName.isEmpty()) {
@@ -47,6 +43,8 @@ public class AuthPolicy {
         return new ArrayList<>();
     }
 
+    
+
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
         Set<Set<String>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
@@ -61,15 +59,12 @@ public class AuthPolicy {
         Map<String,String> cookieMap = parseCookie(cookieList);
         Set<String> authTypes = new HashSet<>();
 
+        Set<String> headerAndCookieKeys = CustomAuthType.normalizeKeys(headers.keySet());
+        headerAndCookieKeys.addAll(CustomAuthType.normalizeKeys(cookieMap.keySet()));
+
         for (CustomAuthType customAuthType : customAuthTypes) {
-
-            Set<String> headerAndCookieKeys = new HashSet<>();
-            headerAndCookieKeys.addAll(headers.keySet());
-            headerAndCookieKeys.addAll(cookieMap.keySet());
-
             // Find custom auth type in header and cookie
-            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
-            if (!headerAndCookieKeys.isEmpty() && !customAuthTypeHeaderKeys.isEmpty() && headerAndCookieKeys.containsAll(customAuthTypeHeaderKeys)) {
+            if (customAuthType.hasAllHeaderKeysIn(headerAndCookieKeys)) {
                 // CRITICAL: Use the custom auth type's NAME directly instead of "CUSTOM"
                 String customAuthName = customAuthType.getName();
                 if (customAuthName != null && !customAuthName.trim().isEmpty()) {

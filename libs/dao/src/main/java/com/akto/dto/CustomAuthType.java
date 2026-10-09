@@ -1,6 +1,9 @@
 package com.akto.dto;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
@@ -54,6 +57,31 @@ public class CustomAuthType {
     }
     public void setHeaderKeys(List<String> headerKeys) {
         this.headerKeys = headerKeys;
+    }
+    public static String normalizeKey(String key) {
+        return key == null ? null : key.trim().toLowerCase();
+    }
+
+    public static Set<String> normalizeKeys(Collection<String> keys) {
+        Set<String> normalized = new HashSet<>();
+        if (keys == null) {
+            return normalized;
+        }
+        for (String key : keys) {
+            normalized.add(normalizeKey(key));
+        }
+        return normalized;
+    }
+
+    /**
+     * Header/cookie keys are matched case-insensitively and ignoring surrounding whitespace.
+     * @param normalizedKeys keys present in the request, already passed through {@link #normalizeKeys(Collection)}
+     */
+    public boolean hasAllHeaderKeysIn(Set<String> normalizedKeys) {
+        if (headerKeys == null || headerKeys.isEmpty() || normalizedKeys == null || normalizedKeys.isEmpty()) {
+            return false;
+        }
+        return normalizedKeys.containsAll(normalizeKeys(headerKeys));
     }
     public List<String> getPayloadKeys() {
         return payloadKeys;
