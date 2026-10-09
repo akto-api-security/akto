@@ -29,6 +29,7 @@ import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
+import com.akto.testing.kafka_utils.KafkaAdminClient;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.TestingStateStore;
@@ -449,7 +450,11 @@ public class Main {
                         loggerMaker.errorAndAddToDb("Module found busy while shutdown hook was triggered for mini-testing: " + customMiniTestingServiceName);
                     }
                     loggerMaker.infoAndAddToDb("Shutdown hook triggered for mini-testing: " + customMiniTestingServiceName);
-                    shutdown();
+                    // Cleanup only - never System.exit() here. The JVM is already mid-shutdown by
+                    // the time any hook runs, and a hook calling exit() again deadlocks: confirmed
+                    // live, the second call blocks forever trying to re-enter the same shutdown
+                    // sequence the first call is still holding open waiting for this hook to finish.
+                    cleanupResources();
                 }
             });
             runModule();
@@ -466,7 +471,17 @@ public class Main {
         }
     }
 
+    /** The only place that actually calls System.exit() - reached from main()'s own non-hook
+     *  finally block (runModule() returned or threw), never from the shutdown hook itself. */
     private static void shutdown() {
+        cleanupResources();
+        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
+        System.exit(0);
+    }
+
+    /** No System.exit() here - safe to call from the shutdown hook's own thread, where the JVM is
+     *  already exiting and calling exit() again would deadlock (see the hook's own comment). */
+    private static void cleanupResources() {
         try {
             UtilityServer.stop();
         } catch (Exception e) {
@@ -477,9 +492,8 @@ public class Main {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Exception while performing shutdown tasks");
         }
-
-        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
-        System.exit(0);
+        // the one shared AdminClient outlives every caller (Producer, ConsumerUtil) - close it here, once
+        KafkaAdminClient.close();
     }
 
     private static void runModule() throws InterruptedException, IOException {
