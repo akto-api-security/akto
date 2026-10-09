@@ -339,3 +339,25 @@ async def test_backup_entry_never_runs_and_is_not_reported_in_details():
     assert FakeScanner.calls == ["gemma_vertexai"]
     assert r["is_valid"] is False
     assert "anthropic" not in r["details"]
+
+
+async def test_fallback_provider_uses_backup_when_primary_hangs(monkeypatch):
+    import asyncio
+
+    import providers
+
+    class Hang:
+        name = "hang"
+
+        async def complete(self, prompt):
+            await asyncio.sleep(10)
+
+    class Backup:
+        name = "backup"
+
+        async def complete(self, prompt):
+            return "from backup"
+
+    monkeypatch.setattr(providers, "build_provider_from_config", lambda entry: Backup())
+    fb = providers.FallbackProvider(Hang(), {"provider": "anthropic"}, primary_timeout_s=0.05)
+    assert await asyncio.wait_for(fb.complete("hi"), timeout=1.0) == "from backup"
