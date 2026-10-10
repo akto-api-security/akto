@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
@@ -26,7 +27,6 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.CollectionTags.TagSource;
-import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -55,6 +55,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
+import com.akto.service.collections.*;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.result.DeleteResult;
@@ -73,12 +74,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
-import com.akto.dto.billing.UningestedApiOverage;
-import com.akto.dto.type.URLMethods;
 import com.akto.utils.scripts.AcesssTypeCollectionLevel;
 import com.akto.gpt.handlers.gpt_prompts.AgentGuardSystemPromptClassifier;
 import com.akto.gpt.handlers.gpt_prompts.AzureOpenAIPromptHandler;
-import com.mongodb.client.model.Projections;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -108,12 +106,7 @@ public class ApiCollectionsAction extends UserAction {
             long stepStart = start;
             Context.accountId.set(CACHED_ACCOUNT_ID);
 
-            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
-                    "urls", "conditions", "serviceGraphEdges", "hostNames",
-                    "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
-                    "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
-                    "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
-            ));
+            List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(Filters.empty(), ApiCollectionsDao.LIST_PROJECTION_WITH_SERVICE_TAG);
             loggerMaker.warnAndAddToDb("[fetchAllCollectionsBasic-cache] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + collections.size());
             stepStart = System.currentTimeMillis();
 
@@ -256,6 +249,34 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
+    /**
+     * The single definition of a collection's API count: the STI-derived count when it applies,
+     * else the collection's own fallback. Keep every consumer (including the stats refresh) on this.
+     */
+    public static int resolveUrlsCount(ApiCollection apiCollection, Integer count) {
+        int apiCollectionId = apiCollection.getId();
+        int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
+        if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
+            fallbackCount = 200;
+        }
+        if (count != null && (apiCollection.getHostName() != null)) {
+            return count;
+        } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
+            return count == null ? fallbackCount : count;
+        }
+        /*
+         * In case the default collection is filled by traffic-collector traffic,
+         * the count will not be null, but the fallbackCount would be zero
+         */
+        if (apiCollectionId == 0 && count != null) {
+            fallbackCount = count;
+        }
+        if (fallbackCount == 0 && count != null) {
+            fallbackCount = count;
+        }
+        return fallbackCount;
+    }
+
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
         long fillStart = System.currentTimeMillis();
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
@@ -264,92 +285,13 @@ public class ApiCollectionsAction extends UserAction {
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
-            Integer count = countMap.get(apiCollectionId);
-            int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
-            if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
-                fallbackCount = 200;
-            }
-            if (count != null && (apiCollection.getHostName() != null)) {
-                apiCollection.setUrlsCount(count);
-            } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
-                if (count == null) {
-                    count = fallbackCount;
-                }
-                apiCollection.setUrlsCount(count);
-            } else {
-                /*
-                 * In case the default collection is filled by traffic-collector traffic,
-                 * the count will not be null, but the fallbackCount would be zero
-                 */
-                if (apiCollectionId == 0 && count != null) {
-                    fallbackCount = count;
-                }
-                if (fallbackCount == 0 && count != null) {
-                    fallbackCount = count;
-                }
-                apiCollection.setUrlsCount(fallbackCount);
-            }
+            apiCollection.setUrlsCount(resolveUrlsCount(apiCollection, countMap.get(apiCollectionId)));
 
             // Populate URLs for MCP collections using the service
             populateCollectionUrls(apiCollection);
         }
         loggerMaker.infoAndAddToDb("[fillApiCollectionsUrlCount] loop + populateUrls took " + (System.currentTimeMillis() - loopStart) + "ms");
         return apiCollections;
-    }
-
-    private Map<Integer, Integer> deactivatedHostnameCountMap;
-
-    private Map<Integer, Integer> uningestedApiCountMap;
-    private List<UningestedApiOverage> uningestedApiList;
-
-    public String fetchCountForHostnameDeactivatedCollections(){
-        this.deactivatedHostnameCountMap = new HashMap<>();
-        if(deactivatedCollections == null || deactivatedCollections.isEmpty()){
-            return SUCCESS.toUpperCase();
-        }
-        Bson filter = Filters.and(Filters.exists(ApiCollection.HOST_NAME), Filters.in(Constants.ID, deactivatedCollections));
-        List<ApiCollection> hCollections = ApiCollectionsDao.instance.findAll(filter, Projections.include(Constants.ID));
-        Set<Integer> deactivatedIds = new HashSet<>();
-        for(ApiCollection collection : hCollections){
-            if(deactivatedCollections.contains(collection.getId())){
-                deactivatedIds.add(collection.getId());
-            }
-        }
-
-        if(deactivatedIds.isEmpty()){
-            return SUCCESS.toUpperCase();
-        }
-
-        if (Context.accountId.get() == 1736798101) {
-            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapNew(deactivatedIds);
-        } else {
-            this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
-                    Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
-            );
-        }
-        return SUCCESS.toUpperCase();
-    }
-
-    public String fetchCountForUningestedApis(){
-        this.uningestedApiCountMap = new HashMap<>();
-        try {
-            this.uningestedApiCountMap = UningestedApiOverageDao.instance.getCountByCollection();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
-        }
-        return SUCCESS.toUpperCase();
-    }
-
-    public String fetchUningestedApis(){
-        this.uningestedApiList = new ArrayList<>();
-        try {
-            // Fetch all uningested APIs excluding OPTIONS methods
-            Bson filter = Filters.ne(UningestedApiOverage.METHOD, URLMethods.Method.OPTIONS);
-            this.uningestedApiList = UningestedApiOverageDao.instance.findAll(filter);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API details", LogDb.DASHBOARD);
-        }
-        return SUCCESS.toUpperCase();
     }
 
     private String nameRegex;
@@ -409,6 +351,68 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    // ---- paginated collections table (api_collection_stats) ----
+
+    @Setter private int skip;
+    @Setter private int limit;
+    @Setter private String sortKey;
+    @Setter private int sortOrder;
+    @Setter private String tab;
+    @Setter private String queryValue;
+    @Setter private Map<String, List<String>> filters;
+    @Setter private Map<String, List<String>> tagFilters;
+    @Setter private boolean force;
+
+    @Getter private CollectionsPageResponse.Page collectionsPage;
+    @Getter private CollectionsPageResponse.Meta collectionsPageMeta;
+    @Getter private CollectionsPageResponse.Details collectionsPageDetails;
+    @Getter private CollectionsPageResponse.TabCounts collectionsTabCounts;
+
+    /** One page of the collections table; see CollectionsPageService. */
+    public String fetchApiCollectionsPage() {
+        this.collectionsPage = new CollectionsPageService().fetchPage(new CollectionsPageRequest(
+                skip, limit, sortKey, sortOrder, tab, queryValue, filters, tagFilters, force));
+        return SUCCESS.toUpperCase();
+    }
+
+    /** Coverage and open issues of the collections (apiCollectionIds) of a page the table already shows. */
+    public String fetchApiCollectionsPageDetails() {
+        this.collectionsPageDetails = new CollectionsPageService().fetchDetails(apiCollectionIds);
+        return SUCCESS.toUpperCase();
+    }
+
+    /** The tab badges under the table's current search and filters. */
+    public String fetchApiCollectionsTabCounts() {
+        this.collectionsTabCounts = new CollectionsPageService().fetchTabCounts(new CollectionsPageRequest(
+                0, 0, null, -1, CollectionsPageQueryBuilder.TAB_ALL, queryValue, filters, tagFilters, false));
+        return SUCCESS.toUpperCase();
+    }
+
+    /** Tab counts, summary card numbers and tag filter choices for the collections table. */
+    public String fetchApiCollectionsPageMeta() {
+        this.collectionsPageMeta = new CollectionsPageService().fetchMeta();
+        return SUCCESS.toUpperCase();
+    }
+
+    /** Runs a collection mutating action, then keeps api_collection_stats' filterable attributes in step with it. */
+    private String syncingStats(Supplier<String> mutation) {
+        try {
+            return mutation.get();
+        } finally {
+            syncStatsAfterMutation();
+        }
+    }
+
+    private void syncStatsAfterMutation() {
+        Set<Integer> ids = new HashSet<>();
+        if (apiCollectionIds != null) ids.addAll(apiCollectionIds);
+        if (apiCollections != null) {
+            for (ApiCollection collection : apiCollections) ids.add(collection.getId());
+        }
+        if (apiCollectionId != 0) ids.add(apiCollectionId);
+        new CollectionAttrsSync().syncIdsAndRecentQuietly(ids);
+    }
+
     public String fetchAllCollectionsBasic() throws Exception {
         RuleCollections.refreshInBackground(Context.accountId.get());
         long start = System.currentTimeMillis();
@@ -425,7 +429,7 @@ public class ApiCollectionsAction extends UserAction {
                 httpResponse.setCharacterEncoding("UTF-8");
                 httpResponse.getOutputStream().write(cached);
                 loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length+ ", loggedInUser=" + loggedInUser);
-                return Action.NONE;
+                return Action.SUCCESS.toUpperCase();
             }
         }
 
@@ -435,12 +439,7 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] deleteContextCollections took " + (System.currentTimeMillis() - stepStart) + "ms");
         stepStart = System.currentTimeMillis();
 
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude(
-                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
-                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
-                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
-                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
-        ));
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), ApiCollectionsDao.LIST_PROJECTION);
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] findAll took " + (System.currentTimeMillis() - stepStart) + "ms, size=" + this.apiCollections.size()+ ", loggedInUser=" + loggedInUser);
         stepStart = System.currentTimeMillis();
 
@@ -489,7 +488,7 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] Jackson serialization took " + (System.currentTimeMillis() - stepStart) + "ms");
 
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
-        return Action.NONE;
+        return Action.SUCCESS.toUpperCase();
     }
 
     // Deliberately NOT named "hostNames"/"hostnames" — this class already has an unrelated
@@ -511,15 +510,10 @@ public class ApiCollectionsAction extends UserAction {
             httpResponse.setContentType("application/json");
             httpResponse.setCharacterEncoding("UTF-8");
             new ObjectMapper().writeValue(httpResponse.getOutputStream(), Collections.singletonMap("apiCollections", Collections.emptyList()));
-            return Action.NONE;
+            return Action.SUCCESS.toUpperCase();
         }
 
-        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(ApiCollection.HOST_NAME, deviceHostNames), Projections.exclude(
-                "urls", "conditions", "serviceGraphEdges", "hostNames", "serviceTag",
-                "sampleCollectionsDropped", "redact", "runDependencyAnalyser",
-                "matchDependencyWithOtherCollections", "sseCallbackUrl", "mcpTransportType",
-                "mcpMaliciousnessLastCheck", "vxlanId", "userSetEnvType"
-        ));
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(ApiCollection.HOST_NAME, deviceHostNames), ApiCollectionsDao.LIST_PROJECTION);
 
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
@@ -545,7 +539,7 @@ public class ApiCollectionsAction extends UserAction {
         mapper.writeValue(httpResponse.getOutputStream(), responseBody);
 
         loggerMaker.infoAndAddToDb("[fetchCollectionsBasicForHostNames] TOTAL took " + (System.currentTimeMillis() - start) + "ms, hostNames=" + deviceHostNames.size() + ", found=" + this.apiCollections.size());
-        return Action.NONE;
+        return  Action.SUCCESS.toUpperCase();
     }
 
     public String fetchCollection() {
@@ -603,6 +597,10 @@ public class ApiCollectionsAction extends UserAction {
 
     @Audit(description = "User created a new API collection", resource = Resource.API_COLLECTION, operation = Operation.CREATE, metadataGenerators = {"getCollectionName"})
     public String createCollection() {
+        return syncingStats(this::createCollectionImpl);
+    }
+
+    private String createCollectionImpl() {
 
         if(!isValidApiCollectionName()){
             return ERROR.toUpperCase();
@@ -713,6 +711,10 @@ public class ApiCollectionsAction extends UserAction {
 
     @Audit(description = "User deleted multiple API collections", resource = Resource.API_COLLECTION, operation = Operation.DELETE, metadataGenerators = {"fetchApiCollectionIdsList"})
     public String deleteMultipleCollections() {
+        return syncingStats(this::deleteMultipleCollectionsImpl);
+    }
+
+    private String deleteMultipleCollectionsImpl() {
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: this.apiCollections) {
             apiCollectionIds.add(apiCollection.getId());
@@ -935,6 +937,10 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String createCustomCollection() {
+        return syncingStats(this::createCustomCollectionImpl);
+    }
+
+    private String createCustomCollectionImpl() {
         if (!isValidApiCollectionName()) {
             return ERROR.toUpperCase();
         }
@@ -1329,6 +1335,10 @@ public class ApiCollectionsAction extends UserAction {
 
     @Audit(description = "User deactivated collections from inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"fetchApiCollectionIdsList"})
     public String deactivateCollections() {
+        return syncingStats(this::deactivateCollectionsImpl);
+    }
+
+    private String deactivateCollectionsImpl() {
         this.apiCollections = filterCollections(this.apiCollections, false);
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections,Filters.empty());
         int deltaUsage = (-1) * this.apiCollections.stream().mapToInt(apiCollection -> apiCollection.getUrlsCount()).sum();
@@ -1341,6 +1351,10 @@ public class ApiCollectionsAction extends UserAction {
 
     @Audit(description = "User activated collections in inventory", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"fetchApiCollectionIdsList"})
     public String activateCollections() {
+        return syncingStats(this::activateCollectionsImpl);
+    }
+
+    private String activateCollectionsImpl() {
         this.apiCollections = filterCollections(this.apiCollections, true);
         if (this.apiCollections.isEmpty()) {
             return Action.SUCCESS.toUpperCase();
@@ -1463,7 +1477,11 @@ public class ApiCollectionsAction extends UserAction {
         }
     }
 
-    public String toggleCollectionsOutOfTestScope(){
+    public String toggleCollectionsOutOfTestScope() {
+        return syncingStats(this::toggleCollectionsOutOfTestScopeImpl);
+    }
+
+    private String toggleCollectionsOutOfTestScopeImpl() {
         try{
             if(this.apiCollectionIds ==null || this.apiCollectionIds.isEmpty()){
                 addActionError("No collections provided");
@@ -1518,7 +1536,11 @@ public class ApiCollectionsAction extends UserAction {
     private boolean resetEnvTypes;
     
     @Audit(description = "User updated environment type", resource = Resource.API_COLLECTION, operation = Operation.UPDATE, metadataGenerators = {"fetchApiCollectionIdsList"})
-    public String updateEnvType(){
+    public String updateEnvType() {
+        return syncingStats(this::updateEnvTypeImpl);
+    }
+
+    private String updateEnvTypeImpl() {
         if(!resetEnvTypes && (envType == null || envType.isEmpty())) {
             addActionError("Please enter a valid ENV type.");
             return Action.ERROR.toUpperCase();
@@ -1699,6 +1721,10 @@ public class ApiCollectionsAction extends UserAction {
         return this.usersCollectionList;
     }
     public String editCollectionName() {
+        return syncingStats(this::editCollectionNameImpl);
+    }
+
+    private String editCollectionNameImpl() {
         if(!isValidApiCollectionName()){
             return ERROR.toUpperCase();
         }
@@ -1734,6 +1760,10 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String saveCollectionDescription() {
+        return syncingStats(this::saveCollectionDescriptionImpl);
+    }
+
+    private String saveCollectionDescriptionImpl() {
         if(description == null) {
             addActionError("No description provided");
             return Action.ERROR.toUpperCase();
@@ -2348,22 +2378,6 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setEndTimestamp(int endTimestamp) {
         this.endTimestamp = endTimestamp;
-    }
-
-    public Map<Integer, Integer> getDeactivatedHostnameCountMap() {
-        return deactivatedHostnameCountMap;
-    }
-
-    public Map<Integer, Integer> getUningestedApiCountMap() {
-        return uningestedApiCountMap;
-    }
-
-    public List<UningestedApiOverage> getUningestedApiList() {
-        return uningestedApiList;
-    }
-
-    public void setUningestedApiList(List<UningestedApiOverage> uningestedApiList) {
-        this.uningestedApiList = uningestedApiList;
     }
 
     public void setDescription(String description) {

@@ -57,7 +57,7 @@ const ensureCollectionFields = (collection) => {
  * Parse filter from URL search params
  * URL format: filters=key__value1,value2
  */
-const parseFilterFromUrl = (searchParams) => {
+export const parseFilterFromUrl = (searchParams) => {
     const filtersParam = searchParams.get('filters');
     if (!filtersParam) return { envTypeFilter: null, hostNameFilter: null };
 

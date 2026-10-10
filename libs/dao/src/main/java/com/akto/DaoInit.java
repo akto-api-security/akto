@@ -574,6 +574,7 @@ public class DaoInit {
         McpRegistryConfigDao.instance.createIndicesIfAbsent();
         HistoricalDataDao.instance.createIndicesIfAbsent();
         EndpointInfoViewDao.instance.createIndicesIfAbsent();
+        ApiCollectionStatsDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
