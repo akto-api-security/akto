@@ -1,17 +1,15 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack, Tooltip, Filters, ChoiceList} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
-import RegistryBadge from "../../../components/shared/RegistryBadge";
 import RunTest from "./RunTest";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
-import { CollectionIcon } from "../../../components/shared/CollectionIcon"
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react"
+import React, { useEffect, useState, useRef, useMemo } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import GithubServerTable from "@/apps/dashboard/components/tables/GithubServerTable";
-import { CircleTickMajor } from '@shopify/polaris-icons';
+
 import ObserveStore from "../observeStore"
 import PersistStore from "../../../../main/PersistStore"
 import transform from "../transform"

@@ -147,7 +147,7 @@ public class AgentClient {
     }
     
     private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "", "", null);
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, null, ConversationType.TEST_EXECUTION_RESULT, "", "", "", null, null);
         
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
@@ -160,13 +160,17 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contextSource) {
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String chatUrl, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contextSource, List<Map<String, String>> history) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
         requestBody.put("conversationId", conversationId);
         requestBody.put("isLastRequest", isLastRequest);
         requestBody.put("conversationType", conversationType);
         requestBody.put("contextString", contextString);
+        // Earlier prompt/response pairs, so the agent can rebuild the conversation if it has no saved history for it
+        if (history != null && !history.isEmpty()) {
+            requestBody.put("history", history);
+        }
 
         // Add user email to request body if available
         if (userEmail != null && !userEmail.isEmpty()) {
@@ -371,8 +375,8 @@ public class AgentClient {
     }
 
     // call akto's mcp server (centralized)
-    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contextSource) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString, userEmail, contextSource);
+    public GenericAgentConversation getResponseFromMcpServer(String prompt, String conversationId, int tokensLimit, String storedTitle, GenericAgentConversation.ConversationType conversationType, String accessTokenForRequest, String contextString, String userEmail, String contextSource, List<Map<String, String>> history) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, false, "/generic_chat", conversationType, accessTokenForRequest, contextString, userEmail, contextSource, history);
         try (Response response = agentHttpClient.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 String responseBody = response.body() != null ? response.body().string() : "";

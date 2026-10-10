@@ -3,6 +3,7 @@ package com.akto.dao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -74,12 +75,28 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
     public SampleData fetchAllSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {
         Bson filterQSampleData = filterForSampleData(apiCollectionId, url, method);
         List<SampleData> list = SampleDataDao.instance.findAll(filterQSampleData);
+        List<SensitiveSampleData> sensitiveSampleDataList = SensitiveSampleDataDao.instance.findAll(filterQSampleData);
         SampleData sampleData = new SampleData();
         if (list != null && !list.isEmpty()) {
             sampleData = list.get(0);
             if (list.size() > 1) {
                 for (SampleData data : list) {
-                    sampleData.getSamples().addAll(data.getSamples());
+                    if(data.getSamples() != null){
+                        sampleData.getSamples().addAll(data.getSamples());
+                    }
+                    
+                }
+            }
+        }else{
+            sampleData.setId(
+                new Key(apiCollectionId, url, method, apiCollectionId, 0, 0)
+            );
+            sampleData.setSamples(new ArrayList<>());
+        }
+        if (sensitiveSampleDataList != null && !sensitiveSampleDataList.isEmpty()) {
+            for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
+                if(sensitiveSampleData.getSampleData() != null){
+                    sampleData.getSamples().addAll(sensitiveSampleData.getSampleData());
                 }
             }
         }
