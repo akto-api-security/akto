@@ -100,6 +100,12 @@ public class ModuleInfoAction extends UserAction {
     private static final String AD_BROWSER_NAME = ModuleInfo.ADDITIONAL_DATA + ".browserName";
     private static final String AD_PROVIDER = ModuleInfo.ADDITIONAL_DATA + ".provider";
     private static final String AD_CURRENT_STATUS = ModuleInfo.ADDITIONAL_DATA + ".currentStatus";
+    // "Last deployed" = start of the latest deployment attempt (installStartedTs, written by
+    // the installers on every attempt), falling back to startedTs for devices installed before
+    // installers sent it. startedTs alone only ever holds the FIRST registration (setOnInsert).
+    // Computed into additionalData like currentStatus, so it can be sorted on and the UI can
+    // read it without a model change.
+    private static final String AD_LAST_DEPLOYED_TS = ModuleInfo.ADDITIONAL_DATA + ".lastDeployedTs";
 
     private Bson buildEndpointShieldFilter() {
         List<Bson> f = new ArrayList<>();
@@ -135,7 +141,7 @@ public class ModuleInfoAction extends UserAction {
             case "username": return AD_USERNAME;
             case "os": return AD_OS;
             case "agentVersion": return ModuleInfo.CURRENT_VERSION;
-            case "lastDeployed": return ModuleInfo.STARTED_TS;
+            case "lastDeployed": return AD_LAST_DEPLOYED_TS;
             case "lastHeartbeat":
             default: return ModuleInfo.LAST_HEARTBEAT_RECEIVED;
         }
@@ -163,12 +169,28 @@ public class ModuleInfoAction extends UserAction {
         return new Document("$ifNull", Arrays.asList("$" + fieldPath, defaultValue));
     }
 
+    // installStatus values the installers write (install_telemetry.sh / install.ps1).
+    private static final List<String> INSTALL_IN_PROGRESS_STATUSES = Arrays.asList("installing", "postinstall");
+    private static final List<String> INSTALL_FAILED_STATUSES = Arrays.asList("failed", "verify-failed");
+
+    private static Document endpointShieldLastDeployedExpr() {
+        String installStarted = "$" + ModuleInfo.ADDITIONAL_DATA + ".installStartedTs";
+        return new Document("$cond", Arrays.asList(
+                new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList(installStarted, 0)), 0)),
+                installStarted,
+                new Document("$ifNull", Arrays.asList("$" + ModuleInfo.STARTED_TS, 0))));
+    }
+
     private static Document endpointShieldCurrentStatusExpr(int now) {
+        String installStatus = "$" + ModuleInfo.ADDITIONAL_DATA + ".installStatus";
         return new Document("$switch", new Document()
                 .append("branches", Arrays.asList(
-                        new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.ADDITIONAL_DATA + ".installStatus", "installing")))
+                        // postinstall is in progress too, and verify-failed (the standalone
+                        // verifier) is a failed install — both used to fall through to the
+                        // heartbeat-based statuses.
+                        new Document("case", new Document("$in", Arrays.asList(installStatus, INSTALL_IN_PROGRESS_STATUSES)))
                                 .append("then", "installing"),
-                        new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.ADDITIONAL_DATA + ".installStatus", "failed")))
+                        new Document("case", new Document("$in", Arrays.asList(installStatus, INSTALL_FAILED_STATUSES)))
                                 .append("then", "install_failed"),
                         new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)))
                                 .append("then", STATUS_FAILED),
@@ -229,7 +251,8 @@ public class ModuleInfoAction extends UserAction {
                         Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
                 Aggregates.addFields(
                         new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
-                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(Context.now()))),
+                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(Context.now())),
+                        new Field<>(AD_LAST_DEPLOYED_TS, endpointShieldLastDeployedExpr())),
                 Aggregates.match(statuses == null || statuses.isEmpty() ? new Document() : Filters.in(AD_CURRENT_STATUS, statuses)),
                 Aggregates.project(Projections.exclude(ORIG_ID_FIELD)),
                 Aggregates.sort(finalSort),

@@ -246,7 +246,66 @@ const getResolvedUsernameForCollection = (collection, usernameMap) => {
     return fromTags || DEFAULT_VALUE;
 };
 
+// installStatus values written by the endpoint-shield installers:
+//   in progress: pending → installing → postinstall
+//   failed:      failed (installer error, or exit 90 nothing running / 91 agent
+//                never reported / 93 pkg failed), verify-failed (standalone
+//                verifier), uninstall-failed
+// The agent reports "running" once it is up, which supersedes any of these.
+const INSTALL_IN_PROGRESS_STATUSES = ['pending', 'installing', 'postinstall'];
+// "uninstall-failed" ends in "failed" but is a removal that did not go through, not a
+// broken install — the agent is usually still running, so it must not raise the
+// installation banner or the critical icon.
+const isInstallFailed = (installStatus) =>
+    typeof installStatus === 'string'
+    && installStatus.endsWith('failed')
+    && !installStatus.startsWith('uninstall');
+
+// installId is "yyyyMMddTHHmmssZ-<suffix>" (UTC) → epoch seconds, or null.
+const installIdToEpoch = (installId) => {
+    const m = typeof installId === 'string' && installId.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
+    if (!m) return null;
+    return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000);
+};
+
+// Latest deployment attempt, from the fields the installers write on every attempt
+// (installStartedTs / installFinishedTs / installOutcome / installVersion — never
+// written by the agent, so its "running" heartbeat cannot hide a failed deploy).
+// An attempt still "in-progress" after this long never reported an end: the
+// installer was killed, timed out, or lost power mid-run.
+const INSTALL_STALE_SECONDS = 30 * 60;
+
+// Returns { startedTs, finishedTs, outcome, version } or null when the device has
+// no attempt data (installed before installers sent it; e.g. Windows today).
+// outcome: 'installed' | 'failed' | 'in-progress' | 'did-not-finish'
+const getDeploymentAttempt = (agent) => {
+    const startedTs = agent?.installStartedTs || 0;
+    if (!startedTs) return null;
+    let outcome = agent?.installOutcome || null;
+    if (outcome === 'in-progress' && (Date.now() / 1000) - startedTs > INSTALL_STALE_SECONDS) {
+        outcome = 'did-not-finish';
+    }
+    return {
+        startedTs,
+        finishedTs: agent?.installFinishedTs || 0,
+        outcome,
+        version: agent?.installVersion || null,
+    };
+};
+
+const DEPLOYMENT_OUTCOME_BADGE = {
+    failed: { status: 'critical', label: 'Failed' },
+    'in-progress': { status: 'attention', label: 'In progress' },
+    'did-not-finish': { status: 'warning', label: 'Did not finish' },
+};
+
 export {
+    INSTALL_STALE_SECONDS,
+    getDeploymentAttempt,
+    DEPLOYMENT_OUTCOME_BADGE,
+    INSTALL_IN_PROGRESS_STATUSES,
+    isInstallFailed,
+    installIdToEpoch,
     fetchEndpointShieldUsernameMap,
     fetchEndpointShieldUserMetadata,
     buildUserAnalysisKeysByDeviceId,
