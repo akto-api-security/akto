@@ -268,7 +268,41 @@ const installIdToEpoch = (installId) => {
     return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000);
 };
 
+// Latest deployment attempt, from the fields the installers write on every attempt
+// (installStartedTs / installFinishedTs / installOutcome / installVersion — never
+// written by the agent, so its "running" heartbeat cannot hide a failed deploy).
+// An attempt still "in-progress" after this long never reported an end: the
+// installer was killed, timed out, or lost power mid-run.
+const INSTALL_STALE_SECONDS = 30 * 60;
+
+// Returns { startedTs, finishedTs, outcome, version } or null when the device has
+// no attempt data (installed before installers sent it; e.g. Windows today).
+// outcome: 'installed' | 'failed' | 'in-progress' | 'did-not-finish'
+const getDeploymentAttempt = (agent) => {
+    const startedTs = agent?.installStartedTs || 0;
+    if (!startedTs) return null;
+    let outcome = agent?.installOutcome || null;
+    if (outcome === 'in-progress' && (Date.now() / 1000) - startedTs > INSTALL_STALE_SECONDS) {
+        outcome = 'did-not-finish';
+    }
+    return {
+        startedTs,
+        finishedTs: agent?.installFinishedTs || 0,
+        outcome,
+        version: agent?.installVersion || null,
+    };
+};
+
+const DEPLOYMENT_OUTCOME_BADGE = {
+    failed: { status: 'critical', label: 'Failed' },
+    'in-progress': { status: 'attention', label: 'In progress' },
+    'did-not-finish': { status: 'warning', label: 'Did not finish' },
+};
+
 export {
+    INSTALL_STALE_SECONDS,
+    getDeploymentAttempt,
+    DEPLOYMENT_OUTCOME_BADGE,
     INSTALL_IN_PROGRESS_STATUSES,
     isInstallFailed,
     installIdToEpoch,

@@ -9,7 +9,7 @@ import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { DEFAULT_VALUE, isExtensionAgent, isInstallFailed, installIdToEpoch } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent, isInstallFailed, installIdToEpoch, getDeploymentAttempt } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
 import DetailGrid from "../agentic/DetailGrid";
@@ -54,11 +54,20 @@ const MetadataField = ({ icon, tooltip, value }) => {
     );
 };
 
+// "2 hours ago" or "2 hours ago · failed" — the latest deployment attempt and,
+// unless it installed cleanly, how it ended.
+const formatLastDeployed = (agent) => {
+    const when = func.prettifyEpoch(agent.lastDeployed);
+    const attempt = getDeploymentAttempt(agent);
+    if (!attempt || !attempt.outcome || attempt.outcome === 'installed') return when;
+    return `${when} · ${attempt.outcome.replace(/-/g, ' ')}`;
+};
+
 const getMetadataFields = (agent) => [
     { icon: CodeMinor, tooltip: "Agent ID", value: agent.agentId },
     { icon: DynamicSourceMinor, tooltip: "Device ID", value: agent.deviceId },
     { icon: ClockMinor, tooltip: "Last Heartbeat", value: func.prettifyEpoch(agent.lastHeartbeat) },
-    { icon: CalendarMinor, tooltip: "Last Deployed", value: func.prettifyEpoch(agent.lastDeployed) },
+    { icon: CalendarMinor, tooltip: "Last Deployed", value: formatLastDeployed(agent) },
 ];
 
 const DEVICE_INFO_SECTIONS = [
@@ -105,6 +114,13 @@ const DEVICE_INFO_SECTIONS = [
         title: "Agent",
         fields: [
             { label: "Shield Version", key: "agentVersion" },
+            { label: "Last Deployment", key: "installStartedTs", format: (v, agent) => {
+                const attempt = getDeploymentAttempt(agent);
+                if (!attempt) return null;
+                return `${func.epochToDateTime(attempt.startedTs)} · ${attempt.outcome || 'unknown'}`;
+            } },
+            { label: "Deployed Version", key: "installVersion" },
+            { label: "First Seen",     key: "firstSeen",     format: (v) => v ? func.epochToDateTime(v) : null },
         ],
     },
 ];
@@ -605,7 +621,7 @@ function AgentDetails({
                                         </Text>
                                     </Box>
                                     <Box minWidth={LOG_LEVEL_WIDTH}>
-                                        <Badge size="small" tone={LOG_LEVEL_TONES[log.level] || 'info'}>
+                                        <Badge size="small" status={LOG_LEVEL_TONES[log.level] || 'info'}>
                                             {log.level}
                                         </Badge>
                                     </Box>
@@ -757,7 +773,10 @@ function AgentDetails({
 
     // Failure summary the installer sends with a failed installStatus. Shown at
     // the top of the panel so the cause is visible without reading the logs.
-    const installFailureBanner = isInstallFailed(selectedAgent?.installStatus) ? (
+    // installOutcome is the installer's verdict for the latest attempt and is never
+    // overwritten by the agent — so a failed deploy still shows when an older agent
+    // keeps running (e.g. a corrupt pkg left the previous install in place).
+    const installFailureBanner = (isInstallFailed(selectedAgent?.installStatus) || selectedAgent?.installOutcome === 'failed') ? (
         <Box paddingBlockStart="3" key="install-failure">
         <Banner
             status="critical"
