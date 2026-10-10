@@ -1040,7 +1040,8 @@ const settingRequests = {
             }
         })
     },
-    getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500) {
+    // level: optional, "error" = error and critical rows only.
+    getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500, level = null) {
         return request({
             url: '/api/getAgentLogs',
             method: 'post',
@@ -1050,11 +1051,12 @@ const settingRequests = {
                 endTime,
                 pageSize,
                 ...(logKey ? { logKey } : {}),
-                ...(afterId ? { afterId } : {})
+                ...(afterId ? { afterId } : {}),
+                ...(level ? { level } : {})
             }
         })
     },
-    exportAgentLogs(agentId, startTime, endTime, logKey = null) {
+    exportAgentLogs(agentId, startTime, endTime, logKey = null, level = null) {
         return request({
             url: '/api/exportAgentLogs',
             method: 'post',
@@ -1062,7 +1064,8 @@ const settingRequests = {
                 agentId,
                 startTime,
                 endTime,
-                ...(logKey ? { logKey } : {})
+                ...(logKey ? { logKey } : {}),
+                ...(level ? { level } : {})
             }
         })
     },

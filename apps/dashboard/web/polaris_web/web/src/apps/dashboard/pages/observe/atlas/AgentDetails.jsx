@@ -1,4 +1,4 @@
-import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar, Spinner } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box, Badge, Banner, Button, ActionList, Icon, List, Popover, Tooltip, Avatar, Spinner } from "@shopify/polaris"
 import { useRef, useMemo, useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
@@ -9,7 +9,7 @@ import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { DEFAULT_VALUE, isExtensionAgent } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent, isInstallFailed, installIdToEpoch } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
 import DetailGrid from "../agentic/DetailGrid";
@@ -17,10 +17,22 @@ import { usePermissions } from "@/util/permissions";
 
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
+    DEBUG: undefined,
     INFO: 'info',
+    WARN: 'warning',
     WARNING: 'warning',
-    ERROR: 'critical'
+    ERROR: 'critical',
+    CRITICAL: 'critical'
 };
+// Minimum-severity filter (getAgentLogs `level`): each option includes every
+// level above it. '' = no filter.
+const LOG_LEVEL_FILTER_OPTIONS = [
+    { label: 'All levels', value: '' },
+    { label: 'Critical', value: 'critical' },
+    { label: 'Error & above', value: 'error' },
+    { label: 'Warning & above', value: 'warn' },
+    { label: 'Info & above', value: 'info' },
+];
 const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
 const LOG_TIMESTAMP_WIDTH = "140px";
 const LOG_LEVEL_WIDTH = "50px";
@@ -217,6 +229,13 @@ function AgentDetails({
     const [totalCount, setTotalCount] = useState(0);
     const [selectedLogSource, setSelectedLogSource] = useState('installation-logs');
     const logSourceRef = useRef('installation-logs');
+    // Minimum log level shown ('' = all). A failed install's Install tab is
+    // 1-2.5k rows; the handful that explain the failure are the error ones.
+    const [minLevel, setMinLevel] = useState('');
+    const minLevelRef = useRef('');
+    const [levelPopoverActive, setLevelPopoverActive] = useState(false);
+    // Lets the failure banner open the Logs tab (see LayoutWithTabs selectedTabId).
+    const [selectedTab, setSelectedTab] = useState({ id: null, nonce: 0 });
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
@@ -235,12 +254,14 @@ function AgentDetails({
                 selectedAgent.agentId, startTimestamp, endTimestamp,
                 logSourceRef.current,
                 afterId,
-                PAGE_SIZE
+                PAGE_SIZE,
+                minLevelRef.current || null
             );
             const transformed = (res.agentLogs || []).map(log => ({
                 hexId: log.hexId,
                 timestamp: log.timestamp,
-                level: log.level || 'INFO',
+                // Senders differ in case (agent "ERROR", installers "error").
+                level: (log.level || 'INFO').toUpperCase(),
                 message: log.log || log.message
             }));
             setCurrentPageLogs(transformed);
@@ -264,6 +285,29 @@ function AgentDetails({
         setCurrentPageLogs([]);
         await fetchPage(null, true);
     }, [selectedAgent, fetchPage]);
+
+    const handleMinLevelChange = useCallback(async (value) => {
+        setLevelPopoverActive(false);
+        if (minLevelRef.current === value) return;
+        minLevelRef.current = value;
+        setMinLevel(value);
+        if (!selectedAgent) return;
+        setPageStack([null]);
+        setPageIndex(0);
+        setCurrentPageLogs([]);
+        await fetchPage(null, true);
+    }, [selectedAgent, fetchPage]);
+
+    // Failure banner action: Install logs at "Error & above", on the Logs tab.
+    const showInstallErrors = useCallback(() => {
+        logSourceRef.current = 'installation-logs';
+        setSelectedLogSource('installation-logs');
+        minLevelRef.current = 'error';
+        setMinLevel('error');
+        setPageStack([null]);
+        setPageIndex(0);
+        setSelectedTab(prev => ({ id: 'agent-logs', nonce: prev.nonce + 1 }));
+    }, []);
 
     const handleRefresh = useCallback(async () => {
         setPageStack([null]);
@@ -294,7 +338,8 @@ function AgentDetails({
         try {
             const res = await settingRequests.exportAgentLogs(
                 selectedAgent.agentId, startTimestamp, endTimestamp,
-                logSourceRef.current
+                logSourceRef.current,
+                minLevelRef.current || null
             );
             const logs = res.agentLogs || [];
             if (logs.length === 0) return;
@@ -305,7 +350,7 @@ function AgentDetails({
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${logSourceRef.current}-${selectedAgent.agentId}.log`;
+            a.download = `${logSourceRef.current}${minLevelRef.current ? `-${minLevelRef.current}-and-above` : ''}-${selectedAgent.agentId}.log`;
             a.click();
             URL.revokeObjectURL(url);
         } catch (error) {
@@ -323,7 +368,19 @@ function AgentDetails({
 
     // Reset state when agent changes and fetch data for the default first tab (MCP Servers).
     useEffect(() => {
-        if (!selectedAgent || !show) return;
+        if (!selectedAgent || !show) {
+            // Closing has to clear the log view as well. The panel's children unmount, so
+            // on the next open LayoutWithTabs mounts and acts on selectedTabId before this
+            // effect runs (child effects flush first) — left stale after "View error logs",
+            // it would reopen on the Logs tab and fetch error-only rows while the level
+            // chip, reset a moment later, reads "All levels".
+            setSelectedTab(prev => (prev.id === null && prev.nonce === 0 ? prev : { id: null, nonce: 0 }));
+            setSelectedLogSource('installation-logs');
+            logSourceRef.current = 'installation-logs';
+            setMinLevel('');
+            minLevelRef.current = '';
+            return;
+        }
 
         setMcpServers([]);
         setCurrentPageLogs([]);
@@ -334,6 +391,9 @@ function AgentDetails({
         setTotalCount(0);
         setSelectedLogSource('installation-logs');
         logSourceRef.current = 'installation-logs';
+        setMinLevel('');
+        minLevelRef.current = '';
+        setSelectedTab({ id: null, nonce: 0 });
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
@@ -459,7 +519,32 @@ function AgentDetails({
                         </Button>
                     ))}
                 </HorizontalStack>
-                <HorizontalStack gap="1">
+                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                    <Popover
+                        active={levelPopoverActive}
+                        onClose={() => setLevelPopoverActive(false)}
+                        preferredAlignment="right"
+                        activator={
+                            <Button
+                                size="micro"
+                                disclosure
+                                pressed={!!minLevel}
+                                disabled={logsLoading}
+                                onClick={() => setLevelPopoverActive(active => !active)}
+                            >
+                                {`Level: ${LOG_LEVEL_FILTER_OPTIONS.find(o => o.value === minLevel)?.label || 'All levels'}`}
+                            </Button>
+                        }
+                    >
+                        <ActionList
+                            actionRole="menuitemradio"
+                            items={LOG_LEVEL_FILTER_OPTIONS.map(({ label, value }) => ({
+                                content: label,
+                                active: minLevel === value,
+                                onAction: () => handleMinLevelChange(value),
+                            }))}
+                        />
+                    </Popover>
                     <Button
                         size="micro"
                         icon={RefreshMinor}
@@ -498,7 +583,7 @@ function AgentDetails({
         } else if (currentPageLogs.length === 0) {
             logBody = (
                 <Box padding="8">
-                    <Text variant="bodyMd" color="subdued" alignment="center">No logs found for this time window.</Text>
+                    <Text variant="bodyMd" color="subdued" alignment="center">{minLevel ? `No logs at ${LOG_LEVEL_FILTER_OPTIONS.find(o => o.value === minLevel)?.label.toLowerCase()} for this time window.` : "No logs found for this time window."}</Text>
                 </Box>
             );
         } else {
@@ -670,7 +755,38 @@ function AgentDetails({
         panelID: 'installed-apps-panel',
     };
 
-   
+    // Failure summary the installer sends with a failed installStatus. Shown at
+    // the top of the panel so the cause is visible without reading the logs.
+    const installFailureBanner = isInstallFailed(selectedAgent?.installStatus) ? (
+        <Box paddingBlockStart="3" key="install-failure">
+        <Banner
+            status="critical"
+            title={`Last installation failed${selectedAgent.installExitCode != null && selectedAgent.installExitCode !== 0 ? ` (exit ${selectedAgent.installExitCode})` : ''}`}
+            action={{ content: 'View error logs', onAction: showInstallErrors }}
+        >
+            <VerticalStack gap="2">
+                <Text as="p">
+                    {selectedAgent.installFailureReason || 'The installer reported a failure. Open the error logs for details.'}
+                </Text>
+                {selectedAgent.installDiagnosis ? (
+                    <Text as="p"><Text as="span" fontWeight="semibold">Diagnosis: </Text>{selectedAgent.installDiagnosis}</Text>
+                ) : null}
+                {selectedAgent.installFindings?.length > 0 ? (
+                    <List type="bullet">
+                        {selectedAgent.installFindings.map((finding, i) => <List.Item key={i}>{finding}</List.Item>)}
+                    </List>
+                ) : null}
+                {selectedAgent.installId ? (
+                    <Text as="p" variant="bodySm" color="subdued">
+                        {`Install ${selectedAgent.installId}`}
+                        {installIdToEpoch(selectedAgent.installId) ? ` · ${func.epochToDateTime(installIdToEpoch(selectedAgent.installId))}` : ''}
+                    </Text>
+                ) : null}
+            </VerticalStack>
+        </Banner>
+        </Box>
+    ) : null;
+
     if (!selectedAgent) return null;
 
     return (
@@ -732,12 +848,15 @@ function AgentDetails({
                         </Box>
                     </VerticalStack>
                 </HorizontalStack>,
+                installFailureBanner,
                 <LayoutWithTabs
                     key="tabs"
                     tabs={[McpServersTab, DeviceTab, AppsTab, AgentLogsTab, ConfigureTab]}
                     currTab={handleTabChange}
+                    selectedTabId={selectedTab.id}
+                    selectedTabNonce={selectedTab.nonce}
                 />
-            ]}
+            ].filter(Boolean)}
         />
     );
 }

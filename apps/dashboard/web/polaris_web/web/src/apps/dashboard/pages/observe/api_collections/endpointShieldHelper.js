@@ -246,7 +246,32 @@ const getResolvedUsernameForCollection = (collection, usernameMap) => {
     return fromTags || DEFAULT_VALUE;
 };
 
+// installStatus values written by the endpoint-shield installers:
+//   in progress: pending → installing → postinstall
+//   failed:      failed (installer error, or exit 90 nothing running / 91 agent
+//                never reported / 93 pkg failed), verify-failed (standalone
+//                verifier), uninstall-failed
+// The agent reports "running" once it is up, which supersedes any of these.
+const INSTALL_IN_PROGRESS_STATUSES = ['pending', 'installing', 'postinstall'];
+// "uninstall-failed" ends in "failed" but is a removal that did not go through, not a
+// broken install — the agent is usually still running, so it must not raise the
+// installation banner or the critical icon.
+const isInstallFailed = (installStatus) =>
+    typeof installStatus === 'string'
+    && installStatus.endsWith('failed')
+    && !installStatus.startsWith('uninstall');
+
+// installId is "yyyyMMddTHHmmssZ-<suffix>" (UTC) → epoch seconds, or null.
+const installIdToEpoch = (installId) => {
+    const m = typeof installId === 'string' && installId.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
+    if (!m) return null;
+    return Math.floor(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) / 1000);
+};
+
 export {
+    INSTALL_IN_PROGRESS_STATUSES,
+    isInstallFailed,
+    installIdToEpoch,
     fetchEndpointShieldUsernameMap,
     fetchEndpointShieldUserMetadata,
     buildUserAnalysisKeysByDeviceId,

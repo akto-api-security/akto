@@ -12,7 +12,7 @@ import settingRequests from "../../settings/api";
 import PersistStore from "../../../../main/PersistStore";
 import { mapLabel } from "../../../../main/labelHelper";
 import AgentDetails from "./AgentDetails";
-import { DEFAULT_VALUE, isExtensionAgent } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent, INSTALL_IN_PROGRESS_STATUSES, isInstallFailed } from "../api_collections/endpointShieldHelper";
 
 const createHeading = (text, value = null, sortKey = null) => ({
     text,
@@ -144,17 +144,17 @@ const CURRENT_STATUS_COMP_MAP = {
     failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Never connected" },
 };
 
-const getStatusComp = (installStatus, currentStatus) => {
-    if (installStatus === 'installing') {
+const getStatusComp = (installStatus, currentStatus, installFailureReason) => {
+    if (INSTALL_IN_PROGRESS_STATUSES.includes(installStatus)) {
         return (
             <Tooltip content="Installation in progress" dismissOnMouseOut>
                 <Icon source={RefreshMinor} color="warning" />
             </Tooltip>
         );
     }
-    if (installStatus === 'failed') {
+    if (isInstallFailed(installStatus)) {
         return (
-            <Tooltip content="Installation failed" dismissOnMouseOut>
+            <Tooltip content={installFailureReason ? `Installation failed: ${installFailureReason}` : "Installation failed"} dismissOnMouseOut>
                 <Icon source={DiamondAlertMinor} color="critical" />
             </Tooltip>
         );
@@ -174,7 +174,7 @@ const convertDataIntoTableFormat = (agentData) => ({
     lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
     lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
     osComp: getOsOrBrowserComp(agentData),
-    statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus),
+    statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus, agentData?.installFailureReason),
 });
 
 const knownOrDefault = (value) => (value && String(value).toLowerCase() !== 'unknown') ? value : DEFAULT_VALUE;
@@ -215,6 +215,12 @@ const mapModuleToAgent = (module) => ({
     bootTime: module.additionalData?.bootTime || null,
     installedApps: module.additionalData?.installedApps || [],
     installStatus: module.additionalData?.installStatus || null,
+    // Failure summary sent by the installer with a failed status (cleared on success).
+    installFailureReason: module.additionalData?.installFailureReason || null,
+    installDiagnosis: module.additionalData?.installDiagnosis || null,
+    installFindings: Array.isArray(module.additionalData?.installFindings) ? module.additionalData.installFindings : [],
+    installExitCode: module.additionalData?.installExitCode ?? null,
+    installId: module.additionalData?.installId || null,
     _moduleData: module
 });
 
