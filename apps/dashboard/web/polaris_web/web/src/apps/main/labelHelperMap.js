@@ -165,7 +165,7 @@ export const labelMap = {
     "Untracked APIs": "Untracked tools",
     "Total endpoints": "Total tools",
     "Test your APIs": "Scan your MCPs",
-    "API Security": "MCP Security",
+    "API Security": "MCP Protection",
     "API endpoint": "MCP component",
     "API endpoints": "MCP components",
     "API Endpoints Discovered": "MCP Components Discovered",
