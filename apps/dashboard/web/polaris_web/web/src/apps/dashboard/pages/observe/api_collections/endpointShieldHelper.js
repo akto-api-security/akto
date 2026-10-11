@@ -293,16 +293,9 @@ const getDeploymentAttempt = (agent) => {
     };
 };
 
-const DEPLOYMENT_OUTCOME_BADGE = {
-    failed: { status: 'critical', label: 'Failed' },
-    'in-progress': { status: 'attention', label: 'In progress' },
-    'did-not-finish': { status: 'warning', label: 'Did not finish' },
-};
-
 export {
     INSTALL_STALE_SECONDS,
     getDeploymentAttempt,
-    DEPLOYMENT_OUTCOME_BADGE,
     INSTALL_IN_PROGRESS_STATUSES,
     isInstallFailed,
     installIdToEpoch,

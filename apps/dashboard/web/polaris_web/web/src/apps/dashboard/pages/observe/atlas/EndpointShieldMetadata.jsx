@@ -1,4 +1,4 @@
-import { Text, HorizontalStack, Icon, Tooltip, Badge } from "@shopify/polaris"
+import { Text, HorizontalStack, Icon, Tooltip } from "@shopify/polaris"
 import { StatusActiveMajor, DiamondAlertMinor, RefreshMinor, ClockMinor } from "@shopify/polaris-icons"
 import { useEffect, useReducer, useState, useCallback, useRef } from "react"
 import values from "@/util/values";
@@ -12,7 +12,7 @@ import settingRequests from "../../settings/api";
 import PersistStore from "../../../../main/PersistStore";
 import { mapLabel } from "../../../../main/labelHelper";
 import AgentDetails from "./AgentDetails";
-import { DEFAULT_VALUE, isExtensionAgent, INSTALL_IN_PROGRESS_STATUSES, isInstallFailed, getDeploymentAttempt, DEPLOYMENT_OUTCOME_BADGE } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent, INSTALL_IN_PROGRESS_STATUSES, isInstallFailed } from "../api_collections/endpointShieldHelper";
 
 const createHeading = (text, value = null, sortKey = null) => ({
     text,
@@ -168,34 +168,11 @@ const getStatusComp = (installStatus, currentStatus, installFailureReason) => {
     );
 };
 
-// "Last deployed" cell: when the latest deployment attempt started, plus a badge
-// when it did not end in a successful install. The tooltip has the details.
-const getLastDeployedComp = (agentData) => {
-    const text = func.prettifyEpoch(agentData?.lastDeployed);
-    const attempt = getDeploymentAttempt(agentData);
-    if (!attempt) return text;
-    const badge = DEPLOYMENT_OUTCOME_BADGE[attempt.outcome];
-    const details = [
-        `Started ${func.epochToDateTime(attempt.startedTs)}`,
-        attempt.finishedTs ? `finished ${func.epochToDateTime(attempt.finishedTs)}` : null,
-        attempt.outcome ? `outcome: ${attempt.outcome}` : null,
-        attempt.version ? `version ${attempt.version}` : null,
-    ].filter(Boolean).join(' · ');
-    return (
-        <Tooltip content={details} dismissOnMouseOut>
-            <HorizontalStack gap="1" wrap={false} blockAlign="center">
-                <Text variant="bodyMd">{text}</Text>
-                {badge ? <Badge size="small" status={badge.status}>{badge.label}</Badge> : null}
-            </HorizontalStack>
-        </Tooltip>
-    );
-};
-
 const convertDataIntoTableFormat = (agentData) => ({
     ...agentData,
     id: agentData?.agentId,
     lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
-    lastDeployedComp: getLastDeployedComp(agentData),
+    lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
     osComp: getOsOrBrowserComp(agentData),
     statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus, agentData?.installFailureReason),
 });

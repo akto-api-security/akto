@@ -54,20 +54,11 @@ const MetadataField = ({ icon, tooltip, value }) => {
     );
 };
 
-// "2 hours ago" or "2 hours ago · failed" — the latest deployment attempt and,
-// unless it installed cleanly, how it ended.
-const formatLastDeployed = (agent) => {
-    const when = func.prettifyEpoch(agent.lastDeployed);
-    const attempt = getDeploymentAttempt(agent);
-    if (!attempt || !attempt.outcome || attempt.outcome === 'installed') return when;
-    return `${when} · ${attempt.outcome.replace(/-/g, ' ')}`;
-};
-
 const getMetadataFields = (agent) => [
     { icon: CodeMinor, tooltip: "Agent ID", value: agent.agentId },
     { icon: DynamicSourceMinor, tooltip: "Device ID", value: agent.deviceId },
     { icon: ClockMinor, tooltip: "Last Heartbeat", value: func.prettifyEpoch(agent.lastHeartbeat) },
-    { icon: CalendarMinor, tooltip: "Last Deployed", value: formatLastDeployed(agent) },
+    { icon: CalendarMinor, tooltip: "Last Deployed", value: func.prettifyEpoch(agent.lastDeployed) },
 ];
 
 const DEVICE_INFO_SECTIONS = [
@@ -776,38 +767,44 @@ function AgentDetails({
     // installOutcome is the installer's verdict for the latest attempt and is never
     // overwritten by the agent — so a failed deploy still shows when an older agent
     // keeps running (e.g. a corrupt pkg left the previous install in place).
-    const installFailureBanner = (isInstallFailed(selectedAgent?.installStatus) || selectedAgent?.installOutcome === 'failed') ? (
-        <Box paddingBlockStart="3" key="install-failure">
-        <Banner
-            status="critical"
-            title={`Last installation failed${selectedAgent.installExitCode != null && selectedAgent.installExitCode !== 0 ? ` (exit ${selectedAgent.installExitCode})` : ''}`}
-            action={{ content: 'View error logs', onAction: showInstallErrors }}
-        >
-            <VerticalStack gap="2">
-                <Text as="p">
-                    {selectedAgent.installFailureReason || 'The installer reported a failure. Open the error logs for details.'}
-                </Text>
-                {selectedAgent.installDiagnosis ? (
-                    // The diagnostic's verdict on the device as it is now — not the cause of
-                    // the failure (that is the reason above). After a failure that left the
-                    // previous install in place it correctly reads HEALTHY.
-                    <Text as="p"><Text as="span" fontWeight="semibold">Device state: </Text>{selectedAgent.installDiagnosis}</Text>
-                ) : null}
-                {selectedAgent.installFindings?.length > 0 ? (
-                    <List type="bullet">
-                        {selectedAgent.installFindings.map((finding, i) => <List.Item key={i}>{finding}</List.Item>)}
-                    </List>
-                ) : null}
-                {selectedAgent.installId ? (
-                    <Text as="p" variant="bodySm" color="subdued">
-                        {`Install ${selectedAgent.installId}`}
-                        {installIdToEpoch(selectedAgent.installId) ? ` · ${func.epochToDateTime(installIdToEpoch(selectedAgent.installId))}` : ''}
-                    </Text>
-                ) : null}
-            </VerticalStack>
-        </Banner>
-        </Box>
-    ) : null;
+    const installFailureBanner = (isInstallFailed(selectedAgent?.installStatus) || selectedAgent?.installOutcome === 'failed') ? (() => {
+        // Kept to what a reader acts on: what failed, the specific causes, and
+        // when. The exit code and install-run id stay in the logs ("View error
+        // logs"), where they are used to correlate a run.
+        const findings = (selectedAgent.installFindings || []).slice(0, 3);
+        // The diagnostic's verdict describes the device as it is now. It adds
+        // nothing when the device is healthy (e.g. a failed deploy that left the
+        // previous install running — the reason already says so).
+        const deviceState = selectedAgent.installDiagnosis && !/^HEALTHY\b/.test(selectedAgent.installDiagnosis)
+            ? selectedAgent.installDiagnosis : null;
+        const attemptedAt = selectedAgent.installStartedTs || installIdToEpoch(selectedAgent.installId);
+        return (
+            <Box paddingBlockStart="3" key="install-failure">
+                <Banner
+                    status="critical"
+                    title="Last deployment failed"
+                    action={{ content: 'View error logs', onAction: showInstallErrors }}
+                >
+                    <VerticalStack gap="2">
+                        <Text as="p">
+                            {selectedAgent.installFailureReason || 'The installer reported a failure. Open the error logs for details.'}
+                        </Text>
+                        {findings.length > 0 ? (
+                            <List type="bullet">
+                                {findings.map((finding, i) => <List.Item key={i}>{finding}</List.Item>)}
+                            </List>
+                        ) : null}
+                        {deviceState ? (
+                            <Text as="p"><Text as="span" fontWeight="semibold">Device state: </Text>{deviceState}</Text>
+                        ) : null}
+                        {attemptedAt ? (
+                            <Text as="p" variant="bodySm" color="subdued">{`Attempted ${func.prettifyEpoch(attemptedAt)}`}</Text>
+                        ) : null}
+                    </VerticalStack>
+                </Banner>
+            </Box>
+        );
+    })() : null;
 
     if (!selectedAgent) return null;
 
