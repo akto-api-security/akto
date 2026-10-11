@@ -35,7 +35,7 @@ akto-gateway/
 Build the JAR file using Maven:
 
 ```bash
-cd /Users/abhijeet/Documents/akto/akto/apps/akto-gateway
+cd apps/akto-gateway
 mvn clean package
 ```
 
