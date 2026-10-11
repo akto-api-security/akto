@@ -144,7 +144,7 @@ const CURRENT_STATUS_COMP_MAP = {
     failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Never connected" },
 };
 
-const getStatusComp = (installStatus, currentStatus, installFailureReason) => {
+const getStatusComp = (installStatus, currentStatus) => {
     if (INSTALL_IN_PROGRESS_STATUSES.includes(installStatus)) {
         return (
             <Tooltip content="Installation in progress" dismissOnMouseOut>
@@ -153,8 +153,11 @@ const getStatusComp = (installStatus, currentStatus, installFailureReason) => {
         );
     }
     if (isInstallFailed(installStatus)) {
+        // Short, like the other status tooltips: the full reason is long enough to
+        // span the row and sit under the icon itself. It is shown in the device
+        // panel's banner instead.
         return (
-            <Tooltip content={installFailureReason ? `Installation failed: ${installFailureReason}` : "Installation failed"} dismissOnMouseOut>
+            <Tooltip content="Last deployment failed" preferredPosition="above" dismissOnMouseOut>
                 <Icon source={DiamondAlertMinor} color="critical" />
             </Tooltip>
         );
@@ -174,7 +177,7 @@ const convertDataIntoTableFormat = (agentData) => ({
     lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
     lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
     osComp: getOsOrBrowserComp(agentData),
-    statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus, agentData?.installFailureReason),
+    statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus),
 });
 
 const knownOrDefault = (value) => (value && String(value).toLowerCase() !== 'unknown') ? value : DEFAULT_VALUE;
