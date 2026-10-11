@@ -414,17 +414,23 @@ public class DbLayer {
         return endpoints;
     }
 
-    public static void createCollectionSimple(int vxlanId) {
+    public static void createCollectionSimple(int vxlanId, boolean hasLatestRagDetection) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
+        Bson updates = Updates.combine(
+                Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                Updates.setOnInsert("startTs", Context.now()),
+                Updates.set("urls", new HashSet<>())
+        );
+
+        if (hasLatestRagDetection) {
+            updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", Constants.AKTO_RAG_DATABASE_TAG));
+        }
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
                 Filters.eq("_id", vxlanId),
-                Updates.combine(
-                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
-                        Updates.setOnInsert("startTs", Context.now()),
-                        Updates.set("urls", new HashSet<>())
-                ),
+                updates,
                 updateOptions
         );
     }
@@ -454,7 +460,7 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
         );
     }
 
-    public static void createCollectionForHost(String host, int id) {
+    public static void createCollectionForHost(String host, int id, boolean hasLatestRagDetection) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -464,6 +470,10 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>())
         );
+
+        if (hasLatestRagDetection) {
+            updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", Constants.AKTO_RAG_DATABASE_TAG));
+        }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
