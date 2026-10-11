@@ -140,6 +140,25 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName);
 
+    public static final String VERDICT_FRESH_RUN = "FRESH_RUN";
+    public static final String VERDICT_CICD = "CICD";
+    public static final String VERDICT_RERUN_SPECIFIC_TESTCASES = "RERUN_SPECIFIC_TESTCASES";
+    public static final String VERDICT_RECLAIMED_ABANDONED = "RECLAIMED_ABANDONED";
+    public static final String VERDICT_NO_WORK_FOUND = "NO_WORK_FOUND";
+
+    public static class ClaimResult {
+        public final String verdict;
+        public final TestingRunResultSummary trrs;
+        public final TestingRun testingRun;
+        public ClaimResult(String verdict, TestingRunResultSummary trrs, TestingRun testingRun) {
+            this.verdict = verdict;
+            this.trrs = trrs;
+            this.testingRun = testingRun;
+        }
+    }
+
+    public abstract ClaimResult claimNextTestWork(String miniTestingName, String leaseToken, int leaseSeconds);
+
     public abstract TestingRun findTestingRun(String testingRunId);
 
     public abstract void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId);
