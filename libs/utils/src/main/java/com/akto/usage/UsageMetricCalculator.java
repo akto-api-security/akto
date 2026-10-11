@@ -231,6 +231,16 @@ public class UsageMetricCalculator {
         return calculateEndpoints(collectionsToDiscard);
     }
 
+    private static int calculateEndpointAssets() {
+        /*
+         * To count Atlas endpoint/device assets, discard everything that is not an
+         * endpoint (ATLAS) collection — i.e. discard MCP, GenAI, and plain API collections.
+         */
+        Set<Integer> collectionsToDiscard = getMcpCollections();
+        collectionsToDiscard.addAll(getGenAiCollections());
+        collectionsToDiscard.addAll(getApiCollections());
+        return calculateEndpoints(collectionsToDiscard);
+    }
 
     private static int calculateEndpoints(Set<Integer> collectionsIdsToDiscard) {
         collectionsIdsToDiscard.addAll(getDemosAndDeactivated());
@@ -362,6 +372,9 @@ public class UsageMetricCalculator {
                     break;
                 case AI_ASSET_COUNT:
                     usage = calculateGenAiAssets();
+                    break;
+                case ENDPOINT_ASSET_COUNT:
+                    usage = calculateEndpointAssets();
                     break;
                 case CUSTOM_TESTS:
                     usage = calculateCustomTests(usageMetric);
