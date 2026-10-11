@@ -788,7 +788,10 @@ function AgentDetails({
                     {selectedAgent.installFailureReason || 'The installer reported a failure. Open the error logs for details.'}
                 </Text>
                 {selectedAgent.installDiagnosis ? (
-                    <Text as="p"><Text as="span" fontWeight="semibold">Diagnosis: </Text>{selectedAgent.installDiagnosis}</Text>
+                    // The diagnostic's verdict on the device as it is now — not the cause of
+                    // the failure (that is the reason above). After a failure that left the
+                    // previous install in place it correctly reads HEALTHY.
+                    <Text as="p"><Text as="span" fontWeight="semibold">Device state: </Text>{selectedAgent.installDiagnosis}</Text>
                 ) : null}
                 {selectedAgent.installFindings?.length > 0 ? (
                     <List type="bullet">
