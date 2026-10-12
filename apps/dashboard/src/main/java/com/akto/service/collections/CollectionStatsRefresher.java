@@ -47,7 +47,7 @@ public class CollectionStatsRefresher {
     public enum Metric {
         ATTRS_FULL(300), ATTRS_DELTA(30),
         ENDPOINTS_COUNT(120), RISK_SCORE(120), LAST_SEEN(60),
-        SENSITIVE(300), SUMMARY(120);
+        SENSITIVE(300), SUMMARY(120), POSTURE(120);
 
         private final int ttlSeconds;
 
@@ -55,22 +55,36 @@ public class CollectionStatsRefresher {
         boolean isTableMetric() {
             return this == ENDPOINTS_COUNT || this == RISK_SCORE || this == LAST_SEEN;
         }
+
+        /** The metrics that can hold a thread for a minute or more, see HEAVY_EXECUTOR. */
+        boolean isHeavy() {
+            return this == SENSITIVE || this == POSTURE;
+        }
     }
 
     // a refresh holding its claim longer than this is considered crashed and can be taken over
     static final int LOCK_TIMEOUT_SECONDS = 300;
+    // while collections have never had their posture counted, the next counting run is due this soon
+    static final int POSTURE_CATCH_UP_SECONDS = 30;
     // the Refresh button may re-run a metric no more often than this
     static final int FORCE_COOLDOWN_SECONDS = 15;
     // after a failed refresh, wait this long before anyone retries it
     static final int FAILURE_BACKOFF_SECONDS = 30;
     static final String SUMMARY_ID = Metric.SUMMARY.name();
 
-    private static final ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(2, 2, 60, TimeUnit.SECONDS,
-            new ArrayBlockingQueue<>(16), r -> {
-                Thread t = new Thread(r, "collection-stats-refresh");
-                t.setDaemon(true);
-                return t;
-            });
+    // the metrics the collections table sorts and shows, each a short pass
+    private static final ThreadPoolExecutor EXECUTOR = executor("collection-stats-refresh");
+    // the long ones (a pass over single_type_info, a minute of recounting api_info), apart so that they can
+    // never hold every thread of the quick ones and leave the table's numbers stale
+    private static final ThreadPoolExecutor HEAVY_EXECUTOR = executor("collection-stats-refresh-heavy");
+
+    private static ThreadPoolExecutor executor(String threadName) {
+        return new ThreadPoolExecutor(2, 2, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(16), r -> {
+            Thread t = new Thread(r, threadName);
+            t.setDaemon(true);
+            return t;
+        });
+    }
 
     @Getter
     @AllArgsConstructor
@@ -96,10 +110,10 @@ public class CollectionStatsRefresher {
         boolean attrsReady = refreshedAt(meta.get(Metric.ATTRS_FULL)) > 0;
         for (Metric metric : Metric.values()) {
             if (metric != Metric.ATTRS_FULL && !attrsReady) continue;
-            if (!isStale(meta.get(metric), metric, force, now)) continue;
+            if (!isStale(meta.get(metric), metric, force, now) && !isCatchingUp(meta.get(metric), metric, now)) continue;
             if (!tryClaim(metric, now)) continue;
             try {
-                EXECUTOR.execute(() -> runInAccount(accountId, metric));
+                (metric.isHeavy() ? HEAVY_EXECUTOR : EXECUTOR).execute(() -> runInAccount(accountId, metric));
             } catch (RejectedExecutionException e) {
                 release(metric, 0);
             }
@@ -129,6 +143,14 @@ public class CollectionStatsRefresher {
         boolean refreshButtonApplies = metric.isTableMetric() || metric == Metric.SUMMARY;
         int ttl = force && refreshButtonApplies ? FORCE_COOLDOWN_SECONDS : metric.getTtlSeconds();
         return now - refreshedAt(meta) > ttl;
+    }
+
+    /**
+     * The posture counts of a first fill (collections never counted) come a run at a time, and a run only starts when
+     * the dashboard asks: until every collection is counted it is due again after a short while, not the usual ttl.
+     */
+    static boolean isCatchingUp(ApiCollectionStatsMeta meta, Metric metric, int now) {
+        return metric == Metric.POSTURE && now - refreshedAt(meta) > POSTURE_CATCH_UP_SECONDS && PosturePartialsRefresh.hasUncountedCollections();
     }
 
     private static int refreshedAt(ApiCollectionStatsMeta meta) {
@@ -219,6 +241,9 @@ public class CollectionStatsRefresher {
                         break;
                     case SUMMARY:
                         new SummaryRefresh().refresh();
+                        break;
+                    case POSTURE:
+                        new PosturePartialsRefresh().refresh();
                         break;
                     default:
                         throw new IllegalStateException("unhandled metric " + metric);

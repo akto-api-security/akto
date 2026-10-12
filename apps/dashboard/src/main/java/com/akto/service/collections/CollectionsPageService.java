@@ -17,6 +17,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.service.TimedService;
 import com.akto.service.collections.CollectionsPageResponse.Details;
 import com.akto.service.collections.CollectionsPageResponse.Meta;
+import com.akto.service.collections.CollectionsPageResponse.NewDomain;
 import com.akto.service.collections.CollectionsPageResponse.Page;
 import com.akto.service.collections.CollectionsPageResponse.Summary;
 import com.akto.service.collections.CollectionsPageResponse.TabCounts;
@@ -126,6 +127,26 @@ public class CollectionsPageService extends TimedService {
         List<Integer> ids = collectionIds == null ? new ArrayList<>()
                 : collectionIds.stream().distinct().limit(CollectionsPageRequest.MAX_LIMIT).collect(Collectors.toList());
         return new Details(awaitOrNull(submitLimited("coverage of the page's collections", () -> loadCoverage(ids), Map::size), "coverage"));
+    }
+
+    /**
+     * The newest host collections with how many of their apis were tested lately, for the home dashboard's
+     * new domains tile: the same rows, counts and coverage the collections table shows for them, without
+     * the rest of a page. Coverage is time limited; when it is unavailable the tested counts are 0.
+     */
+    public List<NewDomain> fetchNewestHostnames(int limit) {
+        CollectionsPageRequest request = new CollectionsPageRequest(0, limit, CollectionsPageQueryBuilder.SortKey.DISCOVERED.getKey(), -1,
+                ApiCollectionStats.Tab.HOSTNAME.name(), "", null, null, false);
+        List<ApiCollectionStats> rows = timed("find the newest host collections", () -> statsDao.findAll(
+                CollectionsPageQueryBuilder.buildFilter(request), 0, request.getLimit(),
+                CollectionsPageQueryBuilder.buildSort(request.getSortKey(), request.getSortOrder()),
+                Projections.include(ApiCollectionStats.ID, ApiCollectionStats.HOST_NAME, ApiCollectionStats.ENDPOINTS_COUNT)), List::size);
+        if (rows.isEmpty()) return new ArrayList<>();
+
+        List<Integer> ids = rows.stream().map(ApiCollectionStats::getId).collect(Collectors.toList());
+        Map<Integer, Integer> coverage = fetchDetails(ids).getCoverageMap();
+        return rows.stream().map(row -> new NewDomain(row.getHostName(), row.getEndpointsCount(), coverage.getOrDefault(row.getId(), 0)))
+                .collect(Collectors.toList());
     }
 
     /** Runs a query on the shared executor under the caller's account and role scoping. */

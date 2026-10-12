@@ -40,10 +40,8 @@ import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
-import com.akto.utils.ApiInfoKeyResult;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -141,15 +139,7 @@ public class StartTestAction extends UserAction {
         return response;
     }
 
-    @Getter
-    int misConfiguredTestsCount;
-
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-
-    @Setter
-    private boolean showApiInfo;
-    @Getter
-    private List<ApiInfo> misConfiguredTestsApiInfo = new ArrayList<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -1692,20 +1682,6 @@ public class StartTestAction extends UserAction {
     private TestingIssuesId getTestingIssueIdFromRunResult(TestingRunResult runResult) {
         return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
             runResult.getTestSubType());
-    }
-
-    public String fetchMisConfiguredTestsCount() {
-       ApiInfoKeyResult result = Utils.fetchUniqueApiInfoKeys(
-                TestingRunResultDao.instance.getRawCollection(),
-                Filters.eq(TestingRunResult.REQUIRES_CONFIG, true),
-                "apiInfoKey",
-                this.showApiInfo
-        );
-        this.misConfiguredTestsCount = result.count;
-        if (this.showApiInfo) {
-            this.misConfiguredTestsApiInfo = result.apiInfoList;
-        }
-        return Action.SUCCESS.toUpperCase();
     }
 
     @Getter

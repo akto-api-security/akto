@@ -19,7 +19,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.HistoricalData;
 import com.akto.dto.RBAC.Role;
 import com.akto.dto.demo.VulnerableRequestForTemplate;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -41,7 +40,6 @@ import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.ComplianceResolutionUtils;
 import com.akto.testing_utils.TestingUtils;
-import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -109,25 +107,10 @@ public class IssuesAction extends UserAction {
 
     private Map<String, String> issuesDescriptionMap;
 
-    @Getter
-    int buaCategoryCount;
-
-    int URL_METHOD_PAIR_THRESHOLD = 1;
-    
-    @Setter
-    private boolean showTestSubCategories;
-    @Setter
-    private boolean showApiInfo;
-    @Getter
-    private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
     @Setter
     String categoryType;
     @Getter
     int endpointsCount;
-
-    public boolean isShowApiInfo() {
-        return showApiInfo;
-    }
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -1476,101 +1459,6 @@ public class IssuesAction extends UserAction {
         Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(Constants.ID, issueId));
         TestingRunIssuesDao.instance.getMCollection().updateOne(accessFilter, Updates.set(TestingRunIssues.DESCRIPTION, description));
         return SUCCESS.toUpperCase();
-    }
-
-    public String fetchBUACategoryCount() {
-        ApiInfoKeyResult result = com.akto.utils.Utils.fetchUniqueApiInfoKeys(
-                TestingRunIssuesDao.instance.getRawCollection(),
-                createFilters(true),
-                "_id.apiInfoKey",
-                this.showApiInfo
-        );
-        this.buaCategoryCount = result.count;
-        if (this.showApiInfo) {
-            this.buaCategoryApiInfo = result.apiInfoList;
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchUrlsByIssues() {
-        List<Bson> pipeline = new ArrayList<>();
-
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
-        pipeline.add(
-                Aggregates.match(Filters.and(
-                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                        filterQ
-                ))
-        );
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
-            }
-        } catch(Exception e){
-        }
-
-        // Group by testSubCategory and collect unique URL+Method combinations
-        BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
-        pipeline.add(Aggregates.group(groupId,
-                Accumulators.addToSet("apiInfoKeySet", new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.URL)
-                        .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.METHOD)
-                        .append("apiCollectionId", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID))
-        ));
-
-        // Filter to only include groups with more than the threshold of unique URL+Method combinations
-        pipeline.add(Aggregates.match(Filters.expr(
-                new BasicDBObject("$gt", Arrays.asList(
-                        new BasicDBObject("$size", "$apiInfoKeySet"),
-                        URL_METHOD_PAIR_THRESHOLD
-                ))
-        )));
-
-        if (!showTestSubCategories) {
-            try {
-                long totalCount = TestingRunIssuesDao.instance.getMCollection()
-                        .aggregate(pipeline, BasicDBObject.class)
-                        .into(new ArrayList<>())
-                        .size();
-
-                this.response = new BasicDBObject();
-                this.response.put("totalCount", (int) totalCount);
-                return SUCCESS.toUpperCase();
-            } catch (Exception e) {
-                addActionError("Error counting URLs by test subcategory");
-                return ERROR.toUpperCase();
-            }
-        }
-
-        pipeline.add(Aggregates.project(Projections.fields(
-                Projections.include("testSubCategory", "apiInfoKeySet"),
-                Projections.computed("apiInfoKeySetCount", new BasicDBObject("$size", "$apiInfoKeySet"))
-        )));
-
-        // Sort by testSubCategory
-        pipeline.add(Aggregates.sort(Sorts.ascending("testSubCategory")));
-
-        try {
-            MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
-                    .aggregate(pipeline, BasicDBObject.class)
-                    .cursor();
-
-            List<BasicDBObject> result = new ArrayList<>();
-            while (cursor.hasNext()) {
-                BasicDBObject doc = cursor.next();
-                result.add(doc);
-            }
-
-            this.response = new BasicDBObject();
-            this.response.put("testSubCategories", result);
-            this.response.put("totalCount", result.size());
-
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            addActionError("Error fetching URLs by test subcategory");
-            return ERROR.toUpperCase();
-        }
     }
 
     public List<TestingRunIssues> getIssues() {

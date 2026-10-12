@@ -10,7 +10,6 @@ import issuesApi from '../../issues/api';
 import { createActionItem as createActionItemUtil } from '../../../../../util/createActionItem';
 import settingsModule from '../../settings/module';
 import ActionItemDetails from './ActionItemDetails';
-import { fetchAllActionItemsApiInfo } from './actionItemsTransform'; 
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const actionItemsHeaders = [
@@ -57,26 +56,6 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
     const [showFlyout, setShowFlyout] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
-    const [allApiInfo, setAllApiInfo] = useState(null);
-    const [apiInfoLoading, setApiInfoLoading] = useState(false);
-
-    useEffect(() => {
-        const fetchApiInfo = async () => {
-            setApiInfoLoading(true);
-            try {
-                const apiData = await fetchAllActionItemsApiInfo();
-                setAllApiInfo(apiData);
-            } catch (error) {
-                console.error('Error fetching API info:', error);
-                setAllApiInfo(null);
-            } finally {
-                setApiInfoLoading(false);
-            }
-        };
-
-        fetchApiInfo();
-    }, []); 
-
     const handleJiraIntegration = async (actionItem) => {
         const integrated = window.JIRA_INTEGRATED === 'true'
         if (!integrated) {
@@ -314,8 +293,6 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                         item={selectedItem}
                         jiraTicketUrlMap={jiraTicketUrlMap}
                         onJiraButtonClick={handleJiraIntegration}
-                        allApiInfo={allApiInfo} 
-                        apiInfoLoading={apiInfoLoading} 
                     />
                 ]}
             />
