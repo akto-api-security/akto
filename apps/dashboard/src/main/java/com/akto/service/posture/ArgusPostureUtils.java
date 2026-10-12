@@ -13,7 +13,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -34,19 +33,7 @@ public class ArgusPostureUtils {
     static final int SEVERITY_HIGH_AT = 50;
     private static final int SEVERITY_MEDIUM_AT = 25;
 
-    // Display buckets/tag-value lists moved to InsightUtil (environmentBucket/envTagValue) so any
-    // AGENTIC insight provider can group by environment too, without depending on this package.
-    private static final String ENV_PRODUCTION  = InsightUtil.ENV_PRODUCTION;
-    private static final String ENV_STAGING     = InsightUtil.ENV_STAGING;
-    private static final String ENV_DEVELOPMENT = InsightUtil.ENV_DEVELOPMENT;
-
-    static final String ENV_ID_ALL         = "all";
-    static final String ENV_ID_PRODUCTION  = "production";
-    static final String ENV_ID_STAGING     = "staging";
-    static final String ENV_ID_DEVELOPMENT = "development";
-
-    private static final List<String> DEV_ENVS     = Arrays.asList("DEV");
-    private static final List<String> STAGING_ENVS = Arrays.asList("STAGING", "PREPROD", "UAT", "QA", "INTEG");
+    static final String ENV_ID_ALL = "all";
 
     // Mirrors UsersCollectionsList#getContextCollections(AGENTIC); must match AgenticPostureScoreCron's gate.
     static boolean isAgenticInScope(ApiCollection c) {
@@ -165,21 +152,18 @@ public class ArgusPostureUtils {
     }
 
     private static String bucketForId(String environment) {
-        if (StringUtils.isBlank(environment)) return null;
-        switch (environment.trim().toLowerCase(Locale.ROOT)) {
-            case ENV_ID_PRODUCTION:
-                return ENV_PRODUCTION;
-            case ENV_ID_STAGING:
-                return ENV_STAGING;
-            case ENV_ID_DEVELOPMENT:
-                return ENV_DEVELOPMENT;
-            default:
-                return null;
-        }
+        ApiCollection.ENV_BUCKET bucket = ApiCollection.ENV_BUCKET.fromId(environment);
+        return bucket == null ? null : bucket.getDisplayName();
     }
 
+    /** Buckets a raw env-type tag value into one of the three display buckets, via
+     *  ApiCollection.ENV_TYPE's own bucket field. Untagged or unrecognized values default to
+     *  Production — the same "no tag means it's live traffic" assumption ArgusPostureService's
+     *  KPI tiles already made. */
     public static String envBucket(String envTagValue) {
-        return InsightUtil.environmentBucket(envTagValue);
+        ApiCollection.ENV_TYPE type = ApiCollection.ENV_TYPE.fromTagValue(envTagValue);
+        ApiCollection.ENV_BUCKET bucket = type == null ? ApiCollection.ENV_BUCKET.PRODUCTION : type.getBucket();
+        return bucket.getDisplayName();
     }
 
     static boolean isAllEnvironments(String environment) {
@@ -191,16 +175,18 @@ public class ArgusPostureUtils {
     }
 
     public static Bson filterForEnvironment(String environment) {
-        if (StringUtils.isBlank(environment)) return Filters.empty();
-        switch (environment.trim().toLowerCase(Locale.ROOT)) {
-            case ENV_ID_DEVELOPMENT:
-                return envTagIn(DEV_ENVS);
-            case ENV_ID_STAGING:
-                return envTagIn(STAGING_ENVS);
-            case ENV_ID_PRODUCTION:
-                List<String> nonProd = new ArrayList<>(DEV_ENVS);
-                nonProd.addAll(STAGING_ENVS);
+        ApiCollection.ENV_BUCKET bucket = ApiCollection.ENV_BUCKET.fromId(environment);
+        if (bucket == null) return Filters.empty();
+        switch (bucket) {
+            case PRODUCTION:
+                List<String> nonProd = new ArrayList<>();
+                nonProd.addAll(ApiCollection.ENV_TYPE.namesInBucket(ApiCollection.ENV_BUCKET.DEVELOPMENT));
+                nonProd.addAll(ApiCollection.ENV_TYPE.namesInBucket(ApiCollection.ENV_BUCKET.STAGING));
                 return Filters.nor(envTagIn(nonProd));
+            case STAGING:
+                return envTagIn(ApiCollection.ENV_TYPE.namesInBucket(ApiCollection.ENV_BUCKET.STAGING));
+            case DEVELOPMENT:
+                return envTagIn(ApiCollection.ENV_TYPE.namesInBucket(ApiCollection.ENV_BUCKET.DEVELOPMENT));
             default:
                 return Filters.empty();
         }

@@ -838,7 +838,7 @@ public class ArgusPostureService {
         if (ArgusPostureUtils.isAllEnvironments(environment)) {
             long production = 0;
             for (ApiCollection asset : assets) {
-                if (InsightUtil.ENV_PRODUCTION.equals(ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(asset)))) production++;
+                if (ApiCollection.ENV_BUCKET.PRODUCTION.getDisplayName().equals(ArgusPostureUtils.envBucket(ArgusPostureUtils.envTagValue(asset)))) production++;
             }
             kpi.put("footnote", countLine(production, "production", "None in production"));
         }
@@ -1394,9 +1394,12 @@ public class ArgusPostureService {
     private static List<BasicDBObject> environments(Map<String, Integer> counts) {
         List<BasicDBObject> out = new ArrayList<>();
         out.add(environment(ArgusPostureUtils.ENV_ID_ALL, "All environments", null));
-        out.add(environment(ArgusPostureUtils.ENV_ID_PRODUCTION, InsightUtil.ENV_PRODUCTION, counts.getOrDefault(InsightUtil.ENV_PRODUCTION, 0)));
-        out.add(environment(ArgusPostureUtils.ENV_ID_STAGING, InsightUtil.ENV_STAGING, counts.getOrDefault(InsightUtil.ENV_STAGING, 0)));
-        out.add(environment(ArgusPostureUtils.ENV_ID_DEVELOPMENT, InsightUtil.ENV_DEVELOPMENT, counts.getOrDefault(InsightUtil.ENV_DEVELOPMENT, 0)));
+        out.add(environment(ApiCollection.ENV_BUCKET.PRODUCTION.getId(),
+                ApiCollection.ENV_BUCKET.PRODUCTION.getDisplayName(), counts.getOrDefault(ApiCollection.ENV_BUCKET.PRODUCTION.getDisplayName(), 0)));
+        out.add(environment(ApiCollection.ENV_BUCKET.STAGING.getId(),
+                ApiCollection.ENV_BUCKET.STAGING.getDisplayName(), counts.getOrDefault(ApiCollection.ENV_BUCKET.STAGING.getDisplayName(), 0)));
+        out.add(environment(ApiCollection.ENV_BUCKET.DEVELOPMENT.getId(),
+                ApiCollection.ENV_BUCKET.DEVELOPMENT.getDisplayName(), counts.getOrDefault(ApiCollection.ENV_BUCKET.DEVELOPMENT.getDisplayName(), 0)));
         return out;
     }
 

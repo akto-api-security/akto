@@ -309,12 +309,6 @@ public final class InsightUtil {
     // ── Environment classification — moved from ArgusPostureService so any AGENTIC provider can
     // group findings by environment without a package-crossing dependency on service/posture. ──
 
-    public static final String ENV_PRODUCTION = "Production";
-    public static final String ENV_STAGING = "Staging";
-    public static final String ENV_DEVELOPMENT = "Development";
-    private static final List<String> ENV_DEV_VALUES = Arrays.asList("DEV");
-    private static final List<String> ENV_STAGING_VALUES = Arrays.asList("STAGING", "PREPROD", "UAT", "QA", "INTEG");
-
     /** Raw env-type tag value (e.g. "PROD", "STAGING") on a collection, or null when untagged. */
     public static String envTagValue(ApiCollection c) {
         if (c == null || c.getEnvType() == null) return null;
@@ -322,22 +316,6 @@ public final class InsightUtil {
             if (tag != null && Constants.AKTO_ENV_TYPE_TAG.equalsIgnoreCase(tag.getKeyName())) return tag.getValue();
         }
         return null;
-    }
-
-    /** Buckets a raw env-type tag value into one of the three display buckets. Untagged
-     *  collections default to Production — the same "no tag means it's live traffic" assumption
-     *  ArgusPostureService's KPI tiles already made. */
-    public static String environmentBucket(String envTagValue) {
-        if (StringUtils.isBlank(envTagValue)) return ENV_PRODUCTION;
-        String value = envTagValue.trim().toUpperCase(Locale.ROOT);
-        if (ENV_DEV_VALUES.contains(value)) return ENV_DEVELOPMENT;
-        if (ENV_STAGING_VALUES.contains(value)) return ENV_STAGING;
-        return ENV_PRODUCTION;
-    }
-
-    /** The environment bucket a finding should display for this collection/agent. */
-    public static String environmentOf(ApiCollection c) {
-        return environmentBucket(envTagValue(c));
     }
 
     // ── Vendor classification for agentic findings — a superset of endpointVendorNameOfHost's

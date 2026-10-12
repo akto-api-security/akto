@@ -372,7 +372,7 @@ public class ArgusAgentPostureDrillService {
         long score = agent.getPostureScore() == null ? 0 : Math.round(agent.getPostureScore());
         header.setRiskScore(score);
         header.setSeverity(ArgusPostureUtils.severityForScore(score));
-        header.setEnvironment(InsightUtil.environmentBucket(InsightUtil.envTagValue(agent)));
+        header.setEnvironment(ArgusPostureUtils.envBucket(InsightUtil.envTagValue(agent)));
         header.setCreatedAt(agent.getStartTs() == 0 ? null : agent.getStartTs());
         header.setLastActive(agentLastActive(agent.getId()));
         header.setHost(agent.getHostName());

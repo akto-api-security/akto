@@ -216,21 +216,42 @@ public class InsightDataBundle {
 
     /**
      * Newest-first events for these collections; null when the threat backend is unavailable.
-     *
-     * Argus attributes malicious events by host, not apiCollectionId (see HostCollectionResolver's
-     * own javadoc) — an event's apiCollectionId is frequently unset or stale for agentic traffic,
-     * which is why maliciousSeverityCounts/countByCollection never filters by it either. This used
-     * to query by apiCollectionId directly, which silently returned nothing for agents whose events
-     * only carry a host match, while the severity-count sibling (host-resolved) reported a real
-     * total — the two disagreeing on the same agent is what surfaced this.
+     * Dispatches by context source — see listMaliciousEventsAgentic/listMaliciousEventsApi for why
+     * they query differently.
+     */
+    public List<DashboardMaliciousEvent> listMaliciousEvents(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        if (!threatBackendAvailable || threatAccess == null) return null;
+
+        switch (Context.contextSource.get()) {
+            case AGENTIC:
+            case ENDPOINT:
+                return listMaliciousEventsAgentic(startTs, endTs, limit, collectionIds);
+            default:
+                return listMaliciousEventsApi(startTs, endTs, limit, collectionIds);
+        }
+    }
+
+    /** API, MCP, GEN_AI, DAST: apiCollectionId is a real, reliable field for this traffic. */
+    private List<DashboardMaliciousEvent> listMaliciousEventsApi(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        return threatAccess.violationEvents(startTs, endTs, limit,
+                Collections.singletonMap("apiCollectionId", collectionIds), null);
+    }
+
+    /**
+     * AGENTIC and ENDPOINT attribute malicious events by host, not apiCollectionId (see
+     * HostCollectionResolver's own javadoc) — an event's apiCollectionId is frequently unset or
+     * stale for agentic traffic, which is why maliciousSeverityCounts/countByCollection never
+     * filters by it either for those context sources. Querying by apiCollectionId directly for
+     * them silently returned nothing for agents whose events only carry a host match, while the
+     * severity-count sibling (host-resolved) reported a real total — the two disagreeing on the
+     * same agent is what surfaced this.
      *
      * Two queries unioned, not one with both fields set: the backend ANDs "hosts" and "actors"
      * when both are present in one request, so a single call would ask for events whose host AND
      * actor both match, not either — same reasoning HostCollectionResolver.resolveEvent's own
      * host-then-actor fallback documents.
      */
-    public List<DashboardMaliciousEvent> listMaliciousEvents(int startTs, int endTs, int limit, List<Integer> collectionIds) {
-        if (!threatBackendAvailable || threatAccess == null) return null;
+    private List<DashboardMaliciousEvent> listMaliciousEventsAgentic(int startTs, int endTs, int limit, List<Integer> collectionIds) {
         Set<Integer> wanted = new HashSet<>(collectionIds);
         List<String> hosts = new ArrayList<>();
         for (ApiCollection c : collections) {
