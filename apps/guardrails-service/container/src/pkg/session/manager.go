@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	"go.uber.org/zap"
 )
 
@@ -45,7 +46,7 @@ type SessionManager struct {
 	sessions      map[string]*SessionData
 	mu            sync.RWMutex
 	httpClient    *http.Client
-	cyborgURL     string // Cyborg URL for LLM calls and session retrieval
+	cyborgURL     string // Cyborg URL for session retrieval
 	authToken     string // Cyborg auth token
 	tbsURL        string // Threat Backend Service URL for bulkUpdate
 	tbsToken      string // Threat Backend Service token
@@ -169,6 +170,13 @@ func (sm *SessionManager) syncSessions(ctx context.Context) {
 
 		// Skip if session hasn't been modified since last sync
 		if session.LastSyncedAt >= session.LastUpdated {
+			session.mu.RUnlock()
+			skippedCount++
+			continue
+		}
+
+		// Skip until session guardrails have a summary or session-anomaly lock (no sparse docs).
+		if strings.TrimSpace(session.LastSummary) == "" && !session.IsMalicious {
 			session.mu.RUnlock()
 			skippedCount++
 			continue
@@ -349,6 +357,9 @@ func ExtractPromptFromRequestPayload(payload string) string {
 
 	if prompt, ok := env.outer["prompt"].(string); ok {
 		return prompt
+	}
+	if body, ok := env.outer["body"].(string); ok {
+		return body
 	}
 
 	return payload
@@ -679,84 +690,32 @@ Assistant response, the only evidence available so far, note it explicitly if th
 %s`, currentItem, rules)
 }
 
-// GenerateAndUpdateSummary calls cyborg's getLLMResponseV2 to generate a new summary
+// GenerateAndUpdateSummary asks agent-guard (POST {SCANNER_API_URL}/guardrails/llm/async) for an
+// updated session summary. It runs in the background after the turn is tracked, so it uses the
+// async route with its larger reply ceiling.
 // isRequest: true for user requests, false for system responses
 func (sm *SessionManager) GenerateAndUpdateSummary(ctx context.Context, sessionID string, currentItem string, isRequest bool) error {
+	currentItem = strings.TrimSpace(currentItem)
 	if currentItem == "" {
 		return nil
 	}
 
 	// Get existing summary and build prompt
 	existingSummary, _ := sm.GetSessionSummary(sessionID)
-	systemPrompt := buildSummarizationPrompt(existingSummary, currentItem, isRequest)
+	prompt := buildSummarizationPrompt(existingSummary, currentItem, isRequest)
 
-	// Call cyborg's getLLMResponseV2 endpoint
-	requestBody := map[string]interface{}{
-		"llmPayload": map[string]interface{}{
-			"temperature":       0.1,
-			"top_p":             0.9,
-			"max_tokens":        150,
-			"frequency_penalty": 0.0,
-			"presence_penalty":  0.6,
-			"messages": []map[string]string{
-				{
-					"role":    "system",
-					"content": systemPrompt,
-				},
-			},
-		},
-	}
-
-	jsonData, err := json.Marshal(requestBody)
+	content, err := mcp.CallGuardrailsLLMAsync(ctx, prompt)
 	if err != nil {
-		return fmt.Errorf("failed to marshal LLM request: %w", err)
+		return fmt.Errorf("failed to generate session summary: %w", err)
 	}
 
-	endpoint := sm.cyborgURL + "/api/getLLMResponseV2"
-	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to create LLM request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	if sm.authToken != "" {
-		req.Header.Set("Authorization", sm.authToken)
-	}
-
-	resp, err := sm.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to call LLM API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("LLM API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse LLM response (OpenAI-compatible format)
-	var llmResponse struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&llmResponse); err != nil {
-		return fmt.Errorf("failed to decode LLM response: %w", err)
-	}
-
-	// Extract and update summary
-	if len(llmResponse.Choices) > 0 {
-		summary := strings.TrimSpace(llmResponse.Choices[0].Message.Content)
-		if summary != "" {
-			sm.UpdateSessionSummary(sessionID, summary)
-			sm.logger.Info("Updated session summary via LLM",
-				zap.String("sessionID", sessionID),
-				zap.Int("summaryLength", len(summary)),
-				zap.String("sessionSummary", summary))
-		}
+	summary := strings.TrimSpace(content)
+	if summary != "" {
+		sm.UpdateSessionSummary(sessionID, summary)
+		sm.logger.Info("Updated session summary via LLM",
+			zap.String("sessionID", sessionID),
+			zap.Int("summaryLength", len(summary)),
+			zap.String("sessionSummary", summary))
 	}
 
 	return nil

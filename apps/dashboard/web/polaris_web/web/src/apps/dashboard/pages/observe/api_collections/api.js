@@ -15,23 +15,34 @@ export default {
             data: { apiCollections: items }
         })
     },
-    fetchCountForHostnameDeactivatedCollections(){
+    // one page of the collections table, sorted/filtered on the server. sortOrder: 1 asc, -1 desc
+    fetchApiCollectionsPage({ skip, limit, sortKey, sortOrder, tab, queryValue, filters, tagFilters, force }){
         return request({
-            url: '/api/getCountForHostnameDeactivatedCollections',
+            url: '/api/fetchApiCollectionsPage',
             method: 'post',
-            data: {}
+            data: { skip, limit, sortKey, sortOrder, tab, queryValue, filters, tagFilters, force: !!force }
         })
     },
-    fetchCountForUningestedApis(){
+    // how many collections each tab holds under the table's search and filters
+    fetchApiCollectionsTabCounts({ queryValue, filters, tagFilters }){
         return request({
-            url: '/api/getCountForUningestedApis',
+            url: '/api/fetchApiCollectionsTabCounts',
             method: 'post',
-            data: {}
+            data: { queryValue, filters, tagFilters }
         })
     },
-    fetchUningestedApis(){
+    // coverage of the collections of a page, fetched after the rows are shown
+    fetchApiCollectionsPageDetails(apiCollectionIds){
         return request({
-            url: '/api/fetchUningestedApis',
+            url: '/api/fetchApiCollectionsPageDetails',
+            method: 'post',
+            data: { apiCollectionIds }
+        })
+    },
+    // tab counts, summary card numbers and tag filter choices
+    fetchApiCollectionsPageMeta(){
+        return request({
+            url: '/api/fetchApiCollectionsPageMeta',
             method: 'post',
             data: {}
         })

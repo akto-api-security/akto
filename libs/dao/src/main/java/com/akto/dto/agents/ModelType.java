@@ -9,6 +9,8 @@ public enum ModelType {
     DATABRICKS,
     GITHUB_COPILOT,
     GEMINI,
-    CLOUDFLARE
+    CLOUDFLARE,
+    VERTEX_AI,
+    BEDROCK
 
 }

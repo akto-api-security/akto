@@ -193,7 +193,7 @@ class LLMScanner:
                 scanner_type,
                 config,
                 text,
-                provider_name=self.provider.name,
+                provider_name=self.provider.prompt_name,
                 response_format=self.response_format,
             )
             if prompt is None:

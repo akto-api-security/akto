@@ -1,6 +1,7 @@
-import { Badge, Box, Button, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Card, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
 import { ArrowDownMinor, ArrowUpMinor } from '@shopify/polaris-icons'
-import { GapHint, BAND_LABEL_FOR_TONE, TONE_TEXT_COLOR, riskBand } from '../../agenticPostureShared'
+import { SeverityBadge } from '../../../observe/agentic/AgenticCellRenderers'
+import { GapHint, RISK_LABEL_FOR_SEVERITY, TONE_TEXT_COLOR, riskBand } from '../../agenticPostureShared'
 
 const TONE_STROKE_VAR = {
     critical: 'var(--p-color-icon-critical)',
@@ -48,7 +49,7 @@ function PostureScoreCard({ postureScore, onOpenBreakdown }) {
     const deltaPositive = delta > 0
     const band = hasValue ? riskBand(value) : null
     const bandTone = band ? band.tone : null
-    const bandLabel = bandTone ? BAND_LABEL_FOR_TONE[bandTone] : null
+    const bandLabel = band ? RISK_LABEL_FOR_SEVERITY[band.severity] : null
     const clickable = hasValue && !!onOpenBreakdown
 
     return (
@@ -61,7 +62,7 @@ function PostureScoreCard({ postureScore, onOpenBreakdown }) {
                             <Text variant="bodySm" fontWeight="semibold" color="subdued">POSTURE SCORE</Text>
                             <GapHint gaps={dataGaps} />
                         </HorizontalStack>
-                        {bandLabel && <Badge status={bandTone}>{bandLabel}</Badge>}
+                        {bandLabel && <SeverityBadge severity={band.severity}>{bandLabel}</SeverityBadge>}
                     </HorizontalStack>
                     {hasValue ? (
                         <HorizontalStack gap="4" blockAlign="center" wrap={false}>

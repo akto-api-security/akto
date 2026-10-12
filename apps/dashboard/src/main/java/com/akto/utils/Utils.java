@@ -946,64 +946,6 @@ public class Utils {
         return testResult;
     }
 
-    public static ApiInfoKeyResult fetchUniqueApiInfoKeys(
-            MongoCollection<Document> collection,
-            Bson matchFilter,
-            String apiInfoKeyPath,
-            boolean showApiInfo
-    ) {
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(apiInfoKeyPath + ".apiCollectionId");
-        List<Integer> collectionIds;
-        try {
-            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if (collectionIds == null) {
-                return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
-            }
-        } catch (Exception e) {
-            return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
-        }
-
-        // Combine filters: exclude unwanted, include only allowed
-        Bson combinedFilter = Filters.and(
-                matchFilter,
-                filterQ,
-                Filters.in(apiInfoKeyPath + ".apiCollectionId", collectionIds)
-        );
-
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(combinedFilter));
-        pipeline.add(Aggregates.project(Projections.include(
-                apiInfoKeyPath + ".apiCollectionId",
-                apiInfoKeyPath + ".url",
-                apiInfoKeyPath + ".method"
-        )));
-        pipeline.add(Aggregates.group(
-                new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
-                        .append("url", "$" + apiInfoKeyPath + ".url")
-                        .append("method", "$" + apiInfoKeyPath + ".method"),
-                Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
-        ));
-
-        Set<ApiInfo.ApiInfoKey> apiInfoKeys = new HashSet<>();
-        List<ApiInfo> apiInfoList = new ArrayList<>();
-        List<Document> results = collection.aggregate(pipeline, Document.class).into(new ArrayList<>());
-        for (Document doc : results) {
-            Document keyDoc = (Document) doc.get("apiInfoKey");
-            if (keyDoc != null) {
-                ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
-                        keyDoc.getInteger("apiCollectionId"),
-                        keyDoc.getString("url"),
-                        URLMethods.Method.fromString(keyDoc.getString("method"))
-                );
-                apiInfoKeys.add(key);
-                if (showApiInfo) {
-                    apiInfoList.add(new ApiInfo(key));
-                }
-            }
-        }
-        return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
-    }
-
     public static String fetchDefaultInviteRole(int accountId, String fallbackDefault){
         try {
             Context.accountId.set(accountId);

@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akto-api-security/akto-endpoint-shield/mcp"
 	kafkago "github.com/segmentio/kafka-go"
 	"go.uber.org/zap"
 )
@@ -42,7 +43,7 @@ func TestSink_FallsBackToDirectPostWhenBrokerDown(t *testing.T) {
 	})
 
 	sink := unreachableProducer(t).Sink()
-	if err := sink(context.Background(), []byte(sampleBody)); err != nil {
+	if err := sink(context.Background(), sampleEvent); err != nil {
 		t.Fatalf("sink should have recovered via the direct POST, got: %v", err)
 	}
 
@@ -69,8 +70,28 @@ func TestSink_ErrorsWhenBrokerAndBackendBothDown(t *testing.T) {
 	})
 
 	sink := unreachableProducer(t).Sink()
-	err := sink(context.Background(), []byte(sampleBody))
+	err := sink(context.Background(), sampleEvent)
 	if err == nil {
 		t.Fatal("expected an error when both Kafka and the backend are unavailable")
+	}
+}
+
+// An enrichment update that cannot be buffered falls back to update_remediation,
+// not record_malicious_event.
+func TestSink_EnrichmentFallsBackToUpdateRemediation(t *testing.T) {
+	var gotPath string
+	withThreatAPI(t, func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusOK)
+	})
+	mcp.ThreatDetectionAPIURL += "/api/threat_detection/record_malicious_event"
+
+	sink := unreachableProducer(t).Sink()
+	update := mcp.ThreatMessage{Kind: mcp.ThreatMessageEnrichment, Key: "sess-1", Body: []byte(`{"refId":"r"}`)}
+	if err := sink(context.Background(), update); err != nil {
+		t.Fatalf("sink should have recovered via the direct POST, got: %v", err)
+	}
+	if gotPath != "/api/threat_detection/update_remediation" {
+		t.Fatalf("enrichment fell back to %q", gotPath)
 	}
 }

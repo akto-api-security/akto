@@ -9,6 +9,7 @@ import java.util.Map;
 
 import static com.akto.utils.crons.AgenticPostureScoreCron.guardrailSeverityScore;
 import static com.akto.utils.crons.AgenticPostureScoreCron.redTeamSeverityScore;
+import static com.akto.utils.crons.AgenticPostureScoreCron.untestedRedTeamScore;
 import static com.akto.utils.crons.AgenticPostureScoreCron.worstSliceMean;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -174,5 +175,13 @@ public class TestAgenticPostureScoreBands {
     public void unrecognisedSeverityScoresZero() {
         assertEquals(0.0, redTeamSeverityScore(counts("UNKNOWN", 5)), DELTA);
         assertEquals(0.0, guardrailSeverityScore(counts("UNKNOWN", 5)), DELTA);
+    }
+
+    @Test
+    public void neverScannedIsHighRiskAndCriticalWithMaliciousActivity() {
+        assertEquals(76.0, untestedRedTeamScore(false), DELTA);
+        assertEquals(100.0, untestedRedTeamScore(true), DELTA);
+        // A scanned agent with no open findings still scores 0, below any never-scanned agent.
+        assertEquals(0.0, redTeamSeverityScore(counts()), DELTA);
     }
 }

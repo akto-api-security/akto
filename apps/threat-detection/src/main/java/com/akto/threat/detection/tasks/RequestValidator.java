@@ -342,6 +342,8 @@ public class RequestValidator {
       "origin", "referer", "upgrade-insecure-requests",
       // Auto-calculated headers (1)
       "content-length",
+      // Ignored per OpenAPI spec when declared as header parameters
+      "content-type", "accept", "authorization",
       // Misplaced response headers in request
       "access-control-allow-origin"));
 

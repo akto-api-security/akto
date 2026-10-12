@@ -73,6 +73,14 @@ def _read_file(path: str) -> str:
         return f.read().strip()
 
 
+def _raise_for_status(resp, what: str) -> None:
+    """Like raise_for_status, but keeps the response body: the Pod Identity agent
+    and STS put the actual reason there (e.g. "EKS does not have permissions to
+    assume the associated role"), which a bare 400 would hide."""
+    if resp.status_code >= 400:
+        raise RuntimeError(f"{what} returned HTTP {resp.status_code}: {resp.text[:500]!r}")
+
+
 def _epoch(iso_timestamp: str) -> float:
     return datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00")).timestamp()
 
@@ -89,7 +97,7 @@ async def _fetch_container_credentials() -> tuple[AwsCredentials, float]:
     if token:
         headers["Authorization"] = token
     resp = await http_client.get_client().get(url, headers=headers, timeout=10)
-    resp.raise_for_status()
+    _raise_for_status(resp, "container credentials endpoint")
     body = resp.json()
     creds = AwsCredentials(body["AccessKeyId"], body["SecretAccessKey"], body.get("Token", ""))
     return creds, _epoch(body["Expiration"])
@@ -111,7 +119,7 @@ async def _fetch_web_identity_credentials(region: str) -> tuple[AwsCredentials, 
         },
         timeout=10,
     )
-    resp.raise_for_status()
+    _raise_for_status(resp, "STS AssumeRoleWithWebIdentity")
     node = ET.fromstring(resp.text).find(".//sts:Credentials", _STS_NS)
     if node is None:
         raise ValueError(f"AssumeRoleWithWebIdentity response has no Credentials: {resp.text[:300]!r}")

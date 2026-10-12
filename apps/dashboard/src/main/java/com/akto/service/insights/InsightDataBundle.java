@@ -11,18 +11,27 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
+import org.apache.commons.lang3.StringUtils;
 
 import com.akto.dto.ApiInfo;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * One immutable snapshot of every Mongo/threat-backend read the 10 providers need,
@@ -161,23 +170,120 @@ public class InsightDataBundle {
     // collectionId -> {severity -> count} since startTs in the request's context source, attributed by host, then actor
     // (event collection ids aren't reliable); null when the threat backend is unavailable.
     public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs) {
-        if (!threatBackendAvailable || threatAccess == null) return null;
-        int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
-        List<DashboardMaliciousEvent> hostCounts = hostCountsSince.get(since);
-        if (hostCounts == null) {
-            hostCounts = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
-            hostCountsSince.putIfAbsent(since, hostCounts);
-        }
-        if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);
-        Map<Integer, Map<String, Integer>> byCollection = hostResolver.severityByCollection(hostCounts);
+        return maliciousSeverityCounts(collectionIds, startTs, null);
+    }
+
+    // Same, counting only the events that pass eventFilter (null = all events).
+    public Map<Integer, Map<String, Integer>> maliciousSeverityCounts(List<Integer> collectionIds, int startTs,
+                                                                        Predicate<DashboardMaliciousEvent> eventFilter) {
+        return countsByCollection(collectionIds, startTs, eventFilter,
+                e -> e.getSeverity() == null ? "UNKNOWN" : e.getSeverity().toUpperCase(Locale.ROOT));
+    }
+
+    // collectionId -> {flagged data ("email", "<policy> (LLM rule)") -> count} since startTs; null when unavailable.
+    public Map<Integer, Map<String, Integer>> sensitiveDataCounts(List<Integer> collectionIds, int startTs) {
+        return countsByCollection(collectionIds, startTs, InsightUtil::isSensitiveDataEvent, InsightUtil::sensitiveDataLabel);
+    }
+
+    private Map<Integer, Map<String, Integer>> countsByCollection(List<Integer> collectionIds, int startTs,
+                                                                 Predicate<DashboardMaliciousEvent> eventFilter,
+                                                                 Function<DashboardMaliciousEvent, String> keyOf) {
+        List<DashboardMaliciousEvent> hostCounts = cachedEventsSince(startTs);
+        if (hostCounts == null) return null;
+        List<DashboardMaliciousEvent> events = eventFilter == null ? hostCounts
+                : hostCounts.stream().filter(eventFilter).collect(Collectors.toList());
+        Map<Integer, Map<String, Integer>> byCollection = hostResolver().countByCollection(events, keyOf);
         byCollection.keySet().retainAll(new HashSet<>(collectionIds));
         return byCollection;
     }
 
-    // Newest-first events for these collections; null when the threat backend is unavailable.
+    private List<DashboardMaliciousEvent> cachedEventsSince(int startTs) {
+        if (!threatBackendAvailable || threatAccess == null) return null;
+        int since = startTs - Math.floorMod(startTs, HOST_COUNTS_BUCKET_SECONDS);
+        List<DashboardMaliciousEvent> events = hostCountsSince.get(since);
+        if (events == null) {
+            events = threatAccess.violationEventsMinimal(since, Context.now(), 100_000, null);
+            hostCountsSince.putIfAbsent(since, events);
+        }
+        return events;
+    }
+
+    /** Events inside the page's date range (ctx start..end), from the same cache; null when the threat
+     *  backend is unavailable. */
+    public List<DashboardMaliciousEvent> windowEvents() {
+        List<DashboardMaliciousEvent> events = cachedEventsSince(ctx.getStartTs());
+        if (events == null) return null;
+        long start = ctx.getStartTs();
+        long end = ctx.getEndTs() > 0 ? ctx.getEndTs() : Long.MAX_VALUE;
+        return events.stream().filter(e -> e != null && e.getTimestamp() >= start && e.getTimestamp() <= end)
+                .collect(Collectors.toList());
+    }
+
+    /** Attributes events to this bundle's collections (host, then actor). */
+    public HostCollectionResolver hostResolver() {
+        if (hostResolver == null) hostResolver = new HostCollectionResolver(collections);
+        return hostResolver;
+    }
+
+    /**
+     * Newest-first events for these collections; null when the threat backend is unavailable.
+     * Dispatches by context source — see listMaliciousEventsAgentic/listMaliciousEventsApi for why
+     * they query differently.
+     */
     public List<DashboardMaliciousEvent> listMaliciousEvents(int startTs, int endTs, int limit, List<Integer> collectionIds) {
         if (!threatBackendAvailable || threatAccess == null) return null;
-        return threatAccess.violationEvents(startTs, endTs, limit, Collections.singletonMap("apiCollectionId", collectionIds), null);
+
+        switch (Context.contextSource.get()) {
+            case AGENTIC:
+            case ENDPOINT:
+                return listMaliciousEventsAgentic(startTs, endTs, limit, collectionIds);
+            default:
+                return listMaliciousEventsApi(startTs, endTs, limit, collectionIds);
+        }
+    }
+
+    /** API, MCP, GEN_AI, DAST: apiCollectionId is a real, reliable field for this traffic. */
+    private List<DashboardMaliciousEvent> listMaliciousEventsApi(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        return threatAccess.violationEvents(startTs, endTs, limit,
+                Collections.singletonMap("apiCollectionId", collectionIds), null);
+    }
+
+    /**
+     * AGENTIC and ENDPOINT attribute malicious events by host, not apiCollectionId (see
+     * HostCollectionResolver's own javadoc) — an event's apiCollectionId is frequently unset or
+     * stale for agentic traffic, which is why maliciousSeverityCounts/countByCollection never
+     * filters by it either for those context sources. Querying by apiCollectionId directly for
+     * them silently returned nothing for agents whose events only carry a host match, while the
+     * severity-count sibling (host-resolved) reported a real total — the two disagreeing on the
+     * same agent is what surfaced this.
+     *
+     * Two queries unioned, not one with both fields set: the backend ANDs "hosts" and "actors"
+     * when both are present in one request, so a single call would ask for events whose host AND
+     * actor both match, not either — same reasoning HostCollectionResolver.resolveEvent's own
+     * host-then-actor fallback documents.
+     */
+    private List<DashboardMaliciousEvent> listMaliciousEventsAgentic(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        Set<Integer> wanted = new HashSet<>(collectionIds);
+        List<String> hosts = new ArrayList<>();
+        for (ApiCollection c : collections) {
+            if (c == null || !wanted.contains(c.getId())) continue;
+            String identity = InsightUtil.assetIdentity(c);
+            if (StringUtils.isNotBlank(identity)) hosts.add(identity);
+        }
+        if (hosts.isEmpty()) return new ArrayList<>();
+
+        Map<String, DashboardMaliciousEvent> byId = new LinkedHashMap<>();
+        for (String field : Arrays.asList("hosts", "actors")) {
+            List<DashboardMaliciousEvent> page = threatAccess.violationEvents(startTs, endTs, limit,
+                    Collections.singletonMap(field, hosts), null);
+            if (page == null) continue;
+            for (DashboardMaliciousEvent event : page) {
+                if (event != null && event.getId() != null) byId.put(event.getId(), event);
+            }
+        }
+        List<DashboardMaliciousEvent> events = new ArrayList<>(byId.values());
+        events.sort(Comparator.comparingLong(DashboardMaliciousEvent::getTimestamp).reversed());
+        return events.size() > limit ? events.subList(0, limit) : events;
     }
 
     private static final long MALICIOUS_INVOCATION_WINDOW_MS = 15L * 24 * 3600 * 1000;

@@ -66,6 +66,14 @@ IRSA, `sts.<region>` (VPC interface endpoints keep both private), plus
 
 - IAM needs `bedrock:InvokeModel` on the model (or inference-profile) ARN, and
   model access must be enabled for that model in the Bedrock console.
+- **Gemma 4** (`google.gemma-4-*`) is routed automatically: AWS serves it only
+  on the `bedrock-mantle` endpoint (OpenAI-compatible chat completions at
+  `https://bedrock-mantle.<region>.api.aws/openai/v1`), so the `bedrock`
+  provider sends those models there and everything else to Converse. Same
+  region and credentials, but IAM needs **`bedrock-mantle:CreateInference`** on
+  the default project (`arn:aws:bedrock-mantle:<region>:<account>:project/default`),
+  and the region must offer Gemma 4 (us-east-1, us-east-2, us-west-2,
+  eu-central-1 at the time of writing — not ap-south-1). Use plain ids.
 - A `modelConfigs` entry may set its own `model` and `baseUrl` (e.g. a VPC
   interface endpoint); credentials and region are env-only.
 - Converse returns no logprobs, so Bedrock suits the LLM-judge roles (JSON

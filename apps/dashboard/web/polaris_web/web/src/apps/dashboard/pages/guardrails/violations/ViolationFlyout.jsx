@@ -474,7 +474,7 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
     function renderTabContent(id) {
         switch (id) {
             case "overview":        return <OverviewSection row={violation} detail={detail} />;
-            case "promptResponse":  return <PromptResponseSection detail={detail} />;
+            case "promptResponse":  return <PromptResponseSection detail={detail} host={violation.host} anchorTimestamp={violation.detected} />;
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
                 if (violation.type === "Tool") {

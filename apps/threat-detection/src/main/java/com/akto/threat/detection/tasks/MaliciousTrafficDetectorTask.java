@@ -101,7 +101,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
   private static final int MAX_APPLY_FILTER_LOGS = 1000;
   private static final int MAX_PAYLOAD_SIZE_BYTES = 50 * 1024; // 50 KB
 
-  private static final FilterConfig SEQUENCE_ANOMALY_FILTER = Utils.buildSequenceAnomalyFilter();
   private SequenceCache sequenceCache;
 
 
@@ -271,12 +270,6 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
-    // Sequence anomaly detection — pure in-memory, no Redis, no locking (single-threaded loop)
-    boolean isSequenceEnabled = accountConfig != null && accountConfig.isBehavioralSequenceEnabled();
-    if(isSequenceEnabled){
-      checkSequenceAnomaly(actor, apiCollectionId, urlForAggregation, method, responseParam);
-    }
-
     boolean successfulExploit = false;
     boolean isIgnoredEvent = false;
     if (rawApi != null) {
@@ -348,7 +341,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072);
+      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072, 1786100206);
       if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
@@ -362,7 +355,12 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
-      }else {
+      } else if (apiFilter.getId().equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
+        if (apiCollectionId != 0) {
+          String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
+          hasPassedFilter = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
+        }
+      } else {
         boolean hasSuccessFailureFilters = (apiFilter.getSuccessFilter() != null || apiFilter.getFailureFilter() != null);
 
         if (apiFilter.getFilter() != null) {
@@ -527,29 +525,14 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
     }
     }
 
-  private void checkSequenceAnomaly(String actor, int apiCollectionId, String urlForAggregation,
-      URLMethods.Method method, HttpResponseParams responseParam) {
-    if (apiCollectionId == 0) return;
-
-    String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
-    boolean shouldAlert = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
-
-    if (shouldAlert) {
-      RedactionType redactionType = Utils.getRedactionType(responseParam.getRequestParams().getHeaders(), dataActor);
-      SampleMaliciousRequest seqReq = Utils.buildSampleMaliciousRequest(
-          actor, responseParam, SEQUENCE_ANOMALY_FILTER, null, null, false, false, redactionType);
-      generateAndPushMaliciousEventRequest(
-          SEQUENCE_ANOMALY_FILTER, actor, responseParam, seqReq, EventType.EVENT_TYPE_SINGLE, "Anomaly");
-    }
-  }
-
   private void generateAndPushMaliciousEventRequest(
       FilterConfig apiFilter,
       String actor,
       HttpResponseParams responseParam,
       SampleMaliciousRequest maliciousReq,
       EventType eventType) {
-    generateAndPushMaliciousEventRequest(apiFilter, actor, responseParam, maliciousReq, eventType, "Rule-Based");
+    String detectionType = ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID.equals(apiFilter.getId()) ? "Anomaly" : "Rule-Based";
+    generateAndPushMaliciousEventRequest(apiFilter, actor, responseParam, maliciousReq, eventType, detectionType);
   }
 
   private void generateAndPushMaliciousEventRequest(

@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.RuntimeUtil;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +88,6 @@ public class AccountConfigurationCache {
             0,                          // accountId
             false,                      // isRedacted = false
             false,                      // isHyperscanEnabled = false (default to filter yaml)
-            false,                      // isBehavioralSequenceEnabled = false
             new ArrayList<>(),          // empty apiCollections
             new ArrayList<>(),          // empty apiInfos
             new HashMap<>(),            // empty apiCollectionUrlTemplates
@@ -117,7 +117,6 @@ public class AccountConfigurationCache {
             boolean isHyperscanEnabled = false;
 
             // Check feature flag for behavioural
-            boolean isBehavioralSequenceEnabled = false;
             try {
                 Organization organization = dataActor.fetchOrganization(accountSettings.getId());
                 if (organization != null && organization.getFeatureWiseAllowed() != null) {
@@ -125,14 +124,11 @@ public class AccountConfigurationCache {
                             .getOrDefault("THREAT_DETECTION_HYPERSCAN", FeatureAccess.noAccess);
                     isHyperscanEnabled = hyperscanAccess.getIsGranted();
 
-                    FeatureAccess sequenceAccess = organization.getFeatureWiseAllowed().getOrDefault("BEHAVIORAL_ANOMALLY_SEQUENCE", FeatureAccess.noAccess);
-                    isBehavioralSequenceEnabled = sequenceAccess.getIsGranted();
                 }
             } catch (Exception e) {
                 logger.errorAndAddToDb(e, "Error fetching organization for hyperscan feature flag: " + e.getMessage());
             }
             logger.infoAndAddToDb("Hyperscan feature flag: " + isHyperscanEnabled);
-            logger.infoAndAddToDb("Behavioral sequence flag: " + isBehavioralSequenceEnabled);
 
             List <ApiCollection> apiCollections = new ArrayList<>();
             if (accountSettings.getId() != 1758179941) {
@@ -141,7 +137,7 @@ public class AccountConfigurationCache {
             // This will fetch paginated apiInfos with _id, rateLimits fields.
             List<ApiInfo> apiInfos = new ArrayList<>();
 
-            if (accountSettings.getId() == 1763355072) {
+            if (Arrays.asList(1763355072, 1786100206).contains(accountSettings.getId())) {
                 apiInfos = dataActor.fetchApiRateLimits(null);
             }
 
@@ -157,7 +153,6 @@ public class AccountConfigurationCache {
                 accountSettings.getId(),
                 accountSettings.isRedactPayload(),
                 isHyperscanEnabled,
-                isBehavioralSequenceEnabled,
                 apiCollections,
                 apiInfos,
                 apiCollectionUrlTemplates,

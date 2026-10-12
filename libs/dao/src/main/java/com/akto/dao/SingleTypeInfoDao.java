@@ -502,9 +502,12 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return countMap;
     }
 
-    public List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly, Bson customFilter){
-        List<Bson> pipeline = new ArrayList<>();
-
+    /**
+     * The single_type_info rows that make an api sensitive: a request row of a type that is sensitive in
+     * requests (or always), or a response row of a type that is sensitive in responses (or always).
+     * Served by the {subType, responseCode} index.
+     */
+    public Bson sensitiveRowsFilter(Bson customFilter) {
         List<String> sensitiveInRequest = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
         sensitiveInRequest.addAll(SingleTypeInfoDao.instance.sensitiveSubTypeNames());
         Bson sensitiveSubTypeFilterRequest = Filters.in("subType",sensitiveInRequest);
@@ -521,10 +524,15 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         responseFilterList.add(customFilter);
         responseFilterList.add(Filters.gt("responseCode", -1));
 
-        pipeline.add(Aggregates.match(Filters.or(
+        return Filters.or(
             Filters.and(responseFilterList),
             Filters.and(requestFilterList)
-        )));
+        );
+    }
+
+    public List<Bson> generateFilterForSubtypes(List<String> sensitiveParameters, BasicDBObject groupedId, Boolean inResponseOnly, Bson customFilter){
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(sensitiveRowsFilter(customFilter)));
 
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
@@ -716,6 +724,21 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             return 0;
         }
 
+    }
+
+    /** Distinct sensitive apis (any request or response row of a sensitive type) per collection. */
+    public Map<Integer, Integer> getSensitiveApisCountPerCollection(Bson customFilter) {
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                                        .append(SingleTypeInfo._URL, "$url")
+                                        .append(SingleTypeInfo._METHOD, "$method");
+        List<Bson> pipeline = generateFilterForSubtypes(new ArrayList<>(), groupedId, false, customFilter);
+        pipeline.add(Aggregates.group("$_id." + SingleTypeInfo._API_COLLECTION_ID, Accumulators.sum(_COUNT, 1)));
+
+        Map<Integer, Integer> counts = new HashMap<>();
+        for (BasicDBObject row : SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).allowDiskUse(true)) {
+            counts.put(row.getInt(Constants.ID), row.getInt(_COUNT));
+        }
+        return counts;
     }
 
     public static final int LARGE_LIMIT = 10_000;

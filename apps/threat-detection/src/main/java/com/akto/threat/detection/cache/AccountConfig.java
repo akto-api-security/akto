@@ -22,21 +22,18 @@ public class AccountConfig {
     private final int accountId;
     private final boolean isRedacted;
     private final boolean isHyperscanEnabled;
-    private final boolean isBehavioralSequenceEnabled;
     private final Map<Integer, Boolean> apiCollections;
     private final List<ApiInfo> apiInfos;
     private final Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates;
     private final Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods;
 
     public AccountConfig(int accountId, boolean isRedacted, boolean isHyperscanEnabled,
-                         boolean isBehavioralSequenceEnabled,
                          List<ApiCollection> apiCollections,
                          List<ApiInfo> apiInfos, Map<Integer, List<URLTemplate>> apiCollectionUrlTemplates,
                          Map<String, Set<URLMethods.Method>> apiInfoUrlToMethods) {
         this.accountId = accountId;
         this.isRedacted = isRedacted;
         this.isHyperscanEnabled = isHyperscanEnabled;
-        this.isBehavioralSequenceEnabled = isBehavioralSequenceEnabled;
         this.apiCollections  = new HashMap<>();
         initMapApiCollectionsFromList(apiCollections);
         // Guarantee non-null collections - use empty collections if null
@@ -77,12 +74,6 @@ public class AccountConfig {
         return isHyperscanEnabled;
     }
 
-    /**
-     * Check if Behavioral Sequence detection is enabled via Stigg feature flag
-     */
-    public boolean isBehavioralSequenceEnabled() {
-        return isBehavioralSequenceEnabled;
-    }
 
     /**
      * Get all API collections mapped by collection ID
@@ -130,7 +121,6 @@ public class AccountConfig {
                 "accountId=" + accountId +
                 ", isRedacted=" + isRedacted +
                 ", isHyperscanEnabled=" + isHyperscanEnabled +
-                ", isBehavioralSequenceEnabled=" + isBehavioralSequenceEnabled +
                 ", apiCollectionsCount=" + (apiCollections != null ? apiCollections.size() : 0) +
                 ", apiInfosCount=" + (apiInfos != null ? apiInfos.size() : 0) +
                 ", apiInfoUrlToMethodsCount=" + (apiInfoUrlToMethods != null ? apiInfoUrlToMethods.size() : 0) +

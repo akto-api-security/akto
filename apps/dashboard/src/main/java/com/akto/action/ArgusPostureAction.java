@@ -17,9 +17,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
+import com.akto.service.posture.AgentDetailResult;
 import com.akto.service.posture.ArgusAgentPostureDrillService;
 import com.akto.service.posture.ArgusPostureChangesService;
 import com.akto.service.posture.ArgusPostureService;
+import com.akto.service.posture.ArgusPostureUtils;
 import com.akto.service.posture.PostureDrillNarrativeService;
 import com.akto.service.posture.PostureDrillResult;
 import com.akto.util.Constants;
@@ -69,7 +71,8 @@ public class ArgusPostureAction extends UserAction {
             ArgusAgentPostureDrillService.DRILL_HIGH_RISK_AGENTS,
             ArgusPostureService.DRILL_PROTECTION_COVERAGE,
             ArgusPostureService.DRILL_PRIVILEGED_TOOLS,
-            ArgusPostureService.DRILL_SENSITIVE_DATA));
+            ArgusPostureService.DRILL_SENSITIVE_DATA,
+            ArgusPostureService.DRILL_GUARDRAIL_VIOLATIONS));
 
     private final ArgusPostureService argusPostureService = new ArgusPostureService();
     private final ArgusAgentPostureDrillService agentPostureDrillService = new ArgusAgentPostureDrillService();
@@ -84,10 +87,14 @@ public class ArgusPostureAction extends UserAction {
     @Getter @Setter private int skip;
     @Getter @Setter private int limit;
 
+    @Getter @Setter private int collectionId;
+    @Getter @Setter private String finding;
+
     @Getter private BasicDBObject response = new BasicDBObject();
     @Getter private List<BasicDBObject> insights = new ArrayList<>();
     @Getter private Map<String, BasicDBObject> insightSummaries;
     @Getter private PostureDrillResult postureDrill;
+    @Getter private AgentDetailResult agentDetail;
 
     public String fetchArgusPostureSummary() {
         try {
@@ -168,7 +175,7 @@ public class ArgusPostureAction extends UserAction {
             if (BUNDLE_ONLY_DRILLS.contains(drillId)) {
                 InsightDataBundle bundle = getOrEmpty(EXECUTOR.submit(Context.withContext(accountId, userId, contextSource,
                         () -> insightService.getOrLoadBundle(ctx))), null, "bundle");
-                String envScopeKey = "env=" + ArgusPostureService.environmentKey(environment);
+                String envScopeKey = "env=" + ArgusPostureUtils.environmentKey(environment);
                 switch (drillId) {
                     case ArgusAgentPostureDrillService.DRILL_POSTURE_SCORE:
                         postureDrill = agentPostureDrillService.fetchPostureScoreDrill(bundle, path, skip, limit);
@@ -181,6 +188,9 @@ public class ArgusPostureAction extends UserAction {
                         break;
                     case ArgusPostureService.DRILL_PRIVILEGED_TOOLS:
                         postureDrill = argusPostureService.fetchPrivilegedToolsDrill(bundle, environment, skip, limit);
+                        break;
+                    case ArgusPostureService.DRILL_GUARDRAIL_VIOLATIONS:
+                        postureDrill = argusPostureService.fetchGuardrailViolationsDrill(bundle, environment);
                         break;
                     default:
                         postureDrill = argusPostureService.fetchSensitiveDataDrill(bundle, environment, skip, limit);
@@ -232,6 +242,23 @@ public class ArgusPostureAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Argus posture drill: " + e.getMessage());
             addActionError("Failed to build Argus posture drill");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchArgusAgentDetail() {
+        try {
+            InsightContext ctx = buildCtx();
+            InsightDataBundle bundle = insightService.getOrLoadBundle(ctx);
+            agentDetail = agentPostureDrillService.fetchAgentDetail(bundle, collectionId, finding);
+            if (agentDetail == null) {
+                addActionError("Agent not found");
+                return ERROR.toUpperCase();
+            }
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Argus agent detail: " + e.getMessage());
+            addActionError("Failed to build Argus agent detail");
             return ERROR.toUpperCase();
         }
     }

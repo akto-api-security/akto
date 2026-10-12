@@ -32,7 +32,6 @@ import AssetIcon from "@/apps/dashboard/pages/observe/agentic/AssetIcon";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
 import { OsIcon, TYPE_CLASS_MAP } from "@/apps/dashboard/pages/observe/agentic/DeviceEndpoints";
 import func from "@/util/func";
-import values from "@/util/values";
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import PersistStore from "@/apps/main/PersistStore";
 import SessionStore from "@/apps/main/SessionStore";

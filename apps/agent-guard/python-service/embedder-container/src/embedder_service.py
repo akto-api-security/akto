@@ -22,13 +22,16 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
 MODEL_NAME = os.getenv("EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
+# Baked directory inside the image (see Dockerfile); falls back to the hub name
+# for local dev, where the model is fetched into the HF cache.
+MODEL_PATH = os.getenv("EMBED_MODEL_PATH", MODEL_NAME)
 EMBEDDING_DIM = 384  # all-MiniLM-L6-v2
 
 app = FastAPI(title="Akto Agent Guard Embedder", version="1.0.0")
 
 # Loaded once at process start. SentenceTransformer.encode is safe to call
 # concurrently, so a single shared instance serves all requests.
-model = SentenceTransformer(MODEL_NAME)
+model = SentenceTransformer(MODEL_PATH)
 
 
 class EmbedRequest(BaseModel):

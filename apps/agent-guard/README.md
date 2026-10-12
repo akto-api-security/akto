@@ -47,7 +47,7 @@ curl -s -X POST localhost:8090/scan \
 
 **Scanners:** `BanSubstrings`, `Secrets`, `TokenLimit` (local); `PromptInjection`, `BanTopics`, `Toxicity`, `Gibberish`, `BanCode` (cascade, needs Vertex, Azure Foundry or Bedrock creds); `Anonymize` (proxies to anonymizer).
 
-**Cascade model providers** (used in `modelConfigs` / `DEFAULT_MODEL_CONFIG_JSON`): `qwen3guard`, `gemma_vertexai`, `vertexai` (GCP Vertex dedicated endpoints); `qwen3guard_foundry`, `gemma_foundry`, `azure_foundry` (Azure AI Foundry managed-compute endpoints, OpenAI-compatible); `anthropic`, `openai`, `openai_compatible`; `bedrock` (any AWS Bedrock model via the Converse API). Foundry needs `*_FOUNDRY_BASE_URL` + `*_FOUNDRY_API_KEY` per provider; Bedrock needs `BEDROCK_REGION` plus `BEDROCK_API_KEY` or IAM keys (see [ENV.md](ENV.md)), e.g. `{"provider": "bedrock", "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}`.
+**Cascade model providers** (used in `modelConfigs` / `DEFAULT_MODEL_CONFIG_JSON`): `qwen3guard`, `gemma_vertexai`, `vertexai` (GCP Vertex dedicated endpoints); `qwen3guard_foundry`, `gemma_foundry`, `azure_foundry` (Azure AI Foundry managed-compute endpoints, OpenAI-compatible); `anthropic`, `openai`, `openai_compatible`; `bedrock` (any AWS Bedrock model via the Converse API; Gemma 4 models are routed to Bedrock's `bedrock-mantle` endpoint). Foundry needs `*_FOUNDRY_BASE_URL` + `*_FOUNDRY_API_KEY` per provider; Bedrock needs `BEDROCK_REGION` plus `BEDROCK_API_KEY` or IAM keys (see [ENV.md](ENV.md)), e.g. `{"provider": "bedrock", "model": "us.anthropic.claude-haiku-4-5-20251001-v1:0", "modelRole": "FINAL_ARBITER", "timeoutMs": 30000}`.
 
 **Anonymizer direct** (`:8093` if port exposed):
 

@@ -3325,6 +3325,205 @@
             </result>
         </action>
 
+        <action name="api/fetchApiCollectionsPage" class="com.akto.action.ApiCollectionsAction" method="fetchApiCollectionsPage">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">collectionsPage</param>
+                <param name="excludeProperties">apiCollections\[\d+\]\.(urls|tagsList|conditions|serviceGraphEdges|hostNames|serviceTag|sampleCollectionsDropped|redact|runDependencyAnalyser|matchDependencyWithOtherCollections|sseCallbackUrl|mcpTransportType|mcpMaliciousnessLastCheck|vxlanId|userSetEnvType|mcpCollection|dastCollection|genAICollection|guardRailCollection|endpointCollection)</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchApiCollectionsPageMeta" class="com.akto.action.ApiCollectionsAction" method="fetchApiCollectionsPageMeta">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">collectionsPageMeta</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchApiCollectionsTabCounts" class="com.akto.action.ApiCollectionsAction" method="fetchApiCollectionsTabCounts">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">collectionsTabCounts</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchPostureActionItems" class="com.akto.action.ApiCollectionsAction" method="fetchPostureActionItems">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">postureActionItems</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchMcpPostureCounts" class="com.akto.action.ApiCollectionsAction" method="fetchMcpPostureCounts">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">mcpPostureCounts</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchMcpPostureData" class="com.akto.action.ApiCollectionsAction" method="fetchMcpPostureData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">mcpPostureData</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchTaggedApiCallSeries" class="com.akto.action.ApiCollectionsAction" method="fetchTaggedApiCallSeries">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">apiCallSeries</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchPostureSnapshot" class="com.akto.action.ApiCollectionsAction" method="fetchPostureSnapshot">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">postureSnapshot</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchApiCollectionsPageDetails" class="com.akto.action.ApiCollectionsAction" method="fetchApiCollectionsPageDetails">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">collectionsPageDetails</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/getAllCollectionsBasic" class="com.akto.action.ApiCollectionsAction" method="fetchAllCollectionsBasic">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -3439,72 +3638,6 @@
         </action>
 
 
-        <action name="api/getCountForHostnameDeactivatedCollections" class="com.akto.action.ApiCollectionsAction" method="fetchCountForHostnameDeactivatedCollections">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="root">deactivatedHostnameCountMap</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>   
-
-        <action name="api/getCountForUningestedApis" class="com.akto.action.ApiCollectionsAction" method="fetchCountForUningestedApis">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="root">uningestedApiCountMap</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-        
-        <action name="api/fetchUningestedApis" class="com.akto.action.ApiCollectionsAction" method="fetchUningestedApis">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="includeProperties">uningestedApiList.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>   
-     
         <action name="api/getSensitiveInfoForCollections" class="com.akto.action.ApiCollectionsAction" method="fetchSensitiveInfoInCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -3526,204 +3659,7 @@
             </result>
         </action>
 
-        <action name="api/getSensitiveAndUnauthenticatedValue" class="com.akto.action.ApiCollectionsAction" method="fetchSensitiveAndUnauthenticatedValue">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="includeProperties">sensitiveUnauthenticatedEndpointsCount,sensitiveUnauthenticatedEndpointsApiInfo.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
 
-        <action name="api/getHighRiskThirdPartyValue" class="com.akto.action.ApiCollectionsAction" method="fetchHighRiskThirdPartyValue">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="includeProperties">highRiskThirdPartyEndpointsCount,highRiskThirdPartyEndpointsApiInfo.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/getShadowApis" class="com.akto.action.ApiCollectionsAction" method="fetchShadowApisValue">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="includeProperties">shadowApisCount,shadowApisApiInfo.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/fetchActionItemsApiInfo" class="com.akto.action.ApiCollectionsAction" method="fetchActionItemsApiInfo">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="includeProperties">response.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/fetchMcpdata" class="com.akto.action.ApiCollectionsAction" method="fetchMcpdata">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="includeProperties">mcpDataCount, response.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/fetchAllUnauthenticatedApis" class="com.akto.action.ApiInfoAction" method="fetchAllUnauthenticatedApis">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="includeProperties">unauthenticatedApis,unauthenticatedApiList.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/getBUACategoryCount" class="com.akto.action.testing_issues.IssuesAction" method="fetchBUACategoryCount">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ISSUES</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="includeProperties">buaCategoryCount,buaCategoryApiInfo.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-
-        <action name="api/getNotTestedAPICount" class="com.akto.action.observe.InventoryAction" method="fetchNotTestedAPICount">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="includeProperties">notTestedEndpointsCount,notTestedEndpointsApiInfo.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/getOnlyOnceTestedAPICount" class="com.akto.action.observe.InventoryAction" method="fetchOnlyOnceTestedAPICount">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="includeProperties">onlyOnceTestedEndpointsCount,onlyOnceTestedEndpointsApiInfo.*</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
        <action name="api/fetchTestedApisRanges" class="com.akto.action.observe.InventoryAction" method="fetchTestedApisRanges">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -3738,28 +3674,6 @@
             </result>
             <result name="SUCCESS"  type="json">
                 <param name="root">response</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/getMisConfiguredTestsCount" class="com.akto.action.testing.StartTestAction" method="fetchMisConfiguredTestsCount">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">TEST_RESULTS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="includeProperties">misConfiguredTestsCount,misConfiguredTestsApiInfo.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -13574,21 +13488,6 @@
             </result>
         </action>
 
-        <action name="api/fetchApiStats" class="com.akto.action.ApiCollectionsAction" method="fetchApiStats">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-             </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-            </result>
-        </action>
         <action name="api/addAdvancedFiltersForTraffic" class="com.akto.action.settings.AdvancedTrafficFiltersAction" method="saveYamlTemplateForTrafficFilters">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -13787,7 +13686,7 @@
             </result>
         </action>
 
-        <action name="api/findTotalIssues" class="com.akto.action.DashboardAction" method="findTotalIssues">
+        <action name="api/fetchIssuesSnapshot" class="com.akto.action.DashboardAction" method="fetchIssuesSnapshot">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -13801,29 +13700,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/getAPIInfosForMissingData" class="com.akto.action.DashboardAction" method="fetchAPIInfosForMissingData">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="root">response</param>
+                <param name="root">issuesSnapshot</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -14096,6 +13973,28 @@
             </interceptor-ref>
             <result name="SUCCESS" type="json">
                 <param name="root">postureDrill</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchArgusAgentDetail" class="com.akto.action.ArgusPostureAction" method="fetchArgusAgentDetail">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">API_COLLECTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">agentDetail</param>
             </result>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -17565,28 +17464,6 @@
             </result>
             <result name="UNAUTHORIZED" type="json">
                 <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/fetchUrlsByIssues" class="com.akto.action.testing_issues.IssuesAction" method="fetchUrlsByIssues">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="root">response</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>

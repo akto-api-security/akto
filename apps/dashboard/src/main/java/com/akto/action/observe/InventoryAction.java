@@ -65,22 +65,8 @@ public class InventoryAction extends UserAction {
     //     return Action.SUCCESS.toUpperCase();
     // }
 
-    @Getter
-    int notTestedEndpointsCount;
-
-    @Getter
-    int onlyOnceTestedEndpointsCount;
-
     @Setter
     private boolean showUrls;
-
-    @Getter
-    private List<ApiInfo> notTestedEndpointsApiInfo = new ArrayList<>();
-    @Setter
-    private boolean showApiInfo;
-
-    @Getter
-    private List<ApiInfo> onlyOnceTestedEndpointsApiInfo = new ArrayList<>();
 
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class, LogDb.DASHBOARD);
@@ -1456,45 +1442,6 @@ public class InventoryAction extends UserAction {
 
     public List<ApiInfo.ApiInfoKey> getApiInfoKeyList() {
         return apiInfoKeyList;
-    }
-
-    public String fetchNotTestedAPICount() {
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-
-        Bson filter = Filters.and(
-                filterQ,
-                Filters.exists(ApiInfo.LAST_TESTED, false)
-        );
-
-        if (this.showApiInfo) {
-            this.notTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
-            this.notTestedEndpointsCount = this.notTestedEndpointsApiInfo.size();
-        } else {
-            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
-        }
-
-        return Action.SUCCESS.toUpperCase();
-    }
-
-
-    public String fetchOnlyOnceTestedAPICount() {
-
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-
-        Bson filter = Filters.and(
-                filterQ,
-                Filters.exists(ApiInfo.LAST_TESTED, true),
-                Filters.eq(ApiInfo.TOTAL_TESTED_COUNT, 1)
-        );
-
-        if (this.showApiInfo) {
-            this.onlyOnceTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
-            this.onlyOnceTestedEndpointsCount = this.onlyOnceTestedEndpointsApiInfo.size();
-        } else {
-            this.onlyOnceTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
-        }
-
-        return Action.SUCCESS.toUpperCase();
     }
 
     public String fetchTestedApisRanges(){

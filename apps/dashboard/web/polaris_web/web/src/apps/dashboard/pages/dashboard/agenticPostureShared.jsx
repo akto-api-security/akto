@@ -40,21 +40,21 @@ export function formatDelta(delta, unit) {
     return `${sign}${delta}${unit === 'percent' ? '%' : ''}`
 }
 
-// Higher-is-worse 0-100 score -> a red/amber/green tone. First-pass thresholds, easy to retune
-// once real accounts show where they should sit — same convention SecurityPosture.jsx's own
-// riskBand uses for its composite score.
+// Higher-is-worse 0-100 score -> severity, on the same thresholds as the backend's agent severity
+// (ArgusPostureService.severityForScore: 75 / 50 / 25), so a score reads the same everywhere on the page.
 export function riskBand(value) {
     if (value === null || value === undefined) return null
-    if (value >= 67) return { tone: 'critical' }
-    if (value >= 34) return { tone: 'warning' }
-    return { tone: 'success' }
+    if (value >= 75) return { severity: 'CRITICAL', tone: 'critical' }
+    if (value >= 50) return { severity: 'HIGH', tone: 'critical' }
+    if (value >= 25) return { severity: 'MEDIUM', tone: 'warning' }
+    return { severity: 'LOW', tone: 'success' }
 }
 
-// Display label for riskBand's tone; wording is a presentation concern, so it lives client-side.
-export const BAND_LABEL_FOR_TONE = {
-    critical: 'Elevated risk',
-    warning: 'Moderate risk',
-    success: 'Good posture',
+export const RISK_LABEL_FOR_SEVERITY = {
+    CRITICAL: 'Critical risk',
+    HIGH: 'High risk',
+    MEDIUM: 'Medium risk',
+    LOW: 'Low risk',
 }
 
 // A data gap (dataGaps[] on any KPI/panel a real backend phase sends) — one shared renderer so a

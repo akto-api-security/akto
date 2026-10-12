@@ -6,7 +6,6 @@ import com.akto.dao.AgenticPostureScoreHistoryDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.GuardrailPoliciesDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -40,6 +39,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.function.ToDoubleFunction;
 import java.util.concurrent.ScheduledExecutorService;
@@ -134,16 +134,15 @@ public class AgenticPostureScoreCron {
                 if (a == null || a.getId() == null) continue;
                 apiInfosByCollection.computeIfAbsent(a.getId().getApiCollectionId(), k -> new ArrayList<>()).add(a);
             }
-            // Warms the in-memory custom data type cache so TOKEN/USERNAME etc. count as sensitive.
-            SingleTypeInfo.fetchCustomDataTypes(accountId);
-            Map<Integer, List<String>> sensitiveByCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(null);
 
             int now = Context.now();
             // Attributed to agents by host, then actor (see HostCollectionResolver.resolveEvent).
             List<DashboardMaliciousEvent> hostCounts = new AbstractThreatDetectionAction().fetchAllMaliciousEvents(
                     now - MALICIOUS_EVENTS_WINDOW_SECONDS, now, MAX_MALICIOUS_EVENTS, null, null, true);
-            Map<Integer, Map<String, Integer>> maliciousSeverities =
-                    new HostCollectionResolver(agentCollections).severityByCollection(hostCounts);
+            HostCollectionResolver resolver = new HostCollectionResolver(agentCollections);
+            Map<Integer, Map<String, Integer>> maliciousSeverities = resolver.severityByCollection(hostCounts);
+            // Agents with a PII or custom LLM (DLP) rule violation (see InsightUtil.isSensitiveDataEvent).
+            Set<Integer> agentsWithSensitiveData = resolver.countByCollection(hostCounts, InsightUtil::sensitiveDataLabel).keySet();
             List<WriteModel<ApiCollection>> updates = new ArrayList<>();
             List<Double> composites = new ArrayList<>();
             int agentsWithNoSignal = 0;
@@ -154,10 +153,13 @@ public class AgenticPostureScoreCron {
                         || apis.stream().anyMatch(a -> a != null && a.getLastTested() > 0);
                 boolean coveredByPolicy = isCoveredByGuardrailPolicy(policies, c);
 
-                double redTeam = redTeamSeverityScore(redTeamSeverities.get(c.getId()));
+                boolean hasMaliciousEvents = maliciousSeverities.containsKey(c.getId());
+                double redTeam = collectionEverTested
+                        ? redTeamSeverityScore(redTeamSeverities.get(c.getId()))
+                        : untestedRedTeamScore(hasMaliciousEvents);
                 double guardrailMalicious = guardrailSeverityScore(maliciousSeverities.get(c.getId()));
                 double coverage = coverageSubScore(coveredByPolicy, collectionEverTested);
-                double sensitiveData = sensitiveDataSubScore(c.getId(), sensitiveByCollection);
+                double sensitiveData = agentsWithSensitiveData.contains(c.getId()) ? 100.0 : 0.0;
                 double accessAuth = accessAuthSubScore(apis);
                 double overprivilegedTools = overprivilegedToolsSubScore(apis);
 
@@ -171,9 +173,10 @@ public class AgenticPostureScoreCron {
 
                 Map<String, String> gaps = new HashMap<>();
                 if (!collectionEverTested) {
-                    gaps.put("redTeam", anyRedTeamScanEverRun
+                    String notScanned = anyRedTeamScanEverRun
                             ? "Red-teaming scan not run for this agent"
-                            : "No red-teaming scans have been run for this account yet");
+                            : "No red-teaming scans have been run for this account yet";
+                    gaps.put("redTeam", hasMaliciousEvents ? notScanned + ", and it has malicious activity" : notScanned);
                 }
 
                 double composite = agentComposite(redTeam, guardrailMalicious, coverage, sensitiveData, accessAuth, overprivilegedTools);
@@ -270,6 +273,11 @@ public class AgenticPostureScoreCron {
         return floor + (ceiling - floor) * fraction;
     }
 
+    // Never scanned is unknown risk, not zero: HIGH, and CRITICAL when the agent is already seeing malicious traffic.
+    static double untestedRedTeamScore(boolean hasMaliciousEvents) {
+        return hasMaliciousEvents ? 100.0 : 76.0;
+    }
+
     static double redTeamSeverityScore(Map<String, Integer> bySeverity) {
         String worst = worstSeverity(bySeverity);
         if (worst == null) return 0.0;
@@ -352,12 +360,6 @@ public class AgenticPostureScoreCron {
         if (isPublic) score += 50;
         if (isUnauthenticated) score += 50;
         return score;
-    }
-
-    // Same source as the inventory page's "Sensitive data" column.
-    private static double sensitiveDataSubScore(int collectionId, Map<Integer, List<String>> sensitiveByCollection) {
-        List<String> subtypes = sensitiveByCollection.get(collectionId);
-        return (subtypes == null || subtypes.isEmpty()) ? 0.0 : 100.0;
     }
 
     public void forceRunForAccount(int accountId) {

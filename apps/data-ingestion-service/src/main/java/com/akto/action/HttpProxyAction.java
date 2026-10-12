@@ -68,6 +68,7 @@ public class HttpProxyAction extends ActionSupport {
     private Map<String, Object> data;
     private boolean success;
     private String message;
+    private long latencyMs;
 
     public String httpProxy() {
         long start = System.currentTimeMillis();
@@ -96,7 +97,7 @@ public class HttpProxyAction extends ActionSupport {
             message = (String) result.get("message");
             data = result;
 
-            long latencyMs = System.currentTimeMillis() - start;
+            latencyMs = System.currentTimeMillis() - start;
             if (!success) {
                 String errorMsg = "[http-proxy] API failed - path: " + path + ", method: " + method
                     + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + message;
@@ -109,7 +110,7 @@ public class HttpProxyAction extends ActionSupport {
             return success ? Action.SUCCESS.toUpperCase() : Action.ERROR.toUpperCase();
 
         } catch (Exception e) {
-            long latencyMs = System.currentTimeMillis() - start;
+            latencyMs = System.currentTimeMillis() - start;
             String errorMsg = "[http-proxy] Unexpected error - path: " + path + ", method: " + method
                 + ", account: " + akto_account_id + ", latencyMs: " + latencyMs + ", error: " + e.getMessage();
             loggerMaker.errorAndAddToDb(errorMsg);

@@ -43,7 +43,8 @@ public class ToolClassificationCron {
     private static final int PER_ACCOUNT_LIMIT = 200;
     private static final int RECLASSIFY_THRESHOLD_SECONDS = 7 * 24 * 60 * 60;
 
-    private static final Pattern TOOL_URL = Pattern.compile("/tools?/");
+    /** A tool call lives under /tool(s)/ — the one definition of which endpoints are tools. */
+    public static final Pattern TOOL_URL = Pattern.compile("/tools?/");
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
