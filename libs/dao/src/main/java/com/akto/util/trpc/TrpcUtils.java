@@ -25,25 +25,15 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * tRPC support. Akto only models REST, so a tRPC HTTP call is converted to one REST-shaped call per procedure.
- *
- * Wire format handled (https://trpc.io/docs/rpc):
- *   query    GET  {mount}/{proc}[,{proc}...]?[batch=1&]input=<urlencoded JSON>   (batch input is keyed by call index)
- *   mutation POST {mount}/{proc}[,{proc}...][?batch=1]  body = JSON               (batch body is keyed by call index)
- *   response {"result":{"data":..}} | {"error":{..,"data":{"httpStatus":..}}}     (batch: array in call order)
- * A deployment may also put tenant segments between the mount and the procedure ({mount}/{tenant}/{proc}).
- *
- * Detection: the url path has a `trpc` segment followed by a procedure-shaped last segment, the way GraphQL is found by
- * its `/graphql` path. Nothing else about the request is looked at until that matches, so other traffic costs one contains.
- *
- * Ingestion ({@link #parseTrpcResponseParam}):
- *   - the endpoint becomes {mount}/STRING/.../{proc}: one endpoint per procedure, tenant segments templated
- *   - the request payload of the REST view is the decoded input of that procedure, the response payload its data
- *   - the stored sample (orig) is a standalone, non batched tRPC call for that single procedure. A GET keeps its input in
- *     the request payload, readable in the dashboard and editable by the test operations, not as a percent encoded
- *     `input` query param
- * Testing ({@link #moveBodyToInputQuery}): a tRPC GET never carries a body, so a body on one is its input and is moved
- * into the `input` query param right before the request is sent.
+ * tRPC support. Akto only models REST, so a tRPC call is converted to one REST-shaped call per procedure.
+ * Wire format (https://trpc.io/docs/rpc): GET {mount}/{proc}[,{proc}...]?[batch=1&]input=<urlencoded JSON> and POST
+ * {mount}/{proc}[,{proc}...][?batch=1] with a JSON body (batch input is keyed by call index); the response is
+ * {"result":{"data":..}} or {"error":{..,"data":{"httpStatus":..}}}, an array in call order for a batch. Tenant segments may
+ * sit between the mount and the procedure. Detection: a `trpc` path segment before a procedure-shaped last segment.
+ * Ingestion ({@link #parseTrpcResponseParam}): one endpoint {mount}/STRING/.../{proc} per procedure, a REST view of the
+ * decoded input and the response data, and a stored sample that is a standalone non batched call whose GET input stays
+ * in the request payload (readable and editable). Testing ({@link #moveBodyToInputQuery}): a body on a tRPC GET is its
+ * input and is moved into the `input` query param right before the request is sent.
  */
 public final class TrpcUtils {
 
@@ -87,10 +77,6 @@ public final class TrpcUtils {
             this.statusCode = statusCode;
         }
     }
-
-    // ------------------------------------------------------------------------------------------------------------
-    // detection
-    // ------------------------------------------------------------------------------------------------------------
 
     /** Cheap, url only check. Used to keep tRPC procedures such as `health.check` out of the /health filter. */
     public static boolean isTrpcUrl(String url) {
@@ -137,7 +123,6 @@ public final class TrpcUtils {
         if (!readQueryParams(query, trpcUrl)) {
             return null;
         }
-        // a comma separated procedure list is only meaningful for a batch call
         if (procedures.size() > 1 && !trpcUrl.isBatch) {
             return null;
         }
@@ -191,14 +176,7 @@ public final class TrpcUtils {
         return true;
     }
 
-    // ------------------------------------------------------------------------------------------------------------
-    // ingestion: split one tRPC http call into one REST call per procedure
-    // ------------------------------------------------------------------------------------------------------------
-
-    /**
-     * Returns one HttpResponseParams per procedure of the call, or an empty list when the traffic is not (provably)
-     * tRPC, in which case the caller carries on with its other protocol parsers.
-     */
+    /** One REST call per procedure of the call, or an empty list when the traffic is not (provably) tRPC. */
     public static List<HttpResponseParams> parseTrpcResponseParam(HttpResponseParams responseParams) {
         try {
             return splitIntoProcedureCalls(responseParams);
@@ -267,10 +245,7 @@ public final class TrpcUtils {
         return procedureCalls;
     }
 
-    /**
-     * Validates the response against the batch shape of the url and returns the per procedure envelope, or null when
-     * the traffic does not look like tRPC. An empty / truncated response is accepted when the url is a strong enough signal.
-     */
+    /** The per procedure envelopes of the response, null when it does not look like tRPC; an empty response needs a strong url signal. */
     private static ProcedureResponse[] matchProcedureResponses(HttpResponseParams responseParams, TrpcUrl trpcUrl,
                                                                boolean hasInputPayload) {
         int procedureCount = trpcUrl.procedures.size();
@@ -405,10 +380,7 @@ public final class TrpcUtils {
         return "{\"data\":" + data + "}";
     }
 
-    /**
-     * The stored sample: a standalone, non batched tRPC call for this one procedure, with the real tenant slug. The input of
-     * a GET is kept in the request payload, see {@link #moveBodyToInputQuery} for how it is put back on the wire.
-     */
+    /** The stored sample: a standalone non batched call for one procedure; a GET keeps its input in the request payload. */
     private static String buildSampleMessage(HttpResponseParams originalCall, TrpcUrl trpcUrl, int callIndex, JsonNode rawInput,
                                              String rawRequestBody, ProcedureResponse procedureResponse, boolean isGet) {
         // the original kafka message is always there for ingested traffic; a call without it fails here and stays plain REST
@@ -443,7 +415,6 @@ public final class TrpcUtils {
         return message.toString();
     }
 
-    /** Edits the headers entry of a kafka message. The entry is a JSON object stored as a string. */
     private static final class MessageHeaders {
         static void removeHeaders(ObjectNode message, String headersField, Set<String> namesToRemove, String extraNameToRemove) {
             JsonNode headersEntry = message.get(headersField);
@@ -466,15 +437,7 @@ public final class TrpcUtils {
         }
     }
 
-    // ------------------------------------------------------------------------------------------------------------
-    // testing: GET input, body -> query param
-    // ------------------------------------------------------------------------------------------------------------
-
-    /**
-     * Moves the body of a single (non batched) tRPC GET call into the `input` query param, URL encoded, and clears the
-     * body. A tRPC GET never carries a body, so a body on one is its input: the stored sample keeps the input there and the
-     * test operations edit it there. Does nothing for any other request, or when the query already carries an `input`.
-     */
+    /** Moves the body of a single tRPC GET (its input, edited as the body) into the `input` query param, URL encoded; no-op otherwise. */
     public static boolean moveBodyToInputQuery(OriginalHttpRequest request) {
         try {
             if (request == null) {
@@ -498,7 +461,6 @@ public final class TrpcUtils {
         }
     }
 
-    /** The parsed url of a single (non batched) tRPC GET call, null for any other request. */
     private static TrpcUrl parseSingleGetUrl(OriginalHttpRequest request) {
         if (!"GET".equalsIgnoreCase(request.getMethod()) || request.getUrl() == null) {
             return null;
@@ -516,10 +478,6 @@ public final class TrpcUtils {
         }
         return trpcUrl;
     }
-
-    // ------------------------------------------------------------------------------------------------------------
-    // helpers
-    // ------------------------------------------------------------------------------------------------------------
 
     /** Missing node for a blank string, null when the string is not valid json. */
     private static JsonNode tryParseJson(String json) {
@@ -609,7 +567,6 @@ public final class TrpcUtils {
     }
 
     private static String joinPath(List<String> segments) {
-        // a request target always starts with `/`
         return "/" + String.join("/", segments);
     }
 

@@ -25,8 +25,6 @@ public class TrpcUtilsTest {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final int COLLECTION = 627031169;
 
-    // ---------------------------------------------------------------------------------------------- helpers
-
     private static Map<String, List<String>> multiValued(Map<String, String> headers) {
         Map<String, List<String>> result = new HashMap<>();
         headers.forEach((name, value) -> result.put(name, new ArrayList<>(Arrays.asList(value))));
@@ -92,8 +90,6 @@ public class TrpcUtilsTest {
         assertEquals(json(expected), json(actual));
     }
 
-    // ---------------------------------------------------------------------------------------------- ingestion
-
     @Test
     public void batchGetIsSplitIntoOneRestCallPerProcedure() throws Exception {
         String input = "{\"1\":{\"view\":\"\",\"limit\":50,\"page\":null,\"sorts\":[{\"key\":\"lastActivityAt\",\"order\":\"desc\"}]}}";
@@ -115,7 +111,6 @@ public class TrpcUtilsTest {
         assertJsonEquals("{}", ops.get(0).getRequestParams().getPayload());
         assertJsonEquals("{\"view\":\"\",\"limit\":50,\"page\":null,\"sorts\":[{\"key\":\"lastActivityAt\",\"order\":\"desc\"}]}", ops.get(1).getRequestParams().getPayload());
         assertJsonEquals("{}", ops.get(2).getRequestParams().getPayload());
-        // rest view of the output is the data, not the trpc envelope
         assertJsonEquals("{\"views\":[1,2]}", ops.get(0).getPayload());
         assertJsonEquals("{\"items\":[{\"id\":\"m1\"}]}", ops.get(1).getPayload());
         assertJsonEquals("{\"id\":\"u1\",\"email\":\"a@b.com\"}", ops.get(2).getPayload());
@@ -165,7 +160,6 @@ public class TrpcUtilsTest {
             assertEquals("t", op.getTraces());
             assertEquals("1728622642", op.getAccountId());
         }
-        // headers are not shared between the ops nor with the original
         ops.get(0).getRequestParams().getHeaders().put("x-test", new ArrayList<>(Arrays.asList("1")));
         assertFalse(ops.get(1).getRequestParams().getHeaders().containsKey("x-test"));
         assertFalse(original.getRequestParams().getHeaders().containsKey("x-test"));
@@ -204,8 +198,6 @@ public class TrpcUtilsTest {
         assertEquals(body, sample(fetched.get(0)).get("requestPayload").asText());
     }
 
-    // ---------------------------------------------------------------------------------------------- responses
-
     @Test
     public void errorItemGetsItsOwnHttpStatus() throws Exception {
         String response = "[{\"result\":{\"data\":{\"ok\":true}}},{\"error\":{\"message\":\"nope\",\"code\":-32004,\"data\":{\"code\":\"NOT_FOUND\",\"httpStatus\":404,\"path\":\"b.two\"}}}]";
@@ -230,7 +222,6 @@ public class TrpcUtilsTest {
         assertJsonEquals("{\"x\":1}", ops.get(0).getRequestParams().getPayload());
         assertEquals("{}", sample(ops.get(0)).get("responsePayload").asText());
 
-        // a plain call with an empty response and no input proves nothing
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one", "{}")).isEmpty());
     }
 
@@ -264,8 +255,6 @@ public class TrpcUtilsTest {
         assertEquals("/trpc/acme/matter.update", sample(ops.get(0)).get("path").asText());
     }
 
-    // ---------------------------------------------------------------------------------------------- not trpc
-
     @Test
     public void ordinaryTrafficIsLeftAlone() throws Exception {
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/api/users/me", "{\"id\":1}")).isEmpty());
@@ -278,11 +267,8 @@ public class TrpcUtilsTest {
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/api/trpc", "{\"result\":{\"data\":1}}")).isEmpty());
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/docs", "<html></html>")).isEmpty());
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one", "{\"foo\":1}")).isEmpty());
-        // json-rpc is not trpc
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one", "{\"jsonrpc\":\"2.0\",\"result\":1,\"id\":1}")).isEmpty());
-        // batch response of the wrong size
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one,b.two?batch=1", "[{\"result\":{\"data\":1}}]")).isEmpty());
-        // comma list without batch
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one,b.two", "{\"result\":{\"data\":1}}")).isEmpty());
         // batch input must be keyed by call index
         assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one?batch=1&input=" + enc("{\"email\":\"x\"}"), "[{\"result\":{\"data\":1}}]")).isEmpty());
@@ -315,8 +301,6 @@ public class TrpcUtilsTest {
         assertFalse(TrpcUtils.isTrpcUrl("/api/health/check"));
         assertFalse(TrpcUtils.isTrpcUrl(null));
     }
-
-    // ---------------------------------------------------------------------------------------------- testing: stored GET input -> query param
 
     private static OriginalHttpRequest request(String sampleMessage) {
         OriginalHttpRequest request = new OriginalHttpRequest();
@@ -370,18 +354,15 @@ public class TrpcUtilsTest {
 
     @Test
     public void bodyOfEveryOtherRequestIsLeftAlone() throws Exception {
-        // not trpc
         OriginalHttpRequest rest = new OriginalHttpRequest("/api/users", "a=1", "GET", "{\"x\":1}", new HashMap<>(), "HTTP/1.1");
         assertFalse(TrpcUtils.moveBodyToInputQuery(rest));
         assertEquals("{\"x\":1}", rest.getBody());
         assertEquals("a=1", rest.getQueryParams());
 
-        // not a GET
         OriginalHttpRequest post = new OriginalHttpRequest("/trpc/acme/a.one", "", "POST", "{\"x\":1}", new HashMap<>(), "HTTP/1.1");
         assertFalse(TrpcUtils.moveBodyToInputQuery(post));
         assertEquals("{\"x\":1}", post.getBody());
 
-        // a batch is never rewritten
         OriginalHttpRequest batch = new OriginalHttpRequest("/trpc/acme/a.one,b.two", "batch=1", "GET", "{\"0\":{}}", new HashMap<>(), "HTTP/1.1");
         assertFalse(TrpcUtils.moveBodyToInputQuery(batch));
 
@@ -391,7 +372,6 @@ public class TrpcUtilsTest {
         assertEquals("input=%7B%7D", hasInput.getQueryParams());
         assertEquals("{\"x\":1}", hasInput.getBody());
 
-        // no body
         OriginalHttpRequest empty = new OriginalHttpRequest("/trpc/acme/a.one", "", "GET", null, new HashMap<>(), "HTTP/1.1");
         assertFalse(TrpcUtils.moveBodyToInputQuery(empty));
         assertFalse(TrpcUtils.moveBodyToInputQuery(null));
