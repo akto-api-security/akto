@@ -2797,14 +2797,14 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    // logger.warn("Starting init functions and scheduling jobs at " + now);
-                    // updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    logger.warn("Starting init functions and scheduling jobs at " + now);
+                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
 
-                    // // API group jobs
-                    // setUpUpdateCustomCollections();
-                    // logger.warn("Setting up user analysis cron scheduler");
-                    // userAnalysisCron.setUpUserAnalysisCronScheduler();
-                    // logger.warn("User analysis cron scheduler setup complete");
+                    // API group jobs
+                    setUpUpdateCustomCollections();
+                    logger.warn("Setting up user analysis cron scheduler");
+                    userAnalysisCron.setUpUserAnalysisCronScheduler();
+                    logger.warn("User analysis cron scheduler setup complete");
                     updateApiGroupsForAccounts();
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
