@@ -37,6 +37,13 @@ public class MergingLogic {
     public static final int STRING_MERGING_THRESHOLD = 10;
     private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     static final Set<String> MERGE_NAMESPACE_LITERALS = new HashSet<>(Arrays.asList("skills", "skill"));
+
+    // tRPC endpoints are identified by their procedure: {mount}/trpc/[{tenant}/]{procedure[,procedure...]}. Merging them folds
+    // distinct procedures into one STRING endpoint, so they never take part in merging. Endpoint level counterpart of the
+    // mcp-server collection skip: only the tRPC endpoints are skipped, the rest of the collection merges as usual.
+    static final String TRPC_MOUNT_TOKEN = "trpc";
+    private static final String TRPC_PROCEDURE = "[A-Za-z_$][A-Za-z0-9_$-]*(\\.[A-Za-z_$][A-Za-z0-9_$-]*)*";
+    private static final Pattern TRPC_PROCEDURE_SEGMENT = Pattern.compile("^" + TRPC_PROCEDURE + "(," + TRPC_PROCEDURE + ")*$");
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class, LogDb.DB_ABS);
     private static final int OPTIMIZED_MERGING_ACCOUNT_ID = 1736798101;
 
@@ -320,6 +327,7 @@ public class MergingLogic {
 
             Map<String, Set<String>> staticUrlToSti = new HashMap<>();
             Set<String> templateUrlSet = new HashSet<>();
+            Set<String> skippedTrpcUrls = new HashSet<>();
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 if (sti.getMethod() == null || sti.getUrl() == null || sti.getUrl().isEmpty()) {
@@ -331,6 +339,13 @@ public class MergingLogic {
                     templateUrlSet.add(key);
                     continue;
                 };
+
+                // tRPC endpoints never take part in merging. This is the single place static urls enter the merge, so
+                // neither the static-to-static nor the template-to-static (absorption) paths ever see them.
+                if (isTrpcEndpoint(sti.getUrl())) {
+                    skippedTrpcUrls.add(key);
+                    continue;
+                }
 
                 if (sti.getIsUrlParam()) continue;
                 if (sti.getIsHeader()) {
@@ -346,6 +361,10 @@ public class MergingLogic {
                     }
                     set.add(sti.getResponseCode() + " " + sti.getParam());
                 }
+            }
+
+            if (!skippedTrpcUrls.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Skipped merging for " + skippedTrpcUrls.size() + " tRPC endpoints in collection " + apiCollectionId, LogDb.DB_ABS);
             }
 
             for (String s: templateUrlSet) {
@@ -669,6 +688,43 @@ public class MergingLogic {
         return trim(url).split("/");
     }
 
+    /**
+     * True for a tRPC endpoint: a `trpc` mount token followed by a procedure (or a comma separated batch of procedures) as
+     * the last token, e.g. /trpc/login, /api/trpc/acme/matter.list, /trpc/STRING/user.get,matter.list.
+     */
+    static boolean isTrpcEndpoint(String url) {
+        // cheap pre-check, this is evaluated for every sti url of a collection
+        if (url == null || !containsIgnoreCase(url, TRPC_MOUNT_TOKEN)) {
+            return false;
+        }
+        return isTrpcEndpoint(tokenize(url));
+    }
+
+    static boolean isTrpcEndpoint(String[] tokens) {
+        if (tokens == null || tokens.length < 2) {
+            return false;
+        }
+        if (!TRPC_PROCEDURE_SEGMENT.matcher(tokens[tokens.length - 1]).matches()) {
+            return false;
+        }
+        for (int i = 0; i < tokens.length - 1; i++) {
+            if (TRPC_MOUNT_TOKEN.equalsIgnoreCase(tokens[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsIgnoreCase(String text, String token) {
+        int max = text.length() - token.length();
+        for (int i = 0; i <= max; i++) {
+            if (text.regionMatches(true, i, token, 0, token.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions, boolean allowStringMerging) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
@@ -678,6 +734,11 @@ public class MergingLogic {
         String[] newTokens = tokenize(newUrl.getUrl());
 
         if (dbTokens.length != newTokens.length) {
+            return null;
+        }
+
+        // Never merge tRPC endpoints, the procedure is the identity of the endpoint
+        if (isTrpcEndpoint(newTokens) || isTrpcEndpoint(dbTokens)) {
             return null;
         }
 
@@ -897,6 +958,7 @@ public class MergingLogic {
             String method = parts[0];
             String endpoint = parts[1];
             if (endpoint.contains("//") || endpoint.isEmpty()) continue;
+            if (isTrpcEndpoint(endpoint)) continue; // tRPC endpoints are never absorbed into a template
 
             // Normalize to match URLTemplate behavior
             String normalized = endpoint;

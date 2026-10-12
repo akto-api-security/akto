@@ -244,4 +244,55 @@ public class MergingLogicTest {
     //         assertEquals("Should create LOCALE template", "/api/LOCALE/data", result.getTemplateString());
     //     }
     // }
+
+    // ---- tRPC endpoints never merge (endpoint level counterpart of the mcp-server collection skip) ----
+
+    @Test
+    public void testIsTrpcEndpoint() {
+        assertTrue(MergingLogic.isTrpcEndpoint("/trpc/login"));
+        assertTrue(MergingLogic.isTrpcEndpoint("/trpc/xk9f/matter.list"));
+        assertTrue(MergingLogic.isTrpcEndpoint("/_/sow/trpc/xk9f/matter.list,user.getCurrentUser"));
+        assertTrue(MergingLogic.isTrpcEndpoint("/api/TRPC/user.get"));
+        assertTrue(MergingLogic.isTrpcEndpoint("/trpc/STRING/matter.list"));
+        assertTrue(MergingLogic.isTrpcEndpoint("trpc/xk9f/matter.list/"));
+
+        assertFalse(MergingLogic.isTrpcEndpoint("/api/users/123"));
+        assertFalse(MergingLogic.isTrpcEndpoint("/trpc"));
+        assertFalse("trpc as the last token is not a mount", MergingLogic.isTrpcEndpoint("/api/trpc"));
+        assertFalse("last token is not a procedure", MergingLogic.isTrpcEndpoint("/trpc/xk9f/123"));
+        assertFalse("dangling comma", MergingLogic.isTrpcEndpoint("/trpc/xk9f/a.one,"));
+        assertFalse("not the mount token", MergingLogic.isTrpcEndpoint("/trpcs/xk9f/matter.list"));
+        assertFalse(MergingLogic.isTrpcEndpoint(""));
+        assertFalse(MergingLogic.isTrpcEndpoint((String) null));
+    }
+
+    @Test
+    public void testTryMergeUrls_TrpcEndpointsNeverMerge() {
+        URLMethods.Method get = URLMethods.Method.GET;
+
+        assertNull("different procedures", MergingLogic.tryMergeUrls(
+                new URLStatic("/trpc/xk9f/matter.list", get), new URLStatic("/trpc/xk9f/lead.list", get), true, true));
+        assertNull("different tenants", MergingLogic.tryMergeUrls(
+                new URLStatic("/trpc/xk9f/items.list", get), new URLStatic("/trpc/qw8z/items.list", get), true, true));
+        assertNull("batched procedures", MergingLogic.tryMergeUrls(
+                new URLStatic("/trpc/xk9f/a.one,b.two", get), new URLStatic("/trpc/xk9f/c.three,d.four", get), true, true));
+        assertNull("differing before the mount too", MergingLogic.tryMergeUrls(
+                new URLStatic("/v1/trpc/xk9f/a.one", get), new URLStatic("/v2/trpc/xk9f/a.one", get), true, true));
+        assertNull("tenant less procedures", MergingLogic.tryMergeUrls(
+                new URLStatic("/trpc/login", get), new URLStatic("/trpc/logout", get), true, true));
+    }
+
+    @Test
+    public void testTryMergeUrls_SameShapeWithoutTrpcStillMerges() {
+        URLMethods.Method get = URLMethods.Method.GET;
+
+        URLTemplate template = MergingLogic.tryMergeUrls(
+                new URLStatic("/api/xk9f/orders", get), new URLStatic("/api/qw8z/orders", get), true, true);
+        assertNotNull(template);
+        assertEquals("/api/STRING/orders", template.getTemplateString());
+
+        URLTemplate trpcLast = MergingLogic.tryMergeUrls(
+                new URLStatic("/xk9f/trpc", get), new URLStatic("/qw8z/trpc", get), true, true);
+        assertNotNull("trpc as the last token is not a mount", trpcLast);
+    }
 }

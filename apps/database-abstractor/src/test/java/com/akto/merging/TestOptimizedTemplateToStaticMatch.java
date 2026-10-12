@@ -749,4 +749,15 @@ public class TestOptimizedTemplateToStaticMatch {
         Set<String> result2 = callOptimized(templates2, statics, 0);
         assertEquals("Template order should not affect result", result1, result2);
     }
+
+    @Test
+    public void testTrpcStaticUrlsAreNotAbsorbedIntoTemplates() {
+        // a collapsed tRPC template (procedure position wildcarded) must not keep absorbing new procedures
+        List<String> templates = Arrays.asList("GET /trpc/xk9f/STRING", "GET /api/xk9f/STRING");
+        Map<String, Set<String>> statics = toStaticMap("GET /trpc/xk9f/zq7x.qw8k", "GET /api/xk9f/zq7x");
+
+        Set<String> matched = callOptimized(templates, statics, 0);
+
+        assertEquals(new HashSet<>(Arrays.asList("GET /api/xk9f/zq7x")), matched);
+    }
 }
