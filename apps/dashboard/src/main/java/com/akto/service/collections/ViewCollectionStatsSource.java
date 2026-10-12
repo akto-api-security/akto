@@ -70,7 +70,12 @@ class ViewCollectionStatsSource extends AbstractCollectionStatsSource {
     }
 
     @Override
-    protected int countSensitiveEndpoints() {
-        return (int) EndpointInfoViewDao.instance.getMCollection().countDocuments(SENSITIVE_FILTER);
+    protected Map<Integer, Integer> buildSensitiveApiCounts() {
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(SENSITIVE_FILTER),
+                Aggregates.group(field(EndpointInfoView.API_COLLECTION_ID), Accumulators.sum(ApiCollectionStatsDao.COUNT, 1)));
+        return EndpointInfoViewDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).allowDiskUse(true).into(new ArrayList<>()).stream()
+                .collect(Collectors.toMap(row -> row.getInt(ApiCollectionStatsDao.ID_FIELD), row -> row.getInt(ApiCollectionStatsDao.COUNT)));
     }
 }

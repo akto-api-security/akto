@@ -22,7 +22,7 @@ class BaseCollectionStatsSource extends AbstractCollectionStatsSource {
     }
 
     @Override
-    protected int countSensitiveEndpoints() {
-        return SingleTypeInfoDao.instance.getSensitiveApisCount(new ArrayList<>(), false, deactivatedFilter());
+    protected Map<Integer, Integer> buildSensitiveApiCounts() {
+        return SingleTypeInfoDao.instance.getSensitiveApisCountPerCollection(deactivatedFilter());
     }
 }

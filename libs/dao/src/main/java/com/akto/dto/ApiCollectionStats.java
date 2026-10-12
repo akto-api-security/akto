@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * One small row per api collection: the filterable attributes (denormalized from api_collections)
@@ -69,6 +70,16 @@ public class ApiCollectionStats {
 
     public static final String SENSITIVE_SUB_TYPES = "sensitiveSubTypes";
     private List<String> sensitiveSubTypes;
+
+    // distinct apis of the collection with an active sensitive data type in a request or a response (single_type_info)
+    public static final String SENSITIVE_APIS_COUNT = "sensitiveApisCount";
+    private int sensitiveApisCount;
+
+    // the collection's api_info counts for the home dashboard (see PostureMetric), plus the time they were computed at
+    public static final String POSTURE = "posture";
+    public static final String POSTURE_AT_KEY = "at";
+    public static final String POSTURE_AT = POSTURE + "." + POSTURE_AT_KEY;
+    private Map<String, Long> posture;
 
     public static final String ATTRS_SYNCED_AT = "attrsSyncedAt";
 

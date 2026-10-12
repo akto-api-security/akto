@@ -59,6 +59,16 @@ public final class CollectionsPageResponse {
         }
     }
 
+    /** A row of the home dashboard's new domains tile. */
+    @Getter
+    @AllArgsConstructor
+    public static class NewDomain {
+        private final String name;
+        private final int totalApis;
+        /** apis tested within the last month */
+        private final int apisTested;
+    }
+
     /** The header of the table: tab badges, summary card, filter choices. */
     @Getter
     @AllArgsConstructor

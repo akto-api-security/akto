@@ -32,7 +32,8 @@ abstract class AbstractCollectionStatsSource extends TimedService implements Col
     /** collection id -> sensitive sub types. */
     protected abstract Map<Integer, ? extends Iterable<String>> buildSensitiveMap();
 
-    protected abstract int countSensitiveEndpoints();
+    /** collection id -> distinct apis with sensitive data (request or response). */
+    protected abstract Map<Integer, Integer> buildSensitiveApiCounts();
 
     @Override
     public void refreshEndpointsCount() {
@@ -94,7 +95,15 @@ abstract class AbstractCollectionStatsSource extends TimedService implements Col
                 writer.resetUnwritten(new ArrayList<String>());
             }
         });
-        int sensitiveEndpoints = timed("count sensitive endpoints (" + getClass().getSimpleName() + ")", this::countSensitiveEndpoints);
+        Map<Integer, Integer> sensitiveApis = timed("count sensitive apis per collection (" + getClass().getSimpleName() + ")",
+                this::buildSensitiveApiCounts, Map::size);
+        timed("write sensitive api counts", () -> {
+            try (ApiCollectionStatsMetricWriter writer = new ApiCollectionStatsMetricWriter(ApiCollectionStats.SENSITIVE_APIS_COUNT, startedAt)) {
+                sensitiveApis.forEach(writer::set);
+                writer.resetUnwritten(0);
+            }
+        });
+        int sensitiveEndpoints = sensitiveApis.values().stream().mapToInt(Integer::intValue).sum();
         CollectionStatsRefresher.saveSummary(Updates.set(ApiCollectionStatsMeta.TOTAL_SENSITIVE_ENDPOINTS, sensitiveEndpoints));
     }
 

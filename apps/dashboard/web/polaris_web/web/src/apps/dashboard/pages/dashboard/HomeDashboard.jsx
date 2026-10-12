@@ -29,7 +29,8 @@ import CriticalUnsecuredAPIsOverTimeGraph from '../issues/IssuesPage/CriticalUns
 import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
-import { fetchActionItemsData } from './components/actionItemsTransform';
+import { buildActionItemsData } from './components/actionItemsTransform';
+import settingsModule from '../settings/module';
 import { getDashboardCategory, isMCPSecurityCategory, isApiSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
@@ -48,14 +49,14 @@ function HomeDashboard() {
         'threat-timeline': 'api/getDailyThreatActorsCount',
         'threat-severity': 'api/fetchCountBySeverity',
         'threat-categories': 'api/fetchThreatCategoryCount',
-        'risk-score': 'api/fetchApiStats',
-        'access-type': 'api/fetchApiStats',
-        'auth-type': 'api/fetchApiStats',
-        'api-type': 'api/fetchApiStats',
-        'mcp-open-alerts': 'api/fetchMcpdata',
-        'mcp-types-table': 'api/fetchMcpdata',
+        'risk-score': 'api/fetchPostureSnapshot',
+        'access-type': 'api/fetchPostureSnapshot',
+        'auth-type': 'api/fetchPostureSnapshot',
+        'api-type': 'api/fetchPostureSnapshot',
+        'mcp-open-alerts': 'api/fetchMcpPostureData',
+        'mcp-types-table': 'api/fetchMcpPostureCounts',
     };
-    const canLoadApiCallStats = canCall('api/fetchApiCallStats');
+    const canLoadApiCallStats = canCall('api/fetchTaggedApiCallSeries');
 
     const [loading, setLoading] = useState(true);
     const [showBannerComponent, setShowBannerComponent] = useState(false)
@@ -63,6 +64,9 @@ function HomeDashboard() {
     const [selectedTab, setSelectedTab] = useState(0);
     const [actionItemsCount, setActionItemsCount] = useState(0);
     const [actionItemsData, setActionItemsData] = useState(null);
+    // what the two snapshot calls returned: the action items and the critical findings chart are made from them
+    const [snapshots, setSnapshots] = useState(null);
+    const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
 
     const handleTabChange = useCallback(
         (selectedTabIndex) => setSelectedTab(selectedTabIndex),
@@ -92,9 +96,6 @@ function HomeDashboard() {
     const ALL_COLLECTION_INVENTORY_ID = 111111121
     const EXPLORE_MODE_QUERY_PATH = '/dashboard/observe/query_mode'
 
-    const allCollections = PersistStore(state => state.allCollections)
-    const hostNameMap = PersistStore(state => state.hostNameMap)
-    const coverageMap = PersistStore(state => state.coverageMap)
     const [authMap, setAuthMap] = useState({})
     const [apiTypesData, setApiTypesData] = useState([{ "data": [], "color": "#D6BBFB" }])
     const [riskScoreData, setRiskScoreData] = useState([])
@@ -291,149 +292,28 @@ function HomeDashboard() {
         });
     }
 
-    const fetchPolicyGuardrailStats = async (startTs, endTs) => {
+    // Api calls of the collections with a tag, summed per time bucket by the backend, as a chart series
+    const fetchTaggedApiCallStats = async (tag, startTs, endTs, setSeries) => {
         if (!canLoadApiCallStats) return;
         if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
-            const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
-            setPolicyGuardrailStats(emptyData);
+            setSeries(generateTimeSeriesWithGaps(startTs, endTs, {}));
             return;
         }
         try {
-            // Get collections with guard-rail tag
-            const guardRailCollections = allCollections.filter(collection => {
-                return collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'guard-rail' && envType.value === 'Guard Rail'
-                );
-            });
-
-            if (guardRailCollections.length === 0) {
-                // Generate empty data points for the time range
-                const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
-                setPolicyGuardrailStats(emptyData);
-                return;
-            }
-
-            // Fetch API call stats for each guard-rail collection and their URLs
-            const promises = [];
-            guardRailCollections.forEach(collection => {
-                // Check if the collection has urls array and it's not empty
-                if (collection.urls && Array.isArray(collection.urls) && collection.urls.length > 0) {
-                    collection.urls.forEach(urlString => {
-                        // Split the URL string by space to get url and method
-                        const parts = urlString.split(' ');
-                        const url = parts[0];
-                        const method = parts[1];
-
-                        // Create a promise for each URL/method combination
-                        promises.push(
-                            observeApi.fetchApiCallStats(collection.id, url, method, startTs, endTs)
-                                .catch(err => {
-                                    return null;
-                                })
-                        );
-                    });
-                } else {
-                    // Skip collections without urls array or with empty urls array
-                }
-            });
-
-            const results = await Promise.all(promises);
-
-            // Aggregate the results
+            const resp = await api.fetchTaggedApiCallSeries(tag, startTs, endTs);
             const aggregatedStats = {};
-            results.forEach(result => {
-                if (result && result.result && result.result.apiCallStats) {
-                    result.result.apiCallStats.forEach(stat => {
-                        const ts = stat.ts * 60 * 1000; // Convert to milliseconds
-                        if (!aggregatedStats[ts]) {
-                            aggregatedStats[ts] = 0;
-                        }
-                        aggregatedStats[ts] += stat.count;
-                    });
-                }
+            (resp?.points || []).forEach(point => {
+                aggregatedStats[point.ts * 60 * 1000] = point.count; // minutes to milliseconds
             });
-
-            // Generate complete time series with gaps filled as zeros
-            const chartData = generateTimeSeriesWithGaps(startTs, endTs, aggregatedStats);
-
-            setPolicyGuardrailStats(chartData);
+            setSeries(generateTimeSeriesWithGaps(startTs, endTs, aggregatedStats));
         } catch (error) {
-            setPolicyGuardrailStats([]);
+            setSeries([]);
         }
     };
 
-    const fetchMcpApiCallStats = async (startTs, endTs) => {
-        if (!canLoadApiCallStats) return;
-        if (!func.checkForFeatureSaas('THREAT_DETECTION')) {
-            const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
-            setMcpApiCallStats(emptyData);
-            return;
-        }
-        try {
-            // Get MCP collections by checking for MCP tag
-            const mcpCollections = allCollections.filter(collection => {
-                return collection.envType && collection.envType.some(envType =>
-                    envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
-                );
-            });
+    const fetchPolicyGuardrailStats = (startTs, endTs) => fetchTaggedApiCallStats('GUARDRAIL', startTs, endTs, setPolicyGuardrailStats);
+    const fetchMcpApiCallStats = (startTs, endTs) => fetchTaggedApiCallStats('MCP', startTs, endTs, setMcpApiCallStats);
 
-
-            if (mcpCollections.length === 0) {
-                // Generate empty data points for the time range
-                const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
-                setMcpApiCallStats(emptyData);
-                return;
-            }
-
-            // Fetch API call stats for each MCP collection and their URLs
-            const promises = [];
-            mcpCollections.forEach(collection => {
-                // Check if the collection has urls array and it's not empty
-                if (collection.urls && Array.isArray(collection.urls) && collection.urls.length > 0) {
-                    collection.urls.forEach(urlString => {
-                        // Split the URL string by space to get url and method
-                        const parts = urlString.split(' ');
-                        const url = parts[0];
-                        const method = parts[1];
-
-                        // Create a promise for each URL/method combination
-                        promises.push(
-                            observeApi.fetchApiCallStats(collection.id, url, method, startTs, endTs)
-                                .catch(err => {
-                                    return null;
-                                })
-                        );
-                    });
-                } else {
-                    // Skip collections without urls array or with empty urls array
-                }
-            });
-
-            const results = await Promise.all(promises);
-
-            // Aggregate the results
-            const aggregatedStats = {};
-            results.forEach(result => {
-                if (result && result.result && result.result.apiCallStats) {
-                    result.result.apiCallStats.forEach(stat => {
-                        const ts = stat.ts * 60 * 1000; // Convert to milliseconds
-                        if (!aggregatedStats[ts]) {
-                            aggregatedStats[ts] = 0;
-                        }
-                        aggregatedStats[ts] += stat.count;
-                    });
-                }
-            });
-
-            // Generate complete time series with gaps filled as zeros
-            const chartData = generateTimeSeriesWithGaps(startTs, endTs, aggregatedStats);
-
-            setMcpApiCallStats(chartData);
-        } catch (error) {
-            setMcpApiCallStats([]);
-        }
-    };
-    
     // Helper function to generate time series data with gaps filled as zeros
     const generateTimeSeriesWithGaps = (startTs, endTs, dataMap) => {
         const startMs = startTs * 1000;
@@ -487,115 +367,67 @@ function HomeDashboard() {
 
     const fetchData = async () => {
         setLoading(true)
-        // Fast-loading APIs - page will load with these first
+        // the api numbers, the issue numbers and the MCP counts are one call each; the lists and charts load after
         let apiPromises = [
             callIfAllowed('api/getCustomerEndpoints', () => observeApi.getUserEndpoints()),
-            callIfAllowed('api/findTotalIssues', () => api.findTotalIssues(startTimestamp, endTimestamp)),
-            callIfAllowed('api/fetchApiStats', () => api.fetchApiStats(startTimestamp, endTimestamp)),
+            callIfAllowed('api/fetchIssuesSnapshot', () => api.fetchIssuesSnapshot(startTimestamp, endTimestamp)),
+            callIfAllowed('api/fetchPostureSnapshot', () => api.fetchPostureSnapshot(startTimestamp, endTimestamp)),
             callIfAllowed('api/fetchEndpointsCount', () => api.fetchEndpointsCount(startTimestamp, endTimestamp)),
-            callIfAllowed('api/fetchSeverityInfoForIssues', () => testingApi.fetchSeverityInfoForIssues({activeCollections: true}, [], 0))
         ];
 
         // Only fetch MCP data if not in API Security category
-        if (!isApiSecurityCategory() && canCall('api/fetchMcpdata')) {
+        const loadMcp = !isApiSecurityCategory() && canCall('api/fetchMcpPostureCounts')
+        if (loadMcp) {
             apiPromises.push(
-                api.fetchMcpdata('TOTAL_APIS'),
-                api.fetchMcpdata('THIRD_PARTY_APIS'),
-                api.fetchMcpdata('RECENT_OPEN_ALERTS'),
-                api.fetchMcpdata('CRITICAL_APIS'),
-                api.fetchMcpdata('TOOLS'),
-                api.fetchMcpdata('PROMPTS'),
-                api.fetchMcpdata('RESOURCES'),
-                api.fetchMcpdata('MCP_SERVER'),
-                api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
-                api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
+                api.fetchMcpPostureCounts(),
+                canCall('api/fetchMcpPostureData') ? api.fetchMcpPostureData('RECENT_ALERTS', 0, 2) : Promise.reject(new Error('not allowed')),
+                canCall('api/fetchMcpPostureData') ? api.fetchMcpPostureData('TOP_APPLICATIONS', 0, 3) : Promise.reject(new Error('not allowed'))
             );
         }
 
         let results = await Promise.allSettled(apiPromises);
+        const valueOf = (index, fallback) => results[index]?.status === 'fulfilled' ? results[index].value : fallback
 
-        let userEndpoints = results[0].status === 'fulfilled' ? results[0].value : true;
-        let findTotalIssuesResp = results[1].status === 'fulfilled' ? results[1].value : {}
-        let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
-        let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
-        let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
-
-        // MCP data is only fetched if not in API Security category
-        let mcpTotalApis = null
-        let mcpThirdParty = null
-        let mcpOpenAlertsDetails = []
-        let mcpCriticalApis = null
-        let mcpTools = null
-        let mcpPrompts = null
-        let mcpResources = null
-        let mcpServer = null
-        let mcpPolicyGuardrailApis = null
-        let mcpTopApps = []
-
-        if (!isApiSecurityCategory()) {
-            mcpTotalApis = results[5]?.status === 'fulfilled' ? (results[5].value?.mcpDataCount ?? null) : null
-            mcpThirdParty = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
-            mcpOpenAlertsDetails = results[7]?.status === 'fulfilled' ? (results[7].value?.response?.alertDetails ?? []) : []
-            mcpCriticalApis = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
-            mcpTools = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
-            mcpPrompts = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
-            mcpResources = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
-            mcpServer = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
-            mcpPolicyGuardrailApis = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
-            mcpTopApps = results[14]?.status === 'fulfilled' ? (results[14].value?.response?.topApplications ?? []) : []
-        }
-
-        // Initial load with default values (0) for missing API info
-        let totalRedundantApis = 0
-        let totalMissingApis = 0
+        let userEndpoints = valueOf(0, true)
+        let issuesSnapshot = valueOf(1, {})
+        let posture = valueOf(2, {})
+        let fetchEndpointsCountResp = valueOf(3, {})
 
         setShowBannerComponent(!userEndpoints)
 
         // for now we are actually using the apis from stis instead of the total apis in the response
         // TODO: Fix apiStats API to return the correct total apis
-        buildMetrics(apisStatsResp.apiStatsEnd, fetchEndpointsCountResp)
+        buildMetrics(posture.apiStatsEnd, fetchEndpointsCountResp)
         testSummaryData()
-        mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, 0)
-        mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, 0)
-        buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, 0)
-        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis))
-        getCollectionsWithCoverage()
-        buildSeverityMap(issueSeverityMap.severityInfo)
-        buildIssuesSummary(findTotalIssuesResp)
+        // the missing apis figure is already the net of apis missing from and redundant in api_info
+        const missing = posture.missing || {}
+        const netMissing = missing.netMissing || 0
+        const stats = posture.apiStatsEnd ? posture : null
+        mapAccessTypes(stats, netMissing, 0, missing.accessTypeNotCalculated || 0)
+        mapAuthTypes(stats, netMissing, 0, missing.authNotCalculated || 0)
+        if (posture.apiStatsEnd) {
+            buildAPITypesData(posture.apiStatsEnd, netMissing, 0, missing.apiTypeMissing || 0)
+            buildSetRiskScoreData(posture.apiStatsEnd, Math.max(0, netMissing))
+        }
+        setNewDomains((posture.newDomains || []).map(domain => ({ name: domain.name, apisTested: domain.apisTested, totalApis: domain.totalApis })))
+        setSnapshots({ posture, issues: issuesSnapshot })
+        buildSeverityMap(issuesSnapshot.severityCounts)
+        buildIssuesSummary(issuesSnapshot)
 
         const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
         buildDeltaInfo(fetchHistoricalDataResp)
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer,policyGuardrailApis: mcpPolicyGuardrailApis })
-        setMcpOpenAlertDetails(Array.isArray(mcpOpenAlertsDetails) ? mcpOpenAlertsDetails.slice(0, 2) : [])
-        setMcpTopApplications(Array.isArray(mcpTopApps) ? mcpTopApps : [])
-        fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
-        setLoading(false)
-
-        // Fetch slow API in background and update charts when it returns
-        fetchMissingApiInfoData(apisStatsResp)
-    }
-
-    const fetchMissingApiInfoData = async (apisStatsResp) => {
-        try {
-            const missingApiInfoData = await callIfAllowed('api/getAPIInfosForMissingData', () => api.getApiInfoForMissingData(0, endTimestamp))
-
-            if (missingApiInfoData) {
-                const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
-                const totalMissingApis = missingApiInfoData?.totalMissing || 0
-
-                // Update charts with accurate missing data
-                mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.accessTypeNotCalculated || 0)
-                mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.authNotCalculated || 0)
-                buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, missingApiInfoData?.apiTypeMissing || 0)
-                buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis))
-            }
-        } catch (error) {
-            // Silently fail - page already loaded with default values
-            console.log('Failed to fetch missing API info data:', error)
+        if (loadMcp) {
+            const mcpCounts = valueOf(4, {})
+            setMcpTotals({ mcpTotalApis: mcpCounts.totalApis ?? null, thirdPartyApis: mcpCounts.thirdPartyApis ?? null, newApis7Days: mcpCounts.newApis7Days ?? null,
+                criticalApis: mcpCounts.criticalApis ?? null, tools: mcpCounts.tools ?? null, prompts: mcpCounts.prompts ?? null,
+                resources: mcpCounts.resources ?? null, server: mcpCounts.servers ?? null, policyGuardrailApis: mcpCounts.policyGuardrailApis ?? null })
+            setMcpOpenAlertDetails(valueOf(5, {})?.alerts || [])
+            setMcpTopApplications(valueOf(6, {})?.topApplications || [])
         }
+        setLoading(false)
     }
 
     const fetchThreatData = async () => {
@@ -647,20 +479,21 @@ function HomeDashboard() {
     
     // Fetch MCP API call stats when time range changes
     useEffect(() => {
-        if (allCollections && allCollections.length > 0) {
-            fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
-        }
-    }, [mcpStatsTimeRange, allCollections])
+        fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
+    }, [mcpStatsTimeRange])
 
     // Fetch Policy Guardrail stats when time range changes
     useEffect(() => {
-        if (allCollections && allCollections.length > 0) {
-            fetchPolicyGuardrailStats(policyGuardrailStatsTimeRange, func.timeNow());
-        }
-    }, [policyGuardrailStatsTimeRange, allCollections])
+        fetchPolicyGuardrailStats(policyGuardrailStatsTimeRange, func.timeNow());
+    }, [policyGuardrailStatsTimeRange])
 
-    async function getActionItemsDataAndCount() {
-        const data = await fetchActionItemsData();
+    useEffect(() => {
+        settingsModule.fetchAccountConfig().then(config => setJiraTicketUrlMap(config?.jiraTicketUrlMap || {})).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (!snapshots) return
+        const data = buildActionItemsData(snapshots.posture, snapshots.issues, jiraTicketUrlMap);
         setActionItemsData(data);
         const excludeKeys = new Set([
             'numBatches',
@@ -674,24 +507,11 @@ function HomeDashboard() {
             if (typeof val === 'number' && val > 0) count++;
         });
         setActionItemsCount(count);
-    }
+    }, [snapshots, jiraTicketUrlMap]);
 
-    useEffect(() => {
-        getActionItemsDataAndCount();
-    }, []);
-
-    function buildIssuesSummary(findTotalIssuesResp) {
-        if (findTotalIssuesResp && findTotalIssuesResp.totalIssuesCount) {
-            setTotalIssuesCount(findTotalIssuesResp.totalIssuesCount)
-        } else {
-            setTotalIssuesCount(0)
-        }
-
-        if (findTotalIssuesResp && findTotalIssuesResp.oldOpenCount){
-            setOldIssueCount(findTotalIssuesResp.oldOpenCount)
-        } else {
-            setOldIssueCount(0)
-        }
+    function buildIssuesSummary(issuesSnapshot) {
+        setTotalIssuesCount(issuesSnapshot?.totalIssuesCount || 0)
+        setOldIssueCount(issuesSnapshot?.oldOpenCount || 0)
     }
 
     function buildEndpointsCount(fetchEndpointsCountResp) {
@@ -960,27 +780,10 @@ function HomeDashboard() {
         setRiskScoreData(result)
     }
 
-    function getCollectionsWithCoverage() {
-        const validCollections = allCollections.filter(collection => (hostNameMap[collection.id] && hostNameMap[collection.id] !== undefined)  && !collection.deactivated);
-
-        const sortedCollections = validCollections.sort((a, b) => b?.startTs - a?.startTs);
-
-        const result = sortedCollections.slice(0, 10).map(collection => {
-            const apisTested = coverageMap[collection.id] || 0;
-            return {
-                name: collection.hostName,
-                apisTested: apisTested,
-                totalApis: collection.urlsCount
-            };
-        });
-
-        setNewDomains(result)
-    }
-
     let summaryInfo = [
         {
             title: 'Issues',
-            requires: 'api/findTotalIssues',
+            requires: 'api/fetchIssuesSnapshot',
             data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
             color: 'critical',
@@ -989,7 +792,7 @@ function HomeDashboard() {
         },
         {
             title: mapLabel("API Risk Score", getDashboardCategory()),
-            requires: 'api/fetchApiStats',
+            requires: 'api/fetchPostureSnapshot',
             data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2))  : apiRiskScore,
             variant: 'heading2xl',
             color: (customRiskScoreAvg > 2.5 || apiRiskScore > 2.5) ? 'critical' : 'warning',
@@ -1000,7 +803,7 @@ function HomeDashboard() {
         },
         {
             title: 'Test Coverage',
-            requires: 'api/fetchApiStats',
+            requires: 'api/fetchPostureSnapshot',
             data: testCoverage + "%",
             variant: 'heading2xl',
             color: testCoverage > 80 ? 'success' : 'warning',
@@ -1048,15 +851,13 @@ function HomeDashboard() {
         />
     ) : null
 
-    function buildSeverityMap(severityInfo) {
+    // severityCounts: open issues by severity, already summed by the backend
+    function buildSeverityMap(severityCounts) {
         const countMap = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 }
 
-        if (severityInfo && severityInfo != undefined && severityInfo != null && severityInfo instanceof Object) {
-            for (const apiCollectionId in severityInfo) {
-                let temp = severityInfo[apiCollectionId]
-                for (const key in temp) {
-                    countMap[key] += temp[key]
-                }
+        if (severityCounts instanceof Object) {
+            for (const key in severityCounts) {
+                if (key in countMap) countMap[key] += severityCounts[key]
             }
         }
 
@@ -1131,7 +932,7 @@ function HomeDashboard() {
 
     const criticalUnsecuredAPIsOverTime = <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
-    const criticalFindings = <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
+    const criticalFindings = <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} subCategoryCounts={snapshots?.issues?.subCategoryCounts ?? null} linkText={"Fix critical issues"} linkUrl={"/dashboard/issues"} />
 
     const apisByRiskscoreComponent = <InfoCard
         component={

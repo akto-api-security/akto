@@ -52,6 +52,8 @@ public class ApiCollectionStatsDao extends AccountsContextDaoWithRbac<ApiCollect
                 "tab_1_displayName_1__id_1");
         createIndex(Indexes.compoundIndex(Indexes.ascending(ApiCollectionStats.DISPLAY_NAME),
                 Indexes.ascending(ApiCollectionStats.ID)), "displayName_1__id_1");
+        // oldest posture first, for the refresh that recomputes the least recently computed collections
+        createIndex(Indexes.ascending(ApiCollectionStats.POSTURE_AT), "posture_at_1");
         createIndex(Indexes.ascending(ApiCollectionStats.TAGS_LIST + "." + CollectionTags.KEY_NAME, ApiCollectionStats.TAGS_LIST + "." + CollectionTags.VALUE),
                 "tagsList_keyName_1_value_1");
     }
@@ -82,6 +84,11 @@ public class ApiCollectionStatsDao extends AccountsContextDaoWithRbac<ApiCollect
             // the parent treats a failure to resolve the user's collections as unscoped too
         }
         return super.modifyFilters(originalQuery, ignoreGroupFilter, ignoreSummaryIdFilter);
+    }
+
+    /** A bounded, ordered read of rows for a background refresh (not scoped to a user, like the writes). */
+    public List<ApiCollectionStats> findRowsToRefresh(Bson filter, Bson sort, int limit, Bson projection) {
+        return getMCollection().find(filter).sort(sort).limit(limit).projection(projection).into(new java.util.ArrayList<>());
     }
 
     /** Sets a metric of one row and stamps the time it was computed at. */

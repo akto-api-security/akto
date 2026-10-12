@@ -47,7 +47,7 @@ public class CollectionStatsRefresher {
     public enum Metric {
         ATTRS_FULL(300), ATTRS_DELTA(30),
         ENDPOINTS_COUNT(120), RISK_SCORE(120), LAST_SEEN(60),
-        SENSITIVE(300), SUMMARY(120);
+        SENSITIVE(300), SUMMARY(120), POSTURE(120);
 
         private final int ttlSeconds;
 
@@ -219,6 +219,9 @@ public class CollectionStatsRefresher {
                         break;
                     case SUMMARY:
                         new SummaryRefresh().refresh();
+                        break;
+                    case POSTURE:
+                        new PosturePartialsRefresh().refresh();
                         break;
                     default:
                         throw new IllegalStateException("unhandled metric " + metric);

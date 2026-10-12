@@ -18,7 +18,6 @@ import org.bson.conversions.Bson;
 import com.akto.action.observe.Utils;
 import com.akto.audit_logs_util.Audit;
 import com.akto.dao.*;
-import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
@@ -50,7 +49,6 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
-import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -72,7 +70,6 @@ import org.apache.struts2.ServletActionContext;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
 import com.akto.utils.scripts.AcesssTypeCollectionLevel;
 import com.akto.gpt.handlers.gpt_prompts.AgentGuardSystemPromptClassifier;
@@ -204,24 +201,8 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfoKey> apiList;
     private BasicDBObject response;
     private boolean hasUsageEndpoints;
-    @Getter
-    int sensitiveUnauthenticatedEndpointsCount;
-    @Getter
-    int highRiskThirdPartyEndpointsCount;
-    @Getter
-    int shadowApisCount;
-    @Getter
-    List<ApiInfo> sensitiveUnauthenticatedEndpointsApiInfo = new ArrayList<>();
-    @Getter
-    List<ApiInfo> highRiskThirdPartyEndpointsApiInfo = new ArrayList<>();
-    @Getter
-    List<ApiInfo> shadowApisApiInfo = new ArrayList<>();
-    @Getter
-    int mcpDataCount;
     @Setter
     String type;
-    @Getter
-    List<McpAuditInfo> auditAlerts;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -326,31 +307,8 @@ public class ApiCollectionsAction extends UserAction {
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
-    private ApiStats apiStatsStart;
-    private ApiStats apiStatsEnd;
     private int startTimestamp;
     private int endTimestamp;
-    public String fetchApiStats() {
-        if (AccountSettingsDao.isEndpointInfoViewEnabled()) {
-            long t = System.currentTimeMillis();
-            Bson filter = Filters.empty();
-            apiStatsEnd = EndpointInfoViewDao.instance.buildApiStats(filter, startTimestamp, endTimestamp);
-            if (apiStatsEnd.getTotalAPIs() > 0) {
-                loggerMaker.warnAndAddToDb("[fetchApiStats] startTimestamp=" + startTimestamp + ", endTimestamp=" + endTimestamp);
-                apiStatsStart = EndpointInfoViewDao.instance.buildApiStats(filter, 0, startTimestamp);
-                loggerMaker.warnAndAddToDb("[fetchApiStats] view query took " + (System.currentTimeMillis() - t) + "ms, endAPIs=" + apiStatsEnd.getTotalAPIs() + ", startAPIs=" + apiStatsStart.getTotalAPIs());
-                return SUCCESS.toUpperCase();
-            }
-            loggerMaker.warnAndAddToDb("[fetchApiStats] view empty, falling back. Took " + (System.currentTimeMillis() - t) + "ms");
-        }
-        Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-        Bson collFilter = UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID);
-        Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(collFilter, filter, startTimestamp, endTimestamp);
-        apiStatsStart = result.getFirst();
-        apiStatsEnd = result.getSecond();
-        return SUCCESS.toUpperCase();
-    }
-
     // ---- paginated collections table (api_collection_stats) ----
 
     @Setter private int skip;
@@ -367,6 +325,14 @@ public class ApiCollectionsAction extends UserAction {
     @Getter private CollectionsPageResponse.Meta collectionsPageMeta;
     @Getter private CollectionsPageResponse.Details collectionsPageDetails;
     @Getter private CollectionsPageResponse.TabCounts collectionsTabCounts;
+    @Getter private PostureSnapshotResponse postureSnapshot;
+    @Getter private McpPostureResponses.Counts mcpPostureCounts;
+    @Getter private McpPostureResponses.Data mcpPostureData;
+    @Getter private McpPostureResponses.Series apiCallSeries;
+    @Getter private PostureActionItemsResponse postureActionItems;
+    @Setter private PostureActionItemsService.Type itemType;
+    @Setter private McpPostureService.Section section;
+    @Setter private McpPostureService.Tag tag;
 
     /** One page of the collections table; see CollectionsPageService. */
     public String fetchApiCollectionsPage() {
@@ -378,6 +344,40 @@ public class ApiCollectionsAction extends UserAction {
     /** Coverage and open issues of the collections (apiCollectionIds) of a page the table already shows. */
     public String fetchApiCollectionsPageDetails() {
         this.collectionsPageDetails = new CollectionsPageService().fetchDetails(apiCollectionIds);
+        return SUCCESS.toUpperCase();
+    }
+
+    /** The api numbers of the home dashboard (startTimestamp / endTimestamp: the range); see PostureSnapshotService. */
+    public String fetchPostureSnapshot() {
+        this.postureSnapshot = new PostureSnapshotService().fetch(startTimestamp, endTimestamp, force);
+        return SUCCESS.toUpperCase();
+    }
+
+    /** A page (skip, limit) of the list behind a home dashboard action item (itemType); see PostureActionItemsService. */
+    public String fetchPostureActionItems() {
+        if (itemType == null) {
+            addActionError("itemType is required");
+            return ERROR.toUpperCase();
+        }
+        this.postureActionItems = new PostureActionItemsService().fetch(itemType, skip, limit);
+        return SUCCESS.toUpperCase();
+    }
+
+    /** Every MCP and guardrail count of the home dashboard; see McpPostureService. */
+    public String fetchMcpPostureCounts() {
+        this.mcpPostureCounts = new McpPostureService().counts();
+        return SUCCESS.toUpperCase();
+    }
+
+    /** A page of one MCP list widget (section, skip, limit). */
+    public String fetchMcpPostureData() {
+        this.mcpPostureData = new McpPostureService().data(section == null ? McpPostureService.Section.RECENT_ALERTS : section, skip, limit);
+        return SUCCESS.toUpperCase();
+    }
+
+    /** Api calls of the MCP or guardrail collections over startTimestamp..endTimestamp, summed per time bucket. */
+    public String fetchTaggedApiCallSeries() {
+        this.apiCallSeries = new McpPostureService().apiCallSeries(tag == null ? McpPostureService.Tag.MCP : tag, startTimestamp, endTimestamp);
         return SUCCESS.toUpperCase();
     }
 
@@ -1834,351 +1834,6 @@ public class ApiCollectionsAction extends UserAction {
         });
     }
 
-    @Setter
-    private boolean showApiInfo;
-
-    public String fetchSensitiveAndUnauthenticatedValue() {
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-
-        if (!this.showApiInfo) {
-            Bson baseFilter = Filters.and(
-                Filters.eq(ApiInfo.IS_SENSITIVE, true),
-                Filters.in(ApiInfo.ALL_AUTH_TYPES_FOUND,
-                          Arrays.asList(Arrays.asList(ApiInfo.AuthType.UNAUTHENTICATED)))
-            );
-
-            int totalCount = (int) ApiInfoDao.instance.count(baseFilter);
-
-            Set<Integer> demosAndDeactivated = UsageMetricCalculator.getDemosAndDeactivated();
-            Bson excludedFilter = Filters.and(
-                Filters.in(ApiInfo.ID_API_COLLECTION_ID, demosAndDeactivated),
-                baseFilter
-            );
-            int excludedCount = (int) ApiInfoDao.instance.count(excludedFilter);
-
-            this.sensitiveUnauthenticatedEndpointsCount = totalCount - excludedCount;
-            return Action.SUCCESS.toUpperCase();
-        }
-
-        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.and(filterQ, Filters.eq(ApiInfo.IS_SENSITIVE, true)));
-        for (ApiInfo apiInfo : sensitiveEndpoints) {
-            if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
-                for (Set<String> authType : apiInfo.getAllAuthTypesFound()) {
-                    if (authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
-                        this.sensitiveUnauthenticatedEndpointsCount++;
-                        if (this.showApiInfo) {
-                            this.sensitiveUnauthenticatedEndpointsApiInfo.add(apiInfo);
-                        }
-                    }
-                }
-            }
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchHighRiskThirdPartyValue() {
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-        Bson filter = Filters.and(
-                filterQ,
-                Filters.gte(ApiInfo.RISK_SCORE, 4),
-                Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
-        );
-
-        if (this.showApiInfo) {
-            this.highRiskThirdPartyEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
-            this.highRiskThirdPartyEndpointsCount = this.highRiskThirdPartyEndpointsApiInfo.size();
-        }else{
-            this.highRiskThirdPartyEndpointsCount = (int) ApiInfoDao.instance.count(filter);
-        }
-
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchShadowApisValue() {
-        ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
-        if (shadowApisCollection != null) {
-
-            if (this.showApiInfo) {
-                this.shadowApisApiInfo = ApiInfoDao.instance.findAll(
-                        Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
-                );
-                this.shadowApisCount = shadowApisApiInfo.size();
-            }else{
-                this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
-            }
-        }
-
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    private String filterType;
-
-    public String fetchActionItemsApiInfo() {
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-        List<ApiInfo> result = new ArrayList<>();
-
-        switch (filterType) {
-            case "HIGH_RISK":
-                Bson highRiskFilter = Filters.and(
-                        filterQ,
-                        Filters.gt(ApiInfo.RISK_SCORE, 3)
-                );
-                result = ApiInfoDao.instance.findAll(highRiskFilter);
-                break;
-
-            case "SENSITIVE":
-                Bson sensitiveFilter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(
-                        null, null, null, null
-                );
-                List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFilter);
-                java.util.Set<String> seen = new java.util.HashSet<>();
-
-                for (SingleTypeInfo sti : sensitiveSTIs) {
-                    int collectionId = sti.getApiCollectionId();
-                    String url = sti.getUrl();
-                    String method = sti.getMethod();
-                    String key = collectionId + "|" + url + "|" + method;
-                    if (seen.contains(key)) continue;
-                    seen.add(key);
-                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, collectionId));
-                    if (apiInfo != null) {
-                        result.add(apiInfo);
-                    } else {
-                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(collectionId, url, Method.fromString(method));
-                        ApiInfo minimalApiInfo = new ApiInfo();
-                        minimalApiInfo.setId(apiInfoKey);
-                        result.add(minimalApiInfo);
-                    }
-                }
-                break;
-
-            case "THIRD_PARTY":
-                int sevenDaysAgo = (int) (System.currentTimeMillis() / 1000) - 604800; // 7 days in seconds
-                Bson thirdPartyFilter = Filters.and(
-                        filterQ,
-                        Filters.gte(ApiInfo.LAST_SEEN, sevenDaysAgo),
-                        Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
-                );
-                result = ApiInfoDao.instance.findAll(thirdPartyFilter);
-                break;
-
-            case "NEWLY_DISCOVERED":
-                int oneHourAgo = (int) (System.currentTimeMillis() / 1000) - 3600; // 1 hour in seconds
-                Bson newlyDiscoveredFilter = Filters.and(
-                        filterQ,
-                        Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, oneHourAgo)
-                );
-                result = ApiInfoDao.instance.findAll(newlyDiscoveredFilter);
-                break;
-
-            default:
-                addActionError("Invalid filter type: " + filterType);
-                return Action.ERROR.toUpperCase();
-        }
-
-        BasicDBObject response = new BasicDBObject();
-        response.put("apiInfos", result);
-
-        this.response = response;
-        return Action.SUCCESS.toUpperCase();
-    }
-
-
-    // For MCP Security posture dashboard
-    public String fetchMcpdata() {
-        int count = 0;
-        String filterType = this.filterType; // Assume filterType is set from request
-        int now = (int) (System.currentTimeMillis() / 1000);
-        int last24Hours = now - 86400;
-        int oneHourAgo = now - 3600;
-        int sevenDaysAgo = now - 604800; // 7 days in seconds
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-
-        // Common MCP filter, similar to isMcpCollection logic
-        Bson mcpTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
-            Filters.eq("keyName", com.akto.util.Constants.AKTO_MCP_SERVER_TAG)
-        );
-        List<ApiCollection> mcpCollections = ApiCollectionsDao.instance.findAll(mcpTagFilter, null);
-        List<Integer> mcpCollectionIds = mcpCollections.stream().map(ApiCollection::getId).collect(Collectors.toList());
-
-        switch (filterType) {
-            case "TOTAL_APIS":
-                Bson totalApisFilter = Filters.and(
-                    filterQ,
-                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds)
-                );
-                this.mcpDataCount = (int) ApiInfoDao.instance.count(totalApisFilter);
-                break;
-            case "NEW_APIS_7_DAYS":
-                Bson newApisFilter = Filters.and(
-                    filterQ,
-                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds),
-                    Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, sevenDaysAgo)
-                );
-                this.mcpDataCount = (int) ApiInfoDao.instance.count(newApisFilter);
-                break;
-            case "THIRD_PARTY_APIS":
-                Bson thirdPartyFilter = Filters.and(
-                    filterQ,
-                    Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY),
-                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds)
-                );
-                this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
-                break;
-            case "RECENT_OPEN_ALERTS":
-                Bson openAlertsFilter = Filters.and(
-                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null))
-                );
-
-                // Optimize: Use projection to fetch only required fields (type and lastDetected)
-                // This reduces network transfer and memory usage
-                Bson projection = Projections.include("type", "lastDetected", "resourceName");
-                
-                // Get 2 most recent alerts sorted by lastDetected
-                this.auditAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter,0, 2, Sorts.descending("lastDetected"), projection);
-
-                this.response = new BasicDBObject();
-                this.response.put("alertDetails", auditAlerts);
-                break;
-            case "CRITICAL_APIS":
-                Bson criticalApisFilter = Filters.and(
-                        filterQ,
-                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds),
-                        Filters.gte(ApiInfo.RISK_SCORE, 4)
-                );
-                this.mcpDataCount = (int) ApiInfoDao.instance.count(criticalApisFilter);
-                break;
-            case "TOOLS":
-                Bson toolsFilter = Filters.and(
-                        Filters.eq("type", Constants.AKTO_MCP_TOOL),
-                        Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(toolsFilter);
-                break;
-            case "PROMPTS":
-                Bson promptsFilter = Filters.and(
-                        Filters.eq("type", Constants.AKTO_MCP_PROMPT),
-                        Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(promptsFilter);
-                break;
-            case "RESOURCES":
-                Bson resourcesFilter = Filters.and(
-                        Filters.eq("type", Constants.AKTO_MCP_RESOURCE),
-                        Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(resourcesFilter);
-                break;
-
-            case "MCP_SERVER":
-                Bson mcpServerFilter = Filters.and(
-                        Filters.eq("type", Constants.AKTO_MCP_SERVER),
-                        Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(mcpServerFilter);
-                break;
-
-            case "TOP_3_APPLICATIONS_BY_TRAFFIC":
-                // Use existing mcpCollectionIds from common filters above
-                Map<Integer, String> collectionIdToName = new HashMap<>();
-
-                // Build collection ID to name mapping for all MCP collections
-                for (ApiCollection collection : mcpCollections) {
-                    collectionIdToName.put(collection.getId(), collection.getName());
-                }
-
-                if (!mcpCollectionIds.isEmpty()) {
-                    // Aggregate pipeline to get hit counts per collection
-                    // api_hit_count_info structure: {_id: {ts: timestamp, apiCollectionId: int}, count: int}
-                    List<Bson> pipeline = new ArrayList<>();
-                    pipeline.add(Aggregates.match(Filters.in("apiCollectionId", mcpCollectionIds)));
-                    pipeline.add(Aggregates.group(
-                        "$apiCollectionId",
-                        Accumulators.sum("totalHits", "$count")
-                    ));
-                    pipeline.add(Aggregates.sort(Sorts.descending("totalHits")));
-                    pipeline.add(Aggregates.limit(3));
-
-                    // Execute aggregation on api_hit_count_info collection
-                    List<BasicDBObject> topApplications = new ArrayList<>();
-                    try (MongoCursor<BasicDBObject> cursor = ApiHitCountInfoDao.instance.getMCollection()
-                        .aggregate(pipeline, BasicDBObject.class).cursor()) {
-
-                        while(cursor.hasNext()) {
-                            BasicDBObject result = cursor.next();
-                            Integer collectionId = result.getInt("_id");
-                            Integer totalHits = result.getInt("totalHits");
-                            String collectionName = collectionIdToName.get(collectionId);
-
-                            if (collectionName != null) {
-                                BasicDBObject appInfo = new BasicDBObject();
-                                appInfo.put("name", collectionName);
-                                appInfo.put("collectionId", collectionId);
-                                appInfo.put("hitCount", totalHits);
-                                topApplications.add(appInfo);
-                            }
-                        }
-                    }
-
-                    // Set response with top applications
-                    if (this.response == null) {
-                        this.response = new BasicDBObject();
-                    }
-                    this.response.put("topApplications", topApplications);
-                    this.mcpDataCount = topApplications.size();
-                } else {
-                    // No active MCP collections found
-                    if (this.response == null) {
-                        this.response = new BasicDBObject();
-                    }
-                    this.response.put("topApplications", new ArrayList<>());
-                    this.mcpDataCount = 0;
-                }
-                break;
-
-            case "POLICY_GUARDRAIL_APIS":
-                // Filter for collections with guard-rail tag
-                Bson guardRailTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
-                    Filters.eq("keyName", Constants.AKTO_GUARD_RAIL_TAG)
-                );
-                // Use projection to only fetch IDs, reducing memory usage
-                List<ApiCollection> guardRailCollections = ApiCollectionsDao.instance.findAll(
-                    guardRailTagFilter, 
-                    Projections.include(ApiCollection.ID)
-                );
-                List<Integer> guardRailCollectionIds = guardRailCollections.stream()
-                    .map(ApiCollection::getId)
-                    .collect(Collectors.toList());
-                
-                if (!guardRailCollectionIds.isEmpty()) {
-
-                    // Put the indexed field first in the AND clause for better index utilization
-                    Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, guardRailCollectionIds);
-                    Bson excludeFilter = UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID);
-                    
-                    // Order matters for index usage - put the most selective filter first
-                    Bson guardRailApisFilter = Filters.and(collectionFilter, excludeFilter);
-                    
-                    this.mcpDataCount = (int) SingleTypeInfoDao.instance.count(guardRailApisFilter);
-                } else {
-                    this.mcpDataCount = 0;
-                }
-                break;
-
-
-
-            default:
-                if(Context.contextSource.get().equals(CONTEXT_SOURCE.MCP)){
-                    addActionError("Invalid filter type: " + filterType);
-                    return Action.ERROR.toUpperCase();
-                }
-                
-        }
-
-
-        return Action.SUCCESS.toUpperCase();
-    }
-
     public String fetchMcpToolsApiCalls() {
         CONTEXT_SOURCE currentContextSource = Context.contextSource.get();
 
@@ -2253,10 +1908,6 @@ public class ApiCollectionsAction extends UserAction {
         }
         
         return apiCollectionIds;
-    }
-
-    public void setFilterType(String filterType) {
-        this.filterType = filterType;
     }
 
 
@@ -2362,14 +2013,6 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setResponse(BasicDBObject response) {
         this.response = response;
-    }
-
-    public ApiStats getApiStatsEnd() {
-        return apiStatsEnd;
-    }
-
-    public ApiStats getApiStatsStart() {
-        return apiStatsStart;
     }
 
     public void setStartTimestamp(int startTimestamp) {
