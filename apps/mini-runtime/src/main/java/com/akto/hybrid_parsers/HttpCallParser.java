@@ -28,6 +28,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.gen_ai.GenAiCollectionUtils;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.util.trpc.TrpcUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -1835,7 +1836,7 @@ public class HttpCallParser {
                 continue;
             }
 
-            if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health")) {
+            if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health") && !TrpcUtils.isTrpcUrl(httpResponseParam.getRequestParams().getURL())) {
                 continue;
             }
 
@@ -1984,7 +1985,12 @@ public class HttpCallParser {
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
-            List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            // a tRPC call is split into one REST call per procedure; everything else carries on to the other parsers
+            List<HttpResponseParams> responseParamsList = TrpcUtils.parseTrpcResponseParam(httpResponseParam);
+            boolean isTrpc = !responseParamsList.isEmpty();
+            if (!isTrpc) {
+                responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            }
             if (responseParamsList.isEmpty()) {
                 // Check for REST method payload structure (only for account 1758525547)
                 if (Context.getActualAccountId() == 1758525547 || Context.getActualAccountId() == 1667235738) {
@@ -2004,7 +2010,7 @@ public class HttpCallParser {
                 }
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new " + (isTrpc ? "trpc" : "graphql") + " endpoints in inventory");
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {

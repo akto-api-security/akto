@@ -18,6 +18,7 @@ import com.akto.testing.SseStreamingUtil.StreamingResult;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
+import com.akto.util.trpc.TrpcUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -297,6 +298,9 @@ public class ApiExecutor {
 
     private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck, boolean useHighTimeout) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
+
+        // a tRPC GET carries its input in the `input` query param; tests work on it as the body, put it back before sending
+        TrpcUtils.moveBodyToInputQuery(request);
 
         if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false, useHighTimeout);

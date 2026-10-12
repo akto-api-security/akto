@@ -1,0 +1,507 @@
+package com.akto.util.trpc;
+
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.junit.Test;
+
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+public class TrpcUtilsTest {
+
+    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final int COLLECTION = 627031169;
+
+    // ---------------------------------------------------------------------------------------------- helpers
+
+    private static HttpResponseParams call(String method, String path, String requestPayload, String responsePayload,
+                                           int status, Map<String, String> extraRequestHeaders) throws Exception {
+        Map<String, String> reqHeaders = new HashMap<>();
+        reqHeaders.put("host", "app.example.com");
+        reqHeaders.put("cookie", "session=abc");
+        reqHeaders.put("content-length", String.valueOf(requestPayload.length()));
+        if (method.equals("POST")) {
+            reqHeaders.put("content-type", "application/json");
+        }
+        reqHeaders.putAll(extraRequestHeaders);
+        Map<String, String> respHeaders = new HashMap<>();
+        respHeaders.put("content-type", "application/json");
+        respHeaders.put("content-encoding", "gzip");
+        respHeaders.put("content-length", "123");
+
+        ObjectNode orig = mapper.createObjectNode();
+        orig.put("method", method);
+        orig.put("path", path);
+        orig.put("type", "HTTP/1.1");
+        orig.put("requestHeaders", mapper.writeValueAsString(reqHeaders));
+        orig.put("requestPayload", requestPayload);
+        orig.put("responseHeaders", mapper.writeValueAsString(respHeaders));
+        orig.put("responsePayload", responsePayload);
+        orig.put("statusCode", String.valueOf(status));
+        orig.put("status", "OK");
+        orig.put("ip", "1.2.3.4");
+        orig.put("time", "1700000000");
+        orig.put("akto_vxlan_id", COLLECTION);
+        orig.put("source", "MIRRORING");
+
+        Map<String, List<String>> requestHeaders = new HashMap<>();
+        for (Map.Entry<String, String> e : reqHeaders.entrySet()) {
+            requestHeaders.put(e.getKey(), new ArrayList<>(Arrays.asList(e.getValue())));
+        }
+        Map<String, List<String>> responseHeaders = new HashMap<>();
+        for (Map.Entry<String, String> e : respHeaders.entrySet()) {
+            responseHeaders.put(e.getKey(), new ArrayList<>(Arrays.asList(e.getValue())));
+        }
+        HttpRequestParams request = new HttpRequestParams(method, path, "HTTP/1.1", requestHeaders, requestPayload, COLLECTION);
+        return new HttpResponseParams("HTTP/1.1", status, "OK", responseHeaders, responsePayload, request, 1700000000,
+                "1728622642", false, HttpResponseParams.Source.MIRRORING, orig.toString(), "1.2.3.4");
+    }
+
+    private static HttpResponseParams get(String path, String responsePayload) throws Exception {
+        return call("GET", path, "", responsePayload, 200, new HashMap<>());
+    }
+
+    private static HttpResponseParams post(String path, String body, String responsePayload) throws Exception {
+        return call("POST", path, body, responsePayload, 200, new HashMap<>());
+    }
+
+    private static JsonNode json(String s) throws Exception {
+        return mapper.readTree(s);
+    }
+
+    private static JsonNode sample(HttpResponseParams p) throws Exception {
+        return mapper.readTree(p.getOrig());
+    }
+
+    private static String enc(String s) throws Exception {
+        return URLEncoder.encode(s, "UTF-8").replace("+", "%20");
+    }
+
+    private static void assertJsonEquals(String expected, String actual) throws Exception {
+        assertEquals(json(expected), json(actual));
+    }
+
+    // ---------------------------------------------------------------------------------------------- batch queries
+
+    @Test
+    public void batchGetIsSplitIntoOneRestCallPerProcedure() throws Exception {
+        String input = "{\"1\":{\"view\":\"\",\"limit\":50,\"page\":null,\"sorts\":[{\"key\":\"lastActivityAt\",\"order\":\"desc\"}]}}";
+        String path = "/trpc/planet-express/matter.tableView.list,matter.list,user.getCurrentUser?batch=1&input=" + enc(input);
+        String response = "[{\"result\":{\"data\":{\"views\":[1,2]}}},{\"result\":{\"data\":{\"items\":[{\"id\":\"m1\"}]}}},{\"result\":{\"data\":{\"id\":\"u1\",\"email\":\"a@b.com\"}}}]";
+
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(get(path, response));
+
+        assertEquals(3, ops.size());
+        assertEquals("/trpc/STRING/matter.tableView.list", ops.get(0).getRequestParams().getURL());
+        assertEquals("/trpc/STRING/matter.list", ops.get(1).getRequestParams().getURL());
+        assertEquals("/trpc/STRING/user.getCurrentUser", ops.get(2).getRequestParams().getURL());
+        for (HttpResponseParams op : ops) {
+            assertEquals("GET", op.getRequestParams().getMethod());
+            assertEquals(COLLECTION, op.getRequestParams().getApiCollectionId());
+            assertEquals(200, op.getStatusCode());
+        }
+
+        // only call 1 had an input; its rest view is the decoded input, the others are empty
+        assertJsonEquals("{}", ops.get(0).getRequestParams().getPayload());
+        assertJsonEquals("{\"view\":\"\",\"limit\":50,\"page\":null,\"sorts\":[{\"key\":\"lastActivityAt\",\"order\":\"desc\"}]}", ops.get(1).getRequestParams().getPayload());
+        assertJsonEquals("{}", ops.get(2).getRequestParams().getPayload());
+
+        // rest view of the output is the data, not the trpc envelope
+        assertJsonEquals("{\"views\":[1,2]}", ops.get(0).getPayload());
+        assertJsonEquals("{\"items\":[{\"id\":\"m1\"}]}", ops.get(1).getPayload());
+        assertJsonEquals("{\"id\":\"u1\",\"email\":\"a@b.com\"}", ops.get(2).getPayload());
+    }
+
+    @Test
+    public void storedSampleIsAReplayableSingleProcedureCall() throws Exception {
+        String input = "{\"1\":{\"limit\":50}}";
+        String path = "/_/sow/trpc/planet-express/matter.tableView.list,matter.list?batch=1&input=" + enc(input);
+        String response = "[{\"result\":{\"data\":{\"views\":[]}}},{\"result\":{\"data\":{\"items\":[]}}}]";
+
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(get(path, response));
+        assertEquals(2, ops.size());
+
+        JsonNode first = sample(ops.get(0));
+        // the real tenant is kept, the call is not batched and has no input
+        assertEquals("/_/sow/trpc/planet-express/matter.tableView.list", first.get("path").asText());
+        assertEquals("", first.get("requestPayload").asText());
+        assertEquals("{\"result\":{\"data\":{\"views\":[]}}}", first.get("responsePayload").asText());
+        assertEquals("200", first.get("statusCode").asText());
+
+        JsonNode second = sample(ops.get(1));
+        // the input of a GET is in the payload, readable and editable, not a percent encoded query param
+        assertEquals("/_/sow/trpc/planet-express/matter.list", second.get("path").asText());
+        assertEquals("{\"limit\":50}", second.get("requestPayload").asText());
+        assertEquals("{\"result\":{\"data\":{\"items\":[]}}}", second.get("responsePayload").asText());
+
+        // everything else of the kafka message survives, stale length / encoding headers do not
+        assertEquals("1.2.3.4", second.get("ip").asText());
+        assertEquals("MIRRORING", second.get("source").asText());
+        JsonNode requestHeaders = json(second.get("requestHeaders").asText());
+        assertEquals("session=abc", requestHeaders.get("cookie").asText());
+        assertFalse(requestHeaders.has("content-length"));
+        JsonNode responseHeaders = json(second.get("responseHeaders").asText());
+        assertFalse(responseHeaders.has("content-length"));
+        assertFalse(responseHeaders.has("content-encoding"));
+        assertTrue(responseHeaders.has("content-type"));
+    }
+
+    @Test
+    public void everyOpGetsItsOwnCompleteClone() throws Exception {
+        HttpResponseParams original = get("/trpc/acme/a.one,b.two?batch=1&input=" + enc("{}"),
+                "[{\"result\":{\"data\":1}},{\"result\":{\"data\":2}}]");
+        original.setTags("{\"k8s\":\"x\"}");
+        original.setDirection("in");
+        original.setDestIP("9.9.9.9");
+        original.setTraces("t");
+        original.setGuardrailVerdict("g");
+
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(original);
+        assertEquals(2, ops.size());
+        for (HttpResponseParams op : ops) {
+            assertEquals("{\"k8s\":\"x\"}", op.getTags());
+            assertEquals("in", op.getDirection());
+            assertEquals("9.9.9.9", op.getDestIP());
+            assertEquals("t", op.getTraces());
+            assertEquals("g", op.getGuardrailVerdict());
+            assertEquals("1728622642", op.getAccountId());
+            assertEquals(HttpResponseParams.Source.MIRRORING, op.getSource());
+            assertEquals(1700000000, op.getTime());
+        }
+        // headers are not shared between the ops nor with the original
+        ops.get(0).getRequestParams().getHeaders().put("x-test", new ArrayList<>(Arrays.asList("1")));
+        assertFalse(ops.get(1).getRequestParams().getHeaders().containsKey("x-test"));
+        assertFalse(original.getRequestParams().getHeaders().containsKey("x-test"));
+        assertFalse(ops.get(0).getRequestParams().getHeaders().containsKey("content-length"));
+    }
+
+    @Test
+    public void primitiveDataIsNamed() throws Exception {
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                get("/trpc/acme/matter.lopsId?batch=1&input=" + enc("{\"0\":\"abc\"}"), "[{\"result\":{\"data\":\"LOPS-1\"}}]"));
+        assertEquals(1, ops.size());
+        assertJsonEquals("{\"input\":\"abc\"}", ops.get(0).getRequestParams().getPayload());
+        assertJsonEquals("{\"data\":\"LOPS-1\"}", ops.get(0).getPayload());
+    }
+
+    // ---------------------------------------------------------------------------------------------- mutations
+
+    @Test
+    public void postMutationBatchOfOne() throws Exception {
+        String body = "{\"0\":{\"id\":\"m1\",\"detailsData\":{\"referredOutCheck__r\":{\"date__f\":\"2026-05-03\"}}}}";
+        String response = "[{\"result\":{\"data\":{\"id\":\"m1\",\"name\":\"Avery\"}}}]";
+
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(post("/trpc/acme/matter.details.set?batch=1", body, response));
+
+        assertEquals(1, ops.size());
+        HttpResponseParams op = ops.get(0);
+        assertEquals("POST", op.getRequestParams().getMethod());
+        assertEquals("/trpc/STRING/matter.details.set", op.getRequestParams().getURL());
+        assertJsonEquals("{\"id\":\"m1\",\"detailsData\":{\"referredOutCheck__r\":{\"date__f\":\"2026-05-03\"}}}", op.getRequestParams().getPayload());
+        assertJsonEquals("{\"id\":\"m1\",\"name\":\"Avery\"}", op.getPayload());
+
+        JsonNode sample = sample(op);
+        assertEquals("/trpc/acme/matter.details.set", sample.get("path").asText());
+        assertEquals("{\"id\":\"m1\",\"detailsData\":{\"referredOutCheck__r\":{\"date__f\":\"2026-05-03\"}}}", sample.get("requestPayload").asText());
+        assertTrue(json(sample.get("requestHeaders").asText()).has("content-type"));
+    }
+
+    @Test
+    public void nonBatchedCallsKeepTheirBodyVerbatim() throws Exception {
+        String body = "{\"email\":\"a@b.com\",\"provider\":\"google\"}";
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                post("/trpc/login", body, "{\"result\":{\"data\":\"https://idp.example.com/authorize\"}}"));
+
+        assertEquals(1, ops.size());
+        // no tenant segment: nothing is templated
+        assertEquals("/trpc/login", ops.get(0).getRequestParams().getURL());
+        assertJsonEquals(body, ops.get(0).getRequestParams().getPayload());
+        assertJsonEquals("{\"data\":\"https://idp.example.com/authorize\"}", ops.get(0).getPayload());
+        assertEquals(body, sample(ops.get(0)).get("requestPayload").asText());
+    }
+
+    @Test
+    public void nonBatchedGetKeepsTheInputVerbatim() throws Exception {
+        String input = "{\"email\":\"a@b.com\"}";
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                get("/_/sow/trpc/info?input=" + enc(input), "{\"result\":{\"data\":{\"loginProvider\":\"WORKOS\"}}}"));
+
+        assertEquals(1, ops.size());
+        assertEquals("/_/sow/trpc/info", ops.get(0).getRequestParams().getURL());
+        assertJsonEquals(input, ops.get(0).getRequestParams().getPayload());
+        assertEquals("/_/sow/trpc/info", sample(ops.get(0)).get("path").asText());
+        assertEquals(input, sample(ops.get(0)).get("requestPayload").asText());
+    }
+
+    @Test
+    public void rawStringBodyBecomesNamedInput() throws Exception {
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                post("/trpc/impersonate.start", "\"019dd43a-e052\"", "{\"result\":{}}"));
+        assertEquals(1, ops.size());
+        assertJsonEquals("{\"input\":\"019dd43a-e052\"}", ops.get(0).getRequestParams().getPayload());
+        assertJsonEquals("{}", ops.get(0).getPayload());
+        assertEquals("\"019dd43a-e052\"", sample(ops.get(0)).get("requestPayload").asText());
+    }
+
+    // ---------------------------------------------------------------------------------------------- responses
+
+    @Test
+    public void errorItemGetsItsOwnHttpStatus() throws Exception {
+        String response = "[{\"result\":{\"data\":{\"ok\":true}}},{\"error\":{\"message\":\"nope\",\"code\":-32004,\"data\":{\"code\":\"NOT_FOUND\",\"httpStatus\":404,\"path\":\"b.two\"}}}]";
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(call("GET",
+                "/trpc/acme/a.one,b.two?batch=1&input=" + enc("{}"), "", response, 207, new HashMap<>()));
+
+        assertEquals(2, ops.size());
+        assertEquals(200, ops.get(0).getStatusCode());
+        assertEquals(404, ops.get(1).getStatusCode());
+        assertEquals("404", sample(ops.get(1)).get("statusCode").asText());
+        assertTrue(json(sample(ops.get(1)).get("responsePayload").asText()).has("error"));
+    }
+
+    @Test
+    public void emptyResponseOfAConfirmedMountStillSplits() throws Exception {
+        // 7% of the real samples have a `{}` response on a 207/200 call, the request side is still worth recording
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(call("GET",
+                "/trpc/acme/a.one,b.two?batch=1&input=" + enc("{\"0\":{\"x\":1}}"), "", "{}", 207, new HashMap<>()));
+
+        assertEquals(2, ops.size());
+        assertEquals(200, ops.get(0).getStatusCode());
+        assertJsonEquals("{\"x\":1}", ops.get(0).getRequestParams().getPayload());
+        assertJsonEquals("{}", ops.get(0).getPayload());
+        assertEquals("{}", sample(ops.get(0)).get("responsePayload").asText());
+    }
+
+    @Test
+    public void emptyResponseWithoutAStrongUrlSignalIsNotTrpc() throws Exception {
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one", "{}")).isEmpty());
+    }
+
+    @Test
+    public void jsonlStreamingChunkKeepsTheRequestSide() throws Exception {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("trpc-accept", "application/jsonl");
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(call("GET",
+                "/trpc/acme/task.get?batch=1&input=" + enc("{\"0\":{\"id\":\"t1\"}}"), "", "{\"0\":[[0],[null,0,0]]}", 200, headers));
+
+        assertEquals(1, ops.size());
+        assertJsonEquals("{\"id\":\"t1\"}", ops.get(0).getRequestParams().getPayload());
+        assertJsonEquals("{}", ops.get(0).getPayload());
+        // the replayable sample asks for plain json
+        assertFalse(json(sample(ops.get(0)).get("requestHeaders").asText()).has("trpc-accept"));
+    }
+
+    // ---------------------------------------------------------------------------------------------- superjson
+
+    @Test
+    public void superjsonEnvelopeIsUnwrappedInTheRestViewOnly() throws Exception {
+        String input = "{\"0\":{\"json\":{\"id\":\"m1\"},\"meta\":{\"values\":{\"d\":[\"Date\"]}}}}";
+        String response = "[{\"result\":{\"data\":{\"json\":{\"id\":\"m1\",\"n\":1},\"meta\":{\"values\":{}}}}}]";
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                post("/trpc/acme/matter.update?batch=1", input, response));
+
+        assertEquals(1, ops.size());
+        assertJsonEquals("{\"id\":\"m1\"}", ops.get(0).getRequestParams().getPayload());
+        assertJsonEquals("{\"id\":\"m1\",\"n\":1}", ops.get(0).getPayload());
+        // the sample is what went over the wire, wrapper included
+        assertEquals("{\"json\":{\"id\":\"m1\"},\"meta\":{\"values\":{\"d\":[\"Date\"]}}}", sample(ops.get(0)).get("requestPayload").asText());
+    }
+
+    // ---------------------------------------------------------------------------------------------- mounts
+
+    @Test
+    public void tenantSegmentsAreTemplatedAndUnknownMountsNeedBatch() throws Exception {
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                get("/api/rpc/a.one,b.two?batch=1&input=" + enc("{}"), "[{\"result\":{\"data\":1}},{\"result\":{\"data\":2}}]"));
+        assertEquals(2, ops.size());
+        // no `trpc` segment: the whole prefix is the mount, nothing is templated
+        assertEquals("/api/rpc/a.one", ops.get(0).getRequestParams().getURL());
+
+        List<HttpResponseParams> deeper = TrpcUtils.parseTrpcResponseParam(
+                get("/api/trpc/firm/sub/a.one", "{\"result\":{\"data\":1}}"));
+        assertEquals(1, deeper.size());
+        assertEquals("/api/trpc/STRING/STRING/a.one", deeper.get(0).getRequestParams().getURL());
+        assertEquals("/api/trpc/firm/sub/a.one", sample(deeper.get(0)).get("path").asText());
+    }
+
+    // ---------------------------------------------------------------------------------------------- not trpc
+
+    @Test
+    public void ordinaryTrafficIsLeftAlone() throws Exception {
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/api/users/me", "{\"id\":1}")).isEmpty());
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/v2/cases/123/activity?batch=1", "{\"id\":1}")).isEmpty());
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/docs", "<html></html>")).isEmpty());
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one", "{\"foo\":1}")).isEmpty());
+        // json-rpc is not trpc
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one", "{\"jsonrpc\":\"2.0\",\"result\":1,\"id\":1}")).isEmpty());
+        // batch response of the wrong size
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one,b.two?batch=1", "[{\"result\":{\"data\":1}}]")).isEmpty());
+        // comma list without batch
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one,b.two", "{\"result\":{\"data\":1}}")).isEmpty());
+        // batch input must be keyed by call index
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/a.one?batch=1&input=" + enc("{\"email\":\"x\"}"), "[{\"result\":{\"data\":1}}]")).isEmpty());
+        // other verbs, form bodies
+        assertTrue(TrpcUtils.parseTrpcResponseParam(call("PUT", "/trpc/acme/a.one", "{}", "{\"result\":{}}", 200, new HashMap<>())).isEmpty());
+        Map<String, String> form = new HashMap<>();
+        form.put("content-type", "multipart/form-data; boundary=x");
+        assertTrue(TrpcUtils.parseTrpcResponseParam(call("POST", "/trpc/acme/a.one", "--x", "{\"result\":{}}", 200, form)).isEmpty());
+        assertTrue(TrpcUtils.parseTrpcResponseParam(null).isEmpty());
+    }
+
+    @Test
+    public void absoluteUrlsAreNotSplit() throws Exception {
+        // HAR / Postman uploads are processed by the api-runtime, mini-runtime only sees request targets
+        String input = "{\"0\":{\"json\":{\"id\":\"123\"}}}";
+        assertTrue(TrpcUtils.parseTrpcResponseParam(get("https://api.example.com/trpc/getUser?batch=1&input=" + enc(input),
+                "[{\"result\":{\"data\":{\"json\":{\"id\":\"123\"}}}}]")).isEmpty());
+        assertFalse(TrpcUtils.isTrpcUrl("https://api.example.com/trpc/getUser?input=%7B%7D"));
+    }
+
+    @Test
+    public void trpcProceduresAreNotMistakenForHealthChecks() {
+        assertTrue(TrpcUtils.isTrpcUrl("/trpc/acme/health.check"));
+        assertTrue(TrpcUtils.isTrpcUrl("/api/trpc/health.check?batch=1&input=%7B%7D"));
+        assertFalse(TrpcUtils.isTrpcUrl("/health"));
+        assertFalse(TrpcUtils.isTrpcUrl("/api/health/check"));
+        assertFalse(TrpcUtils.isTrpcUrl(null));
+    }
+
+    // ---------------------------------------------------------------------------------------------- testing: stored GET input -> query param
+
+    private static OriginalHttpRequest request(String sampleMessage) {
+        OriginalHttpRequest request = new OriginalHttpRequest();
+        request.buildFromSampleMessage(sampleMessage);
+        return request;
+    }
+
+    @Test
+    public void storedGetInputIsEditableAsTheBodyAndMovesBackIntoTheQueryWhenSent() throws Exception {
+        String input = "{\"limit\":50,\"filters\":[{\"key\":\"status\",\"value\":[\"active\"]}]}";
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                get("/trpc/acme/matter.list,user.get?batch=1&input=" + enc("{\"0\":" + input + "}") + "&foo=bar",
+                        "[{\"result\":{\"data\":{}}},{\"result\":{\"data\":{}}}]"));
+        OriginalHttpRequest request = request(ops.get(0).getOrig());
+
+        // what the test operations and the dashboard work on
+        assertEquals(input, request.getBody());
+        assertEquals("foo=bar", request.getQueryParams());
+        assertEquals("/trpc/acme/matter.list", request.getUrl());
+
+        // a body operation changes the input, sending puts it on the wire
+        request.setBody("{\"limit\":999}");
+        assertTrue(TrpcUtils.moveBodyToInputQuery(request));
+        assertEquals("", request.getBody());
+        assertEquals("input=" + enc("{\"limit\":999}") + "&foo=bar", request.getQueryParams());
+        assertFalse("a second move is a no-op", TrpcUtils.moveBodyToInputQuery(request));
+    }
+
+    @Test
+    public void unmodifiedRoundTripIsLossless() throws Exception {
+        String input = "{\"q\":\"a&b=c+d%20é #?\",\"n\":[1,2.50,null],\"empty\":{}}";
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                get("/trpc/acme/search.run?batch=1&input=" + enc("{\"0\":" + input + "}"), "[{\"result\":{\"data\":{}}}]"));
+        OriginalHttpRequest request = request(ops.get(0).getOrig());
+
+        assertEquals(input, request.getBody());
+        assertTrue(TrpcUtils.moveBodyToInputQuery(request));
+        assertEquals("input=" + enc(input), request.getQueryParams());
+        assertEquals(input, URLDecoder.decode(request.getQueryParams().substring("input=".length()), "UTF-8"));
+    }
+
+    @Test
+    public void aGetWithoutInputHasNoPayloadAndSendsNoInput() throws Exception {
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(get("/trpc/acme/user.list", "{\"result\":{\"data\":[]}}"));
+        OriginalHttpRequest request = request(ops.get(0).getOrig());
+
+        assertEquals("", request.getBody());
+        assertFalse(TrpcUtils.moveBodyToInputQuery(request));
+        assertEquals("", request.getQueryParams() == null ? "" : request.getQueryParams());
+    }
+
+    @Test
+    public void deletingTheWholeBodyOmitsTheInputParam() throws Exception {
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                get("/trpc/acme/a.one?input=" + enc("{\"x\":1}"), "{\"result\":{\"data\":1}}"));
+        OriginalHttpRequest request = request(ops.get(0).getOrig());
+        request.setBody("");
+
+        assertFalse(TrpcUtils.moveBodyToInputQuery(request));
+        assertEquals("", request.getQueryParams() == null ? "" : request.getQueryParams());
+    }
+
+    @Test
+    public void copiesAreMovedIndependently() throws Exception {
+        List<HttpResponseParams> ops = TrpcUtils.parseTrpcResponseParam(
+                get("/trpc/acme/a.one?input=" + enc("{\"x\":1}"), "{\"result\":{\"data\":1}}"));
+        OriginalHttpRequest request = request(ops.get(0).getOrig());
+        OriginalHttpRequest copy = request.copy();
+
+        // nothing but the request itself decides whether it is moved, so a copy behaves like its original
+        assertTrue(TrpcUtils.moveBodyToInputQuery(copy));
+        assertEquals("input=" + enc("{\"x\":1}"), copy.getQueryParams());
+        assertEquals("", copy.getBody());
+        assertEquals("{\"x\":1}", request.getBody());
+    }
+
+    @Test
+    public void aBodyAddedByATestOperationToACallWithoutInputMovesIntoTheQuery() throws Exception {
+        OriginalHttpRequest request = new OriginalHttpRequest("/trpc/acme/a.one", "", "GET", "{\"id\":\"x\"}", new HashMap<>(), "HTTP/1.1");
+
+        assertTrue(TrpcUtils.moveBodyToInputQuery(request));
+        assertEquals("input=" + enc("{\"id\":\"x\"}"), request.getQueryParams());
+        assertEquals("", request.getBody());
+        assertFalse("second move is a no-op", TrpcUtils.moveBodyToInputQuery(request));
+    }
+
+    @Test
+    public void bodyOfEveryOtherRequestIsLeftAlone() throws Exception {
+        // not trpc
+        OriginalHttpRequest rest = new OriginalHttpRequest("/api/users", "a=1", "GET", "{\"x\":1}", new HashMap<>(), "HTTP/1.1");
+        assertFalse(TrpcUtils.moveBodyToInputQuery(rest));
+        assertEquals("{\"x\":1}", rest.getBody());
+        assertEquals("a=1", rest.getQueryParams());
+
+        // not a GET
+        OriginalHttpRequest post = new OriginalHttpRequest("/trpc/acme/a.one", "", "POST", "{\"x\":1}", new HashMap<>(), "HTTP/1.1");
+        assertFalse(TrpcUtils.moveBodyToInputQuery(post));
+        assertEquals("{\"x\":1}", post.getBody());
+
+        // a batch is never rewritten
+        OriginalHttpRequest batch = new OriginalHttpRequest("/trpc/acme/a.one,b.two", "batch=1", "GET", "{\"0\":{}}", new HashMap<>(), "HTTP/1.1");
+        assertFalse(TrpcUtils.moveBodyToInputQuery(batch));
+
+        // the query already carries the input
+        OriginalHttpRequest hasInput = new OriginalHttpRequest("/trpc/acme/a.one", "input=%7B%7D", "GET", "{\"x\":1}", new HashMap<>(), "HTTP/1.1");
+        assertFalse(TrpcUtils.moveBodyToInputQuery(hasInput));
+        assertEquals("input=%7B%7D", hasInput.getQueryParams());
+        assertEquals("{\"x\":1}", hasInput.getBody());
+
+        // no body
+        OriginalHttpRequest empty = new OriginalHttpRequest("/trpc/acme/a.one", "", "GET", null, new HashMap<>(), "HTTP/1.1");
+        assertFalse(TrpcUtils.moveBodyToInputQuery(empty));
+        assertEquals("", empty.getQueryParams());
+        assertFalse(TrpcUtils.moveBodyToInputQuery(null));
+    }
+
+    @Test
+    public void movesWorkOnAnAbsoluteUrl() throws Exception {
+        // a modify_url test operation or the executor may have made the url absolute by the time the request is sent
+        OriginalHttpRequest request = new OriginalHttpRequest("https://app.example.com/trpc/acme/a.one", "", "GET", "{\"x\":2}", new HashMap<>(), "HTTP/1.1");
+
+        assertTrue(TrpcUtils.moveBodyToInputQuery(request));
+        assertEquals("input=" + enc("{\"x\":2}"), request.getQueryParams());
+        assertEquals("https://app.example.com/trpc/acme/a.one", request.getUrl());
+    }
+}
