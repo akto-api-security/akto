@@ -11,7 +11,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -220,22 +219,10 @@ public class ApiInfoBackfillJob {
 
         // read straight off the raw _id so pagination still advances when the last doc on a page
         // carries a method the enum cannot hold
-        int apiCollectionId = lastId.getInt("apiCollectionId");
-        String url = lastId.getString("url", "");
-        String method = lastId.getString("method", "");
-
-        return Filters.or(
-                Filters.gt("_id.apiCollectionId", apiCollectionId),
-                Filters.and(
-                        Filters.eq("_id.apiCollectionId", apiCollectionId),
-                        Filters.gt("_id.url", url)
-                ),
-                Filters.and(
-                        Filters.eq("_id.apiCollectionId", apiCollectionId),
-                        Filters.eq("_id.url", url),
-                        Filters.gt("_id.method", method)
-                )
-        );
+        return ApiInfoDao.keysetAfter(
+                lastId.getInt("apiCollectionId"),
+                lastId.getString("url", ""),
+                lastId.getString("method", ""));
     }
 
     private static int processPage(List<BasicDBObject> page, List<CustomAuthType> customAuthTypes) {

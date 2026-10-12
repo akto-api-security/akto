@@ -103,7 +103,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
 
         fillDBValues();
         RiskScoreOfCollections riskScoreOfCollections = new RiskScoreOfCollections();
-        riskScoreOfCollections.mapSensitiveSTIsInApiInfo(0, 0);
+        riskScoreOfCollections.mapSensitiveSTIsInApiInfo(0);
         
         Bson filter = Filters.and(
             Filters.eq("_id.url", "http://sampl-aktol-1exannwybqov-67928726.ap-south-1.elb.amazonaws.com/api/college/student-details"),
@@ -143,7 +143,7 @@ public class TestUpdatesInCollections extends MongoBasedTest {
             options
         );
         SingleTypeInfo.fetchCustomDataTypes(MongoBasedTest.ACCOUNT_ID);
-        riskScoreOfCollections.mapSensitiveSTIsInApiInfo(Context.now() - (2 * 60), 0);
+        riskScoreOfCollections.mapSensitiveSTIsInApiInfo(Context.now() - (2 * 60));
         ApiInfo apiInfo4 = ApiInfoDao.instance.findOne(filter3);
         assertEquals(false, apiInfo4.getIsSensitive());
     }

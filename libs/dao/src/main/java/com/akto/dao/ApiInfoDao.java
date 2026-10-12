@@ -27,6 +27,7 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -422,6 +423,33 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 Filters.eq("_id.url", url),
                 Filters.eq("_id.method", method),
                 Filters.eq("_id.apiCollectionId", apiCollectionId)
+        );
+    }
+
+    public static Bson getFilter(Collection<ApiInfo.ApiInfoKey> apiInfoKeys) {
+        List<Bson> filters = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeys) {
+            filters.add(getFilter(apiInfoKey));
+        }
+        return filters.isEmpty() ? MCollection.noMatchFilter : Filters.or(filters);
+    }
+
+    /**
+     * Keyset pagination filter over the compound _id (apiCollectionId, url, method): matches every doc strictly after
+     * the given key when sorted by _id.apiCollectionId, _id.url, _id.method ascending.
+     */
+    public static Bson keysetAfter(int apiCollectionId, String url, String method) {
+        return Filters.or(
+                Filters.gt(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                Filters.and(
+                        Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                        Filters.gt(ApiInfo.ID_URL, url)
+                ),
+                Filters.and(
+                        Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                        Filters.eq(ApiInfo.ID_URL, url),
+                        Filters.gt(ApiInfo.ID_METHOD, method)
+                )
         );
     }
 

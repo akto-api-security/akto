@@ -7,7 +7,6 @@ import java.util.function.Consumer;
 
 import org.bson.conversions.Bson;
 
-import com.akto.action.observe.InventoryAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiCollectionsDao;
@@ -33,13 +32,13 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.utils.RiskScoreOfCollections;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-import com.akto.dao.billing.OrganizationsDao;
 import org.json.JSONObject;
 import org.json.JSONArray;
 import java.util.ArrayList;
@@ -51,18 +50,19 @@ import java.util.stream.Collectors;
 
 public class SyncCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
-    private static final String AKTO_API_INFO_CRONS = "AKTO_API_INFO_CRONS";
+    private static final int SYNC_CRON_INTERVAL_MINUTES = 30;
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     ScheduledExecutorService mcpMaliciousnessScheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpUpdateCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                Set<Integer> accountsWithRecentUserLogin = DormantAccountFilter.fetchAccountsWithRecentUserLogin();
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        if (!OrganizationsDao.instance.checkFeatureAccess(t.getId(), AKTO_API_INFO_CRONS)) {
-                            loggerMaker.debugAndAddToDb("Skipping risk info mapping for account: " + t.getId(), LogDb.DASHBOARD);
+                        if (DormantAccountFilter.isDormant(t.getId(), accountsWithRecentUserLogin)) {
+                            loggerMaker.debugAndAddToDb("Skipping risk info mapping for dormant account: " + t.getId(), LogDb.DASHBOARD);
                             return;
                         }
                         loggerMaker.warnAndAddToDb("Cron for mapping risk info picked up by " + t.getId(), LogDb.DASHBOARD);
@@ -71,7 +71,7 @@ public class SyncCron {
                         loggerMaker.debugAndAddToDb("Cron for updating new parameters, new endpoints and severity score picked up " + accountSettings.getId(), LogDb.DASHBOARD);
                         try {
                             int endTs = Context.now();
-                            int startTs = endTs - 600 ;
+                            int startTs = endTs - SYNC_CRON_INTERVAL_MINUTES * 60;
                             int startTsSeverity = 0;
                             int resetTs = 0;
                             if(lastRunTimerInfo != null){
@@ -89,7 +89,12 @@ public class SyncCron {
                             }
 
                              // synced new endpoints from APIinfo and then inserted into activities
-                            long newEndpoints  = new InventoryAction().fetchRecentEndpoints(startTs,endTs).size();
+                            // discoveredTimestamp is indexed and set when the api is first seen, so this is a range count
+                            long newEndpoints = ApiInfoDao.instance.getMCollection().countDocuments(Filters.and(
+                                Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, startTs),
+                                Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTs),
+                                Filters.nin(ApiInfo.ID_API_COLLECTION_ID, UsageMetricCalculator.getDeactivated())
+                            ));
                             if(newEndpoints > 0){
                                 ActivitiesDao.instance.insertActivity("Endpoints detected",newEndpoints + " new endpoints detected");
                             }
@@ -140,7 +145,7 @@ public class SyncCron {
                     }
                 }, "sync-cron-info");
             }
-        }, 0, 5, TimeUnit.MINUTES);
+        }, 0, SYNC_CRON_INTERVAL_MINUTES, TimeUnit.MINUTES);
     }
 
     public void setUpMcpMaliciousnessCronScheduler() {

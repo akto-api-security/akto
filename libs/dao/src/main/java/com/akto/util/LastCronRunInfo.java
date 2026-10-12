@@ -19,6 +19,12 @@ public class LastCronRunInfo {
     public static final String LAST_USER_ANALYSIS_CRON = "lastUserAnalysisCron";
     private int lastUserAnalysisCron;
 
+    public static final String LAST_API_GROUPS_SYNC = "lastApiGroupsSync";
+    private int lastApiGroupsSync;
+
+    public static final String LAST_API_GROUPS_FULL_SYNC = "lastApiGroupsFullSync";
+    private int lastApiGroupsFullSync;
+
     public LastCronRunInfo() {
     }
 
@@ -75,5 +81,21 @@ public class LastCronRunInfo {
 
     public void setLastUserAnalysisCron(int lastUserAnalysisCron) {
         this.lastUserAnalysisCron = lastUserAnalysisCron;
+    }
+
+    public int getLastApiGroupsSync() {
+        return lastApiGroupsSync;
+    }
+
+    public void setLastApiGroupsSync(int lastApiGroupsSync) {
+        this.lastApiGroupsSync = lastApiGroupsSync;
+    }
+
+    public int getLastApiGroupsFullSync() {
+        return lastApiGroupsFullSync;
+    }
+
+    public void setLastApiGroupsFullSync(int lastApiGroupsFullSync) {
+        this.lastApiGroupsFullSync = lastApiGroupsFullSync;
     }
 }
