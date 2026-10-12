@@ -10,9 +10,12 @@ import java.util.stream.Collectors;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
@@ -25,6 +28,8 @@ import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.client.model.Filters;
 
 public class AllAPIsGroup extends TestingEndpoints {
+
+    private static final Logger logger = LoggerFactory.getLogger(AllAPIsGroup.class);
 
     /**
      * When set, the group is only (re)computed for these api collections. Lets crons add the group id to just the
@@ -68,6 +73,7 @@ public class AllAPIsGroup extends TestingEndpoints {
      * covered by an earlier run, and new docs are only ever created under their own api collection.
      */
     public static void updateCollections(int since) {
+        long startMs = System.currentTimeMillis();
         Set<Integer> apiCollectionIds = new HashSet<>();
 
         SingleTypeInfoDao.instance.getMCollection()
@@ -87,10 +93,15 @@ public class AllAPIsGroup extends TestingEndpoints {
                 ), Integer.class)
                 .into(apiCollectionIds);
 
+        long scopeMs = System.currentTimeMillis() - startMs;
         if (apiCollectionIds.isEmpty()) {
+            logger.info(String.format("AccountId: %d All apis group: no new data since %d, scope lookup took: %d ms",
+                    Context.accountId.get(), since, scopeMs));
             return;
         }
         AllAPIsGroup scopedGroup = new AllAPIsGroup(new ArrayList<>(apiCollectionIds));
         ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(scopedGroup), ALL_APIS_GROUP_ID);
+        logger.info(String.format("AccountId: %d All apis group: updating %d api collections since %d, scope lookup took: %d ms, total: %d ms",
+                Context.accountId.get(), apiCollectionIds.size(), since, scopeMs, System.currentTimeMillis() - startMs));
     }
 }

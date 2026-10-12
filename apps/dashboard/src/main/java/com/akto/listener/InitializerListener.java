@@ -38,6 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -445,18 +446,30 @@ public class InitializerListener implements ServletContextListener {
     public void updateApiGroupsForAccounts() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                long runStartMs = System.currentTimeMillis();
                 Set<Integer> accountsWithRecentUserLogin = DormantAccountFilter.fetchAccountsWithRecentUserLogin();
+                AtomicInteger processedAccounts = new AtomicInteger();
+                AtomicInteger dormantAccounts = new AtomicInteger();
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         if (DormantAccountFilter.isDormant(t.getId(), accountsWithRecentUserLogin)) {
+                            dormantAccounts.incrementAndGet();
                             logger.info("Skipping update api groups for dormant account: " + t.getId());
                             return;
                         }
+                        processedAccounts.incrementAndGet();
+                        long accountStartMs = System.currentTimeMillis();
                         updateApiGroups();
+                        long groupsMs = System.currentTimeMillis() - accountStartMs;
                         backFillStatusCodeType();
+                        logger.info("update-api-groups AccountId: " + t.getId() + " api groups: " + groupsMs + " ms"
+                                + ", backFillStatusCodeType: " + (System.currentTimeMillis() - accountStartMs - groupsMs) + " ms"
+                                + ", total: " + (System.currentTimeMillis() - accountStartMs) + " ms");
                     }
                 }, "update-api-groups");
+                logger.info("update-api-groups run finished: accounts processed: " + processedAccounts.get()
+                        + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
@@ -472,6 +485,7 @@ public class InitializerListener implements ServletContextListener {
         boolean full = lastSync == 0 || (now - lastFullSync) >=  Constants.ONE_DAY_TIMESTAMP;
         int since = Math.max(lastSync - API_GROUPS_SYNC_BUFFER_SECONDS, 0);
 
+        long startMs = System.currentTimeMillis();
         createFirstUnauthenticatedApiGroup(since, full);
 
         List<Bson> updates = new ArrayList<>();
@@ -481,6 +495,8 @@ public class InitializerListener implements ServletContextListener {
         }
         AccountSettingsDao.instance.getMCollection().updateOne(
                 AccountSettingsDao.generateFilter(), Updates.combine(updates), new UpdateOptions().upsert(true));
+        logger.info("AccountId: " + Context.accountId.get() + " api groups updated, mode: " + (full ? "full" : "incremental")
+                + ", since: " + since + ", took: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 
     public void setUpGuardrailServiceUrlLatencyScheduler() {
@@ -2070,8 +2086,13 @@ public class InitializerListener implements ServletContextListener {
 
 
     public static void createFirstUnauthenticatedApiGroup(int since, boolean full){
+        long startMs = System.currentTimeMillis();
         createUnauthenticatedApiGroup(since, full);
+        long unauthenticatedMs = System.currentTimeMillis() - startMs;
         createAllApisGroup(since, full);
+        // updateMany writes are queued on the shared collection-id executor, so these timings cover the scan and queueing
+        logger.info("AccountId: " + Context.accountId.get() + " unauthenticated group: " + unauthenticatedMs + " ms"
+                + ", all apis group: " + (System.currentTimeMillis() - startMs - unauthenticatedMs) + " ms");
     }
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
@@ -2776,16 +2797,15 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    logger.warn("Starting init functions and scheduling jobs at " + now);
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    // logger.warn("Starting init functions and scheduling jobs at " + now);
+                    // updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
 
-                    // API group jobs
-                    setUpUpdateCustomCollections();
-                    logger.warn("Setting up user analysis cron scheduler");
-                    userAnalysisCron.setUpUserAnalysisCronScheduler();
-                    logger.warn("User analysis cron scheduler setup complete");
+                    // // API group jobs
+                    // setUpUpdateCustomCollections();
+                    // logger.warn("Setting up user analysis cron scheduler");
+                    // userAnalysisCron.setUpUserAnalysisCronScheduler();
+                    // logger.warn("User analysis cron scheduler setup complete");
                     updateApiGroupsForAccounts();
-
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpGuardrailServiceUrlLatencyScheduler();

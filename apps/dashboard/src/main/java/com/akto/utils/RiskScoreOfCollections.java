@@ -205,10 +205,12 @@ public class RiskScoreOfCollections {
     
     public void updateSeverityScoreInApiInfo(int timeStampFilter){
         int startTime = Context.now();
+        long startMs = System.currentTimeMillis();
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
 
         Map<ApiInfoKey, Float> severityScoreMap = getUpdatedApiInfosMap(timeStampFilter);
+        long issuesMs = System.currentTimeMillis() - startMs;
         int severityScoreMapSize = severityScoreMap != null ? severityScoreMap.size() : 0;
         int riskScoreGroupUpdateCount = 0;
         int apiInfoNotFoundCount = 0;
@@ -261,6 +263,11 @@ public class RiskScoreOfCollections {
         }
 
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
+
+        loggerMaker.info("Severity score incremental update AccountId: " + Context.accountId.get() + " since: " + timeStampFilter
+            + " apis with updated issues: " + severityScoreMapSize + " (fetched in " + issuesMs + " ms)"
+            + " api infos not found: " + apiInfoNotFoundCount + " bulk updates: " + bulkUpdatesSize
+            + " riskScore group updates: " + riskScoreGroupUpdateCount + " total: " + (System.currentTimeMillis() - startMs) + " ms");
 
         // Log activity for account 1763355072
         if (Context.accountId.get() == 1763355072) {
@@ -430,6 +437,7 @@ public class RiskScoreOfCollections {
      */
     public void mapSensitiveSTIsInApiInfo(int lastSyncedTs){
         int startTs = Context.now();
+        long startMs = System.currentTimeMillis();
         LazyMcpRiskScoreContext mcpRiskScoreContext = new LazyMcpRiskScoreContext();
 
         int stiTimeStampFilter = lastSyncedTs == 0 ? 0 : lastSyncedTs - SENSITIVE_SYNC_BUFFER_SECONDS;
@@ -442,20 +450,26 @@ public class RiskScoreOfCollections {
             );
             updateSensitiveInfoFromStis(stiFilter, true, mcpRiskScoreContext);
         }
+        long newStisMs = System.currentTimeMillis() - startMs;
 
         if (lastSyncedTs != 0) {
             reevaluateApisOfModifiedDataTypes(lastSyncedTs, mcpRiskScoreContext);
         }
+        long totalMs = System.currentTimeMillis() - startMs;
 
         AccountSettingsDao.instance.getMCollection().updateOne(
             AccountSettingsDao.generateFilter(),
             Updates.set((AccountSettings.LAST_UPDATED_CRON_INFO + "."+ LastCronRunInfo.LAST_UPDATED_SENSITIVE_MAP), startTs),
             new UpdateOptions().upsert(true)
         );
+        loggerMaker.info("Sensitive info mapping AccountId: " + Context.accountId.get() + " mode: " + (lastSyncedTs == 0 ? "first run" : "incremental")
+            + " since: " + stiTimeStampFilter + " new STIs: " + newStisMs + " ms"
+            + " modified data types re-evaluation: " + (totalMs - newStisMs) + " ms total: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 
     public void calculateRiskScoreForAllApis() {
         int startTime = Context.now();
+        long startMs = System.currentTimeMillis();
         int timeStamp = startTime - 24*60*60;
         int limit = 1000;
         int count = 0; 
@@ -472,6 +486,7 @@ public class RiskScoreOfCollections {
         // create a set for severityScore
         Map<ApiInfoKey, Float> initialSeverityScoreMap = getUpdatedApiInfosMap(0);
         int initialSeverityScoreMapSize = initialSeverityScoreMap != null ? initialSeverityScoreMap.size() : 0;
+        long severityScoreMapMs = System.currentTimeMillis() - startMs;
         int totalApisProcessed = 0;
         int riskScoreGroupUpdates = 0;
         int totalBulkWrites = 0;
@@ -532,5 +547,9 @@ public class RiskScoreOfCollections {
         }
 
         riskScoreTestingEndpointsUtils.syncRiskScoreGroupApis();
+
+        loggerMaker.info("Risk score full reset AccountId: " + Context.accountId.get() + " apis with open issues: " + initialSeverityScoreMapSize
+            + " (aggregated in " + severityScoreMapMs + " ms) apis processed: " + totalApisProcessed + " in " + count + " batches"
+            + " riskScore group updates: " + riskScoreGroupUpdates + " total: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 }

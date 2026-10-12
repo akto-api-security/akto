@@ -4,6 +4,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import com.akto.dao.AccountSettingsDao;
@@ -24,15 +25,20 @@ public class UpdateSensitiveInfoInApiInfo {
     public void setUpSensitiveMapInApiInfoScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                long runStartMs = System.currentTimeMillis();
                 Set<Integer> accountsWithRecentUserLogin = DormantAccountFilter.fetchAccountsWithRecentUserLogin();
+                AtomicInteger processedAccounts = new AtomicInteger();
+                AtomicInteger dormantAccounts = new AtomicInteger();
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         int account = t.getId();
                         if (DormantAccountFilter.isDormant(account, accountsWithRecentUserLogin)) {
+                            dormantAccounts.incrementAndGet();
                             loggerMaker.debugAndAddToDb("Skipping sensitive info mapping for dormant account: " + account, LogDb.DASHBOARD);
                             return;
                         }
+                        processedAccounts.incrementAndGet();
                         loggerMaker.warnAndAddToDb("Cron for mapping sensitive info picked up by " + account, LogDb.DASHBOARD);
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         loggerMaker.debugAndAddToDb("Cron for mapping sensitive info picked up by " + accountSettings.getId(), LogDb.DASHBOARD);
@@ -46,6 +52,8 @@ public class UpdateSensitiveInfoInApiInfo {
                         }
                     }
                 }, "map-sensitiveInfo-in-ApiInfo");
+                loggerMaker.info("map-sensitiveInfo-in-ApiInfo run finished: accounts processed: " + processedAccounts.get()
+                    + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, cronTime, TimeUnit.MINUTES);
     }

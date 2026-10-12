@@ -3,6 +3,7 @@ package com.akto.utils.crons;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import org.bson.conversions.Bson;
@@ -57,14 +58,20 @@ public class SyncCron {
     public void setUpUpdateCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                long runStartMs = System.currentTimeMillis();
                 Set<Integer> accountsWithRecentUserLogin = DormantAccountFilter.fetchAccountsWithRecentUserLogin();
+                AtomicInteger processedAccounts = new AtomicInteger();
+                AtomicInteger dormantAccounts = new AtomicInteger();
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         if (DormantAccountFilter.isDormant(t.getId(), accountsWithRecentUserLogin)) {
+                            dormantAccounts.incrementAndGet();
                             loggerMaker.debugAndAddToDb("Skipping risk info mapping for dormant account: " + t.getId(), LogDb.DASHBOARD);
                             return;
                         }
+                        processedAccounts.incrementAndGet();
+                        long accountStartMs = System.currentTimeMillis();
                         loggerMaker.warnAndAddToDb("Cron for mapping risk info picked up by " + t.getId(), LogDb.DASHBOARD);
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
@@ -83,6 +90,7 @@ public class SyncCron {
                             // synced new parameters from STI and then inserted into activities
                             Bson filter = Filters.and(Filters.gte(SingleTypeInfo._TIMESTAMP, startTs),Filters.lte(SingleTypeInfo._TIMESTAMP, endTs));
                             long newParams = SingleTypeInfoDao.instance.getMCollection().countDocuments(filter);
+                            long paramsCountMs = System.currentTimeMillis() - accountStartMs;
                             
                             if(newParams > 0){
                                 ActivitiesDao.instance.insertActivity("Parameters detected",newParams + " new parameters detected");
@@ -98,6 +106,7 @@ public class SyncCron {
                             if(newEndpoints > 0){
                                 ActivitiesDao.instance.insertActivity("Endpoints detected",newEndpoints + " new endpoints detected");
                             }
+                            long endpointsCountMs = System.currentTimeMillis() - accountStartMs - paramsCountMs;
 
                             // updated {Severity score field in APIinfo}
                             RiskScoreOfCollections updateRiskScore = new RiskScoreOfCollections();
@@ -110,7 +119,9 @@ public class SyncCron {
                             // invoke reset once everyday
                             int resetTime = 24 * 60 * 60;
 
-                            if((endTs - resetTs) >= resetTime){
+                            boolean fullReset = (endTs - resetTs) >= resetTime;
+                            long riskScoreStartMs = System.currentTimeMillis();
+                            if(fullReset){
                                 // if reset is called, calculate riskScore for each api whose last updated is here while resetting isSensitive false and severityScore 0
                                 updateRiskScore.calculateRiskScoreForAllApis();
 
@@ -134,16 +145,25 @@ public class SyncCron {
                             }
 
 
+                            long riskScoreMs = System.currentTimeMillis() - riskScoreStartMs;
+
                             AccountSettingsDao.instance.getMCollection().updateOne(
                                 AccountSettingsDao.generateFilter(),
                                 update,
                                 new UpdateOptions().upsert(true)
                             );
+                            loggerMaker.info("sync-cron-info AccountId: " + t.getId() + " window: [" + startTs + ", " + endTs + "]"
+                                + " newParams: " + newParams + " (" + paramsCountMs + " ms)"
+                                + " newEndpoints: " + newEndpoints + " (" + endpointsCountMs + " ms)"
+                                + " riskScore(" + (fullReset ? "full reset" : "incremental from " + startTsSeverity) + "): " + riskScoreMs + " ms"
+                                + " total: " + (System.currentTimeMillis() - accountStartMs) + " ms");
                         } catch (Exception e) {
                            e.printStackTrace();
                         }
                     }
                 }, "sync-cron-info");
+                loggerMaker.info("sync-cron-info run finished: accounts processed: " + processedAccounts.get()
+                    + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, SYNC_CRON_INTERVAL_MINUTES, TimeUnit.MINUTES);
     }

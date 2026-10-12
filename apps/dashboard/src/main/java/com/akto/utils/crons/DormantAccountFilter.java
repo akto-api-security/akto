@@ -41,6 +41,7 @@ public class DormantAccountFilter {
      * On failure returns an empty set, which falls back to the per-account traffic check alone.
      */
     public static Set<Integer> fetchAccountsWithRecentUserLogin() {
+        long startMs = System.currentTimeMillis();
         Set<Integer> accountIds = new HashSet<>();
         try {
             Bson filter = Filters.and(
@@ -65,6 +66,8 @@ public class DormantAccountFilter {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error fetching accounts with recent user login: " + e.getMessage());
         }
+        loggerMaker.info("Accounts with a non-Akto user login in the last " + LOGIN_STALE_SECONDS / (24 * 60 * 60) + " days: "
+            + accountIds.size() + ", fetched in " + (System.currentTimeMillis() - startMs) + " ms");
         return accountIds;
     }
 

@@ -131,6 +131,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         );
         Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
         int accountId = Context.accountId.get();
+        long startMs = System.currentTimeMillis();
         logger.info(String.format("AccountId: %d Starting full update of unauthenticated data collection", accountId));
 
         // single keyset scan over api_info instead of one query per api collection
@@ -157,12 +158,13 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
             filter = Filters.and(unauthenticatedFilter,
                     ApiInfoDao.keysetAfter(last.getApiCollectionId(), last.getUrl(), last.getMethod().name()));
         }
-        logger.info(String.format("AccountId: %d Finished full update of unauthenticated data collection, scanned: %d",
-                accountId, scanned));
+        logger.info(String.format("AccountId: %d Finished full update of unauthenticated data collection, scanned: %d, took: %d ms",
+                accountId, scanned, System.currentTimeMillis() - startMs));
     }
 
     private static void incrementalUpdate(Set<Integer> allowedCollectionIds, int since) {
         int accountId = Context.accountId.get();
+        long startMs = System.currentTimeMillis();
         logger.info(String.format("AccountId: %d Starting incremental update of unauthenticated data collection since %d",
                 accountId, since));
 
@@ -202,8 +204,8 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
             removeFromGroup(authenticated);
             changed += unauthenticated.size() + authenticated.size();
         }
-        logger.info(String.format("AccountId: %d Finished incremental update of unauthenticated data collection, apis checked: %d",
-                accountId, changed));
+        logger.info(String.format("AccountId: %d Finished incremental update of unauthenticated data collection, collections: %d, apis checked: %d, took: %d ms",
+                accountId, collectionIds.size(), changed, System.currentTimeMillis() - startMs));
     }
 
     private static void addToGroup(List<ApiInfoKey> keys) {
