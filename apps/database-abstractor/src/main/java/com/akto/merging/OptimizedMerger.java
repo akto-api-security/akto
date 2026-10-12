@@ -92,6 +92,7 @@ class OptimizedMerger {
             if (parts.length < 2 || parts[1].isEmpty() || parts[1].contains("//")) continue;
             String[] tokens = MergingLogic.tokenize(parts[1]);
             if (tokens.length <= 1) continue;
+            if (MergingLogic.isTrpcEndpoint(tokens)) continue; // tRPC endpoints never take part in merging
 
             TokenTag[] tags = new TokenTag[tokens.length];
             for (int i = 0; i < tokens.length; i++) {

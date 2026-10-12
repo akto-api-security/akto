@@ -436,4 +436,39 @@ public class TestOptimizedMerger {
         assertEquals(1, result.templateToStaticURLs.size());
         assertEquals(2, result.templateToStaticURLs.values().iterator().next().size());
     }
+
+    // ---- tRPC endpoints never merge ----
+
+    @Test
+    public void testTrpcEndpointsAreNeverMerged() {
+        Set<String> urls = new HashSet<>();
+        // differing in the procedure
+        for (int i = 1; i <= 12; i++) {
+            urls.add("GET /trpc/xk9f/proc" + i + ".list");
+        }
+        // differing in a tenant that would otherwise be merged as a uuid
+        urls.add("GET /trpc/550e8400-e29b-41d4-a716-446655440000/orders.list");
+        urls.add("GET /trpc/6ba7b810-9dad-11d1-80b4-00c04fd430c8/orders.list");
+
+        MergingLogic.ApiMergerResult result = OptimizedMerger.mergeStaticUrls(urls, true, true, 0);
+
+        assertTrue("tRPC endpoints must not create templates", result.templateToStaticURLs.isEmpty());
+    }
+
+    @Test
+    public void testSameShapeWithoutTrpcStillMerges() {
+        Set<String> urls = new HashSet<>(Arrays.asList(
+                "GET /api/550e8400-e29b-41d4-a716-446655440000/orders.list",
+                "GET /api/6ba7b810-9dad-11d1-80b4-00c04fd430c8/orders.list",
+                "GET /trpc/550e8400-e29b-41d4-a716-446655440000/orders.list",
+                "GET /trpc/6ba7b810-9dad-11d1-80b4-00c04fd430c8/orders.list"
+        ));
+
+        MergingLogic.ApiMergerResult result = OptimizedMerger.mergeStaticUrls(urls, true, true, 0);
+
+        assertEquals("only the non tRPC urls merge", 1, result.templateToStaticURLs.size());
+        URLTemplate template = result.templateToStaticURLs.keySet().iterator().next();
+        assertEquals("/api/STRING/orders.list", template.getTemplateString());
+        assertEquals(2, result.templateToStaticURLs.get(template).size());
+    }
 }
