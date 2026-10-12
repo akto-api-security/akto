@@ -16,4 +16,5 @@ public final class InsightRoutes {
     public static final String GUARDRAIL_MISCONFIGURATIONS = "/dashboard/guardrails/misconfigurations";
     public static final String AGENTIC_ASSET_DEVICES = "/dashboard/observe/agentic-assets-legacy/devices";
     public static final String ISSUES = "/dashboard/issues";
+    public static final String TESTING = "/dashboard/testing";
 }

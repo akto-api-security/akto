@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -166,7 +167,76 @@ public class ApiCollection {
     }
 
     public enum ENV_TYPE {
-        STAGING, PRODUCTION, QA, DEV, INTEG, UAT, PREPROD, INTERNAL
+        STAGING(ENV_BUCKET.STAGING),
+        PRODUCTION(ENV_BUCKET.PRODUCTION),
+        QA(ENV_BUCKET.STAGING),
+        DEV(ENV_BUCKET.DEVELOPMENT),
+        INTEG(ENV_BUCKET.STAGING),
+        UAT(ENV_BUCKET.STAGING),
+        PREPROD(ENV_BUCKET.STAGING),
+        INTERNAL(ENV_BUCKET.PRODUCTION);
+
+        private ENV_BUCKET bucket;
+
+        ENV_TYPE(ENV_BUCKET bucket) {
+            this.bucket = bucket;
+        }
+
+        public ENV_BUCKET getBucket() {
+            return this.bucket;
+        }
+
+        /** Case-insensitive; null for blank or unrecognized raw tag values. */
+        public static ENV_TYPE fromTagValue(String value) {
+            if (value == null || value.trim().isEmpty()) return null;
+            try {
+                return ENV_TYPE.valueOf(value.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+
+        /** Raw tag names (this.name()) of every constant whose bucket matches. */
+        public static List<String> namesInBucket(ENV_BUCKET bucket) {
+            List<String> names = new ArrayList<>();
+            for (ENV_TYPE type : values()) {
+                if (type.bucket == bucket) names.add(type.name());
+            }
+            return names;
+        }
+    }
+
+        /** The 3 display/route buckets every ENV_TYPE rolls up into. */
+    public enum ENV_BUCKET {
+        PRODUCTION("production", "Production"),
+        STAGING("staging", "Staging"),
+        DEVELOPMENT("development", "Development");
+
+        private String id;
+        private String displayName;
+
+        ENV_BUCKET(String id, String displayName) {
+            this.id = id;
+            this.displayName = displayName;
+        }
+
+        public String getId() {
+            return this.id;
+        }
+
+        public String getDisplayName() {
+            return this.displayName;
+        }
+
+        /** Case-insensitive; null for blank or unrecognized route/query-param ids. */
+        public static ENV_BUCKET fromId(String id) {
+            if (id == null || id.trim().isEmpty()) return null;
+            String key = id.trim().toLowerCase(Locale.ROOT);
+            for (ENV_BUCKET bucket : values()) {
+                if (bucket.id.equals(key)) return bucket;
+            }
+            return null;
+        }
     }
 
     Type type;

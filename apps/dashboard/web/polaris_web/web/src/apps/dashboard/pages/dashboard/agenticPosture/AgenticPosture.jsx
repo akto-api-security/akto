@@ -209,7 +209,8 @@ function AgenticPosture() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currDateRange])
 
-    const openAgent = (groupKey) => navigate(`/dashboard/agentic-posture/agents/${encodeURIComponent(groupKey)}`)
+    // Highest-risk rows carry a real ApiCollection id as groupKey, which is what the detail page is keyed by.
+    const openAgent = (collectionId) => navigate(`/dashboard/agentic-posture/agent/${encodeURIComponent(collectionId)}`)
     const openKpiLink = (kpi) => { if (kpi.linkGroupKey) openAgent(kpi.linkGroupKey) }
 
     // Highest-risk rows carry a real ApiCollection id as groupKey, so they open the collection page.
@@ -255,7 +256,7 @@ function AgenticPosture() {
                 description="Ranked by blast radius — privilege held, data reached, and controls missing."
                 action={<Button onClick={() => openDrill('highRiskAgents')}>View all agents</Button>}
             >
-                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={(groupKey) => openDrill('highRiskAgents', groupKey)} />
+                <HighestRiskAgentsTable agents={pageData.highestRiskAgents} onOpenAgent={openAgent} />
             </Section>
 
             <Section title="Insights" description="Red-team, guardrail activity, and observability — the account-wide picture, each with an AI summary.">
