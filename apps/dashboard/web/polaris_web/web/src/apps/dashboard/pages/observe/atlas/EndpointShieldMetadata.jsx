@@ -12,7 +12,7 @@ import settingRequests from "../../settings/api";
 import PersistStore from "../../../../main/PersistStore";
 import { mapLabel } from "../../../../main/labelHelper";
 import AgentDetails from "./AgentDetails";
-import { DEFAULT_VALUE, isExtensionAgent, INSTALL_IN_PROGRESS_STATUSES, isInstallFailed } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent } from "../api_collections/endpointShieldHelper";
 
 const createHeading = (text, value = null, sortKey = null) => ({
     text,
@@ -135,37 +135,27 @@ const getOsOrBrowserComp = (agentData) => {
     );
 };
 
-// currentStatus is computed server-side (ModuleInfoAction.fetchEndpointShieldAgents) from
-// lastHeartbeatReceived: active (<2h), inactive (<24h), error (stale >24h), failed (never heartbeat).
+// currentStatus is computed server-side (ModuleInfoAction.endpointShieldCurrentStatusExpr):
+// installing / install_failed from installStatus, otherwise from lastHeartbeatReceived —
+// active (<2h), inactive (<24h), error (stale >24h), failed (never heartbeat). Rendering
+// straight off it, rather than re-deriving installing/failed from installStatus here, is
+// what keeps the icon, the Status filter and STATUS_LABELS describing the same device.
 const CURRENT_STATUS_COMP_MAP = {
+    installing: { icon: RefreshMinor, color: "warning", tooltip: "Installation in progress" },
+    // Short, like the other status tooltips: the full reason is long enough to span the
+    // row and sit under the icon itself. It is shown in the device panel's banner instead.
+    install_failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Last deployment failed" },
     active: { icon: StatusActiveMajor, color: "success", tooltip: "Running" },
     inactive: { icon: ClockMinor, color: "warning", tooltip: "No heartbeat in over 2 hours" },
     error: { icon: DiamondAlertMinor, color: "critical", tooltip: "No heartbeat in over 24 hours" },
     failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Never connected" },
 };
 
-const getStatusComp = (installStatus, currentStatus) => {
-    if (INSTALL_IN_PROGRESS_STATUSES.includes(installStatus)) {
-        return (
-            <Tooltip content="Installation in progress" dismissOnMouseOut>
-                <Icon source={RefreshMinor} color="warning" />
-            </Tooltip>
-        );
-    }
-    if (isInstallFailed(installStatus)) {
-        // Short, like the other status tooltips: the full reason is long enough to
-        // span the row and sit under the icon itself. It is shown in the device
-        // panel's banner instead.
-        return (
-            <Tooltip content="Last deployment failed" preferredPosition="above" dismissOnMouseOut>
-                <Icon source={DiamondAlertMinor} color="critical" />
-            </Tooltip>
-        );
-    }
+const getStatusComp = (currentStatus) => {
     const statusComp = CURRENT_STATUS_COMP_MAP[currentStatus];
     if (!statusComp) return null;
     return (
-        <Tooltip content={statusComp.tooltip} dismissOnMouseOut>
+        <Tooltip content={statusComp.tooltip} preferredPosition="above" dismissOnMouseOut>
             <Icon source={statusComp.icon} color={statusComp.color} />
         </Tooltip>
     );
@@ -177,7 +167,7 @@ const convertDataIntoTableFormat = (agentData) => ({
     lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
     lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
     osComp: getOsOrBrowserComp(agentData),
-    statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus),
+    statusComp: getStatusComp(agentData?.currentStatus),
 });
 
 const knownOrDefault = (value) => (value && String(value).toLowerCase() !== 'unknown') ? value : DEFAULT_VALUE;

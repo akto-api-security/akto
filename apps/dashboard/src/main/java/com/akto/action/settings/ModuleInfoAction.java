@@ -170,8 +170,11 @@ public class ModuleInfoAction extends UserAction {
     }
 
     // installStatus values the installers write (install_telemetry.sh / install.ps1).
-    private static final List<String> INSTALL_IN_PROGRESS_STATUSES = Arrays.asList("installing", "postinstall");
+    private static final List<String> INSTALL_IN_PROGRESS_STATUSES = Arrays.asList("pending", "installing", "postinstall");
     private static final List<String> INSTALL_FAILED_STATUSES = Arrays.asList("failed", "verify-failed");
+
+    // Sort key for the dedup $group only; $group drops it, so it never reaches the client.
+    private static final String DEDUP_TS_FIELD = "_dedupDeployedTs";
 
     private static Document endpointShieldLastDeployedExpr() {
         String installStarted = "$" + ModuleInfo.ADDITIONAL_DATA + ".installStartedTs";
@@ -237,7 +240,16 @@ public class ModuleInfoAction extends UserAction {
 
         List<Bson> pipeline = Arrays.asList(
                 Aggregates.match(filter),
-                Aggregates.sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)),
+                // Dedup on the newest DEPLOYMENT, not the newest heartbeat. A reinstall that
+                // failed never heartbeats (lastHeartbeatReceived stays 0), so ordering by
+                // heartbeat alone always handed the {name, os} group to the previous, still
+                // running doc — exactly the "failed deploy while the old agent keeps running"
+                // case the banner is for, which therefore never surfaced. Heartbeat stays as
+                // the tiebreaker for docs deployed at the same second (or never deployed).
+                Aggregates.addFields(new Field<>(DEDUP_TS_FIELD, endpointShieldLastDeployedExpr())),
+                Aggregates.sort(Sorts.orderBy(
+                        Sorts.descending(DEDUP_TS_FIELD),
+                        Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED))),
                 Aggregates.group(groupId,
                         Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
                         Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),

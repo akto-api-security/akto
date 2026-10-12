@@ -16,6 +16,9 @@ import DetailGrid from "../agentic/DetailGrid";
 import { usePermissions } from "@/util/permissions";
 
 const ANIMATION_DURATION = 0.2;
+// Badge status per level. DEBUG maps to no status on purpose — the neutral grey badge
+// is what separates it from INFO — so the lookup below must not collapse it into the
+// 'info' fallback, which is only there for a level we do not know.
 const LOG_LEVEL_TONES = {
     DEBUG: undefined,
     INFO: 'info',
@@ -612,7 +615,7 @@ function AgentDetails({
                                         </Text>
                                     </Box>
                                     <Box minWidth={LOG_LEVEL_WIDTH}>
-                                        <Badge size="small" status={LOG_LEVEL_TONES[log.level] || 'info'}>
+                                        <Badge size="small" status={log.level in LOG_LEVEL_TONES ? LOG_LEVEL_TONES[log.level] : 'info'}>
                                             {log.level}
                                         </Badge>
                                     </Box>

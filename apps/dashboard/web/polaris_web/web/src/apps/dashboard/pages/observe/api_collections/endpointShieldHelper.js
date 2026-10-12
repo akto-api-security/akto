@@ -252,14 +252,13 @@ const getResolvedUsernameForCollection = (collection, usernameMap) => {
 //                never reported / 93 pkg failed), verify-failed (standalone
 //                verifier), uninstall-failed
 // The agent reports "running" once it is up, which supersedes any of these.
-const INSTALL_IN_PROGRESS_STATUSES = ['pending', 'installing', 'postinstall'];
-// "uninstall-failed" ends in "failed" but is a removal that did not go through, not a
-// broken install — the agent is usually still running, so it must not raise the
-// installation banner or the critical icon.
+// Exactly ModuleInfoAction.INSTALL_FAILED_STATUSES — the server classifies the device
+// into currentStatus from the same two values, and a row's icon, the Status filter and
+// this banner have to agree about what "failed" means. "uninstall-failed" is deliberately
+// not one of them: a removal that did not go through usually leaves the agent running.
+const INSTALL_FAILED_STATUSES = ['failed', 'verify-failed'];
 const isInstallFailed = (installStatus) =>
-    typeof installStatus === 'string'
-    && installStatus.endsWith('failed')
-    && !installStatus.startsWith('uninstall');
+    typeof installStatus === 'string' && INSTALL_FAILED_STATUSES.includes(installStatus);
 
 // installId is "yyyyMMddTHHmmssZ-<suffix>" (UTC) → epoch seconds, or null.
 const installIdToEpoch = (installId) => {
@@ -296,7 +295,7 @@ const getDeploymentAttempt = (agent) => {
 export {
     INSTALL_STALE_SECONDS,
     getDeploymentAttempt,
-    INSTALL_IN_PROGRESS_STATUSES,
+    INSTALL_FAILED_STATUSES,
     isInstallFailed,
     installIdToEpoch,
     fetchEndpointShieldUsernameMap,
