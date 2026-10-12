@@ -80,7 +80,13 @@ public class APICatalogSync {
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls = new HashSet<>();
     private static final ClientLayer clientLayer = new ClientLayer();
-    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
+    /*
+     * Set per deployment. When true, redacted samples still go to Mongo with their akto_uuid, but the
+     * encrypted unredacted copy is never built or sent to the testing DB layer (Postgres).
+     */
+    public static final boolean skipPostgresSampleIngestion = System.getenv()
+            .getOrDefault("SKIP_POSTGRES_SAMPLE_INGESTION", "false").equalsIgnoreCase("true");
+    private static RSAPublicKey publicKey = skipPostgresSampleIngestion ? null : PayloadEncodeUtil.getPublicKey();
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
@@ -1649,7 +1655,7 @@ public class APICatalogSync {
 
         loggerMaker.debug("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
 
-        if (accountLevelRedact || apiCollectionLevelRedact) {
+        if ((accountLevelRedact || apiCollectionLevelRedact) && !skipPostgresSampleIngestion) {
             if (publicKey == null) {
                 loggerMaker.errorAndAddToDb("acc: " + Context.accountId.get() + ", apiCollectionId: "
                         + apiCollectionId + ", redaction is enabled but the public key is unavailable, "
@@ -1736,27 +1742,29 @@ public class APICatalogSync {
                         UUID uuid = UUID.randomUUID();
                         json.put(AKTO_UUID, uuid);
                         redactedSample = gson.toJson(json);
-                        int now = Context.now();
-                        Key id = sample.getId();
-                        int accountId = Context.accountId.get();
-                        String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
-                        // This copy is protected by encryption alone - redactIfRequired is
-                        // called with both flags false above - so if the key is missing or
-                        // encryption fails, the sample must be dropped rather than stored in
-                        // clear. Failing closed here keeps unencrypted payloads out of the
-                        // database when PUBLIC_KEY / PUBLIC_KEY_FILE is misconfigured.
-                        boolean encrypted = false;
-                        if (publicKey != null) {
-                            try {
-                                piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);
-                                encrypted = true;
-                            } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
+                        if (!skipPostgresSampleIngestion) {
+                            int now = Context.now();
+                            Key id = sample.getId();
+                            int accountId = Context.accountId.get();
+                            String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
+                            // This copy is protected by encryption alone - redactIfRequired is
+                            // called with both flags false above - so if the key is missing or
+                            // encryption fails, the sample must be dropped rather than stored in
+                            // clear. Failing closed here keeps unencrypted payloads out of the
+                            // database when PUBLIC_KEY / PUBLIC_KEY_FILE is misconfigured.
+                            boolean encrypted = false;
+                            if (publicKey != null) {
+                                try {
+                                    piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);
+                                    encrypted = true;
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
+                                }
                             }
-                        }
-                        if (encrypted && sample.getId().getApiCollectionId() != 0) {
-                            unfilteredSamples.add(new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
-                                    id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId));
+                            if (encrypted && sample.getId().getApiCollectionId() != 0) {
+                                unfilteredSamples.add(new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
+                                        id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId));
+                            }
                         }
                         sampleIds.add(uuid.toString());
 
