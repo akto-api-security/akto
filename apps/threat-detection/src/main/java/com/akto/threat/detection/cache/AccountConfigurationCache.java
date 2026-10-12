@@ -13,6 +13,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.RuntimeUtil;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -141,7 +142,7 @@ public class AccountConfigurationCache {
             // This will fetch paginated apiInfos with _id, rateLimits fields.
             List<ApiInfo> apiInfos = new ArrayList<>();
 
-            if (accountSettings.getId() == 1763355072) {
+            if (Arrays.asList(1763355072, 1786100206).contains(accountSettings.getId())) {
                 apiInfos = dataActor.fetchApiRateLimits(null);
             }
 

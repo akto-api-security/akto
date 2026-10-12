@@ -348,7 +348,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
-      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072);
+      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072, 1786100206);
       if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
