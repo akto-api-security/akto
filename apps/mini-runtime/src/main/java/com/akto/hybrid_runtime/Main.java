@@ -573,7 +573,7 @@ public class Main {
                     }
                 }
 
-                if (checkPg) {
+                if (checkPg && !APICatalogSync.skipPostgresSampleIngestion) {
                     long dbSizeInMb = clientLayer.fetchTotalSize();
                     AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
                     loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB");
