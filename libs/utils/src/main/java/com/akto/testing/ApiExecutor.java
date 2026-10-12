@@ -19,6 +19,7 @@ import com.akto.mcp.McpSchema;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
+import com.akto.util.trpc.TrpcUtils;
 
 import kotlin.Pair;
 import okhttp3.*;
@@ -394,6 +395,9 @@ public class ApiExecutor {
         TestingRunConfig testingRunConfig, boolean debug, boolean jsonRpcCheck, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
+
+        // a tRPC GET carries its input in the `input` query param; tests work on it as the body, put it back before sending
+        TrpcUtils.moveBodyToInputQuery(request);
 
         if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);

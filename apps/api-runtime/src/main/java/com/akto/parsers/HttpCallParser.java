@@ -23,6 +23,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.util.trpc.TrpcUtils;
 import com.akto.graphql.PersistedGraphQLUtils;
 import com.akto.imperva.ImpervaUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
@@ -746,7 +747,12 @@ public class HttpCallParser {
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
-            List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            // a tRPC call is split into one REST call per procedure; everything else carries on to the other parsers
+            List<HttpResponseParams> responseParamsList = TrpcUtils.parseTrpcResponseParam(httpResponseParam);
+            boolean isTrpc = !responseParamsList.isEmpty();
+            if (!isTrpc) {
+                responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            }
             if (responseParamsList.isEmpty()) {
                 // Check for persisted GraphQL payload structure
                 List<HttpResponseParams> persistedGraphQLResponseParams =
@@ -794,7 +800,7 @@ public class HttpCallParser {
                 }
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new graphql endpoints in inventory", LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new " + (isTrpc ? "trpc" : "graphql") + " endpoints in inventory", LogDb.RUNTIME);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
