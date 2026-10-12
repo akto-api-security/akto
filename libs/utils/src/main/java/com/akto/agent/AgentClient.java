@@ -50,8 +50,8 @@ public class AgentClient {
             .build();
     private static final OkHttpClient clientWithLongTimeout = CoreHTTPClient.client.newBuilder()
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.MINUTES)
-            .callTimeout(10, TimeUnit.MINUTES)
+            .readTimeout(Constants.AGENT_CHAT_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(Constants.AGENT_CHAT_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             .writeTimeout(120, TimeUnit.SECONDS)
             .build();
     

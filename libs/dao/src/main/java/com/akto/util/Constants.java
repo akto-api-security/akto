@@ -72,6 +72,8 @@ public class Constants {
     public static final int TESTING_TARGET_READ_TIMEOUT_SECONDS = StringUtils.hasLength(System.getenv("AKTO_TESTING_TARGET_READ_TIMEOUT_SECONDS")) ? Integer.parseInt(System.getenv("AKTO_TESTING_TARGET_READ_TIMEOUT_SECONDS")) : 180;
     // Wall-clock cap for a single Kafka test task (agentic runs can span multiple slow target replays).
     public static final int MINI_TESTING_TASK_TIMEOUT_SECONDS = StringUtils.hasLength(System.getenv("MINI_TESTING_TASK_TIMEOUT_SECONDS")) ? Integer.parseInt(System.getenv("MINI_TESTING_TASK_TIMEOUT_SECONDS")) : 300;
+    // Wall-clock cap for mini-testing → agent module POST /chat (must cover full orchestration + utility polls).
+    public static final int AGENT_CHAT_READ_TIMEOUT_SECONDS = StringUtils.hasLength(System.getenv("AGENT_CHAT_READ_TIMEOUT_SECONDS")) ? Integer.parseInt(System.getenv("AGENT_CHAT_READ_TIMEOUT_SECONDS")) : 600;
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 5000;
     // Must exceed MINI_TESTING_TASK_TIMEOUT_SECONDS or the consumer can be evicted mid-test.
     public static final int MAX_POLL_INTERVAL_MS = StringUtils.hasLength(System.getenv("MAX_POLL_INTERVAL_MS")) ? Integer.parseInt(System.getenv("MAX_POLL_INTERVAL_MS")) : 300000;
