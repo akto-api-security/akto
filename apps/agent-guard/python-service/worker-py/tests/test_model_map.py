@@ -385,6 +385,7 @@ async def test_fallback_uses_primary_when_available_or_unknown(monkeypatch):
 
 async def test_connect_error_marks_primary_down_and_falls_back(monkeypatch):
     import httpx
+
     import providers
 
     class Refused(_Primary):
