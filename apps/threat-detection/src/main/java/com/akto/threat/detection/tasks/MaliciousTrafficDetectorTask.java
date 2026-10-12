@@ -342,13 +342,7 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       // Evaluate filter first (ignore and filter are independent conditions)
       // SchemaConform check is disabled
       List<Integer> accountIds = Arrays.asList(1758179941, 1763355072, 1786100206);
-      if (apiFilter.getId().equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
-        if (apiCollectionId == 0) {
-          continue;
-        }
-        String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
-        hasPassedFilter = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
-      } else if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
         
@@ -361,7 +355,12 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
         vulnerable = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = vulnerable != null && !vulnerable.isEmpty();
 
-      }else {
+      } else if (apiFilter.getId().equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
+        if (apiCollectionId != 0) {
+          String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
+          hasPassedFilter = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
+        }
+      } else {
         boolean hasSuccessFailureFilters = (apiFilter.getSuccessFilter() != null || apiFilter.getFailureFilter() != null);
 
         if (apiFilter.getFilter() != null) {
