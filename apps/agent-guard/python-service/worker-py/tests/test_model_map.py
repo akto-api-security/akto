@@ -341,16 +341,8 @@ async def test_backup_entry_never_runs_and_is_not_reported_in_details():
     assert "anthropic" not in r["details"]
 
 
-async def test_fallback_provider_uses_backup_when_primary_hangs(monkeypatch):
-    import asyncio
-
+def _fallback(monkeypatch, primary):
     import providers
-
-    class Hang:
-        name = "hang"
-
-        async def complete(self, prompt):
-            await asyncio.sleep(10)
 
     class Backup:
         name = "backup"
@@ -359,5 +351,88 @@ async def test_fallback_provider_uses_backup_when_primary_hangs(monkeypatch):
             return "from backup"
 
     monkeypatch.setattr(providers, "build_provider_from_config", lambda entry: Backup())
-    fb = providers.FallbackProvider(Hang(), {"provider": "anthropic"}, primary_timeout_s=0.05)
-    assert await asyncio.wait_for(fb.complete("hi"), timeout=1.0) == "from backup"
+    monkeypatch.setattr(providers, "_ensure_health_monitor", lambda url: None)
+    monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {})
+    return providers.FallbackProvider(primary, {"provider": "anthropic"})
+
+
+class _Primary:
+    name = "primary"
+    base_url = "http://vllm:80/v1"
+    health_path = "/health"
+
+    async def complete(self, prompt):
+        return "from primary"
+
+
+async def test_fallback_skips_primary_when_flagged_down(monkeypatch):
+    import providers
+
+    fb = _fallback(monkeypatch, _Primary())
+    assert fb.health_url == "http://vllm:80/health"
+    providers._PRIMARY_AVAILABLE[fb.health_url] = False
+    assert await fb.complete("hi") == "from backup"
+
+
+async def test_fallback_uses_primary_when_available_or_unknown(monkeypatch):
+    import providers
+
+    fb = _fallback(monkeypatch, _Primary())
+    assert await fb.complete("hi") == "from primary"  # unknown counts as available
+    providers._PRIMARY_AVAILABLE[fb.health_url] = True
+    assert await fb.complete("hi") == "from primary"
+
+
+async def test_connect_error_marks_primary_down_and_falls_back(monkeypatch):
+    import httpx
+    import providers
+
+    class Refused(_Primary):
+        async def complete(self, prompt):
+            raise httpx.ConnectError("refused")
+
+    fb = _fallback(monkeypatch, Refused())
+    assert await fb.complete("hi") == "from backup"
+    assert providers._PRIMARY_AVAILABLE[fb.health_url] is False
+
+
+async def test_health_probe_sets_the_flag_back_to_available(monkeypatch):
+    import asyncio
+
+    import providers
+
+    monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {"u": False})
+
+    class Client:
+        async def get(self, url, timeout=None):
+            return type("R", (), {"status_code": 200})()
+
+    async def stop(_):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(providers.http_client, "get_client", lambda: Client())
+    monkeypatch.setattr(providers.asyncio, "sleep", stop)
+    try:
+        await providers._health_loop("u")
+    except asyncio.CancelledError:
+        pass
+    assert providers._PRIMARY_AVAILABLE["u"] is True
+
+
+async def test_other_errors_fall_back_without_flagging_down(monkeypatch):
+    import providers
+
+    class Boom(_Primary):
+        async def complete(self, prompt):
+            raise ValueError("bad reply")
+
+    fb = _fallback(monkeypatch, Boom())
+    assert await fb.complete("hi") == "from backup"
+    assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
+
+
+async def test_primary_without_health_path_is_never_monitored(monkeypatch):
+    class Plain(_Primary):
+        health_path = ""
+
+    assert _fallback(monkeypatch, Plain()).health_url == ""

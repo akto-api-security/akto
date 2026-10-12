@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import math
+import os
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
@@ -938,6 +939,7 @@ class GemmaFastArbiterProvider(OpenAIProvider):
 
     name = "gemma_fast_arbiter"
     include_metrics = True
+    health_path = "/health"  # vLLM liveness; probed only when a FINAL_ARBITER_BACKUP exists (FallbackProvider)
 
     def __init__(self, api_key: str, model: str, base_url: str = ""):
         super().__init__(api_key, model, base_url=base_url)
@@ -1072,25 +1074,74 @@ def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "
     return _cached_provider((provider_name, model, base_url, deployment), lambda: builder(model, base_url, deployment))
 
 
+# ── Primary availability flag (FINAL_ARBITER_BACKUP only) ────────────────────
+# A background task GETs the primary's /health once per interval (default 60s) and records the
+# result here. FallbackProvider reads the flag, so a down primary is skipped with a dict lookup
+# and no waiting. Only primaries that have a FINAL_ARBITER_BACKUP and declare a health_path are
+# probed; with no backup configured nothing runs. Unknown (not probed yet) counts as available.
+_HEALTH_INTERVAL_S = float(os.getenv("AGW_ARBITER_HEALTH_INTERVAL_S", "60"))
+_HEALTH_PROBE_TIMEOUT_S = 3.0
+_PRIMARY_AVAILABLE: dict[str, bool] = {}
+_HEALTH_TASKS: dict[str, "asyncio.Task[None]"] = {}
+
+
+def _set_availability(health_url: str, available: bool) -> None:
+    if _PRIMARY_AVAILABLE.get(health_url, True) != available:
+        logger.warning(f"[FinalArbiter] primary {health_url} is now {'AVAILABLE' if available else 'DOWN'}")
+    _PRIMARY_AVAILABLE[health_url] = available
+
+
+async def _health_loop(health_url: str) -> None:
+    while True:
+        try:
+            resp = await http_client.get_client().get(health_url, timeout=_HEALTH_PROBE_TIMEOUT_S)
+            _set_availability(health_url, resp.status_code == 200)
+        except Exception:
+            _set_availability(health_url, False)
+        await asyncio.sleep(_HEALTH_INTERVAL_S)
+
+
+def _ensure_health_monitor(health_url: str) -> None:
+    task = _HEALTH_TASKS.get(health_url)
+    if task is None or task.done():
+        _HEALTH_TASKS[health_url] = asyncio.ensure_future(_health_loop(health_url))
+
+
+def _health_url_of(primary: LLMProvider) -> str:
+    path = getattr(primary, "health_path", None)
+    base_url = getattr(primary, "base_url", "")
+    if not path or not base_url:
+        return ""
+    return base_url.removesuffix("/v1") + path
+
+
 class FallbackProvider(LLMProvider):
-    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any], primary_timeout_s: float | None = None):
+    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any]):
         self.primary = primary
         self.backup_entry = backup_entry
-        self.primary_timeout_s = primary_timeout_s
         self.name = primary.name
+        self.health_url = _health_url_of(primary)
 
     async def complete(self, prompt: str) -> str:
+        if self.health_url:
+            _ensure_health_monitor(self.health_url)
+            if not _PRIMARY_AVAILABLE.get(self.health_url, True):
+                return await self._complete_on_backup(prompt, "marked down by health check")
         try:
-            # Own budget so a hung primary fails as TimeoutError (caught below), not the caller's CancelledError.
-            return await asyncio.wait_for(self.primary.complete(prompt), timeout=self.primary_timeout_s)
+            return await self.primary.complete(prompt)
         except Exception as exc:
-            backup = build_provider_from_config(self.backup_entry)
-            if backup is None:
-                raise
-            logger.warning(
-                f"[FinalArbiter] primary {self.primary.name} failed ({exc!r}), falling back to {backup.name}"
-            )
-            return await backup.complete(prompt)
+            if self.health_url and isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
+                _set_availability(self.health_url, False)  # refused/unreachable: skip it until the next probe says up
+            return await self._complete_on_backup(prompt, repr(exc), exc)
+
+    async def _complete_on_backup(self, prompt: str, why: str, exc: Exception | None = None) -> str:
+        backup = build_provider_from_config(self.backup_entry)
+        if backup is None:
+            if exc is not None:
+                raise exc
+            return await self.primary.complete(prompt)  # no usable backup: behave as without one
+        logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({why}), falling back to {backup.name}")
+        return await backup.complete(prompt)
 
 
 def build_provider_from_env(provider_name: str, model: str = "") -> LLMProvider | None:
