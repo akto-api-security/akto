@@ -33,6 +33,9 @@ import java.util.regex.Pattern;
  *   response {"result":{"data":..}} | {"error":{..,"data":{"httpStatus":..}}}     (batch: array in call order)
  * A deployment may also put tenant segments between the mount and the procedure ({mount}/{tenant}/{proc}).
  *
+ * Detection: the url path has a `trpc` segment followed by a procedure-shaped last segment, the way GraphQL is found by
+ * its `/graphql` path. Nothing else about the request is looked at until that matches, so other traffic costs one contains.
+ *
  * Ingestion ({@link #parseTrpcResponseParam}):
  *   - the endpoint becomes {mount}/STRING/.../{proc}: one endpoint per procedure, tenant segments templated
  *   - the request payload of the REST view is the decoded input of that procedure, the response payload its data
@@ -70,7 +73,6 @@ public final class TrpcUtils {
         List<String> mountSegments = new ArrayList<>();     // path segments up to and including the `trpc` mount
         List<String> tenantSegments = new ArrayList<>();    // path segments between the mount and the procedure
         List<String> procedures = new ArrayList<>();
-        boolean hasMountSegment;                            // the url contains an explicit `trpc` segment
         boolean isBatch;
         String inputJson;                                   // decoded `input` query value, null when absent
         List<String> otherQueryPairs = new ArrayList<>();   // raw k=v pairs other than batch and input
@@ -100,11 +102,8 @@ public final class TrpcUtils {
     }
 
     static TrpcUrl parseTrpcUrl(String url) {
-        if (url == null || url.isEmpty() || url.startsWith("http")) {
-            return null;
-        }
-        // hot path: every ingested request lands here, bail out before allocating anything
-        if (!containsIgnoreCase(url, TRPC_MOUNT_SEGMENT) && !url.contains(BATCH_QUERY_PARAM + "=")) {
+        // every ingested request lands here: like GraphQL's `/graphql` check, a plain contains turns almost all traffic down
+        if (url == null || url.startsWith("http") || !url.contains(TRPC_MOUNT_SEGMENT)) {
             return null;
         }
 
@@ -118,11 +117,18 @@ public final class TrpcUtils {
                 segments.add(segment);
             }
         }
-        if (segments.isEmpty()) {
+
+        // the procedure is the last segment, the `trpc` mount is the closest segment before it
+        int procedureSegmentIndex = segments.size() - 1;
+        int mountSegmentIndex = procedureSegmentIndex - 1;
+        while (mountSegmentIndex >= 0 && !TRPC_MOUNT_SEGMENT.equals(segments.get(mountSegmentIndex))) {
+            mountSegmentIndex--;
+        }
+        if (mountSegmentIndex < 0) {
             return null;
         }
 
-        List<String> procedures = parseProcedureNames(segments.get(segments.size() - 1));
+        List<String> procedures = parseProcedureNames(segments.get(procedureSegmentIndex));
         if (procedures == null) {
             return null;
         }
@@ -131,29 +137,14 @@ public final class TrpcUtils {
         if (!readQueryParams(query, trpcUrl)) {
             return null;
         }
-
-        int mountSegmentIndex = -1;
-        for (int i = segments.size() - 2; i >= 0; i--) {
-            if (TRPC_MOUNT_SEGMENT.equalsIgnoreCase(segments.get(i))) {
-                mountSegmentIndex = i;
-                break;
-            }
-        }
-        trpcUrl.hasMountSegment = mountSegmentIndex >= 0;
-        // without a `trpc` segment the only url level signal is `batch=`
-        if (!trpcUrl.hasMountSegment && !trpcUrl.isBatch) {
-            return null;
-        }
         // a comma separated procedure list is only meaningful for a batch call
         if (procedures.size() > 1 && !trpcUrl.isBatch) {
             return null;
         }
 
         trpcUrl.procedures = procedures;
-        int procedureSegmentIndex = segments.size() - 1;
-        int mountEnd = trpcUrl.hasMountSegment ? mountSegmentIndex + 1 : procedureSegmentIndex;
-        trpcUrl.mountSegments = new ArrayList<>(segments.subList(0, mountEnd));
-        trpcUrl.tenantSegments = new ArrayList<>(segments.subList(mountEnd, procedureSegmentIndex));
+        trpcUrl.mountSegments = new ArrayList<>(segments.subList(0, mountSegmentIndex + 1));
+        trpcUrl.tenantSegments = new ArrayList<>(segments.subList(mountSegmentIndex + 1, procedureSegmentIndex));
         return trpcUrl;
     }
 
@@ -297,7 +288,7 @@ public final class TrpcUtils {
                 || (responseJson.isObject() && isKeyedByCallIndex(responseJson)
                         && requestsJsonlStream(responseParams.getRequestParams().getHeaders()));
         if (responseUnavailable) {
-            boolean hasStrongUrlSignal = trpcUrl.hasMountSegment && (trpcUrl.isBatch || hasInputPayload);
+            boolean hasStrongUrlSignal = trpcUrl.isBatch || hasInputPayload;
             if (!hasStrongUrlSignal) {
                 return null;
             }
@@ -420,7 +411,8 @@ public final class TrpcUtils {
      */
     private static String buildSampleMessage(HttpResponseParams originalCall, TrpcUrl trpcUrl, int callIndex, JsonNode rawInput,
                                              String rawRequestBody, ProcedureResponse procedureResponse, boolean isGet) {
-        ObjectNode message = buildBaseKafkaMessage(originalCall);
+        // the original kafka message is always there for ingested traffic; a call without it fails here and stays plain REST
+        ObjectNode message = ((ObjectNode) tryParseJson(originalCall.getOrig())).deepCopy();
 
         List<String> pathSegments = new ArrayList<>(trpcUrl.mountSegments);
         pathSegments.addAll(trpcUrl.tenantSegments);
@@ -449,29 +441,6 @@ public final class TrpcUtils {
         MessageHeaders.removeHeaders(message, "requestHeaders", STALE_REQUEST_HEADERS, extraRequestHeaderToRemove);
         MessageHeaders.removeHeaders(message, "responseHeaders", STALE_RESPONSE_HEADERS, null);
         return message.toString();
-    }
-
-    /** The original kafka message when it is usable, otherwise a message rebuilt from the parsed params. */
-    private static ObjectNode buildBaseKafkaMessage(HttpResponseParams originalCall) {
-        JsonNode originalMessage = tryParseJson(originalCall.getOrig());
-        if (originalMessage != null && originalMessage.isObject()) {
-            return ((ObjectNode) originalMessage).deepCopy();
-        }
-        HttpRequestParams request = originalCall.getRequestParams();
-        ObjectNode message = jsonMapper.createObjectNode();
-        message.put("method", request.getMethod());
-        message.put("type", originalCall.getType());
-        message.put("requestHeaders", headersToJsonString(request.getHeaders()));
-        message.put("status", originalCall.getStatus());
-        message.put("responseHeaders", headersToJsonString(originalCall.getHeaders()));
-        message.put("time", String.valueOf(originalCall.getTime()));
-        message.put("akto_account_id", originalCall.getAccountId());
-        message.put("akto_vxlan_id", request.getApiCollectionId());
-        message.put("ip", originalCall.getSourceIP());
-        message.put("destIp", originalCall.getDestIP());
-        message.put("direction", originalCall.getDirection());
-        message.put("source", originalCall.getSource() == null ? null : originalCall.getSource().name());
-        return message;
     }
 
     /** Edits the headers entry of a kafka message. The entry is a JSON object stored as a string. */
@@ -639,18 +608,6 @@ public final class TrpcUtils {
         return headersCopy;
     }
 
-    private static String headersToJsonString(Map<String, List<String>> headers) {
-        ObjectNode headersNode = jsonMapper.createObjectNode();
-        if (headers != null) {
-            for (Map.Entry<String, List<String>> header : headers.entrySet()) {
-                if (header.getKey() != null && header.getValue() != null) {
-                    headersNode.put(header.getKey(), String.join(", ", header.getValue()));
-                }
-            }
-        }
-        return headersNode.toString();
-    }
-
     private static String joinPath(List<String> segments) {
         // a request target always starts with `/`
         return "/" + String.join("/", segments);
@@ -665,13 +622,4 @@ public final class TrpcUtils {
         }
     }
 
-    private static boolean containsIgnoreCase(String text, String token) {
-        int lastStart = text.length() - token.length();
-        for (int i = 0; i <= lastStart; i++) {
-            if (text.regionMatches(true, i, token, 0, token.length())) {
-                return true;
-            }
-        }
-        return false;
-    }
 }
