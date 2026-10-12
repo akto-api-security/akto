@@ -44,6 +44,9 @@ import java.util.stream.Collectors;
 public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
     public static final ApiInfoDao instance = new ApiInfoDao();
+    public static final String ID_COLLECTION_RISK_SCORE_INDEX = "_id.apiCollectionId_1_riskScore_-1";
+    public static final String COLLECTION_IDS_RISK_SCORE_INDEX = "collectionIds_1_riskScore_-1";
+    public static final String COLLECTION_IDS_LAST_SEEN_INDEX = "collectionIds_1_lastSeen_-1";
 
     public static final String ID = "_id.";
     public static final int AKTO_DISCOVERED_APIS_COLLECTION_ID = 1333333333;
@@ -102,6 +105,19 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.DISCOVERED_TIMESTAMP }, false);
+
+        // per collection max riskScore / lastSeen as a DISTINCT_SCAN (one key per collection) for
+        // api_collection_stats, and the same lookups for api groups, which are only reachable
+        // through collectionIds.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(ApiInfo.ID_API_COLLECTION_ID), Indexes.descending(ApiInfo.RISK_SCORE)),
+            new IndexOptions().name(ID_COLLECTION_RISK_SCORE_INDEX));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(SingleTypeInfo._COLLECTION_IDS), Indexes.descending(ApiInfo.RISK_SCORE)),
+            new IndexOptions().name(COLLECTION_IDS_RISK_SCORE_INDEX));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(SingleTypeInfo._COLLECTION_IDS), Indexes.descending(ApiInfo.LAST_SEEN)),
+            new IndexOptions().name(COLLECTION_IDS_LAST_SEEN_INDEX));
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
@@ -170,6 +186,33 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 result.put(basicDBObject.getInt("apiCollectionId"), basicDBObject.getInt("count"));
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Same count as getCoverageCount (unwound over collectionIds, so api groups are covered), but
+     * only for these collections: the page needs it for its rows, not for every collection. The
+     * server gives up after maxTimeSeconds, so a slow count does not keep running once nobody waits for it.
+     */
+    public Map<Integer,Integer> getCoverageCountForCollections(List<Integer> collectionIds, long maxTimeSeconds){
+        Map<Integer,Integer> result = new HashMap<>();
+        if (collectionIds == null || collectionIds.isEmpty()) return result;
+
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(Filters.and(
+                        Filters.gte(ApiInfo.LAST_TESTED, Context.now() - Constants.ONE_MONTH_TIMESTAMP),
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds))),
+                Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS),
+                // the unwind also yields the other collections a document belongs to
+                Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)),
+                Aggregates.group("$" + SingleTypeInfo._COLLECTION_IDS, Accumulators.sum(SingleTypeInfoDao._COUNT, 1)));
+
+        try (MongoCursor<BasicDBObject> cursor = aggregateWithRbac(pipeline).maxTime(maxTimeSeconds, TimeUnit.SECONDS).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                result.put(doc.getInt(Constants.ID), doc.getInt(SingleTypeInfoDao._COUNT));
             }
         }
         return result;

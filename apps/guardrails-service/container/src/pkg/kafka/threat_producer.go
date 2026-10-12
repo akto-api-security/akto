@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -12,10 +11,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// ThreatProducer buffers malicious events onto Kafka so they survive a threat
-// backend outage. It is installed as the endpoint-shield ThreatSink, which
-// hands it the exact JSON body that would otherwise have been POSTed — the
-// threat client re-POSTs those bytes unchanged.
+// ThreatProducer buffers malicious events and their enrichment updates onto
+// Kafka so they survive a threat backend outage. It is installed
+// as the endpoint-shield ThreatSink, which hands it the exact JSON body that
+// would otherwise have been POSTed — the threat client re-POSTs those bytes
+// unchanged, to the endpoint named by the MessageTypeHeader.
 type ThreatProducer struct {
 	writer *kafka.Writer
 	logger *zap.Logger
@@ -37,7 +37,8 @@ func NewThreatProducer(cfg *config.Config, logger *zap.Logger) (*ThreatProducer,
 		Topic:   tk.Topic,
 		Dialer:  dialer,
 		// Balancer is only consulted when a message carries no key. Keyed
-		// messages hash to a partition so one session stays ordered.
+		// messages hash to a partition so one session stays ordered and an
+		// enrichment update stays behind its event.
 		Balancer:     &kafka.Hash{},
 		BatchTimeout: 200 * time.Millisecond,
 		WriteTimeout: 10 * time.Second,
@@ -62,73 +63,53 @@ func NewThreatProducer(cfg *config.Config, logger *zap.Logger) (*ThreatProducer,
 	return p, nil
 }
 
+// MessageTypeHeader names the Kafka header carrying the mcp.ThreatMessageKind.
+// The threat client reads it to pick the backend endpoint; a message without it
+// is a malicious event.
+const MessageTypeHeader = "akto-msg-type"
+
 // Sink adapts the producer to the endpoint-shield ThreatSink signature.
 //
 // If the buffer write fails — broker down, topic missing, message too large —
-// it falls back to POSTing the event directly, which is what the service did
+// it falls back to POSTing the message directly, which is what the service did
 // before the buffer existed. Enabling the buffer can therefore never be worse
 // than not having it.
 func (p *ThreatProducer) Sink() mcp.ThreatSink {
-	return func(ctx context.Context, body []byte) error {
-		err := p.write(ctx, body)
+	return func(ctx context.Context, msg mcp.ThreatMessage) error {
+		err := p.write(ctx, msg)
 		if err == nil {
 			return nil
 		}
 
-		p.logger.Warn("Buffering threat event failed, falling back to direct POST",
+		p.logger.Warn("Buffering threat message failed, falling back to direct POST",
+			zap.String("kind", string(msg.Kind)),
 			zap.Error(err))
 
-		if postErr := mcp.PostThreatReportBody(ctx, body); postErr != nil {
+		if postErr := mcp.PostThreatMessage(ctx, msg); postErr != nil {
 			return fmt.Errorf("kafka write failed (%v) and direct post failed: %w", err, postErr)
 		}
 		return nil
 	}
 }
 
-func (p *ThreatProducer) write(ctx context.Context, body []byte) error {
-	msg := kafka.Message{
-		Key:   partitionKey(body),
-		Value: body,
+// write keys the message so an event and its enrichment update land on the
+// same partition, in order. An empty key lets the balancer spread it.
+func (p *ThreatProducer) write(ctx context.Context, msg mcp.ThreatMessage) error {
+	var key []byte
+	if msg.Key != "" {
+		key = []byte(msg.Key)
 	}
-	if err := p.writer.WriteMessages(ctx, msg); err != nil {
-		return fmt.Errorf("writing threat event to kafka: %w", err)
+	kmsg := kafka.Message{
+		Key:     key,
+		Value:   msg.Body,
+		Headers: []kafka.Header{{Key: MessageTypeHeader, Value: []byte(msg.Kind)}},
+	}
+	if err := p.writer.WriteMessages(ctx, kmsg); err != nil {
+		return fmt.Errorf("writing threat %s to kafka: %w", msg.Kind, err)
 	}
 	return nil
 }
 
 func (p *ThreatProducer) Close() error {
 	return p.writer.Close()
-}
-
-// threatEventEnvelope is the minimal view of the buffered body needed for
-// partitioning and logging. The body is forwarded verbatim; this never
-// re-serialises it.
-type threatEventEnvelope struct {
-	MaliciousEvent struct {
-		Actor     string `json:"actor"`
-		SessionID string `json:"sessionId"`
-		FilterID  string `json:"filterId"`
-	} `json:"maliciousEvent"`
-}
-
-func parseEnvelope(body []byte) threatEventEnvelope {
-	var env threatEventEnvelope
-	// A body we cannot parse is still forwarded; the backend is the authority
-	// on what is valid, so this only degrades the partition key and log detail.
-	_ = json.Unmarshal(body, &env)
-	return env
-}
-
-// partitionKey keeps one session's events on one partition, so they stay
-// ordered relative to each other. Falls back to the actor, then to nil (which
-// lets the balancer spread the message).
-func partitionKey(body []byte) []byte {
-	env := parseEnvelope(body)
-	if env.MaliciousEvent.SessionID != "" {
-		return []byte(env.MaliciousEvent.SessionID)
-	}
-	if env.MaliciousEvent.Actor != "" {
-		return []byte(env.MaliciousEvent.Actor)
-	}
-	return nil
 }

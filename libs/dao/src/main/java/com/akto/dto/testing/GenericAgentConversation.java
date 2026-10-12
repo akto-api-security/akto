@@ -38,4 +38,15 @@ public class GenericAgentConversation {
     private ConversationType conversationType;
     public static final String CONTEXT_SOURCE = "contextSource";
     private String contextSource;
+    public static final String USER_ID = "userId";
+    /** Id (Context.userId) of the user who sent the turn; null on conversations stored before this field existed. */
+    private Integer userId;
+
+    // Keeps the 12-arg constructor for existing callers (AgentClient, AgentConversationResult)
+    public GenericAgentConversation(String title, String conversationId, String prompt, String response,
+            String finalSentPrompt, int createdAt, int lastUpdatedAt, int tokensUsed, int externalApiTokens,
+            int tokensLimit, ConversationType conversationType, String contextSource) {
+        this(title, conversationId, prompt, response, finalSentPrompt, createdAt, lastUpdatedAt, tokensUsed,
+            externalApiTokens, tokensLimit, conversationType, contextSource, null);
+    }
 }

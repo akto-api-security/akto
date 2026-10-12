@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,6 +79,26 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { ApiCollection.HOST_NAME }, true);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { ApiCollection.TAGS_STRING + "." + CollectionTags.KEY_NAME, ApiCollection.TAGS_STRING + "." + CollectionTags.VALUE }, true);
+    }
+
+    /** Fields of a collection a list of collections does not need, some of them as big as every url of the collection. */
+    private static final List<String> LIST_EXCLUDED_FIELDS = Arrays.asList(
+            ApiCollection.URLS_STRING, ApiCollection.CONDITIONS_STRING, ApiCollection.SERVICE_GRAPH_EDGES,
+            ApiCollection.HOST_NAMES, ApiCollection.SAMPLE_COLLECTIONS_DROPPED, ApiCollection.REDACT,
+            ApiCollection.RUN_DEPENDENCY_ANALYSER, ApiCollection.MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS,
+            ApiCollection.SSE_CALLBACK_URL, ApiCollection.MCP_TRANSPORT_TYPE, ApiCollection.MCP_MALICIOUSNESS_LAST_CHECK,
+            ApiCollection.VXLAN_ID, ApiCollection.USER_ENV_TYPE);
+
+    /** What the collections table and the app wide id lookups read of each collection. */
+    public static final Bson LIST_PROJECTION = Projections.exclude(withServiceTag(false));
+
+    /** The same, keeping serviceTag, which the display name of a service collection is built from. */
+    public static final Bson LIST_PROJECTION_WITH_SERVICE_TAG = Projections.exclude(withServiceTag(true));
+
+    private static List<String> withServiceTag(boolean keepServiceTag) {
+        List<String> excluded = new ArrayList<>(LIST_EXCLUDED_FIELDS);
+        if (!keepServiceTag) excluded.add(ApiCollection.SERVICE_TAG);
+        return excluded;
     }
 
     public ApiCollection getMeta(int apiCollectionId) {
@@ -197,11 +218,14 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
     }
 
     public ApiCollection findByName(String name) {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        // the display name is derived from these three fields only, so match on a projection of them
+        // and load the one matching document in full; the documents carry every url of the collection
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection.SERVICE_TAG));
         for (ApiCollection apiCollection: apiCollections) {
             if (apiCollection.getDisplayName() == null) continue;
             if (apiCollection.getDisplayName().equalsIgnoreCase(name)) {
-                return apiCollection;
+                return ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.ID, apiCollection.getId()));
             }
         }
         return null;

@@ -1324,6 +1324,7 @@ function SingleTestRunPage() {
         }>Export results</Button></Box> : undefined}
         secondaryActions={!workflowTest ? moreActionsComp : undefined}
         components={useComponents}
+        backUrl={"/dashboard/testing"}
       />
       <ReRunModal selectedTestRun={selectedTestRun} shouldRefresh={false} />
       {currentSummary?.hexId ? (
