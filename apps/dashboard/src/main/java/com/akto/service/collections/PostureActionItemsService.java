@@ -86,6 +86,8 @@ public class PostureActionItemsService extends TimedService {
     private static final String ROWS = "rows";
     private static final String TOTAL = "total";
     private static final String ENDPOINTS = "endpoints";
+    // the collection of an issue's api, in the _id a group by api key makes
+    private static final String API_COLLECTION_ID_OF_KEY = Constants.ID + "." + SingleTypeInfo._API_COLLECTION_ID;
     private static final String SUB_CATEGORY_PATH = Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY;
 
     // api_info's {_id.apiCollectionId, _id.url} index: hands the documents over already in key order
@@ -172,7 +174,11 @@ public class PostureActionItemsService extends TimedService {
         if (collections.isEmpty()) return PostureActionItemsResponse.ofRows(new ArrayList<>(), 0);
 
         List<Bson> filters = new ArrayList<>(Arrays.asList(Filters.in(ApiInfo.ID_API_COLLECTION_ID, collections), match));
-        if (type == Type.THIRD_PARTY) filters.add(Filters.gte(ApiInfo.LAST_SEEN, Context.now() - THIRD_PARTY_SEEN_WITHIN_SECONDS));
+        if (type == Type.THIRD_PARTY) {
+            // the list is of the recently seen ones only, which the collections' counts (of all of them) cannot tell: count them
+            filters.add(Filters.gte(ApiInfo.LAST_SEEN, Context.now() - THIRD_PARTY_SEEN_WITHIN_SECONDS));
+            total = ApiInfoDao.instance.count(Filters.and(filters));
+        }
         List<Row> rows = ApiInfoDao.instance.findAll(Filters.and(filters), skip, limit, Sorts.ascending(Constants.ID), null)
                 .stream().map(info -> rowOf(info, null)).collect(Collectors.toList());
         return PostureActionItemsResponse.ofRows(rows, total);
@@ -239,8 +245,11 @@ public class PostureActionItemsService extends TimedService {
         List<BsonField> perApi = new ArrayList<>(Collections.singletonList(Accumulators.sum(COUNT, 1)));
         if (type == Type.MULTIPLE_ISSUES) perApi.add(Accumulators.addToSet(ISSUE_NAMES, field(SUB_CATEGORY_PATH)));
         List<Bson> perApiStages = new ArrayList<>(Arrays.asList(
-                Aggregates.match(fromResults ? IssuesSnapshotService.misConfiguredFilter(excluded) : issueFilter(type, excluded)),
+                Aggregates.match(fromResults ? IssuesSnapshotService.misConfiguredFilter(excluded) : issueFilter(type)),
                 Aggregates.group(field(apiKeyPath), perApi)));
+        // demo and deactivated collections are taken out of the grouped apis: as a "not in" among the issues' own
+        // filter they would be no help to the index ({status, collection}) that finds the issues
+        if (!fromResults) perApiStages.add(Aggregates.match(Filters.nin(API_COLLECTION_ID_OF_KEY, excluded)));
         if (type == Type.MULTIPLE_ISSUES) perApiStages.add(Aggregates.match(Filters.gte(COUNT, IssuesSnapshotService.HIGH_VALUE_MIN_ISSUES)));
 
         List<Bson> pipeline = new ArrayList<>(perApiStages);
@@ -273,12 +282,10 @@ public class PostureActionItemsService extends TimedService {
         return key.getApiCollectionId() + " " + key.getMethod().name() + " " + key.getUrl();
     }
 
-    /** The issues an issue level item is about: open, of the collections the user may see, less demo and deactivated ones. */
-    private Bson issueFilter(Type type, Set<Integer> excluded) {
-        Bson visible = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(
-                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, excluded));
-        List<Bson> filters = new ArrayList<>(Arrays.asList(visible,
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)));
+    /** The issues an issue level item is about: open, of the collections the user may see (demo and deactivated ones are taken out after grouping). */
+    private Bson issueFilter(Type type) {
+        List<Bson> filters = new ArrayList<>(Collections.singletonList(TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN))));
         if (type != Type.MULTIPLE_ISSUES) filters.add(Filters.ne(IssuesSnapshotService.TEST_ERROR_SOURCE, IssuesSnapshotService.TEST_EDITOR));
         if (type == Type.VULNERABLE) filters.add(Filters.eq(TestingRunIssues.KEY_SEVERITY, GlobalEnums.Severity.CRITICAL.name()));
         if (type == Type.VEM || type == Type.MHH) {
@@ -291,8 +298,7 @@ public class PostureActionItemsService extends TimedService {
     /** Test sub categories more than one api has an open issue for, with the first of those apis. */
     private PostureActionItemsResponse urlsByIssue(int skip, int limit) {
         Set<Integer> excluded = UsageMetricCalculator.getDemosAndDeactivated();
-        Bson open = Filters.and(TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(
-                        Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, excluded)),
+        Bson open = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN));
         String subCategory = "subCategory";
         String api = "api";
@@ -302,6 +308,7 @@ public class PostureActionItemsService extends TimedService {
                 // one entry per (sub category, api), then the apis of each sub category
                 Aggregates.group(Projections.fields(Projections.computed(subCategory, field(SUB_CATEGORY_PATH)),
                         Projections.computed(api, field(Constants.ID + "." + TestingIssuesId.API_KEY_INFO)))),
+                Aggregates.match(Filters.nin(Constants.ID + "." + api + "." + SingleTypeInfo._API_COLLECTION_ID, excluded)),
                 Aggregates.group(field(Constants.ID + "." + subCategory), Accumulators.push(ENDPOINTS, field(Constants.ID + "." + api)),
                         Accumulators.sum(COUNT, 1)),
                 Aggregates.match(Filters.gt(COUNT, IssuesSnapshotService.URLS_PER_PLAYBOOK_THRESHOLD)),

@@ -31,13 +31,14 @@ public class PostureSnapshotService extends TimedService {
         PostureCounts counts = data.getCounts();
         long shadowApis = timed("count shadow apis", this::countShadowApis);
 
-        return new PostureSnapshotResponse(data.getStart(), data.getEnd(), data.isStartUnavailable(),
+        return new PostureSnapshotResponse(data.getStart(), data.getEnd(), data.isStartUnavailable(), data.isEndApproximate(),
                 new ActionItemCounts(counts.get(PostureMetric.SENSITIVE_UNAUTHENTICATED), counts.get(PostureMetric.HIGH_RISK_THIRD_PARTY),
                         shadowApis, counts.get(PostureMetric.UNAUTHENTICATED), counts.get(PostureMetric.NOT_TESTED),
                         counts.get(PostureMetric.ONLY_ONCE_TESTED), counts.get(PostureMetric.HIGH_RISK), counts.get(PostureMetric.SENSITIVE)),
                 new Missing(data.getNetMissing(), counts.get(PostureMetric.AUTH_NOT_CALCULATED),
                         counts.get(PostureMetric.ACCESS_NOT_CALCULATED), counts.get(PostureMetric.API_TYPE_MISSING)),
                 freshness.getRefreshedAt(), data.isPending(),
+                new PostureSnapshotResponse.Progress(data.getCountedCollections(), data.getCollections()),
                 timed("newest host collections", () -> new CollectionsPageService().fetchNewestHostnames(NEW_DOMAINS), List::size));
     }
 

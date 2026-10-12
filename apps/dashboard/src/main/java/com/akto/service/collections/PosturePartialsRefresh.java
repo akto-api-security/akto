@@ -62,6 +62,14 @@ class PosturePartialsRefresh extends TimedService {
 
     private static final ApiCollectionStatsDao statsDao = ApiCollectionStatsDao.instance;
 
+    /** Whether some collection that is counted has never been (a first fill is still going on). */
+    static boolean hasUncountedCollections() {
+        return !statsDao.findRowsToRefresh(Filters.and(
+                        Filters.in(ApiCollectionStats.TAB, ApiCollectionStats.Tab.HOSTNAME.name(), ApiCollectionStats.Tab.CUSTOM.name()),
+                        Filters.exists(ApiCollectionStats.POSTURE_AT, false)),
+                Sorts.ascending(ApiCollectionStats.ID), 1, Projections.include(ApiCollectionStats.ID)).isEmpty();
+    }
+
     void refresh() {
         // the view already holds these numbers: nothing is counted for an account that reads them from it
         if (PostureSource.viewHasRows()) return;
@@ -82,7 +90,8 @@ class PosturePartialsRefresh extends TimedService {
                 Filters.or(
                         Filters.exists(ApiCollectionStats.POSTURE_AT, false),
                         Filters.expr(gt(field(ApiCollectionStats.LAST_SEEN), field(ApiCollectionStats.POSTURE_AT))),
-                        Filters.expr(gt(field(ApiCollectionStats.RISK_SCORE + ApiCollectionStats.AT_SUFFIX), field(ApiCollectionStats.POSTURE_AT))),
+                        // the collection's highest risk score moved (riskScoreAt moves on every risk refresh, whether or not a score did)
+                        Filters.expr(ne(riskScoreNow(), ifNull(field(ApiCollectionStats.POSTURE + "." + PostureMetric.RISK_SEEN), -1))),
                         // the sensitive refresh found another number of sensitive apis: the sensitive and unauthenticated ones may have moved
                         Filters.expr(ne(ifNull(field(ApiCollectionStats.SENSITIVE_APIS_COUNT), 0),
                                 ifNull(field(ApiCollectionStats.POSTURE + "." + PostureMetric.SENSITIVE_APIS_SEEN), -1))),
@@ -164,9 +173,18 @@ class PosturePartialsRefresh extends TimedService {
         ApiInfoDao.instance.getMCollection().aggregate(pipeline).allowDiskUse(true).toCollection();
     }
 
-    /** What the stats row already holds that a new posture keeps: the sensitive unauthenticated count and the sensitive count it was counted with. */
+    /** The stats row's highest risk score of the collection, as the integer a posture keeps it as. */
+    private static Object riskScoreNow() {
+        return round(multiply(ifNull(field(ApiCollectionStats.RISK_SCORE), 0), PostureMetric.RISK_SCORE_SCALE));
+    }
+
+    /**
+     * What a new posture keeps from the stats row: the sensitive and unauthenticated count (written by its own
+     * pass) and the signals it was counted at, which a recount is due when they differ from the row's now.
+     */
     private Map<String, Object> sensitivePosture() {
         Map<String, Object> kept = new LinkedHashMap<>();
+        kept.put(PostureMetric.RISK_SEEN, riskScoreNow());
         kept.put(PostureMetric.SENSITIVE_UNAUTHENTICATED,
                 ifNull(field(ApiCollectionStats.POSTURE + "." + PostureMetric.SENSITIVE_UNAUTHENTICATED), 0));
         kept.put(PostureMetric.SENSITIVE_APIS_SEEN, ifNull(field(ApiCollectionStats.SENSITIVE_APIS_COUNT), 0));

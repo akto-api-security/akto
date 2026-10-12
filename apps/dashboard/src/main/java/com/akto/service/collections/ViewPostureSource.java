@@ -42,7 +42,7 @@ class ViewPostureSource extends TimedService implements PostureSource {
         ApiStats end = timed("view stats at the end of the range", () -> viewDao.buildApiStats(Filters.empty(), startTimestamp, endTimestamp));
         ApiStats start = timed("view stats at the start of the range", () -> viewDao.buildApiStats(Filters.empty(), 0, startTimestamp));
         PostureCounts counts = timed("view action item counts", () -> actionItemCounts(endTimestamp));
-        return new PostureData(start, end, false, counts, 0, false);
+        return new PostureData(start, end, false, counts, 0, false, 0, 0, false);
     }
 
     /**
@@ -91,7 +91,7 @@ class ViewPostureSource extends TimedService implements PostureSource {
         return Filters.and(Filters.lte(EndpointInfoView.DISCOVERED_TIMESTAMP, endTimestamp), visibleCollections());
     }
 
-    /** The view's endpoints of the collections the user may see. */
+    /** The view's endpoints of the collections the user may see (the view is built without demo and deactivated ones). */
     static Bson visibleCollections() {
         Bson filter = Filters.empty();
         try {

@@ -50,17 +50,21 @@ class PartialsPostureSource extends TimedService implements PostureSource {
 
         PostureCounts all = timed("sum the posture of the collections", () -> sumCollections(excluded));
         PostureCounts end = all;
+        boolean endApproximate = false;
         if (endTimestamp < now - END_IS_NOW_SECONDS) {
             PostureCounts later = timed("apis discovered after the end of the range", () -> discoveredAfter(endTimestamp, excluded, now));
             if (later != null) end = all.minus(later);
+            else endApproximate = true;
         }
         PostureCounts afterStart = timed("apis discovered after the start of the range", () -> discoveredAfter(startTimestamp, excluded, now));
         boolean startUnavailable = afterStart == null;
 
         return new PostureData(startUnavailable ? new ApiStats(startTimestamp) : all.minus(afterStart).toApiStats(startTimestamp),
                 end.toApiStats(endTimestamp), startUnavailable, end,
-                end.get(PostureCounts.ENDPOINTS_COUNT) - end.get(PostureMetric.TOTAL),
-                all.get(PostureCounts.COUNTED_ROWS) < all.get(PostureCounts.ROWS));
+                // missing data is today's figure, whatever the range: traffic's apis less api_info's, both as they are now
+                all.get(PostureCounts.ENDPOINTS_COUNT) - all.get(PostureMetric.TOTAL),
+                all.get(PostureCounts.COUNTED_ROWS) < all.get(PostureCounts.ROWS),
+                all.get(PostureCounts.COUNTED_ROWS), all.get(PostureCounts.ROWS), endApproximate);
     }
 
     int windowDocCap() {

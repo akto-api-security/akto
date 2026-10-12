@@ -25,6 +25,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BsonField;
+import com.mongodb.client.model.Facet;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -73,6 +74,7 @@ public class McpPostureService extends TimedService {
     private static final String COUNT = "count";
     private static final String HITS = "hits";
     private static final String TOTAL = "total";
+    private static final String ROWS = "rows";
     private static final String NEW = "newApis";
     private static final String THIRD_PARTY = "thirdParty";
     private static final String CRITICAL = "critical";
@@ -108,11 +110,13 @@ public class McpPostureService extends TimedService {
         if (ids.isEmpty()) return new Series(new ArrayList<>());
 
         int bucketMinutes = bucketMinutes(endTimestamp - startTimestamp);
-        // the bucket a minute falls in, named by its first minute
-        Object bucketStart = multiply(floor(divide(field(HIT_COUNT_TS), bucketMinutes)), bucketMinutes);
+        // the bucket a minute falls in, named by its first minute. Buckets count from the start of the range,
+        // as the chart's intervals do, so none straddles two of them and the first is not cut short
+        int startMinute = startTimestamp / 60;
+        Object bucketStart = add(startMinute, multiply(floor(divide(add(field(HIT_COUNT_TS), -startMinute), bucketMinutes)), bucketMinutes));
         List<Bson> pipeline = Arrays.asList(
                 Aggregates.match(Filters.and(Filters.in(HIT_COUNT_COLLECTION, ids),
-                        Filters.gte(HIT_COUNT_TS, startTimestamp / 60), Filters.lte(HIT_COUNT_TS, endTimestamp / 60))),
+                        Filters.gte(HIT_COUNT_TS, startMinute), Filters.lte(HIT_COUNT_TS, endTimestamp / 60))),
                 Aggregates.group(bucketStart, Accumulators.sum(COUNT, field(HIT_COUNT_COUNT))),
                 Aggregates.sort(Sorts.ascending(Constants.ID)));
         List<Point> points = timed("api calls of the tagged collections", () -> ApiHitCountInfoDao.instance.getMCollection()
@@ -122,11 +126,13 @@ public class McpPostureService extends TimedService {
         return new Series(points);
     }
 
+    /** The chart's intervals (HomeDashboard generateTimeSeriesWithGaps): keep the two in step. */
     static int bucketMinutes(int rangeSeconds) {
         if (rangeSeconds <= HOUR_SECONDS) return 1;
         if (rangeSeconds <= DAY_SECONDS) return 5;
         if (rangeSeconds <= 7 * DAY_SECONDS) return 60;
         if (rangeSeconds <= 30 * DAY_SECONDS) return 6 * 60;
+        if (rangeSeconds <= 90 * DAY_SECONDS) return 24 * 60;
         return 7 * 24 * 60;
     }
 
@@ -186,15 +192,29 @@ public class McpPostureService extends TimedService {
         List<Bson> pipeline = Arrays.asList(
                 Aggregates.match(Filters.in(HIT_COUNT_COLLECTION, ids(mcp))),
                 Aggregates.group(field(HIT_COUNT_COLLECTION), Accumulators.sum(HITS, field(HIT_COUNT_COUNT))),
-                // the id breaks ties, so pages never repeat or drop an application
-                Aggregates.sort(Sorts.orderBy(Sorts.descending(HITS), Sorts.ascending(Constants.ID))),
-                Aggregates.skip(skip), Aggregates.limit(limit));
+                Aggregates.facet(
+                        // the id breaks ties, so pages never repeat or drop an application
+                        new Facet(ROWS, Aggregates.sort(Sorts.orderBy(Sorts.descending(HITS), Sorts.ascending(Constants.ID))),
+                                Aggregates.skip(skip), Aggregates.limit(limit)),
+                        new Facet(TOTAL, Aggregates.count(COUNT))));
         Map<Integer, String> names = mcp.stream().collect(Collectors.toMap(ApiCollectionStats::getId, ApiCollectionStats::getName, (a, b) -> a));
-        List<TopApplication> top = timed("top mcp applications by traffic", () -> ApiHitCountInfoDao.instance.getMCollection()
-                .withDocumentClass(BasicDBObject.class).aggregate(pipeline).into(new ArrayList<>()).stream()
-                .map(row -> new TopApplication(names.get(row.getInt(Constants.ID)), row.getInt(Constants.ID), ((Number) row.get(HITS)).longValue()))
-                .collect(Collectors.toList()), List::size);
-        return new Data(new ArrayList<>(), top, mcp.size());
+        BasicDBObject result = timed("top mcp applications by traffic", () -> ApiHitCountInfoDao.instance.getMCollection()
+                .withDocumentClass(BasicDBObject.class).aggregate(pipeline).first());
+
+        List<TopApplication> top = new ArrayList<>();
+        for (Object entry : list(result, ROWS)) {
+            BasicDBObject row = (BasicDBObject) entry;
+            top.add(new TopApplication(names.get(row.getInt(Constants.ID)), row.getInt(Constants.ID), ((Number) row.get(HITS)).longValue()));
+        }
+        // only the collections with traffic can be listed, so only they count towards the pages
+        List<?> totals = list(result, TOTAL);
+        long total = totals.isEmpty() ? 0 : ((Number) ((BasicDBObject) totals.get(0)).get(COUNT)).longValue();
+        return new Data(new ArrayList<>(), top, total);
+    }
+
+    private static List<?> list(BasicDBObject row, String branch) {
+        Object value = row == null ? null : row.get(branch);
+        return value instanceof List ? (List<?>) value : new ArrayList<>();
     }
 
     private static long number(BasicDBObject row, String field) {

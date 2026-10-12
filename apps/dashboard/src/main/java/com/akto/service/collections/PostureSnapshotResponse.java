@@ -18,12 +18,16 @@ public class PostureSnapshotResponse {
     private final ApiStats apiStatsEnd;
     /** true when the start of the range could not be worked out cheaply, so apiStatsStart is empty */
     private final boolean startUnavailable;
+    /** true when the end of the range is in the past and apiStatsEnd is today's numbers, too many apis having been discovered since to take out */
+    private final boolean endApproximate;
     private final ActionItemCounts actionItemCounts;
     private final Missing missing;
     /** metric -> epoch seconds of its last refresh, for the "updated Xs ago" label */
     private final Map<String, Integer> statsUpdatedAt;
     /** true while some collections have not been counted yet, so the numbers are still growing */
     private final boolean statsPending;
+    /** how far the counting of the collections has got, for a progress bar while statsPending */
+    private final Progress statsProgress;
     /** the newest host collections, for the new domains tile */
     private final List<NewDomain> newDomains;
 
@@ -39,6 +43,13 @@ public class PostureSnapshotResponse {
         private final long onlyOnceTested;
         private final long highRisk;
         private final long sensitiveApis;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    public static class Progress {
+        private final long countedCollections;
+        private final long collections;
     }
 
     /** What the missing data charts need. */

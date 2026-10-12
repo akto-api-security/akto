@@ -75,8 +75,17 @@ public class IssuesSnapshotService extends TimedService {
         List<String> vemTests = timed("test ids of " + VEM_CATEGORY, () -> testIdsOfCategory(VEM_CATEGORY));
         List<String> mhhTests = timed("test ids of " + MHH_CATEGORY, () -> testIdsOfCategory(MHH_CATEGORY));
 
+        // a $facet reads its input whole and cannot use an index: narrow what it gets to the issues any branch
+        // counts, of what the user may see, on indexed fields only ({status, collection}). The demo and deactivated
+        // collections are taken out inside the branches: a "not in" is no way to pick documents from an index
+        Bson countedByABranch = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                        Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)));
+        Bson inScope = Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, excluded);
+
         BasicDBObject row = timed("issue counts", () -> TestingRunIssuesDao.instance.getMCollection()
-                .aggregate(Collections.singletonList(Aggregates.facet(branches(excluded, startTimestamp, endTimestamp, vemTests, mhhTests))), BasicDBObject.class)
+                .aggregate(Arrays.asList(Aggregates.match(countedByABranch),
+                        Aggregates.facet(branches(inScope, startTimestamp, endTimestamp, vemTests, mhhTests))), BasicDBObject.class)
                 .maxTime(QUERY_MAX_TIME_SECONDS, TimeUnit.SECONDS).first());
 
         Map<String, Long> severityCounts = new HashMap<>();
@@ -96,34 +105,31 @@ public class IssuesSnapshotService extends TimedService {
                 count(row, PLAYBOOKS), misConfigured, subCategoryCounts);
     }
 
-    private List<Facet> branches(Set<Integer> excluded, int start, int end, List<String> vemTests, List<String> mhhTests) {
-        // what the dashboard shows of the issue collection, less the demo and deactivated collections
-        Bson visible = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(
-                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, excluded));
+    private List<Facet> branches(Bson inScope, int start, int end, List<String> vemTests, List<String> mhhTests) {
         Bson open = Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN);
         Bson notFromTestEditor = Filters.ne(TEST_ERROR_SOURCE, TEST_EDITOR);
-        Bson openFinding = Filters.and(visible, open, notFromTestEditor);
+        Bson openFinding = Filters.and(inScope, open, notFromTestEditor);
 
         List<Facet> facets = new ArrayList<>();
-        facets.add(new Facet(OPEN_AT_END, Aggregates.match(Filters.and(visible, open, Filters.lte(TestingRunIssues.CREATION_TIME, end))),
+        facets.add(new Facet(OPEN_AT_END, Aggregates.match(Filters.and(inScope, open, Filters.lte(TestingRunIssues.CREATION_TIME, end))),
                 Aggregates.count(COUNT)));
-        facets.add(new Facet(OPEN_AND_FIXED_AT_START, Aggregates.match(Filters.and(visible,
+        facets.add(new Facet(OPEN_AND_FIXED_AT_START, Aggregates.match(Filters.and(inScope,
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN, GlobalEnums.TestRunIssueStatus.FIXED)),
                 Filters.lte(TestingRunIssues.CREATION_TIME, start))), Aggregates.count(COUNT)));
         facets.add(new Facet(BY_SEVERITY, Aggregates.match(openFinding),
                 Aggregates.group(field(TestingRunIssues.KEY_SEVERITY), Accumulators.sum(COUNT, 1))));
         facets.add(apisWith(VULNERABLE, Filters.and(openFinding, Filters.eq(TestingRunIssues.KEY_SEVERITY, GlobalEnums.Severity.CRITICAL.name()))));
         facets.add(apisWith(BROKEN_AUTH, openFinding));
-        facets.add(new Facet(HIGH_VALUE, Aggregates.match(Filters.and(visible, open)),
+        facets.add(new Facet(HIGH_VALUE, Aggregates.match(Filters.and(inScope, open)),
                 Aggregates.group(apiKey(), Accumulators.sum(COUNT, 1)),
                 Aggregates.match(Filters.gte(COUNT, HIGH_VALUE_MIN_ISSUES)), Aggregates.count(COUNT)));
         facets.add(categoryApis(VEM, openFinding, vemTests));
         facets.add(categoryApis(MHH, openFinding, mhhTests));
         // as the critical findings chart always counted: open issues last seen within the range
-        facets.add(new Facet(BY_SUB_CATEGORY, Aggregates.match(Filters.and(visible, open,
+        facets.add(new Facet(BY_SUB_CATEGORY, Aggregates.match(Filters.and(inScope, open,
                         Filters.gte(TestingRunIssues.LAST_SEEN, start), Filters.lte(TestingRunIssues.LAST_SEEN, end))),
                 Aggregates.group(field(SUB_CATEGORY_PATH), Accumulators.sum(COUNT, 1))));
-        facets.add(new Facet(PLAYBOOKS, Aggregates.match(Filters.and(visible, open)),
+        facets.add(new Facet(PLAYBOOKS, Aggregates.match(Filters.and(inScope, open)),
                 Aggregates.group(Projections.fields(Projections.computed("subCategory", field(SUB_CATEGORY_PATH)), Projections.computed("api", apiKey())),
                         Accumulators.sum(COUNT, 1)),
                 Aggregates.group(field(Constants.ID + ".subCategory"), Accumulators.sum(COUNT, 1)),

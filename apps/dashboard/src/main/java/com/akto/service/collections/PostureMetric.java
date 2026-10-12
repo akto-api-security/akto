@@ -56,6 +56,8 @@ final class PostureMetric {
     static final String SENSITIVE_UNAUTHENTICATED = "sensitiveUnauthenticated";
     /** The stats row's sensitiveApisCount a collection's posture was counted with: a different one means a recount. */
     static final String SENSITIVE_APIS_SEEN = "sensitiveApisSeen";
+    /** The stats row's riskScore (the collection's highest, times RISK_SCORE_SCALE) a collection's posture was counted with. */
+    static final String RISK_SEEN = "riskSeen";
     /** apis any of whose access types is third party (not the "actual" one the access chart counts) */
     static final String THIRD_PARTY = "thirdParty";
     /** The sum of the risk scores, times {@link #RISK_SCORE_SCALE} so that it stays an integer. */

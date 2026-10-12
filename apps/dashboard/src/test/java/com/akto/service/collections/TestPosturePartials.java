@@ -434,6 +434,71 @@ public class TestPosturePartials extends MongoBasedTest {
     }
 
     @Test
+    public void theThirdPartyListsTotalCountsOnlyTheRecentlySeenApisItLists() {
+        prepare(seed());
+        // seen this week: the third party apis of one collection only (a new ApiInfo is seen now)
+        ApiInfoDao.instance.getMCollection().updateMany(Filters.ne(ApiInfo.ID_API_COLLECTION_ID, 1),
+                Updates.set(ApiInfo.LAST_SEEN, Context.now() - 30 * 24 * 60 * 60));
+        refreshAll();
+
+        PostureActionItemsResponse all = allOf(PostureActionItemsService.Type.THIRD_PARTY, 2);
+
+        assertTrue(all.getRows().size() > 0);
+        assertEquals(all.getRows().size(), all.getTotal());
+        assertTrue("more third party apis than the recent ones", sum(PostureMetric.THIRD_PARTY) > all.getTotal());
+    }
+
+    @Test
+    public void aRiskRefreshThatMovesNoScoreDoesNotMakeCollectionsDue() {
+        prepare(seed());
+        refreshAll();
+        PosturePartialsRefresh refresh = new PosturePartialsRefresh();
+        assertTrue(refresh.pickBatch(Context.now()).isEmpty());
+
+        // every risk refresh stamps riskScoreAt on every collection, moved score or not
+        ApiCollectionStatsDao.instance.getMCollection().updateMany(Filters.empty(),
+                Updates.set(ApiCollectionStats.RISK_SCORE + ApiCollectionStats.AT_SUFFIX, Context.now() + 100));
+        assertTrue(refresh.pickBatch(Context.now()).isEmpty());
+
+        ApiCollectionStatsDao.instance.getMCollection().updateOne(Filters.eq(ApiCollectionStats.ID, 3),
+                Updates.set(ApiCollectionStats.RISK_SCORE, 4.5));
+        List<ApiCollectionStats> due = refresh.pickBatch(Context.now());
+        assertEquals(1, due.size());
+        assertEquals(3, due.get(0).getId());
+    }
+
+    @Test
+    public void postureIsDueSoonAgainWhileCollectionsAreStillUncounted() {
+        prepare(seed());
+        int now = Context.now();
+        ApiCollectionStatsMeta justRun = new ApiCollectionStatsMeta();
+        justRun.setRefreshedAt(now - 10);
+        ApiCollectionStatsMeta runAWhileAgo = new ApiCollectionStatsMeta();
+        runAWhileAgo.setRefreshedAt(now - CollectionStatsRefresher.POSTURE_CATCH_UP_SECONDS - 1);
+
+        assertFalse("not before the catch up time", CollectionStatsRefresher.isCatchingUp(justRun, Metric.POSTURE, now));
+        assertTrue(CollectionStatsRefresher.isCatchingUp(runAWhileAgo, Metric.POSTURE, now));
+        assertFalse("other metrics keep their ttl", CollectionStatsRefresher.isCatchingUp(runAWhileAgo, Metric.RISK_SCORE, now));
+
+        refreshAll();
+        assertFalse("everything counted: back to the usual ttl", CollectionStatsRefresher.isCatchingUp(runAWhileAgo, Metric.POSTURE, now));
+    }
+
+    @Test
+    public void theSnapshotSaysHowFarTheCountingHasGot() {
+        prepare(seed());
+        markAllMetricsFresh();
+
+        PostureSnapshotResponse before = new PostureSnapshotService().fetch(Context.now() - 50_000, Context.now(), false);
+        assertEquals(0, before.getStatsProgress().getCountedCollections());
+        assertEquals(3, before.getStatsProgress().getCollections());
+
+        refreshAll();
+        PostureSnapshotResponse after = new PostureSnapshotService().fetch(Context.now() - 50_000, Context.now(), false);
+        assertEquals(3, after.getStatsProgress().getCountedCollections());
+    }
+
+    @Test
     public void aPageIsNeverLargerThanTheMaximum() {
         prepare(seed());
         refreshAll();

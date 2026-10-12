@@ -125,5 +125,24 @@ public class TestMcpPostureService extends MongoBasedTest {
         assertEquals(5, McpPostureService.bucketMinutes(McpPostureService.DAY_SECONDS));
         assertEquals(60, McpPostureService.bucketMinutes(3 * McpPostureService.DAY_SECONDS));
         assertEquals(360, McpPostureService.bucketMinutes(20 * McpPostureService.DAY_SECONDS));
+        assertEquals("daily up to 90 days, as the chart draws it", 24 * 60, McpPostureService.bucketMinutes(60 * McpPostureService.DAY_SECONDS));
+        assertEquals(7 * 24 * 60, McpPostureService.bucketMinutes(120 * McpPostureService.DAY_SECONDS));
+    }
+
+    @Test
+    public void bucketsCountFromTheStartOfTheRangeSoTheFirstOneIsNotCutShort() {
+        seed();
+        int start = (Context.now() - 60 * McpPostureService.DAY_SECONDS) / 60 * 60;
+        int startMinute = start / 60;
+        // 3 minutes into the first day, and in the second day
+        ApiHitCountInfoDao.instance.insertMany(Arrays.asList(
+                new ApiHitCountInfo(1, "/a", "GET", 5, startMinute + 3), new ApiHitCountInfo(1, "/a", "GET", 7, startMinute + 24 * 60 + 1)));
+
+        McpPostureResponses.Series series = new McpPostureService().apiCallSeries(McpPostureService.Tag.MCP, start, start + 60 * McpPostureService.DAY_SECONDS);
+
+        assertEquals(2, series.getPoints().size());
+        assertEquals(startMinute, series.getPoints().get(0).getTs());
+        assertEquals(5, series.getPoints().get(0).getCount());
+        assertEquals(startMinute + 24 * 60, series.getPoints().get(1).getTs());
     }
 }

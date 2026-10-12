@@ -1,11 +1,11 @@
-import React, { useEffect, useReducer, useState, useCallback } from 'react'
+import React, { useEffect, useReducer, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from './api';
 import threatApi from "../threat_detection/api"
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Banner, ProgressBar, Spinner } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -35,6 +35,11 @@ import { getDashboardCategory, isMCPSecurityCategory, isApiSecurityCategory, map
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
 import { usePermissions } from '@/util/permissions';
+
+// The api numbers of a first fill come a run at a time, and a run starts when the dashboard asks: look again
+// this often, this many times (the backend is due another run every 30s while collections are uncounted)
+const PENDING_POLL_MS = 3000
+const MAX_PENDING_POLLS = 10
 
 function HomeDashboard() {
 
@@ -66,6 +71,10 @@ function HomeDashboard() {
     const [actionItemsData, setActionItemsData] = useState(null);
     // what the two snapshot calls returned: the action items and the critical findings chart are made from them
     const [snapshots, setSnapshots] = useState(null);
+    // what the api numbers say about themselves: still being counted, or approximate for a range that ended in the past
+    const [postureNotice, setPostureNotice] = useState({ pending: false, endApproximate: false, counted: 0, collections: 0 });
+    const [pendingPolls, setPendingPolls] = useState(0);
+    const endpointsCountRef = useRef({});
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
 
     const handleTabChange = useCallback(
@@ -336,34 +345,52 @@ function HomeDashboard() {
             intervalMs = 7 * 24 * 60 * 60 * 1000;
         }
         
-        // Generate complete time series
+        // One point per interval from the start of the range, then each data point added to the interval it falls in
+        // (the backend counts its buckets from the start of the range too, with these same sizes)
         const completeData = [];
         for (let ts = startMs; ts <= endMs; ts += intervalMs) {
-            // Find the closest data point within the interval
-            let value = 0;
-            for (let checkTs = ts; checkTs < ts + intervalMs && checkTs <= endMs; checkTs += 60000) {
-                if (dataMap[checkTs]) {
-                    value += dataMap[checkTs];
-                }
-            }
-            completeData.push([ts, value]);
+            completeData.push([ts, 0]);
         }
-        
-        // If we have actual data points, merge them in for accuracy
         Object.entries(dataMap).forEach(([ts, count]) => {
             const timestamp = parseInt(ts);
-            if (timestamp >= startMs && timestamp <= endMs) {
-                // Find the nearest interval point
-                const intervalIndex = Math.floor((timestamp - startMs) / intervalMs);
-                if (intervalIndex >= 0 && intervalIndex < completeData.length) {
-                    // Update the value at this interval
-                    completeData[intervalIndex][1] = Math.max(completeData[intervalIndex][1], count);
-                }
-            }
+            if (timestamp > endMs || completeData.length === 0) return;
+            // a bucket named by a minute just before the start of the range still belongs to the first interval
+            const intervalIndex = Math.min(Math.max(Math.floor((timestamp - startMs) / intervalMs), 0), completeData.length - 1);
+            completeData[intervalIndex][1] += count;
         });
-        
+
         return completeData.sort((a, b) => a[0] - b[0]);
     };
+
+    const safely = (what, build) => {
+        try {
+            build()
+        } catch (error) {
+            console.error('home dashboard: ' + what + ' failed', error)
+        }
+    }
+
+    // the charts, cards and tiles made from the api numbers snapshot; a snapshot that never came leaves them as they are
+    const applyPosture = (posture, endpointsCountResp) => {
+        // for now we are actually using the apis from stis instead of the total apis in the response
+        // TODO: Fix apiStats API to return the correct total apis
+        safely('metrics', () => buildMetrics(posture.apiStatsEnd, endpointsCountResp))
+        // the missing apis figure is already the net of apis missing from and redundant in api_info
+        const missing = posture.missing || {}
+        const netMissing = missing.netMissing || 0
+        const stats = posture.apiStatsEnd ? posture : null
+        safely('access types', () => mapAccessTypes(stats, netMissing, 0, missing.accessTypeNotCalculated || 0))
+        safely('auth types', () => mapAuthTypes(stats, netMissing, 0, missing.authNotCalculated || 0))
+        if (posture.apiStatsEnd) {
+            safely('api types', () => buildAPITypesData(posture.apiStatsEnd, netMissing, 0, missing.apiTypeMissing || 0))
+            safely('risk score', () => buildSetRiskScoreData(posture.apiStatsEnd, Math.max(0, netMissing)))
+        }
+        setNewDomains((posture.newDomains || []).map(domain => ({ name: domain.name, apisTested: domain.apisTested, totalApis: domain.totalApis })))
+        setPostureNotice({
+            pending: !!posture.statsPending, endApproximate: !!posture.endApproximate,
+            counted: posture.statsProgress?.countedCollections || 0, collections: posture.statsProgress?.collections || 0
+        })
+    }
 
     const fetchData = async () => {
         setLoading(true)
@@ -394,40 +421,35 @@ function HomeDashboard() {
         let fetchEndpointsCountResp = valueOf(3, {})
 
         setShowBannerComponent(!userEndpoints)
+        endpointsCountRef.current = fetchEndpointsCountResp
+        setPendingPolls(0)
 
-        // for now we are actually using the apis from stis instead of the total apis in the response
-        // TODO: Fix apiStats API to return the correct total apis
-        buildMetrics(posture.apiStatsEnd, fetchEndpointsCountResp)
-        testSummaryData()
-        // the missing apis figure is already the net of apis missing from and redundant in api_info
-        const missing = posture.missing || {}
-        const netMissing = missing.netMissing || 0
-        const stats = posture.apiStatsEnd ? posture : null
-        mapAccessTypes(stats, netMissing, 0, missing.accessTypeNotCalculated || 0)
-        mapAuthTypes(stats, netMissing, 0, missing.authNotCalculated || 0)
-        if (posture.apiStatsEnd) {
-            buildAPITypesData(posture.apiStatsEnd, netMissing, 0, missing.apiTypeMissing || 0)
-            buildSetRiskScoreData(posture.apiStatsEnd, Math.max(0, netMissing))
+        // one widget failing to build must not leave the others, and the page, waiting
+        try {
+            applyPosture(posture, fetchEndpointsCountResp)
+            safely('recent tests', () => testSummaryData())
+            setSnapshots({ posture, issues: issuesSnapshot })
+            safely('severity map', () => buildSeverityMap(issuesSnapshot.severityCounts))
+            safely('issues summary', () => buildIssuesSummary(issuesSnapshot))
+
+            const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
+            buildDeltaInfo(fetchHistoricalDataResp)
+
+            buildEndpointsCount(fetchEndpointsCountResp)
+
+            if (loadMcp) {
+                const mcpCounts = valueOf(4, {})
+                setMcpTotals({ mcpTotalApis: mcpCounts.totalApis ?? null, thirdPartyApis: mcpCounts.thirdPartyApis ?? null, newApis7Days: mcpCounts.newApis7Days ?? null,
+                    criticalApis: mcpCounts.criticalApis ?? null, tools: mcpCounts.tools ?? null, prompts: mcpCounts.prompts ?? null,
+                    resources: mcpCounts.resources ?? null, server: mcpCounts.servers ?? null, policyGuardrailApis: mcpCounts.policyGuardrailApis ?? null })
+                setMcpOpenAlertDetails(valueOf(5, {})?.alerts || [])
+                setMcpTopApplications(valueOf(6, {})?.topApplications || [])
+            }
+        } catch (error) {
+            console.error('home dashboard: building the page failed', error)
+        } finally {
+            setLoading(false)
         }
-        setNewDomains((posture.newDomains || []).map(domain => ({ name: domain.name, apisTested: domain.apisTested, totalApis: domain.totalApis })))
-        setSnapshots({ posture, issues: issuesSnapshot })
-        buildSeverityMap(issuesSnapshot.severityCounts)
-        buildIssuesSummary(issuesSnapshot)
-
-        const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
-        buildDeltaInfo(fetchHistoricalDataResp)
-
-        buildEndpointsCount(fetchEndpointsCountResp)
-
-        if (loadMcp) {
-            const mcpCounts = valueOf(4, {})
-            setMcpTotals({ mcpTotalApis: mcpCounts.totalApis ?? null, thirdPartyApis: mcpCounts.thirdPartyApis ?? null, newApis7Days: mcpCounts.newApis7Days ?? null,
-                criticalApis: mcpCounts.criticalApis ?? null, tools: mcpCounts.tools ?? null, prompts: mcpCounts.prompts ?? null,
-                resources: mcpCounts.resources ?? null, server: mcpCounts.servers ?? null, policyGuardrailApis: mcpCounts.policyGuardrailApis ?? null })
-            setMcpOpenAlertDetails(valueOf(5, {})?.alerts || [])
-            setMcpTopApplications(valueOf(6, {})?.topApplications || [])
-        }
-        setLoading(false)
     }
 
     const fetchThreatData = async () => {
@@ -477,6 +499,22 @@ function HomeDashboard() {
         }
     }, [startTimestamp, endTimestamp])
     
+    // collections not counted yet make the numbers grow as they are: look again, with the banner showing how far it has got
+    useEffect(() => {
+        if (!postureNotice.pending || pendingPolls >= MAX_PENDING_POLLS) return
+        const timer = setTimeout(async () => {
+            try {
+                const posture = await api.fetchPostureSnapshot(startTimestamp, endTimestamp)
+                applyPosture(posture, endpointsCountRef.current)
+                setSnapshots(previous => ({ ...(previous || {}), posture }))
+            } catch (error) {
+                // the next look will tell
+            }
+            setPendingPolls(count => count + 1)
+        }, PENDING_POLL_MS)
+        return () => clearTimeout(timer)
+    }, [postureNotice.pending, pendingPolls, startTimestamp, endTimestamp])
+
     // Fetch MCP API call stats when time range changes
     useEffect(() => {
         fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
@@ -627,6 +665,7 @@ function HomeDashboard() {
 
 
     function mapAuthTypes(apiStats, missingCount, redundantCount, authTypeMissing) {
+        if (!apiStats) return
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
         const convertKey = (key) => {
@@ -1489,6 +1528,31 @@ function HomeDashboard() {
 
     const dashboardComp = (
         <VerticalStack gap={4}>
+            {postureNotice.pending && (
+                <Banner status="info">
+                    <VerticalStack gap="2">
+                        {pendingPolls < MAX_PENDING_POLLS ? (
+                            <HorizontalStack gap="2" blockAlign="center">
+                                <Spinner size="small" accessibilityLabel="Counting" />
+                                <Text>
+                                    Counting the APIs of your collections{postureNotice.collections > 0 ? ` (${postureNotice.counted} of ${postureNotice.collections})` : ''}.
+                                    The numbers below are partial and fill in as it goes.
+                                </Text>
+                            </HorizontalStack>
+                        ) : (
+                            <Text>Still counting the APIs of your collections: the numbers below are partial. Reload in a while to see them complete.</Text>
+                        )}
+                        {postureNotice.collections > 0 && (
+                            <ProgressBar size="small" progress={Math.round(100 * postureNotice.counted / postureNotice.collections)} />
+                        )}
+                    </VerticalStack>
+                </Banner>
+            )}
+            {postureNotice.endApproximate && (
+                <Banner status="warning">
+                    Too many APIs were discovered after the end of this range to take them out of the numbers, so they are today's.
+                </Banner>
+            )}
             {components.map(({id, component}) => (
                 <div key={id}>{component}</div>
             ))}
