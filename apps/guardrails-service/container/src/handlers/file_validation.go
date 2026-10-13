@@ -88,6 +88,8 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 	}
 
 	contextSource := strings.TrimSpace(c.PostForm("contextSource"))
+	// Named policies are enforced regardless of their scope, as on /validate/request.
+	policyName := strings.TrimSpace(c.PostForm("policyName"))
 
 	requestHeaders := h.fileRequestHeaders(c)
 
@@ -95,7 +97,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 
 	// Pre-flight policy gate: with no policy applicable to this caller there is nothing
 	// to enforce, so skip fetching, extracting and inspecting the content entirely.
-	if h.policyGate != nil {
+	if h.policyGate != nil && policyName == "" {
 		applicable, err := h.policyGate(contextSource, requestHeaders, strings.TrimSpace(c.PostForm("tag")))
 		if err != nil {
 			// Could not tell — inspect rather than assume there is nothing to enforce.
@@ -139,6 +141,7 @@ func (h *ValidationHandler) ValidateFile(c *gin.Context) {
 		Status:         strings.TrimSpace(c.PostForm("status")),
 		Tag:            strings.TrimSpace(c.PostForm("tag")),
 		Metadata:       strings.TrimSpace(c.PostForm("metadata")),
+		PolicyName:     policyName,
 		Source:         "file",
 	}
 
@@ -233,7 +236,7 @@ func (h *ValidationHandler) validateSingleFile(ctx context.Context, input *fileI
 			zap.Int("chunkOverlap", h.cfg.File.ChunkOverlap))
 	}
 
-	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validatorService.ValidateRequest)
+	results := h.validateChunks(ctx, chunks, meta, sessionID, requestID, h.validateFileChunk)
 	return h.applyFileChunkResults(fr, results)
 }
 

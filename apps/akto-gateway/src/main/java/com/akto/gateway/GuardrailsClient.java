@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.binder.okhttp3.OkHttpMetricsEventListener;
 import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.MediaType;
+import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -19,7 +20,9 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.net.SocketTimeoutException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
@@ -28,16 +31,21 @@ public class GuardrailsClient {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailsClient.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    private static final MediaType OCTET_STREAM = MediaType.get("application/octet-stream");
+    static final String VALIDATE_FILE_ENDPOINT = "/api/validate/file";
 
     // Inline LLM-proxy path: bound guardrails wait so servlet threads release quickly.
     // On timeout/transport failure we fail-open (see buildFailOpenResponse) — same HTTP
     // 200 + Allowed=true shape as a healthy validation, so LiteLLM/k6 keep flowing.
     private static final int TIMEOUT_MS = resolveTimeoutMs();
+    // File validation extracts and scans whole documents, so it gets a longer timeout than a prompt check.
+    static final int FILE_TIMEOUT_MS = resolveTimeoutMs("GUARDRAILS_FILE_TIMEOUT_MS", 15_000);
 
     private static final OkHttpClient HTTP_CLIENT = buildHttpClient(TIMEOUT_MS);
 
     private final String guardrailsServiceUrl;
     private final OkHttpClient httpClient;
+    private final OkHttpClient fileHttpClient;
     private final BiConsumer<String, String> alerts;
 
     public GuardrailsClient() {
@@ -52,18 +60,27 @@ public class GuardrailsClient {
     GuardrailsClient(String serviceUrl, OkHttpClient httpClient, BiConsumer<String, String> alerts) {
         this.guardrailsServiceUrl = serviceUrl;
         this.httpClient = httpClient;
+        this.fileHttpClient = httpClient.newBuilder()
+                .readTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .writeTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .callTimeout(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .build();
         this.alerts = alerts;
     }
 
     private static int resolveTimeoutMs() {
-        String raw = System.getenv("GUARDRAILS_CLIENT_TIMEOUT_MS");
+        return resolveTimeoutMs("GUARDRAILS_CLIENT_TIMEOUT_MS", 3_000);
+    }
+
+    private static int resolveTimeoutMs(String envVar, int defaultMs) {
+        String raw = System.getenv(envVar);
         if (raw == null || raw.trim().isEmpty()) {
-            return 3_000;
+            return defaultMs;
         }
         try {
             return Math.max(500, Integer.parseInt(raw.trim()));
         } catch (NumberFormatException e) {
-            return 3_000;
+            return defaultMs;
         }
     }
 
@@ -127,22 +144,38 @@ public class GuardrailsClient {
         return false;
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> callValidate(Map<String, Object> request, String endpoint) {
+        return send(httpClient, endpoint, request, () -> RequestBody.create(objectMapper.writeValueAsString(request), JSON));
+    }
+
+    /** Validates files with /validate/file: fields go as form values and each file as a "file" part. */
+    public Map<String, Object> callValidateFile(Map<String, Object> fields, List<FileUpload> files) {
+        MultipartBody.Builder body = new MultipartBody.Builder().setType(MultipartBody.FORM);
+        for (Map.Entry<String, Object> field : fields.entrySet()) {
+            if (field.getValue() != null) {
+                body.addFormDataPart(field.getKey(), field.getValue().toString());
+            }
+        }
+        for (FileUpload file : files) {
+            body.addFormDataPart("file", file.filename, RequestBody.create(file.content, OCTET_STREAM));
+        }
+        return send(fileHttpClient, VALIDATE_FILE_ENDPOINT, fields, body::build);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> send(OkHttpClient client, String endpoint, Map<String, Object> request,
+            Callable<RequestBody> body) {
         // Single result reference assigned on every return path, so the decision counter is
         // recorded exactly once (in finally) regardless of which branch we exit through.
         Map<String, Object> result = null;
         try {
-            String jsonRequest = objectMapper.writeValueAsString(request);
             String url = guardrailsServiceUrl + endpoint;
 
             loggerMaker.infoAndAddToDb("Calling guardrails service at: {}", url);
 
-            RequestBody body = RequestBody.create(jsonRequest, JSON);
             Request.Builder requestBuilder = new Request.Builder()
                     .url(url)
-                    .post(body)
-                    .addHeader("Content-Type", "application/json");
+                    .post(body.call());
 
             String authToken = loadGuardrailsAuthToken();
             if (authToken == null || authToken.trim().isEmpty()) {
@@ -153,7 +186,7 @@ public class GuardrailsClient {
 
             Request httpRequest = requestBuilder.build();
 
-            try (Response response = httpClient.newCall(httpRequest).execute()) {
+            try (Response response = client.newCall(httpRequest).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
 
                 loggerMaker.infoAndAddToDb("Guardrails response (status {}): {}", response.code(), responseBody);
@@ -192,6 +225,17 @@ public class GuardrailsClient {
             return result;
         } finally {
             recordDecision(endpoint, result);
+        }
+    }
+
+    /** One decoded file for /validate/file. */
+    public static final class FileUpload {
+        final String filename;
+        final byte[] content;
+
+        public FileUpload(String filename, byte[] content) {
+            this.filename = filename;
+            this.content = content;
         }
     }
 

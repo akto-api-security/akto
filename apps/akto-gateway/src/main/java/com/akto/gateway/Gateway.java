@@ -6,7 +6,11 @@ import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -24,6 +28,10 @@ public class Gateway {
     public static final String GUARDRAILS_REQUEST_PAYLOAD = "guardrailsRequestPayload";
     // Optional comma-separated policy names the guardrails service narrows its policies to.
     public static final String GUARDRAILS_POLICY_NAME = "policyName";
+    // Request context /validate/file reads, so files get the same policies and scoping as the request.
+    private static final List<String> FILE_CONTEXT_FIELDS = Arrays.asList("contextSource", "path", "method",
+        "akto_account_id", "akto_vxlan_id", "ip", "requestHeaders", "time", "statusCode", "status", "tag", "metadata",
+        GUARDRAILS_POLICY_NAME);
     private static Gateway instance;
     private final GuardrailsClient guardrailsClient;
     private DataPublisher dataPublisher;
@@ -214,7 +222,7 @@ public class Gateway {
         return "";
     }
 
-    private String asString(Object val) {
+    private static String asString(Object val) {
         return val == null ? "" : val.toString().trim();
     }
 
@@ -317,6 +325,53 @@ public class Gateway {
 
     public DataPublisher getDataPublisher() {
         return dataPublisher;
+    }
+
+    /**
+     * Validates the files a user uploaded ([{filename, type, content (base64)}]) with the guardrails service's
+     * /validate/file, using the request's context. Entries without inline content (a url) are not validated.
+     * The verdict comes back as guardrailsResult, absent when there was nothing to validate.
+     */
+    public Map<String, Object> validateFile(Map<String, Object> requestData, List<?> files) {
+        Map<String, Object> result = new HashMap<>();
+        List<GuardrailsClient.FileUpload> uploads = uploadsToValidate(files);
+        if (uploads.isEmpty()) {
+            return result;
+        }
+        Map<String, Object> fields = new HashMap<>();
+        for (String key : FILE_CONTEXT_FIELDS) {
+            putIfNotNull(fields, requestData, key);
+        }
+        result.put("guardrailsResult", guardrailsClient.callValidateFile(fields, uploads));
+        return result;
+    }
+
+    static List<GuardrailsClient.FileUpload> uploadsToValidate(List<?> files) {
+        List<GuardrailsClient.FileUpload> uploads = new ArrayList<>();
+        int withoutContent = 0;
+        // Newest first, so the guardrails service's file cap drops old attachments rather than the latest.
+        for (int i = files.size() - 1; i >= 0; i--) {
+            if (!(files.get(i) instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> file = (Map<?, ?>) files.get(i);
+            String filename = asString(file.get("filename"));
+            String content = asString(file.get("content"));
+            if (content.isEmpty()) {
+                withoutContent++;
+                continue;
+            }
+            try {
+                uploads.add(new GuardrailsClient.FileUpload(filename.isEmpty() ? "attachment" : filename,
+                    Base64.getDecoder().decode(content)));
+            } catch (IllegalArgumentException e) {
+                loggerMaker.warnAndAddToDb("Skipping file with invalid base64 content: " + filename);
+            }
+        }
+        if (withoutContent > 0) {
+            loggerMaker.info("Skipping {} attachment(s) without inline content, e.g. a url", withoutContent);
+        }
+        return uploads;
     }
 
     public void setDataPublisher(DataPublisher dataPublisher) {
