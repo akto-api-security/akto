@@ -2336,7 +2336,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
   hasAccessToNewPosture(){
     const activeAccount = window?.ACTIVE_ACCOUNT
-    const allowedAccountsForPosture = [1779231193, 1783981503];
+    const allowedAccountsForPosture = [1779231193, 1783981503, 1768175789, 1786073624,1758787662];
     return allowedAccountsForPosture.some(x => x === activeAccount)
   },
 
