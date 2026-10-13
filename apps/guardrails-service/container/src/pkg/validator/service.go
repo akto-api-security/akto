@@ -189,6 +189,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		}
 	}()
 	go svc.runPolicyRefresher()
+	svc.startMcpAllowlistRefresher()
 	return svc, nil
 }
 
@@ -910,55 +911,62 @@ func buildApprovalPollResponse(activityID string, status *threatapi.ApprovalStat
 }
 
 func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
-	refreshInterval := time.Duration(s.config.McpAllowedListRefreshIntervalMin) * time.Minute
-
 	s.mcpListCache.mu.RLock()
-	if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
+	if !s.mcpListCache.lastFetched.IsZero() {
 		list := s.mcpListCache.mcpAllowedList
 		s.mcpListCache.mu.RUnlock()
-		s.logger.Debug("Using cached MCP allowlist", zap.Int("count", len(list)))
 		return list, nil
 	}
 	s.mcpListCache.mu.RUnlock()
 
-	v, err, _ := s.allowlistRefreshGroup.Do("mcp-allowlist", func() (interface{}, error) {
-		s.mcpListCache.mu.Lock()
-		defer s.mcpListCache.mu.Unlock()
-
-		if !s.mcpListCache.lastFetched.IsZero() && time.Since(s.mcpListCache.lastFetched) < refreshInterval {
-			return s.mcpListCache.mcpAllowedList, nil
-		}
-
-		rawResp, fetchErr := s.dbClient.FetchMcpAllowedHostList()
-		if fetchErr != nil {
-			return nil, fetchErr
-		}
-
-		var mcpHostAllowedList struct {
-			McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
-		}
-		if unmarshalErr := json.Unmarshal(rawResp, &mcpHostAllowedList); unmarshalErr != nil {
-			return nil, fmt.Errorf("failed to unmarshal outer response: %w", unmarshalErr)
-		}
-
-		s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
-		s.mcpListCache.lastFetched = time.Now()
-		s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
-		return mcpHostAllowedList.McpAllowlist, nil
+	_, err, _ := s.allowlistRefreshGroup.Do("mcp-allowlist", func() (interface{}, error) {
+		return nil, s.refreshMcpAllowlist()
 	})
 	if err != nil {
-		s.mcpListCache.mu.RLock()
-		if len(s.mcpListCache.mcpAllowedList) > 0 {
-			stale := s.mcpListCache.mcpAllowedList
-			s.mcpListCache.mu.RUnlock()
-			s.logger.Warn("MCP allowlist refresh failed, using stale cache", zap.Error(err))
-			return stale, nil
-		}
-		s.mcpListCache.mu.RUnlock()
 		s.logger.Error("Failed to fetch MCP allowlist from database-abstractor", zap.Error(err))
 		return nil, err
 	}
-	return v.([]types.McpAllowedList), nil
+
+	s.mcpListCache.mu.RLock()
+	defer s.mcpListCache.mu.RUnlock()
+	return s.mcpListCache.mcpAllowedList, nil
+}
+
+func (s *Service) refreshMcpAllowlist() error {
+	rawResp, err := s.dbClient.FetchMcpAllowedHostList()
+	if err != nil {
+		return err
+	}
+
+	var mcpHostAllowedList struct {
+		McpAllowlist []types.McpAllowedList `json:"mcpAllowlist"`
+	}
+	if err := json.Unmarshal(rawResp, &mcpHostAllowedList); err != nil {
+		return fmt.Errorf("failed to unmarshal outer response: %w", err)
+	}
+
+	s.mcpListCache.mu.Lock()
+	s.mcpListCache.mcpAllowedList = mcpHostAllowedList.McpAllowlist
+	s.mcpListCache.lastFetched = time.Now()
+	s.mcpListCache.mu.Unlock()
+	s.logger.Info("MCP allowlist cache refreshed", zap.Int("count", len(mcpHostAllowedList.McpAllowlist)))
+	return nil
+}
+
+func (s *Service) startMcpAllowlistRefresher() {
+	interval := time.Duration(s.config.McpAllowedListRefreshIntervalMin) * time.Minute
+	if interval <= 0 {
+		interval = time.Minute
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			if err := s.refreshMcpAllowlist(); err != nil {
+				s.logger.Warn("MCP allowlist refresh failed, keeping previously cached list", zap.Error(err))
+			}
+		}
+	}()
 }
 
 // getCachedPolicies serves policies from the cache, which is kept fresh by
