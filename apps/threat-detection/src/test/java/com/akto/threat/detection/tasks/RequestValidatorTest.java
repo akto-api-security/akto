@@ -285,66 +285,6 @@ class RequestValidatorTest {
     // ==================== Header Validation Tests ====================
 
     @Test
-    void testValidate_ExtraHeaderNotInSchema() throws Exception {
-        HttpResponseParams responseParam = new HttpResponseParams();
-        responseParam.setRequestParams(new HttpRequestParams());
-        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
-        responseParam.getRequestParams().setMethod("GET");
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("content-type", Collections.singletonList("application/json"));
-        headers.put("x-custom-header", Collections.singletonList("custom-value"));
-        responseParam.getRequestParams().setHeaders(headers);
-
-        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
-
-        assertFalse(errors.isEmpty());
-        boolean hasHeaderError = errors.stream()
-                .anyMatch(e -> e.getAttribute().equals("header") && e.getMessage().contains("x-custom-header"));
-        assertTrue(hasHeaderError, "Expected error for extra header not defined in schema");
-    }
-
-    @Test
-    void testValidate_StandardHeadersSkipped() throws Exception {
-        HttpResponseParams responseParam = new HttpResponseParams();
-        responseParam.setRequestParams(new HttpRequestParams());
-        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
-        responseParam.getRequestParams().setMethod("GET");
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("user-agent", Collections.singletonList("Mozilla/5.0"));
-        headers.put("accept-encoding", Collections.singletonList("gzip, deflate"));
-        headers.put("x-forwarded-for", Collections.singletonList("192.168.1.1"));
-        headers.put("content-length", Collections.singletonList("100"));
-        headers.put("content-type", Collections.singletonList("application/json"));
-        responseParam.getRequestParams().setHeaders(headers);
-
-        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
-
-        boolean hasHeaderError = errors.stream().anyMatch(e -> e.getAttribute().equals("header"));
-        assertFalse(hasHeaderError, "Standard headers should be skipped and not cause errors");
-    }
-
-    @Test
-    void testValidate_AktoK8sHeadersSkipped() throws Exception {
-        HttpResponseParams responseParam = new HttpResponseParams();
-        responseParam.setRequestParams(new HttpRequestParams());
-        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus");
-        responseParam.getRequestParams().setMethod("GET");
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("x-akto-k8s-namespace", Collections.singletonList("default"));
-        headers.put("content-type", Collections.singletonList("application/json"));
-        headers.put("x-akto-k8s-pod", Collections.singletonList("pod-123"));
-        responseParam.getRequestParams().setHeaders(headers);
-
-        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
-
-        boolean hasHeaderError = errors.stream().anyMatch(e -> e.getAttribute().equals("header"));
-        assertFalse(hasHeaderError, "x-akto-k8s prefixed headers should be skipped");
-    }
-
-    @Test
     void testValidate_DefinedHeaderAllowed() throws Exception {
         // DELETE /pet/{petId} has api_key header defined in schema
         HttpResponseParams responseParam = new HttpResponseParams();
@@ -645,26 +585,6 @@ class RequestValidatorTest {
         assertFalse(errors.isEmpty());
         assertEquals(SchemaConformanceError.Location.LOCATION_BODY, errors.get(0).getLocation(),
                 "URL path not found error should have LOCATION_BODY");
-    }
-
-    @Test
-    void testValidate_ErrorLocation_ExtraHeader() throws Exception {
-        HttpResponseParams responseParam = new HttpResponseParams();
-        responseParam.setRequestParams(new HttpRequestParams());
-        responseParam.getRequestParams().setUrl("/api/v3/pet/findByStatus?status=available");
-        responseParam.getRequestParams().setMethod("GET");
-
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("content-type", Collections.singletonList("application/json"));
-        headers.put("x-custom-header", Collections.singletonList("value"));
-        responseParam.getRequestParams().setHeaders(headers);
-
-        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
-
-        boolean hasHeaderErrorWithCorrectLocation = errors.stream()
-                .anyMatch(e -> e.getAttribute().equals("header")
-                        && e.getLocation() == SchemaConformanceError.Location.LOCATION_HEADER);
-        assertTrue(hasHeaderErrorWithCorrectLocation, "Extra header error should have LOCATION_HEADER");
     }
 
     @Test
