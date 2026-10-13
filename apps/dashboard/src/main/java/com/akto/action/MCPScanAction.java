@@ -4,6 +4,7 @@ import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -11,15 +12,24 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.dto.McpAuditInfo;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.LoginFlowResponse;
+import com.akto.dto.testing.TestRoles;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.McpToolsSyncJobExecutor;
+import com.akto.testing.TestExecutor;
+import com.akto.util.Constants;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -35,6 +45,7 @@ public class MCPScanAction extends UserAction {
     private String dashboardUrl;
     private String authKey;
     private String authValue;
+    private String testRoleHexId;
     private String apiCollectionId;
     private ApiCollection createdCollection;
 
@@ -43,6 +54,20 @@ public class MCPScanAction extends UserAction {
 
     public String initiateMCPScan() {
         try {
+
+            // Resolve auth from the test role upfront so an invalid role or failed login flow
+            // (e.g. OAuth token fetch) is reported to the user instead of failing silently in the sync job
+            Map<String, String> testRoleAuthHeaders = null;
+            if (testRoleHexId != null && !testRoleHexId.isEmpty()) {
+                try {
+                    testRoleAuthHeaders = resolveAuthHeadersFromTestRole(testRoleHexId);
+                } catch (Exception e) {
+                    String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                    loggerMaker.errorAndAddToDb(e, "Error resolving auth from test role for MCP scan: " + reason);
+                    addActionError("Test role authentication failed: " + reason);
+                    return Action.ERROR.toUpperCase();
+                }
+            }
 
             URL parsedUrl = new URL(serverUrl);
             // Store the full path with query params for MCP endpoint
@@ -107,7 +132,9 @@ public class MCPScanAction extends UserAction {
             try {
                 loggerMaker.info("Starting MCP sync job..");
                 Map<String, String> authHeader = new HashMap<>();
-                if(authKey != null && !authKey.isEmpty() && authValue != null && !authValue.isEmpty()) {
+                if(testRoleAuthHeaders != null) {
+                    authHeader.putAll(testRoleAuthHeaders);
+                } else if(authKey != null && !authKey.isEmpty() && authValue != null && !authValue.isEmpty()) {
                     authHeader.put(authKey, authValue);
                 } else {
                     loggerMaker.info("No authentication credentials provided");
@@ -134,6 +161,49 @@ public class MCPScanAction extends UserAction {
             e.printStackTrace();
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    private Map<String, String> resolveAuthHeadersFromTestRole(String roleHexId) throws Exception {
+        TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(roleHexId)));
+        if (testRole == null) {
+            throw new Exception("Test role not found.");
+        }
+
+        AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
+        if (authMechanism == null) {
+            throw new Exception("No default auth mechanism configured for test role: " + testRole.getName());
+        }
+
+        String authType = authMechanism.getType();
+        if (LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authType)) {
+            // Runs the configured login steps (e.g. OAuth token request or recorded login) and caches the resolved tokens
+            LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanism, null, testRole.getName());
+            if (loginFlowResponse == null || loginFlowResponse.getSuccess() == null || !loginFlowResponse.getSuccess()) {
+                String reason = (loginFlowResponse != null && loginFlowResponse.getError() != null && !loginFlowResponse.getError().isEmpty())
+                    ? loginFlowResponse.getError() : "login flow did not succeed.";
+                throw new Exception("Could not fetch access token: " + reason);
+            }
+        } else if (!LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString().equalsIgnoreCase(authType)) {
+            throw new Exception("Auth type " + authType + " is not supported for MCP import. Use a hardcoded or login request based test role.");
+        }
+
+        List<AuthParam> authParams = authMechanism.getAuthParamsFromAuthMechanism();
+        Map<String, String> authHeaders = new HashMap<>();
+        if (authParams != null) {
+            for (AuthParam authParam : authParams) {
+                if (authParam.getKey() == null || authParam.getKey().isEmpty() || authParam.getValue() == null) continue;
+                if (authParam.getWhere() != null && authParam.getWhere() != AuthParam.Location.HEADER) {
+                    loggerMaker.info("Skipping non-header auth param " + authParam.getKey() + " for MCP scan", LogDb.DASHBOARD);
+                    continue;
+                }
+                authHeaders.put(authParam.getKey(), authParam.getValue());
+            }
+        }
+
+        if (authHeaders.isEmpty()) {
+            throw new Exception("No header auth params found in test role: " + testRole.getName());
+        }
+        return authHeaders;
     }
 
     public String getServerUrl() {
@@ -175,5 +245,13 @@ public class MCPScanAction extends UserAction {
 
     public void setAuthValue(String authValue) {
         this.authValue = authValue;
+    }
+
+    public String getTestRoleHexId() {
+        return testRoleHexId;
+    }
+
+    public void setTestRoleHexId(String testRoleHexId) {
+        this.testRoleHexId = testRoleHexId;
     }
 }
