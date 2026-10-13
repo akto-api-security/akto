@@ -23,8 +23,8 @@ import java.util.Map;
  *       and agent grouping (the envelope contextSource is not carried past ingestion).</li>
  * </ul>
  * The identity (first host segment) is, in order: the user's email local part when the traffic
- * carries an email (X-OpenWebUI-User-Email first, then x-akto-installer-user_email, the user_email
- * tag, x-litellm-spend-logs-metadata, then the LiteLLM virtual key's owner when its user_id tag is an
+ * carries an email (X-OpenWebUI-User-Email first, then x-akto-installer-user_email,
+ * x-litellm-user-email, x-user-email, the user_email tag, x-litellm-spend-logs-metadata, then the LiteLLM virtual key's owner when its user_id tag is an
  * email); else the client's device id (the client_device_id tag, e.g. from the Anthropic
  * metadata.user_id Claude Code sends), shortened; else the host the connector sent (the LiteLLM
  * agent name or proxy host). Every call of a conversation carries the same inputs, so it lands on
@@ -48,6 +48,9 @@ public final class LitellmAgentEndpointRewrite {
     // Open WebUI's logged-in user, sent when Open WebUI runs with ENABLE_FORWARD_USER_INFO_HEADERS=true.
     static final String OPENWEBUI_USER_EMAIL_HEADER = "x-openwebui-user-email";
     static final String INSTALLER_USER_EMAIL_HEADER = "x-akto-installer-user_email";
+    // User email headers LiteLLM deployments forward from the calling client.
+    static final String LITELLM_USER_EMAIL_HEADER = "x-litellm-user-email";
+    static final String USER_EMAIL_HEADER = "x-user-email";
     static final String SPEND_LOGS_METADATA_HEADER = "x-litellm-spend-logs-metadata";
     // Session id mini-runtime groups a trace under; Atlas traces without one are not listed.
     static final String AKTO_SESSION_ID_HEADER = "x-akto-installer-akto_session_id";
@@ -89,6 +92,8 @@ public final class LitellmAgentEndpointRewrite {
         String email = firstNonEmpty(
             header(headers, OPENWEBUI_USER_EMAIL_HEADER),
             header(headers, INSTALLER_USER_EMAIL_HEADER),
+            header(headers, LITELLM_USER_EMAIL_HEADER),
+            header(headers, USER_EMAIL_HEADER),
             tag.getString(USER_EMAIL_KEY),
             parseObject(header(headers, SPEND_LOGS_METADATA_HEADER)).getString(USER_EMAIL_KEY),
             emailOrNull(tag.getString(KEY_USER_ID_TAG)));
