@@ -7,13 +7,18 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.LoginFlowResponse;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.HostValidator;
+import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
+import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -197,15 +202,14 @@ public class AgentImportAction extends UserAction{
             response = new OriginalHttpResponse(customResponseBody, customRespHeaders, statusCode);
         } else {
             try {
+                OriginalHttpRequest requestToSend = request;
                 if (!StringUtils.isEmpty(testRoleId)) {
-                    TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleId)));
-                    if (testRole != null) {
-                        AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
-                        authMechanism.addAuthToRequest(request, false);
-                    }
+                    // Auth goes on a copy so the token/cookie is sent but never persisted in the saved sample.
+                    requestToSend = request.copy();
+                    applyTestRoleAuth(requestToSend, testRoleId);
                 }
 
-                response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
+                response = ApiExecutor.sendRequest(requestToSend, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
                 if (response == null) {
                     throw new Exception("No response received from URL: " + url);
                 }
@@ -230,6 +234,50 @@ public class AgentImportAction extends UserAction{
         }
     }
     
+    /**
+     * Mirrors Executor.modifyAuthTokenInRawApi (apps/testing), with two differences needed here:
+     * a failed role is an error (not a silent unauthenticated call), and header-type auth params are
+     * added even when the request doesn't carry that header yet (AuthMechanism.addAuthToRequest only
+     * replaces headers that already exist, and this request is built from scratch).
+     */
+    private void applyTestRoleAuth(OriginalHttpRequest request, String roleId) throws Exception {
+        TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(roleId)));
+        if (testRole == null) {
+            throw new Exception("Test role not found: " + roleId);
+        }
+        AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
+        if (authMechanism == null || authMechanism.getAuthParams() == null || authMechanism.getAuthParams().isEmpty()) {
+            throw new Exception("No default auth mechanism configured for test role: " + testRole.getName());
+        }
+
+        // LOGIN_REQUEST (incl. recorded flows) params are templates like ${x1.response.body...};
+        // they only hold real values after the login flow has run and filled the cached params.
+        boolean usesCachedParams = LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanism.getType());
+        if (usesCachedParams) {
+            LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanism, null, testRole.getName());
+            if (loginFlowResponse == null || !Boolean.TRUE.equals(loginFlowResponse.getSuccess())) {
+                String reason = loginFlowResponse != null && !StringUtils.isEmpty(loginFlowResponse.getError())
+                        ? loginFlowResponse.getError() : "login flow did not succeed";
+                throw new Exception("Could not fetch auth for test role " + testRole.getName() + ": " + reason);
+            }
+        }
+
+        List<AuthParam> paramsToUse = authMechanism.getAuthParamsFromAuthMechanism();
+        if (paramsToUse == null || paramsToUse.isEmpty()) {
+            throw new Exception("No resolved auth params for test role: " + testRole.getName());
+        }
+        for (AuthParam authParam : paramsToUse) {
+            if (authParam.getKey() != null && authParam.getWhere() == AuthParam.Location.HEADER) {
+                request.getHeaders().putIfAbsent(authParam.getKey().toLowerCase().trim(), new ArrayList<>(Arrays.asList("")));
+            }
+        }
+
+        ExecutorSingleOperationResp result = authMechanism.addAuthToRequest(request, usesCachedParams);
+        if (!Boolean.TRUE.equals(result.getSuccess())) {
+            throw new Exception("Auth was not applied for test role " + testRole.getName() + ": " + result.getErrMsg());
+        }
+    }
+
     private final static ObjectMapper mapper = new ObjectMapper();
 
     private String convertToMessage(String url, Map<String, List<String>> requestHeaders, String requestBody, OriginalHttpResponse response) throws Exception {
