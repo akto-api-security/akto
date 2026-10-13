@@ -1,18 +1,11 @@
 package com.akto.service.ask;
-
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.GuardrailPoliciesDao;
-import com.akto.dao.McpAllowlistDao;
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.McpAllowlist;
-import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -22,7 +15,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.service.insights.InsightRoutes;
-import com.akto.service.insights.InsightUtil;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
@@ -36,7 +28,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -64,8 +55,6 @@ public final class RecommendationCatalog {
 
     private static final LoggerMaker logger = new LoggerMaker(RecommendationCatalog.class, LogDb.DASHBOARD);
 
-    private static final int MCP_COLLECTION_ROW_CAP = 20_000;
-    private static final int AUDIT_ROW_CAP = 5_000;
     private static final int SKILL_ROW_CAP = 20_000;
     private static final int THREAT_FETCH_LIMIT = 500;
     private static final int THREAT_LOOKBACK_SECONDS = 30 * 24 * 3600;
@@ -100,11 +89,7 @@ public final class RecommendationCatalog {
 
     private static List<Recommendation> computeAgentic(CONTEXT_SOURCE contextSource) {
         List<Recommendation> out = new ArrayList<>();
-        List<ApiCollection> mcpCollections = loadMcpCollections(contextSource);
-        List<McpAuditInfo> auditRows = loadAuditRows();
         out.add(redTeamingCriticals(contextSource));
-        out.add(maliciousMcpTools(mcpCollections, auditRows));
-        out.add(unapprovedMcpServers(mcpCollections, auditRows));
         out.add(threatActivity());
         return out;
     }
@@ -245,112 +230,7 @@ public final class RecommendationCatalog {
                 InsightRoutes.ISSUES, params("severity", Arrays.asList("CRITICAL"), "status", Arrays.asList("OPEN")));
     }
 
-    /** Candidate collections for maliciousMcpTools()/unapprovedMcpServers(): AGENTIC's context
-     *  collections (MCP union GenAI, RBAC'd and cached by
-     *  UsersCollectionsList.getContextCollectionsForUser) narrowed further to real MCP servers
-     *  via isMcpCollection() in Java, so a browser-based LLM chat account or other non-MCP
-     *  agentic collection isn't swept in. Replaces an earlier version of this method that
-     *  scanned every collection in the account with no domain filter at all — the context-scoped
-     *  candidate set here is both smaller and already RBAC'd, so the projection below is now the
-     *  only remaining cost worth caring about. */
-    private static List<ApiCollection> loadMcpCollections(CONTEXT_SOURCE contextSource) {
-        try {
-            Bson filter = Filters.and(
-                    Filters.in(ApiCollection.ID, contextCollectionIds(contextSource)),
-                    Filters.ne(ApiCollection._DEACTIVATED, true));
-            Bson projection = Projections.include(ApiCollection.TAGS_STRING, ApiCollection.HOST_NAME);
-            return ApiCollectionsDao.instance.findAll(filter, 0, MCP_COLLECTION_ROW_CAP, null, projection);
-        } catch (Exception e) {
-            logger.error("RecommendationCatalog: loadMcpCollections failed: " + e.getMessage());
-            return java.util.Collections.emptyList();
-        }
-    }
 
-    /** Same contextSource filter InsightDataLoader.loadAuditRows() uses for the bundle (current
-     *  contextSource, or missing entirely on legacy docs) — without this, maliciousMcpTools()/
-     *  unapprovedMcpServers() would silently disagree with MaliciousComponentInUseProvider/
-     *  McpSprawlProvider's counts for the same account, which is exactly the kind of drift that
-     *  reads as a bug to whoever notices it first. Projected to only mcpHost/remarks/
-     *  componentRiskAnalysis, the three fields actually read below. */
-    private static List<McpAuditInfo> loadAuditRows() {
-        try {
-            String contextSourceName = Context.contextSource.get() != null ? Context.contextSource.get().name() : null;
-            Bson filter = Filters.or(
-                    Filters.eq(McpAuditInfo.CONTEXT_SOURCE, contextSourceName),
-                    Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
-            Bson projection = Projections.include(McpAuditInfo.MCP_HOST, McpAuditInfo.REMARKS, McpAuditInfo.COMPONENT_RISK_ANALYSIS);
-            return McpAuditInfoDao.instance.findAll(filter, 0, AUDIT_ROW_CAP, null, projection);
-        } catch (Exception e) {
-            logger.error("RecommendationCatalog: loadAuditRows failed: " + e.getMessage());
-            return java.util.Collections.emptyList();
-        }
-    }
-
-    /** Distinct malicious MCP components (servers/tools) reachable right now — the
-     *  RecommendationCatalog-weight version of MaliciousComponentInUseProvider's core count: an
-     *  ApiCollection tagged malicious-mcp-server, or an McpAuditInfo row whose
-     *  componentRiskAnalysis flags the component malicious. No invocation search, no
-     *  team/device breakdown — those stay in the insight tile, which already runs this same
-     *  cross-reference at CRITICAL/HIGH through the bundle. */
-    private static Recommendation maliciousMcpTools(List<ApiCollection> mcpCollections, List<McpAuditInfo> auditRows) {
-        long count = 0;
-        try {
-            Set<String> maliciousServiceNames = new HashSet<>();
-            for (ApiCollection c : mcpCollections) {
-                if (c.isDeactivated() || !c.isMcpCollection()) continue;
-                if (InsightUtil.isMaliciousMcpServer(c)) {
-                    String s = InsightUtil.serviceNameOf(c);
-                    if (s != null) maliciousServiceNames.add(s.toLowerCase(Locale.ROOT));
-                }
-            }
-            for (McpAuditInfo a : auditRows) {
-                if (a.getComponentRiskAnalysis() != null && a.getComponentRiskAnalysis().getIsComponentMalicious()
-                        && a.getMcpHost() != null) {
-                    maliciousServiceNames.add(a.getMcpHost().toLowerCase(Locale.ROOT));
-                }
-            }
-            count = maliciousServiceNames.size();
-        } catch (Exception e) {
-            logger.error("RecommendationCatalog: maliciousMcpTools failed: " + e.getMessage());
-        }
-        return new Recommendation("malicious_mcp_tools", "Malicious tools on local MCP servers", count, "count",
-                count > 0 ? "CRITICAL" : null,
-                "Which of these " + count + " malicious tools are being called by locally-hosted MCP servers?",
-                InsightRoutes.AUDIT, params());
-    }
-
-    /** Local or not-allowlisted MCP servers — McpSprawlProvider's flaggedCount, without the
-     *  team-breakdown/dormancy pass. "Approved" = on the allowlist, or an audit row with
-     *  remarks=Approved; scope is restricted to real MCP servers via isMcpCollection() so
-     *  browser-based LLM chat accounts and other agentic (non-MCP) collections aren't swept in. */
-    private static Recommendation unapprovedMcpServers(List<ApiCollection> mcpCollections, List<McpAuditInfo> auditRows) {
-        long count = 0;
-        try {
-            Set<String> approvedLower = new HashSet<>();
-            List<McpAllowlist> allowlist = McpAllowlistDao.instance.findAll(Filters.empty(), Projections.include(McpAllowlist.NAME));
-            for (McpAllowlist a : allowlist) {
-                if (a.getName() != null) approvedLower.add(a.getName().toLowerCase(Locale.ROOT));
-            }
-            for (McpAuditInfo a : auditRows) {
-                if (McpAuditInfo.REMARKS_APPROVED.equals(a.getRemarks()) && a.getMcpHost() != null) {
-                    approvedLower.add(a.getMcpHost().toLowerCase(Locale.ROOT));
-                }
-            }
-
-            for (ApiCollection c : mcpCollections) {
-                if (c.isDeactivated() || !c.isMcpCollection()) continue;
-                String serviceName = InsightUtil.serviceNameOf(c);
-                boolean unapproved = serviceName != null && !approvedLower.contains(serviceName.toLowerCase(Locale.ROOT));
-                if (InsightUtil.isLocalMcp(c) || unapproved) count++;
-            }
-        } catch (Exception e) {
-            logger.error("RecommendationCatalog: unapprovedMcpServers failed: " + e.getMessage());
-        }
-        return new Recommendation("unapproved_mcp_servers", "Unapproved MCP servers", count, "count",
-                count > 0 ? "MEDIUM" : null,
-                "Which of these " + count + " unapproved MCP servers should be reviewed in the audit log?",
-                InsightRoutes.AUDIT, params());
-    }
 
     /** High-severity threat events in the last 30 days, from the threat-detection backend — the
      *  one recommendation that isn't a local Mongo query. Mirrors
