@@ -291,6 +291,8 @@ public class DaoInit {
         ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<DeviceDomainConfig> deviceDomainConfigClassModel = ClassModel.builder(DeviceDomainConfig.class).enableDiscriminator(true).build();
+        ClassModel<EndpointCaRoot> endpointCaRootClassModel = ClassModel.builder(EndpointCaRoot.class).enableDiscriminator(true).build();
+        ClassModel<EndpointDeviceCa> endpointDeviceCaClassModel = ClassModel.builder(EndpointDeviceCa.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldSettings> endpointShieldSettingsClassModel = ClassModel.builder(EndpointShieldSettings.class).enableDiscriminator(true).build();
@@ -333,7 +335,7 @@ public class DaoInit {
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
-                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel
+                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel, endpointCaRootClassModel, endpointDeviceCaClassModel
                 , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel
                 , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel, endpointAgentOrganizationClassModel).automatic(true).build());
 
