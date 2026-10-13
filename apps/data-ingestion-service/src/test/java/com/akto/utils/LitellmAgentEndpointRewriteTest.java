@@ -414,6 +414,20 @@ public class LitellmAgentEndpointRewriteTest {
     }
 
     @Test
+    public void litellmUserEmailHeadersIdentifyTheUser() {
+        BasicDBObject h = genericClientHeaders("CustomOpenAIClient/JS 5.8.2").append("x-akto-contextsource", "ENDPOINT")
+            .append("x-litellm-user-email", "jane@example.com").append("x-user-email", "raj@example.com");
+        Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag());
+        assertEquals("jane@example.com", LitellmAgentEndpointRewrite.apply(data));
+        assertEquals("jane.ai-agent.customopenaiclient-litellm", headers(data).getString("host"));
+        assertEquals("jane@example.com", headers(data).getString("x-akto-installer-user_email"));
+
+        BasicDBObject userEmailOnly = genericClientHeaders("CustomOpenAIClient/JS 5.8.2").append("x-akto-contextsource", "ENDPOINT")
+            .append("X-User-Email", "raj@example.com");
+        assertEquals("raj@example.com", LitellmAgentEndpointRewrite.apply(envelope("litellm", userEmailOnly, builtInGuardrailTag())));
+    }
+
+    @Test
     public void keyOwnerThatIsNotAnEmailIsIgnored() {
         BasicDBObject h = genericClientHeaders("opencode/1.18.32").append("x-akto-contextsource", "ENDPOINT");
         Map<String, Object> data = envelope("litellm", h, builtInGuardrailTag().append("user_id", "default_user_id"));
