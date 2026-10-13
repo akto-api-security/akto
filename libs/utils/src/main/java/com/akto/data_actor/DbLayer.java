@@ -748,8 +748,16 @@ public class DbLayer {
             return existing;
         }
 
+        // The expensive, failure-prone step: an RSA-4096 keygen through BouncyCastle, run
+        // exactly once per account. Bracketed with logs because a failure here leaves no
+        // trace otherwise — the collection is never created, so afterwards the database
+        // looks identical to an account that simply never enrolled.
+        loggerMaker.infoAndAddToDb("endpoint CA: generating root for account " + accountId
+                + " (RSA-4096, first enrolment)", LogDb.DB_ABS);
         com.akto.ca.CertificateAuthority.GeneratedRoot generated =
                 com.akto.ca.CertificateAuthority.generateRoot(accountId);
+        loggerMaker.infoAndAddToDb("endpoint CA: generated root " + generated.fingerprintSha256
+                + " for account " + accountId + ", persisting", LogDb.DB_ABS);
 
         EndpointCaRootDao.instance.getMCollection().updateOne(
                 Filters.eq("_id", accountId),
@@ -762,7 +770,16 @@ public class DbLayer {
                         Updates.setOnInsert(EndpointCaRoot.CREATED_AT, Context.now())),
                 new com.mongodb.client.model.UpdateOptions().upsert(true));
 
-        return fetchEndpointCaRoot(accountId);
+        EndpointCaRoot stored = fetchEndpointCaRoot(accountId);
+        if (stored == null) {
+            // Written but not readable back: the upsert reported success yet the decode
+            // returned nothing, which points at the collection or codec rather than at the
+            // certificate. Distinguishing that from "generation failed" matters, because
+            // the fixes are unrelated.
+            loggerMaker.errorAndAddToDb("endpoint CA: root persisted for account " + accountId
+                    + " but could not be read back", LogDb.DB_ABS);
+        }
+        return stored;
     }
 
     public static void insertEndpointDeviceCa(EndpointDeviceCa deviceCa) {
