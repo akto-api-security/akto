@@ -28,9 +28,13 @@ import java.io.StringWriter;
 import java.math.BigInteger;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+
 import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.Provider;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.cert.X509Certificate;
@@ -54,9 +58,43 @@ import java.util.concurrent.TimeUnit;
  */
 public class CertificateAuthority {
 
+    private static final LoggerMaker loggerMaker =
+            new LoggerMaker(CertificateAuthority.class, LogDb.DB_ABS);
+
     static {
-        if (Security.getProvider(BouncyCastleProvider.PROVIDER_NAME) == null) {
+        Provider existing = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME);
+        if (existing == null) {
             Security.addProvider(new BouncyCastleProvider());
+            existing = Security.getProvider(BouncyCastleProvider.PROVIDER_NAME);
+        }
+        // Log which provider actually answers to "BC", with its version.
+        //
+        // Two BouncyCastle jars can declare the same classes, and whichever the classloader
+        // reaches first wins — so the provider in use is a property of packaging, not of
+        // this source. That is how a bcprov-jdk16:1.46 pulled in transitively silently
+        // shadowed the bcprov-jdk18on this code needs: every class loaded, the provider
+        // registered, and certificate generation then failed inside a provider that
+        // predated the bcpkix calling it. From the outside it looked environmental.
+        //
+        // Anything other than a current version here explains that class of failure
+        // immediately, which is worth one line at startup.
+        if (existing == null) {
+            loggerMaker.errorAndAddToDb("endpoint CA: no BouncyCastle provider could be registered"
+                    + " — certificate generation will fail");
+        } else {
+            loggerMaker.infoAndAddToDb("endpoint CA: BouncyCastle provider '" + existing.getName()
+                    + "' v" + existing.getVersion()
+                    + " from " + describeSource(BouncyCastleProvider.class));
+        }
+    }
+
+    /** Where a class was actually loaded from — names the jar when two supply the same class. */
+    private static String describeSource(Class<?> c) {
+        try {
+            java.security.CodeSource cs = c.getProtectionDomain().getCodeSource();
+            return cs == null || cs.getLocation() == null ? "unknown" : cs.getLocation().toString();
+        } catch (Exception e) {
+            return "unknown";
         }
     }
 

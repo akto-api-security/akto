@@ -59,6 +59,20 @@
             <groupId>com.akto.apps.mini-testing</groupId>
             <artifactId>mini-testing</artifactId>
             <version>${project.version}</version>
+            <exclusions>
+                <!-- bcprov-jdk16:1.46 (2011) declares the same classes as the
+                     bcprov-jdk18on this module needs for com.akto.ca.CertificateAuthority,
+                     including org.bouncycastle.jce.provider.BouncyCastleProvider. With both
+                     in WEB-INF/lib, whichever the classloader reaches first registers as
+                     "BC" — and when the old one wins, bcpkix 1.78 is left calling a
+                     provider that predates it, so certificate generation throws while
+                     everything still loads. That failed only in the packaged WAR, never
+                     from the Maven classpath, which is what made it look environmental. -->
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcprov-jdk16</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         
         <dependency>

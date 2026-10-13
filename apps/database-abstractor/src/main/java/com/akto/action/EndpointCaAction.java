@@ -95,12 +95,20 @@ public class EndpointCaAction extends ActionSupport {
                 return ERROR.toUpperCase();
             }
 
+            // Logged per step because these three stages fail for completely different
+            // reasons — a missing root, a crypto/provider problem, and a database write —
+            // and from the outside all three surface as the same 422. The last line in the
+            // log before an error names the stage.
+            loggerMaker.infoAndAddToDb("signDeviceCa: resolving root for account " + accountId
+                    + ", device " + deviceId);
             EndpointCaRoot root = DbLayer.fetchOrCreateEndpointCaRoot(accountId);
             if (root == null) {
+                loggerMaker.errorAndAddToDb("signDeviceCa: no root CA for account " + accountId);
                 addActionError("could not resolve the account root CA");
                 return ERROR.toUpperCase();
             }
 
+            loggerMaker.infoAndAddToDb("signDeviceCa: signing under root " + root.getFingerprintSha256());
             CertificateAuthority.SignedDeviceCa signed = CertificateAuthority.signDeviceCa(
                     csr, deviceId, accountId, root.getCertPem(), root.getPrivateKeyPem(), null);
 
@@ -141,7 +149,7 @@ public class EndpointCaAction extends ActionSupport {
             return ERROR.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in signDeviceCa " + e.toString());
-            addActionError("could not sign the device CA");
+            addActionError("could not sign the device CA: " + failureHint(e));
             return ERROR.toUpperCase();
         }
     }
@@ -155,18 +163,22 @@ public class EndpointCaAction extends ActionSupport {
     public String fetchEndpointCaRoot() {
         try {
             int accountId = Context.accountId.get();
+            loggerMaker.infoAndAddToDb("fetchEndpointCaRoot: resolving root for account " + accountId);
             EndpointCaRoot root = DbLayer.fetchOrCreateEndpointCaRoot(accountId);
             if (root == null) {
+                loggerMaker.errorAndAddToDb("fetchEndpointCaRoot: no root CA for account " + accountId);
                 addActionError("could not resolve the account root CA");
                 return ERROR.toUpperCase();
             }
+            loggerMaker.infoAndAddToDb("fetchEndpointCaRoot: returning root "
+                    + root.getFingerprintSha256() + " for account " + accountId);
             this.rootPem = root.getCertPem();
             this.rootFingerprintSha256 = root.getFingerprintSha256();
             this.notAfter = root.getNotAfter();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchEndpointCaRoot " + e.toString());
-            addActionError("could not fetch the root CA");
+            addActionError("could not fetch the root CA: " + failureHint(e));
             return ERROR.toUpperCase();
         }
     }
@@ -190,8 +202,32 @@ public class EndpointCaAction extends ActionSupport {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in revokeEndpointDeviceCa " + e.toString());
-            addActionError("could not revoke the device CA");
+            addActionError("could not revoke the device CA: " + failureHint(e));
             return ERROR.toUpperCase();
         }
+    }
+
+    /**
+     * Describes a failure well enough to act on, without leaking internals.
+     *
+     * Returns the exception class name only — never the message, which can carry
+     * connection strings, file paths or key material depending on what threw.
+     *
+     * Added because the generic "could not fetch the root CA" cost two deploy round trips:
+     * from the client, a missing BouncyCastle jar, an unregistered Mongo codec and an
+     * unreachable database are indistinguishable, yet they need completely different fixes.
+     * Callers here are Akto's own agent and build tooling, so the class name is both safe
+     * and the single most useful thing to return.
+     */
+    private static String failureHint(Exception e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String cls = root.getClass().getSimpleName();
+        if (root != e) {
+            return e.getClass().getSimpleName() + " caused by " + cls;
+        }
+        return cls;
     }
 }
