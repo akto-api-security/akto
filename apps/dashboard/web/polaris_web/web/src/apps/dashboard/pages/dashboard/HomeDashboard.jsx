@@ -74,7 +74,9 @@ function HomeDashboard() {
     // what the api numbers say about themselves: still being counted, or approximate for a range that ended in the past
     const [postureNotice, setPostureNotice] = useState({ pending: false, endApproximate: false, counted: 0, collections: 0 });
     const [pendingPolls, setPendingPolls] = useState(0);
-    const endpointsCountRef = useRef({});
+    // the endpoints count is a slow call of its own that nothing else waits for: null until it has answered, {} if it failed
+    const [endpointsCount, setEndpointsCount] = useState(null);
+    const endpointsCountRequest = useRef(0);
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
 
     const handleTabChange = useCallback(
@@ -371,10 +373,7 @@ function HomeDashboard() {
     }
 
     // the charts, cards and tiles made from the api numbers snapshot; a snapshot that never came leaves them as they are
-    const applyPosture = (posture, endpointsCountResp) => {
-        // for now we are actually using the apis from stis instead of the total apis in the response
-        // TODO: Fix apiStats API to return the correct total apis
-        safely('metrics', () => buildMetrics(posture.apiStatsEnd, endpointsCountResp))
+    const applyPosture = (posture) => {
         // the missing apis figure is already the net of apis missing from and redundant in api_info
         const missing = posture.missing || {}
         const netMissing = missing.netMissing || 0
@@ -392,6 +391,17 @@ function HomeDashboard() {
         })
     }
 
+    // Not awaited by the page: the count is slow, and only what is made from it waits. An answer to an earlier range is dropped.
+    const fetchEndpointsCountInBackground = () => {
+        const request = ++endpointsCountRequest.current
+        setEndpointsCount(null)
+        callIfAllowed('api/fetchEndpointsCount', () => api.fetchEndpointsCount(startTimestamp, endTimestamp))
+            .then(response => response || {}, () => ({}))
+            .then(response => {
+                if (request === endpointsCountRequest.current) setEndpointsCount(response)
+            })
+    }
+
     const fetchData = async () => {
         setLoading(true)
         // the api numbers, the issue numbers and the MCP counts are one call each; the lists and charts load after
@@ -399,8 +409,8 @@ function HomeDashboard() {
             callIfAllowed('api/getCustomerEndpoints', () => observeApi.getUserEndpoints()),
             callIfAllowed('api/fetchIssuesSnapshot', () => api.fetchIssuesSnapshot(startTimestamp, endTimestamp)),
             callIfAllowed('api/fetchPostureSnapshot', () => api.fetchPostureSnapshot(startTimestamp, endTimestamp)),
-            callIfAllowed('api/fetchEndpointsCount', () => api.fetchEndpointsCount(startTimestamp, endTimestamp)),
         ];
+        fetchEndpointsCountInBackground()
 
         // Only fetch MCP data if not in API Security category
         const loadMcp = !isApiSecurityCategory() && canCall('api/fetchMcpPostureCounts')
@@ -418,15 +428,13 @@ function HomeDashboard() {
         let userEndpoints = valueOf(0, true)
         let issuesSnapshot = valueOf(1, {})
         let posture = valueOf(2, {})
-        let fetchEndpointsCountResp = valueOf(3, {})
 
         setShowBannerComponent(!userEndpoints)
-        endpointsCountRef.current = fetchEndpointsCountResp
         setPendingPolls(0)
 
         // one widget failing to build must not leave the others, and the page, waiting
         try {
-            applyPosture(posture, fetchEndpointsCountResp)
+            applyPosture(posture)
             safely('recent tests', () => testSummaryData())
             setSnapshots({ posture, issues: issuesSnapshot })
             safely('severity map', () => buildSeverityMap(issuesSnapshot.severityCounts))
@@ -435,15 +443,13 @@ function HomeDashboard() {
             const fetchHistoricalDataResp = { "finalHistoricalData": finalHistoricalData, "initialHistoricalData": initialHistoricalData }
             buildDeltaInfo(fetchHistoricalDataResp)
 
-            buildEndpointsCount(fetchEndpointsCountResp)
-
             if (loadMcp) {
-                const mcpCounts = valueOf(4, {})
+                const mcpCounts = valueOf(3, {})
                 setMcpTotals({ mcpTotalApis: mcpCounts.totalApis ?? null, thirdPartyApis: mcpCounts.thirdPartyApis ?? null, newApis7Days: mcpCounts.newApis7Days ?? null,
                     criticalApis: mcpCounts.criticalApis ?? null, tools: mcpCounts.tools ?? null, prompts: mcpCounts.prompts ?? null,
                     resources: mcpCounts.resources ?? null, server: mcpCounts.servers ?? null, policyGuardrailApis: mcpCounts.policyGuardrailApis ?? null })
-                setMcpOpenAlertDetails(valueOf(5, {})?.alerts || [])
-                setMcpTopApplications(valueOf(6, {})?.topApplications || [])
+                setMcpOpenAlertDetails(valueOf(4, {})?.alerts || [])
+                setMcpTopApplications(valueOf(5, {})?.topApplications || [])
             }
         } catch (error) {
             console.error('home dashboard: building the page failed', error)
@@ -499,13 +505,21 @@ function HomeDashboard() {
         }
     }, [startTimestamp, endTimestamp])
     
+    // the total apis tile, and the risk score and test coverage, which divide by the count when there is one
+    // (for now we are actually using the apis from stis instead of the total apis in the response)
+    // TODO: Fix apiStats API to return the correct total apis
+    useEffect(() => {
+        if (endpointsCount !== null) safely('total apis', () => buildEndpointsCount(endpointsCount))
+        safely('metrics', () => buildMetrics(snapshots?.posture?.apiStatsEnd, endpointsCount))
+    }, [snapshots, endpointsCount])
+
     // collections not counted yet make the numbers grow as they are: look again, with the banner showing how far it has got
     useEffect(() => {
         if (!postureNotice.pending || pendingPolls >= MAX_PENDING_POLLS) return
         const timer = setTimeout(async () => {
             try {
                 const posture = await api.fetchPostureSnapshot(startTimestamp, endTimestamp)
-                applyPosture(posture, endpointsCountRef.current)
+                applyPosture(posture)
                 setSnapshots(previous => ({ ...(previous || {}), posture }))
             } catch (error) {
                 // the next look will tell
@@ -855,10 +869,13 @@ function HomeDashboard() {
         summaryInfo.unshift({
             title: mapLabel("Total APIs", getDashboardCategory()),
             requires: 'api/fetchEndpointsCount',
-            data: transform.formatNumberWithCommas(totalAPIs),
+            // still counting: no number yet rather than a 0 that is not one
+            data: endpointsCount === null ? '-' : transform.formatNumberWithCommas(totalAPIs),
             variant: 'heading2xl',
-            byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
+            ...(endpointsCount === null ? {} : {
+                byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
+                smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
+            })
         })
     }
 

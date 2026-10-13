@@ -467,7 +467,7 @@ export default function Header() {
             </div> */}
 
             {/* Same entitlement the overlay's own endpoints check (usageInterceptor DASHBOARD_INSIGHTS). */}
-            {dashboardInsightsGranted && <AskOverlayButton />}
+            <AskOverlayButton />
 
             {dashboardInsightsGranted && (
                 <Popover
