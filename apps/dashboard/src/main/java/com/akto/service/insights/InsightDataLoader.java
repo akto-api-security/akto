@@ -78,6 +78,9 @@ public class InsightDataLoader {
     private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(16);
     private static final int EXTERNAL_CALL_TIMEOUT_SECONDS = 8;
 
+    // Row caps and other constants for the lazy API_POSTURE/TESTING_POSTURE reads now live on
+    // InsightLazySources itself, next to the code that uses them.
+
     public InsightDataBundle load(InsightContext ctx) {
         long loadStart = System.currentTimeMillis();
         // Threat-backend calls run in worker threads — Context ThreadLocals must be
@@ -149,13 +152,14 @@ public class InsightDataLoader {
             threatBackendAvailable = false;
         }
 
+        InsightLazySources lazy = new InsightLazySources(ctx);
         logger.info("InsightDataLoader: load() total " + (System.currentTimeMillis() - loadStart)
                 + "ms for accountId=" + accountId);
 
         return new InsightDataBundle(ctx, collections, collectionsByServiceName, fields.deviceIdToUsername, fields.userTags,
                 fields.auditRows, policies, allowlistNamesLower, fields.sensitiveByCollection, fields.userAnalysis, fields.nhiIdentities,
                 hostSeverityCounts, subCategoryCounts, skillSeverityCounts, threatBackendAvailable,
-                fields.activeCollections, fields.collectionLastTrafficSeen, threatAccess);
+                fields.activeCollections, fields.collectionLastTrafficSeen, threatAccess,lazy);
     }
 
     private ContextReader contextReaderFor(CONTEXT_SOURCE contextSource) {

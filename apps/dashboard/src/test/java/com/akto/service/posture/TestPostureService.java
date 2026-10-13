@@ -143,7 +143,7 @@ public class TestPostureService extends MongoBasedTest {
         return new InsightDataBundle(ctx, collections, new HashMap<>(), deviceIdToUsername, new HashMap<>(),
                 new ArrayList<>(), policies, allowlistNamesLower, new HashMap<>(), new ArrayList<>(), new ArrayList<>(),
                 hostSeverityCounts, subCategoryCounts, new ArrayList<>(), threatBackendAvailable, collections,
-                collectionLastTrafficSeen, null);
+                collectionLastTrafficSeen, null, null);
     }
 
     private static Map<Integer, Integer> lastTrafficSeenForFourVendors() {

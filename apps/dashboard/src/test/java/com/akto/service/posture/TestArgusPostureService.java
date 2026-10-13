@@ -148,7 +148,7 @@ public class TestArgusPostureService {
         return new InsightDataBundle(ctx, collections, new HashMap<>(), new HashMap<>(), new HashMap<>(),
                 new ArrayList<>(), new ArrayList<>(), new java.util.HashSet<>(), new HashMap<>(), new ArrayList<>(),
                 new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), false, collections,
-                new HashMap<>(), null);
+                new HashMap<>(), null, null);
     }
 
     // ── formatPercent ──────────────────────────────────────────────────────────
