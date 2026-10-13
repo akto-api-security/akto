@@ -84,6 +84,30 @@ public class TestViewPosture extends MongoBasedTest {
     }
 
     @Test
+    public void anEndpointWithNothingWorkedOutYetDoesNotBreakTheSnapshotOrTheLists() {
+        seed();
+        // only what the view's merge key and time filter need: no risk, auth, access, api type, severity, test or sensitive data fields
+        EndpointInfoViewDao.instance.getMCollection().withDocumentClass(org.bson.Document.class).insertOne(new org.bson.Document()
+                .append(EndpointInfoView.API_COLLECTION_ID, 2).append(EndpointInfoView.URL, "/bare")
+                .append(EndpointInfoView.METHOD, Method.GET.name()).append(EndpointInfoView.DISCOVERED_TIMESTAMP, Context.now() - 10));
+        markAllMetricsFresh();
+
+        PostureSnapshotResponse snapshot = new PostureSnapshotService().fetch(Context.now() - 50, Context.now(), false);
+
+        assertEquals(4, snapshot.getApiStatsEnd().getTotalAPIs());
+        assertEquals("the ones with types are counted as before", 1, snapshot.getApiStatsEnd().getAuthTypeMap().get(AuthType.UNAUTHENTICATED).intValue());
+        assertEquals(1, snapshot.getMissing().getAuthNotCalculated());
+        assertEquals(1, snapshot.getMissing().getAccessTypeNotCalculated());
+        assertEquals(1, snapshot.getMissing().getApiTypeMissing());
+        assertEquals("never tested", 3, snapshot.getActionItemCounts().getNotTested());
+        for (PostureActionItemsService.Type type : PostureActionItemsService.Type.values()) {
+            if (type.getMetric() == null && type != PostureActionItemsService.Type.SHADOW) continue;
+            // every list the view serves reads the same endpoint without failing
+            new PostureActionItemsService().fetch(type, 0, 10);
+        }
+    }
+
+    @Test
     public void anAccountWithAFilledViewReadsFromIt() {
         assertTrue("an empty view is not read from", !PostureSource.viewHasRows());
         seed();
