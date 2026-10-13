@@ -129,15 +129,13 @@ public class APICatalogSync {
     }
 
     public void processResponse(RequestTemplate requestTemplate, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
-        // Detection reports each tracked type it sees while this message is parsed; one message
+        // Detection records each tracked type it sees, with the collection it was seen in; one message
         // counts once per type, however many values of that type it carries.
         try {
             processResponseParams(requestTemplate, responseParams, deletedInfo);
         } finally {
-            Set<String> seenTypes = SensitiveDataEvents.drain();
-            if (!seenTypes.isEmpty() && !responseParams.getIsPending()) {
-                SensitiveDataCounter.instance.record(responseParams.getRequestParams().getApiCollectionId(),
-                        seenTypes, responseParams.getTimeOrNow());
+            for (Map.Entry<Integer, Set<String>> seen : SensitiveDataEvents.drain().entrySet()) {
+                SensitiveDataCounter.instance.record(seen.getKey(), seen.getValue(), responseParams.getTimeOrNow());
             }
         }
     }

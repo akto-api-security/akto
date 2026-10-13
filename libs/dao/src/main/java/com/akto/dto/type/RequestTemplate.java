@@ -126,7 +126,11 @@ public class RequestTemplate {
         SubType finalSubType = DataTypeRefiner.refine(new ParamLocation(apiCollectionId, url, method, param),
                 obj == null ? null : obj.toString(), localSubType);
 
-        SensitiveDataEvents.record(finalSubType);
+        // URL path segments are detected when URLs are merged into templates - once per template,
+        // not once per message - so they are not events.
+        if (!isUrlParam) {
+            SensitiveDataEvents.record(apiCollectionId, finalSubType);
+        }
 
         keyTypes.record(url, method, responseCode, isHeader, param, obj, userId, apiCollectionId, rawMessage,
                 sensitiveParamInfoBooleanMap, isUrlParam, timestamp, finalSubType);

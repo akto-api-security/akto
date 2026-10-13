@@ -8,7 +8,9 @@ import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -24,20 +26,24 @@ public class SensitiveDataEventsTest {
 
     @Test
     public void recordsNothingWhenNoTypesAreTracked() {
-        SensitiveDataEvents.record(SingleTypeInfo.EMAIL);
+        SensitiveDataEvents.record(1, SingleTypeInfo.EMAIL);
         assertTrue(SensitiveDataEvents.drain().isEmpty());
     }
 
     @Test
-    public void recordsOnlyTrackedTypesOncePerMessage() {
+    public void recordsTrackedTypesOncePerCollection() {
         SensitiveDataEvents.setTrackedTypes(Collections.singleton("EMAIL"));
 
-        SensitiveDataEvents.record(SingleTypeInfo.EMAIL);
-        SensitiveDataEvents.record(SingleTypeInfo.EMAIL);
-        SensitiveDataEvents.record(SingleTypeInfo.GENERIC);
-        SensitiveDataEvents.record(null);
+        SensitiveDataEvents.record(1, SingleTypeInfo.EMAIL);
+        SensitiveDataEvents.record(1, SingleTypeInfo.EMAIL);
+        SensitiveDataEvents.record(2, SingleTypeInfo.EMAIL);
+        SensitiveDataEvents.record(1, SingleTypeInfo.GENERIC);
+        SensitiveDataEvents.record(1, null);
 
-        assertEquals(Collections.singleton("EMAIL"), SensitiveDataEvents.drain());
+        Map<Integer, Set<String>> expected = new HashMap<>();
+        expected.put(1, Collections.singleton("EMAIL"));
+        expected.put(2, Collections.singleton("EMAIL"));
+        assertEquals(expected, SensitiveDataEvents.drain());
         assertTrue("drain must forget what it returned", SensitiveDataEvents.drain().isEmpty());
     }
 

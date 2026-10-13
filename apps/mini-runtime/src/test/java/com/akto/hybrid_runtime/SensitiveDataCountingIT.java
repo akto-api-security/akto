@@ -203,9 +203,9 @@ public class SensitiveDataCountingIT {
     }
 
     @Test
-    public void pendingMessagesAreNotCounted() throws Exception {
+    public void pendingMessagesAreCounted() throws Exception {
         process(1, "/api/booking", null, "{\"ref\":\"BK-123456\"}", "{}", HOUR + 60, true);
-        assertTrue(pending().isEmpty());
+        assertEquals(expect("1|BOOKING_REF|" + HOUR, 1), pending());
     }
 
     @Test
@@ -253,6 +253,20 @@ public class SensitiveDataCountingIT {
         process(2, "{\"nothing\":\"here\"}", "{}");
         assertEquals(expect("1|BOOKING_REF|" + HOUR, 1), pending());
         assertTrue(SensitiveDataEvents.drain().isEmpty());
+    }
+
+    @Test
+    public void urlPathValuesSeenWhileTemplatingAreNotCountedAgainstTheNextMessage() throws Exception {
+        // URL templating (computeDelta / tryWithKnownURLTemplates) runs detection on path segments on
+        // the ingestion thread, between messages. That must not leak into the next message's count.
+        String[] tokens = APICatalogSync.tokenize("/api/bookings/BK-123456");
+        SingleTypeInfo.SuperType[] types = new SingleTypeInfo.SuperType[tokens.length];
+        types[tokens.length - 1] = SingleTypeInfo.SuperType.STRING;
+        RequestTemplate templated = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+        templated.fillUrlParams(tokens, new com.akto.dto.type.URLTemplate(tokens, types, com.akto.dto.type.URLMethods.Method.GET), 2);
+
+        process(1, "{\"nothing\":\"here\"}", "{}");
+        assertTrue("path value leaked into collection 1: " + pending(), pending().isEmpty());
     }
 
     @Test
