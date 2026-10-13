@@ -8,7 +8,13 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +46,15 @@ public final class GuardrailBackfillReplayRunner {
      *  scanners that are the only other source of a detection in this pipeline — mirrors
      *  buildMaliciousEvent's own hardcoded "Rule-Based" (mcp-endpoint-shield's threat_reporter.go). */
     private static final String DETECTION_TYPE_RULE_BASED = "Rule-Based";
+
+    /** Live guardrail detections are stored as THREAT. */
+    private static final String LABEL_THREAT = "THREAT";
+
+    /** Akamai's Kong gateway. Its agent-query rows do not keep the request line or host, and
+     *  every backfilled call on this account went through this deployment. */
+    private static final int AKAMAI_ACCOUNT_ID = 1783401773;
+    private static final String AKAMAI_PATH = "/llm/chat/completions";
+    private static final String AKAMAI_HOST = "mcp-gateway-kong-proxy.mcp-gateway.svc.cluster.local:8000";
 
     private GuardrailBackfillReplayRunner() {
     }
@@ -88,21 +103,29 @@ public final class GuardrailBackfillReplayRunner {
             return new PageResult(batch, page.total, 0, 0, 0, searchAfterJson);
         }
 
+        TrafficShape shape = trafficShape(accountId);
         List<BasicDBObject> items = new ArrayList<>();
         Map<String, Map<String, Object>> rowById = new HashMap<>();
+        Map<String, String> envelopeById = new HashMap<>();
         for (Map<String, Object> row : batch) {
             String prompt = asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD));
             if (StringUtils.isBlank(prompt)) {
                 continue;
             }
-            String id = asText(row.get(AgentQueryRecord.F_TRACE_ID));
+            // Document id is unique per stored message. traceId is not: one trace can hold several rows.
+            String id = asText(row.get("id"));
             if (StringUtils.isBlank(id)) {
-                id = asText(row.get("id")); // ES document's own _id: always present, always unique
+                id = asText(row.get(AgentQueryRecord.F_TRACE_ID));
+            }
+            if (StringUtils.isBlank(id)) {
+                continue;
             }
             String envelope = GuardrailsServiceClient.traceEnvelope(
-                prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)));
+                prompt, asText(row.get(AgentQueryRecord.F_RESPONSE_PAYLOAD)),
+                shape.method, shape.path, shape.host);
             items.add(new BasicDBObject("id", id).append("envelope", envelope));
             rowById.put(id, row);
+            envelopeById.put(id, envelope);
         }
 
         // Computed even when replay/record below throws, so a caller that wants to log progress
@@ -126,8 +149,9 @@ public final class GuardrailBackfillReplayRunner {
                     detected++;
                     String id = verdict.path("id").asText("");
                     Map<String, Object> row = rowById.get(id);
-                    if (row != null) {
-                        recordDetection(accountId, policyName, contextSourceForEvents, row, verdict, bearerToken);
+                    String envelope = envelopeById.get(id);
+                    if (row != null && envelope != null) {
+                        recordDetection(accountId, policyName, contextSourceForEvents, row, envelope, shape, verdict, bearerToken);
                     }
                 }
             }
@@ -137,41 +161,33 @@ public final class GuardrailBackfillReplayRunner {
     }
 
     /** Builds and sends the record_malicious_event call for one detected row, backdated to the
-     *  row's own traffic timestamp rather than "now". Populates the same category/subCategory/
-     *  severity/actor/host/metadata shape a live detection reports (see buildMaliciousEvent in
-     *  mcp-endpoint-shield's threat_reporter.go) instead of the bare-minimum filterId/label/
-     *  detectedAt a replay verdict alone would give — verdict must have been requested with
-     *  includeDetectionDetails=true or category/subCategory/severity come back empty. */
+     *  row's own traffic timestamp rather than "now". Actor and session come from the stored row.
+     *  Method, path, and host come from {@code shape}: the account override when one exists,
+     *  otherwise the synthetic line the envelope was evaluated under. The source IP is not on the
+     *  row, so latestApiIp is left unset. Category, subCategory, and severity come from the
+     *  verdict only — it must have been requested with includeDetectionDetails=true or those
+     *  fields come back empty. Collection id is the detection timestamp, matching live guardrail
+     *  events, which have no API collection for this traffic. */
     private static void recordDetection(int accountId, String policyName, String contextSource,
-                                        Map<String, Object> row, JsonNode verdict, String bearerToken) throws Exception {
+                                        Map<String, Object> row, String envelope, TrafficShape shape,
+                                        JsonNode verdict, String bearerToken) throws Exception {
         String id = verdict.path("id").asText("");
-        long detectedAtSec = asLong(row.get(AgentQueryRecord.F_TIMESTAMP)) / 1000L;
+        long detectedAtSec = timestampMillis(row.get(AgentQueryRecord.F_TIMESTAMP)) / 1000L;
 
         String category = verdict.path("category").asText("");
-        if (StringUtils.isBlank(category)) {
-            category = policyName;
-        }
         String subCategory = verdict.path("subCategory").asText("");
-        if (StringUtils.isBlank(subCategory)) {
-            subCategory = category;
-        }
         String severity = verdict.path("severity").asText("");
-        if (StringUtils.isBlank(severity)) {
-            severity = "CRITICAL";
-        }
         String reason = verdict.path("reason").asText("");
         String behaviour = verdict.path("behaviour").asText("");
 
-        // Best-effort actor/host from the traffic record itself — a real detection gets these
-        // from the live request's IP/host header, which a backfilled ES row does not carry, so
-        // the closest equivalents on stored agent-query records are userName/deviceId.
         String actor = asText(row.get(AgentQueryRecord.F_USER_NAME));
-        String host = asText(row.get(AgentQueryRecord.F_DEVICE_ID));
         String sessionId = asText(row.get(AgentQueryRecord.F_SESSION_IDENTIFIER));
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("policyName", policyName);
-        metadata.put("ruleViolated", subCategory);
+        if (StringUtils.isNotBlank(subCategory)) {
+            metadata.put("ruleViolated", subCategory);
+        }
         if (StringUtils.isNotBlank(reason)) {
             metadata.put("reason", reason);
         }
@@ -181,22 +197,29 @@ public final class GuardrailBackfillReplayRunner {
 
         Map<String, Object> maliciousEvent = new HashMap<>();
         maliciousEvent.put("filterId", policyName);
-        maliciousEvent.put("label", "guardrail");
+        maliciousEvent.put("label", LABEL_THREAT);
         maliciousEvent.put("detectedAt", detectedAtSec);
         maliciousEvent.put("actor", actor);
-        maliciousEvent.put("latestApiIp", actor);
-        maliciousEvent.put("latestApiMethod", GuardrailsServiceClient.TRACE_METHOD);
-        maliciousEvent.put("latestApiEndpoint", GuardrailsServiceClient.TRACE_PATH);
+        maliciousEvent.put("latestApiMethod", shape.method);
+        maliciousEvent.put("latestApiEndpoint", shape.path);
         maliciousEvent.put("latestApiCollectionId", detectedAtSec);
-        maliciousEvent.put("latestApiPayload", asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD)));
+        maliciousEvent.put("latestApiPayload", envelope);
         maliciousEvent.put("eventType", "EVENT_TYPE_SINGLE");
-        maliciousEvent.put("category", category);
-        maliciousEvent.put("subCategory", subCategory);
-        maliciousEvent.put("severity", severity);
+        if (StringUtils.isNotBlank(category)) {
+            maliciousEvent.put("category", category);
+        }
+        if (StringUtils.isNotBlank(subCategory)) {
+            maliciousEvent.put("subCategory", subCategory);
+        }
+        if (StringUtils.isNotBlank(severity)) {
+            maliciousEvent.put("severity", severity);
+        }
         maliciousEvent.put("type", DETECTION_TYPE_RULE_BASED);
         maliciousEvent.put("metadata", metadata);
         maliciousEvent.put("successfulExploit", true);
-        maliciousEvent.put("host", host);
+        if (StringUtils.isNotBlank(shape.host)) {
+            maliciousEvent.put("host", shape.host);
+        }
         maliciousEvent.put("contextSource", contextSource);
         if (StringUtils.isNotBlank(sessionId)) {
             maliciousEvent.put("sessionId", sessionId);
@@ -208,21 +231,77 @@ public final class GuardrailBackfillReplayRunner {
         ThreatDetectionBackendClient.recordMaliciousEvent(accountId, maliciousEvent, bearerToken);
     }
 
+    private static TrafficShape trafficShape(int accountId) {
+        if (accountId == AKAMAI_ACCOUNT_ID) {
+            return new TrafficShape(GuardrailsServiceClient.TRACE_METHOD, AKAMAI_PATH, AKAMAI_HOST);
+        }
+        return new TrafficShape(GuardrailsServiceClient.TRACE_METHOD, GuardrailsServiceClient.TRACE_PATH, "");
+    }
+
+    /** Request line and host used both to evaluate a row and to record a detection for it. */
+    private static final class TrafficShape {
+        final String method;
+        final String path;
+        final String host;
+
+        TrafficShape(String method, String path, String host) {
+            this.method = method;
+            this.path = path;
+            this.host = host;
+        }
+    }
+
     private static String asText(Object value) {
         return value == null ? "" : String.valueOf(value);
     }
 
-    private static long asLong(Object value) {
+    /** Epoch milliseconds. Elasticsearch stores a number; ADX search rows can carry a datetime.
+     *  A numeric value below 10^12 is epoch seconds. */
+    private static long timestampMillis(Object value) {
         if (value == null) {
             return 0L;
         }
         if (value instanceof Number) {
-            return ((Number) value).longValue();
+            return epochMillis(((Number) value).longValue());
         }
-        try {
-            return Long.parseLong(String.valueOf(value));
-        } catch (NumberFormatException e) {
+        if (value instanceof Date) {
+            return ((Date) value).getTime();
+        }
+        if (value instanceof Instant) {
+            return ((Instant) value).toEpochMilli();
+        }
+        if (value instanceof OffsetDateTime) {
+            return ((OffsetDateTime) value).toInstant().toEpochMilli();
+        }
+        if (value instanceof ZonedDateTime) {
+            return ((ZonedDateTime) value).toInstant().toEpochMilli();
+        }
+        if (value instanceof LocalDateTime) {
+            return ((LocalDateTime) value).toInstant(ZoneOffset.UTC).toEpochMilli();
+        }
+        String text = String.valueOf(value).trim();
+        if (text.isEmpty()) {
             return 0L;
         }
+        try {
+            return epochMillis(Long.parseLong(text));
+        } catch (NumberFormatException ignored) {
+        }
+        try {
+            return Instant.parse(text).toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        try {
+            return LocalDateTime.parse(text).toInstant(ZoneOffset.UTC).toEpochMilli();
+        } catch (Exception ignored) {
+        }
+        return 0L;
+    }
+
+    private static long epochMillis(long value) {
+        if (value > 0 && value < 1_000_000_000_000L) {
+            return value * 1000L;
+        }
+        return value;
     }
 }

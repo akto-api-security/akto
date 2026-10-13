@@ -189,12 +189,25 @@ public final class GuardrailsServiceClient {
      * again would bury the prompt one level deeper than any field mapping or extractor looks.
      */
     public static String traceEnvelope(String requestPayload, String responsePayload) {
-        return new BasicDBObject()
-            .append("method", TRACE_METHOD)
-            .append("path", TRACE_PATH)
+        return traceEnvelope(requestPayload, responsePayload, TRACE_METHOD, TRACE_PATH, null);
+    }
+
+    /**
+     * Same envelope as {@link #traceEnvelope(String, String)}, with the request line the caller
+     * actually evaluated and, when {@code host} is set, a requestHeaders object containing only
+     * that host. Agent-query rows do not store the original headers, so nothing else is filled in.
+     */
+    public static String traceEnvelope(String requestPayload, String responsePayload,
+                                       String method, String path, String host) {
+        BasicDBObject envelope = new BasicDBObject()
+            .append("method", StringUtils.defaultIfBlank(method, TRACE_METHOD))
+            .append("path", StringUtils.defaultIfBlank(path, TRACE_PATH))
             .append("requestPayload", requestPayload)
-            .append("responsePayload", responsePayload == null ? "" : responsePayload)
-            .toJson();
+            .append("responsePayload", responsePayload == null ? "" : responsePayload);
+        if (StringUtils.isNotBlank(host)) {
+            envelope.append("requestHeaders", new BasicDBObject("host", host).toJson());
+        }
+        return envelope.toJson();
     }
 
     /**
