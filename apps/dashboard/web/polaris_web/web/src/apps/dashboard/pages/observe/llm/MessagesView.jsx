@@ -38,7 +38,7 @@ export default function MessagesView({ currDateRange, traceFilter, onRowClicked,
     return (
         <>
             <AgGridTable
-                key={traceFilter || "all"}
+                key={`${traceFilter || "all"}~${currDateRange.period.since}~${currDateRange.period.until}`}
                 rowData={rows}
                 columnDefs={columnDefs}
                 defaultColDef={{ resizable: true, sortable: false, filter: false }}
