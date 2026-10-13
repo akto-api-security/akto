@@ -42,6 +42,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -628,6 +629,11 @@ public class DbActor extends DataActor {
 
     public void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
+    }
+
+    public boolean bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments) {
+        DbLayer.bulkIncSensitiveDataCounts(idempotencyKey, increments);
+        return true;
     }
 
     public List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {

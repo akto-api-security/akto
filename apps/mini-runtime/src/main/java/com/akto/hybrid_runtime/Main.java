@@ -15,6 +15,7 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.detection.DetectionCorrectorInstaller;
+import com.akto.detection.SensitiveDataEvents;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
@@ -84,6 +85,12 @@ public class Main {
     public static final String kafkaUsername = KafkaConfig.getKafkaUsername();
     public static final String kafkaPassword = KafkaConfig.getKafkaPassword();
     public static final boolean isSendToThreatEnabled = System.getenv("SEND_TO_THREAT_ENABLED") != null && System.getenv("SEND_TO_THREAT_ENABLED").equalsIgnoreCase("true");
+
+    /**
+     * Counting of custom sensitive data events per collection and hour, sent to the central store for
+     * threshold alerts. Off unless set to "true": nothing is tracked and nothing is sent.
+     */
+    public static final boolean isSensitiveDataCountsEnabled = "true".equalsIgnoreCase(System.getenv("SENSITIVE_DATA_COUNTS_ENABLED"));
 
     private static int debugPrintCounter = 20;
     private static void printL(Object o) {
@@ -384,6 +391,10 @@ public class Main {
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
         initializeRuntime();
+        if (isSensitiveDataCountsEnabled) {
+            SensitiveDataCounter.instance.start(dataActor::bulkIncSensitiveDataCounts);
+            loggerMaker.infoAndAddToDb("sensitive data counts enabled");
+        }
 
         // Fast-Discovery Integration (optional) - Run as separate process from embedded classes
         if (isFastDiscoveryEnabled()) {
@@ -523,6 +534,9 @@ public class Main {
                     loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage());
                 }
                 
+                // The consumer has stopped, so nothing more will be counted: write what is pending.
+                SensitiveDataCounter.instance.flush();
+
                 // Close protobuf producer
                 if (protobufKafkaProducer != null) {
                     protobufKafkaProducer.close();
@@ -1300,6 +1314,9 @@ public class Main {
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
                 SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+                if (isSensitiveDataCountsEnabled) {
+                    SensitiveDataEvents.setTrackedTypes(SensitiveDataEvents.customSensitiveTypeNames(customDataTypes));
+                }
 
                 // Refreshed alongside data types on purpose: the corrector may only return labels
                 // that already exist as data types, so the two must not drift apart.
