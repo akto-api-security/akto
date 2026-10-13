@@ -103,7 +103,7 @@ suggested prompts are grouped the same way (`commandRegistry.suggestedPrompts(ca
 | `contextSource` | Recommendation tiles | Default insight groups |
 |---|---|---|
 | `API` (also `DAST`, null/unrecognized) | open criticals, unauthenticated+sensitive, never tested, sensitive data types in responses | `API_POSTURE`, `TESTING_POSTURE` |
-| `AGENTIC` (also `MCP`, `GEN_AI`) | red-teaming criticals, malicious MCP tools, unapproved MCP servers, threat activity (30d) | `ATLAS_DISCOVERY`, `GUARDRAIL_VIOLATIONS` |
+| `AGENTIC` (also `MCP`, `GEN_AI`) | red-teaming criticals, threat activity (30d) | `ATLAS_DISCOVERY`, `GUARDRAIL_VIOLATIONS` |
 | `ENDPOINT` | malicious skills in use, tokens used, active guardrail policies | `GUARDRAIL_VIOLATIONS` |
 
 Every domain-specific recommendation query is additionally scoped to
@@ -147,8 +147,7 @@ earlier version of this file; retrofitted after review.
   addition).
 - **Projections matter more than they look** — `ApiInfo` and `ApiCollection` are the fattest
   collections in the schema; every row-fetch in `RecommendationCatalog` projects to only the
-  fields it reads (`tagsList`/`hostName` for MCP collection checks, `tagsList` alone for the
-  skills scan, the two token fields for the usage sum).
+  fields it reads (`tagsList` alone for the skills scan, the two token fields for the usage sum).
 - **`maliciousSkillsTotal()` has no cache**, unlike `AgenticObserveAction.getOrBuildSkillData()`
   (2-minute TTL) which it mirrors the query shape of. The underlying regex (`"skills/"` /
   `"/config/"`, unanchored) isn't index-backed either way — this is the one recommendation still

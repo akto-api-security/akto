@@ -4,8 +4,6 @@ import com.akto.MongoBasedTest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.GuardrailPoliciesDao;
-import com.akto.dao.McpAllowlistDao;
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.context.Context;
@@ -13,9 +11,6 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.ComponentRiskAnalysis;
-import com.akto.dto.McpAllowlist;
-import com.akto.dto.McpAuditInfo;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.traffic.CollectionTags;
@@ -42,7 +37,6 @@ import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -68,8 +62,6 @@ public class TestRecommendationCatalog extends MongoBasedTest {
         ApiInfoDao.instance.getMCollection().drop();
         SingleTypeInfoDao.instance.getMCollection().drop();
         TestingRunIssuesDao.instance.getMCollection().drop();
-        McpAuditInfoDao.instance.getMCollection().drop();
-        McpAllowlistDao.instance.getMCollection().drop();
         GuardrailPoliciesDao.instance.getMCollection().drop();
         UserAnalysisDataDao.instance.getMCollection().drop();
 
@@ -157,7 +149,11 @@ public class TestRecommendationCatalog extends MongoBasedTest {
                     .thenThrow(new RuntimeException("stubbed — no live threat-detection-backend in tests"));
 
             List<Recommendation> recs = computeForDomain(CONTEXT_SOURCE.AGENTIC);
-            assertEquals(4, recs.size());
+            // Asserting the ids, not just the size: a tile quietly re-added or dropped must fail here.
+            HashSet<String> ids = new HashSet<>();
+            for (Recommendation r : recs) ids.add(r.getId());
+            assertEquals(new HashSet<>(java.util.Arrays.asList("open_criticals_redteam", "threat_activity")), ids);
+            assertEquals(2, recs.size());
             for (Recommendation r : recs) {
                 assertEquals("count should be 0 for " + r.getId(), 0, r.getCount());
                 assertNull("severity should be null for " + r.getId(), r.getSeverity());
@@ -312,62 +308,6 @@ public class TestRecommendationCatalog extends MongoBasedTest {
         Recommendation rec = findById(computeForDomain(CONTEXT_SOURCE.ENDPOINT), "malicious_skills");
 
         assertEquals("unanchored regex means '/campaigns/adminskills/launch' matches 'skills/' as a substring", 1, rec.getCount());
-    }
-
-    // ── maliciousMcpTools() / unapprovedMcpServers(): AGENTIC MCP governance ───────────
-
-    private void insertMcpTaggedCollection(int id, String hostName, boolean malicious, boolean local) {
-        ApiCollection collection = new ApiCollection(id, "mcp-collection-" + id, 0, new HashSet<>(), hostName, 0, false, true);
-        List<CollectionTags> tags = new java.util.ArrayList<>();
-        tags.add(new CollectionTags(0, Constants.AKTO_MCP_SERVER_TAG, "true", CollectionTags.TagSource.USER));
-        if (malicious) tags.add(new CollectionTags(0, Constants.AKTO_MALICIOUS_MCP_SERVER_TAG, "true", CollectionTags.TagSource.USER));
-        if (local) tags.add(new CollectionTags(0, "local-mcp-server", "true", CollectionTags.TagSource.USER));
-        collection.setTagsList(tags);
-        ApiCollectionsDao.instance.insertMany(java.util.Collections.singletonList(collection));
-    }
-
-    /**
-     * maliciousMcpTools() unions two independent signals into one distinct-service-name count:
-     * an ApiCollection tagged malicious-mcp-server=true, and an McpAuditInfo row whose
-     * componentRiskAnalysis flags the component malicious. Seeds one of each, under different
-     * service names, and confirms both are counted (not deduplicated away, not one masking
-     * the other).
-     */
-    @Test
-    public void testMaliciousMcpTools_taggedCollectionAndAuditRow_bothCountedAsDistinctServices() {
-        insertMcpTaggedCollection(7001, "malicious-collection-tag", true, false);
-
-        McpAuditInfo maliciousAudit = new McpAuditInfo();
-        maliciousAudit.setMcpHost("malicious-audit-row");
-        maliciousAudit.setContextSource(CONTEXT_SOURCE.AGENTIC.name());
-        maliciousAudit.setComponentRiskAnalysis(new ComponentRiskAnalysis(false, true, "flagged by scan"));
-        McpAuditInfoDao.instance.insertMany(java.util.Collections.singletonList(maliciousAudit));
-
-        Recommendation rec = findById(computeForDomain(CONTEXT_SOURCE.AGENTIC), "malicious_mcp_tools");
-
-        assertEquals(2, rec.getCount());
-        assertEquals("CRITICAL", rec.getSeverity());
-    }
-
-    /**
-     * unapprovedMcpServers() flags a server if it's local OR not on the allowlist/not
-     * audit-approved. Seeds a local server (counted regardless of approval), a server that's
-     * neither local nor approved (counted), and a server that IS on the allowlist (not counted).
-     */
-    @Test
-    public void testUnapprovedMcpServers_localAndUnapproved_countedApprovedExcluded() {
-        insertMcpTaggedCollection(7002, "local-server", false, true);
-        insertMcpTaggedCollection(7003, "random-unapproved-server", false, false);
-        insertMcpTaggedCollection(7004, "approved-server", false, false);
-
-        McpAllowlist allowlistEntry = new McpAllowlist();
-        allowlistEntry.setName("approved-server");
-        McpAllowlistDao.instance.insertMany(java.util.Collections.singletonList(allowlistEntry));
-
-        Recommendation rec = findById(computeForDomain(CONTEXT_SOURCE.AGENTIC), "unapproved_mcp_servers");
-
-        assertEquals("local server + unapproved server counted, allowlisted server excluded", 2, rec.getCount());
-        assertEquals("MEDIUM", rec.getSeverity());
     }
 
     // ── threatActivity(): degrade on backend failure + severity filtering ──────────────
