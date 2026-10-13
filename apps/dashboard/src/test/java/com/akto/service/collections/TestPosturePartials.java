@@ -499,6 +499,32 @@ public class TestPosturePartials extends MongoBasedTest {
     }
 
     @Test
+    public void anApiInfoWithNothingWorkedOutYetIsCountedNotFailedOn() {
+        ApiCollectionsDao.instance.insertOne(collection(1, "a.com"));
+        new CollectionAttrsSync().syncAll();
+        // only the key: no risk, auth, access, api type, severity, test or sensitive data fields at all
+        ApiInfoDao.instance.getMCollection().withDocumentClass(org.bson.Document.class).insertOne(new org.bson.Document("_id",
+                new org.bson.Document(ApiInfo.ApiInfoKey.API_COLLECTION_ID, 1).append(ApiInfo.ApiInfoKey.URL, "/bare")
+                        .append(ApiInfo.ApiInfoKey.METHOD, Method.GET.name())));
+        ApiCollectionStatsDao.instance.getMCollection().updateMany(Filters.empty(), Updates.combine(
+                Updates.set(ApiCollectionStats.ENDPOINTS_COUNT, 1), Updates.set(ApiCollectionStats.LAST_SEEN, Context.now())));
+
+        refreshAll();
+
+        assertEquals(1, sum(PostureMetric.TOTAL));
+        assertEquals(1, sum(PostureMetric.AUTH_NOT_CALCULATED));
+        assertEquals(1, sum(PostureMetric.ACCESS_NOT_CALCULATED));
+        assertEquals(1, sum(PostureMetric.API_TYPE_MISSING));
+        assertEquals(1, sum(PostureMetric.NOT_TESTED));
+        assertEquals(0, sum(PostureMetric.UNAUTHENTICATED));
+        assertEquals(1, sum(PostureMetric.riskField(0)));
+        for (PostureActionItemsService.Type type : PostureActionItemsService.Type.values()) {
+            if (type.getMetric() == null && type != PostureActionItemsService.Type.SHADOW) continue;
+            new PostureActionItemsService().fetch(type, 0, 10);
+        }
+    }
+
+    @Test
     public void aPageIsNeverLargerThanTheMaximum() {
         prepare(seed());
         refreshAll();

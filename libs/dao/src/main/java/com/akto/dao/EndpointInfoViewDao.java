@@ -76,6 +76,14 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
             "UNAUTHENTICATED", "BASIC", "AUTHORIZATION_HEADER", "JWT",
             "API_TOKEN", "BEARER", "API_KEY", "MTLS", "SESSION_TOKEN");
 
+    /**
+     * The array field, or an empty one where an endpoint has none. Absent is not null in an aggregation
+     * ($eq: [missing, null] is false), so a null check does not stop $size from failing on the whole query.
+     */
+    private static Document missingAsEmpty(String arrayField) {
+        return new Document("$ifNull", Arrays.asList("$" + arrayField, Collections.emptyList()));
+    }
+
     private ApiStats aggregateWithFacet(Bson filter) {
         int lookBack = Context.now() - 30 * 24 * 60 * 60;
         Bson inScopeFilter = Filters.eq(EndpointInfoView.IS_OUT_OF_TESTING_SCOPE, false);
@@ -87,7 +95,7 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
                 .append("cond", new Document("$in", Arrays.asList("$$this", STANDARD_AUTH_TYPES))));
         Document authTypeExpr = new Document("$let", new Document()
                 .append("vars", new Document()
-                        .append("auth", "$" + EndpointInfoView.ACTUAL_AUTH_TYPE))
+                        .append("auth", missingAsEmpty(EndpointInfoView.ACTUAL_AUTH_TYPE)))
                 .append("in", new Document("$cond", Arrays.asList(
                         new Document("$or", Arrays.asList(
                                 new Document("$eq", Arrays.asList("$$auth", null)),
@@ -105,7 +113,7 @@ public class EndpointInfoViewDao extends AccountsContextDao<EndpointInfoView> {
 
         // Priority-pick from actualAccessType array
         Document accessTypeExpr = new Document("$let", new Document()
-                .append("vars", new Document("acc", "$" + EndpointInfoView.ACTUAL_ACCESS_TYPE))
+                .append("vars", new Document("acc", missingAsEmpty(EndpointInfoView.ACTUAL_ACCESS_TYPE)))
                 .append("in", new Document("$cond", Arrays.asList(
                         new Document("$or", Arrays.asList(
                                 new Document("$eq", Arrays.asList("$$acc", null)),
