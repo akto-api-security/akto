@@ -591,6 +591,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         Double baseRiskScore;
         String baseRiskScoreReason;
         int maxTrafficTimestamp = 0;
+        int minStartTs = 0; // 0 == "no discovered time seen yet", same convention as EndpointGroup.startTs
         boolean hasPersonalAccount = false;
         boolean hasLocalMcpServer = false;
         boolean hasMisconfiguredConfig = false;
@@ -667,6 +668,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 baseRiskScoreReason = c.getBaseRiskScoreReason();
             }
             if (collTraffic > maxTrafficTimestamp) maxTrafficTimestamp = collTraffic;
+            int cStartTs = c.getStartTs();
+            if (cStartTs > 0 && (minStartTs == 0 || cStartTs < minStartTs)) minStartTs = cStartTs;
         }
 
         // Deliberately excludes hostNames/collectionIds/skillNames/mcpServers/mcpServerCollectionIds
@@ -690,7 +693,6 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             g.put("skillCount", skillNames.size());
             g.put("pluginCount", pluginNames.size());
             if (pluginVersion != null) g.put("pluginVersion", pluginVersion);
-            if (pluginScope != null) g.put("pluginScope", pluginScope);
             if (pluginStatus != null) g.put("pluginStatus", pluginStatus);
             if (pluginMarketplace != null) g.put("pluginMarketplace", pluginMarketplace);
             if (pluginParentAgent != null) g.put("pluginParentAgent", pluginParentAgent);
@@ -701,6 +703,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 g.put("baseRiskScoreReason", baseRiskScoreReason);
             }
             g.put("lastSeenEpoch", maxTrafficTimestamp);
+            g.put("discoveredAt", minStartTs);
             g.put("hasPersonalAccount", hasPersonalAccount);
             g.put("hasLocalMcpServer", hasLocalMcpServer);
             g.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
@@ -721,6 +724,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         int aiInteractions;
         final Set<String> services = new HashSet<>();
         final Set<String> seenAnalysisKeys = new HashSet<>();
+        // Plugin-asset devices tab only — this device's own AKTO_PLUGIN_STATUS_TAG, null for every
+        // other asset type (no plugin collection to read it from).
+        String pluginStatus;
+        String pluginScope;
 
         DeviceAcc(String deviceId) { this.deviceId = deviceId; }
 
@@ -732,6 +739,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             d.put("lastSeenEpoch", lastSeenEpoch);
             d.put("services", new ArrayList<>(services));
             d.put("aiInteractions", aiInteractions);
+            if (pluginStatus != null) d.put("pluginStatus", pluginStatus);
+            if (pluginScope != null) d.put("pluginScope", pluginScope);
             return d;
         }
     }
@@ -778,6 +787,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (collTraffic > d.lastSeenEpoch) d.lastSeenEpoch = collTraffic;
             if (serviceName != null) d.services.add(serviceName);
             accumulateAiInteractions(d, hostName, userAnalysisMap);
+            // Plugin collections only (getPluginTagValue returns null for anything else) — one
+            // device only ever has one collection for a given plugin, so no conflict to resolve.
+            String devicePluginStatus = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_STATUS_TAG);
+            if (devicePluginStatus != null) d.pluginStatus = devicePluginStatus;
+            String devicePluginScope = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_SCOPE_TAG);
+            if (devicePluginScope != null) d.pluginScope = devicePluginScope;
         }
         return devices;
     }
@@ -829,7 +844,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(
                     Filters.in(Constants.ID, ids),
-                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                    // TAGS_STRING needed so accumulateDevices can read a plugin collection's own
+                    // AKTO_PLUGIN_STATUS_TAG (getEnvType()/getPluginTagValue) for Plugin-asset devices.
+                    Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING)
             );
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
@@ -896,6 +913,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         boolean hasMisconfiguredConfig = false;
         boolean hasMaliciousSkill = false;
         boolean hasOwnerTag = false;
+        // Plugin rows only — a device only ever has one collection for a given plugin, so no
+        // conflict to resolve (unlike riskScore/lastSeenEpoch above, which merge across children).
+        String pluginStatus = null;
+        String pluginScope = null;
         String environmentName = null;
         // A Set, not a single value: one device row merges several collections, and nothing
         // guarantees they were all signed in as the same account.
@@ -967,8 +988,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             // Plugin collections carry the agent's mcp-client/ai-agent tags (naming where the plugin is
             // installed), so label the child by its own type rather than letting those tags speak.
+            String childPluginStatus = null;
+            String childPluginScope = null;
             if ("plugin".equals(rowType)) {
                 child.put("type", AgenticObserveUtil.CLIENT_TYPE_PLUGIN);
+                childPluginStatus = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_STATUS_TAG);
+                if (childPluginStatus != null) child.put("pluginStatus", childPluginStatus);
+                childPluginScope = AgenticObserveUtil.getPluginTagValue(c, Constants.AKTO_PLUGIN_SCOPE_TAG);
+                if (childPluginScope != null) child.put("pluginScope", childPluginScope);
             } else {
                 // MCP Server/LLM asset's own device tree only — each child IS that server's own
                 // collection, so its plugin-name tag (if any) is unambiguous here (see
@@ -985,6 +1012,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 return ng;
             });
             g.children.add(child);
+            if ("plugin".equals(rowType) && childPluginStatus != null) g.pluginStatus = childPluginStatus;
+            if ("plugin".equals(rowType) && childPluginScope != null) g.pluginScope = childPluginScope;
             if (collTraffic > g.lastSeenEpoch) g.lastSeenEpoch = collTraffic;
             if (childStartTs > 0 && (g.startTs == 0 || childStartTs < g.startTs)) g.startTs = childStartTs;
             // Carry the base score/remarks from whichever child owns the current max risk score,
@@ -1082,6 +1111,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 row.put("sensitiveInRespTypes", new ArrayList<>(g.sensitiveTypes));
                 row.put("lastSeenEpoch", g.lastSeenEpoch);
                 row.put("startTs", g.startTs);
+                if (g.pluginStatus != null) row.put("pluginStatus", g.pluginStatus);
+                if (g.pluginScope != null) row.put("pluginScope", g.pluginScope);
                 row.put("hasPersonalAccount", g.hasPersonalAccount);
                 row.put("hasLocalMcpServer", g.hasLocalMcpServer);
                 row.put("hasMisconfiguredConfig", g.hasMisconfiguredConfig);
