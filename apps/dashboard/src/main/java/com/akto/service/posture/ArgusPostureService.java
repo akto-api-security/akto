@@ -654,10 +654,11 @@ public class ArgusPostureService {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (AgentFindingGroup g : groups) {
             totalOpenIssues += g.getCount();
-            // apiCollectionId isn't a column: it lets a caller (the Ask Akto red-team conversation
-            // tool) look up this group's issues by collection and vulnType.
+            // apiCollectionId and testSubCategory aren't columns: they let a caller (the Ask Akto
+            // red-team conversation tool) look up this group's issues. vulnType is only the display
+            // name, so the raw test id is carried separately.
             rows.add(PostureService.row("agentName", agentName(g.getCollectionId(), collectionsById),
-                    "apiCollectionId", g.getCollectionId(),
+                    "apiCollectionId", g.getCollectionId(), "testSubCategory", g.getType(),
                     "vulnType", ArgusPostureUtils.testDisplayName(g.getType(), testInfoByType), "severity", g.getSecondary(), "count", g.getCount(),
                     "lastSeen", g.getLastSeen()));
         }
