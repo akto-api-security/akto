@@ -307,48 +307,6 @@ public class RequestValidator {
         }
       }
     }
-
-    if (actualHeaders == null) {
-      return;
-    }
-
-    // Check for extra headers not defined in schema
-    for (String headerName : actualHeaders.keySet()) {
-      String lowerHeaderName = headerName.toLowerCase();
-      // Skip common standard headers that are typically not defined in OpenAPI specs
-      if (isStandardHeader(lowerHeaderName)) {
-        continue;
-      }
-
-      if (!definedHeaders.containsKey(lowerHeaderName)) {
-        addError(schemaPath + "/parameters", headerName, "header",
-            String.format("Extra header '%s' not defined in schema", headerName),
-            SchemaConformanceError.Location.LOCATION_HEADER);
-      }
-    }
-  }
-
-  private static final Set<String> STANDARD_HEADERS = new HashSet<>(java.util.Arrays.asList(
-      // Proxy/Infrastructure headers (14)
-      "x-forwarded-for", "x-forwarded-host", "x-forwarded-port", "x-forwarded-proto",
-      "x-forwarded-scheme", "x-forwarded-client-cert", "x-original-forwarded-for",
-      "x-real-ip", "x-envoy-attempt-count", "x-envoy-external-address",
-      "x-request-id", "x-scheme", "via", "host",
-      // Browser/Client metadata headers (10)
-      "user-agent", "accept-encoding", "accept-language", "sec-ch-ua",
-      "sec-ch-ua-mobile", "sec-ch-ua-platform", "sec-fetch-dest",
-      "sec-fetch-mode", "sec-fetch-site", "dnt",
-      // CORS/Browser security headers (3)
-      "origin", "referer", "upgrade-insecure-requests",
-      // Auto-calculated headers (1)
-      "content-length",
-      // Misplaced response headers in request
-      "access-control-allow-origin"));
-
-  private static final String AKTO_K8S_PREFIX = "x-akto-k8s";
-
-  private static boolean isStandardHeader(String headerName) {
-    return STANDARD_HEADERS.contains(headerName) || headerName.startsWith(AKTO_K8S_PREFIX);
   }
 
   private static void validateQueryParams(HttpResponseParams httpResponseParams, JsonNode methodNode,

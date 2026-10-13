@@ -67,12 +67,12 @@
             </interceptor-ref>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^success,^message,^data.*</param>
+                <param name="includeProperties">^success,^message,^latencyMs,^data.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^success,^message,^data.*</param>
+                <param name="includeProperties">^success,^message,^latencyMs,^data.*</param>
             </result>
         </action>
 

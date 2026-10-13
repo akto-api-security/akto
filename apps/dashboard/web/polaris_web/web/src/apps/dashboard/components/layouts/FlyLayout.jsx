@@ -16,7 +16,7 @@ function FlyLayout(props) {
     const divWidth = width || "50vw";
     const scrollableHeight = variant !== "default" ? "calc(100vh - 106px)"  : "92vh";
     return (
-        <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth}}>
+        <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth, ...(show ? {} : {right: `calc(-1 * ${divWidth})`})}}>
             <div className="innerFlyLayout">
                 <Box borderColor="border-subdued" borderWidth="1" background="bg" width={divWidth} minHeight="100%">
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:

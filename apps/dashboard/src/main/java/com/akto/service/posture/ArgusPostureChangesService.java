@@ -47,7 +47,7 @@ public class ArgusPostureChangesService {
     public BasicDBObject fetchChanges(int accountId, int userId, String environment,
                                       Supplier<InsightDataBundle> bundleSupplier) {
         // userId is part of the key because the underlying reads are scoped to that user's collections.
-        String key = accountId + "|" + userId + "|" + ArgusPostureService.environmentKey(environment);
+        String key = accountId + "|" + userId + "|" + ArgusPostureUtils.environmentKey(environment);
         CachedChanges cached = CACHE.get(key);
         if (cached != null && System.currentTimeMillis() - cached.computedAtMs < CACHE_TTL_MS) return cached.response;
 
@@ -64,8 +64,8 @@ public class ArgusPostureChangesService {
     // Rows with nothing to report (zero count or unavailable source) are left out.
     private BasicDBObject compute(InsightDataBundle bundle, String environment, int now) {
         int weekStart = now - WEEK_SECONDS;
-        List<ApiCollection> agents = ArgusPostureService.assetsIn(bundle.collections.stream()
-                .filter(c -> c != null && !c.isDeactivated() && ArgusPostureService.isAgenticInScope(c))
+        List<ApiCollection> agents = ArgusPostureUtils.assetsIn(bundle.collections.stream()
+                .filter(c -> c != null && !c.isDeactivated() && ArgusPostureUtils.isAgenticInScope(c))
                 .collect(Collectors.toList()), environment);
         List<Integer> ids = agents.stream().map(ApiCollection::getId).collect(Collectors.toList());
 

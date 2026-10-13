@@ -9,7 +9,7 @@ import AgenticSuggestionsList from './components/AgenticSuggestionsList';
 import AgenticSearchInput from './components/AgenticSearchInput';
 import AgenticHistoryModal from './components/AgenticHistoryModal';
 import './AgenticConversationPage.css';
-import { sendQuery, getConversationsList, getConversationById } from './services/agenticService';
+import { sendQuery, getConversationById } from './services/agenticService';
 import SpinnerCentered from '../../components/progress/SpinnerCentered';
 import { usePermissions, NO_PERMISSION_REASON } from '@/util/permissions';
 
@@ -55,11 +55,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     const [isStreaming, setIsStreaming] = useState(false);
     const [followUpValue, setFollowUpValue] = useState('');
     const [showHistoryModal, setShowHistoryModal] = useState(false);
-
-    // History state
-    const [historyItems, setHistoryItems] = useState([]);
-    const [historySearchQuery, setHistorySearchQuery] = useState('');
-    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
     // Error state
     const [error, setError] = useState(null);
@@ -120,47 +115,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialQuery, existingConversationId]);
 
-
-    // Fetch history when modal opens or search query changes
-    useEffect(() => {
-        const fetchHistory = async () => {
-            if (!showHistoryModal) return;
-
-            setIsHistoryLoading(true);
-            try {
-                const response = await getConversationsList(50, historySearchQuery);
-                if (response && response.history) {
-                    const formattedHistory = response.history.map(conv => {
-                        // Get the conversation ID from the nested structure
-                        const conversationId = conv._id?._id || conv._id;
-
-                        // Use the title from the conversation
-                        const title = conv.title || 'Untitled conversation';
-
-                        // Use lastUpdatedAt if available and not 0, otherwise use current time
-                        const lastUpdatedAt = conv.lastUpdatedAt && conv.lastUpdatedAt !== 0
-                            ? conv.lastUpdatedAt
-                            : Date.now();
-
-                        return {
-                            id: conversationId,
-                            title: title,
-                            lastUpdatedAt: lastUpdatedAt
-                        };
-                    }).sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
-                    console.log('Formatted history:', formattedHistory);
-                    setHistoryItems(formattedHistory);
-                }
-            } catch (error) {
-                console.error('Error fetching history:', error);
-                setHistoryItems([]);
-            } finally {
-                setIsHistoryLoading(false);
-            }
-        };
-
-        fetchHistory();
-    }, [showHistoryModal, historySearchQuery]);
 
     // Auto-focus input on keypress
     useEffect(() => {
@@ -263,11 +217,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
         }
     };
 
-    const handleDeleteHistory = (conversationId) => {
-        // Remove the conversation from the history list
-        setHistoryItems(prev => prev.filter(item => item.id !== conversationId));
-    };
-
     const handleStreamingComplete = (messageId) => {
         setCompletedStreamingMessages(prev => new Set([...prev, messageId]));
     };
@@ -357,11 +306,6 @@ function AgenticConversationPage({ initialQuery, existingConversationId, onBack,
                     isOpen={showHistoryModal}
                     onClose={() => setShowHistoryModal(false)}
                     onHistoryClick={handleHistoryClick}
-                    historyItems={historyItems}
-                    searchQuery={historySearchQuery}
-                    onSearchQueryChange={setHistorySearchQuery}
-                    isLoading={isHistoryLoading}
-                    onDelete={handleDeleteHistory}
                 />
             </Page>
         </>

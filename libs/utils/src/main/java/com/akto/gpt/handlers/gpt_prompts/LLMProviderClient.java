@@ -121,7 +121,7 @@ public class LLMProviderClient {
 
     private static String callAzureOpenAI(Model model, String prompt, OkHttpClient client) throws IOException, org.json.JSONException {
         String endpoint = model.getAzureEndpoint();
-        String apiKey = model.getApiKey();
+        String apiKey = model.readApiKey();
         String modelName = model.getModelName();
 
         if (endpoint == null || endpoint.isEmpty()) {
@@ -157,7 +157,7 @@ public class LLMProviderClient {
 
     private static String callDatabricks(Model model, String prompt, OkHttpClient client) throws IOException, org.json.JSONException {
         String databricksEndpoint = model.getDatabricksEndpoint();
-        String apiKey = model.getApiKey();
+        String apiKey = model.readApiKey();
         String modelName = model.getModelName();
 
         if (databricksEndpoint == null || databricksEndpoint.isEmpty()) {

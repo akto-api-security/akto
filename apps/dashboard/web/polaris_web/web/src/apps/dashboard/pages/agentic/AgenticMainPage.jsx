@@ -26,8 +26,6 @@ function AgenticMainPage() {
     const [newConversationQuery, setNewConversationQuery] = useState(null);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [historyItems, setHistoryItems] = useState([]);
-    const [historySearchQuery, setHistorySearchQuery] = useState('');
-    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
     const showConversation = Boolean(activeConversationId) || newConversationQuery !== null;
 
@@ -61,10 +59,10 @@ function AgenticMainPage() {
         setShowHistoryModal(true);
     }, []);
 
-    const loadHistory = useCallback(async (limit = 50, searchQuery = "") => {
-        setIsLoadingHistory(true);
+    // Only feeds the 3 recent-history cards; the full paged/searchable list lives in AgenticHistoryModal
+    const loadRecentHistory = useCallback(async () => {
         try {
-            const conversations = await getConversationsList(limit, searchQuery);
+            const conversations = await getConversationsList(3, "");
             const sortedHistory = [...(conversations?.history || [])].sort((a, b) => b.lastUpdatedAt - a.lastUpdatedAt);
             setHistoryItems(sortedHistory.map(item => ({
                 ...item,
@@ -74,17 +72,12 @@ function AgenticMainPage() {
             console.error('Error loading conversation history:', error);
             setHistoryItems([]);
         }
-        setIsLoadingHistory(false);
     }, []);
 
     useEffect(() => {
         if (showConversation) return;
-        if (showHistoryModal) {
-            loadHistory(50, historySearchQuery);
-        } else {
-            loadHistory(3, "");
-        }
-    }, [showConversation, showHistoryModal, historySearchQuery, loadHistory]);
+        loadRecentHistory();
+    }, [showConversation, showHistoryModal, loadRecentHistory]);
 
     // If conversation is active, show the conversation page
     if (showConversation) {
@@ -128,15 +121,8 @@ function AgenticMainPage() {
             {/* History Modal */}
             <AgenticHistoryModal
                 isOpen={showHistoryModal}
-                onClose={() => {
-                    setShowHistoryModal(false);
-                    setHistorySearchQuery(''); // Reset search query when closing
-                }}
+                onClose={() => setShowHistoryModal(false)}
                 onHistoryClick={handleHistoryClick}
-                historyItems={historyItems}
-                searchQuery={historySearchQuery}
-                onSearchQueryChange={setHistorySearchQuery}
-                isLoading={isLoadingHistory}
                 onDelete={(conversationId) => {
                     setHistoryItems(prev => prev.filter(item => item.id !== conversationId));
                 }}

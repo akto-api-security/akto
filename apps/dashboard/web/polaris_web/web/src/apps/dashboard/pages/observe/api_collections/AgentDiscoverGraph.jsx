@@ -17,16 +17,24 @@ import {
 // Fields rendered in the node hover panel, in display order. Every field is read straight off
 // serviceGraphEdges.<nodeName>.metadata, so adding a row here is all it takes to surface a new
 // metadata key. `list: true` fields accept either an array or a comma-separated string.
+// `labelByCloud` renames a field for the cloud named in metadata.cloud (set by the producer, e.g.
+// ALIBABA_CLOUD by the mini-runtime's AlibabaCloudTraceParser); other nodes keep `label`.
 const HOVER_FIELDS = [
   { key: 'endpointUrl',     label: 'Endpoint URL' },
   { key: 'toolName',        label: 'Tool Name',          color: 'success' },
   { key: 'description',     label: 'Description' },
-  { key: 'role',            label: 'IAM Role',           color: 'success' },
-  { key: 'policies',        label: 'IAM Policies',       list: true, showCount: true },
+  { key: 'role',            label: 'IAM Role',           color: 'success', labelByCloud: { ALIBABA_CLOUD: 'RAM Role' } },
+  { key: 'policies',        label: 'IAM Policies',       list: true, showCount: true, labelByCloud: { ALIBABA_CLOUD: 'RAM Policies' } },
+  { key: 'plugins',         label: 'Plug-ins',           list: true, showCount: true },
+  { key: 'consumers',       label: 'Consumers',          list: true, showCount: true },
+  { key: 'region',          label: 'Region' },
+  { key: 'workspaceId',     label: 'Workspace' },
   { key: 'totalToolCalls',  label: 'Total Tool Calls' },
   { key: 'lastToolInvoked', label: 'Last Tool Invoked',  color: 'success' },
   { key: 'toolsList',       label: 'Tools List',         list: true, showCount: true },
 ];
+
+export const hoverLabel = (field, metadata) => field.labelByCloud?.[metadata?.cloud] || field.label;
 
 // Tolerates both ["a","b"] and "a, b" so the panel doesn't care how the producer wrote the value.
 const toList = (value) => {
@@ -55,7 +63,9 @@ const NodeHoverPanel = ({ metadata }) => {
     <Card>
       <Box maxWidth='400px'>
         <VerticalStack gap="3">
-          {HOVER_FIELDS.map(({ key, label, color, list, showCount }) => {
+          {HOVER_FIELDS.map((field) => {
+            const { key, color, list, showCount } = field;
+            const label = hoverLabel(field, metadata);
             if (list) {
               const items = toList(metadata?.[key]);
               if (items.length === 0) return null;

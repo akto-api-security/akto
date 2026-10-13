@@ -255,13 +255,6 @@ export default {
         return resp
     },
 
-    async getAllCollections() {
-        return await request({
-            url: '/api/getAllCollections',
-            method: 'post',
-            data: {}
-        })
-    },
     async getAllCollectionsBasic() {
         return await request({
             url: '/api/getAllCollectionsBasic',

@@ -192,17 +192,6 @@ const paramHeaders = [
     }
 ]
 
-const lastFetchedInfo = PersistStore.getState().lastFetchedInfo
-const lastFetchedResp = PersistStore.getState().lastFetchedResp
-const lastFetchedSeverityResp = PersistStore.getState().lastFetchedSeverityResp
-const lastCalledSensitiveInfo = PersistStore.getState().lastCalledSensitiveInfo
-const lastFetchedSensitiveResp = PersistStore.getState().lastFetchedSensitiveResp
-const setLastFetchedInfo = PersistStore.getState().setLastFetchedInfo
-const setLastFetchedResp = PersistStore.getState().setLastFetchedResp
-const setLastFetchedSeverityResp = PersistStore.getState().setLastFetchedSeverityResp
-const setLastCalledSensitiveInfo = PersistStore.getState().setLastCalledSensitiveInfo
-const setLastFetchedSensitiveResp = PersistStore.getState().setLastFetchedSensitiveResp
-
 const transform = {
     prepareEndpointData: (apiCollectionMap, res) => {
         let apiCollection = apiCollectionMap[res?.data?.endpoints[0]?.apiCollectionId];
@@ -540,7 +529,8 @@ const transform = {
         )
     },
 
-    prettifyCollectionsData(newData, isLoading, selectedTab, filterType){
+    // detailsLoading: the coverage column has not arrived yet (it loads after the rows)
+    prettifyCollectionsData(newData, isLoading, selectedTab, filterType, detailsLoading = false){
         const category = getDashboardCategory();
         const isEndpointSecurity = category === CATEGORY_ENDPOINT_SECURITY;
 
@@ -633,8 +623,8 @@ const transform = {
                 descriptionComp: descriptionComp,
                 outOfTestingScopeComp: outOfTestingScopeComp,
                 riskScoreComp: riskScoreComp,
-                coverage: calcCoverage,
-                issuesArr: isLoading ? loadingComp : this.getIssuesList(c.severityInfo),
+                coverage: detailsLoading ? '...' : (c.coverageUnavailable ? '-' : calcCoverage),
+                issuesArr: isLoading ? loadingComp : (c.issuesUnavailable ? '-' : this.getIssuesList(c.severityInfo)),
                 issuesArrVal: this.getIssuesListText(c.severityInfo),
                 sensitiveSubTypes: isLoading ? loadingComp : this.prettifySubtypes(c.sensitiveInRespTypes, c.deactivated),
                 lastTraffic: isLoading ? '...' : c.detected,
@@ -832,69 +822,6 @@ const transform = {
 
     getParamHeaders(){
         return paramHeaders;
-    },
-
-    async fetchRiskScoreInfo(){
-        let tempRiskScoreObj = lastFetchedResp
-        let tempSeverityObj = lastFetchedSeverityResp
-        await api.lastUpdatedInfo().then(async(resp) => {
-            if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo || resp.lastUpdatedSensitiveMap >= lastFetchedInfo.lastSensitiveInfo){
-                try {
-                    await api.getRiskScoreInfo().then((res) =>{
-                        const newObj = {
-                            criticalUrls: res.criticalEndpointsCount,
-                            riskScoreMap: res.riskScoreOfCollectionsMap, 
-                        }
-                        tempRiskScoreObj = JSON.parse(JSON.stringify(newObj));
-                        setLastFetchedResp(newObj);
-                    })
-                } catch (error) {
-                    func.setToast(true, false, error.message)
-                }
-                
-            }
-            if(resp.lastUpdatedSeverity >= lastFetchedInfo.lastRiskScoreInfo){
-                try {
-                    await api.getSeverityInfoForCollections().then((resp) => {
-                        tempSeverityObj = JSON.parse(JSON.stringify(resp))
-                        setLastFetchedSeverityResp(resp)
-                    })
-                } catch (error) {
-                    func.setToast(true, false, error.message)
-                }
-                
-            }
-            setLastFetchedInfo({
-                lastRiskScoreInfo: func.timeNow() >= resp.lastUpdatedSeverity ? func.timeNow() : resp.lastUpdatedSeverity,
-                lastSensitiveInfo: func.timeNow() >= resp.lastUpdatedSensitiveMap ? func.timeNow() : resp.lastUpdatedSensitiveMap,
-            })
-        })
-        let finalObj = {
-            riskScoreObj: tempRiskScoreObj,
-            severityObj: tempSeverityObj
-        }
-        return finalObj
-    },
-
-    async fetchSensitiveInfo(){
-        let tempSensitiveInfo = lastFetchedSensitiveResp
-        if((func.timeNow() - (5 * 60)) >= lastCalledSensitiveInfo){
-            try {
-                await api.getSensitiveInfoForCollections().then((resp) => {
-                    const sensitiveObj = {
-                        sensitiveUrls: resp.sensitiveUrlsInResponse,
-                        sensitiveInfoMap: resp.sensitiveSubtypesInCollection
-                    }
-                    setLastCalledSensitiveInfo(func.timeNow())
-                    setLastFetchedSensitiveResp(sensitiveObj)
-                    tempSensitiveInfo = JSON.parse(JSON.stringify(sensitiveObj))
-                })
-            } catch (error) {
-                return tempSensitiveInfo
-            }
-            
-        }
-        return tempSensitiveInfo; 
     },
 
     convertToPrettifyData(c){

@@ -11,14 +11,24 @@ import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.nhi_governance.NhiIdentity;
+import org.apache.commons.lang3.StringUtils;
 
+import com.akto.dto.ApiInfo;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -58,6 +68,10 @@ public class InsightDataBundle {
 
     private final InsightsThreatBackendAccess threatAccess;
 
+    // API_POSTURE / TESTING_POSTURE lazy reads — see the memo()/withCtx() javadocs below.
+    private final InsightLazySources lazy;
+    private final Map<String, Object> lazyCache = new ConcurrentHashMap<>();
+
     public InsightDataBundle(InsightContext ctx,
                               List<ApiCollection> collections,
                               Map<String, List<ApiCollection>> collectionsByServiceName,
@@ -75,7 +89,8 @@ public class InsightDataBundle {
                               boolean threatBackendAvailable,
                               List<ApiCollection> activeCollections,
                               Map<Integer, Integer> collectionLastTrafficSeen,
-                              InsightsThreatBackendAccess threatAccess) {
+                              InsightsThreatBackendAccess threatAccess,
+                              InsightLazySources lazy) {
         this.ctx = ctx;
         this.collections = collections;
         this.collectionsByServiceName = collectionsByServiceName;
@@ -94,6 +109,7 @@ public class InsightDataBundle {
         this.activeCollections = activeCollections;
         this.collectionLastTrafficSeen = collectionLastTrafficSeen;
         this.threatAccess = threatAccess;
+        this.lazy = lazy;
     }
 
     public List<ApiCollection> collectionsForServiceName(String serviceName) {
@@ -209,10 +225,65 @@ public class InsightDataBundle {
         return hostResolver;
     }
 
-    // Newest-first events for these collections; null when the threat backend is unavailable.
+    /**
+     * Newest-first events for these collections; null when the threat backend is unavailable.
+     * Dispatches by context source — see listMaliciousEventsAgentic/listMaliciousEventsApi for why
+     * they query differently.
+     */
     public List<DashboardMaliciousEvent> listMaliciousEvents(int startTs, int endTs, int limit, List<Integer> collectionIds) {
         if (!threatBackendAvailable || threatAccess == null) return null;
-        return threatAccess.violationEvents(startTs, endTs, limit, Collections.singletonMap("apiCollectionId", collectionIds), null);
+
+        switch (Context.contextSource.get()) {
+            case AGENTIC:
+            case ENDPOINT:
+                return listMaliciousEventsAgentic(startTs, endTs, limit, collectionIds);
+            default:
+                return listMaliciousEventsApi(startTs, endTs, limit, collectionIds);
+        }
+    }
+
+    /** API, MCP, GEN_AI, DAST: apiCollectionId is a real, reliable field for this traffic. */
+    private List<DashboardMaliciousEvent> listMaliciousEventsApi(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        return threatAccess.violationEvents(startTs, endTs, limit,
+                Collections.singletonMap("apiCollectionId", collectionIds), null);
+    }
+
+    /**
+     * AGENTIC and ENDPOINT attribute malicious events by host, not apiCollectionId (see
+     * HostCollectionResolver's own javadoc) — an event's apiCollectionId is frequently unset or
+     * stale for agentic traffic, which is why maliciousSeverityCounts/countByCollection never
+     * filters by it either for those context sources. Querying by apiCollectionId directly for
+     * them silently returned nothing for agents whose events only carry a host match, while the
+     * severity-count sibling (host-resolved) reported a real total — the two disagreeing on the
+     * same agent is what surfaced this.
+     *
+     * Two queries unioned, not one with both fields set: the backend ANDs "hosts" and "actors"
+     * when both are present in one request, so a single call would ask for events whose host AND
+     * actor both match, not either — same reasoning HostCollectionResolver.resolveEvent's own
+     * host-then-actor fallback documents.
+     */
+    private List<DashboardMaliciousEvent> listMaliciousEventsAgentic(int startTs, int endTs, int limit, List<Integer> collectionIds) {
+        Set<Integer> wanted = new HashSet<>(collectionIds);
+        List<String> hosts = new ArrayList<>();
+        for (ApiCollection c : collections) {
+            if (c == null || !wanted.contains(c.getId())) continue;
+            String identity = InsightUtil.assetIdentity(c);
+            if (StringUtils.isNotBlank(identity)) hosts.add(identity);
+        }
+        if (hosts.isEmpty()) return new ArrayList<>();
+
+        Map<String, DashboardMaliciousEvent> byId = new LinkedHashMap<>();
+        for (String field : Arrays.asList("hosts", "actors")) {
+            List<DashboardMaliciousEvent> page = threatAccess.violationEvents(startTs, endTs, limit,
+                    Collections.singletonMap(field, hosts), null);
+            if (page == null) continue;
+            for (DashboardMaliciousEvent event : page) {
+                if (event != null && event.getId() != null) byId.put(event.getId(), event);
+            }
+        }
+        List<DashboardMaliciousEvent> events = new ArrayList<>(byId.values());
+        events.sort(Comparator.comparingLong(DashboardMaliciousEvent::getTimestamp).reversed());
+        return events.size() > limit ? events.subList(0, limit) : events;
     }
 
     private static final long MALICIOUS_INVOCATION_WINDOW_MS = 15L * 24 * 3600 * 1000;
@@ -236,5 +307,80 @@ public class InsightDataBundle {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private <T> T withCtx(Supplier<T> s) {
+        Integer prevAcc = Context.accountId.get();
+        Integer prevUser = Context.userId.get();
+        CONTEXT_SOURCE prevSrc = Context.contextSource.get();
+        try {
+            Context.accountId.set(ctx.getAccountId());
+            Context.userId.set(ctx.getUserId());
+            Context.contextSource.set(ctx.getContextSource());
+            return s.get();
+        } finally {
+            if (prevAcc == null) Context.accountId.remove(); else Context.accountId.set(prevAcc);
+            if (prevUser == null) Context.userId.remove(); else Context.userId.set(prevUser);
+            if (prevSrc == null) Context.contextSource.remove(); else Context.contextSource.set(prevSrc);
+        }
+    }
+
+    /**
+     * Memoizes one lazy read per bundle instance, so N providers sharing one read (e.g. three
+     * API_POSTURE providers all wanting apiInfoRows()) still pay for it once. ConcurrentHashMap
+     * .computeIfAbsent is NOT reentrant — a supplier here must never call another memo()'d
+     * accessor, or a hash collision can deadlock. Every supplier below is therefore built only
+     * from what InsightDataLoader already loaded eagerly (collections -> collection ids), never
+     * from another lazy field.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T memo(String key, Supplier<T> s) {
+        return (T) lazyCache.computeIfAbsent(key, k -> withCtx(s));
+    }
+
+    /**
+     * Bounded, RBAC-scoped api_info rows for API_POSTURE providers. Capped at
+     * InsightLazySources.API_INFO_ROW_CAP — a provider that reads this MUST check
+     * isApiInfoRowsTruncated() and, if true, set metricsComplete=false and add a Gap rather than
+     * silently treating the capped list as the whole account (a truncated read must never become
+     * a denominator).
+     */
+    public List<ApiInfo> apiInfoRows() {
+        return memo("apiInfoRows", lazy::apiInfoRows);
+    }
+
+    public boolean isApiInfoRowsTruncated() {
+        apiInfoRows(); // ensure the memoized read has actually run — the flag is a side effect of it
+        return lazy.isApiInfoRowsTruncated();
+    }
+
+    /** subType (PII class) -> number of distinct endpoints exposing it in a response — an API
+     *  count, not a hit/location count. See SingleTypeInfoDao.responseSensitiveSubtypeApiCounts()
+     *  for why SingleTypeInfo.count isn't summed here (it isn't a reliable hit counter). */
+    public Map<String, Integer> sensitiveApiCountBySubType() {
+        return memo("sensitiveApiCountBySubType", lazy::sensitiveApiCountBySubType);
+    }
+
+    /** apiCollectionId -> {severity -> open-issue count}, RBAC-scoped via
+     *  TestingRunIssuesDao.addCollectionsFilterForDashboard — see
+     *  InsightLazySources.openIssueSeverityByCollection() for why that filter, not
+     *  TestingRunIssuesDao.getSeveritiesMapForCollections's own weaker best-effort one, is used
+     *  here. */
+    public Map<Integer, Map<String, Integer>> openIssueSeverityByCollection() {
+        return memo("openIssueSeverityByCollection", lazy::openIssueSeverityByCollection);
+    }
+
+    /** OPEN issues with creationTime older than 30 days (wall clock, not ctx — ctx's end
+     *  timestamp can be a far-future "All time" sentinel). */
+    public List<TestingRunIssues> agingOpenIssues() {
+        return memo("agingOpenIssues", lazy::agingOpenIssues);
+    }
+
+    /** {apiInfoKey, testSubType} -> how many distinct test runs saw that finding — the
+     *  repetition score. See InsightLazySources.issueRecurrence() for the merge across
+     *  vulnerable_testing_run_results and the legacy testing_run_result collection, and why
+     *  distinctRuns is an $addToSet of summaryId rather than a raw document count. */
+    public List<IssueRecurrenceRow> issueRecurrence() {
+        return memo("issueRecurrence", lazy::issueRecurrence);
     }
 }

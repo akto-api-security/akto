@@ -185,7 +185,7 @@ const router = createBrowserRouter([
                         element: <AgenticPosture/>,
                     },
                     {
-                        path: "agentic-posture/agents/:groupKey",
+                        path: "agentic-posture/agent/:collectionId",
                         element: <AgenticPostureAgentDetail/>,
                     },
                     {

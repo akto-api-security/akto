@@ -25,13 +25,23 @@ export const clearConversationFromLocal = async (conversationId) => {
     }
 };
 
-// History list: titles and timestamps only, without messages
-export const getConversationsList = async (limit = 10, searchQuery = "") => {
+// History list: one row per conversation (title, user, type, counts), without messages. Response has total for pagination
+export const getConversationsList = async (limit = 10, searchQuery = "", skip = 0, userIds = []) => {
     return await request({
         url: '/api/fetchHistory',
         method: 'post',
-        data: {limit, searchQuery, includeMessages: false}
+        data: {limit, skip, searchQuery, userIds, includeMessages: false}
     })
+};
+
+// Users who have conversations in the current dashboard, as [{id, email}], to fill the user filter
+export const getConversationUsers = async () => {
+    const res = await request({
+        url: '/api/fetchHistory',
+        method: 'post',
+        data: {limit: 1, includeMessages: false, includeUsers: true}
+    })
+    return res?.users || [];
 };
 
 // Single conversation with all turns, oldest first; null if not found

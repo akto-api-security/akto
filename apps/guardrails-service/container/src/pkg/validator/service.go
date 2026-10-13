@@ -187,10 +187,8 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		if _, err := svc.getMcpAllowedHostList(); err != nil {
 			logger.Warn("Warm MCP allowlist cache failed", zap.Error(err))
 		}
-		if _, _, _, _, err := svc.getCachedPolicies(""); err != nil {
-			logger.Warn("Warm policy cache failed", zap.Error(err))
-		}
 	}()
+	go svc.runPolicyRefresher()
 	return svc, nil
 }
 
@@ -963,30 +961,42 @@ func (s *Service) getMcpAllowedHostList() ([]types.McpAllowedList, error) {
 	return v.([]types.McpAllowedList), nil
 }
 
+// getCachedPolicies serves policies from the cache, which is kept fresh by
+// runPolicyRefresher. Requests never wait on a refresh; they only block when the
+// cache has never been loaded (e.g. right after startup), since there is nothing to serve.
 func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
-	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
-
-	// Check if cache is valid
 	s.cache.mu.RLock()
-	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
+	if !s.cache.lastFetched.IsZero() {
 		// Filter policies by contextSource from cached data
 		filteredPolicies := s.filterPoliciesByContextSource(s.cache.policies, contextSource)
 		auditPolicies := s.cache.auditPolicies
 		compiledRules := s.cache.compiledRules
 		hasAuditRules := s.cache.hasAuditRules
+		lastFetched := s.cache.lastFetched
+		totalPoliciesCount := len(s.cache.policies)
 		// RUnlock so that multiple goroutines can read the cached policies
 		s.cache.mu.RUnlock()
 		s.logger.Debug("Using cached policies",
-			zap.Time("lastFetched", s.cache.lastFetched),
+			zap.Time("lastFetched", lastFetched),
 			zap.String("contextSource", contextSource),
-			zap.Int("totalPoliciesCount", len(s.cache.policies)),
+			zap.Int("totalPoliciesCount", totalPoliciesCount),
 			zap.Int("filteredPoliciesCount", len(filteredPolicies)))
 		return filteredPolicies, auditPolicies, compiledRules, hasAuditRules, nil
 	}
 	s.cache.mu.RUnlock()
 
-	// Cache is stale or empty, coalesce refresh across concurrent requests.
-	v, refreshErr, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
+	// Cache never loaded, join (or start) the in-flight load.
+	bundle, err := s.loadPolicies()
+	if err != nil {
+		return nil, nil, nil, false, err
+	}
+	filteredPolicies := s.filterPoliciesByContextSource(bundle.policies, contextSource)
+	return filteredPolicies, bundle.auditPolicies, bundle.compiledRules, bundle.hasAuditRules, nil
+}
+
+// loadPolicies refreshes the policy cache, coalescing concurrent callers into one fetch.
+func (s *Service) loadPolicies() (*policyRefreshResult, error) {
+	v, err, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
 		policies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
 		if err != nil {
 			return nil, err
@@ -998,50 +1008,43 @@ func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[s
 			hasAuditRules: hasAuditRules,
 		}, nil
 	})
-	if refreshErr != nil {
-		s.cache.mu.RLock()
-		hasStale := !s.cache.lastFetched.IsZero() && len(s.cache.policies) > 0
-		if hasStale {
-			filteredPolicies := s.filterPoliciesByContextSource(s.cache.policies, contextSource)
-			staleAudit := s.cache.auditPolicies
-			staleRules := s.cache.compiledRules
-			staleHasAudit := s.cache.hasAuditRules
-			lastFetched := s.cache.lastFetched
-			s.cache.mu.RUnlock()
-			s.logger.Warn("Policy refresh failed, using stale cache",
-				zap.String("contextSource", contextSource),
-				zap.Time("lastFetched", lastFetched),
-				zap.Error(refreshErr))
-			return filteredPolicies, staleAudit, staleRules, staleHasAudit, nil
-		}
-		s.cache.mu.RUnlock()
-		return nil, nil, nil, false, refreshErr
+	if err != nil {
+		return nil, err
 	}
+	return v.(*policyRefreshResult), nil
+}
 
-	bundle := v.(*policyRefreshResult)
-	filteredPolicies := s.filterPoliciesByContextSource(bundle.policies, contextSource)
-	return filteredPolicies, bundle.auditPolicies, bundle.compiledRules, bundle.hasAuditRules, nil
+// runPolicyRefresher loads policies immediately and then refreshes them every
+// POLICY_REFRESH_INTERVAL_MIN. On failure the previous policies stay in the cache.
+func (s *Service) runPolicyRefresher() {
+	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
+	if refreshInterval <= 0 {
+		refreshInterval = time.Minute
+	}
+	ticker := time.NewTicker(refreshInterval)
+	defer ticker.Stop()
+	for {
+		if _, err := s.loadPolicies(); err != nil {
+			s.logger.Warn("Policy refresh failed, keeping previously cached policies", zap.Error(err))
+		}
+		<-ticker.C
+	}
 }
 
 // refreshPolicies fetches fresh policies from database and updates the cache
-// Fetches ALL policies without filtering by contextSource
+// Fetches ALL policies without filtering by contextSource.
+// The fetch runs without holding the cache lock so readers keep using the
+// current policies; the write lock is held only to swap in the new set.
 func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
-	s.cache.mu.Lock()
-	defer s.cache.mu.Unlock()
-
-	// Double-check: another goroutine might have refreshed while we waited for the lock
-	refreshInterval := time.Duration(s.config.PolicyRefreshIntervalMin) * time.Minute
-	if !s.cache.lastFetched.IsZero() && time.Since(s.cache.lastFetched) < refreshInterval {
-		s.logger.Debug("Cache was refreshed by another goroutine, using cached policies")
-		return s.cache.policies, s.cache.auditPolicies, s.cache.compiledRules, s.cache.hasAuditRules, nil
-	}
-
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
 	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
+
+	s.cache.mu.Lock()
+	defer s.cache.mu.Unlock()
 
 	// Update cache with ALL policies
 	s.cache.policies = policies

@@ -44,6 +44,9 @@ import java.util.stream.Collectors;
 public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
     public static final ApiInfoDao instance = new ApiInfoDao();
+    public static final String ID_COLLECTION_RISK_SCORE_INDEX = "_id.apiCollectionId_1_riskScore_-1";
+    public static final String COLLECTION_IDS_RISK_SCORE_INDEX = "collectionIds_1_riskScore_-1";
+    public static final String COLLECTION_IDS_LAST_SEEN_INDEX = "collectionIds_1_lastSeen_-1";
 
     public static final String ID = "_id.";
     public static final int AKTO_DISCOVERED_APIS_COLLECTION_ID = 1333333333;
@@ -102,6 +105,19 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.DISCOVERED_TIMESTAMP }, false);
+
+        // per collection max riskScore / lastSeen as a DISTINCT_SCAN (one key per collection) for
+        // api_collection_stats, and the same lookups for api groups, which are only reachable
+        // through collectionIds.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(ApiInfo.ID_API_COLLECTION_ID), Indexes.descending(ApiInfo.RISK_SCORE)),
+            new IndexOptions().name(ID_COLLECTION_RISK_SCORE_INDEX));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(SingleTypeInfo._COLLECTION_IDS), Indexes.descending(ApiInfo.RISK_SCORE)),
+            new IndexOptions().name(COLLECTION_IDS_RISK_SCORE_INDEX));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.compoundIndex(Indexes.ascending(SingleTypeInfo._COLLECTION_IDS), Indexes.descending(ApiInfo.LAST_SEEN)),
+            new IndexOptions().name(COLLECTION_IDS_LAST_SEEN_INDEX));
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
@@ -170,6 +186,33 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 result.put(basicDBObject.getInt("apiCollectionId"), basicDBObject.getInt("count"));
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Same count as getCoverageCount (unwound over collectionIds, so api groups are covered), but
+     * only for these collections: the page needs it for its rows, not for every collection. The
+     * server gives up after maxTimeSeconds, so a slow count does not keep running once nobody waits for it.
+     */
+    public Map<Integer,Integer> getCoverageCountForCollections(List<Integer> collectionIds, long maxTimeSeconds){
+        Map<Integer,Integer> result = new HashMap<>();
+        if (collectionIds == null || collectionIds.isEmpty()) return result;
+
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(Filters.and(
+                        Filters.gte(ApiInfo.LAST_TESTED, Context.now() - Constants.ONE_MONTH_TIMESTAMP),
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds))),
+                Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS),
+                // the unwind also yields the other collections a document belongs to
+                Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)),
+                Aggregates.group("$" + SingleTypeInfo._COLLECTION_IDS, Accumulators.sum(SingleTypeInfoDao._COUNT, 1)));
+
+        try (MongoCursor<BasicDBObject> cursor = aggregateWithRbac(pipeline).maxTime(maxTimeSeconds, TimeUnit.SECONDS).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                result.put(doc.getInt(Constants.ID), doc.getInt(SingleTypeInfoDao._COUNT));
             }
         }
         return result;
@@ -370,189 +413,6 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
             } 
         }
         return apiInfoList;
-    }
-
-    public Pair<ApiStats,ApiStats> fetchApiInfoStats(Bson collectionFilter, Bson apiFilter, int startTimestamp, int endTimestamp) {
-        long methodStart = System.currentTimeMillis();
-        ApiStats apiStatsStart = new ApiStats(startTimestamp);
-        ApiStats apiStatsEnd = new ApiStats(endTimestamp);
-
-        int totalApis = 0;
-        int apisTestedInLookBackPeriod = 0;
-        float totalRiskScore = 0;
-        int apisInScopeForTesting = 0;
-
-        long query1Start = System.currentTimeMillis();
-        Map<Integer,Boolean> collectionsMap = ApiCollectionsDao.instance.findAll(collectionFilter, Projections.include(ApiCollection.ID, ApiCollection.IS_OUT_OF_TESTING_SCOPE))
-            .stream()
-            .collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getIsOutOfTestingScope));
-        long query1Time = System.currentTimeMillis() - query1Start;
-        System.out.println("[ApiInfoDao.fetchApiInfoStats] Query1 (ApiCollections findAll): time=" + query1Time + "ms, collections=" + collectionsMap.size());
-
-        // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating
-        Bson filter = Filters.and(apiFilter,
-            Filters.or(
-                Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp),
-                Filters.and(
-                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
-                    Filters.lte(ApiInfo.LAST_SEEN, endTimestamp) // in case discovered timestamp is not set
-                )// in case discovered timestamp is not set
-            )
-        );
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
-            if (collectionIds != null) {
-                System.out.println("[ApiInfoDao.fetchApiInfoStats] RBAC filter applied: collectionIds size=" + collectionIds.size() + ", ids=" + collectionIds);
-                filter = Filters.and(filter, Filters.in("collectionIds", collectionIds));
-            } else {
-                System.out.println("[ApiInfoDao.fetchApiInfoStats] RBAC filter: collectionIds is null, no RBAC filtering applied");
-            }
-        } catch (Exception e){
-            System.out.println("[ApiInfoDao.fetchApiInfoStats] Exception getting collectionIds: " + e.getMessage());
-        }
-
-        long query2Start = System.currentTimeMillis();
-        MongoCursor<ApiInfo> cursor = instance.getMCollection().find(filter).cursor();
-        long query2Time = System.currentTimeMillis() - query2Start;
-        System.out.println("[ApiInfoDao.fetchApiInfoStats] Query2 (api_info find cursor init): time=" + query2Time + "ms, startTs=" + startTimestamp + ", endTs=" + endTimestamp);
-
-        long iterationStart = System.currentTimeMillis();
-        boolean isOutOfTestingScope = false;
-        while(cursor.hasNext()) {
-            ApiInfo apiInfo = cursor.next();
-            isOutOfTestingScope = collectionsMap.getOrDefault(apiInfo.getId().getApiCollectionId(), false);
-            if (apiInfo.getDiscoveredTimestamp() <= startTimestamp) {
-                apiInfo.addStats(apiStatsStart);
-                apiStatsStart.setTotalAPIs(apiStatsStart.getTotalAPIs()+1);
-                apiStatsStart.setTotalRiskScore(apiStatsStart.getTotalRiskScore() + apiInfo.getRiskScore());
-            }
-
-            apiInfo.addStats(apiStatsEnd);
-            totalApis += 1;
-            totalRiskScore += apiInfo.getRiskScore();
-            if(!isOutOfTestingScope){
-                if (apiInfo.getLastTested() > (Context.now() - 30 * 24 * 60 * 60)) apisTestedInLookBackPeriod += 1;
-                apisInScopeForTesting += 1;
-            }
-            String severity = apiInfo.findSeverity();
-            apiStatsEnd.addSeverityCount(severity);
-        }
-        cursor.close();
-        long iterationTime = System.currentTimeMillis() - iterationStart;
-        System.out.println("[ApiInfoDao.fetchApiInfoStats] Cursor iteration: time=" + iterationTime + "ms, docsProcessed=" + totalApis);
-
-        apiStatsEnd.setTotalAPIs(totalApis);
-        apiStatsEnd.setApisTestedInLookBackPeriod(apisTestedInLookBackPeriod);
-        apiStatsEnd.setTotalRiskScore(totalRiskScore);
-        apiStatsEnd.setTotalInScopeForTestingApis(apisInScopeForTesting);
-
-        long totalTime = System.currentTimeMillis() - methodStart;
-        System.out.println("[ApiInfoDao.fetchApiInfoStats] Total method time: " + totalTime + "ms (query1=" + query1Time + "ms, query2=" + query2Time + "ms, iteration=" + iterationTime + "ms)");
-
-        return new Pair<>(apiStatsStart, apiStatsEnd);
-    }
-
-    public Map<Integer, BasicDBObject> getApisListMissingInApiInfoDao(Bson customFilterForCollection, int startTimestamp, int endTimestamp){
-        Map<Integer, BasicDBObject> result = new HashMap<>();
-        ExecutorService executor = Executors.newFixedThreadPool(20);
-        Set<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(customFilterForCollection, Projections.include(ApiCollection.ID)).stream()
-                .map(ApiCollection::getId)
-                .collect(Collectors.toSet());
-
-        List<Future<Void>> futures = new ArrayList<>();
-        int accountId = Context.accountId.get();
-        
-        for (Integer apiCollectionId : apiCollectionIds) {
-            futures.add(executor.submit(() -> {
-                Context.accountId.set(accountId);
-                Set<ApiInfoKey> missingApiInfoKeysInSti = new HashSet<>();
-                List<ApiInfoKey> missingApiInfoKeysInSamples = new ArrayList<>();
-                List<ApiInfoKey> missingApiInfoKeysForAuth = new ArrayList<>();
-                List<ApiInfoKey> missingApiInfoKeysForAccessType = new ArrayList<>();
-                List<ApiInfoKey> redundantApiInfoKeys = new ArrayList<>();
-                BasicDBObject missingInfos = new BasicDBObject();
-
-                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHostWithTsRange(apiCollectionId, startTimestamp, endTimestamp);
-
-                Bson apiInfoFilter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId);
-                if(endTimestamp > 0) {
-                    apiInfoFilter = Filters.and(apiInfoFilter, Filters.or(
-                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp),
-                            Filters.and(
-                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
-                                    Filters.lte(ApiInfo.LAST_SEEN, endTimestamp) // in case discovered timestamp is not set
-                            )// in case discovered timestamp is not set
-                    ));
-                }
-
-                List<ApiInfo> actualApiInfosInColl = ApiInfoDao.instance.findAll(
-                    apiInfoFilter,
-                    Projections.include(Constants.ID, ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.API_ACCESS_TYPES, ApiInfo.API_TYPE)
-                );
-                Map<ApiInfoKey, ApiInfo> apiInfos = actualApiInfosInColl.stream()
-                        .collect(Collectors.toMap(ApiInfo::getId, Function.identity()));
-
-                Set<ApiInfoKey> apiInfoKeysFromStis = new HashSet<>();
-                for (BasicDBObject singleTypeInfo : endpoints) {
-                    // apiinfos which are not present in the sti
-                    singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                    int apiCollectionIdFromDb = singleTypeInfo.getInt("apiCollectionId");
-                    String url = singleTypeInfo.getString("url");
-                    String method = singleTypeInfo.getString("method");
-                    ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionIdFromDb, url, Method.fromString(method));
-                    apiInfoKeysFromStis.add(apiInfoKey);
-                    if (apiInfos.get(apiInfoKey) == null) {
-                        missingApiInfoKeysInSti.add(apiInfoKey);
-                    }
-                }
-
-                Set<ApiInfoKey> sampleApisKeys = SampleDataDao.instance.findAll(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId), Projections.include(Constants.ID)).stream().map((data) -> {
-                    return new ApiInfoKey(apiCollectionId, data.getId().getUrl(), data.getId().getMethod());
-                }).collect(Collectors.toSet());
-                for (ApiInfoKey apiInfoKey : sampleApisKeys) {
-                    if (apiInfos.get(apiInfoKey) == null) {
-                        missingApiInfoKeysInSamples.add(apiInfoKey);
-                    }
-                }
-
-                for (ApiInfo apiInfo : actualApiInfosInColl) {
-                    ApiInfoKey apiInfoKey = apiInfo.getId();
-                    if (!apiInfoKeysFromStis.contains(apiInfoKey)) {
-                        redundantApiInfoKeys.add(apiInfoKey);
-                    }
-                    if (apiInfo.getAllAuthTypesFound() == null || apiInfo.getAllAuthTypesFound().isEmpty()) {
-                        missingApiInfoKeysForAuth.add(apiInfoKey);
-                    }
-                    if (apiInfo.getApiAccessTypes() == null || apiInfo.getApiAccessTypes().isEmpty()) {
-                        missingApiInfoKeysForAccessType.add(apiInfoKey);
-                    }
-                    
-                }
-
-                if(missingApiInfoKeysInSti.isEmpty() && missingApiInfoKeysInSamples.isEmpty() && missingApiInfoKeysForAuth.isEmpty() && missingApiInfoKeysForAccessType.isEmpty() && redundantApiInfoKeys.isEmpty()) {
-                    return null;
-                }
-
-                missingInfos.append("missingApiInfoKeysInSti", missingApiInfoKeysInSti);
-                missingInfos.append("missingApiInfoKeysInSamples", missingApiInfoKeysInSamples);
-                missingInfos.append("missingApiInfoKeysForAuth", missingApiInfoKeysForAuth);
-                missingInfos.append("missingApiInfoKeysForAccessType", missingApiInfoKeysForAccessType);
-                missingInfos.append("redundantApiInfoKeys", redundantApiInfoKeys);
-                result.put(apiCollectionId, missingInfos);
-                return null;
-            }));
-        }
-     
-        executor.shutdown();
-        try {
-            if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
-                executor.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-
-        return result;
     }
 
     @Override

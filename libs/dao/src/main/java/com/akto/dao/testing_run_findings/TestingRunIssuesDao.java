@@ -88,6 +88,13 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id." + TestingIssuesId.TEST_SUB_CATEGORY};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+        // Severity appears nowhere else in this index list, so a {status, severity} count (e.g.
+        // RecommendationCatalog's open-criticals tile, computed on every Ask Akto overlay open)
+        // falls back to scanning every OPEN doc past the {status} index. Small, additive,
+        // idempotent — safe to add alongside the rest of this list.
+        fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.KEY_SEVERITY};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
     }
 
     private List<Bson> getPipelineForSeverityCount(Bson filter, boolean expandApiGroups, BasicDBObject groupedId) {
@@ -119,9 +126,14 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
+        return getSeveritiesMapForCollections((Bson) null);
+    }
+
+    /** Open issues per collection (api groups expanded to their collections) narrowed by the filter, which may be null. */
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter){
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                 .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
-        return getSeveritiesMapForCollections(null, true, groupedId);
+        return getSeveritiesMapForCollections(filter, true, groupedId);
     }
 
     public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter, boolean expandApiGroups, BasicDBObject groupedId){

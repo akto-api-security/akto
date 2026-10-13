@@ -72,15 +72,12 @@ public class AuthPolicy {
             flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
         } catch (Exception e){
         }
+        Set<String> headerAndCookieKeys = CustomAuthType.normalizeKeys(headers.keySet());
+        headerAndCookieKeys.addAll(CustomAuthType.normalizeKeys(cookieMap.keySet()));
+
         for (CustomAuthType customAuthType : customAuthTypes) {
-
-            Set<String> headerAndCookieKeys = new HashSet<>();
-            headerAndCookieKeys.addAll(headers.keySet());
-            headerAndCookieKeys.addAll(cookieMap.keySet());
-
             // Find custom auth type in header and cookie
-            List<String> customAuthTypeHeaderKeys = customAuthType.getHeaderKeys();
-            if (!headerAndCookieKeys.isEmpty() && !customAuthTypeHeaderKeys.isEmpty() && headerAndCookieKeys.containsAll(customAuthTypeHeaderKeys)) {
+            if (customAuthType.hasAllHeaderKeysIn(headerAndCookieKeys)) {
                 authTypes.add(ApiInfo.AuthType.CUSTOM);
                 break;
             }
@@ -139,6 +136,8 @@ public class AuthPolicy {
         }
 
 
+        // drop empty auth type sets persisted earlier
+        allAuthTypesFound.remove(Collections.emptySet());
         allAuthTypesFound.add(authTypes);
         apiInfo.setAllAuthTypesFound(allAuthTypesFound);
 
