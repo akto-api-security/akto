@@ -20,6 +20,7 @@ import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.McpToolsSyncJobExecutor;
+import com.akto.utils.TestRoleAuthUtils;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -35,6 +36,7 @@ public class MCPScanAction extends UserAction {
     private String dashboardUrl;
     private String authKey;
     private String authValue;
+    private String testRoleHexId;
     private String apiCollectionId;
     private ApiCollection createdCollection;
 
@@ -43,6 +45,20 @@ public class MCPScanAction extends UserAction {
 
     public String initiateMCPScan() {
         try {
+
+            // Resolve auth from the test role upfront so an invalid role or failed login flow
+            // (e.g. OAuth token fetch) is reported to the user instead of failing silently in the sync job
+            Map<String, String> testRoleAuthHeaders = null;
+            if (testRoleHexId != null && !testRoleHexId.isEmpty()) {
+                try {
+                    testRoleAuthHeaders = TestRoleAuthUtils.fetchTestRoleAuthHeaders(serverUrl, testRoleHexId);
+                } catch (Exception e) {
+                    String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+                    loggerMaker.errorAndAddToDb(e, "Error resolving auth from test role for MCP scan: " + reason);
+                    addActionError("Test role authentication failed: " + reason);
+                    return Action.ERROR.toUpperCase();
+                }
+            }
 
             URL parsedUrl = new URL(serverUrl);
             // Store the full path with query params for MCP endpoint
@@ -107,7 +123,9 @@ public class MCPScanAction extends UserAction {
             try {
                 loggerMaker.info("Starting MCP sync job..");
                 Map<String, String> authHeader = new HashMap<>();
-                if(authKey != null && !authKey.isEmpty() && authValue != null && !authValue.isEmpty()) {
+                if(testRoleAuthHeaders != null) {
+                    authHeader.putAll(testRoleAuthHeaders);
+                } else if(authKey != null && !authKey.isEmpty() && authValue != null && !authValue.isEmpty()) {
                     authHeader.put(authKey, authValue);
                 } else {
                     loggerMaker.info("No authentication credentials provided");
@@ -175,5 +193,13 @@ public class MCPScanAction extends UserAction {
 
     public void setAuthValue(String authValue) {
         this.authValue = authValue;
+    }
+
+    public String getTestRoleHexId() {
+        return testRoleHexId;
+    }
+
+    public void setTestRoleHexId(String testRoleHexId) {
+        this.testRoleHexId = testRoleHexId;
     }
 }

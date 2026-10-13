@@ -1,10 +1,9 @@
 import { Box, Button, ButtonGroup, Checkbox, Divider, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
 import { DeleteMinor } from '@shopify/polaris-icons';
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import api from '../api';
 import func from "@/util/func"
-import Dropdown from '../../../components/layouts/Dropdown';
-import testingApi from '../../testing/api'
+import TestRoleDropdown from '../../../components/shared/TestRoleDropdown';
 
 const MAX_HEADERS = 5
 
@@ -16,33 +15,11 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
     const [customRequestBody, setCustomRequestBody] = useState('')
     const [useTestRole, setUseTestRole] = useState(false)
     const [testRole, setTestRole] = useState('')
-    const [testRolesArr, setTestRolesArr] = useState([])
     const [headers, setHeaders] = useState([])
     const [useCustomResponse, setUseCustomResponse] = useState(false)
     const [customResponseBody, setCustomResponseBody] = useState('')
     const [customResponseStatusCode, setCustomResponseStatusCode] = useState('200')
     const [responseHeaders, setResponseHeaders] = useState([])
-
-    const fetchTestRoles = async () => {
-        try {
-            const testRolesResponse = await testingApi.fetchTestRoles()
-            const testRoles = testRolesResponse.testRoles.map(testRole => {
-                return {
-                    "label": testRole.name,
-                    "value": testRole.hexId
-                }
-            })
-            setTestRolesArr(testRoles)
-            if (testRoles.length > 0) {
-                setTestRole(testRoles[0].value)
-            }
-        } catch (error) {
-        }
-    }
-
-    useEffect(() => {
-        fetchTestRoles()
-    }, [])
 
     function updateHeaderRow(setList, index, field, val) {
         setList(prev => {
@@ -102,7 +79,7 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             setCustomRequestBody('')
             setUseCustomRequestBody(false)
             setUseTestRole(false)
-            setTestRole(testRolesArr[0]?.value || '')
+            setTestRole('')
             setHeaders([])
             setUseCustomResponse(false)
             setCustomResponseBody('')
@@ -166,12 +143,11 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                     onChange={setUseTestRole}
                 />
 
-                {useTestRole && testRolesArr.length > 0 && (
-                    <Dropdown
-                        label="Test Role"
-                        menuItems={testRolesArr}
-                        initial={testRole}
-                        selected={setTestRole}
+                {useTestRole && (
+                    <TestRoleDropdown
+                        selectedRole={testRole}
+                        setSelectedRole={setTestRole}
+                        selectFirstByDefault={true}
                     />
                 )}
 

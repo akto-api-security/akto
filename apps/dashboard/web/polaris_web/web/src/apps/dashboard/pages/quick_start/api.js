@@ -195,11 +195,11 @@ const api = {
         })
     },
 
-    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl) {
+    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl, testRoleHexId) {
         return request({
             url: '/api/initiateMCPScan',
             method: 'post',
-            data: {serverUrl, authKey, authValue, dashboardUrl}
+            data: {serverUrl, authKey, authValue, dashboardUrl, testRoleHexId}
         })
     },
 
