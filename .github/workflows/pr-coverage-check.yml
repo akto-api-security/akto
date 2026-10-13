@@ -30,6 +30,39 @@ jobs:
       - name: Run tests with coverage (mini-testing + mini-runtime + deps)
         run: mvn -B package -pl apps/mini-testing,apps/mini-runtime -am
 
+      # Files left out of the coverage check: thin plumbing (data actors, DB layer, index setup)
+      # that unit tests cannot reach without a live database or abstractor. Their entries are
+      # dropped from the JaCoCo reports, so they count toward neither changed-lines nor overall
+      # coverage. Listed as package path -> source file names.
+      - name: Exclude files from coverage check
+        run: |
+          python3 - <<'EOF'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          EXCLUDED = {
+              "com/akto/data_actor": {"DataActor.java", "ClientActor.java", "DbActor.java", "DbLayer.java"},
+              "com/akto": {"DaoInit.java"},
+          }
+
+          for path in glob.glob("apps/*/target/site/jacoco/jacoco.xml") + glob.glob("libs/*/target/site/jacoco/jacoco.xml"):
+              tree = ET.parse(path)
+              removed = []
+              for package in tree.getroot().iter("package"):
+                  names = EXCLUDED.get(package.get("name"))
+                  if not names:
+                      continue
+                  for child in list(package):
+                      source = child.get("sourcefilename") if child.tag == "class" else child.get("name") if child.tag == "sourcefile" else None
+                      if source in names:
+                          package.remove(child)
+                          if child.tag == "sourcefile":
+                              removed.append(package.get("name") + "/" + source)
+              if removed:
+                  tree.write(path, encoding="UTF-8", xml_declaration=True)
+                  print(f"{path}: excluded {', '.join(sorted(removed))}")
+          EOF
+
       # Pinned to an unreleased main commit, not a tagged release: v1.8.0's
       # "coverage-changed-files" output is actually whole-file coverage (including
       # all pre-existing untested code in any file you touch), not real diff coverage.
