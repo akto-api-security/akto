@@ -3,6 +3,7 @@ package com.akto.util.trpc;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -520,30 +521,14 @@ public final class TrpcUtils {
     }
 
     private static boolean isJsonContentTypeOrAbsent(Map<String, List<String>> headers) {
-        List<String> contentTypes = findHeaderValues(headers, "content-type");
-        return contentTypes.isEmpty() || contentTypes.get(0).toLowerCase().contains("json");
+        String contentType = HttpRequestResponseUtils.getHeaderValue(headers, "content-type");
+        return contentType == null || contentType.toLowerCase().contains("json");
     }
 
     /** True when the request asks for a streamed response (tRPC v11 `trpc-accept: application/jsonl`). */
     private static boolean requestsJsonlStream(Map<String, List<String>> requestHeaders) {
-        for (String value : findHeaderValues(requestHeaders, "trpc-accept")) {
-            if (value != null && value.toLowerCase().contains("jsonl")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static List<String> findHeaderValues(Map<String, List<String>> headers, String headerName) {
-        if (headers == null) {
-            return Collections.emptyList();
-        }
-        for (Map.Entry<String, List<String>> header : headers.entrySet()) {
-            if (header.getKey() != null && header.getKey().equalsIgnoreCase(headerName) && header.getValue() != null) {
-                return header.getValue();
-            }
-        }
-        return Collections.emptyList();
+        String trpcAccept = HttpRequestResponseUtils.getHeaderValue(requestHeaders, "trpc-accept");
+        return trpcAccept != null && trpcAccept.toLowerCase().contains("jsonl");
     }
 
     private static Map<String, List<String>> copyHeadersExcept(Map<String, List<String>> headers, Set<String> namesToRemove) {
