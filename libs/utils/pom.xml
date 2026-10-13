@@ -15,6 +15,21 @@
     <packaging>jar</packaging>
 
     <dependencies>
+        <!-- Endpoint CA (com.akto.ca.CertificateAuthority): X.509 issuance for the
+             per-device intermediate CAs. The JDK has no public API for building a
+             certificate, so bcpkix is required rather than preferred. "jdk18on" is
+             BouncyCastle's name for the JDK 1.8-and-later build, which matches this
+             project's 1.8 compiler target. -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.78.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.78.1</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
             <groupId>com.mixpanel</groupId>

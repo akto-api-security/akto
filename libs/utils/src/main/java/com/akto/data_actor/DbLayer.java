@@ -723,6 +723,81 @@ public class DbLayer {
         return DeviceDomainConfigDao.instance.findOne(Filters.eq("_id", deviceId));
     }
 
+    // ---------------------------------------------------------------------------
+    // Endpoint CA — the two-tier PKI behind mitmproxy's TLS interception.
+    // One root per account signs a per-device intermediate; the device keeps its own
+    // private key and only ever sends a CSR. See com.akto.ca.CertificateAuthority.
+    // ---------------------------------------------------------------------------
+
+    public static EndpointCaRoot fetchEndpointCaRoot(int accountId) {
+        return EndpointCaRootDao.instance.findOne(Filters.eq("_id", accountId));
+    }
+
+    /**
+     * Returns the account's root, creating it on first use.
+     *
+     * Uses an upsert that only sets fields on insert, so two devices enrolling at the same
+     * moment cannot end up with different roots: whichever write lands second is a no-op
+     * and both read back the same certificate. Generating the root before the race means a
+     * discarded keypair in the loser's case, which costs nothing — the alternative, locking
+     * around generation, would hold a lock across an RSA-4096 keygen.
+     */
+    public static EndpointCaRoot fetchOrCreateEndpointCaRoot(int accountId) throws Exception {
+        EndpointCaRoot existing = fetchEndpointCaRoot(accountId);
+        if (existing != null) {
+            return existing;
+        }
+
+        com.akto.ca.CertificateAuthority.GeneratedRoot generated =
+                com.akto.ca.CertificateAuthority.generateRoot(accountId);
+
+        EndpointCaRootDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", accountId),
+                Updates.combine(
+                        Updates.setOnInsert(EndpointCaRoot.CERT_PEM, generated.certPem),
+                        Updates.setOnInsert(EndpointCaRoot.PRIVATE_KEY_PEM, generated.privateKeyPem),
+                        Updates.setOnInsert(EndpointCaRoot.FINGERPRINT_SHA256, generated.fingerprintSha256),
+                        Updates.setOnInsert(EndpointCaRoot.SUBJECT, generated.subject),
+                        Updates.setOnInsert(EndpointCaRoot.NOT_AFTER, generated.notAfterEpoch),
+                        Updates.setOnInsert(EndpointCaRoot.CREATED_AT, Context.now())),
+                new com.mongodb.client.model.UpdateOptions().upsert(true));
+
+        return fetchEndpointCaRoot(accountId);
+    }
+
+    public static void insertEndpointDeviceCa(EndpointDeviceCa deviceCa) {
+        EndpointDeviceCaDao.instance.insertOne(deviceCa);
+    }
+
+    /** Most recent issuance for a device, used to answer renewal and status queries. */
+    public static EndpointDeviceCa fetchLatestEndpointDeviceCa(String deviceId) {
+        List<EndpointDeviceCa> rows = EndpointDeviceCaDao.instance.findAll(
+                Filters.eq(EndpointDeviceCa.DEVICE_ID, deviceId),
+                0, 1,
+                com.mongodb.client.model.Sorts.descending(EndpointDeviceCa.ISSUED_AT));
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /**
+     * Issuances for a device since an epoch second. Backs the per-device quota — this
+     * endpoint mints CAs, so an unbounded caller is the difference between "one device was
+     * compromised" and "the attacker has as many fleet-trusted CAs as they want".
+     */
+    public static long countEndpointDeviceCaIssuedSince(String deviceId, int sinceEpoch) {
+        return EndpointDeviceCaDao.instance.count(
+                Filters.and(
+                        Filters.eq(EndpointDeviceCa.DEVICE_ID, deviceId),
+                        Filters.gte(EndpointDeviceCa.ISSUED_AT, sinceEpoch)));
+    }
+
+    public static void revokeEndpointDeviceCa(String serial) {
+        EndpointDeviceCaDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", serial),
+                Updates.combine(
+                        Updates.set(EndpointDeviceCa.STATUS, EndpointDeviceCa.STATUS_REVOKED),
+                        Updates.set(EndpointDeviceCa.REVOKED_AT, Context.now())));
+    }
+
     public static void updateAccountDomainsDelta(String domainKey, List<String> toAdd, List<String> toRemove) {
         Bson filter = AccountSettingsDao.generateFilter();
         if (toAdd != null && !toAdd.isEmpty()) {

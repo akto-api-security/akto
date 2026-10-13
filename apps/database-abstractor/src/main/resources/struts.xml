@@ -2688,6 +2688,50 @@
             </result>
         </action>
 
+        <!-- Endpoint CA: signs a per-device intermediate under the account's root so the
+             agent can intercept TLS with a certificate MDM already made the fleet trust.
+             includeProperties is an allowlist here rather than a convenience — the root's
+             private key is reachable from the action's object graph via DbLayer, and a
+             broader pattern would serialise it to the device. -->
+        <action name="api/signEndpointDeviceCa" class="com.akto.action.EndpointCaAction" method="signDeviceCa">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^intermediatePem$,^rootPem$,^rootFingerprintSha256$,^issuedSerial$,^notAfter$,^permittedDomains.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointCaRoot" class="com.akto.action.EndpointCaAction" method="fetchEndpointCaRoot">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^rootPem$,^rootFingerprintSha256$,^notAfter$</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/revokeEndpointDeviceCa" class="com.akto.action.EndpointCaAction" method="revokeEndpointDeviceCa">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^issuedSerial$</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchGuardrailPolicies" class="com.akto.action.GuardrailPoliciesAction" method="fetchGuardrailPolicies">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
