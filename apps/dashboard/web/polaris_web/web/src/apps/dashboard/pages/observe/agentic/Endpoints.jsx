@@ -40,7 +40,6 @@ const pluginDiscoveredHeader = {
 // Status deliberately not shown here — a plugin row rolls up one collection per device, so a
 // single blended value would misrepresent devices that disagree; see the Devices page instead.
 const pluginMetadataHeaders = [
-    { title: 'Scope', text: 'Scope', value: 'pluginScope', boxWidth: '80px' },
     { title: 'Marketplace', text: 'Marketplace', value: 'pluginMarketplace', boxWidth: '160px' },
 ];
 
@@ -139,7 +138,6 @@ function shapeRow(row, { skillScoreMap = {} } = {}) {
             </Box>
         ),
         pluginVersion: row.pluginVersion || "-",
-        pluginScope: row.pluginScope || "-",
         pluginMarketplace: row.pluginMarketplace || "-",
         // Already formatted server-side (McpClientRegistry.formatDisplayName) — e.g. "Claude", not
         // the raw "claude"/"claudecli" tag value.

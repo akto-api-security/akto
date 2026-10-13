@@ -128,7 +128,6 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
         if (asset.type !== "Plugin") return null;
         return [
             { label: "Version",     value: asset.pluginVersion },
-            { label: "Scope",       value: asset.pluginScope },
             { label: "Marketplace", value: asset.pluginMarketplace },
             { label: "AI Agent",    value: asset.pluginParentAgent },
         ];

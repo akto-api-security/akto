@@ -40,11 +40,15 @@ const PLUGIN_STATUS_HEADER = {
     title: "Status", text: "Status", value: "pluginStatusComp", textValue: "pluginStatus", boxWidth: "90px",
 };
 
+const PLUGIN_SCOPE_HEADER = {
+    title: "Scope", text: "Scope", value: "pluginScopeComp", textValue: "pluginScope", boxWidth: "90px",
+};
+
 const getParentHeaders = (rowType) => [
     { title: "", text: "", value: "collapsibleIcon", type: CellType.COLLAPSIBLE, boxWidth: "32px" },
     { title: "Endpoint ID", text: "Endpoint ID", value: "displayNameComp", textValue: "endpointId" },
     { title: "Username", text: "Username", value: "usernameComp", textValue: "username", boxWidth: "100px" },
-    ...(rowType === "plugin" ? [PLUGIN_STATUS_HEADER] : []),
+    ...(rowType === "plugin" ? [PLUGIN_STATUS_HEADER, PLUGIN_SCOPE_HEADER] : []),
     {
         title: <HeadingWithTooltip content={<Text variant="bodySm">Risk score of this device is the maximum risk score across its own collections</Text>} title="Risk score" />,
         text: "Risk score", value: "riskScoreComp", textValue: "riskScore", numericValue: "riskScore",
@@ -187,6 +191,7 @@ function ChildrenTable({ children, rowType, misconfiguredChildId, onOpenBundle }
                             {isPluginEnabled(child.pluginStatus) ? "enabled" : "disabled"}
                         </Badge>
                     )}
+                    {rowType === "plugin" && child.pluginScope && <Badge size="small">{child.pluginScope}</Badge>}
                     {(child.skillCount || 0) > 0 && (
                         <Badge size="small" status="info">{`${child.skillCount} ${child.skillCount === 1 ? "skill" : "skills"}`}</Badge>
                     )}
@@ -342,6 +347,7 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
                 {isPluginEnabled(row.pluginStatus) ? "enabled" : "disabled"}
             </Badge>
         ) : "-",
+        pluginScopeComp: rowType === "plugin" ? (row.pluginScope || "-") : "-",
         riskScoreComp: transform.wrapRiskScoreTooltip(
             <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
             riskScore, row.baseRiskScore, row.baseRiskScoreReason

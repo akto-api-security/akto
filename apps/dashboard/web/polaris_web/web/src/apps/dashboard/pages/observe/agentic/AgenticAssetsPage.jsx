@@ -161,7 +161,6 @@ const COL_DEFS = [
   // single blended value would misrepresent devices that disagree; see the flyout's Devices tab for
   // the real per-device breakdown instead.
   { field: "pluginVersion", headerName: "Plugin Version", width: 130, hide: true, filter: false, sortable: false },
-  { field: "pluginScope", headerName: "Plugin Scope", width: 120, hide: true, filter: false, sortable: false },
   { field: "pluginMarketplace", headerName: "Marketplace", width: 170, hide: true, filter: false, sortable: false },
   {
     field: "severity",

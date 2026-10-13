@@ -39,8 +39,15 @@ const PLUGIN_STATUS_COL_DEF = {
     ),
 };
 
+const PLUGIN_SCOPE_COL_DEF = {
+    field: "pluginScope", headerName: "Plugin Scope", width: 130,
+    suppressHeaderMenuButton: true, suppressHeaderFilterButton: true,
+    cellStyle: { display: "flex", alignItems: "center" },
+    valueFormatter: p => p.value || "-",
+};
+
 const getDevicesColDefs = (assetType) =>
-    assetType === "Plugin" ? [...DEVICES_BASE_COL_DEFS, PLUGIN_STATUS_COL_DEF] : DEVICES_BASE_COL_DEFS;
+    assetType === "Plugin" ? [...DEVICES_BASE_COL_DEFS, PLUGIN_STATUS_COL_DEF, PLUGIN_SCOPE_COL_DEF] : DEVICES_BASE_COL_DEFS;
 
 const GRID_DEFAULT_COL = { sortable: true, resizable: true, filter: false };
 
