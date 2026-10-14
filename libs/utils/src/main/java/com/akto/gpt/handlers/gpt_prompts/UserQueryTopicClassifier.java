@@ -24,6 +24,12 @@ public class UserQueryTopicClassifier extends AzureOpenAIPromptHandler {
     @Override
     protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
 
+    // Azure's token rate limit is charged the prompt plus the requested max tokens at request time,
+    // not what is generated, so the 10,000 default would count ~10k tokens per call against the
+    // deployment's limit. A batch of 10 needs ~760 output tokens (measured), so 3000 leaves ample room.
+    @Override
+    protected int getMaxTokens() { return 3000; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }

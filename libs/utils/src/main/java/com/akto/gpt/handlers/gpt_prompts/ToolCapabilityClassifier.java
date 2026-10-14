@@ -36,8 +36,10 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
         catch (Exception e) { return null; }
     }
 
+    // The verdict is ~25 tokens (measured); 300 keeps a stray reasoning burst from returning empty
+    // content, which the cron would otherwise retry on every run.
     @Override
-    protected int getMaxTokens() { return 60; }
+    protected int getMaxTokens() { return 300; }
 
     @Override
     protected double getTemperature() { return 0.0; }

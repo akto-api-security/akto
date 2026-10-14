@@ -41,7 +41,8 @@ public class GuardrailSuggestionClassifier extends AzureOpenAIPromptHandler {
     @Override
     // Each denied topic costs ~100 output tokens (name, description, sample phrases); a live run with
     // 3 topics used 324 of the old 400-token cap, so anything beyond ~3 topics was cut off mid-JSON.
-    protected int getMaxTokens() { return 1200; }
+    // 10 topics measured ~780 tokens; the 2000-char input cap allows ~20 topics, so 2000 covers it.
+    protected int getMaxTokens() { return 2000; }
 
     @Override
     protected double getTemperature() { return 0.0; }

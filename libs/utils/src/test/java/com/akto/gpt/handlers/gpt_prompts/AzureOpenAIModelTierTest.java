@@ -73,12 +73,24 @@ class AzureOpenAIModelTierTest {
     @Test
     void nano_sendsEachHandlersOwnCapAsMaxCompletionTokens() throws Exception {
         // No reasoning allowance is added: to give a handler more room, raise its getMaxTokens().
-        assertEquals(60, new ToolCapabilityClassifier().buildPayload("x").getInt("max_completion_tokens"));
+        assertEquals(300, new ToolCapabilityClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(300, new AgentDomainClassifier().buildPayload("x").getInt("max_completion_tokens"));
-        assertEquals(1200, new GuardrailSuggestionClassifier().buildPayload("x").getInt("max_completion_tokens"));
+        assertEquals(2000, new GuardrailSuggestionClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(600, new ConversationContinuityClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(4000, new InsightNarrativeHandler().buildPayload("x").getInt("max_completion_tokens"));
-        assertEquals(PromptHandler.max_tokens, new UserQueryTopicClassifier().buildPayload("x").getInt("max_completion_tokens"));
+        assertEquals(3000, new UserQueryTopicClassifier().buildPayload("x").getInt("max_completion_tokens"));
+    }
+
+    @Test
+    void nanoCaps_leaveRoomForTheMeasuredOutputs() {
+        // Measured on gpt-5-nano at minimal effort: verdict ~25 tokens, 11-domain ON/OFF map ~93,
+        // 10 denied topics ~780, a batch of 10 topic labels ~760. Keep every cap well above these.
+        assertTrue(new ToolCapabilityClassifier().getMaxTokens() >= 10 * 25);
+        assertTrue(new AgentDomainClassifier().getMaxTokens() >= 3 * 93);
+        assertTrue(new GuardrailSuggestionClassifier().getMaxTokens() >= 2 * 780);
+        assertTrue(new UserQueryTopicClassifier().getMaxTokens() >= 3 * 760);
+        // and the topic classifier must not fall back to the 10,000 default that Azure charges per call
+        assertTrue(new UserQueryTopicClassifier().getMaxTokens() < PromptHandler.max_tokens);
     }
 
     @Test
