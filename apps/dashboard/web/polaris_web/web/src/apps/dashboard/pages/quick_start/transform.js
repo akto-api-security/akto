@@ -1608,6 +1608,47 @@ const hermesHookObj = {
     />
 }
 
+// Personal AI agents (Coming Soon)
+const openaiDotsObj = {
+    icon: '/public/openai.svg',
+    label: "OpenAI Dots (Coming Soon)",
+    text: "Discover OpenAI Dots on employee endpoints and flag personal accounts.",
+    key: "OPENAI_DOTS_AGENT",
+    component: <BannerComponent
+        content="Discover OpenAI Dots on employee endpoints and flag personal accounts."
+    />
+}
+
+const grokBotObj = {
+    icon: '/public/grok.svg',
+    label: "xAI Grok Bot (Coming Soon)",
+    text: "Discover xAI Grok Bot on employee endpoints and flag personal accounts.",
+    key: "XAI_GROK_BOT_AGENT",
+    component: <BannerComponent
+        content="Discover xAI Grok Bot on employee endpoints and flag personal accounts."
+    />
+}
+
+const metaMuseObj = {
+    icon: '/public/meta.svg',
+    label: "Meta Muse (Coming Soon)",
+    text: "Discover Meta Muse on employee endpoints and flag personal accounts.",
+    key: "META_MUSE_AGENT",
+    component: <BannerComponent
+        content="Discover Meta Muse on employee endpoints and flag personal accounts."
+    />
+}
+
+const instinctObj = {
+    icon: '/public/instinct.svg',
+    label: "Instinct (Coming Soon)",
+    text: "Discover Instinct on employee endpoints and flag personal accounts.",
+    key: "INSTINCT_AGENT",
+    component: <BannerComponent
+        content="Discover Instinct on employee endpoints and flag personal accounts."
+    />
+}
+
 const ENDPOINTS_DISCOVERY_AGENTS_DOCS_URL =
     'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents'
 
@@ -2463,6 +2504,10 @@ const quickStartFunc = {
                 openaiImportObj, chatgptIdeObj, codexHookObj,
             ]
 
+            const personalAiAgents = [
+                openaiDotsObj, grokBotObj, metaMuseObj, instinctObj,
+            ]
+
             const microsoftConnectors = [
                 m365CopilotObj, copilotStudioImportObj, copilotStudioMultiEnvImportObj,
             ]
@@ -2473,6 +2518,7 @@ const quickStartFunc = {
                 "Endpoint Management": endpointManagement,
                 "MDM Tools": mdmTools,
                 "Agentic Proxies": [...agenticProxies, litellmAtlasObj],
+                "Personal AI Agents": personalAiAgents,
                 "Claude Suite": anthropicConnectors,
                 "ChatGPT Suite": openaiConnectors,
                 "Microsoft Suite": microsoftConnectors,
