@@ -21,6 +21,8 @@ public class McpAuditInfo {
     public static final String UPDATED_TIMESTAMP = "updatedTimestamp";
     public static final String RESOURCE_NAME = "resourceName";
     public static final String REMARKS = "remarks";
+    public static final String REMARKS_REJECTED = "Rejected";
+    public static final String REMARKS_APPROVED = "Approved";
     public static final String API_ACCESS_TYPES = "apiAccessTypes";
     public static final String HOST_COLLECTION_ID = "hostCollectionId";
     public static final String MCP_HOST = "mcpHost";

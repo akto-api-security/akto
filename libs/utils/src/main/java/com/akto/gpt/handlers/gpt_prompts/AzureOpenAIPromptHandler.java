@@ -10,6 +10,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
+import org.json.JSONObject;
 
 import okhttp3.OkHttpClient;
 
@@ -76,10 +77,23 @@ public abstract class AzureOpenAIPromptHandler {
 
     protected abstract String getPrompt(BasicDBObject queryData);
 
+    protected int getMaxTokens() {
+        return PromptHandler.max_tokens;
+    }
+
+    protected double getTemperature() {
+        return PromptHandler.temperature;
+    }
+
+    /** Override to request a specific response_format (e.g. json_object). Null = default (unset). */
+    protected JSONObject getResponseFormat() {
+        return null;
+    }
+
     protected String call(String prompt) throws Exception {
         Model model = resolveModel();
         logger.info("call: resolved model=" + (model != null ? model.getName() + "/" + model.getType() : "null (env var fallback)"));
-        String content = LLMProviderClient.callLLM(model, prompt, client);
+        String content = LLMProviderClient.callLLM(model, prompt, client, getMaxTokens(), getTemperature(), getResponseFormat());
         logger.info("call: raw content length=" + (content != null ? content.length() : 0));
         String cleaned = content != null ? cleanJSON(content) : null;
         logger.info("call: cleaned response length=" + (cleaned != null ? cleaned.length() : 0));

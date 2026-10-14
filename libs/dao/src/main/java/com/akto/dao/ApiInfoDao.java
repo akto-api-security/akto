@@ -18,6 +18,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
@@ -103,6 +105,17 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
             new String[] {ApiInfo.PARENT_MCP_TOOL_NAMES }, false);
+
+        // Partial: only classified tool rows are indexed, so the Argus posture tile's capability
+        // counts walk an index sized by tools rather than by every api_info document.
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            Indexes.ascending(ApiInfo.TOOL_INFO_CAPABILITY),
+            new IndexOptions()
+                .name("capability_1_partial_exists")
+                .partialFilterExpression(Filters.exists(ApiInfo.TOOL_INFO_CAPABILITY, true)));
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] {ApiInfo.TOOL_INFO_CALCULATED_AT }, true);
     }
     
 
