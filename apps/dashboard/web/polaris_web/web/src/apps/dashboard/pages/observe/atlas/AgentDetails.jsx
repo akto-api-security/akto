@@ -9,7 +9,7 @@ import func from "@/util/func"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
-import { DEFAULT_VALUE, isExtensionAgent, isInstallFailed, installIdToEpoch, getDeploymentAttempt } from "../api_collections/endpointShieldHelper";
+import { DEFAULT_VALUE, isExtensionAgent, hasFailedDeployment, installIdToEpoch, getDeploymentAttempt } from "../api_collections/endpointShieldHelper";
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
 import DetailGrid from "../agentic/DetailGrid";
@@ -770,7 +770,7 @@ function AgentDetails({
     // installOutcome is the installer's verdict for the latest attempt and is never
     // overwritten by the agent — so a failed deploy still shows when an older agent
     // keeps running (e.g. a corrupt pkg left the previous install in place).
-    const installFailureBanner = (isInstallFailed(selectedAgent?.installStatus) || selectedAgent?.installOutcome === 'failed') ? (() => {
+    const installFailureBanner = hasFailedDeployment(selectedAgent) ? (() => {
         // Kept to what a reader acts on: what failed, the specific causes, and
         // when. The exit code and install-run id stay in the logs ("View error
         // logs"), where they are used to correlate a run.

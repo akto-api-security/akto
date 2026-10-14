@@ -106,12 +106,29 @@ public class ModuleInfoAction extends UserAction {
     // Computed into additionalData like currentStatus, so it can be sorted on and the UI can
     // read it without a model change.
     private static final String AD_LAST_DEPLOYED_TS = ModuleInfo.ADDITIONAL_DATA + ".lastDeployedTs";
+    private static final String AD_INSTALL_STARTED_TS = ModuleInfo.ADDITIONAL_DATA + ".installStartedTs";
+    private static final String AD_INSTALL_OUTCOME = ModuleInfo.ADDITIONAL_DATA + ".installOutcome";
 
     private Bson buildEndpointShieldFilter() {
         List<Bson> f = new ArrayList<>();
         f.add(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD.toString()));
-        if (startTimestamp > 0) f.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, startTimestamp));
-        if (endTimestamp > 0) f.add(Filters.lte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, endTimestamp));
+        // A failed install never heartbeats, so matching the window on lastHeartbeatReceived
+        // alone dropped exactly the docs this page's install banner, row icon and
+        // "Install failed" filter are about — they worked only on "All time". A deployment
+        // started inside the window counts as activity in it too.
+        List<Bson> heartbeatInWindow = new ArrayList<>();
+        List<Bson> deployedInWindow = new ArrayList<>();
+        if (startTimestamp > 0) {
+            heartbeatInWindow.add(Filters.gte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, startTimestamp));
+            deployedInWindow.add(Filters.gte(AD_INSTALL_STARTED_TS, startTimestamp));
+        }
+        if (endTimestamp > 0) {
+            heartbeatInWindow.add(Filters.lte(ModuleInfo.LAST_HEARTBEAT_RECEIVED, endTimestamp));
+            deployedInWindow.add(Filters.lte(AD_INSTALL_STARTED_TS, endTimestamp));
+        }
+        if (!heartbeatInWindow.isEmpty()) {
+            f.add(Filters.or(Filters.and(heartbeatInWindow), Filters.and(deployedInWindow)));
+        }
         if (hostnames != null && !hostnames.isEmpty()) f.add(Filters.in(ModuleInfo.NAME, hostnames));
         if (usernames != null && !usernames.isEmpty()) f.add(Filters.in(AD_USERNAME, usernames));
         if (deviceIds != null && !deviceIds.isEmpty()) f.add(Filters.in(AD_DEVICE_ID, deviceIds));
@@ -177,7 +194,7 @@ public class ModuleInfoAction extends UserAction {
     private static final String DEDUP_TS_FIELD = "_dedupDeployedTs";
 
     private static Document endpointShieldLastDeployedExpr() {
-        String installStarted = "$" + ModuleInfo.ADDITIONAL_DATA + ".installStartedTs";
+        String installStarted = "$" + AD_INSTALL_STARTED_TS;
         return new Document("$cond", Arrays.asList(
                 new Document("$gt", Arrays.asList(new Document("$ifNull", Arrays.asList(installStarted, 0)), 0)),
                 installStarted,
@@ -186,6 +203,7 @@ public class ModuleInfoAction extends UserAction {
 
     private static Document endpointShieldCurrentStatusExpr(int now) {
         String installStatus = "$" + ModuleInfo.ADDITIONAL_DATA + ".installStatus";
+        String installOutcome = "$" + AD_INSTALL_OUTCOME;
         return new Document("$switch", new Document()
                 .append("branches", Arrays.asList(
                         // postinstall is in progress too, and verify-failed (the standalone
@@ -193,7 +211,16 @@ public class ModuleInfoAction extends UserAction {
                         // heartbeat-based statuses.
                         new Document("case", new Document("$in", Arrays.asList(installStatus, INSTALL_IN_PROGRESS_STATUSES)))
                                 .append("then", "installing"),
-                        new Document("case", new Document("$in", Arrays.asList(installStatus, INSTALL_FAILED_STATUSES)))
+                        // installOutcome is the installer's verdict for the LATEST attempt and
+                        // the agent never overwrites it, so a deploy that failed still reads as
+                        // failed once an older agent heartbeats again. It is the latest value
+                        // that counts: a later attempt that recovers or rolls back successfully
+                        // is expected to write its own outcome/version, which then wins here.
+                        // The in-progress branch above keeps a running attempt ahead of the
+                        // previous attempt's verdict.
+                        new Document("case", new Document("$or", Arrays.asList(
+                                new Document("$in", Arrays.asList(installStatus, INSTALL_FAILED_STATUSES)),
+                                new Document("$eq", Arrays.asList(installOutcome, "failed")))))
                                 .append("then", "install_failed"),
                         new Document("case", new Document("$eq", Arrays.asList("$" + ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)))
                                 .append("then", STATUS_FAILED),
@@ -275,12 +302,17 @@ public class ModuleInfoAction extends UserAction {
         if (statuses != null && !statuses.isEmpty()) {
             List<Bson> countPipeline = new ArrayList<>(pipeline.subList(0, pipeline.size() - 3));
             countPipeline.add(Aggregates.count("total"));
-            Document statusCount = ModuleInfoDao.instance.getMCollection().aggregate(countPipeline, Document.class).first();
+            Document statusCount = ModuleInfoDao.instance.getMCollection()
+                    .aggregate(countPipeline, Document.class).allowDiskUse(true).first();
             total = statusCount == null ? 0 : ((Number) statusCount.get("total")).longValue();
         }
 
         moduleInfos = new ArrayList<>();
-        MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, ModuleInfo.class).cursor();
+        // The dedup sorts on a computed deployment timestamp, so the planner cannot serve it
+        // from the {moduleType, lastHeartbeatReceived} index and sorts the matched docs in
+        // memory. Spilling beats failing at the 100MB sort limit on a large fleet.
+        MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection()
+                .aggregate(pipeline, ModuleInfo.class).allowDiskUse(true).cursor();
         while (cursor.hasNext()) {
             moduleInfos.add(cursor.next());
         }

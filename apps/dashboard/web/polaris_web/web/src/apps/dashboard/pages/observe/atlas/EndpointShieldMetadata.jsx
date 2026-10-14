@@ -140,6 +140,10 @@ const getOsOrBrowserComp = (agentData) => {
 // active (<2h), inactive (<24h), error (stale >24h), failed (never heartbeat). Rendering
 // straight off it, rather than re-deriving installing/failed from installStatus here, is
 // what keeps the icon, the Status filter and STATUS_LABELS describing the same device.
+// install_failed covers installOutcome === 'failed' as well, which is what the panel's
+// banner reads, so a device whose agent came up after a failed deploy carries the failure
+// in both places until an attempt that succeeds (or rolls back cleanly) writes a new
+// outcome.
 const CURRENT_STATUS_COMP_MAP = {
     installing: { icon: RefreshMinor, color: "warning", tooltip: "Installation in progress" },
     // Short, like the other status tooltips: the full reason is long enough to span the

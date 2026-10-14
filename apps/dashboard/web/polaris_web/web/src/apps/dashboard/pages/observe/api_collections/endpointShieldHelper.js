@@ -260,6 +260,14 @@ const INSTALL_FAILED_STATUSES = ['failed', 'verify-failed'];
 const isInstallFailed = (installStatus) =>
     typeof installStatus === 'string' && INSTALL_FAILED_STATUSES.includes(installStatus);
 
+// Mirrors the install_failed branch of ModuleInfoAction.endpointShieldCurrentStatusExpr,
+// so the panel's banner and the row's status icon answer the same question. installOutcome
+// is the installer's verdict for the latest attempt — the agent never overwrites it, so a
+// failed deploy still reads as failed once an older agent heartbeats again; a later attempt
+// that recovers or rolls back writes its own outcome and that one wins.
+const hasFailedDeployment = (agent) =>
+    isInstallFailed(agent?.installStatus) || agent?.installOutcome === 'failed';
+
 // installId is "yyyyMMddTHHmmssZ-<suffix>" (UTC) → epoch seconds, or null.
 const installIdToEpoch = (installId) => {
     const m = typeof installId === 'string' && installId.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/);
@@ -296,7 +304,7 @@ export {
     INSTALL_STALE_SECONDS,
     getDeploymentAttempt,
     INSTALL_FAILED_STATUSES,
-    isInstallFailed,
+    hasFailedDeployment,
     installIdToEpoch,
     fetchEndpointShieldUsernameMap,
     fetchEndpointShieldUserMetadata,
