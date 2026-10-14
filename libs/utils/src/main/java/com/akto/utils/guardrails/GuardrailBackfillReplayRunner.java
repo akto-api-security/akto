@@ -55,6 +55,18 @@ public final class GuardrailBackfillReplayRunner {
     private static final int AKAMAI_ACCOUNT_ID = 1783401773;
     private static final String AKAMAI_PATH = "/llm/chat/completions";
     private static final String AKAMAI_HOST = "mcp-gateway-kong-proxy.mcp-gateway.svc.cluster.local:8000";
+    /** Client addresses seen on this account's live guardrail events. A row has no source IP,
+     *  so one of these is chosen from its id and reused for actor, latestApiIp, and the envelope. */
+    private static final String[] AKAMAI_SOURCE_IPS = {
+        "10.2.6.109",
+        "10.2.23.78",
+        "10.2.25.226",
+        "10.2.6.37",
+        "10.2.23.90",
+        "10.2.24.4",
+        "10.2.25.183"
+    };
+    private static final String GUARDRAIL_RESPONSE_MESSAGE = "This has been reported by Akto";
 
     private GuardrailBackfillReplayRunner() {
     }
@@ -106,7 +118,6 @@ public final class GuardrailBackfillReplayRunner {
         TrafficShape shape = trafficShape(accountId);
         List<BasicDBObject> items = new ArrayList<>();
         Map<String, Map<String, Object>> rowById = new HashMap<>();
-        Map<String, String> envelopeById = new HashMap<>();
         for (Map<String, Object> row : batch) {
             String prompt = asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD));
             if (StringUtils.isBlank(prompt)) {
@@ -125,7 +136,6 @@ public final class GuardrailBackfillReplayRunner {
                 shape.method, shape.path, shape.host);
             items.add(new BasicDBObject("id", id).append("envelope", envelope));
             rowById.put(id, row);
-            envelopeById.put(id, envelope);
         }
 
         // Computed even when replay/record below throws, so a caller that wants to log progress
@@ -149,9 +159,8 @@ public final class GuardrailBackfillReplayRunner {
                     detected++;
                     String id = verdict.path("id").asText("");
                     Map<String, Object> row = rowById.get(id);
-                    String envelope = envelopeById.get(id);
-                    if (row != null && envelope != null) {
-                        recordDetection(accountId, policyName, contextSourceForEvents, row, envelope, shape, verdict, bearerToken);
+                    if (row != null) {
+                        recordDetection(accountId, policyName, contextSourceForEvents, row, shape, verdict, bearerToken);
                     }
                 }
             }
@@ -161,15 +170,12 @@ public final class GuardrailBackfillReplayRunner {
     }
 
     /** Builds and sends the record_malicious_event call for one detected row, backdated to the
-     *  row's own traffic timestamp rather than "now". Actor and session come from the stored row.
-     *  Method, path, and host come from {@code shape}: the account override when one exists,
-     *  otherwise the synthetic line the envelope was evaluated under. The source IP is not on the
-     *  row, so latestApiIp is left unset. Category, subCategory, and severity come from the
-     *  verdict only — it must have been requested with includeDetectionDetails=true or those
-     *  fields come back empty. Collection id is the detection timestamp, matching live guardrail
-     *  events, which have no API collection for this traffic. */
+     *  row's own traffic timestamp rather than "now". Method, path, and host come from
+     *  {@code shape}. The stored payload uses the guardrail alert body a live detection writes,
+     *  not the model completion that was scored. Category, subCategory, and severity come from
+     *  the verdict only. Collection id is the detection timestamp, matching live guardrail events. */
     private static void recordDetection(int accountId, String policyName, String contextSource,
-                                        Map<String, Object> row, String envelope, TrafficShape shape,
+                                        Map<String, Object> row, TrafficShape shape,
                                         JsonNode verdict, String bearerToken) throws Exception {
         String id = verdict.path("id").asText("");
         long detectedAtSec = timestampMillis(row.get(AgentQueryRecord.F_TIMESTAMP)) / 1000L;
@@ -180,8 +186,11 @@ public final class GuardrailBackfillReplayRunner {
         String reason = verdict.path("reason").asText("");
         String behaviour = verdict.path("behaviour").asText("");
 
-        String actor = asText(row.get(AgentQueryRecord.F_USER_NAME));
+        String sourceIp = sourceIp(accountId, id);
+        String actor = StringUtils.isNotBlank(sourceIp) ? sourceIp : asText(row.get(AgentQueryRecord.F_USER_NAME));
         String sessionId = asText(row.get(AgentQueryRecord.F_SESSION_IDENTIFIER));
+        String storedPayload = activityEnvelope(
+            asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD)), shape, sourceIp, detectedAtSec, behaviour, reason);
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("policyName", policyName);
@@ -203,7 +212,10 @@ public final class GuardrailBackfillReplayRunner {
         maliciousEvent.put("latestApiMethod", shape.method);
         maliciousEvent.put("latestApiEndpoint", shape.path);
         maliciousEvent.put("latestApiCollectionId", detectedAtSec);
-        maliciousEvent.put("latestApiPayload", envelope);
+        maliciousEvent.put("latestApiPayload", storedPayload);
+        if (StringUtils.isNotBlank(sourceIp)) {
+            maliciousEvent.put("latestApiIp", sourceIp);
+        }
         maliciousEvent.put("eventType", "EVENT_TYPE_SINGLE");
         if (StringUtils.isNotBlank(category)) {
             maliciousEvent.put("category", category);
@@ -229,6 +241,63 @@ public final class GuardrailBackfillReplayRunner {
         maliciousEvent.put("refId", "backfill|" + policyName + "|" + id);
 
         ThreatDetectionBackendClient.recordMaliciousEvent(accountId, maliciousEvent, bearerToken);
+    }
+
+    /** Same address for a given row on every retry, spread across the account's known clients. */
+    private static String sourceIp(int accountId, String id) {
+        if (accountId != AKAMAI_ACCOUNT_ID || StringUtils.isBlank(id)) {
+            return "";
+        }
+        return AKAMAI_SOURCE_IPS[Math.floorMod(id.hashCode(), AKAMAI_SOURCE_IPS.length)];
+    }
+
+    /** Live guardrail activity envelope. The response is the alert body the gateway stores after
+     *  a detection, not the model completion replay scored. */
+    private static String activityEnvelope(String requestPayload, TrafficShape shape, String ip,
+                                           long detectedAtSec, String behaviour, String reason) {
+        BasicDBObject envelope = new BasicDBObject();
+        envelope.put("akto_account_id", "");
+        envelope.put("akto_vxlan_id", "");
+        if (StringUtils.isNotBlank(ip)) {
+            envelope.put("destIp", ip);
+            envelope.put("ip", ip);
+        }
+        envelope.put("method", shape.method);
+        envelope.put("path", shape.path);
+        if (StringUtils.isNotBlank(shape.host)) {
+            envelope.put("requestHeaders", new BasicDBObject("host", shape.host).toJson());
+        }
+        envelope.put("requestPayload", requestPayload);
+        envelope.put("responsePayload", guardrailResponse(detectedAtSec, behaviour, reason));
+        envelope.put("source", "OTHER");
+        envelope.put("status", "OK");
+        envelope.put("statusCode", 200);
+        envelope.put("time", 0);
+        envelope.put("type", "http");
+        return envelope.toJson();
+    }
+
+    private static String guardrailResponse(long detectedAtSec, String behaviour, String reason) {
+        BasicDBObject data = new BasicDBObject();
+        if (StringUtils.isNotBlank(behaviour)) {
+            data.put("behaviour", behaviour);
+        }
+        if (detectedAtSec > 0) {
+            data.put("blocked_at", Instant.ofEpochSecond(detectedAtSec).toString());
+        }
+        data.put("blocked_by", "policy_validator");
+        if (StringUtils.isNotBlank(reason)) {
+            data.put("reason", reason);
+        }
+        BasicDBObject error = new BasicDBObject();
+        error.put("code", -32000);
+        error.put("data", data);
+        error.put("message", GUARDRAIL_RESPONSE_MESSAGE);
+        return new BasicDBObject()
+            .append("error", error)
+            .append("id", null)
+            .append("jsonrpc", "2.0")
+            .toJson();
     }
 
     private static TrafficShape trafficShape(int accountId) {
