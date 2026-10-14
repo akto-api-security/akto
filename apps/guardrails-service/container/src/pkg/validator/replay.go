@@ -271,12 +271,14 @@ func (s *Service) compareOne(
 				// error.message is the operator-facing blocked message ("This has been reported
 				// by Akto"). Live activity stores the scanner reason in error.data.reason, which
 				// is Metadata.Reason. Prefer that so a backfilled response matches a live one.
-				if reason := strings.TrimSpace(res.Metadata.Reason); reason != "" {
+				reason := strings.TrimSpace(res.Metadata.Reason)
+				if reason != "" && !placeholderLLMReason(reason) {
 					verdict.Reason = reason
 				} else if reason := s.customRuleReason(ctx, prepared, side, &params); reason != "" {
-					// Compact custom-prompt rules return only a grade. Live fills the
-					// explanation afterwards; replay has to make that same call or the
-					// stored reason is just "Alerted by LLM policy - <name>".
+					// Compact custom-prompt rules return only a grade. The label
+					// "Alerted by LLM policy - <name>" is then stored as the reason.
+					// Live replaces that label with a follow-up explanation; replay
+					// has to make the same call.
 					verdict.Reason = reason
 				}
 				verdict.Category = res.Metadata.PolicyName
@@ -332,6 +334,18 @@ func (s *Service) customRuleReason(
 		return ""
 	}
 	return strings.TrimSpace(reason)
+}
+
+// placeholderLLMReason reports the label stored when a custom prompt rule flags a
+// payload without an explanation: "Alerted by LLM policy - <name>". A real
+// explanation is appended after a colon.
+func placeholderLLMReason(reason string) bool {
+	const marker = "by LLM policy - "
+	idx := strings.Index(reason, marker)
+	if idx < 0 {
+		return false
+	}
+	return !strings.Contains(reason[idx+len(marker):], ":")
 }
 
 func llmRulePrompt(policies []types.Policy, requestSide bool) string {
