@@ -159,6 +159,8 @@ public class FlushMessagesToDB {
         if (IgnoredEventCache.isIgnoredInCache(accountId, event.getLatestApiEndpoint(), event.getFilterId())) {
             logger.debug("Skipping insertion of malicious event due to ignored status for: " +
                        event.getLatestApiEndpoint() + " + " + event.getFilterId());
+        } else if (isDuplicateBackfill(accountId, event)) {
+            logger.debug("Skipping duplicate backfill event refId=" + event.getRefId());
         } else {
             // No ignored event exists, safe to insert
             MaliciousEventDao.instance.insertOne(accountId, event);
@@ -171,6 +173,20 @@ public class FlushMessagesToDB {
       default:
         throw new IllegalArgumentException("Invalid event type");
     }
+  }
+
+  /** A backfill refId is the policy plus the conversation turn. A retry of the same turn
+   *  must not insert a second malicious_events document. */
+  private static boolean isDuplicateBackfill(String accountId, MaliciousEventDto event) {
+    String refId = event.getRefId();
+    if (refId == null || !refId.startsWith("backfill|")) {
+      return false;
+    }
+    MaliciousEventDto existing = MaliciousEventDao.instance.getCollection(accountId)
+        .find(Filters.eq("refId", refId))
+        .limit(1)
+        .first();
+    return existing != null;
   }
 
   private void sendEventToSplunk(AggregateSampleMaliciousEventModel event, String accountId) {
