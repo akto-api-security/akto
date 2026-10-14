@@ -268,6 +268,12 @@ func (s *Service) compareOne(
 				// Mirrors buildMaliciousEvent's own category/subCategory/severity fallback
 				// rules (mcp-endpoint-shield's threat_reporter.go) so a caller persisting a
 				// malicious_events record from this verdict matches a live detection's shape.
+				// error.message is the operator-facing blocked message ("This has been reported
+				// by Akto"). Live activity stores the scanner reason in error.data.reason, which
+				// is Metadata.Reason. Prefer that so a backfilled response matches a live one.
+				if reason := strings.TrimSpace(res.Metadata.Reason); reason != "" {
+					verdict.Reason = reason
+				}
 				verdict.Category = res.Metadata.PolicyName
 				verdict.SubCategory = res.Metadata.RuleViolated
 				if verdict.SubCategory == "" {

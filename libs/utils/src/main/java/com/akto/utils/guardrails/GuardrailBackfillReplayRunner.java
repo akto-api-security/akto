@@ -7,7 +7,6 @@ import com.akto.utils.threat_detection.ThreatDetectionBackendClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 
@@ -44,8 +43,9 @@ import java.util.Set;
  * only advances (and running totals only increase) once a whole page has fully succeeded, so a
  * retried page after a transient failure re-does the same items instead of double-counting a
  * partial success. Recording itself stays safe to redo: each detection's {@code refId} is
- * deterministic per (policyName, conversation turn), and a turn already recorded for that
- * policy is not replayed or inserted again.
+ * deterministic per (policyName, flagged chat). A later turn is skipped only when it
+ * continues a chat this policy already flagged. A second chat that shares the opener
+ * and then diverges is recorded on its own.
  */
 public final class GuardrailBackfillReplayRunner {
 
@@ -109,9 +109,10 @@ public final class GuardrailBackfillReplayRunner {
      * @param bearerToken already-minted "Bearer &lt;jwt&gt;" header value, reused across every page
      *     of a backfill job rather than minted per call — see
      *     {@link GuardrailsServiceClient#createLongLivedAuthToken}.
-     * @param recordedRefIds refIds already replayed by this job. The same conversation turn is
-     *     skipped on later pages. The caller keeps the set for the whole job. Pages are fetched
-     *     oldest-first, so the row kept for a turn is the earlier LLM call.
+     * @param recordedRefIds conversation snapshots already flagged for this policy. A later turn
+     *     is skipped only when its messages continue one of those chats. A second chat that
+     *     shares the opener but then diverges is replayed. The caller keeps the set for the
+     *     whole job. Pages are fetched oldest-first, so the row kept is the earlier call.
      */
     public static PageResult runOnePage(int accountId, BasicDBObject policyPayload, String policyName,
                                         String contextSourceForEvents, String bearerToken,
@@ -132,7 +133,7 @@ public final class GuardrailBackfillReplayRunner {
         TrafficShape shape = trafficShape(accountId);
         List<BasicDBObject> items = new ArrayList<>();
         Map<String, Map<String, Object>> rowById = new HashMap<>();
-        Map<String, String> refIdById = new HashMap<>();
+        Map<String, String> snapshotById = new HashMap<>();
         int duplicates = 0;
         for (Map<String, Object> row : batch) {
             String prompt = asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD));
@@ -147,8 +148,8 @@ public final class GuardrailBackfillReplayRunner {
             if (StringUtils.isBlank(id)) {
                 continue;
             }
-            String refId = payloadRefId(policyName, prompt);
-            if (!recordedRefIds.add(refId)) {
+            String snapshot = conversationSnapshot(prompt);
+            if (sameAsRecorded(recordedRefIds, snapshot)) {
                 duplicates++;
                 continue;
             }
@@ -157,7 +158,7 @@ public final class GuardrailBackfillReplayRunner {
                 shape.method, shape.path, shape.host);
             items.add(new BasicDBObject("id", id).append("envelope", envelope));
             rowById.put(id, row);
-            refIdById.put(id, refId);
+            snapshotById.put(id, snapshot);
         }
 
         // Computed even when replay/record below throws, so a caller that wants to log progress
@@ -178,13 +179,18 @@ public final class GuardrailBackfillReplayRunner {
                 }
                 replayed++;
                 if (verdict.path("detected").asBoolean(false)) {
-                    detected++;
                     String id = verdict.path("id").asText("");
                     Map<String, Object> row = rowById.get(id);
-                    if (row != null) {
-                        recordDetection(accountId, policyName, contextSourceForEvents, row, shape,
-                            refIdById.get(id), verdict, bearerToken);
+                    String snapshot = snapshotById.get(id);
+                    if (row == null || snapshot == null || sameAsRecorded(recordedRefIds, snapshot)) {
+                        duplicates++;
+                        continue;
                     }
+                    recordDetection(accountId, policyName, contextSourceForEvents, row, shape,
+                        payloadRefId(policyName, asText(row.get(AgentQueryRecord.F_QUERY_PAYLOAD))),
+                        verdict, bearerToken);
+                    recordedRefIds.add(snapshot);
+                    detected++;
                 }
             }
         }
@@ -259,43 +265,66 @@ public final class GuardrailBackfillReplayRunner {
         if (StringUtils.isNotBlank(sessionId)) {
             maliciousEvent.put("sessionId", sessionId);
         }
-        // Same conversation turn always lands on the same refId. The insert path skips a backfill
-        // refId that is already stored, so a retried page does not create another event.
         maliciousEvent.put("refId", refId);
 
         ThreatDetectionBackendClient.recordMaliciousEvent(accountId, maliciousEvent, bearerToken);
     }
 
-    /** One event per conversation turn for a policy. The turn is the messages through the last
-     *  user message, so a later call that only appends the assistant tool call and tool result
-     *  collapses onto the call that asked the question. A payload with no user message uses its
-     *  full text. */
+    /** refId for the chat as of this payload. A later turn of the same chat has a different
+     *  refId; the job skips it because its messages continue a chat already flagged for this
+     *  policy. Two chats that share an opener and then diverge do not. */
     static String payloadRefId(String policyName, String payload) {
-        return BACKFILL_REF_PREFIX + policyName + "|" + sha256(conversationTurn(payload));
+        return BACKFILL_REF_PREFIX + policyName + "|" + sha256(conversationSnapshot(payload));
     }
 
-    private static String conversationTurn(String payload) {
+    /** Messages in this call, or the raw payload when it has no message list. */
+    static String conversationSnapshot(String payload) {
         JsonNode messages = messageList(payload);
         if (messages == null) {
             return payload;
         }
-        int lastUser = -1;
-        for (int i = 0; i < messages.size(); i++) {
-            if ("user".equals(messages.get(i).path("role").asText(""))) {
-                lastUser = i;
-            }
-        }
-        if (lastUser < 0) {
-            return payload;
-        }
-        ArrayNode turn = JSON.createArrayNode();
-        for (int i = 0; i <= lastUser; i++) {
-            turn.add(messages.get(i));
-        }
         try {
-            return JSON.writeValueAsString(turn);
+            return JSON.writeValueAsString(messages);
         } catch (JsonProcessingException e) {
             return payload;
+        }
+    }
+
+    /** True when {@code earlier} and {@code later} are the same chat: one message list is the
+     *  other, or a prefix of it. A shared opener with a different following turn is not. */
+    static boolean sameConversation(String earlier, String later) {
+        if (earlier.equals(later)) {
+            return true;
+        }
+        JsonNode a = readArray(earlier);
+        JsonNode b = readArray(later);
+        if (a == null || b == null) {
+            return false;
+        }
+        int shared = Math.min(a.size(), b.size());
+        for (int i = 0; i < shared; i++) {
+            if (!a.get(i).equals(b.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameAsRecorded(Set<String> recorded, String snapshot) {
+        for (String earlier : recorded) {
+            if (sameConversation(earlier, snapshot)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static JsonNode readArray(String snapshot) {
+        try {
+            JsonNode node = JSON.readTree(snapshot);
+            return node != null && node.isArray() ? node : null;
+        } catch (JsonProcessingException e) {
+            return null;
         }
     }
 
