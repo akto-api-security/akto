@@ -2,6 +2,7 @@ package com.akto.utils.crons;
 
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.AgenticPostureScoreHistoryDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
@@ -104,6 +105,12 @@ public class AgenticPostureScoreCron {
     private void processAccount(Account account) {
         int accountId = account.getId();
         try {
+            if (!UsageMetricUtils.isSecurityTypeAgenticGranted(accountId)) {
+                loggerMaker.debugAndAddToDb("Agentic posture score cron: skipping accountId=" + accountId
+                        + " (SECURITY_TYPE_AGENTIC not granted)");
+                return;
+            }
+
             Context.accountId.set(accountId);
             // Argus reads, same context the posture page's own requests run in; also sent to the threat backend as x-context-source.
             Context.contextSource.set(CONTEXT_SOURCE.AGENTIC);

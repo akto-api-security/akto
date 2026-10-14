@@ -70,6 +70,12 @@ public class ToolClassificationCron {
     void processAccount(Account account, boolean forceRefresh) {
         int accountId = account.getId();
         try {
+            if (!UsageMetricUtils.isSecurityTypeAgenticGranted(accountId)) {
+                loggerMaker.infoAndAddToDb("Tool classification cron: skipping accountId=" + accountId
+                        + " (SECURITY_TYPE_AGENTIC not granted)");
+                return;
+            }
+
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess == null || !featureAccess.getIsGranted()) {
                 loggerMaker.infoAndAddToDb("Tool classification cron: skipping accountId=" + accountId
