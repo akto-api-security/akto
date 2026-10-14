@@ -38,9 +38,9 @@ public class ApiDistributionDataService {
         this.apiDistributionDataDao = apiDistributionDataDao;
     }
 
-    List<String> RL_ALLOWED_ACCOUNTS = Arrays.asList("1662680463");
+    public static final List<String> RL_ALLOWED_ACCOUNTS = Arrays.asList("1662680463", "1786100206");
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
-        if (!RL_ALLOWED_ACCOUNTS.contains(accountId) || true) {
+        if (!RL_ALLOWED_ACCOUNTS.contains(accountId)) {
             return ApiDistributionDataResponsePayload.newBuilder().build();
         }
         List<WriteModel<ApiDistributionDataModel>> bulkUpdates = new ArrayList<>();
