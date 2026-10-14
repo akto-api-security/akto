@@ -69,9 +69,12 @@ public class PercentilesCron {
         AccountTask.instance.executeTask(new Consumer<Account>() {
             @Override
             public void accept(Account account) {
+                String accountId = String.valueOf(account.getId());
+                if (!ApiDistributionDataService.RL_ALLOWED_ACCOUNTS.contains(accountId)) {
+                    return;
+                }
                 long accountStartTime = System.currentTimeMillis();
                 try {
-                    String accountId = String.valueOf(account.getId());
                     Context.accountId.set(account.getId());
 
                     logger.infoAndAddToDb("PercentilesCron: Processing account " + accountId);

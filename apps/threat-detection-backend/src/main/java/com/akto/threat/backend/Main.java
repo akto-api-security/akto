@@ -96,11 +96,11 @@ public class Main {
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(ApiDistributionDataDao.instance);
     com.akto.log.LoggerMaker logger = new com.akto.log.LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
 
-     // Start PercentilesCron (single scheduler for all accounts, runs every 2 hours)
+     // Start PercentilesCron (single scheduler, runs every 2 hours for RL_ALLOWED_ACCOUNTS)
     try {
       PercentilesCron percentilesCron = new PercentilesCron(threatProtectionMongo);
-      // percentilesCron.startCron();
-      logger.infoAndAddToDb("Started PercentilesCron scheduler (runs every 2 hours for all accounts)");
+      percentilesCron.startCron();
+      logger.infoAndAddToDb("Started PercentilesCron scheduler (runs every 2 hours)");
     } catch (Exception e) {
       logger.errorAndAddToDb("Error starting PercentilesCron: " + e.getMessage());
     }
