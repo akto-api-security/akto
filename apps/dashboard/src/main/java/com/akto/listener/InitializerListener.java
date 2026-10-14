@@ -2556,8 +2556,9 @@ public class InitializerListener implements ServletContextListener {
                     agentBaseRiskScoreCron.setUpAgentBaseRiskScoreCronScheduler();
                     toolClassificationCron.setUpToolClassificationCronScheduler();
                     agenticPostureScoreCron.setUpAgenticPostureScoreCronScheduler();
-                    collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
-                    endpointDescriptionCron.setUpEndpointDescriptionCronScheduler();
+                    // Disabled temporarily: Azure OpenAI input-token cost.
+                    // collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
+                    // endpointDescriptionCron.setUpEndpointDescriptionCronScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         crons.insertHistoricalDataJob();
