@@ -273,6 +273,11 @@ func (s *Service) compareOne(
 				// is Metadata.Reason. Prefer that so a backfilled response matches a live one.
 				if reason := strings.TrimSpace(res.Metadata.Reason); reason != "" {
 					verdict.Reason = reason
+				} else if reason := s.customRuleReason(ctx, prepared, side, &params); reason != "" {
+					// Compact custom-prompt rules return only a grade. Live fills the
+					// explanation afterwards; replay has to make that same call or the
+					// stored reason is just "Alerted by LLM policy - <name>".
+					verdict.Reason = reason
 				}
 				verdict.Category = res.Metadata.PolicyName
 				verdict.SubCategory = res.Metadata.RuleViolated
@@ -296,6 +301,62 @@ func (s *Service) compareOne(
 		verdict.BaselineDetected = baseDetected
 	}
 	return verdict
+}
+
+// customRuleReason asks the same follow-up live uses when a custom prompt rule flags
+// a payload without explaining it. The answer names what in the payload matched.
+func (s *Service) customRuleReason(
+	ctx context.Context,
+	prepared preparedPolicy,
+	side string,
+	params *models.ValidateRequestParams,
+) string {
+	requestSide := side != "response"
+	prompt := llmRulePrompt(prepared.policies, requestSide)
+	if prompt == "" {
+		return ""
+	}
+	body := params.ResponsePayload
+	if requestSide {
+		body = params.RequestPayload
+	}
+	payload := s.extractPayloadForValidation(body, params.Method, params.Path, requestSide)
+	if strings.TrimSpace(payload) == "" {
+		return ""
+	}
+	regenCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	reason, err := mcp.NewPolicyValidator().GenerateCustomRuleReason(regenCtx, prompt, payload)
+	if err != nil {
+		s.logger.Warn("ReplayWithPolicy - custom rule reason failed", zap.Error(err))
+		return ""
+	}
+	return strings.TrimSpace(reason)
+}
+
+func llmRulePrompt(policies []types.Policy, requestSide bool) string {
+	if prompt := rulePrompt(policies, requestSide); prompt != "" {
+		return prompt
+	}
+	return rulePrompt(policies, !requestSide)
+}
+
+func rulePrompt(policies []types.Policy, requestSide bool) string {
+	for _, policy := range policies {
+		rules := policy.Filters.ResponsePayload
+		if requestSide {
+			rules = policy.Filters.RequestPayload
+		}
+		for _, rule := range rules {
+			if rule.Type != mcp.FilterTypeLLM {
+				continue
+			}
+			if prompt := strings.TrimSpace(rule.Pattern); prompt != "" {
+				return prompt
+			}
+		}
+	}
+	return ""
 }
 
 // evaluate runs the sides the policy applies to and returns the first match. skip is non-empty
