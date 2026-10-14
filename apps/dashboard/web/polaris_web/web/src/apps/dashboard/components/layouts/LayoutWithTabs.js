@@ -1,5 +1,5 @@
 import {LegacyTabs} from "@shopify/polaris"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import SpinnerCentered from "../progress/SpinnerCentered"
 
 export default function LayoutWithTabs(props){
@@ -17,6 +17,15 @@ export default function LayoutWithTabs(props){
         }, 500)
         props.currTab(tabs[selected])
     }
+
+    // Optional: a parent can switch tabs programmatically (e.g. a banner action
+    // that opens the Logs tab) by passing selectedTabId; bump selectedTabNonce to
+    // re-select the same tab. Without these props behaviour is unchanged.
+    useEffect(() => {
+        if (!props.selectedTabId) return
+        const idx = tabs.findIndex(t => t.id === props.selectedTabId)
+        if (idx >= 0) setCurrentTab(idx)
+    }, [props.selectedTabId, props.selectedTabNonce])
 
     return(
         <LegacyTabs

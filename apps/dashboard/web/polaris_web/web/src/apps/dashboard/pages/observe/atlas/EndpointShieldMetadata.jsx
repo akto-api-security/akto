@@ -135,34 +135,31 @@ const getOsOrBrowserComp = (agentData) => {
     );
 };
 
-// currentStatus is computed server-side (ModuleInfoAction.fetchEndpointShieldAgents) from
-// lastHeartbeatReceived: active (<2h), inactive (<24h), error (stale >24h), failed (never heartbeat).
+// currentStatus is computed server-side (ModuleInfoAction.endpointShieldCurrentStatusExpr):
+// installing / install_failed from installStatus, otherwise from lastHeartbeatReceived —
+// active (<2h), inactive (<24h), error (stale >24h), failed (never heartbeat). Rendering
+// straight off it, rather than re-deriving installing/failed from installStatus here, is
+// what keeps the icon, the Status filter and STATUS_LABELS describing the same device.
+// install_failed covers installOutcome === 'failed' as well, which is what the panel's
+// banner reads, so a device whose agent came up after a failed deploy carries the failure
+// in both places until an attempt that succeeds (or rolls back cleanly) writes a new
+// outcome.
 const CURRENT_STATUS_COMP_MAP = {
+    installing: { icon: RefreshMinor, color: "warning", tooltip: "Installation in progress" },
+    // Short, like the other status tooltips: the full reason is long enough to span the
+    // row and sit under the icon itself. It is shown in the device panel's banner instead.
+    install_failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Last deployment failed" },
     active: { icon: StatusActiveMajor, color: "success", tooltip: "Running" },
     inactive: { icon: ClockMinor, color: "warning", tooltip: "No heartbeat in over 2 hours" },
     error: { icon: DiamondAlertMinor, color: "critical", tooltip: "No heartbeat in over 24 hours" },
     failed: { icon: DiamondAlertMinor, color: "critical", tooltip: "Never connected" },
 };
 
-const getStatusComp = (installStatus, currentStatus) => {
-    if (installStatus === 'installing') {
-        return (
-            <Tooltip content="Installation in progress" dismissOnMouseOut>
-                <Icon source={RefreshMinor} color="warning" />
-            </Tooltip>
-        );
-    }
-    if (installStatus === 'failed') {
-        return (
-            <Tooltip content="Installation failed" dismissOnMouseOut>
-                <Icon source={DiamondAlertMinor} color="critical" />
-            </Tooltip>
-        );
-    }
+const getStatusComp = (currentStatus) => {
     const statusComp = CURRENT_STATUS_COMP_MAP[currentStatus];
     if (!statusComp) return null;
     return (
-        <Tooltip content={statusComp.tooltip} dismissOnMouseOut>
+        <Tooltip content={statusComp.tooltip} preferredPosition="above" dismissOnMouseOut>
             <Icon source={statusComp.icon} color={statusComp.color} />
         </Tooltip>
     );
@@ -174,7 +171,7 @@ const convertDataIntoTableFormat = (agentData) => ({
     lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
     lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed),
     osComp: getOsOrBrowserComp(agentData),
-    statusComp: getStatusComp(agentData?.installStatus, agentData?.currentStatus),
+    statusComp: getStatusComp(agentData?.currentStatus),
 });
 
 const knownOrDefault = (value) => (value && String(value).toLowerCase() !== 'unknown') ? value : DEFAULT_VALUE;
@@ -187,7 +184,9 @@ const mapModuleToAgent = (module) => ({
     agentVersion: module.currentVersion || DEFAULT_VALUE,
     username: module.additionalData?.username || module?.additionalData?.email || DEFAULT_VALUE,
     lastHeartbeat: module.lastHeartbeatReceived || 0,
-    lastDeployed: module.startedTs || 0,
+    // Latest deployment attempt (computed server-side: installStartedTs, else startedTs).
+    lastDeployed: module.additionalData?.lastDeployedTs || module.additionalData?.installStartedTs || module.startedTs || 0,
+    firstSeen: module.startedTs || 0,
     currentStatus: module.additionalData?.currentStatus || null,
     provider: module.additionalData?.provider || null,
     orgName: module.additionalData?.orgName || null,
@@ -215,6 +214,17 @@ const mapModuleToAgent = (module) => ({
     bootTime: module.additionalData?.bootTime || null,
     installedApps: module.additionalData?.installedApps || [],
     installStatus: module.additionalData?.installStatus || null,
+    // Failure summary sent by the installer with a failed status (cleared on success).
+    installFailureReason: module.additionalData?.installFailureReason || null,
+    installDiagnosis: module.additionalData?.installDiagnosis || null,
+    installFindings: Array.isArray(module.additionalData?.installFindings) ? module.additionalData.installFindings : [],
+    installExitCode: module.additionalData?.installExitCode ?? null,
+    installId: module.additionalData?.installId || null,
+    // Latest deployment attempt (installers only; see getDeploymentAttempt).
+    installStartedTs: module.additionalData?.installStartedTs || 0,
+    installFinishedTs: module.additionalData?.installFinishedTs || 0,
+    installOutcome: module.additionalData?.installOutcome || null,
+    installVersion: module.additionalData?.installVersion || null,
     _moduleData: module
 });
 
