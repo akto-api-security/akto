@@ -17,6 +17,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.CyborgMetricsConfig;
+import com.akto.util.AccountTask;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.EndpointRemoteCommandCleanupCron;
@@ -65,7 +66,10 @@ public class InitializerListener implements ServletContextListener {
                                 DaoInit.init(new ConnectionString(mongoURI));
                             }
                             TestingRunWebhookDao.instance.createIndicesIfAbsent();
-                            ModuleInfoDao.instance.createIndicesIfAbsent();
+                            // module_info is per-account, so indices must be created inside each account's context
+                            AccountTask.instance.executeTask(
+                                    account -> ModuleInfoDao.instance.createIndicesIfAbsent(),
+                                    "moduleInfoCreateIndices");
                             calledOnce = true;
                         }
                         checkMongoConnection();
