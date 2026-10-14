@@ -26,6 +26,10 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
 
     private static final int MAX_SAMPLE_CHARS = 10000;
 
+    // Closed five-label verdict, ~20 output tokens: cheap-tier work (see ModelTier).
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }

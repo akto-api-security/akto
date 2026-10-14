@@ -33,6 +33,11 @@ public abstract class AbstractGroundedNarrativeHandler extends AzureOpenAIPrompt
     protected static final Pattern NUMERIC_LITERAL = Pattern.compile("(?:\\d{1,3}(?:,\\d{3})+|\\d+)(?:\\.\\d+)?%?");
     protected static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^\\]]*\\]\\([^)]*\\)");
 
+    // Pure rendering of precomputed facts (see class javadoc), so the cheap reasoning tier at
+    // "minimal" effort is enough for all three narrative handlers.
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }

@@ -21,6 +21,10 @@ public class AgentDomainClassifier extends AzureOpenAIPromptHandler {
 
     private static final int MAX_DESCRIPTION_CHARS = 1500;
 
+    // ON/OFF per domain against a short description, defaulting to OFF: cheap-tier work.
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }

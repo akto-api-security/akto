@@ -29,6 +29,11 @@ public class ConversationContinuityClassifier extends AzureOpenAIPromptHandler {
     private static final int MAX_QUERY_CHARS    = 2000;
     private static final int MAX_RESPONSE_CHARS = 1500;
 
+    // One confidence float per candidate; a user is waiting on this (ContextWindowAction), and a
+    // wrong result count already falls back to per-candidate calls: cheap-tier work.
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }

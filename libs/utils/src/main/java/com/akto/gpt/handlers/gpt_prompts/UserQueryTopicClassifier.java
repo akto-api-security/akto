@@ -19,6 +19,11 @@ public class UserQueryTopicClassifier extends AzureOpenAIPromptHandler {
     private static final int MAX_RESPONSE_CHARS = 1500;
     private static final int MAX_SUMMARY_CHARS  = 500;
 
+    // Fixed-taxonomy labelling and the highest-volume caller (UserAnalysisCron), so this is where
+    // the cheap tier pays off most; a wrong result count already falls back to per-record calls.
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }
