@@ -131,10 +131,18 @@ public class MaliciousEventService {
   //   }
   // }
 
+  // Events for these filterIds are dropped at ingestion.
+  private static final Set<String> SKIPPED_FILTER_IDS = Collections.singleton("ApiLevelRateLimited");
+
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
     String filterId = evt.getFilterId();
+
+    if (SKIPPED_FILTER_IDS.contains(filterId)) {
+      logger.debug("Skipping malicious event for filterId " + filterId);
+      return;
+    }
 
     MaliciousEventDto.Builder builder = MaliciousEventDto.newBuilder();
     String severity = evt.getSeverity();
