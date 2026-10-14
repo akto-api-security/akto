@@ -51,13 +51,13 @@ public class ToolClassificationCron {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpToolClassificationCronScheduler() {
-        scheduler.scheduleWithFixedDelay(this::run, 0, 60, TimeUnit.MINUTES);
+        scheduler.scheduleWithFixedDelay(this::run, 0, 6, TimeUnit.HOURS);
     }
 
     private void run() {
         try {
             Context.accountId.set(1_000_000);
-            if (!callDibs(Cluster.TOOL_CLASSIFICATION_CRON_INFO, 3300, 60)) {
+            if (!callDibs(Cluster.TOOL_CLASSIFICATION_CRON_INFO, 21300, 60)) {
                 loggerMaker.infoAndAddToDb("Tool classification cron dibs not acquired, thus skipping cron");
                 return;
             }

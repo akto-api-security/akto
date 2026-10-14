@@ -48,7 +48,7 @@ import java.util.function.ToDoubleFunction;
 
 import static com.akto.task.Cluster.callDibs;
 
-// Hourly per-agent posture score: six 0-100 categories, weighted-averaged into ApiCollection.postureScore,
+// Per-agent posture score (every 6 hours): six 0-100 categories, weighted-averaged into ApiCollection.postureScore,
 // plus one account-wide AgenticPostureScoreHistory row per run.
 public class AgenticPostureScoreCron {
 
@@ -86,13 +86,13 @@ public class AgenticPostureScoreCron {
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpAgenticPostureScoreCronScheduler() {
-        scheduler.scheduleWithFixedDelay(this::run, 0, 60, TimeUnit.MINUTES);
+        scheduler.scheduleWithFixedDelay(this::run, 0, 6, TimeUnit.HOURS);
     }
 
     private void run() {
         try {
             Context.accountId.set(1_000_000);
-            if (!callDibs(Cluster.AGENTIC_POSTURE_SCORE_CRON_INFO, 3300, 60)) {
+            if (!callDibs(Cluster.AGENTIC_POSTURE_SCORE_CRON_INFO, 21300, 60)) {
                 loggerMaker.debugAndAddToDb("Agentic posture score cron dibs not acquired, thus skipping cron");
                 return;
             }
