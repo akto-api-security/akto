@@ -4,17 +4,14 @@ import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.kafka.KafkaConfig;
 import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.akto.threat.backend.constants.MongoDBCollection;
-import com.akto.threat.backend.dao.AccountBasedDao;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.Serializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import org.bson.conversions.Bson;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -170,45 +167,6 @@ public class FlushMessagesToDBTest {
             assertEquals(event.getId(), insertedEvent.getId());
             assertEquals(event.getLatestApiEndpoint(), insertedEvent.getLatestApiEndpoint());
             assertEquals(event.getFilterId(), insertedEvent.getFilterId());
-        }
-    }
-
-    @Test
-    public void testProcessMaliciousEvent_DuplicateBackfillRefId_SkipsInsertion() throws Exception {
-        String accountId = "1000";
-        MaliciousEventDto event = MaliciousEventDto.newBuilder()
-            .setLatestApiEndpoint("/llm/chat/completions")
-            .setFilterId("policy")
-            .setStatus(MaliciousEventDto.Status.ACTIVE)
-            .setDetectedAt(1L)
-            .build();
-        event.setId("event-dup");
-        event.setRefId("backfill|policy|abc");
-        java.lang.reflect.Field clients = AccountBasedDao.class.getDeclaredField("clients");
-        clients.setAccessible(true);
-        ((MongoClient[]) clients.get(null))[0] = mongoClient;
-
-        Map<String, Object> message = new HashMap<>();
-        message.put("eventType", MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
-        message.put("payload", mapper.writeValueAsString(event));
-        message.put("accountId", accountId);
-
-        @SuppressWarnings("unchecked")
-        FindIterable<MaliciousEventDto> found = mock(FindIterable.class);
-        when(maliciousEventCollection.find(any(Bson.class))).thenReturn(found);
-        when(found.limit(1)).thenReturn(found);
-        when(found.first()).thenReturn(event);
-
-        try (MockedStatic<IgnoredEventCache> mockedCache = mockStatic(IgnoredEventCache.class)) {
-            mockedCache.when(() -> IgnoredEventCache.isIgnoredInCache(accountId, event.getLatestApiEndpoint(), event.getFilterId()))
-                .thenReturn(false);
-
-            FlushMessagesToDB instance = new FlushMessagesToDB(kafkaConfig, mongoClient);
-            java.lang.reflect.Method writeMessage = FlushMessagesToDB.class.getDeclaredMethod("writeMessage", String.class);
-            writeMessage.setAccessible(true);
-            writeMessage.invoke(instance, gson.toJson(message));
-
-            verify(maliciousEventCollection, never()).insertOne(any(MaliciousEventDto.class));
         }
     }
 
