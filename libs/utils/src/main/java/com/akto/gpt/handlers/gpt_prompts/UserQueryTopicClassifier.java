@@ -19,6 +19,17 @@ public class UserQueryTopicClassifier extends AzureOpenAIPromptHandler {
     private static final int MAX_RESPONSE_CHARS = 1500;
     private static final int MAX_SUMMARY_CHARS  = 500;
 
+    // Fixed-taxonomy labelling and the highest-volume caller (UserAnalysisCron), so this is where
+    // the cheap tier pays off most; a wrong result count already falls back to per-record calls.
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
+    // Azure's token rate limit is charged the prompt plus the requested max tokens at request time,
+    // not what is generated, so the 10,000 default would count ~10k tokens per call against the
+    // deployment's limit. A batch of 10 needs ~760 output tokens (measured), so 3000 leaves ample room.
+    @Override
+    protected int getMaxTokens() { return 3000; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }
