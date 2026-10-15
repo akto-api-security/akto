@@ -2,6 +2,8 @@ package com.akto.dto.agents;
 
 import java.util.Map;
 
+import org.bson.codecs.pojo.annotations.BsonIgnore;
+
 public class Model {
 
     String name;
@@ -18,6 +20,9 @@ public class Model {
 
     public final static String PARAM_MODEL = "model";
     public final static String PARAM_API_KEY = "apiKey";
+    // Env-configured Azure deployment tier (see AzureOpenAIPromptHandler.ModelTier), used by
+    // Akto's own service chains instead of an explicit endpoint/key.
+    public final static String PARAM_TIER = "tier";
     public final static String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
 
     public final static String _PARAMS = "params";
@@ -54,6 +59,23 @@ public class Model {
 
     public void setType(ModelType type) {
         this.type = type;
+    }
+
+    /*
+     * Convenience views over `params`. @BsonIgnore keeps the Mongo POJO codec (automatic
+     * mode maps every getter) from writing them as duplicate top-level fields.
+     */
+    @BsonIgnore
+    public String getModelName() {
+        return params != null ? params.get(PARAM_MODEL) : null;
+    }
+
+    /*
+     * Deliberately not a getter: neither the Mongo codec nor Struts' JSON results
+     * serialize it, so the key never appears as a field of its own.
+     */
+    public String readApiKey() {
+        return params != null ? params.get(PARAM_API_KEY) : null;
     }
 
 }
