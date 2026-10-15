@@ -961,8 +961,10 @@ public class ThreatActorService {
     match.putAll(ThreatUtils.excludeSkillEndpointFilter(contextSource));
     ThreatUtils.andHostScope(match, hostScopeMatch);
 
-      List<Document> pipeline = Arrays.asList(
-        new Document("$match", match),
+      List<Document> pipeline = new ArrayList<>();
+      pipeline.add(new Document("$match", match));
+      pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
+      pipeline.addAll(Arrays.asList(
 
         // Stage 2: Project required fields and normalize timestamp to daily granularity
         new Document("$project", new Document("dayStart",
@@ -980,7 +982,7 @@ public class ThreatActorService {
         new Document("$group", new Document("_id", "$_id.dayStart")
             .append("subCategoryCounts", 
                 new Document("$push", new Document("subCategory", "$_id.subCategory").append("count", "$count"))))
-        );
+        ));
 
         try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
             while (cursor.hasNext()) {
@@ -1323,10 +1325,16 @@ public class ThreatActorService {
 
     List<FetchThreatsForActorResponse.ActivityData> activities = new ArrayList<>();
 
+    List<Document> activityPipeline = new ArrayList<>();
+    activityPipeline.add(new Document("$match", activityQuery));
+    activityPipeline.addAll(ThreatUtils.configScanLatestDocStages(contextSource));
+    if (activityPipeline.size() == 1) {
+      activityPipeline.add(new Document("$sort", new Document("detectedAt", -1)));
+    }
+    activityPipeline.add(new Document("$limit", limit));
+
     try (MongoCursor<MaliciousEventDto> cursor = maliciousEventDao.getCollection(accountId)
-        .find(activityQuery)
-        .sort(Sorts.descending("detectedAt"))
-        .limit(limit)
+        .aggregate(activityPipeline)
         .cursor()) {
       while (cursor.hasNext()) {
         MaliciousEventDto event = cursor.next();

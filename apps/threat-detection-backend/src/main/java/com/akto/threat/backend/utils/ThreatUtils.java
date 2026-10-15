@@ -189,31 +189,47 @@ public class ThreatUtils {
         return conditions;
     }
 
-    // Collapse repeated config-scan re-detections into one.
-    public static List<Document> configScanDedupeStages(String contextSource) {
-        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
-            return Collections.emptyList();
-        }
+    private static Document configScanDedupeKey() {
         Document isConfigEvent = new Document("$regexMatch",
             new Document("input", new Document("$ifNull", Arrays.asList("$latestApiEndpoint", "")))
                 .append("regex", "/config/"));
 
-        Document dedupeKey = new Document("$cond", Arrays.asList(
+        return new Document("$cond", Arrays.asList(
             isConfigEvent,
             new Document("host", "$host").append("actor", "$actor").append("category", "$category")
                 .append("latestApiEndpoint", "$latestApiEndpoint"),
             new Document("uniqueId", "$_id")));
+    }
+
+    public static List<Document> configScanDedupeStages(String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return Collections.emptyList();
+        }
 
         return Arrays.asList(
             new Document("$sort", new Document("detectedAt", -1)),
             new Document("$group",
-                new Document("_id", dedupeKey)
+                new Document("_id", configScanDedupeKey())
                     .append("host", new Document("$first", "$host"))
                     .append("category", new Document("$first", "$category"))
                     .append("subCategory", new Document("$first", "$subCategory"))
                     .append("status", new Document("$first", "$status"))
                     .append("severity", new Document("$first", "$severity"))
+                    .append("detectedAt", new Document("$first", "$detectedAt"))
                     .append("successfulExploit", new Document("$first", "$successfulExploit"))));
+    }
+
+    public static List<Document> configScanLatestDocStages(String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return Collections.emptyList();
+        }
+
+        return Arrays.asList(
+            new Document("$sort", new Document("detectedAt", -1)),
+            new Document("$group",
+                new Document("_id", configScanDedupeKey()).append("doc", new Document("$first", "$$ROOT"))),
+            new Document("$replaceRoot", new Document("newRoot", "$doc")),
+            new Document("$sort", new Document("detectedAt", -1)));
     }
 
     public static boolean isAgenticOrEndpointContext(String contextSource) {
