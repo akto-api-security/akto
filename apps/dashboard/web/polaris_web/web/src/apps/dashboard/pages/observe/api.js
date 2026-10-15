@@ -98,6 +98,21 @@ export default {
         });
         return resp?.vendorAudit || [];
     },
+    // LLMs tab — browser LLM sites (type=browser-llm audit rows); same shape as fetchAuditData / updateAuditData.
+    async fetchLlmAuditData(sortKey, sortOrder, skip, limit, filters, searchString) {
+        return request({
+            url: '/api/fetchLlmAuditData',
+            method: 'post',
+            data: { sortKey, sortOrder, skip, limit, filters, searchString },
+        });
+    },
+    async updateLlmAuditData(hexIds, remarks) {
+        return request({
+            url: '/api/updateLlmAuditData',
+            method: 'post',
+            data: { hexIds, remarks },
+        });
+    },
     async addVendorAllowlistEntries(vendorNames) {
         const list = Array.isArray(vendorNames) ? vendorNames : [vendorNames];
         const names = [...new Set(list.map((v) => String(v ?? '').trim()).filter(Boolean))];

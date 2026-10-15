@@ -26,6 +26,7 @@ import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -325,9 +326,12 @@ public class InsightDataLoader {
     /** contextSource == current, or the field is entirely missing (legacy docs predate it). */
     private List<McpAuditInfo> loadAuditRows(CONTEXT_SOURCE contextSource) {
         try {
-            Bson filter = Filters.or(
-                    Filters.eq(McpAuditInfo.CONTEXT_SOURCE, contextSource != null ? contextSource.name() : null),
-                    Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
+            // Browser LLM decisions aren't MCP components; keep them out of component insights.
+            Bson filter = Filters.and(
+                    Filters.ne(McpAuditInfo.TYPE, Constants.AKTO_BROWSER_LLM_TAG),
+                    Filters.or(
+                            Filters.eq(McpAuditInfo.CONTEXT_SOURCE, contextSource != null ? contextSource.name() : null),
+                            Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false)));
             return McpAuditInfoDao.instance.findAll(filter, 0, 5000, null);
         } catch (Exception e) {
             logger.error("InsightDataLoader: loadAuditRows failed: " + e.getMessage());
