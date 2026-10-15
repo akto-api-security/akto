@@ -2750,10 +2750,9 @@ public class InitializerListener implements ServletContextListener {
 
                     // API group jobs
                     setUpUpdateCustomCollections();
-                    // Disabled temporarily: Azure OpenAI input-token cost.
-                    // logger.warn("Setting up user analysis cron scheduler");
-                    // userAnalysisCron.setUpUserAnalysisCronScheduler();
-                    // logger.warn("User analysis cron scheduler setup complete");
+                    logger.warn("Setting up user analysis cron scheduler");
+                    userAnalysisCron.setUpUserAnalysisCronScheduler();
+                    logger.warn("User analysis cron scheduler setup complete");
                     updateApiGroupsForAccounts();
 
                     syncCronInfo.setUpUpdateCronScheduler();
