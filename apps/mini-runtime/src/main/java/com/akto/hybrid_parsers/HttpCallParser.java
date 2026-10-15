@@ -1474,6 +1474,10 @@ public class HttpCallParser {
             try {
                 createCollectionBasedOnHostName(hostNameMapKey.hashCode(), hostNameMapKey,
                         tagsList, accessType);
+                // New browser LLM collection: audit its site, like a new MCP server.
+                if (tagsList != null && tagsList.stream().anyMatch(t -> Constants.AKTO_BROWSER_LLM_TAG.equals(t.getKeyName()))) {
+                    insertBrowserLlmAuditInfo(hostNameMapKey);
+                }
             } catch (Exception e) {
                 loggerMaker.error(
                         "Error while updating api collection tags for host: " + hostNameMapKey + " " + e.getMessage());
@@ -1484,6 +1488,32 @@ public class HttpCallParser {
         printL(log);
         if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
             Utils.printUrlDebugLog(log);
+        }
+    }
+
+    // Same grouping as the Agentic assets LLMs tab (AgenticObserveAction.extractServiceNameForGrouping), so both tabs list the same sites.
+    private static final Set<String> BROWSER_LLM_SUFFIX_TLDS = new HashSet<>(Arrays.asList(
+            "io", "com", "net", "org", "cloud", "dev", "app", "ai", "co"));
+
+    private static String browserLlmSite(String hostName) {
+        if (hostName == null || hostName.trim().isEmpty() || hostName.contains("not-attached")) return null;
+        String host = hostName.toLowerCase();
+        String[] parts = host.split("\\.");
+        if (parts.length < 3 || BROWSER_LLM_SUFFIX_TLDS.contains(parts[2])) return host;
+        return String.join(".", Arrays.copyOfRange(parts, 2, parts.length));
+    }
+
+    // One mcp_audit_info row per browser LLM site (<user>.<browser>.<site> -> site) for Audit Data -> LLMs.
+    private void insertBrowserLlmAuditInfo(String hostName) {
+        String site = browserLlmSite(hostName);
+        if (site == null) return;
+        try {
+            dataActor.insertMCPAuditDataLog(new McpAuditInfo(
+                Context.now(), "", Constants.AKTO_BROWSER_LLM_TAG, 0,
+                site, "", null, 0, null
+            ));
+        } catch (Exception e) {
+            loggerMaker.error("Error inserting browser LLM audit info for host: " + hostName + " " + e.getMessage());
         }
     }
 
