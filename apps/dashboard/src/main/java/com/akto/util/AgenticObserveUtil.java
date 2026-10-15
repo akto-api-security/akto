@@ -46,26 +46,6 @@ public final class AgenticObserveUtil {
         return dotIdx >= 0 ? hostName.substring(0, dotIdx) : hostName;
     }
 
-    public static final String INFERENCE_HOOKS_TAG = "inference-hooks";
-    public static final String INFERENCE_HOOK_ENDPOINT_PREFIX = "inference-hook-";
-
-    // Endpoint id shown in the UI; inference-hook collections are prefixed so they read apart from real devices.
-    public static String extractDisplayEndpointId(ApiCollection collection) {
-        String id = extractEndpointId(collection.getHostName());
-        if (id == null || !hasTagKey(collection.getEnvType(), INFERENCE_HOOKS_TAG)) {
-            return id;
-        }
-        return INFERENCE_HOOK_ENDPOINT_PREFIX + id;
-    }
-
-    // Raw host segment behind a displayed endpoint id; the username map and host lookups key on it.
-    public static String stripInferenceHookPrefix(String displayEndpointId) {
-        if (displayEndpointId != null && displayEndpointId.startsWith(INFERENCE_HOOK_ENDPOINT_PREFIX)) {
-            return displayEndpointId.substring(INFERENCE_HOOK_ENDPOINT_PREFIX.length());
-        }
-        return displayEndpointId;
-    }
-
     public static String extractServiceName(String hostName) {
         return McpRequestResponseUtils.extractServiceNameFromHost(hostName);
     }

@@ -44,7 +44,6 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String INFERENCE_HOOKS_TAG = "inference-hooks";
     private static final String TOOL_CALL_EVENT = "tool_call";
-    private static final String CONFIG_TEST_APPLICATION = "config-test";
 
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
@@ -220,10 +219,6 @@ public class ProviderGuardrailAction extends ActionSupport {
     // Self-registers this actor's email-slug into agent_users on first contact, so it becomes
     // pickable in the existing device dropdown; fail-open, never affects the guardrails verdict.
     private static void registerConnectorIdentity(ParsedRequest frame) {
-        // Connection tests and recovery checks are synthetic and carry no user.
-        if (CONFIG_TEST_APPLICATION.equals(frame.application)) {
-            return;
-        }
         try {
             String email = extractEmail(frame.actor);
             String slug = AgentHostUtils.slugify(AgentHostUtils.emailLocalPart(email));
