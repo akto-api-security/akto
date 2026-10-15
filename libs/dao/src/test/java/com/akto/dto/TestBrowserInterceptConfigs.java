@@ -81,4 +81,39 @@ public class TestBrowserInterceptConfigs {
     public void testMaxUpdatedTimestampEmpty() {
         assertEquals(0L, BrowserInterceptConfigs.maxUpdatedTimestamp(new ArrayList<>()));
     }
+
+    @Test
+    public void testFilterByEngineVersionGatesOnMinMax() {
+        Document noDep = cfg("a", 1);                                                              // runs everywhere
+        Document needsNewer = cfg("b", 1).append(BrowserInterceptConfigs.MIN_ENGINE_VERSION, "2.5"); // needs >= 2.5
+        Document tooNew = cfg("c", 1).append(BrowserInterceptConfigs.MAX_ENGINE_VERSION, "2.3");      // only <= 2.3
+        List<Document> all = Arrays.asList(noDep, needsNewer, tooNew);
+
+        List<String> dropped = new ArrayList<>();
+        List<Document> out = BrowserInterceptConfigs.filterByEngineVersion(all, "2.4", dropped);
+
+        assertNotNull(byId(out, "a"));                 // no dependency -> kept
+        assertNull(byId(out, "b"));                    // needs 2.5, client 2.4 -> dropped
+        assertNull(byId(out, "c"));                    // max 2.3, client 2.4 -> dropped
+        assertEquals(2, dropped.size());
+        assertTrue(dropped.contains("b") && dropped.contains("c"));
+    }
+
+    @Test
+    public void testFilterByEngineVersionBoundaryIsInclusive() {
+        Document exact = cfg("a", 1).append(BrowserInterceptConfigs.MIN_ENGINE_VERSION, "2.3.0");
+        // "2.3" == "2.3.0", and the bound is inclusive -> client exactly at the min is allowed
+        List<Document> out = BrowserInterceptConfigs.filterByEngineVersion(
+                Arrays.asList(exact), "2.3", new ArrayList<>());
+        assertEquals(1, out.size());
+    }
+
+    @Test
+    public void testFilterByEngineVersionUnparseableClientNoGate() {
+        Document needsNewer = cfg("b", 1).append(BrowserInterceptConfigs.MIN_ENGINE_VERSION, "2.5");
+        // an unparseable client version disables the gate (everything passes), matching the client rule
+        List<Document> out = BrowserInterceptConfigs.filterByEngineVersion(
+                Arrays.asList(needsNewer), "dev", new ArrayList<>());
+        assertEquals(1, out.size());
+    }
 }

@@ -25,6 +25,10 @@ public class BrowserInterceptConfigs {
     public static final String REQUIRES = "requires";
     // epoch-seconds the config last changed; drives the `since` delta sync
     public static final String UPDATED_TIMESTAMP = "updatedTimestamp";
+    // inclusive engine-version bounds: a config (or an endpoint) only runs on an extension whose
+    // engine version is within [minEngineVersion, maxEngineVersion]. Either bound optional.
+    public static final String MIN_ENGINE_VERSION = "minEngineVersion";
+    public static final String MAX_ENGINE_VERSION = "maxEngineVersion";
 
     private BrowserInterceptConfigs() {}
 
@@ -73,6 +77,89 @@ public class BrowserInterceptConfigs {
     }
 
     /**
+     * Drop every config the requesting extension is too old (or too new) to run: a config whose
+     * {@code minEngineVersion} is above the client's engine version, or whose {@code maxEngineVersion}
+     * is below it, is removed so an old extension never receives a config it cannot compile. Dropped
+     * ids are collected into {@code unsupportedOut}. An unparseable client version means no gate
+     * (return everything), matching the client-side {@code inRange} rule ("2.3"=="2.3.0", a leading
+     * "v" and a "-suffix" are ignored).
+     */
+    public static List<Document> filterByEngineVersion(List<Document> configs,
+                                                       String engineVersion,
+                                                       List<String> unsupportedOut) {
+        List<Document> out = new ArrayList<>();
+        if (configs == null) {
+            return out;
+        }
+        int[] clientVer = parseVersion(engineVersion);
+        if (clientVer == null) {
+            out.addAll(configs);   // unparseable version -> no gate
+            return out;
+        }
+        for (Document c : configs) {
+            if (inEngineRange(c, clientVer)) {
+                out.add(c);
+            } else if (unsupportedOut != null) {
+                String id = idOf(c);
+                if (id != null) {
+                    unsupportedOut.add(id);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** True when {@code clientVer} is within the config's [minEngineVersion, maxEngineVersion] bounds. */
+    public static boolean inEngineRange(Document doc, int[] clientVer) {
+        if (clientVer == null || doc == null) {
+            return true;
+        }
+        int[] min = parseVersion(asString(doc.get(MIN_ENGINE_VERSION)));
+        if (min != null && compareVersions(clientVer, min) < 0) {
+            return false;
+        }
+        int[] max = parseVersion(asString(doc.get(MAX_ENGINE_VERSION)));
+        return max == null || compareVersions(clientVer, max) <= 0;
+    }
+
+    // "v2.3.0-beta" -> [2,3,0]; null when not a dotted number (then: no gate). Mirrors engineVersion.js.
+    static int[] parseVersion(String version) {
+        if (version == null) {
+            return null;
+        }
+        String v = version.trim();
+        if (v.startsWith("v") || v.startsWith("V")) {
+            v = v.substring(1);
+        }
+        int dash = v.indexOf('-');
+        if (dash >= 0) {
+            v = v.substring(0, dash);
+        }
+        if (v.isEmpty() || !v.matches("\\d+(\\.\\d+)*")) {
+            return null;
+        }
+        String[] parts = v.split("\\.");
+        int[] out = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            out[i] = Integer.parseInt(parts[i]);
+        }
+        return out;
+    }
+
+    // Missing trailing parts count as 0, so 2.3 == 2.3.0.
+    static int compareVersions(int[] a, int[] b) {
+        int n = Math.max(a.length, b.length);
+        for (int i = 0; i < n; i++) {
+            int x = i < a.length ? a[i] : 0;
+            int y = i < b.length ? b[i] : 0;
+            if (x != y) {
+                return x < y ? -1 : 1;
+            }
+        }
+        return 0;
+    }
+
+    /**
      * The delta subset: only configs changed strictly after {@code since} (epoch seconds). The
      * client passes the newest {@code updatedTimestamp} it already holds, so it receives just what
      * changed since - not the whole catalogue. {@code since <= 0} means a full fetch (return all).
@@ -117,6 +204,10 @@ public class BrowserInterceptConfigs {
         }
         Object id = doc.get(ID);
         return id != null ? id.toString() : null;
+    }
+
+    private static String asString(Object value) {
+        return value instanceof String ? (String) value : null;
     }
 
     private static List<String> asStringList(Object value) {

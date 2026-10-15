@@ -62,7 +62,10 @@ public class BrowserInterceptConfigAction extends ActionSupport {
             List<Document> tenantConfigs = BrowserInterceptConfigDao.instance.findActive();
 
             List<String> unsupportedIds = new ArrayList<>();
+            // drop configs this engine can't compile: first by capability (missing strategies), then
+            // by engine version (minEngineVersion/maxEngineVersion vs the client's engineVersion).
             List<Document> supported = BrowserInterceptConfigs.filterByCapabilities(tenantConfigs, capabilities, unsupportedIds);
+            supported = BrowserInterceptConfigs.filterByEngineVersion(supported, engineVersion, unsupportedIds);
             this.unsupported = unsupportedIds;
 
             this.fullSync = clientSyncedUpTo <= 0;
