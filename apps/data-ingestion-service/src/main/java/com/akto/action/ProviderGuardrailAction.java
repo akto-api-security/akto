@@ -241,7 +241,7 @@ public class ProviderGuardrailAction extends ActionSupport {
                 return "claude_cowork";
             }
             if ("claude-app".equals(app)) {
-                return "claude-app";
+                return "claude-desktop";
             }
         }
         return provider.toLowerCase();
