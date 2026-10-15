@@ -391,6 +391,22 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     }
 
     // Username -> device tags (key/value/source only, the fields the UI reads), deduped like fetchAgenticUsers.
+    // "__deviceId__<device>" -> userName, same key shape as the Endpoint Shield username map.
+    public Map<String, String> fetchDeviceToUsernameMap() {
+        Map<String, String> result = new HashMap<>();
+        List<AgenticUsers> users = findAll(Filters.exists("devices"),
+                Projections.include(AgenticUsers.USER_NAME, "devices"));
+        for (AgenticUsers u : users) {
+            String username = u.getUserName() == null ? "" : u.getUserName().trim();
+            if (username.isEmpty() || u.getDevices() == null) continue;
+            for (String device : u.getDevices()) {
+                if (device == null || device.trim().isEmpty()) continue;
+                result.putIfAbsent("__deviceId__" + device.trim().toLowerCase(java.util.Locale.ROOT), username);
+            }
+        }
+        return result;
+    }
+
     public Map<String, List<Map<String, String>>> fetchDeviceTagsByUsername() {
         Map<String, List<Map<String, String>>> result = new HashMap<>();
         List<AgenticUsers> users = findAll(Filters.empty(),

@@ -354,8 +354,15 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         if (StringUtils.isBlank(deviceId)) {
             return Collections.emptySet();
         }
+        String rawDeviceId = AgenticObserveUtil.stripInferenceHookPrefix(deviceId);
+        Bson hostFilter = Filters.regex(com.akto.dto.ApiCollection.HOST_NAME, "^" + Pattern.quote(rawDeviceId) + "\\.");
+        // A prefixed id is an inference-hook endpoint, so only tagged collections belong to it.
+        if (!rawDeviceId.equals(deviceId)) {
+            hostFilter = Filters.and(hostFilter, Filters.elemMatch(com.akto.dto.ApiCollection.TAGS_STRING,
+                    Filters.eq(CollectionTags.KEY_NAME, AgenticObserveUtil.INFERENCE_HOOKS_TAG)));
+        }
         return com.akto.dao.ApiCollectionsDao.instance.findAll(
-                Filters.regex(com.akto.dto.ApiCollection.HOST_NAME, "^" + Pattern.quote(deviceId) + "\\."),
+                hostFilter,
                 Projections.include(Constants.ID)
         ).stream().map(com.akto.dto.ApiCollection::getId).collect(java.util.stream.Collectors.toSet());
     }
@@ -774,7 +781,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             ApiCollection c = byId.get(cid);
             if (c == null) continue;
             String hostName = c.getHostName();
-            String deviceId = AgenticObserveUtil.extractEndpointId(hostName);
+            String deviceId = AgenticObserveUtil.extractDisplayEndpointId(c);
             if (deviceId == null) continue;
             String serviceName = extractServiceNameForGrouping(hostName);
             String idStr = String.valueOf(cid);
@@ -861,7 +868,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<BasicDBObject> rows = new ArrayList<>();
             for (DeviceAcc d : devices.values()) {
                 BasicDBObject row = d.toResponse();
-                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernames));
+                row.put("username", resolveUsernameByDeviceId(AgenticObserveUtil.stripInferenceHookPrefix(d.deviceId), usernames));
                 rows.add(row);
             }
 
@@ -938,7 +945,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         for (ApiCollection c : collections) {
             String hostName = c.getHostName();
             if (StringUtils.isBlank(hostName)) continue;
-            String deviceId = AgenticObserveUtil.extractEndpointId(hostName);
+            String deviceId = AgenticObserveUtil.extractDisplayEndpointId(c);
             if (deviceId == null) continue;
 
             String idStr = String.valueOf(c.getId());
@@ -1008,7 +1015,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             EndpointGroup g = groups.computeIfAbsent(deviceId, id -> {
                 EndpointGroup ng = new EndpointGroup(id);
-                ng.username = resolveUsernameByDeviceId(id, usernameMap);
+                ng.username = resolveUsernameByDeviceId(AgenticObserveUtil.stripInferenceHookPrefix(id), usernameMap);
                 return ng;
             });
             g.children.add(child);
@@ -1799,8 +1806,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // Endpoint Shield hostname -> username, server-side so the client stops POSTing every device id.
     private Map<String, String> getOrComputeUsernameMap() {
         if (usernameMap != null && !usernameMap.isEmpty()) return usernameMap;
-        return getOrComputeCachedMap(usernameMapFallbackCache, accountCacheKey(),
-                () -> ModuleInfoDao.instance.fetchUsernameLookupMapForEndpointShield(), "username map");
+        return getOrComputeCachedMap(usernameMapFallbackCache, accountCacheKey(), () -> {
+            Map<String, String> merged = new HashMap<>(ModuleInfoDao.instance.fetchUsernameLookupMapForEndpointShield());
+            // Identities without an Endpoint Shield module (e.g. inference hooks) resolve through agent_users; module_info wins.
+            AgentUsersDao.instance.fetchDeviceToUsernameMap().forEach(merged::putIfAbsent);
+            return merged;
+        }, "username map");
     }
 
     // Username -> device tags, server-side so the client stops POSTing the account's identity list.
@@ -3438,7 +3449,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (StringUtils.isBlank(hostName)) continue;
             List<CollectionTags> envType = c.getEnvType();
             if (isConnectorIngested(envType)) continue;
-            if (!deviceId.equals(AgenticObserveUtil.extractEndpointId(hostName))) continue;
+            if (!deviceId.equals(AgenticObserveUtil.extractDisplayEndpointId(c))) continue;
 
             String serviceName = extractServiceNameForGrouping(hostName);
             if (StringUtils.isBlank(serviceName)) serviceName = hostName;
@@ -3777,7 +3788,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                 if (c == null || c.isDeactivated()) continue;
                 String hostName = c.getHostName();
                 if (StringUtils.isBlank(hostName)) continue;
-                String deviceId = AgenticObserveUtil.extractEndpointId(hostName);
+                String deviceId = AgenticObserveUtil.extractDisplayEndpointId(c);
                 if (StringUtils.isBlank(deviceId)) continue;
                 int ts = c.getStartTs();
 

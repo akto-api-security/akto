@@ -42,6 +42,9 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ProviderGuardrailAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String INFERENCE_HOOKS_TAG = "inference-hooks";
+    private static final String TOOL_CALL_EVENT = "tool_call";
+    private static final String CONFIG_TEST_APPLICATION = "config-test";
 
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
@@ -119,6 +122,8 @@ public class ProviderGuardrailAction extends ActionSupport {
         tag.put("gen-ai", "Gen AI");
         tag.put("ai-agent", provider.toLowerCase());
         tag.put("source", "ENDPOINT");
+        // Marks the collection as inference-hooks traffic so the dashboard can label its endpoint.
+        tag.put(INFERENCE_HOOKS_TAG, provider.toLowerCase());
 
         Map<String, Object> meta = new HashMap<>();
         meta.put("webhook_id", frame.requestId);
@@ -132,10 +137,20 @@ public class ProviderGuardrailAction extends ActionSupport {
         if (frame.metadata != null) {
             meta.put("provider_metadata", frame.metadata);
         }
+        meta.put("event_type", frame.eventType);
+        if (frame.toolInfos != null) {
+            meta.put("tool_infos", frame.toolInfos);
+        }
+
+        String path = "/" + provider.toLowerCase() + "/guardrail";
+        // Tool-call frames get their own endpoint so they stay separate from prompt traffic.
+        if (TOOL_CALL_EVENT.equals(frame.eventType)) {
+            path += "/tool-call";
+        }
 
         Map<String, Object> envelope = new HashMap<>();
         envelope.put("akto_connector", provider.toLowerCase());
-        envelope.put("path", "/" + provider.toLowerCase() + "/guardrail");
+        envelope.put("path", path);
         envelope.put("method", "POST");
         envelope.put("requestPayload", toJson(requestPayload));
         envelope.put("responsePayload", "{}");
@@ -205,6 +220,10 @@ public class ProviderGuardrailAction extends ActionSupport {
     // Self-registers this actor's email-slug into agent_users on first contact, so it becomes
     // pickable in the existing device dropdown; fail-open, never affects the guardrails verdict.
     private static void registerConnectorIdentity(ParsedRequest frame) {
+        // Connection tests and recovery checks are synthetic and carry no user.
+        if (CONFIG_TEST_APPLICATION.equals(frame.application)) {
+            return;
+        }
         try {
             String email = extractEmail(frame.actor);
             String slug = AgentHostUtils.slugify(AgentHostUtils.emailLocalPart(email));
