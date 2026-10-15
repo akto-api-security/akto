@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 
 /*
@@ -152,18 +153,22 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
     if (assignment.isEmpty()) {
       return "lag=unknown(no partitions assigned)";
     }
+    // Same numbers kafka-consumer-groups --describe shows: LOG-END-OFFSET - CURRENT-OFFSET (committed).
     Map<TopicPartition, Long> endOffsets = kafkaConsumer.endOffsets(assignment, Duration.ofSeconds(5));
-    Map<Integer, Long> lagByPartition = new TreeMap<>();
+    Map<TopicPartition, OffsetAndMetadata> committed = kafkaConsumer.committed(assignment, Duration.ofSeconds(5));
+    Map<Integer, String> offsetsByPartition = new TreeMap<>();
     long totalLag = 0;
     for (TopicPartition tp : assignment) {
       Long end = endOffsets.get(tp);
       if (end == null) {
         continue;
       }
-      long lag = Math.max(0, end - kafkaConsumer.position(tp));
-      lagByPartition.put(tp.partition(), lag);
+      OffsetAndMetadata c = committed.get(tp);
+      long committedOffset = c == null ? -1 : c.offset();
+      long lag = Math.max(0, end - Math.max(0, committedOffset));
+      offsetsByPartition.put(tp.partition(), "end=" + end + ",committed=" + committedOffset + ",lag=" + lag);
       totalLag += lag;
     }
-    return "lag=" + totalLag + " lagByPartition=" + lagByPartition;
+    return "topic=" + kafkaTopic + " group=" + kafkaConfig.getGroupId() + " committedLag=" + totalLag + " partitions=" + offsetsByPartition;
   }
 }
