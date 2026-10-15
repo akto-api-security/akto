@@ -132,7 +132,7 @@ public class Gateway {
     }
 
     private static boolean shouldForceGuardrailsForAccount(Integer accountId) {
-        return accountId != null && (accountId == 1710118493 || accountId == 1000000);
+        return accountId != null && accountId == 1710118493;
     }
 
     private Map<String, Object> mergeGuardrailsResults(Map<String, Object> existing, Map<String, Object> incoming) {
