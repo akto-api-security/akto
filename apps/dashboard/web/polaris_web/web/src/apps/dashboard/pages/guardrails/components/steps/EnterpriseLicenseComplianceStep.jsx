@@ -1,4 +1,4 @@
-import { VerticalStack, Text, Checkbox, Box, HorizontalStack } from "@shopify/polaris";
+import { VerticalStack, Text, Checkbox, Box, HorizontalStack, Badge } from "@shopify/polaris";
 import { ENTERPRISE_LICENSE_COMPLIANCE_CATEGORIES, enterpriseLicenseComplianceLabels } from "../enterpriseLicenseComplianceCatalog";
 import ControlInfoIcon from "../ControlInfoIcon";
 import { ENTERPRISE_CATEGORY_EXAMPLES } from "../../guardrailDescriptions";
@@ -39,6 +39,7 @@ const EnterpriseLicenseComplianceStep = ({ onTryPrompt, enterpriseLicenseComplia
                             label={
                                 <HorizontalStack gap="1" blockAlign="center">
                                     <Text as="span">{c.label}</Text>
+                                    {c.beta && <Badge status="info">Beta</Badge>}
                                     <ControlInfoIcon
                                         description={c.helpText}
                                         examples={ENTERPRISE_CATEGORY_EXAMPLES[c.key]}
