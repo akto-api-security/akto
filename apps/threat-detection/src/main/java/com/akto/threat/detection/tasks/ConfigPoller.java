@@ -13,6 +13,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.kafka.KafkaTopicResetter;
 
 public class ConfigPoller implements Runnable {
 
@@ -59,6 +61,12 @@ public class ConfigPoller implements Runnable {
             Map<String, String> envVars = extractEnvVars(moduleInfoList);
             if (!envVars.isEmpty()) {
                 writeEnvFile(envVars);
+            }
+
+            if (moduleInfoList.stream().anyMatch(ModuleInfo::isDeleteTopicAndReboot)) {
+                logger.warnAndAddToDb("Delete topic flag detected, resetting traffic and alerts topics before restart");
+                KafkaTopicResetter.resetTopic(System.getenv("AKTO_TRAFFIC_KAFKA_BOOTSTRAP_SERVER"), KafkaTopic.TRAFFIC_LOGS);
+                KafkaTopicResetter.resetTopic(System.getenv("AKTO_INTERNAL_KAFKA_BOOTSTRAP_SERVER"), KafkaTopic.ThreatDetection.ALERTS);
             }
 
             restartSelf();
