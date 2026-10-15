@@ -11,7 +11,7 @@ jobs:
     # No checkout, no build - every check below reads straight from the GitHub API,
     # so the whole job finishes in a few seconds.
     steps:
-      - name: PR size check (<=1000 changed lines, excluding generated/vendor paths)
+      - name: PR size check (<=1000 changed lines, excluding generated/vendor paths and markdown)
         id: size
         continue-on-error: true
         env:
@@ -23,7 +23,7 @@ jobs:
 
           gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate \
             --jq '.[] | select(.filename |
-              test("(^|/)target/|(^|/)node_modules/|(^|/)dist/|(^|/)build/|package-lock\\.json$|yarn\\.lock$|pnpm-lock\\.yaml$|\\.min\\.js$") | not
+              test("(^|/)target/|(^|/)node_modules/|(^|/)dist/|(^|/)build/|package-lock\\.json$|yarn\\.lock$|pnpm-lock\\.yaml$|\\.min\\.js$|\\.md$") | not
             ) | (.additions + .deletions)' > line_counts.txt
 
           CHANGED_LINES=$(awk '{ sum += $1 } END { print sum+0 }' line_counts.txt)
