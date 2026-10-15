@@ -52,7 +52,7 @@ public final class McpClientRegistry {
         String MCP_SERVER = AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER;
 
         register("claude", "Claude", AI_AGENT);
-        register("claude1", "Claude Desktop", AI_AGENT, "claude-desktop");
+        register("claude1", "Claude Desktop", AI_AGENT, "claude-desktop", "claude-app");
         register("claude2", "Claude CLI", AI_AGENT,
                 "claude", "claudecli", "claude-cli", "claude-cli-user", "claude-cli-project",
                 "claude-cli-local", "claude-cli-enterprise", "claude-plugin", "claude-code");
