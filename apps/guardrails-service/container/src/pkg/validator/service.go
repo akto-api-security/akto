@@ -190,6 +190,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	}()
 	go svc.runPolicyRefresher()
 	svc.startMcpAllowlistRefresher()
+	svc.schemaFetcher.StartRefresher()
 	return svc, nil
 }
 
@@ -2304,8 +2305,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	session.TrackRequestOnly(s.sessionMgr, sessionID, requestID, payload)
 
-	s.schemaFetcher.RefreshIfNeeded()
-
 	payloadBare := s.extractPayloadForValidation(payload, params.Method, params.Path, true)
 	s.logger.Info("ValidateRequest - payload prepared for validation",
 		zap.String("path", params.Path),
@@ -2556,8 +2555,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, "", nil
 		}
 	}
-
-	s.schemaFetcher.RefreshIfNeeded()
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
@@ -2877,8 +2874,6 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		zap.Int("count", len(batchData)),
 		zap.String("contextSource", contextSource),
 		zap.Bool("skipThreat", skipThreat))
-
-	s.schemaFetcher.RefreshIfNeeded()
 
 	type batchPolicyBundle struct {
 		policies      []types.Policy
