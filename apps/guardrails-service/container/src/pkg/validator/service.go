@@ -2988,8 +2988,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		var reqResult, respResult *mcp.ValidationResult
 
-		// Validate request payload if present
-		if data.RequestPayload != "" {
+		// Validate request payload if present, unless the http-proxy caller opted out
+		if data.RequestPayload != "" && data.RequestGuardrails != "false" {
 			s.logger.Debug("Processing request",
 				zap.Int("index", i),
 				zap.String("method", data.Method),
@@ -3079,8 +3079,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			}
 		}
 
-		// Validate response payload if present
-		if data.ResponsePayload != "" {
+		// Validate response payload if present, unless the http-proxy caller opted out
+		if data.ResponsePayload != "" && data.ResponseGuardrails != "false" {
 			respPayload := s.extractPayloadForValidation(data.ResponsePayload, data.Method, data.Path, false)
 			processResult, err := s.processor.ProcessResponse(ctx, respPayload, valCtx, itemPolicies)
 			if err != nil {

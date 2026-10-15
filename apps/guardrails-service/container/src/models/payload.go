@@ -27,6 +27,10 @@ type IngestDataBatch struct {
 	Tag                string   `json:"tag"`
 	ContextSource      string   `json:"contextSource,omitempty"`
 	ParentMcpToolNames []string `json:"parentMcpToolNames"`
+	// "false" when an http-proxy caller did not opt into request guardrails; empty for other sources.
+	RequestGuardrails string `json:"request_guardrails,omitempty"`
+	// "false" when an http-proxy caller did not opt into response guardrails; empty for other sources.
+	ResponseGuardrails string `json:"response_guardrails,omitempty"`
 }
 
 // HttpRequestParams represents HTTP request parameters

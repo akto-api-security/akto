@@ -288,6 +288,8 @@ public class Gateway {
         batch.setEnabled_graph(getStringField(requestData, "enabled_graph"));
         batch.setTag(getStringField(requestData, "tag"));
         batch.set_guardrail(getStringField(requestData, GUARDRAIL_FIELD));
+        batch.setRequest_guardrails(String.valueOf("true".equalsIgnoreCase(getStringField(requestData, "guardrails"))));
+        batch.setResponse_guardrails(String.valueOf("true".equalsIgnoreCase(getStringField(requestData, "response_guardrails"))));
 
         if (dataPublisher != null) {
             try {
