@@ -93,9 +93,11 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
       for (TopicPartition tp : assignment) {
         OffsetAndMetadata c = committed.get(tp);
         long committedOffset = c == null ? 0 : c.offset();
-        long lag = endOffsets.getOrDefault(tp, committedOffset) - committedOffset;
+        long endOffset = endOffsets.getOrDefault(tp, committedOffset);
+        long lag = endOffset - committedOffset;
         totalLag += lag;
-        perPartition.append(" ").append(tp).append("=").append(lag);
+        perPartition.append(" ").append(tp).append("=[committed=").append(committedOffset)
+            .append(", end=").append(endOffset).append(", lag=").append(lag).append("]");
       }
       logger.warnAndAddToDb(instanceId + ": Offset lag: " + totalLag + perPartition);
     } catch (Exception e) {
