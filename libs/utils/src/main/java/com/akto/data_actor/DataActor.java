@@ -377,6 +377,8 @@ public abstract class DataActor {
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
 
     public abstract void writeApiSequences(List<ApiSequences> sequences);
+
+    public abstract void writeSequenceCounts(List<SequenceCount> sequenceCounts);
     public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
     public abstract List<AgentQueryRecord> fetchAgentQueryRecords(String messageId);
 

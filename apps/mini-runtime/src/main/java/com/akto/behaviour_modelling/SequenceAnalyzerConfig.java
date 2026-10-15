@@ -1,65 +1,89 @@
 package com.akto.behaviour_modelling;
 
 import com.akto.behaviour_modelling.core.UserIdentifier;
-import com.akto.behaviour_modelling.core.WindowAccumulator;
-import com.akto.behaviour_modelling.core.WindowFlusher;
+import com.akto.dto.SequenceCount;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 
-import java.util.function.Supplier;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 public class SequenceAnalyzerConfig {
 
-    // Number of APIs in a tracked sequence. 2 = pairs (A→B), 3 = triplets (A→B→C).
-    private final int sequenceLength;
+    public static final int DEFAULT_N_MAX = 2;
+    public static final int DEFAULT_MAX_HISTORY = 10;
+    public static final long DEFAULT_SESSION_IDLE_MS = 10 * 60 * 1000L;
+    public static final long DEFAULT_FLUSH_INTERVAL_MS = 5 * 60 * 1000L;
+    public static final long DEFAULT_EVICTION_INTERVAL_MS = 60 * 1000L;
 
-    private final long windowDurationMs;
+    private final int nMax;
+    private final int maxHistory;
+    private final long sessionIdleMs;
+    private final long flushIntervalMs;
+    private final long evictionIntervalMs;
     private final UserIdentifier userIdentifier;
-
-    // Factory so the analyzer can create a fresh accumulator on each window flip.
-    private final Supplier<WindowAccumulator> accumulatorFactory;
-
-    private final WindowFlusher flusher;
-
-    // Used for URL templatization (e.g. /users/123 → /users/INTEGER)
-    // and as a guard to skip URLs not yet known in the catalog.
+    private final Consumer<List<SequenceCount>> sink;
     private final AktoPolicyNew aktoPolicyNew;
+    private final LongSupplier clockMs;
 
-    public SequenceAnalyzerConfig(int sequenceLength, long windowDurationMs,
-                                  UserIdentifier userIdentifier,
-                                  Supplier<WindowAccumulator> accumulatorFactory,
-                                  WindowFlusher flusher,
-                                  AktoPolicyNew aktoPolicyNew) {
-        if (sequenceLength < 2) throw new IllegalArgumentException("sequenceLength must be >= 2");
-        this.sequenceLength = sequenceLength;
-        this.windowDurationMs = windowDurationMs;
+    public SequenceAnalyzerConfig(int nMax, int maxHistory, long sessionIdleMs, long flushIntervalMs,
+                                  long evictionIntervalMs, UserIdentifier userIdentifier,
+                                  Consumer<List<SequenceCount>> sink, AktoPolicyNew aktoPolicyNew,
+                                  LongSupplier clockMs) {
+        if (nMax < 0) throw new IllegalArgumentException("nMax must be >= 0");
+        if (maxHistory < Math.max(1, nMax)) throw new IllegalArgumentException("maxHistory must be >= max(1, nMax)");
+        this.nMax = nMax;
+        this.maxHistory = maxHistory;
+        this.sessionIdleMs = sessionIdleMs;
+        this.flushIntervalMs = flushIntervalMs;
+        this.evictionIntervalMs = evictionIntervalMs;
         this.userIdentifier = userIdentifier;
-        this.accumulatorFactory = accumulatorFactory;
-        this.flusher = flusher;
+        this.sink = sink;
         this.aktoPolicyNew = aktoPolicyNew;
+        this.clockMs = clockMs;
     }
 
-    public int getSequenceLength() {
-        return sequenceLength;
+    public static SequenceAnalyzerConfig withDefaults(UserIdentifier userIdentifier,
+                                                      Consumer<List<SequenceCount>> sink,
+                                                      AktoPolicyNew aktoPolicyNew) {
+        return new SequenceAnalyzerConfig(DEFAULT_N_MAX, DEFAULT_MAX_HISTORY, DEFAULT_SESSION_IDLE_MS,
+                DEFAULT_FLUSH_INTERVAL_MS, DEFAULT_EVICTION_INTERVAL_MS, userIdentifier, sink, aktoPolicyNew,
+                System::currentTimeMillis);
     }
 
-    public long getWindowDurationMs() {
-        return windowDurationMs;
+    public int getNMax() {
+        return nMax;
+    }
+
+    public int getMaxHistory() {
+        return maxHistory;
+    }
+
+    public long getSessionIdleMs() {
+        return sessionIdleMs;
+    }
+
+    public long getFlushIntervalMs() {
+        return flushIntervalMs;
+    }
+
+    public long getEvictionIntervalMs() {
+        return evictionIntervalMs;
     }
 
     public UserIdentifier getUserIdentifier() {
         return userIdentifier;
     }
 
-    public Supplier<WindowAccumulator> getAccumulatorFactory() {
-        return accumulatorFactory;
-    }
-
-    public WindowFlusher getFlusher() {
-        return flusher;
+    public Consumer<List<SequenceCount>> getSink() {
+        return sink;
     }
 
     public AktoPolicyNew getAktoPolicyNew() {
         return aktoPolicyNew;
     }
 
+    public LongSupplier getClockMs() {
+        return clockMs;
+    }
 }

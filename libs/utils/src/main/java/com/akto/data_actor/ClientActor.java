@@ -5041,6 +5041,40 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
+    int sequenceCountBatchLimit = 1000;
+    public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        if (sequenceCounts == null || sequenceCounts.isEmpty()) return;
+        List<SequenceCount> batch = new ArrayList<>();
+        for (SequenceCount sequenceCount : sequenceCounts) {
+            batch.add(sequenceCount);
+            if (batch.size() == sequenceCountBatchLimit) {
+                List<SequenceCount> finalBatch = batch;
+                sequenceThreadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<SequenceCount> finalBatch = batch;
+            sequenceThreadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+        }
+    }
+
+    private void writeSequenceCountsBatch(List<SequenceCount> sequenceCounts) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("sequenceCounts", sequenceCounts);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/writeSequenceCounts", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb(null, "non 2xx response in writeSequenceCounts", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeSequenceCounts: " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public Map<String, String> fetchDeviceUserMap() {
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchDeviceUserMap", "", "POST", null, headers, "");
