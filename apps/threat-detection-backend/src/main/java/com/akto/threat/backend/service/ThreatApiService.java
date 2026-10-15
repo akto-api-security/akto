@@ -250,6 +250,7 @@ public class ThreatApiService {
       List<Document> pipeline = new ArrayList<>();
       pipeline.add(new Document("$match", match));
       ThreatUtils.addHostScope(pipeline, req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null);
+      pipeline.addAll(ThreatUtils.configScanDedupeStages(contextSource));
       pipeline.add(new Document("$group", new Document("_id", "$severity")
           .append("count", new Document("$sum", 1))));
 
