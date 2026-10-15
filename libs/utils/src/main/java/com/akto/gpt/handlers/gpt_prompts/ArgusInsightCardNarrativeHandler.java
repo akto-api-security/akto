@@ -25,6 +25,9 @@ import java.util.Set;
  */
 public class ArgusInsightCardNarrativeHandler extends AbstractGroundedNarrativeHandler {
 
+    @Override
+    protected String getServiceKey() { return "argus-insight-cards"; }
+
     private static final int MAX_FIELD_WORDS = 45;
 
     @Override

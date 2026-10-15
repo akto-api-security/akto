@@ -16,6 +16,9 @@ import java.util.function.Consumer;
 
 public class AgentGuardIntentClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "agent-guard-labeling"; }
+
     public static final String AGENT_HOST = "agentHost";
     public static final String SOURCE_KEY = "sourceKey";
     public static final String UNIT_TEXT  = "unitText";

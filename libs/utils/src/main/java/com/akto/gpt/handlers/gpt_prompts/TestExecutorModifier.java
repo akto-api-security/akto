@@ -13,6 +13,9 @@ import com.mongodb.BasicDBObject;
 
 public class TestExecutorModifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "test-editor"; }
+
     // TODO: use abstract class to decide which prompt handler to use
 
     static final int MAX_QUERY_LENGTH = 100000;

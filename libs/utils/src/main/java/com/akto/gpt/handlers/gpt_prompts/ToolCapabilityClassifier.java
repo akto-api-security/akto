@@ -13,6 +13,9 @@ import javax.validation.ValidationException;
  */
 public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "tool-capability"; }
+
     public static final String TOOL_NAME = "toolName";
     public static final String SAMPLE_DATA = "sampleData";
     public static final String DANGEROUS = "dangerous";

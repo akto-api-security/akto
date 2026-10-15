@@ -22,6 +22,9 @@ import java.util.Set;
  */
 public class AskTileCurationHandler extends AbstractGroundedNarrativeHandler {
 
+    @Override
+    protected String getServiceKey() { return "ask-akto-tiles"; }
+
     static final int MAX_PROMPT_WORDS = 30;
 
     @Override

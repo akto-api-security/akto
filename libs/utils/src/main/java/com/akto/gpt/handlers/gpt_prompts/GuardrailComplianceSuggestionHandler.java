@@ -15,6 +15,9 @@ import com.mongodb.BasicDBObject;
 
 public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "guardrail-compliance"; }
+
     // Query data keys
     public static final String INPUT_TYPE = "inputType";
     public static final String TOPIC_NAME = "topicName";

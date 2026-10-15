@@ -20,6 +20,9 @@ import java.util.List;
  */
 public class ConversationContinuityClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "conversation-continuity"; }
+
     public static final String ANCHOR_QUERY       = "anchorQuery";
     public static final String ANCHOR_RESPONSE    = "anchorResponse";
     public static final String CANDIDATE_QUERY    = "candidateQuery";
