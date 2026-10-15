@@ -3662,6 +3662,11 @@ public class DbAction extends ActionSupport {
                     loggerMaker.errorAndAddToDb(e, "Error creating or inserting MCP audit info: " + e.toString());
                 }
             }
+            boolean isBrowserLlm = tagsList != null
+                && tagsList.stream().anyMatch(t -> Constants.AKTO_BROWSER_LLM_TAG.equals(t.getKeyName()));
+            if (isBrowserLlm) {
+                insertBrowserLlmAuditInfo(host);
+            }
             if (mcpServerCollectionInfo != null) {
                 try {
                     DbLayer.upsertEndpointMcpConfig(mcpServerCollectionInfo);
@@ -3674,6 +3679,31 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    // Same grouping as the Agentic assets LLMs tab (AgenticObserveAction.extractServiceNameForGrouping), so both tabs list the same sites.
+    private static final Set<String> BROWSER_LLM_SUFFIX_TLDS = new HashSet<>(Arrays.asList(
+            "io", "com", "net", "org", "cloud", "dev", "app", "ai", "co"));
+
+    private static String browserLlmSite(String hostName) {
+        if (hostName == null || hostName.trim().isEmpty() || hostName.contains("not-attached")) return null;
+        String host = hostName.toLowerCase();
+        String[] parts = host.split("\\.");
+        if (parts.length < 3 || BROWSER_LLM_SUFFIX_TLDS.contains(parts[2])) return host;
+        return String.join(".", Arrays.copyOfRange(parts, 2, parts.length));
+    }
+
+    // One mcp_audit_info row per browser LLM site (<user>.<browser>.<site> -> site) for Audit Data -> LLMs.
+    private void insertBrowserLlmAuditInfo(String host) {
+        String site = browserLlmSite(host);
+        if (site == null) return;
+        try {
+            McpAuditInfo auditInfo = new McpAuditInfo(Context.now(), "", Constants.AKTO_BROWSER_LLM_TAG, 0, site, "", null, 0, null, null);
+            auditInfo.setContextSource(GlobalEnums.CONTEXT_SOURCE.ENDPOINT.name());
+            DbLayer.insertMCPAuditDataLog(auditInfo);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error inserting browser LLM audit info for host " + host + ": " + e.toString());
+        }
     }
 
     public String createCollectionForServiceTag() {
