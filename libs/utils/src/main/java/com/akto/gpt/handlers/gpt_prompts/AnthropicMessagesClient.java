@@ -6,6 +6,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.akto.dto.agents.Model;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import okhttp3.MediaType;
@@ -20,6 +22,8 @@ class AnthropicMessagesClient {
     static final String API_VERSION = "2023-06-01";
 
     private static final MediaType JSON = MediaType.parse("application/json");
+
+    private static final LoggerMaker logger = new LoggerMaker(AnthropicMessagesClient.class, LogDb.DASHBOARD);
 
     // Built from the shared client on purpose: it verifies TLS, unlike the Azure one.
     private static final OkHttpClient CLIENT = CoreHTTPClient.client.newBuilder()
@@ -43,6 +47,8 @@ class AnthropicMessagesClient {
         try (Response response = CLIENT.newCall(request).execute()) {
             String body = response.body() != null ? response.body().string() : "";
             if (!response.isSuccessful()) throw httpError(response.code(), body);
+            // Same as the Azure client's "Response from ai": the whole body, so stop_reason and usage show next to the text.
+            logger.warn("Response from anthropic (" + target.getModelName() + "): " + body);
             return parseResponse(body);
         }
     }
