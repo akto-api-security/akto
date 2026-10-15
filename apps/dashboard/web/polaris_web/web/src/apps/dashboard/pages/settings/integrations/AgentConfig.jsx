@@ -35,10 +35,11 @@ const OPENAI_MODELS = [
 ]
 
 const ANTHROPIC_MODELS = [
-  { label: "Claude 3.5 Haiku", value: "claude-3-5-haiku-20241022" },
-  { label: "Claude 3 Haiku", value: "claude-3-haiku-20240307" },
-  { label: "Claude 3.7 Sonnet", value: "claude-3-7-sonnet-20250219" },
-  { label: "Claude 3.5 Sonnet", value: "claude-3-5-sonnet-20241022" }
+  { label: "Claude Sonnet 4.6", value: "claude-sonnet-4-6" },
+  { label: "Claude Haiku 4.5", value: "claude-haiku-4-5" },
+  { label: "Claude Opus 4.8", value: "claude-opus-4-8" },
+  { label: "Claude Opus 4.7", value: "claude-opus-4-7" },
+  { label: "Claude Opus 4.6", value: "claude-opus-4-6" }
 ]
 
 
