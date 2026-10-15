@@ -414,4 +414,6 @@ public abstract class DataActor {
 
     public abstract int incrementAndGetTestRateLimitUsage(int globalRateLimit, String dashboardContext);
 
+    public abstract void writeSequenceCounts(List<SequenceCount> sequenceCounts);
+
 }

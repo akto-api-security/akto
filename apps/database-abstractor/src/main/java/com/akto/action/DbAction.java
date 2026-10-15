@@ -31,6 +31,7 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.dao.ApiSequencesDao;
+import com.akto.dao.SequenceModelDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.notifications.CustomWebhook;
@@ -73,6 +74,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.ApiSequences;
+import com.akto.dto.SequenceCount;
 import com.akto.dto.DeviceDomainConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -162,6 +164,7 @@ public class DbAction extends ActionSupport {
     DeviceDomainConfig deviceDomainConfig;
     List<BasicDBObject> apiInfoList;
     List<ApiSequences> apiSequencesList;
+    List<SequenceCount> sequenceCounts;
     List<BulkUpdates> writesForFilterSampleData;
     List<BulkUpdates> writesForSti;
     List<BulkUpdates> writesForSampleData;
@@ -1019,6 +1022,19 @@ public class DbAction extends ActionSupport {
             ApiSequencesDao.instance.getMCollection().bulkWrite(writeModels, new BulkWriteOptions().ordered(false));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in writeApiSequences: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String writeSequenceCounts() {
+        if (sequenceCounts == null || sequenceCounts.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
+        }
+        try {
+            SequenceModelDao.instance.writeSequenceCounts(sequenceCounts);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeSequenceCounts: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -6741,6 +6757,14 @@ public class DbAction extends ActionSupport {
 
     public void setApiSequencesList(List<ApiSequences> apiSequencesList) {
         this.apiSequencesList = apiSequencesList;
+    }
+
+    public List<SequenceCount> getSequenceCounts() {
+        return sequenceCounts;
+    }
+
+    public void setSequenceCounts(List<SequenceCount> sequenceCounts) {
+        this.sequenceCounts = sequenceCounts;
     }
 
     McpServerCollectionInfo mcpServerCollectionInfo;

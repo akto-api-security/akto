@@ -4763,4 +4763,8 @@ public class DbLayer {
         return agentic ? updated.getTestRateLimitUsageCountAgentic() : updated.getTestRateLimitUsageCount();
     }
 
+    public static void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        SequenceModelDao.instance.writeSequenceCounts(sequenceCounts);
+    }
+
 }

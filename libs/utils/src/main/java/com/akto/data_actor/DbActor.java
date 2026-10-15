@@ -767,4 +767,9 @@ public class DbActor extends DataActor {
     public int incrementAndGetTestRateLimitUsage(int globalRateLimit, String dashboardContext) {
         return DbLayer.incrementAndGetTestRateLimitUsage(globalRateLimit, dashboardContext);
     }
+
+    @Override
+    public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        DbLayer.writeSequenceCounts(sequenceCounts);
+    }
 }
