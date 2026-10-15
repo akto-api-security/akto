@@ -68,7 +68,7 @@ func (s *Service) checkRejectedLLM(params *models.ValidateRequestParams, valCtx 
 	reason := "LLM access has been rejected by Audit Policy"
 	metadata := types.ThreatMetadata{
 		PolicyName:   mcp.AuditPolicyCategory,
-		RuleViolated: "ComponentAccessRejected",
+		RuleViolated: "LLMAccessRejected",
 		Severity:     "MEDIUM",
 		Reason:       reason,
 	}
