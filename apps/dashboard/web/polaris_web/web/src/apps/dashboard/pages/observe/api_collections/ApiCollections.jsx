@@ -334,11 +334,11 @@ const issueFields = (collection, severityInfoMap) => {
     }
 }
 
-// Transform raw collection data to plain data (without JSX) for filtering/sorting
-// This function is passed to the table component for lazy transformation
 const hasInferenceHooksTag = (envType) =>
     Array.isArray(envType) && envType.some(tag => tag?.keyName === "inference-hooks");
 
+// Transform raw collection data to plain data (without JSX) for filtering/sorting
+// This function is passed to the table component for lazy transformation
 const transformRawCollectionData = (rawCollection, transformMaps) => {
     const trafficInfoMap = transformMaps?.trafficInfoMap || {};
     const coverageMap = transformMaps?.coverageMap || {};

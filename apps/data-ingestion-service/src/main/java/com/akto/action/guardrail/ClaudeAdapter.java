@@ -72,7 +72,8 @@ public class ClaudeAdapter implements ProviderAdapter {
                 return frame;
             }
             msgs = msgs.subList(msgs.size() - 1, msgs.size());
-            frame.toolInfos = collectToolInfos(msgs);
+            List<Map<String, Object>> infos = collectToolInfos(msgs);
+            frame.toolInfos = infos.isEmpty() ? null : infos;
         }
         frame.prompt = flatten(msgs);
         return frame;
