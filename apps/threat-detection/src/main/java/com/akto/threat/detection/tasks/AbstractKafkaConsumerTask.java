@@ -6,11 +6,15 @@ import com.akto.log.LoggerMaker.LogDb;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 
 
 public abstract class AbstractKafkaConsumerTask<V> implements Task {
@@ -69,11 +73,33 @@ public abstract class AbstractKafkaConsumerTask<V> implements Task {
           " (avg " + String.format("%.2f", recordsReadCount / (timeDiff / 1000.0)) + " records/sec)");
       logger.warnAndAddToDb(instanceId + ": Assigned partitions: " + kafkaConsumer.assignment());
       logger.warnAndAddToDb(instanceId + ": Subscription: " + kafkaConsumer.subscription());
+      logOffsetLag();
       if (kafkaConsumer.assignment().isEmpty()) {
         logger.warnAndAddToDb(instanceId + ": WARNING - No partitions assigned! Consumer may not receive records.");
       }
       recordsReadCount = 0;
       lastRecordCountLogTime = currentTime;
+    }
+  }
+
+  // Same as kafka-consumer-groups --describe: LAG = LOG-END-OFFSET - CURRENT-OFFSET (committed).
+  private void logOffsetLag() {
+    try {
+      Set<TopicPartition> assignment = kafkaConsumer.assignment();
+      Map<TopicPartition, Long> endOffsets = kafkaConsumer.endOffsets(assignment, Duration.ofSeconds(5));
+      Map<TopicPartition, OffsetAndMetadata> committed = kafkaConsumer.committed(assignment, Duration.ofSeconds(5));
+      long totalLag = 0;
+      StringBuilder perPartition = new StringBuilder();
+      for (TopicPartition tp : assignment) {
+        OffsetAndMetadata c = committed.get(tp);
+        long committedOffset = c == null ? 0 : c.offset();
+        long lag = endOffsets.getOrDefault(tp, committedOffset) - committedOffset;
+        totalLag += lag;
+        perPartition.append(" ").append(tp).append("=").append(lag);
+      }
+      logger.warnAndAddToDb(instanceId + ": Offset lag: " + totalLag + perPartition);
+    } catch (Exception e) {
+      logger.errorAndAddToDb(instanceId + ": Error fetching offset lag " + e.getMessage());
     }
   }
 
