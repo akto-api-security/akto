@@ -1,7 +1,6 @@
 package com.akto.threat.detection.tasks;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -340,12 +339,13 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
       }
 
       // Evaluate filter first (ignore and filter are independent conditions)
-      // SchemaConform check is disabled
-      List<Integer> accountIds = Arrays.asList(1758179941, 1763355072, 1786100206);
-      if(accountIds.contains(Context.accountId.get()) && apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+      if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
-        // vulnerable = handleSchemaConformFilter(responseParam, apiInfoKey, vulnerable); 
-        
+
+        if (apiFilter.getFilter() != null && !threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey, matchedTemplate)) {
+          continue;
+        }
+
         String apiSchema = filterCache.getApiSchema(apiCollectionId);
 
         if (apiSchema == null || apiSchema.isEmpty()) {

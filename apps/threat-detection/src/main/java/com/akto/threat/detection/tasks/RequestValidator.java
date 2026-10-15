@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
-import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -326,63 +325,19 @@ public class RequestValidator {
         }
       }
     }
-
-    // Check for extra query parameters not defined in schema
-    for (String paramName : actualQueryParams.keySet()) {
-      if (!definedQueryParams.containsKey(paramName)) {
-        addError(schemaPath + "/parameters", paramName, "query",
-            String.format("Extra query parameter '%s' not defined in schema", paramName),
-            SchemaConformanceError.Location.LOCATION_URL);
-      }
-    }
   }
 
-  private static void validateExtraBodyAttributes(JsonNode dataNode, JsonNode schemaNode, String schemaPath,
-      String instancePath) {
-    if (dataNode == null || schemaNode == null) {
-      return;
-    }
+  private static void validateRequestBody(HttpResponseParams httpResponseParams,
+      JsonNode methodNode, String normalizedUrl) throws Exception {
 
-    // Only validate objects for extra properties
-    if (!dataNode.isObject()) {
-      return;
-    }
-
-    JsonNode propertiesNode = schemaNode.path("properties");
-    if (propertiesNode.isMissingNode()) {
-      return;
-    }
-
-    Set<String> definedProperties = new HashSet<>();
-    propertiesNode.fieldNames().forEachRemaining(definedProperties::add);
-
-    // Check for extra properties in the request body
-    Iterator<String> fieldNames = dataNode.fieldNames();
-    while (fieldNames.hasNext()) {
-      String fieldName = fieldNames.next();
-      if (!definedProperties.contains(fieldName)) {
-        addError(schemaPath + "/properties", instancePath + "/" + fieldName, "requestBody",
-            String.format("Extra property '%s' not defined in schema", fieldName),
-            SchemaConformanceError.Location.LOCATION_BODY);
-      } else {
-        // Recursively validate nested objects
-        JsonNode nestedSchema = propertiesNode.path(fieldName);
-        JsonNode nestedData = dataNode.path(fieldName);
-        validateExtraBodyAttributes(nestedData, nestedSchema,
-            schemaPath + "/properties/" + fieldName, instancePath + "/" + fieldName);
-      }
-    }
-  }
-
-  private static void validateRequestBodyWithExtras(HttpResponseParams httpResponseParams,
-      JsonNode methodNode, String schemaPath, String normalizedUrl) throws Exception {
+    int errorsBefore = errors.size();
 
     // Reuse existing method to get schema node (handles GET/DELETE skip,
     // content-type check, etc.)
     JsonNode schemaNode = getRequestBodySchemaNode(methodNode, httpResponseParams, normalizedUrl);
 
     // If there were errors from getRequestBodySchemaNode, they're already added
-    if (!errors.isEmpty()) {
+    if (errors.size() > errorsBefore) {
       return;
     }
 
@@ -415,11 +370,6 @@ public class RequestValidator {
       errorBuilder.setPhrase(message.getMessage());
       errors.add(errorBuilder.build());
     }
-
-    // Additionally check for extra properties not in schema
-    String contentType = httpResponseParams.getRequestParams().getHeaders().get("content-type").get(0);
-    validateExtraBodyAttributes(dataNode, schemaNode, schemaPath + "/requestBody/content/" + contentType + "/schema",
-        "");
   }
 
   public static List<SchemaConformanceError> validate(HttpResponseParams responseParam, String apiSchema,
@@ -453,24 +403,9 @@ public class RequestValidator {
       String method = responseParam.getRequestParams().getMethod().toLowerCase();
       String schemaPath = "#/paths" + url + "/" + method;
 
-      // Validate headers for extra undefined headers
       validateHeaders(responseParam, methodNode, pathNode, schemaPath);
-      
-      // If there were errors from validateHeaders, they're already added
-      if (!errors.isEmpty()) {
-        return errors;
-      }
-
-      // Validate query params for extra undefined params
       validateQueryParams(responseParam, methodNode, pathNode, schemaPath);
-
-      // If there were errors from validateQueryParams, they're already added
-      if (!errors.isEmpty()) {
-        return errors;
-      }
-
-      // Validate request body (including extra attributes check)
-      validateRequestBodyWithExtras(responseParam, methodNode, schemaPath, url);
+      validateRequestBody(responseParam, methodNode, url);
 
       return errors;
     } catch (Exception e) {
