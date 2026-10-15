@@ -23,6 +23,9 @@ public class Model {
     // steps); consumers fall back to PARAM_MODEL when it's absent.
     public final static String PARAM_FAST_MODEL = "fastModel";
     public final static String PARAM_API_KEY = "apiKey";
+    // Env-configured Azure deployment tier (see AzureOpenAIPromptHandler.ModelTier), used by
+    // Akto's own service chains instead of an explicit endpoint/key.
+    public final static String PARAM_TIER = "tier";
     public final static String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
     public final static String PARAM_OLLAMA_ENDPOINT = "ollamaAIEndpoint";
     public final static String PARAM_DATABRICKS_ENDPOINT = "databricksEndpoint";

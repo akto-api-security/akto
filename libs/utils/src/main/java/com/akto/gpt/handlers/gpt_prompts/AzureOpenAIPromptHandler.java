@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.validation.ValidationException;
 
+import com.akto.dto.agents.Model;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -156,6 +157,11 @@ public abstract class AzureOpenAIPromptHandler {
         return ModelTier.GPT_4O_MINI;
     }
 
+    /** Non-null opts this handler into the per-service model chain (see LlmServiceChains). */
+    protected String getServiceKey() {
+        return null;
+    }
+
     // Overridable so lightweight handlers can cap output tokens / tune sampling
     // without affecting other handlers that share the global defaults.
     protected int getMaxTokens() {
@@ -207,11 +213,15 @@ public abstract class AzureOpenAIPromptHandler {
     /** The chat-completions request body, split out of extractRawContent (pure, no network) so the
      *  reasoning-vs-classic parameter handling can be asserted directly. */
     JSONObject buildPayload(String prompt) throws org.json.JSONException {
+        return buildPayload(prompt, getModelTier());
+    }
+
+    JSONObject buildPayload(String prompt, ModelTier tier) throws org.json.JSONException {
         JSONObject payload = new JSONObject();
 
-        if (isReasoningModel(getModelTier())) {
+        if (isReasoningModel(tier)) {
             payload.put("max_completion_tokens", getMaxTokens());
-            payload.put("reasoning_effort", getReasoningEffort());
+            payload.put("reasoning_effort", tier == ModelTier.GPT_5_NANO ? "minimal" : getReasoningEffort());
         } else {
             payload.put("temperature", getTemperature());
             payload.put("top_p", 0.9);
@@ -234,13 +244,30 @@ public abstract class AzureOpenAIPromptHandler {
     }
 
     private String extractRawContent(String prompt) throws Exception {
+        String service = getServiceKey();
+        if (service == null) return callAzure(getModelTier(), prompt);
+        return LlmServiceChains.call(service, getModelTier(), target -> callTarget(target, prompt));
+    }
+
+    private String callTarget(Model target, String prompt) throws Exception {
+        switch (target.getType()) {
+            case ANTHROPIC:
+                return AnthropicMessagesClient.call(target, prompt, getMaxTokens());
+            case AZURE_OPENAI:
+                return callAzure(LlmServiceChains.tierOf(target), prompt);
+            default:
+                throw LlmCallException.provider("unsupported provider " + target.getType());
+        }
+    }
+
+    private String callAzure(ModelTier tier, String prompt) throws Exception {
         MediaType mediaType = MediaType.parse("application/json");
-        JSONObject payload = buildPayload(prompt);
+        JSONObject payload = buildPayload(prompt, tier);
 
         RequestBody body = RequestBody.create(payload.toString(), mediaType);
         String apiKey = AZURE_OPENAI_API_KEY;
         Request request = new Request.Builder()
-                .url(getAzureOpenAIEndpoint(getModelTier()))
+                .url(getAzureOpenAIEndpoint(tier))
                 .method("POST", body)
                 .addHeader("Content-Type", "application/json")
                 .addHeader("api-key", apiKey)

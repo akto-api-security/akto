@@ -29,6 +29,9 @@ import java.util.Set;
  */
 public class ArgusAttackFlowNarrativeHandler extends AbstractGroundedNarrativeHandler {
 
+    @Override
+    protected String getServiceKey() { return "argus-attack-flow"; }
+
     private static final int MIN_STEPS = 3;
     private static final int MAX_STEPS = 5;
     private static final int MAX_STEP_WORDS = 30;
