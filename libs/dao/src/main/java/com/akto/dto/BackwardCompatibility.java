@@ -117,6 +117,9 @@ public class BackwardCompatibility {
 
     public static final String FILL_LAST_TESTED_FIELD = "fillLastTestedField";
 
+    public static final String BROWSER_LLM_AUDIT_BACKFILL = "browserLlmAuditBackfill";
+    private int browserLlmAuditBackfill;
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -496,5 +499,13 @@ public class BackwardCompatibility {
 
     public void setFillQueryParams(int fillQueryParams) {
         this.fillQueryParams = fillQueryParams;
+    }
+
+    public int getBrowserLlmAuditBackfill() {
+        return browserLlmAuditBackfill;
+    }
+
+    public void setBrowserLlmAuditBackfill(int browserLlmAuditBackfill) {
+        this.browserLlmAuditBackfill = browserLlmAuditBackfill;
     }
 }
