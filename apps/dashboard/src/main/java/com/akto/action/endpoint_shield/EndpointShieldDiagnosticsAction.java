@@ -138,7 +138,7 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
             long nowMs = System.currentTimeMillis();
             for (EndpointRemoteCommand c : recentRunCommands(deviceId, 1)) {
                 String state = (String) runView(c, deviceId, nowMs).get("state");
-                if ("waiting".equals(state) || "running".equals(state)) {
+                if ("waiting".equals(state) || "starting".equals(state) || "running".equals(state)) {
                     commandId = c.getCommandId();
                     return Action.SUCCESS.toUpperCase();
                 }
@@ -225,8 +225,9 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
     }
 
     /**
-     * state: waiting (the device has not picked it up) · running · completed ·
-     * failed · expired (the device never picked it up) · cancelled.
+     * state: waiting (the device has not picked it up) · starting (fetched, not
+     * yet claimed — still cancellable) · running (claimed: a cancel no longer
+     * stops it) · completed · failed · expired (never picked up) · cancelled.
      */
     private static Map<String, Object> runView(EndpointRemoteCommand c, String deviceId, long nowMs) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -254,7 +255,7 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
             state = "expired";
         } else {
             // No execution yet, or PENDING: the agent fetched it but has not claimed it.
-            state = ex == null ? "waiting" : "running";
+            state = ex == null ? "waiting" : "starting";
         }
         m.put("state", state);
         if (ex != null) {

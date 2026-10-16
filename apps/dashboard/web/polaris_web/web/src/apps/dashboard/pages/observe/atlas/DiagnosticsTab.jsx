@@ -42,7 +42,10 @@ const OutcomeBadge = ({ diagnostic }) => {
 
 const PROFILE_LABELS = { full: 'Full report', quick: 'Quick check' }
 const RUN_POLL_MS = 5000
-const ACTIVE_RUN_STATES = ['waiting', 'running']
+const ACTIVE_RUN_STATES = ['waiting', 'starting', 'running']
+// Cancel only fails runs no device has claimed yet; once the agent is executing
+// one (running) it finishes and stores its report anyway.
+const CANCELLABLE_RUN_STATES = ['waiting', 'starting']
 
 // Why a run did not produce a report, in words an admin can act on.
 const runFailureText = (run) => {
@@ -234,6 +237,11 @@ function RunRow({ run, onCancel, cancelling }) {
             title = 'Waiting for the device'
             detail = `Devices check in every 15 seconds. If this one is offline the run expires at ${new Date(run.expiresAt).toLocaleTimeString()}.`
             break
+        case 'starting':
+            icon = <Spinner size="small" />
+            title = 'Starting on the device'
+            detail = 'The device has picked up the run and is about to start it.'
+            break
         case 'running':
             icon = <Spinner size="small" />
             title = 'Running on the device'
@@ -269,7 +277,7 @@ function RunRow({ run, onCancel, cancelling }) {
                         <Text variant="bodySm" color="subdued">{meta}</Text>
                     </VerticalStack>
                 </HorizontalStack>
-                {ACTIVE_RUN_STATES.includes(run.state) && (
+                {CANCELLABLE_RUN_STATES.includes(run.state) && (
                     <Button size="slim" onClick={() => onCancel(run.commandId)} loading={cancelling}>Cancel</Button>
                 )}
             </HorizontalStack>
