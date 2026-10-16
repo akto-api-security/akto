@@ -1,0 +1,48 @@
+id: GRAPHQL_OVERFETCHING
+info:
+  name: "GraphQL Overfetching Vulnerability"
+  description: "Detects if a GraphQL endpoint returns more data than what was requested, which can lead to sensitive data exposure or performance issues."
+  details: "Overfetching happens when a GraphQL query receives more fields than required. This test checks if sending a broad query exposes sensitive fields that shouldn't be publicly accessible."
+  impact: "Medium"
+  category:
+    name: BOLA
+    shortName: BOLA
+    displayName: Business Logic
+  subCategory: GRAPHQL_OVERFETCHING
+  severity: MEDIUM
+  tags:
+    - GraphQL
+    - Business Logic
+    - OWASP API3
+
+auth:
+  authenticated: true
+
+api_selection_filters:
+  response_code:
+    gte: 200
+    lt: 300
+  method:
+    eq: "POST"
+  request_payload:
+    contains_either:
+      - "query"
+      - "mutation"
+
+execute:
+  type: single
+  requests:
+    - req:
+        - modify_body_param:
+            query: "query { user { id name email password creditCard } }"
+
+validate:
+  response_code:
+    gte: 200
+    lt: 300
+  response_payload:
+    contains_either:
+      - "password"
+      - "creditCard"
+    not_contains:
+      - "errors"
