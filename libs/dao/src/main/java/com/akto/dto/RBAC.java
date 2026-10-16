@@ -93,6 +93,10 @@ public class RBAC {
                 // same as threat protection unless a custom role overrides it
                 feature = Feature.THREAT_PROTECTION;
             }
+            if (feature == Feature.TEST_SCRIPTS && this != Role.ADMIN) {
+                // only admins by default; other roles get it through a custom role
+                return ReadWriteAccess.NO_ACCESS;
+            }
             // change default for dev and and feature label to NO_ACCESS
             ReadWriteAccess defaultAccess = ReadWriteAccess.READ;
             if(this.name.equals(Role.DEVELOPER.name()) || this.name.equals(Role.GUEST.name())){
