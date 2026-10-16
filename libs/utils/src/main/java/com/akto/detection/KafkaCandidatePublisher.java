@@ -1,5 +1,6 @@
 package com.akto.detection;
 
+import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.google.gson.Gson;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -57,6 +58,9 @@ public class KafkaCandidatePublisher implements CandidatePublisher {
         props.put(ProducerConfig.ACKS_CONFIG, "1");
         props.put(ProducerConfig.LINGER_MS_CONFIG, 20);
         props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, 1000);
+        if (!KafkaConfig.applyAuthenticationPropertiesFromEnv(props)) {
+            throw new IllegalStateException("kafka authentication is enabled but credentials are missing");
+        }
         this.producer = new KafkaProducer<>(props);
 
         this.askedAtMs = Collections.synchronizedMap(new LinkedHashMap<String, Long>(16, 0.75f, true) {

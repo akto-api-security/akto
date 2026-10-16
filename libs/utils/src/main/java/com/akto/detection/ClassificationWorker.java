@@ -1,5 +1,6 @@
 package com.akto.detection;
 
+import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.google.gson.Gson;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -67,6 +68,11 @@ public class ClassificationWorker implements Runnable {
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, 500);
+        if (!KafkaConfig.applyAuthenticationPropertiesFromEnv(props)) {
+            loggerMaker.error("[detection-corrector] kafka authentication is enabled but credentials are missing, "
+                    + "classification worker not started");
+            return;
+        }
 
         try (KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props)) {
             consumer.subscribe(Collections.singletonList(topic));
