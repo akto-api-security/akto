@@ -12,10 +12,19 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
 
 public class TestingConfigurations {
 
+    /**
+     * When set to a positive integer, replaces the test-run max concurrent requests
+     * (including the default of 10). Use this to slow a run down locally.
+     */
+    public static final String MAX_CONCURRENT_REQUESTS_ENV = "MAX_CONCURRENT_REQUESTS";
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestingConfigurations.class, LogDb.TESTING);
     private static final TestingConfigurations instance = new TestingConfigurations();
 
     private TestingUtil testingUtil;
@@ -42,7 +51,7 @@ public class TestingConfigurations {
         this.testingRunConfig = testingRunConfig;
         this.debug = debug;
         this.testConfigMap = testConfigMap;
-        this.maxConcurrentRequest = maxConcurrentRequests == -1 ? 10 : maxConcurrentRequests;
+        this.maxConcurrentRequest = resolveMaxConcurrentRequests(maxConcurrentRequests);
         this.doNotMarkIssuesAsFixed = doNotMarkIssuesAsFixed;
         this.runAutomatedTests = runAutomatedTests;
     }
@@ -61,6 +70,54 @@ public class TestingConfigurations {
 
     public Map<String, TestConfig> getTestConfigMap() {
         return testConfigMap;
+    }
+
+    /**
+     * Test config value, unless {@code MAX_CONCURRENT_REQUESTS} is a positive integer.
+     * {@code -1} from the test run means the default of 10. The env override is used as-is,
+     * so it can be lower than that default.
+     */
+    public static int resolveMaxConcurrentRequests(int configured) {
+        int fromConfig = configured == -1 ? 10 : configured;
+        Integer fromEnv = readPositiveEnvOverride();
+        if (fromEnv != null) {
+            loggerMaker.infoAndAddToDb("Using MAX_CONCURRENT_REQUESTS=" + fromEnv
+                    + " instead of test config maxConcurrentRequests=" + configured, LogDb.TESTING);
+            return fromEnv;
+        }
+        return fromConfig;
+    }
+
+    /**
+     * Legacy in-process pool size. Without the env override this stays in [10, 100].
+     * With the override, the floor of 10 is skipped so the pool can be smaller; the cap of 100 stays.
+     */
+    public static int resolveLegacyPoolSize(int configured) {
+        Integer fromEnv = readPositiveEnvOverride();
+        if (fromEnv != null) {
+            int size = Math.min(100, fromEnv);
+            loggerMaker.infoAndAddToDb("Using MAX_CONCURRENT_REQUESTS=" + fromEnv
+                    + " (legacy pool size " + size + ") instead of test config maxConcurrentRequests=" + configured, LogDb.TESTING);
+            return size;
+        }
+        return Math.min(100, Math.max(10, configured));
+    }
+
+    private static Integer readPositiveEnvOverride() {
+        String raw = System.getenv(MAX_CONCURRENT_REQUESTS_ENV);
+        if (raw == null || raw.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            int value = Integer.parseInt(raw.trim());
+            if (value > 0) {
+                return value;
+            }
+            loggerMaker.errorAndAddToDb("MAX_CONCURRENT_REQUESTS must be a positive integer, got " + value, LogDb.TESTING);
+        } catch (NumberFormatException e) {
+            loggerMaker.errorAndAddToDb("Invalid MAX_CONCURRENT_REQUESTS='" + raw + "'", LogDb.TESTING);
+        }
+        return null;
     }
 
     public int getMaxConcurrentRequest() {
