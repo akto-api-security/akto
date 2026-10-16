@@ -11,7 +11,7 @@ import java.util.function.LongSupplier;
 public class SequenceAnalyzerConfig {
 
     public static final int DEFAULT_N_MAX = 2;
-    public static final int DEFAULT_MAX_HISTORY = 10;
+    public static final int DEFAULT_MAX_HISTORY = DEFAULT_N_MAX;
     public static final long DEFAULT_SESSION_IDLE_MS = 10 * 60 * 1000L;
     public static final long DEFAULT_FLUSH_INTERVAL_MS = 5 * 60 * 1000L;
     public static final long DEFAULT_EVICTION_INTERVAL_MS = 60 * 1000L;

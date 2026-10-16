@@ -12,7 +12,7 @@ by `BEHAVIORAL_ANOMALLY_SEQUENCE`; one `SessionAnalyzer` per account, created in
    Returned as the first 16 hex chars of SHA-256("<source>:<value>"); raw values are never kept or logged.
    Order is overridable with env `BEHAVIOUR_SESSION_ID_SOURCES`
    (`cookie:<name>`, `header:<name>`, `jwt:<header>:<claim>`, `xff`, `ip`, comma separated).
-3. `model/SessionState`: ring buffer of the last `maxHistory` (10) endpoint ids plus `lastSeen` (event time).
+3. `model/SessionState`: ring buffer of the last `maxHistory` (= `nMax`, 2) endpoint ids plus `lastSeen` (event time).
    A gap > `sessionIdleMs` (10 min) clears the history. A consecutive repeat of the same endpoint is ignored.
 4. With history h and current endpoint x, for k = 0..min(nMax, |h|) (nMax = 2) increment
    (last k of h -> x) in the hour bucket of the request time. Endpoints are interned to int ids.
