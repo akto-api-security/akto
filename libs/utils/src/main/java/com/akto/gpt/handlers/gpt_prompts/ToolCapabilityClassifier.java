@@ -39,10 +39,10 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
         catch (Exception e) { return null; }
     }
 
-    // The verdict is ~25 tokens (measured); 300 keeps a stray reasoning burst from returning empty
+    // The verdict is ~25 tokens (measured); 500 keeps a stray reasoning burst from returning empty
     // content, which the cron would otherwise retry on every run.
     @Override
-    protected int getMaxTokens() { return 300; }
+    protected int getMaxTokens() { return 500; }
 
     @Override
     protected double getTemperature() { return 0.0; }
@@ -91,8 +91,7 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
                 + "Otherwise it is SAFE.\n"
                 + "If more than one applies, pick the most dangerous one (RESOURCE_DELETE > "
                 + "CREDENTIAL_OR_PII_READ > CRITICAL_RESOURCE_WRITE > FILE_WRITE).\n"
-                + "Return ONLY this JSON object, with no explanation or other text before or after it: "
-                + "{\"dangerous\": <true|false>, \"capability\": \"<one of RESOURCE_DELETE, "
+                + "Return JSON: {\"dangerous\": <true|false>, \"capability\": \"<one of RESOURCE_DELETE, "
                 + "FILE_WRITE, CREDENTIAL_OR_PII_READ, CRITICAL_RESOURCE_WRITE, SAFE>\"}\n";
     }
 
