@@ -49,6 +49,14 @@ public class EndpointShieldDiagnostic {
     public static final String PROFILE = "profile";
     private String profile;
 
+    /**
+     * Install / provisioning outcome (installed, failed, hooks-failed, …); empty
+     * for on-demand. The verdict describes the device, which can be healthy
+     * after a failed install, so the dashboard shows both.
+     */
+    public static final String OUTCOME = "outcome";
+    private String outcome;
+
     public static final String AGENT_VERSION = "agentVersion";
     private String agentVersion;
 
