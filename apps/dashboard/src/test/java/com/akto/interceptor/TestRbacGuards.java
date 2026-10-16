@@ -206,9 +206,9 @@ public class TestRbacGuards extends MongoBasedTest {
         RBACDao.instance.getMCollection().drop();
         CustomRoleDao.instance.getMCollection().drop();
 
-        // only admins have scripts by default; every other built-in role has no access
+        // admins edit scripts by default; every other built-in role can only read them, as before
         for (Role role : Role.values()) {
-            ReadWriteAccess expected = role == Role.ADMIN ? ReadWriteAccess.READ_WRITE : ReadWriteAccess.NO_ACCESS;
+            ReadWriteAccess expected = role == Role.ADMIN ? ReadWriteAccess.READ_WRITE : ReadWriteAccess.READ;
             assertEquals(role.name(), expected, role.getReadWriteAccessForFeature(Feature.TEST_SCRIPTS));
         }
 
