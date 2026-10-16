@@ -25,9 +25,9 @@ import { intersectServerActionFlags, getRegistryOverride } from "./auditServerAc
 import "../../components/shared/style.css";
 import { usePermissions, permissions, loadPermissions } from "@/util/permissions";
 
-const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills', VENDORS: 'vendors' };
+const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills', VENDORS: 'vendors', LLMS: 'llms' };
 const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
-const TABS_ENDPOINT_SECURITY_BASE = ['MCP Servers', 'Skills'];
+const TABS_ENDPOINT_SECURITY_BASE = ['MCP Servers', 'Skills', 'LLMs'];
 // Vendors is still only for the internal test account — see LeftNav's same gate on the AI
 // Security Posture nav item, which this tab was built to support.
 const TABS_ENDPOINT_SECURITY = [...TABS_ENDPOINT_SECURITY_BASE, 'Vendors'];
@@ -201,13 +201,51 @@ const headingsVendors = [
     },
 ]
 
+const headingsLlms = [
+    {
+        title: 'LLM',
+        text: 'LLM',
+        value: 'llmComp',
+    },
+    {
+        title: 'Last Detected',
+        text: "Last Detected",
+        value: "lastDetectedComp",
+        sortActive: true,
+        sortKey: 'lastDetected',
+        type: CellType.TEXT
+    },
+    {
+        title: 'Updated',
+        text: "Updated",
+        value: "updatedTimestampComp",
+        sortKey: 'updatedTimestamp',
+        sortActive: true,
+        type: CellType.TEXT
+    },
+    {
+        title: 'Status',
+        text: "Status",
+        value: "statusComp",
+    },
+    {
+        title: 'Marked By',
+        text: "Marked By",
+        value: "markedBy",
+        type: CellType.TEXT
+    },
+]
+
 const sortOptions = [
     { label: 'Last Detected', value: 'lastDetected asc', directionLabel: 'Oldest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Last Detected', value: 'lastDetected desc', directionLabel: 'Newest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Updated', value: 'updatedTimestamp asc', directionLabel: 'Oldest', sortKey: 'updatedTimestamp', columnIndex: 4 },
     { label: 'Updated', value: 'updatedTimestamp desc', directionLabel: 'Newest', sortKey: 'updatedTimestamp', columnIndex: 4 },
-   
+
 ];
+
+// LLMs table has no AI Agent column, so sortable columns sit one position earlier.
+const sortOptionsLlms = sortOptions.map(o => ({ ...o, columnIndex: o.columnIndex - 1 }));
 
 const MCP_TYPE_CHOICES = [
     { label: "Tool", value: "mcp-tool" },
@@ -284,6 +322,24 @@ let filtersEndpointSecurity = [
         label: 'MCP Server',
         title: 'MCP Server',
         choices: [],
+    }
+]
+
+let filtersLlms = [
+    {
+        key: 'markedBy',
+        label: 'Marked By',
+        title: 'Marked By',
+        choices: [],
+    },
+    {
+        key: 'remarks',
+        label: 'Status',
+        title: 'Status',
+        choices: [
+            { label: "Allowed", value: "Approved" },
+            { label: "Blocked", value: "Rejected" }
+        ],
     }
 ]
 
@@ -469,27 +525,30 @@ function AuditData() {
     const [selected, setSelected] = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
-    const [tabCounts, setTabCounts] = useState({ all: 0, mcp_servers: 0, skills: 0, vendors: 0 });
+    const [tabCounts, setTabCounts] = useState({ all: 0, mcp_servers: 0, skills: 0, vendors: 0, llms: 0 });
 
     // Skills are flat AGENT_SKILL records in both modes; only the MCP tab differs
     // between endpoint-security (merged) and default (flat). Vendors are neither —
     // they're derived from endpoint-shield traffic, not mcp_audit_info/api_info rows.
     const isSkillsTab = selectedTab === TAB_IDS.SKILLS;
     const isVendorsTab = selectedTab === TAB_IDS.VENDORS;
-    const useEndpointMergedView = isEndpointSecurity && !isSkillsTab && !isVendorsTab;
+    const isLlmsTab = selectedTab === TAB_IDS.LLMS;
+    const useEndpointMergedView = isEndpointSecurity && !isSkillsTab && !isVendorsTab && !isLlmsTab;
 
     const filters = useMemo(() => {
         if (useEndpointMergedView) return filtersEndpointSecurity;
         if (isVendorsTab) return [];
+        if (isLlmsTab) return filtersLlms;
         return getTabFilters(selectedTab);
-    }, [useEndpointMergedView, isVendorsTab, selectedTab]);
+    }, [useEndpointMergedView, isVendorsTab, isLlmsTab, selectedTab]);
 
     const headings = useMemo(() => {
         if (useEndpointMergedView) return headingsEndpointSecurity;
         if (isSkillsTab) return headingsSkills;
         if (isVendorsTab) return headingsVendors;
+        if (isLlmsTab) return headingsLlms;
         return headingsDefault;
-    }, [useEndpointMergedView, isSkillsTab, isVendorsTab]);
+    }, [useEndpointMergedView, isSkillsTab, isVendorsTab, isLlmsTab]);
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex);
@@ -683,6 +742,46 @@ function AuditData() {
                 destructive: true,
                 onAction: () => bulkUpdateVendors(false, selectedIds),
                 requires: 'api/removeVendorAllowlistEntry',
+            });
+        }
+        return actions;
+    };
+
+    // Same as bulkUpdateServers for LLM rows; guardrails blocks prompts to Rejected sites.
+    const bulkUpdateLlms = async (remarks, selectedIds) => {
+        const hexIds = [...new Set(getRowsForSelectedIds(selectedIds).map((row) => row.hexId).filter(Boolean))];
+        if (!hexIds.length) return;
+        try {
+            await api.updateLlmAuditData(hexIds, remarks);
+            func.setToast(true, false, "Updated selected LLMs");
+            window.location.reload();
+        } catch (e) {
+            func.setToast(true, true, "Bulk update failed");
+        }
+    };
+
+    const llmPromotedBulkActions = (selectedIds) => {
+        if (selectedIds === "All" || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+            return [];
+        }
+        const n = selectedIds.length;
+        const rows = getRowsForSelectedIds(selectedIds);
+        const countPhrase = `${n} selected LLM${n === 1 ? "" : "s"}`;
+        const actions = [];
+        // Only offer the action that changes something, like the Skills tab.
+        if (rows.some((r) => r?.isBlocked)) {
+            actions.push({
+                content: n === 1 ? "Allow this LLM" : `Allow ${countPhrase}`,
+                onAction: () => bulkUpdateLlms("Approved", selectedIds),
+                requires: 'api/updateLlmAuditData',
+            });
+        }
+        if (!rows.every((r) => r?.isBlocked)) {
+            actions.push({
+                content: n === 1 ? "Block this LLM" : `Block ${countPhrase}`,
+                destructive: true,
+                onAction: () => bulkUpdateLlms("Rejected", selectedIds),
+                requires: 'api/updateLlmAuditData',
             });
         }
         return actions;
@@ -950,6 +1049,41 @@ function AuditData() {
             return { value: ret, total };
         }
 
+        // LLMs tab: browser-llm audit rows (one per site), same flow as the MCP tab's flat fetch.
+        if (isLlmsTab) {
+            try {
+                const res = await api.fetchLlmAuditData(sortKey, sortOrder, skip, limit,
+                    { ...filterParams, lastDetected: [startTimestamp, endTimestamp] }, queryValue);
+                endpointRowCacheRef.current = {};
+                (res?.auditData || []).forEach((r) => {
+                    const dataObj = convertDataIntoTableFormat(r, null, null);
+                    const isBlocked = r?.remarks === 'Rejected';
+                    dataObj.id = r.hexId;
+                    dataObj.isBlocked = isBlocked;
+                    // Same Status cell as the Skills tab.
+                    dataObj.statusComp = (
+                        <Text variant="bodyMd" color={isBlocked ? 'critical' : 'success'}>
+                            {isBlocked ? 'Blocked' : 'Allowed'}
+                        </Text>
+                    );
+                    dataObj.llmComp = (
+                        <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                            <Box className="audit-table-icon">
+                                <CollectionIcon hostName={r.resourceName} assetTagValue={r.resourceName} displayName={r.resourceName} />
+                            </Box>
+                            <Text>{r.resourceName}</Text>
+                        </HorizontalStack>
+                    );
+                    ret.push(dataObj);
+                    endpointRowCacheRef.current[String(dataObj.id)] = dataObj;
+                });
+                total = res?.total || 0;
+            } catch (e) {}
+            setTabCounts((prev) => ({ ...prev, [selectedTab]: total }));
+            setLoading(false);
+            return { value: ret, total };
+        }
+
         // Skills tab reads raw AGENT_SKILL audit rows from /api/fetchSkillsData
         // (mcp_audit_info backed). One row per detection record — no client-side
         // grouping, server pagination is the source of truth.
@@ -1127,6 +1261,10 @@ function AuditData() {
                 filtersEndpointSecurity[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
                 filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
             } catch (e) {}
+            try {
+                const llmRes = await api.fetchLlmAuditData('lastDetected', -1, 0, 1, {}, '')
+                filtersLlms[0].choices = (llmRes?.auditFilterOptions?.markedBy || []).map(u => ({ label: u, value: u }))
+            } catch (e) {}
             setFilterVersion(v => v + 1)
         }
     }
@@ -1179,6 +1317,15 @@ function AuditData() {
             }
         };
 
+        const countLlms = async () => {
+            try {
+                const res = await api.fetchLlmAuditData('lastDetected', -1, 0, 1, { lastDetected: [startTimestamp, endTimestamp] }, '');
+                return res?.total || 0;
+            } catch {
+                return 0;
+            }
+        };
+
         (async () => {
             const targets = [];
             // [tabId, typeFilter, merge, scopeByCollection]
@@ -1207,6 +1354,11 @@ function AuditData() {
                 const vendorsTotal = await countVendors();
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.VENDORS]: vendorsTotal }));
+            }
+            if (isEndpointSecurity && selectedTab !== TAB_IDS.LLMS) {
+                const llmsTotal = await countLlms();
+                if (cancelled) return;
+                setTabCounts((prev) => ({ ...prev, [TAB_IDS.LLMS]: llmsTotal }));
             }
         })();
 
@@ -1239,11 +1391,11 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                        key={startTimestamp + endTimestamp + (useEndpointMergedView ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(useEndpointMergedView) + String(registryConfigured) + `-${selectedTab}`}
+                        key={startTimestamp + endTimestamp + (useEndpointMergedView || isLlmsTab ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(useEndpointMergedView) + String(registryConfigured) + `-${selectedTab}`}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
-                        sortOptions={sortOptions}
+                        sortOptions={isLlmsTab ? sortOptionsLlms : sortOptions}
                         disambiguateLabel={disambiguateLabel}
                         loading={loading}
                         loadingText="Loading audit data..."
@@ -1274,7 +1426,9 @@ function AuditData() {
                                 }
                                 : isVendorsTab
                                     ? { selectable: true, promotedBulkActions: vendorPromotedBulkActions}
-                                    : { getActions: (item) => getActionsList(item), hasRowActions: true }
+                                    : isLlmsTab
+                                        ? { selectable: true, promotedBulkActions: llmPromotedBulkActions }
+                                        : { getActions: (item) => getActionsList(item), hasRowActions: true }
                         )}
                 />,
             ]}

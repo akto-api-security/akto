@@ -51,6 +51,9 @@ public class AuditDataAction extends UserAction {
     // Cap user-supplied search to keep regex matching bounded and avoid ReDoS-style abuse.
     private static final int MAX_SEARCH_LENGTH = 256;
 
+    // Audit types with their own tabs, kept out of the All / MCP views.
+    private static final List<String> NON_MCP_AUDIT_TYPES = Arrays.asList(McpAuditInfo.TYPE_AGENT_SKILL, Constants.AKTO_BROWSER_LLM_TAG);
+
     /**
      * Escapes regex metacharacters in caller-supplied search input and caps its
      * length so it can be safely embedded in a $regex filter. Returns null when
@@ -279,7 +282,7 @@ public class AuditDataAction extends UserAction {
     public String fetchAuditDataFilterOptions() {
         try {
             Bson base = Filters.and(
-                    Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
+                    Filters.nin(McpAuditInfo.TYPE, NON_MCP_AUDIT_TYPES),
                     Filters.or(
                             Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
                             Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false)
@@ -324,11 +327,11 @@ public class AuditDataAction extends UserAction {
             // still sit in mcp_audit_info do not double-surface on the All / MCP tabs.
             Bson filter = Filters.and(
                 Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
-                Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL)
+                Filters.nin(McpAuditInfo.TYPE, NON_MCP_AUDIT_TYPES)
             );
             List<Bson> legacyParts = new ArrayList<>();
             legacyParts.add(Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
-            legacyParts.add(Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
+            legacyParts.add(Filters.nin(McpAuditInfo.TYPE, NON_MCP_AUDIT_TYPES));
             if (collectionsIds != null) {
                 legacyParts.add(Filters.in(McpAuditInfo.HOST_COLLECTION_ID, collectionsIds));
             }
@@ -919,6 +922,112 @@ public class AuditDataAction extends UserAction {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error updating audit data: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
+    // LLMs tab: same flow as fetchAuditData's flat path, pinned to type=browser-llm (one row per site).
+    // Not scoped by contextSource: rows written via mini-runtime don't carry it, and browser LLMs are endpoint-only.
+    public String fetchLlmAuditData() {
+        try {
+            if (sortKey == null || sortKey.isEmpty()) {
+                sortKey = McpAuditInfo.LAST_DETECTED;
+            }
+            if (limit <= 0) {
+                limit = 20;
+            }
+            if (skip < 0) {
+                skip = 0;
+            }
+
+            Bson llmFilter = Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_BROWSER_LLM_TAG);
+            Bson filter = llmFilter;
+
+            String safeSearch = sanitizeSearch(searchString);
+            if (safeSearch != null) {
+                filter = Filters.and(filter, Filters.or(
+                    Filters.regex(McpAuditInfo.REMARKS, safeSearch, "i"),
+                    Filters.regex(McpAuditInfo.RESOURCE_NAME, safeSearch, "i")
+                ));
+            }
+
+            // Remarks filter: Rejected = blocked; Approved also covers not-yet-audited rows, which the UI shows as Approved.
+            List<String> remarksChoices = popListFilter(filters, McpAuditInfo.REMARKS);
+            if (remarksChoices != null && remarksChoices.size() == 1) {
+                filter = Filters.and(filter, McpAuditInfo.REMARKS_REJECTED.equals(remarksChoices.get(0))
+                    ? Filters.eq(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_REJECTED)
+                    : Filters.ne(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_REJECTED));
+            }
+
+            List<Bson> additionalFilters = prepareFilters(filters);
+            if (!additionalFilters.isEmpty()) {
+                filter = Filters.and(filter, Filters.and(additionalFilters));
+            }
+
+            Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
+            this.auditData = McpAuditInfoDao.instance.findAll(filter, skip, limit, sort);
+            this.total = McpAuditInfoDao.instance.count(filter);
+
+            List<String> markedByUsers = new ArrayList<>();
+            for (String m : McpAuditInfoDao.instance.getMCollection().distinct(McpAuditInfo.MARKED_BY, llmFilter, String.class)) {
+                if (m != null && !m.isEmpty()) markedByUsers.add(m);
+            }
+            Collections.sort(markedByUsers);
+            auditFilterOptions = new BasicDBObject();
+            auditFilterOptions.put("markedBy", markedByUsers);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching LLM audit data: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    // LLMs tab: same as updateAuditData for the selected rows, pinned to type=browser-llm; no MCP-only
+    // blockAll / cascade handling. Guardrails blocks prompts to Rejected sites.
+    public String updateLlmAuditData() {
+        User user = getSUser();
+        String markedBy = user.getLogin();
+
+        try {
+            List<ObjectId> targetIds = new ArrayList<>();
+            if (hexIds != null) {
+                for (String h : hexIds) {
+                    if (h != null && !h.isEmpty()) targetIds.add(new ObjectId(h));
+                }
+            }
+
+            // Users limited to specific collections can only update records of their own agents
+            List<Integer> restrictedIds = ArgusCollectionScope.getRestrictedCollectionIds(user);
+            if (restrictedIds != null && !targetIds.isEmpty()) {
+                targetIds = McpAuditInfoDao.instance.getMCollection()
+                    .distinct(Constants.ID, Filters.and(Filters.in(Constants.ID, targetIds),
+                        Filters.in(McpAuditInfo.HOST_COLLECTION_ID, restrictedIds)), ObjectId.class)
+                    .into(new ArrayList<>());
+            }
+
+            if (targetIds.isEmpty()) {
+                addActionError("No record id provided");
+                return ERROR.toUpperCase();
+            }
+
+            int currentTime = Context.now();
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.set(McpAuditInfo.REMARKS, remarks));
+            updates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
+            updates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, currentTime));
+            if (McpAuditInfo.REMARKS_APPROVED.equals(remarks)) {
+                updates.add(Updates.set(McpAuditInfo.APPROVED_AT, currentTime));
+            }
+            updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
+
+            McpAuditInfoDao.instance.updateMany(
+                Filters.and(Filters.in(Constants.ID, targetIds), Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_BROWSER_LLM_TAG)),
+                Updates.combine(updates)
+            );
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error updating LLM audit data: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
 

@@ -52,8 +52,10 @@ type policyCache struct {
 	// anomalyByPolicy maps policy ID (== policy name) to its anomaly config.
 	// Only policies with anomaly detection enabled appear here.
 	anomalyByPolicy map[string]*anomalyCfg
-	lastFetched     time.Time
-	mu              sync.RWMutex
+	// rejectedLLMSites holds browser LLM sites marked Rejected in Audit Data.
+	rejectedLLMSites map[string]struct{}
+	lastFetched      time.Time
+	mu               sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -1062,6 +1064,7 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.blockedHosts = blockedHostRules
 	s.cache.anomalyByPolicy = anomalyMap
 	s.cache.ignorePhraseMatchersByPolicy = ignorePhraseMatchersByPolicy
+	s.cache.rejectedLLMSites = rejectedLLMSites(auditPolicies)
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
@@ -1594,7 +1597,12 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 		Severity:     "HIGH",
 		Reason:       reason,
 	}
+	return s.reportAndBlock(params, valCtx, payloadToValidate, sessionID, requestID, metadata, behaviour)
+}
 
+// reportAndBlock tracks the block on the session, reports the threat and returns a block result.
+func (s *Service) reportAndBlock(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string, metadata types.ThreatMetadata, behaviour string) *mcp.ValidationResult {
+	reason := metadata.Reason
 	if s.sessionMgr != nil && sessionID != "" {
 		s.sessionMgr.TrackResponse(sessionID, requestID, reason, true)
 		s.sessionMgr.UpdateBlockedReason(sessionID, reason)
@@ -2383,6 +2391,13 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	if blockResult := s.checkBlockedHost(params, valCtx, payloadBare, sessionID, requestID, policies); blockResult != nil {
 		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadBare, sessionID)
 		return blockResult, activityID, nil
+	}
+
+	// Browser LLM rejected in Audit Data; like MCP audit, enforced only when a policy applies.
+	if len(policies) > 0 {
+		if blockResult := s.checkRejectedLLM(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+			return blockResult, "", nil
+		}
 	}
 
 	// Anomaly detection: check each filtered policy's anomaly config.
