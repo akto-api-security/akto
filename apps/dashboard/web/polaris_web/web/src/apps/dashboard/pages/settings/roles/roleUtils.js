@@ -39,6 +39,7 @@ const PERMISSION_GROUPS = [
             { feature: 'START_TEST_RUN', label: 'Run tests' },
             { feature: 'TEST_RESULTS', label: 'Test results' },
             { feature: 'ISSUES', label: 'Issues' },
+            { feature: 'TEST_SCRIPTS', label: 'Pre and post request scripts' },
         ]
     },
     {
