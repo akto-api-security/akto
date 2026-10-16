@@ -53,7 +53,7 @@ final class LlmServiceChains {
     // Returns null when the last attempt got no usable answer; rethrows when it threw, so a chain
     // with nothing configured fails exactly like a plain Azure call.
     static String call(String service, ModelTier handlerTier, Call call) throws Exception {
-        logger.debug("llm chain " + service + ": called");
+        logger.info("llm chain " + service + ": called");
         List<Model> chain = chainFor(service, handlerTier);
         int last = chain.size() - 1;
         Exception lastException = null;
@@ -62,7 +62,7 @@ final class LlmServiceChains {
             Breaker breaker = BREAKERS.computeIfAbsent(service + "|" + label(target), k -> new Breaker());
             // a failed entry is skipped for a while, but the last one is always tried
             if (i < last && breaker.skipUntil > clock.getAsLong()) continue;
-            logger.debug("llm chain " + service + ": trying " + label(target));
+            logger.info("llm chain " + service + ": trying " + label(target));
             lastException = null;
             String failure;
             boolean perRequest = false;
