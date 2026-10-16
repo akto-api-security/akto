@@ -18,14 +18,18 @@ import com.opensymphony.xwork2.Action;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.Document;
 import org.bson.types.ObjectId;
 
 /**
@@ -52,6 +56,9 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
     private static final long RUNS_WINDOW_MS = 24L * 3600 * 1000;
     private static final int MAX_RUNS = 5;
     private static final int MAX_RUN_ERROR_CHARS = 1000;
+    // An execution's string id (set by the db-abstractor): what agents report as
+    // the executionId. The execution DTO maps only _id.
+    private static final String EXECUTION_AGENT_ID = "id";
     private static final Pattern DIAGNOSTIC_ID = Pattern.compile("diagnosticId:\\s*([0-9a-f]{24})");
 
     // Request
@@ -78,9 +85,10 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
                     Filters.eq(EndpointShieldDiagnostic.DEVICE_ID, deviceId), 0, lim,
                     Sorts.descending(EndpointShieldDiagnostic.CREATED_AT),
                     Projections.exclude(EndpointShieldDiagnostic.REPORT));
+            Map<String, String> requesters = requestersByExecutionId(rows);
             diagnostics = new ArrayList<>(rows.size());
             for (EndpointShieldDiagnostic d : rows) {
-                diagnostics.add(toView(d, false));
+                diagnostics.add(toView(d, requesters.get(d.getExecutionId()), false));
             }
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -102,7 +110,7 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
                 addActionError("diagnostic not found");
                 return Action.ERROR.toUpperCase();
             }
-            diagnostic = toView(d, true);
+            diagnostic = toView(d, requestersByExecutionId(Collections.singletonList(d)).get(d.getExecutionId()), true);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "fetchEndpointShieldDiagnostic failed: " + e.getMessage());
@@ -262,7 +270,59 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
     }
 
     // A flat view with a string id: the ObjectId itself does not serialize usefully to JSON.
-    private static Map<String, Object> toView(EndpointShieldDiagnostic d, boolean withReport) {
+    /**
+     * Who queued each on-demand report's run: report.executionId → the
+     * execution (its string "id", the one agents report — not _id) →
+     * commandId → the command's createdBy. Commands are never deleted (the
+     * cleanup job only marks them expired or cancelled), so the link holds.
+     */
+    private static Map<String, String> requestersByExecutionId(List<EndpointShieldDiagnostic> rows) {
+        Map<String, String> out = new HashMap<>();
+        Set<String> executionIds = new HashSet<>();
+        for (EndpointShieldDiagnostic d : rows) {
+            if (StringUtils.isNotBlank(d.getExecutionId())) {
+                executionIds.add(d.getExecutionId());
+            }
+        }
+        if (executionIds.isEmpty()) {
+            return out;
+        }
+        try {
+            Map<String, String> commandByExecution = new HashMap<>();
+            List<ObjectId> commandOids = new ArrayList<>();
+            for (Document ex : EndpointRemoteCommandExecutionDao.instance.getMCollection()
+                    .withDocumentClass(Document.class)
+                    .find(Filters.in(EXECUTION_AGENT_ID, executionIds))
+                    .projection(Projections.include(EXECUTION_AGENT_ID, EndpointRemoteCommandExecution.COMMAND_ID))) {
+                String cid = ex.getString(EndpointRemoteCommandExecution.COMMAND_ID);
+                if (cid != null && ObjectId.isValid(cid)) {
+                    commandByExecution.put(ex.getString(EXECUTION_AGENT_ID), cid);
+                    commandOids.add(new ObjectId(cid));
+                }
+            }
+            if (commandOids.isEmpty()) {
+                return out;
+            }
+            Map<String, String> createdByCommand = new HashMap<>();
+            for (EndpointRemoteCommand c : EndpointRemoteCommandDao.instance.findAll(Filters.in("_id", commandOids))) {
+                if (c.getCreatedBy() != null) {
+                    createdByCommand.put(c.getCommandId(), c.getCreatedBy());
+                }
+            }
+            for (Map.Entry<String, String> e : commandByExecution.entrySet()) {
+                String by = createdByCommand.get(e.getValue());
+                if (by != null) {
+                    out.put(e.getKey(), by);
+                }
+            }
+        } catch (Exception e) {
+            // Best effort: the reports still render without the name.
+            loggerMaker.errorAndAddToDb(e, "diagnostics: requester lookup failed: " + e.getMessage());
+        }
+        return out;
+    }
+
+    private static Map<String, Object> toView(EndpointShieldDiagnostic d, String requestedBy, boolean withReport) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", d.getHexId());
         m.put("deviceId", d.getDeviceId());
@@ -270,7 +330,7 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
         m.put("source", d.getSource());
         m.put("installId", d.getInstallId());
         m.put("executionId", d.getExecutionId());
-        m.put("requestedBy", d.getRequestedBy());
+        m.put("requestedBy", requestedBy);
         m.put("profile", d.getProfile());
         m.put("outcome", d.getOutcome());
         m.put("agentVersion", d.getAgentVersion());

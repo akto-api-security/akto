@@ -24,7 +24,6 @@ public class EndpointShieldDiagnostic {
     public static final String SOURCE = "source";
     public static final String INSTALL_ID = "installId";
     public static final String EXECUTION_ID = "executionId";
-    public static final String REQUESTED_BY = "requestedBy";
     public static final String PROFILE = "profile";
     public static final String OUTCOME = "outcome";
     public static final String AGENT_VERSION = "agentVersion";
@@ -45,7 +44,6 @@ public class EndpointShieldDiagnostic {
     private String source;
     private String installId;
     private String executionId;
-    private String requestedBy;
     /** full | install | post-provision | quick */
     private String profile;
     /**
