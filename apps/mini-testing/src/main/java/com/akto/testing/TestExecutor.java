@@ -134,7 +134,7 @@ public class TestExecutor {
         
         loggerMaker.insertImportantTestingLog("FALLBACK METHOD CALLED: executeAllTestsInLegacyMode started with " + apiInfoKeyList.size() + " API endpoints and " + testingRunSubCategories.size() + " subcategories");
         
-        int maxThreads = Math.min(100, Math.max(10, testingRun.getMaxConcurrentRequests()));
+        int maxThreads = TestingConfigurations.resolveLegacyPoolSize(testingRun.getMaxConcurrentRequests());
         List<Future<Void>> testingRecords = new ArrayList<>();
         ExecutorService threadPool = Executors.newFixedThreadPool(maxThreads);
         CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
@@ -455,7 +455,7 @@ public class TestExecutor {
             }
 
             if(!Constants.IS_NEW_TESTING_ENABLED){
-                maxThreads = Math.min(100, Math.max(10, testingRun.getMaxConcurrentRequests()));
+                maxThreads = TestingConfigurations.resolveLegacyPoolSize(testingRun.getMaxConcurrentRequests());
             }
 
             List<Future<Void>> testingRecords = new ArrayList<>();
