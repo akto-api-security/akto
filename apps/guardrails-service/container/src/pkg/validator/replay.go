@@ -268,6 +268,19 @@ func (s *Service) compareOne(
 				// Mirrors buildMaliciousEvent's own category/subCategory/severity fallback
 				// rules (mcp-endpoint-shield's threat_reporter.go) so a caller persisting a
 				// malicious_events record from this verdict matches a live detection's shape.
+				// error.message is the operator-facing blocked message ("This has been reported
+				// by Akto"). Live activity stores the scanner reason in error.data.reason, which
+				// is Metadata.Reason. Prefer that so a backfilled response matches a live one.
+				reason := strings.TrimSpace(res.Metadata.Reason)
+				if reason != "" && !placeholderLLMReason(reason) {
+					verdict.Reason = reason
+				} else if reason := s.customRuleReason(ctx, prepared, side, &params); reason != "" {
+					// Compact custom-prompt rules return only a grade. The label
+					// "Alerted by LLM policy - <name>" is then stored as the reason.
+					// Live replaces that label with a follow-up explanation; replay
+					// has to make the same call.
+					verdict.Reason = reason
+				}
 				verdict.Category = res.Metadata.PolicyName
 				verdict.SubCategory = res.Metadata.RuleViolated
 				if verdict.SubCategory == "" {
@@ -290,6 +303,74 @@ func (s *Service) compareOne(
 		verdict.BaselineDetected = baseDetected
 	}
 	return verdict
+}
+
+// customRuleReason asks the same follow-up live uses when a custom prompt rule flags
+// a payload without explaining it. The answer names what in the payload matched.
+func (s *Service) customRuleReason(
+	ctx context.Context,
+	prepared preparedPolicy,
+	side string,
+	params *models.ValidateRequestParams,
+) string {
+	requestSide := side != "response"
+	prompt := llmRulePrompt(prepared.policies, requestSide)
+	if prompt == "" {
+		return ""
+	}
+	body := params.ResponsePayload
+	if requestSide {
+		body = params.RequestPayload
+	}
+	payload := s.extractPayloadForValidation(body, params.Method, params.Path, requestSide)
+	if strings.TrimSpace(payload) == "" {
+		return ""
+	}
+	regenCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	reason, err := mcp.NewPolicyValidator().GenerateCustomRuleReason(regenCtx, prompt, payload)
+	if err != nil {
+		s.logger.Warn("ReplayWithPolicy - custom rule reason failed", zap.Error(err))
+		return ""
+	}
+	return strings.TrimSpace(reason)
+}
+
+// placeholderLLMReason reports the label stored when a custom prompt rule flags a
+// payload without an explanation: "Alerted by LLM policy - <name>". A real
+// explanation is appended after a colon.
+func placeholderLLMReason(reason string) bool {
+	const marker = "by LLM policy - "
+	idx := strings.Index(reason, marker)
+	if idx < 0 {
+		return false
+	}
+	return !strings.Contains(reason[idx+len(marker):], ":")
+}
+
+func llmRulePrompt(policies []types.Policy, requestSide bool) string {
+	if prompt := rulePrompt(policies, requestSide); prompt != "" {
+		return prompt
+	}
+	return rulePrompt(policies, !requestSide)
+}
+
+func rulePrompt(policies []types.Policy, requestSide bool) string {
+	for _, policy := range policies {
+		rules := policy.Filters.ResponsePayload
+		if requestSide {
+			rules = policy.Filters.RequestPayload
+		}
+		for _, rule := range rules {
+			if rule.Type != mcp.FilterTypeLLM {
+				continue
+			}
+			if prompt := strings.TrimSpace(rule.Pattern); prompt != "" {
+				return prompt
+			}
+		}
+	}
+	return ""
 }
 
 // evaluate runs the sides the policy applies to and returns the first match. skip is non-empty
