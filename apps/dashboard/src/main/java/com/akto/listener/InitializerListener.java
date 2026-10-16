@@ -235,6 +235,7 @@ import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.DiscoveredTimestampBackfillJob;
 import com.akto.utils.jobs.JobUtils;
+import com.akto.utils.jobs.ModuleInfoCleanupJob;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
@@ -2760,6 +2761,7 @@ public class InitializerListener implements ServletContextListener {
                     setUpGuardrailServiceUrlLatencyScheduler();
                     ApiInfoBackfillJob.apiInfoBackfillScheduler();
                     DiscoveredTimestampBackfillJob.discoveredTimestampBackfillScheduler();
+                    ModuleInfoCleanupJob.runOnce();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
 //                        crons.insertHistoricalDataJob();
