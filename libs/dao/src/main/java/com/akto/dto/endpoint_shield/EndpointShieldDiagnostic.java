@@ -26,6 +26,7 @@ public class EndpointShieldDiagnostic {
     public static final String EXECUTION_ID = "executionId";
     public static final String REQUESTED_BY = "requestedBy";
     public static final String PROFILE = "profile";
+    public static final String OUTCOME = "outcome";
     public static final String AGENT_VERSION = "agentVersion";
     public static final String OS = "os";
     public static final String VERDICT = "verdict";
@@ -47,6 +48,12 @@ public class EndpointShieldDiagnostic {
     private String requestedBy;
     /** full | install | post-provision | quick */
     private String profile;
+    /**
+     * Install / provisioning outcome (installed, failed, hooks-failed, …); empty
+     * for on-demand. The verdict describes the device, which can be healthy
+     * after a failed install.
+     */
+    private String outcome;
     private String agentVersion;
     private String os;
     private String verdict;

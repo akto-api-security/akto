@@ -18,6 +18,28 @@ const SOURCE_LABELS = {
 }
 const sourceLabel = (source) => SOURCE_LABELS[source] || source || 'Unknown'
 
+// The outcome of the install (or agent setup) the report was taken for. The
+// verdict describes the device, which can be healthy after a failed install
+// (the previous version is still in place), so both are shown. Outcomes that
+// say nothing beyond the source (postinstall, hooks-ok, …) get no badge.
+const OUTCOME_BADGES = {
+    'installed': { status: 'success', label: 'Install succeeded' },
+    'failed': { status: 'critical', label: 'Install failed' },
+    'pkg-install-failed': { status: 'critical', label: 'Package install failed' },
+    'agent-not-running': { status: 'critical', label: 'Install failed — agent not running' },
+    'agent-running-no-report': { status: 'critical', label: 'Install failed — agent never reported' },
+    'hooks-failed': { status: 'critical', label: 'Hook install failed' },
+}
+const outcomeBadge = (outcome) => {
+    if (!outcome) return null
+    if (OUTCOME_BADGES[outcome]) return OUTCOME_BADGES[outcome]
+    return /fail|missing|not-running|no-report/.test(outcome) ? { status: 'critical', label: `Install failed (${outcome})` } : null
+}
+const OutcomeBadge = ({ diagnostic }) => {
+    const b = outcomeBadge(diagnostic?.outcome)
+    return b ? <Badge status={b.status}>{b.label}</Badge> : null
+}
+
 const PROFILE_LABELS = { full: 'Full report', quick: 'Quick check' }
 const RUN_POLL_MS = 5000
 const ACTIVE_RUN_STATES = ['waiting', 'running']
@@ -79,8 +101,8 @@ export const splitReportSections = (report) => {
 const VerdictBadge = ({ diagnostic }) => {
     if (!diagnostic?.verdict) return <Badge>No verdict</Badge>
     return diagnostic.healthy
-        ? <Badge status="success">Healthy</Badge>
-        : <Badge status="critical">Unhealthy</Badge>
+        ? <Badge status="success">Device healthy</Badge>
+        : <Badge status="critical">Device unhealthy</Badge>
 }
 
 const verdictText = (verdict) => (verdict || '').replace(/^[A-Z ]+—\s*/, '')
@@ -160,6 +182,7 @@ function SummaryCard({ diagnostic, onOpen }) {
             <VerticalStack gap="2">
                 <HorizontalStack align="space-between" blockAlign="center">
                     <HorizontalStack gap="2" blockAlign="center">
+                        <OutcomeBadge diagnostic={diagnostic} />
                         <VerdictBadge diagnostic={diagnostic} />
                         <Text variant="headingSm" as="h3">{verdictTitle(diagnostic.verdict) || 'Diagnostic report'}</Text>
                     </HorizontalStack>
@@ -384,6 +407,7 @@ function DiagnosticsTab({ agent }) {
                                         <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
                                             <HorizontalStack gap="3" blockAlign="center" wrap={false}>
                                                 <VerdictBadge diagnostic={d} />
+                                                <OutcomeBadge diagnostic={d} />
                                                 <VerticalStack gap="0">
                                                     <Text variant="bodySm" fontWeight="medium">{sourceLabel(d.source)}</Text>
                                                     <Text variant="bodySm" color="subdued">

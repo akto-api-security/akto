@@ -272,6 +272,7 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
         m.put("executionId", d.getExecutionId());
         m.put("requestedBy", d.getRequestedBy());
         m.put("profile", d.getProfile());
+        m.put("outcome", d.getOutcome());
         m.put("agentVersion", d.getAgentVersion());
         m.put("os", d.getOs());
         m.put("verdict", d.getVerdict());
