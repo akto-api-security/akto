@@ -98,6 +98,7 @@ import com.google.gson.reflect.TypeToken;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
+    private static final int sequenceCountBatchLimit = 1000;
     private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final int maxConcurrentBatchWrites = 150;
@@ -4539,6 +4540,40 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in incrementAndGetTestRateLimitUsage" + e, LoggerMaker.LogDb.RUNTIME);
             return 0;
+        }
+    }
+
+    @Override
+    public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        if (sequenceCounts == null || sequenceCounts.isEmpty()) return;
+        List<SequenceCount> batch = new ArrayList<>();
+        for (SequenceCount sequenceCount : sequenceCounts) {
+            batch.add(sequenceCount);
+            if (batch.size() % sequenceCountBatchLimit == 0) {
+                List<SequenceCount> finalBatch = batch;
+                threadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<SequenceCount> finalBatch = batch;
+            threadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+        }
+    }
+
+    private void writeSequenceCountsBatch(List<SequenceCount> sequenceCounts) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("sequenceCounts", sequenceCounts);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/writeSequenceCounts", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in writeSequenceCounts", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeSequenceCounts: " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
 
