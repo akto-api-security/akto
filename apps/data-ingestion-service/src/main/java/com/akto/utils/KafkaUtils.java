@@ -74,6 +74,8 @@ public class KafkaUtils {
         obj.put("tag", payload.getTag());
         obj.put("_traces", payload.get_traces());
         obj.put("_guardrail", payload.get_guardrail());
+        obj.put("request_guardrails", payload.getRequest_guardrails());
+        obj.put("response_guardrails", payload.getResponse_guardrails());
         return obj;
     }
 

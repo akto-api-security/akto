@@ -31,5 +31,9 @@ public class IngestDataBatch {
     String _traces;
     String _guardrail;
     Boolean publishToGuardrails;
+    // "false" when an http-proxy caller did not opt into request guardrails.
+    String request_guardrails;
+    // "false" when an http-proxy caller did not opt into response guardrails.
+    String response_guardrails;
 
 }
