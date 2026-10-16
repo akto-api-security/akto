@@ -81,7 +81,7 @@ class AzureOpenAIModelTierTest {
     @Test
     void nano_sendsEachHandlersOwnCapAsMaxCompletionTokens() throws Exception {
         // No reasoning allowance is added: to give a handler more room, raise its getMaxTokens().
-        assertEquals(300, new ToolCapabilityClassifier().buildPayload("x").getInt("max_completion_tokens"));
+        assertEquals(500, new ToolCapabilityClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(300, new AgentDomainClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(2000, new GuardrailSuggestionClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(600, new ConversationContinuityClassifier().buildPayload("x").getInt("max_completion_tokens"));
