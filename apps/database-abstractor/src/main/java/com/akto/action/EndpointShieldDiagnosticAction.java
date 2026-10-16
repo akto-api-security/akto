@@ -1,11 +1,7 @@
 package com.akto.action;
 
-import com.akto.dao.EndpointRemoteCommandDao;
-import com.akto.dao.EndpointRemoteCommandExecutionDao;
 import com.akto.dao.EndpointShieldDiagnosticDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.EndpointRemoteCommand;
-import com.akto.dto.EndpointRemoteCommandExecution;
 import com.akto.dto.EndpointShieldDiagnostic;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -13,7 +9,6 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.ActionSupport;
-import org.bson.conversions.Bson;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,9 +57,6 @@ public class EndpointShieldDiagnosticAction extends ActionSupport {
                 d.setFindings(new ArrayList<>(d.getFindings().subList(0, EndpointShieldDiagnostic.MAX_FINDINGS)));
             }
             d.setHealthy(d.getVerdict() != null && d.getVerdict().trim().startsWith("HEALTHY"));
-            // Who asked for an on-demand run comes from the dashboard's command,
-            // never from the device.
-            d.setRequestedBy(isBlank(d.getExecutionId()) ? null : requesterOf(d.getExecutionId(), d.getDeviceId()));
 
             EndpointShieldDiagnosticDao.instance.insertOne(d);
             this.id = d.getHexId();
@@ -73,28 +65,6 @@ public class EndpointShieldDiagnosticAction extends ActionSupport {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertEndpointShieldDiagnostic " + e.getMessage());
             return ERROR.toUpperCase();
-        }
-    }
-
-    /** The dashboard user who queued the remote command behind this execution, or null. */
-    private static String requesterOf(String executionId, String deviceId) {
-        try {
-            EndpointRemoteCommandExecution ex = EndpointRemoteCommandExecutionDao.instance.findOne(Filters.and(
-                    Filters.eq(EndpointRemoteCommandExecution.ID, executionId),
-                    Filters.eq(EndpointRemoteCommandExecution.DEVICE_ID, deviceId)));
-            if (ex == null || isBlank(ex.getCommandId())) {
-                return null;
-            }
-            String cid = ex.getCommandId();
-            // Dashboard-created commands carry only _id; older ones a string id.
-            Bson byId = ObjectId.isValid(cid)
-                    ? Filters.or(Filters.eq("_id", new ObjectId(cid)), Filters.eq(EndpointRemoteCommand.ID, cid))
-                    : Filters.eq(EndpointRemoteCommand.ID, cid);
-            EndpointRemoteCommand cmd = EndpointRemoteCommandDao.instance.findOne(byId);
-            return cmd == null ? null : cmd.getCreatedBy();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "insertEndpointShieldDiagnostic: requester lookup failed " + e.getMessage());
-            return null;
         }
     }
 

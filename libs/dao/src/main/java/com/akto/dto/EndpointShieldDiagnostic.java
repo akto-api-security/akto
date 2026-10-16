@@ -42,9 +42,6 @@ public class EndpointShieldDiagnostic {
     public static final String EXECUTION_ID = "executionId";
     private String executionId;
 
-    public static final String REQUESTED_BY = "requestedBy";
-    private String requestedBy;
-
     /** full | install | post-provision | quick */
     public static final String PROFILE = "profile";
     private String profile;
