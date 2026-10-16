@@ -14,6 +14,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -194,13 +195,17 @@ public class EndpointShieldDiagnosticsAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         try {
-            EndpointRemoteCommandDao.instance.updateOneNoUpsert(
+            UpdateResult r = EndpointRemoteCommandDao.instance.getMCollection().updateOne(
                     Filters.and(
                             Filters.eq("_id", new ObjectId(commandId.trim())),
                             Filters.eq(EndpointRemoteCommand.COMMAND, DIAGNOSE_COMMAND),
                             Filters.eq(EndpointRemoteCommand.STATUS, EndpointRemoteCommand.Status.ACTIVE.name())),
                     Updates.set(EndpointRemoteCommand.STATUS, EndpointRemoteCommand.Status.CANCELLED.name()));
-            EndpointRemoteCommandAction.failPendingExecutions(commandId.trim());
+            // Only executions of the run just cancelled: this route needs only LOGS
+            // access, so it must not be able to fail another command's executions.
+            if (r.getMatchedCount() > 0) {
+                EndpointRemoteCommandAction.failPendingExecutions(commandId.trim());
+            }
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "cancelEndpointShieldDiagnosticRun failed: " + e.getMessage());

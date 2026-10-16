@@ -273,7 +273,8 @@ public class EndpointRemoteCommandAction extends UserAction {
                                 EndpointRemoteCommandExecution.Status.FAILED.name()),
                         Updates.set(EndpointRemoteCommandExecution.ERROR_REASON,
                                 EndpointRemoteCommandExecution.ERR_CANCELLED),
-                        Updates.set(EndpointRemoteCommandExecution.EXECUTED_AT, System.currentTimeMillis())));
+                        // Seconds, like the executedAt agents report (the UI renders it as epoch seconds).
+                        Updates.set(EndpointRemoteCommandExecution.EXECUTED_AT, (long) Context.now())));
     }
 
     private static ExecutionSummary buildSummary(List<EndpointRemoteCommandExecution> execs) {

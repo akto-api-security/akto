@@ -69,10 +69,11 @@ const PRE_STYLE = {
 }
 
 const SEPARATOR = /^={20,}\s*$/
-const ERROR_LINE = /^\s{0,2}❌/
-const WARNING_LINE = /^\s{0,2}⚠️/
+// diagnose_mac.sh marks lines ❌ / ⚠️; diagnose_windows.ps1 [FAIL] / [WARN].
+const ERROR_LINE = /^\s{0,2}(❌|\[FAIL\])/
+const WARNING_LINE = /^\s{0,2}(⚠️|\[WARN\])/
 
-// Split a diagnose_mac.sh report into its sections. Each section is printed as
+// Split a diagnose_mac.sh / diagnose_windows.ps1 report into its sections. Each section is printed as
 //   ====…====
 //     TITLE
 //   ====…====
