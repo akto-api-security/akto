@@ -593,6 +593,47 @@
             </result>
         </action>
 
+        <!-- Endpoint Shield diagnostics (device panel → Diagnostics tab) -->
+        <action name="api/fetchEndpointShieldDiagnostics" class="com.akto.action.endpoint_shield.EndpointShieldDiagnosticsAction" method="fetchEndpointShieldDiagnostics">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointShieldDiagnostic" class="com.akto.action.endpoint_shield.EndpointShieldDiagnosticsAction" method="fetchEndpointShieldDiagnostic">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchEndpointShieldAgents" class="com.akto.action.settings.ModuleInfoAction" method="fetchEndpointShieldAgents">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

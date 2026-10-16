@@ -1041,6 +1041,21 @@ const settingRequests = {
         })
     },
     // level: optional, "error" = error and critical rows only.
+    // Endpoint Shield diagnostics: a device's report history (summaries) and one report.
+    fetchEndpointShieldDiagnostics(deviceId, limit = 20) {
+        return request({
+            url: '/api/fetchEndpointShieldDiagnostics',
+            method: 'post',
+            data: { deviceId, limit }
+        })
+    },
+    fetchEndpointShieldDiagnostic(id) {
+        return request({
+            url: '/api/fetchEndpointShieldDiagnostic',
+            method: 'post',
+            data: { id }
+        })
+    },
     getAgentLogs(agentId, startTime, endTime, logKey = null, afterId = null, pageSize = 500, level = null) {
         return request({
             url: '/api/getAgentLogs',

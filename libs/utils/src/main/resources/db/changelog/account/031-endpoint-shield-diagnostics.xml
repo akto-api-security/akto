@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        endpoint_shield_diagnostics: one document per endpoint-shield diagnostic report
+        (installer, agent post-provision, on-demand). Written by the db-abstractor
+        (api/insertEndpointShieldDiagnostic), read by the dashboard's device panel.
+
+        {deviceId, createdAt desc} serves the per-device history list and the
+        keep-newest-20 trim. Name matches EndpointShieldDiagnosticDao in the
+        db-abstractor, so whichever side builds it first, the other is a no-op.
+    -->
+
+    <changeSet id="031-account-endpoint-shield-diagnostics-collection" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="endpoint_shield_diagnostics"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="endpoint_shield_diagnostics"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="endpoint_shield_diagnostics"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="031-account-endpoint-shield-diagnostics-device-index" author="akto">
+        <mongodb:createIndex collectionName="endpoint_shield_diagnostics">
+            <mongodb:keys>{ "deviceId": 1, "createdAt": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "deviceId_createdAt" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="endpoint_shield_diagnostics">
+                <mongodb:keys>{ "deviceId": 1, "createdAt": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
