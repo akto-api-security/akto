@@ -1104,6 +1104,7 @@ public class Main {
                     )
                 );
                 sessionAnalyzerMap.put(accountId, sessionAnalyzer);
+                loggerMaker.warnAndAddToDb("New Session Based Sequence Analyser initialised for account: " + accountId);
             }
 
             HttpCallParser parser = httpCallParserMap.get(accountId);
