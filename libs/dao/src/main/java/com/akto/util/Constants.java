@@ -40,6 +40,7 @@ public class Constants {
     public static final List<String> MERGING_ALLOWED_TAG_SUBSTRINGS = Arrays.asList("proxy", "gateway");
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_RAG_DATABASE_TAG = "rag-database";
+    public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
 
     public static final String AKTO_GUARDRAIL_MODE = "mode";
     public static final String AKTO_GUARDRAIL_MODE_INLINE = "inline";
