@@ -243,6 +243,7 @@ public class EndpointRemoteCommandAction extends UserAction {
                     Updates.set(EndpointRemoteCommand.STATUS,
                             EndpointRemoteCommand.Status.CANCELLED.name())
             );
+            failPendingExecutions(commandId.trim());
 
             return Action.SUCCESS.toUpperCase();
 
@@ -254,6 +255,26 @@ public class EndpointRemoteCommandAction extends UserAction {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Fail a cancelled command's executions that no agent has claimed yet, so
+     * they read "cancelled" right away instead of PENDING until the
+     * db-abstractor's cleanup job. A RUNNING one is left alone: the agent is
+     * already executing it and will report its real result.
+     */
+    static void failPendingExecutions(String commandHexId) {
+        EndpointRemoteCommandExecutionDao.instance.getMCollection().updateMany(
+                Filters.and(
+                        Filters.eq(EndpointRemoteCommandExecution.COMMAND_ID, commandHexId),
+                        Filters.eq(EndpointRemoteCommandExecution.STATUS,
+                                EndpointRemoteCommandExecution.Status.PENDING.name())),
+                Updates.combine(
+                        Updates.set(EndpointRemoteCommandExecution.STATUS,
+                                EndpointRemoteCommandExecution.Status.FAILED.name()),
+                        Updates.set(EndpointRemoteCommandExecution.ERROR_REASON,
+                                EndpointRemoteCommandExecution.ERR_CANCELLED),
+                        Updates.set(EndpointRemoteCommandExecution.EXECUTED_AT, System.currentTimeMillis())));
+    }
 
     private static ExecutionSummary buildSummary(List<EndpointRemoteCommandExecution> execs) {
         ExecutionSummary s = new ExecutionSummary();

@@ -1049,6 +1049,27 @@ const settingRequests = {
             data: { deviceId, limit }
         })
     },
+    runEndpointShieldDiagnostic(deviceId, profile = 'full') {
+        return request({
+            url: '/api/runEndpointShieldDiagnostic',
+            method: 'post',
+            data: { deviceId, profile }
+        })
+    },
+    fetchEndpointShieldDiagnosticRuns(deviceId) {
+        return request({
+            url: '/api/fetchEndpointShieldDiagnosticRuns',
+            method: 'post',
+            data: { deviceId }
+        })
+    },
+    cancelEndpointShieldDiagnosticRun(commandId) {
+        return request({
+            url: '/api/cancelEndpointShieldDiagnosticRun',
+            method: 'post',
+            data: { commandId }
+        })
+    },
     fetchEndpointShieldDiagnostic(id) {
         return request({
             url: '/api/fetchEndpointShieldDiagnostic',

@@ -1,11 +1,12 @@
-import { Badge, Banner, Box, Button, Collapsible, HorizontalStack, List, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { ActionList, Badge, Banner, Box, Button, Collapsible, HorizontalStack, List, Popover, Spinner, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { ChevronDownMinor, ChevronRightMinor, ExportMinor, RefreshMinor } from "@shopify/polaris-icons"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import func from "@/util/func"
 import settingRequests from "../../settings/api"
 
 // Diagnostic reports for one device: taken by the installer on every deploy, by the
-// agent once it has set itself up, and on demand. The backend keeps the newest 20.
+// agent once it has set itself up, and on demand (Run diagnostics queues an
+// akto-diagnose remote command for this device). The backend keeps the newest 20.
 
 const SOURCE_LABELS = {
     'install': 'Install',
@@ -16,6 +17,27 @@ const SOURCE_LABELS = {
     'manual': 'Manual',
 }
 const sourceLabel = (source) => SOURCE_LABELS[source] || source || 'Unknown'
+
+const PROFILE_LABELS = { full: 'Full report', quick: 'Quick check' }
+const RUN_POLL_MS = 5000
+const ACTIVE_RUN_STATES = ['waiting', 'running']
+
+// Why a run did not produce a report, in words an admin can act on.
+const runFailureText = (run) => {
+    const err = run.error || ''
+    switch (run.errorReason) {
+        case 'disabled_by_config': return 'On-demand diagnostics are disabled on this device (ENABLE_REMOTE_DIAGNOSTICS=false).'
+        case 'timeout': return 'The diagnostic did not finish within 4 minutes.'
+        case 'presumed_dead_agent': return 'The agent stopped responding while running the diagnostic.'
+        case 'not_supported':
+        case 'invalid_args': return err || 'This device cannot run on-demand diagnostics.'
+        case 'exec_error':
+            // An agent from before akto-diagnose looks it up on PATH.
+            if (err.includes('akto-diagnose')) return 'This agent version does not support on-demand diagnostics. Update the agent and try again.'
+            return err || 'The diagnostic could not be started on the device.'
+        default: return err || 'The diagnostic failed on the device.'
+    }
+}
 
 const PRE_STYLE = {
     fontFamily: 'monospace', fontSize: '12px', margin: 0,
@@ -162,27 +184,138 @@ function SummaryCard({ diagnostic, onOpen }) {
     )
 }
 
+function RunRow({ run, onCancel, cancelling }) {
+    const profile = PROFILE_LABELS[run.profile] || run.profile
+    const meta = [profile, run.requestedBy ? `by ${run.requestedBy}` : null, func.prettifyEpoch(Math.floor((run.createdAt || 0) / 1000))]
+        .filter(Boolean).join(' · ')
+    let icon, title, detail
+    switch (run.state) {
+        case 'waiting':
+            icon = <Spinner size="small" />
+            title = 'Waiting for the device'
+            detail = `Devices check in every 15 seconds. If this one is offline the run expires at ${new Date(run.expiresAt).toLocaleTimeString()}.`
+            break
+        case 'running':
+            icon = <Spinner size="small" />
+            title = 'Running on the device'
+            detail = run.profile === 'quick' ? 'A quick check takes a few seconds.' : 'A full report takes about a minute.'
+            break
+        case 'expired':
+            icon = <Badge status="warning">Expired</Badge>
+            title = 'The device never picked it up'
+            detail = 'It did not check in within an hour — it may be offline, or its agent is not running.'
+            break
+        case 'cancelled':
+            icon = <Badge>Cancelled</Badge>
+            title = 'Cancelled'
+            break
+        case 'completed':
+            icon = <Badge status="attention">Not stored</Badge>
+            title = 'Finished, but the report was not stored'
+            detail = 'The backend does not support stored diagnostics yet; the output is in the Remote Commands history.'
+            break
+        default:
+            icon = <Badge status="critical">Failed</Badge>
+            title = 'Diagnostic failed'
+            detail = runFailureText(run)
+    }
+    return (
+        <Box padding="3" borderColor="border-subdued" borderWidth="1" borderRadius="2">
+            <HorizontalStack align="space-between" blockAlign="start" wrap={false} gap="3">
+                <HorizontalStack gap="3" blockAlign="start" wrap={false}>
+                    <Box paddingBlockStart="05">{icon}</Box>
+                    <VerticalStack gap="1">
+                        <Text variant="bodyMd" fontWeight="semibold">{title}</Text>
+                        {detail && <Text variant="bodySm" color="subdued">{detail}</Text>}
+                        <Text variant="bodySm" color="subdued">{meta}</Text>
+                    </VerticalStack>
+                </HorizontalStack>
+                {run.state === 'waiting' && (
+                    <Button size="slim" onClick={() => onCancel(run.commandId)} loading={cancelling}>Cancel</Button>
+                )}
+            </HorizontalStack>
+        </Box>
+    )
+}
+
 function DiagnosticsTab({ agent }) {
     const [loading, setLoading] = useState(false)
     const [diagnostics, setDiagnostics] = useState([])
     const [opened, setOpened] = useState(null) // full report being viewed
     const [openingId, setOpeningId] = useState(null)
+    const [runs, setRuns] = useState([])
+    const [runMenuOpen, setRunMenuOpen] = useState(false)
+    const [starting, setStarting] = useState(false)
+    const [cancellingId, setCancellingId] = useState(null)
     const deviceId = agent?.deviceId
+    const deviceRef = useRef(deviceId)
+    deviceRef.current = deviceId
+
+    const loadRuns = useCallback(async () => {
+        if (!deviceId) return
+        try {
+            const res = await settingRequests.fetchEndpointShieldDiagnosticRuns(deviceId)
+            if (deviceRef.current === deviceId) setRuns(res?.runs || [])
+        } catch (e) {
+            // Runs are secondary; the report list still renders.
+        }
+    }, [deviceId])
 
     const load = useCallback(async () => {
         if (!deviceId) return
         setLoading(true)
         try {
-            const res = await settingRequests.fetchEndpointShieldDiagnostics(deviceId)
-            setDiagnostics(res?.diagnostics || [])
+            const [res] = await Promise.all([
+                settingRequests.fetchEndpointShieldDiagnostics(deviceId),
+                loadRuns(),
+            ])
+            if (deviceRef.current === deviceId) setDiagnostics(res?.diagnostics || [])
         } catch (e) {
             setDiagnostics([])
         } finally {
             setLoading(false)
         }
-    }, [deviceId])
+    }, [deviceId, loadRuns])
 
-    useEffect(() => { setOpened(null); load() }, [load])
+    const wasActive = useRef(false)
+    useEffect(() => { setOpened(null); setRuns([]); wasActive.current = false; load() }, [load])
+
+    // While a run is waiting or running, poll it; when it finishes, reload the
+    // reports so the new one appears at the top.
+    const hasActiveRun = runs.some(r => ACTIVE_RUN_STATES.includes(r.state))
+    useEffect(() => {
+        if (!hasActiveRun) {
+            if (wasActive.current) load()
+            wasActive.current = false
+            return
+        }
+        wasActive.current = true
+        const t = setInterval(loadRuns, RUN_POLL_MS)
+        return () => clearInterval(t)
+    }, [hasActiveRun, loadRuns, load])
+
+    const startRun = useCallback(async (profile) => {
+        setRunMenuOpen(false)
+        setStarting(true)
+        try {
+            await settingRequests.runEndpointShieldDiagnostic(deviceId, profile)
+            await loadRuns()
+        } catch (e) {
+            func.setToast(true, true, 'Could not start diagnostics')
+        } finally {
+            setStarting(false)
+        }
+    }, [deviceId, loadRuns])
+
+    const cancelRun = useCallback(async (commandId) => {
+        setCancellingId(commandId)
+        try {
+            await settingRequests.cancelEndpointShieldDiagnosticRun(commandId)
+            await loadRuns()
+        } finally {
+            setCancellingId(null)
+        }
+    }, [loadRuns])
 
     const open = useCallback(async (id) => {
         setOpeningId(id)
@@ -199,19 +332,45 @@ function DiagnosticsTab({ agent }) {
     }
 
     const [latest, ...older] = diagnostics
+    // Runs worth showing: in flight, or ended without a report since the latest
+    // one (a completed run with a stored report is simply that report).
+    const latestMs = (latest?.createdAt || 0) * 1000
+    const shownRuns = runs.filter(r =>
+        ACTIVE_RUN_STATES.includes(r.state) || (r.createdAt > latestMs && !(r.state === 'completed' && r.diagnosticId))
+    ).slice(0, 3)
     return (
         <Box paddingBlockStart="4">
             <VerticalStack gap="3">
                 <HorizontalStack align="space-between" blockAlign="center">
                     <Text variant="headingSm" as="h3">Diagnostics</Text>
-                    <Button size="slim" icon={RefreshMinor} onClick={load} disabled={loading} accessibilityLabel="Refresh" />
+                    <HorizontalStack gap="2">
+                        <Button size="slim" icon={RefreshMinor} onClick={load} disabled={loading} accessibilityLabel="Refresh" />
+                        <Popover
+                            active={runMenuOpen}
+                            onClose={() => setRunMenuOpen(false)}
+                            activator={
+                                <Button size="slim" primary disclosure loading={starting} disabled={hasActiveRun || !deviceId}
+                                    onClick={() => setRunMenuOpen(o => !o)}>
+                                    Run diagnostics
+                                </Button>
+                            }
+                        >
+                            <ActionList actionRole="menuitem" items={[
+                                { content: 'Full report', helpText: 'Everything — about a minute', onAction: () => startRun('full') },
+                                { content: 'Quick check', helpText: 'Verdict, services and backend reachability — seconds', onAction: () => startRun('quick') },
+                            ]} />
+                        </Popover>
+                    </HorizontalStack>
                 </HorizontalStack>
+                {shownRuns.map(r => (
+                    <RunRow key={r.commandId} run={r} onCancel={cancelRun} cancelling={cancellingId === r.commandId} />
+                ))}
                 {loading && diagnostics.length === 0 ? (
                     <Box padding="6"><HorizontalStack align="center"><Spinner size="small" /></HorizontalStack></Box>
                 ) : !latest ? (
                     <Box padding="6">
                         <Text as="p" color="subdued" alignment="center">
-                            No diagnostic reports yet. A report is taken automatically on every install and when the agent sets itself up.
+                            No diagnostic reports yet. A report is taken automatically on every install and when the agent sets itself up, or run one now with Run diagnostics.
                         </Text>
                     </Box>
                 ) : (
