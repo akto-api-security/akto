@@ -159,9 +159,15 @@ function ReportViewer({ diagnostic, onBack }) {
         a.click()
         URL.revokeObjectURL(url)
     }
-    const copy = () => {
-        navigator.clipboard.writeText(diagnostic.report || '').catch(() => {})
-        func.setToast(true, false, 'Report copied')
+    // Clipboard access fails on a non-secure context or a denied permission; saying
+    // "copied" there leaves the reader pasting the previous clipboard into a ticket.
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(diagnostic.report || '')
+            func.setToast(true, false, 'Report copied')
+        } catch {
+            func.setToast(true, true, 'Could not copy the report — use Download instead')
+        }
     }
 
     return (
@@ -263,7 +269,7 @@ function RunRow({ run, onCancel, cancelling }) {
                         <Text variant="bodySm" color="subdued">{meta}</Text>
                     </VerticalStack>
                 </HorizontalStack>
-                {run.state === 'waiting' && (
+                {ACTIVE_RUN_STATES.includes(run.state) && (
                     <Button size="slim" onClick={() => onCancel(run.commandId)} loading={cancelling}>Cancel</Button>
                 )}
             </HorizontalStack>
@@ -344,21 +350,27 @@ function DiagnosticsTab({ agent }) {
         setCancellingId(commandId)
         try {
             await settingRequests.cancelEndpointShieldDiagnosticRun(commandId)
-            await loadRuns()
+        } catch {
+            func.setToast(true, true, 'Could not cancel the run')
         } finally {
             setCancellingId(null)
         }
+        // Reload either way: a cancel that raced the device finishing is not an error,
+        // and the reloaded row is the honest answer in both cases.
+        await loadRuns()
     }, [loadRuns])
 
     const open = useCallback(async (id) => {
         setOpeningId(id)
         try {
             const res = await settingRequests.fetchEndpointShieldDiagnostic(id)
-            if (res?.diagnostic) setOpened(res.diagnostic)
+            if (res?.diagnostic && deviceRef.current === deviceId) setOpened(res.diagnostic)
+        } catch {
+            func.setToast(true, true, 'Could not open the report')
         } finally {
             setOpeningId(null)
         }
-    }, [])
+    }, [deviceId])
 
     if (opened) {
         return <Box paddingBlockStart="4"><ReportViewer diagnostic={opened} onBack={() => setOpened(null)} /></Box>
