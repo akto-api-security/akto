@@ -42,6 +42,13 @@ public class KafkaConfig {
     public static final String SASL_MECHANISM_SCRAM_SHA_256 = "SCRAM-SHA-256";
     public static final String SASL_MECHANISM_SCRAM_SHA_512 = "SCRAM-SHA-512";
 
+    // Amazon MSK IAM: authenticates with the AWS identity of the process (e.g. ECS task role),
+    // no username/password. Needs software.amazon.msk:aws-msk-iam-auth on the classpath.
+    public static final String SASL_MECHANISM_AWS_MSK_IAM = "AWS_MSK_IAM";
+    public static final String SASL_CLIENT_CALLBACK_HANDLER_CLASS = "sasl.client.callback.handler.class";
+    public static final String MSK_IAM_LOGIN_MODULE = "software.amazon.msk.auth.iam.IAMLoginModule";
+    public static final String MSK_IAM_CALLBACK_HANDLER = "software.amazon.msk.auth.iam.IAMClientCallbackHandler";
+
     // Default SASL mechanism
     public static final String DEFAULT_SASL_MECHANISM = SASL_MECHANISM_PLAIN;
 
@@ -97,7 +104,7 @@ public class KafkaConfig {
     /**
      * Gets the configured SASL mechanism from environment variable with validation.
      *
-     * @return SASL mechanism (PLAIN, SCRAM-SHA-256, or SCRAM-SHA-512)
+     * @return SASL mechanism (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512 or AWS_MSK_IAM)
      */
     public static String getKafkaSaslMechanism() {
         String mechanism = System.getenv().getOrDefault(ENV_KAFKA_SASL_MECHANISM, DEFAULT_SASL_MECHANISM);
@@ -105,7 +112,8 @@ public class KafkaConfig {
         // Validate mechanism
         if (!mechanism.equals(SASL_MECHANISM_PLAIN) &&
             !mechanism.equals(SASL_MECHANISM_SCRAM_SHA_256) &&
-            !mechanism.equals(SASL_MECHANISM_SCRAM_SHA_512)) {
+            !mechanism.equals(SASL_MECHANISM_SCRAM_SHA_512) &&
+            !mechanism.equals(SASL_MECHANISM_AWS_MSK_IAM)) {
             logger.error("Invalid SASL mechanism: {}. Using default: {}", mechanism, DEFAULT_SASL_MECHANISM);
             return DEFAULT_SASL_MECHANISM;
         }
@@ -172,6 +180,30 @@ public class KafkaConfig {
     }
 
     /**
+     * @return true if AKTO_KAFKA_SASL_MECHANISM selects Amazon MSK IAM authentication
+     */
+    public static boolean isMskIamAuthentication() {
+        return SASL_MECHANISM_AWS_MSK_IAM.equals(getKafkaSaslMechanism());
+    }
+
+    /**
+     * Adds Amazon MSK IAM authentication properties. Credentials come from the default AWS
+     * provider chain (ECS task role, instance profile, env vars), so no username/password is needed.
+     *
+     * @param properties The Properties object to add authentication to
+     */
+    public static void addMskIamAuthenticationProperties(Properties properties) {
+        // MSK IAM listeners are TLS only; MSK certificates are publicly trusted, so hostname verification stays on
+        properties.put(SECURITY_PROTOCOL, SECURITY_PROTOCOL_SASL_SSL);
+        properties.put(SASL_MECHANISM, SASL_MECHANISM_AWS_MSK_IAM);
+        properties.put(SASL_CLIENT_CALLBACK_HANDLER_CLASS, MSK_IAM_CALLBACK_HANDLER);
+        properties.put(SASL_JAAS_CONFIG, MSK_IAM_LOGIN_MODULE + " required;");
+
+        // MSK throttles new IAM connections; back off at least 1s between reconnects
+        properties.putIfAbsent("reconnect.backoff.ms", 1000);
+    }
+
+    /**
      * Validates credentials and adds authentication properties with proper security protocol.
      * This is a convenience method that combines credential validation, security protocol detection,
      * and authentication property configuration.
@@ -182,6 +214,11 @@ public class KafkaConfig {
      * @return true if authentication was added successfully, false if credentials are missing
      */
     public static boolean addValidatedAuthenticationProperties(Properties properties, String username, String password) {
+        if (isMskIamAuthentication()) {
+            addMskIamAuthenticationProperties(properties);
+            return true;
+        }
+
         boolean hasCredentials = !StringUtils.isEmpty(username) && !StringUtils.isEmpty(password);
 
         if (!hasCredentials) {
