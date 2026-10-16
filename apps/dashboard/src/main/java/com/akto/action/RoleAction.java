@@ -213,6 +213,7 @@ public class RoleAction extends UserAction {
             case "ISSUES": return "Issues";
             case "INTEGRATIONS": return "Integrations";
             case "API_TOKENS": return "API tokens";
+            case "TEST_SCRIPTS": return "Pre and post request scripts";
             default: return feature;
         }
     }
