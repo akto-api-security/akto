@@ -21,6 +21,10 @@ public class EndpointShieldDiagnostic {
     public static final int RETENTION_PER_DEVICE = 20;
     public static final int MAX_REPORT_BYTES = 512 * 1024;
     public static final int MAX_FINDINGS = 10;
+    /** Identifier fields (deviceId, agentId, installId, executionId, profile); longer is rejected. */
+    public static final int MAX_ID_LENGTH = 256;
+    /** Each finding and the short text fields (verdict, os, agentVersion, outcome); longer is truncated. */
+    public static final int MAX_TEXT_BYTES = 2 * 1024;
 
     @BsonId
     private ObjectId id;

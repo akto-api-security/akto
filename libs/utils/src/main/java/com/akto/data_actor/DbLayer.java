@@ -4402,14 +4402,8 @@ public class DbLayer {
             if (exec == null) return false;
 
             final int maxBytes = 512 * 1024;
-            if (stdout != null && stdout.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBytes) {
-                stdout = new String(stdout.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, maxBytes,
-                        java.nio.charset.StandardCharsets.UTF_8) + "\n[truncated by server]";
-            }
-            if (stderr != null && stderr.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBytes) {
-                stderr = new String(stderr.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, maxBytes,
-                        java.nio.charset.StandardCharsets.UTF_8) + "\n[truncated by server]";
-            }
+            stdout = com.akto.util.Util.truncateUtf8(stdout, maxBytes);
+            stderr = com.akto.util.Util.truncateUtf8(stderr, maxBytes);
 
             EndpointRemoteCommandExecutionDao.instance.getMCollection().updateOne(
                     Filters.and(
@@ -4429,6 +4423,36 @@ public class DbLayer {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateEndpointRemoteCommandResult: " + e.getMessage());
             return false;
+        }
+    }
+
+    /** Store one endpoint-shield diagnostic report. */
+    public static void insertEndpointShieldDiagnostic(EndpointShieldDiagnostic diagnostic) {
+        EndpointShieldDiagnosticDao.instance.insertOne(diagnostic);
+    }
+
+    /**
+     * Delete a device's diagnostic reports beyond the newest {@code keep}. _id breaks
+     * createdAt ties (whole seconds), so a report inserted in the same second as others
+     * is never the one trimmed.
+     */
+    public static void trimEndpointShieldDiagnostics(String deviceId, int keep) {
+        List<EndpointShieldDiagnostic> older = EndpointShieldDiagnosticDao.instance.findAll(
+                Filters.eq(EndpointShieldDiagnostic.DEVICE_ID, deviceId),
+                keep, 1000,
+                Sorts.orderBy(Sorts.descending(EndpointShieldDiagnostic.CREATED_AT), Sorts.descending("_id")),
+                Projections.include("_id"));
+        if (older == null || older.isEmpty()) {
+            return;
+        }
+        List<ObjectId> ids = new ArrayList<>(older.size());
+        for (EndpointShieldDiagnostic o : older) {
+            if (o.getId() != null) {
+                ids.add(o.getId());
+            }
+        }
+        if (!ids.isEmpty()) {
+            EndpointShieldDiagnosticDao.instance.deleteAll(Filters.in("_id", ids));
         }
     }
 

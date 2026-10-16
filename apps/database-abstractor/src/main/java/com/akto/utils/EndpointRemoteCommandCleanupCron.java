@@ -11,9 +11,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateManyModel;
-import com.mongodb.client.model.Variable;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 import org.bson.Document;
@@ -21,7 +21,6 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -146,27 +145,25 @@ public class EndpointRemoteCommandCleanupCron {
     // -------------------------------------------------------------------------
     // Join an execution to its parent command.
     //
-    // commandId holds the parent's ObjectId as a hex string — dashboard-created
-    // commands (and DbLayer.queueEndpointRemoteCommand) have only Mongo's _id, no
-    // string "id" field. A plain localField/foreignField join on "id" therefore
-    // matched nothing for them: RUNNING executions of a dead agent were never
-    // marked presumed_dead_agent, and PENDING ones under an expired/cancelled
-    // command were never failed, so the dashboard kept polling them forever.
-    // Match _id (converted) and, for legacy documents, the string id.
+    // commandId holds the parent's ObjectId as a hex string (EndpointRemoteCommand.getId()
+    // returns the _id hex) — dashboard-created commands have only Mongo's _id, no string
+    // "id" field. A plain localField/foreignField join on "id" therefore matched nothing:
+    // RUNNING executions of a dead agent were never marked presumed_dead_agent, and
+    // PENDING ones under an expired/cancelled command were never failed, so the dashboard
+    // kept polling them forever. Convert commandId to an ObjectId first and join on _id,
+    // which keeps the lookup on the _id index. A missing or malformed commandId converts
+    // to null, which matches no command (every command has an _id).
     // -------------------------------------------------------------------------
-    private static Bson lookupParentCommand() {
-        List<Variable<Object>> let = Arrays.asList(
-                new Variable<Object>("cidStr", "$" + EndpointRemoteCommandExecution.COMMAND_ID),
-                new Variable<Object>("cidOid", new Document("$convert", new Document()
-                        .append("input", "$" + EndpointRemoteCommandExecution.COMMAND_ID)
-                        .append("to", "objectId")
-                        .append("onError", null)
-                        .append("onNull", null))));
-        List<Bson> lookupPipeline = Collections.singletonList(Aggregates.match(Filters.expr(
-                new Document("$or", Arrays.asList(
-                        new Document("$eq", Arrays.asList("$_id", "$$cidOid")),
-                        new Document("$eq", Arrays.asList("$" + EndpointRemoteCommand.ID, "$$cidStr")))))));
-        return Aggregates.lookup(EndpointRemoteCommandDao.COLLECTION_NAME, let, lookupPipeline, "cmd");
+    private static final String CMD_OID = "_cmdOid";
+
+    private static List<Bson> lookupParentCommand() {
+        Bson addOid = Aggregates.addFields(new Field<>(CMD_OID, new Document("$convert", new Document()
+                .append("input", "$" + EndpointRemoteCommandExecution.COMMAND_ID)
+                .append("to", "objectId")
+                .append("onError", null)
+                .append("onNull", null))));
+        Bson lookup = Aggregates.lookup(EndpointRemoteCommandDao.COLLECTION_NAME, CMD_OID, "_id", "cmd");
+        return Arrays.asList(addOid, lookup);
     }
 
     // -------------------------------------------------------------------------
@@ -177,7 +174,7 @@ public class EndpointRemoteCommandCleanupCron {
         pipeline.add(Aggregates.match(
                 Filters.eq(EndpointRemoteCommandExecution.STATUS,
                         EndpointRemoteCommandExecution.Status.RUNNING.name())));
-        pipeline.add(lookupParentCommand());
+        pipeline.addAll(lookupParentCommand());
         pipeline.add(Aggregates.unwind("$cmd"));
 
         List<String> staleIds = new ArrayList<>();
@@ -218,7 +215,7 @@ public class EndpointRemoteCommandCleanupCron {
         pipeline.add(Aggregates.match(
                 Filters.eq(EndpointRemoteCommandExecution.STATUS,
                         EndpointRemoteCommandExecution.Status.PENDING.name())));
-        pipeline.add(lookupParentCommand());
+        pipeline.addAll(lookupParentCommand());
         pipeline.add(Aggregates.unwind("$cmd"));
         pipeline.add(Aggregates.match(
                 Filters.in("cmd." + EndpointRemoteCommand.STATUS,

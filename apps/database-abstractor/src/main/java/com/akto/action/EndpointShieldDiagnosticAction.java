@@ -1,20 +1,19 @@
 package com.akto.action;
 
-import com.akto.dao.EndpointShieldDiagnosticDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.EndpointShieldDiagnostic;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
+import com.akto.util.Util;
+import com.akto.utils.DiagnosticReportSummary;
 import com.opensymphony.xwork2.ActionSupport;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 
 /**
@@ -39,74 +38,87 @@ public class EndpointShieldDiagnosticAction extends ActionSupport {
     private String id;
 
     public String insertEndpointShieldDiagnostic() {
-        try {
-            EndpointShieldDiagnostic d = diagnostic;
-            if (d == null || isBlank(d.getDeviceId())) {
-                addActionError("diagnostic.deviceId is required");
-                return ERROR.toUpperCase();
-            }
-            if (d.getSource() == null || !Arrays.asList(EndpointShieldDiagnostic.SOURCES).contains(d.getSource())) {
-                addActionError("diagnostic.source must be one of " + Arrays.toString(EndpointShieldDiagnostic.SOURCES));
-                return ERROR.toUpperCase();
-            }
-
-            d.setId(new ObjectId());       // always a new document; set here so the id can be returned
-            d.setCreatedAt(Context.now()); // server time, not the device clock
-            d.setReport(truncateUtf8(d.getReport(), EndpointShieldDiagnostic.MAX_REPORT_BYTES));
-            if (d.getFindings() != null && d.getFindings().size() > EndpointShieldDiagnostic.MAX_FINDINGS) {
-                d.setFindings(new ArrayList<>(d.getFindings().subList(0, EndpointShieldDiagnostic.MAX_FINDINGS)));
-            }
-            d.setHealthy(d.getVerdict() != null && d.getVerdict().trim().startsWith("HEALTHY"));
-
-            EndpointShieldDiagnosticDao.instance.insertOne(d);
-            this.id = d.getHexId();
-            trimDeviceHistory(d.getDeviceId());
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in insertEndpointShieldDiagnostic " + e.getMessage());
+        EndpointShieldDiagnostic d = diagnostic;
+        if (d == null || StringUtils.isBlank(d.getDeviceId())) {
+            addActionError("diagnostic.deviceId is required");
             return ERROR.toUpperCase();
         }
+        if (d.getSource() == null || !Arrays.asList(EndpointShieldDiagnostic.SOURCES).contains(d.getSource())) {
+            addActionError("diagnostic.source must be one of " + Arrays.toString(EndpointShieldDiagnostic.SOURCES));
+            return ERROR.toUpperCase();
+        }
+        String tooLong = firstTooLongId(d);
+        if (tooLong != null) {
+            addActionError("diagnostic." + tooLong + " exceeds " + EndpointShieldDiagnostic.MAX_ID_LENGTH + " characters");
+            return ERROR.toUpperCase();
+        }
+
+        d.setId(new ObjectId());       // always a new document; set here so the id can be returned
+        d.setCreatedAt(Context.now()); // server time, not the device clock
+        d.setReport(Util.truncateUtf8(d.getReport(), EndpointShieldDiagnostic.MAX_REPORT_BYTES));
+        // The stored summary is derived from the report here, not taken from the
+        // device, so every installer/agent version is summarised by the same rules.
+        // A device that sent no report keeps whatever summary it sent.
+        if (StringUtils.isNotBlank(d.getReport())) {
+            DiagnosticReportSummary summary = DiagnosticReportSummary.of(d.getReport());
+            d.setVerdict(summary.getVerdict());
+            d.setFindings(summary.getFindings());
+            d.setErrorCount(summary.getErrorCount());
+            d.setWarningCount(summary.getWarningCount());
+        }
+        d.setVerdict(Util.truncateUtf8(d.getVerdict(), EndpointShieldDiagnostic.MAX_TEXT_BYTES));
+        d.setOs(Util.truncateUtf8(d.getOs(), EndpointShieldDiagnostic.MAX_TEXT_BYTES));
+        d.setAgentVersion(Util.truncateUtf8(d.getAgentVersion(), EndpointShieldDiagnostic.MAX_TEXT_BYTES));
+        d.setOutcome(Util.truncateUtf8(d.getOutcome(), EndpointShieldDiagnostic.MAX_TEXT_BYTES));
+        d.setFindings(boundFindings(d.getFindings()));
+        d.setHealthy(d.getVerdict() != null && d.getVerdict().trim().startsWith("HEALTHY"));
+
+        try {
+            DbLayer.insertEndpointShieldDiagnostic(d);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertEndpointShieldDiagnostic " + e.getMessage());
+            addActionError("failed to store diagnostic: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        this.id = d.getHexId();
+
+        // The report is stored; a failed trim must not make the caller retry and duplicate it.
+        try {
+            DbLayer.trimEndpointShieldDiagnostics(d.getDeviceId(), EndpointShieldDiagnostic.RETENTION_PER_DEVICE);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error trimming endpoint shield diagnostics for device "
+                    + d.getDeviceId() + ": " + e.getMessage());
+        }
+        return SUCCESS.toUpperCase();
     }
 
-    /** Delete this device's reports beyond the newest RETENTION_PER_DEVICE. */
-    private static void trimDeviceHistory(String deviceId) {
-        List<EndpointShieldDiagnostic> older = EndpointShieldDiagnosticDao.instance.findAll(
-                Filters.eq(EndpointShieldDiagnostic.DEVICE_ID, deviceId),
-                EndpointShieldDiagnostic.RETENTION_PER_DEVICE, 1000,
-                Sorts.descending(EndpointShieldDiagnostic.CREATED_AT),
-                Projections.include("_id"));
-        if (older == null || older.isEmpty()) {
-            return;
-        }
-        List<ObjectId> ids = new ArrayList<>(older.size());
-        for (EndpointShieldDiagnostic o : older) {
-            if (o.getId() != null) {
-                ids.add(o.getId());
+    /** Name of the first identifier field longer than MAX_ID_LENGTH, or null. */
+    private static String firstTooLongId(EndpointShieldDiagnostic d) {
+        String[][] fields = {
+                {EndpointShieldDiagnostic.DEVICE_ID, d.getDeviceId()},
+                {EndpointShieldDiagnostic.AGENT_ID, d.getAgentId()},
+                {EndpointShieldDiagnostic.INSTALL_ID, d.getInstallId()},
+                {EndpointShieldDiagnostic.EXECUTION_ID, d.getExecutionId()},
+                {EndpointShieldDiagnostic.PROFILE, d.getProfile()},
+        };
+        for (String[] f : fields) {
+            if (f[1] != null && f[1].length() > EndpointShieldDiagnostic.MAX_ID_LENGTH) {
+                return f[0];
             }
         }
-        if (!ids.isEmpty()) {
-            EndpointShieldDiagnosticDao.instance.deleteAll(Filters.in("_id", ids));
-        }
+        return null;
     }
 
-    /** Truncate to at most maxBytes of UTF-8 without splitting a character, noting the cut. */
-    static String truncateUtf8(String s, int maxBytes) {
-        if (s == null) {
+    /** Keep the first MAX_FINDINGS findings, each at most MAX_TEXT_BYTES. */
+    private static List<String> boundFindings(List<String> findings) {
+        if (findings == null) {
             return null;
         }
-        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= maxBytes) {
-            return s;
+        int n = Math.min(findings.size(), EndpointShieldDiagnostic.MAX_FINDINGS);
+        List<String> bounded = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            bounded.add(Util.truncateUtf8(findings.get(i), EndpointShieldDiagnostic.MAX_TEXT_BYTES));
         }
-        int end = maxBytes;
-        while (end > 0 && (bytes[end] & 0xC0) == 0x80) { // don't cut inside a multi-byte char
-            end--;
-        }
-        return new String(bytes, 0, end, StandardCharsets.UTF_8)
-                + "\n[truncated by server: report was " + bytes.length + " bytes]";
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.trim().isEmpty();
+        return bounded;
     }
 }
