@@ -1,12 +1,16 @@
 package com.akto.kafka;
 
-import org.junit.Test;
+import com.akto.detection.ClassificationWorker;
+import com.akto.detection.DetectionCorrector;
+import com.akto.detection.KafkaCandidatePublisher;
+import com.akto.detection.ParamVerdictCache;
+import org.junit.jupiter.api.Test;
 
 import java.util.Properties;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class KafkaConfigTest {
 
@@ -53,5 +57,20 @@ public class KafkaConfigTest {
         Properties props = new Properties();
         assertFalse(KafkaConfig.addValidatedAuthenticationProperties(props, null, null));
         assertFalse(KafkaConfig.isMskIamAuthentication());
+    }
+
+    // Detection corrector clients apply the env Kafka auth; with auth disabled they are built as before.
+    // Neither connects: producer/consumer construction is lazy and the worker is stopped before it polls.
+    @Test
+    public void testDetectionCorrectorPublisherBuildsWithEnvAuth() {
+        new KafkaCandidatePublisher("localhost:1", "akto.detection.candidates").close();
+    }
+
+    @Test
+    public void testDetectionCorrectorWorkerBuildsWithEnvAuth() {
+        ClassificationWorker worker = new ClassificationWorker("localhost:1", "akto.detection.candidates",
+                "test-group", DetectionCorrector.NO_OP, new ParamVerdictCache(1, 1));
+        worker.stop();
+        worker.run();
     }
 }
