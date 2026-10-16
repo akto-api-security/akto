@@ -2,6 +2,7 @@ package com.akto.detection;
 
 import com.akto.dto.AccountSettings;
 import com.akto.dto.settings.DetectionCorrectorSettings;
+import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -141,6 +142,11 @@ public class DetectionCorrectorInstaller {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
         props.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, 10_000);
+        if (!KafkaConfig.applyAuthenticationPropertiesFromEnv(props)) {
+            loggerMaker.error("[detection-corrector] kafka authentication is enabled but credentials are missing, "
+                    + "not creating topic " + topic);
+            return;
+        }
 
         try (AdminClient admin = AdminClient.create(props)) {
             admin.createTopics(Collections.singletonList(new NewTopic(topic, partitions, (short) 1)))
