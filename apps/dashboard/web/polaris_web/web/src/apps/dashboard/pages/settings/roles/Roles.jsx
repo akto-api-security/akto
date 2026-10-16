@@ -88,7 +88,7 @@ export function CreateRoleModal({ open, onClose, source, existingNames, onCreate
 
 const Roles = () => {
     const navigate = useNavigate()
-    const userRole = window.USER_ROLE
+    const userRole = func.currentProductBaseRole()
     const isLocalDeploy = func.checkLocal()
     const { canCall } = usePermissions()
     const canEdit = canCall('api/createCustomRole') && !isLocalDeploy
