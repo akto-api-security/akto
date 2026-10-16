@@ -42,6 +42,9 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ProviderGuardrailAction.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static final Gateway gateway = Gateway.getInstance();
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String INFERENCE_HOOKS_TAG = "inference-hooks";
+    private static final String TOOL_CALL_EVENT = "tool_call";
+    private static final String ENDPOINT_PREFIX = "inference-hook-";
 
     static {
         gateway.setDataPublisher(new KafkaDataPublisher());
@@ -117,8 +120,15 @@ public class ProviderGuardrailAction extends ActionSupport {
 
         Map<String, Object> tag = new HashMap<>();
         tag.put("gen-ai", "Gen AI");
-        tag.put("ai-agent", provider.toLowerCase());
+        tag.put("ai-agent", agentTagValue(normalizeApp(frame.application)));
         tag.put("source", "ENDPOINT");
+        // Marks the collection as inference-hooks traffic.
+        tag.put(INFERENCE_HOOKS_TAG, provider.toLowerCase());
+        // The Username column falls back to a "username" collection tag when there is no Endpoint Shield module.
+        String usernameSlug = actorSlug(frame);
+        if (!usernameSlug.isEmpty()) {
+            tag.put("username", usernameSlug);
+        }
 
         Map<String, Object> meta = new HashMap<>();
         meta.put("webhook_id", frame.requestId);
@@ -132,10 +142,20 @@ public class ProviderGuardrailAction extends ActionSupport {
         if (frame.metadata != null) {
             meta.put("provider_metadata", frame.metadata);
         }
+        meta.put("event_type", frame.eventType);
+        if (frame.toolInfos != null) {
+            meta.put("tool_infos", frame.toolInfos);
+        }
+
+        String path = "/" + provider.toLowerCase() + "/guardrail";
+        // Tool-call frames get their own endpoint so they stay separate from prompt traffic.
+        if (TOOL_CALL_EVENT.equals(frame.eventType)) {
+            path += "/tool-call";
+        }
 
         Map<String, Object> envelope = new HashMap<>();
         envelope.put("akto_connector", provider.toLowerCase());
-        envelope.put("path", "/" + provider.toLowerCase() + "/guardrail");
+        envelope.put("path", path);
         envelope.put("method", "POST");
         envelope.put("requestPayload", toJson(requestPayload));
         envelope.put("responsePayload", "{}");
@@ -191,7 +211,7 @@ public class ProviderGuardrailAction extends ActionSupport {
     }
 
     /**
-     * Agent collection hostname, built server-side as {emailSlug}.ai-agent.{app}.
+     * Agent collection hostname, built server-side as inference-hook-{emailSlug}.ai-agent.{app}.
      * Mirrors the client-side endpoint-shield convention
      * ({deviceLabel}.ai-agent.{agentName}, see device.go GetAgentCollectionName)
      * but uses the incoming email as the slug because the device name and
@@ -199,7 +219,32 @@ public class ProviderGuardrailAction extends ActionSupport {
      * is intentionally omitted.
      */
     private static String buildAgentHost(ParsedRequest frame) {
-        return AgentHostUtils.agentHost(AgentHostUtils.emailLocalPart(extractEmail(frame.actor)), normalizeApp(frame.application));
+        return AgentHostUtils.agentHost(endpointId(frame), normalizeApp(frame.application));
+    }
+
+    // Endpoint ID is the first host segment; the prefix keeps hook endpoints apart from real devices.
+    private static String endpointId(ParsedRequest frame) {
+        return ENDPOINT_PREFIX + AgentHostUtils.identitySlug(AgentHostUtils.emailLocalPart(extractEmail(frame.actor)));
+    }
+
+    private static String actorSlug(ParsedRequest frame) {
+        return AgentHostUtils.slugify(AgentHostUtils.emailLocalPart(extractEmail(frame.actor)));
+    }
+
+    // Registry-known ai-agent values keep each Claude surface in its own group instead of folding everything into Claude CLI.
+    private String agentTagValue(String app) {
+        if ("claude".equalsIgnoreCase(provider)) {
+            if ("claude-cli".equals(app)) {
+                return "claude-cli";
+            }
+            if ("cowork".equals(app)) {
+                return "claude_cowork";
+            }
+            if ("claude-app".equals(app)) {
+                return "claude-app";
+            }
+        }
+        return provider.toLowerCase();
     }
 
     // Self-registers this actor's email-slug into agent_users on first contact, so it becomes
@@ -207,9 +252,8 @@ public class ProviderGuardrailAction extends ActionSupport {
     private static void registerConnectorIdentity(ParsedRequest frame) {
         try {
             String email = extractEmail(frame.actor);
-            String slug = AgentHostUtils.slugify(AgentHostUtils.emailLocalPart(email));
-            if (!slug.isEmpty()) {
-                AgentUsersDao.instance.ensureConnectorIdentity(email, slug, "inference-hooks");
+            if (!actorSlug(frame).isEmpty()) {
+                AgentUsersDao.instance.ensureConnectorIdentity(email, endpointId(frame), "inference-hooks");
             }
         } catch (Exception e) {
             loggerMaker.error("Provider guardrail: failed to register connector identity", e);

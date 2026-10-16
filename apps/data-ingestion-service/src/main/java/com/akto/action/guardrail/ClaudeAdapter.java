@@ -2,6 +2,7 @@ package com.akto.action.guardrail;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,6 +15,8 @@ import java.util.Map;
 public class ClaudeAdapter implements ProviderAdapter {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String PROMPT = "prompt";
+    private static final String TOOL_CALL = "tool_call";
     private static final int DENY_REASON_MAX = 500;
     private static final int REFERENCE_ID_MAX = 50;
 
@@ -31,13 +34,14 @@ public class ClaudeAdapter implements ProviderAdapter {
             return frame;
         }
 
-        // Only "prompt" is defined today; any other (future) event type still
-        // needs a verdict — allow it rather than erroring.
+        // "prompt" and "tool_call" are defined; any other (future) event type still needs a verdict, so allow it.
         String type = stringOrEmpty(body.get("type"));
-        if (!type.isEmpty() && !"prompt".equals(type)) {
+        boolean toolCall = TOOL_CALL.equals(type);
+        if (!type.isEmpty() && !PROMPT.equals(type) && !toolCall) {
             frame.allowShortCircuit = true;
             return frame;
         }
+        frame.eventType = toolCall ? TOOL_CALL : PROMPT;
 
         frame.requestId = stringOrNull(body.get("request_id"));
         frame.sessionId = stringOrNull(body.get("session_id"));
@@ -56,8 +60,47 @@ public class ClaudeAdapter implements ProviderAdapter {
             frame.metadata = (Map<String, Object>) body.get("metadata");
         }
         Object messages = body.get("messages");
-        frame.prompt = messages instanceof List ? flatten((List<Object>) messages) : "";
+        if (!(messages instanceof List)) {
+            frame.prompt = "";
+            return frame;
+        }
+        List<Object> msgs = (List<Object>) messages;
+        if (toolCall) {
+            // A tool_call frame carries the latest assistant message as the last entry; earlier turns were in the prompt frame.
+            if (msgs.isEmpty()) {
+                frame.prompt = "";
+                return frame;
+            }
+            msgs = msgs.subList(msgs.size() - 1, msgs.size());
+            List<Map<String, Object>> infos = collectToolInfos(msgs);
+            frame.toolInfos = infos.isEmpty() ? null : infos;
+        }
+        frame.prompt = flatten(msgs);
         return frame;
+    }
+
+    /** tool_info of every tool_use block, in order; tool_info is omitted (never null) when it does not apply. */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> collectToolInfos(List<Object> msgs) {
+        List<Map<String, Object>> infos = new ArrayList<>();
+        for (Object msgObj : msgs) {
+            if (!(msgObj instanceof Map) || !(((Map<String, Object>) msgObj).get("content") instanceof List)) {
+                continue;
+            }
+            for (Object blockObj : (List<Object>) ((Map<String, Object>) msgObj).get("content")) {
+                if (!(blockObj instanceof Map)) {
+                    continue;
+                }
+                Map<String, Object> block = (Map<String, Object>) blockObj;
+                if (!"tool_use".equals(stringOrEmpty(block.get("type"))) || !(block.get("tool_info") instanceof Map)) {
+                    continue;
+                }
+                Map<String, Object> info = new HashMap<>((Map<String, Object>) block.get("tool_info"));
+                info.put("tool_name", stringOrNull(block.get("tool_name")));
+                infos.add(info);
+            }
+        }
+        return infos;
     }
 
     @Override
@@ -108,6 +151,11 @@ public class ClaudeAdapter implements ProviderAdapter {
                         Object input = block.get("input");
                         if (input != null) {
                             toolUse += " " + toJson(input);
+                        }
+                        // tool_info (who runs/provides the tool) only exists on tool_call frames.
+                        Object toolInfo = block.get("tool_info");
+                        if (toolInfo != null) {
+                            toolUse += " tool_info " + toJson(toolInfo);
                         }
                         appendLine(sb, toolUse);
                         break;

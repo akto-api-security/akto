@@ -729,6 +729,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         String pluginStatus;
         String pluginScope;
 
+        String hookUsername;
         DeviceAcc(String deviceId) { this.deviceId = deviceId; }
 
         BasicDBObject toResponse() {
@@ -783,6 +784,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Double r = risk.get(idStr);
             double collRisk = r != null ? r : 0.0;
             DeviceAcc d = devices.computeIfAbsent(deviceId, DeviceAcc::new);
+            if (d.hookUsername == null) d.hookUsername = inferenceHookUsername(c);
             if (collRisk > d.riskScore) d.riskScore = collRisk;
             if (collTraffic > d.lastSeenEpoch) d.lastSeenEpoch = collTraffic;
             if (serviceName != null) d.services.add(serviceName);
@@ -803,6 +805,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         List<BasicDBObject> out = new ArrayList<>();
         for (DeviceAcc d : devices.values()) out.add(d.toResponse());
         return out;
+    }
+
+    // Inference-hook collections have no Endpoint Shield module, so their username comes from the username collection tag.
+    private static String inferenceHookUsername(ApiCollection c) {
+        List<CollectionTags> tags = c.getEnvType();
+        if (tags == null) return null;
+        boolean isHook = false;
+        for (CollectionTags t : tags) {
+            if (t != null && "inference-hooks".equals(t.getKeyName())) {
+                isHook = true;
+                break;
+            }
+        }
+        return isHook ? findUsernameFromEnvTypeTags(tags) : null;
     }
 
     private static String resolveUsernameByDeviceId(String deviceId, Map<String, String> usernameMap) {
@@ -861,7 +877,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<BasicDBObject> rows = new ArrayList<>();
             for (DeviceAcc d : devices.values()) {
                 BasicDBObject row = d.toResponse();
-                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernames));
+                String resolvedUsername = resolveUsernameByDeviceId(d.deviceId, usernames);
+                if ("-".equals(resolvedUsername) && d.hookUsername != null) resolvedUsername = d.hookUsername;
+                row.put("username", resolvedUsername);
                 rows.add(row);
             }
 
@@ -1009,6 +1027,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             EndpointGroup g = groups.computeIfAbsent(deviceId, id -> {
                 EndpointGroup ng = new EndpointGroup(id);
                 ng.username = resolveUsernameByDeviceId(id, usernameMap);
+                if ("-".equals(ng.username)) {
+                    String hookUsername = inferenceHookUsername(c);
+                    if (hookUsername != null) ng.username = hookUsername;
+                }
                 return ng;
             });
             g.children.add(child);

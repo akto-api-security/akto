@@ -36,4 +36,8 @@ public class ParsedRequest {
      * inspection (e.g. an unrecognized future event type).
      */
     public boolean allowShortCircuit;
+    /** Hook event: "prompt" or "tool_call". */
+    public String eventType;
+    /** tool_info of each tool_use in a tool_call frame, in model order. */
+    public java.util.List<Map<String, Object>> toolInfos;
 }
