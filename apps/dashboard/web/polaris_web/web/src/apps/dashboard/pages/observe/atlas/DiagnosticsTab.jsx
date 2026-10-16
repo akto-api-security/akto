@@ -98,11 +98,20 @@ export const splitReportSections = (report) => {
     }))
 }
 
+// DEGRADED: the agent runs and reports, but ingest or the threat backend is
+// unreachable, so its data goes nowhere. A healthy verdict can still come with
+// ❌ findings elsewhere in the report; their count is shown next to it.
 const VerdictBadge = ({ diagnostic }) => {
     if (!diagnostic?.verdict) return <Badge>No verdict</Badge>
-    return diagnostic.healthy
-        ? <Badge status="success">Device healthy</Badge>
-        : <Badge status="critical">Device unhealthy</Badge>
+    if (diagnostic.verdict.startsWith('DEGRADED')) return <Badge status="warning">Device degraded</Badge>
+    if (!diagnostic.healthy) return <Badge status="critical">Device unhealthy</Badge>
+    const errors = diagnostic.errorCount || 0
+    return (
+        <HorizontalStack gap="1" wrap={false}>
+            <Badge status="success">Device healthy</Badge>
+            {errors > 0 && <Badge status="critical">{`${errors} error${errors > 1 ? 's' : ''}`}</Badge>}
+        </HorizontalStack>
+    )
 }
 
 const verdictText = (verdict) => (verdict || '').replace(/^[A-Z ]+—\s*/, '')
@@ -411,7 +420,7 @@ function DiagnosticsTab({ agent }) {
                                                 <VerticalStack gap="0">
                                                     <Text variant="bodySm" fontWeight="medium">{sourceLabel(d.source)}</Text>
                                                     <Text variant="bodySm" color="subdued">
-                                                        {[func.prettifyEpoch(d.createdAt), d.errorCount ? `${d.errorCount} error${d.errorCount > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')}
+                                                        {[func.prettifyEpoch(d.createdAt), !d.healthy && d.errorCount ? `${d.errorCount} error${d.errorCount > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')}
                                                     </Text>
                                                 </VerticalStack>
                                             </HorizontalStack>
