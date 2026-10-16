@@ -91,7 +91,8 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
                 + "Otherwise it is SAFE.\n"
                 + "If more than one applies, pick the most dangerous one (RESOURCE_DELETE > "
                 + "CREDENTIAL_OR_PII_READ > CRITICAL_RESOURCE_WRITE > FILE_WRITE).\n"
-                + "Return JSON: {\"dangerous\": <true|false>, \"capability\": \"<one of RESOURCE_DELETE, "
+                + "Return ONLY this JSON object, with no explanation or other text before or after it: "
+                + "{\"dangerous\": <true|false>, \"capability\": \"<one of RESOURCE_DELETE, "
                 + "FILE_WRITE, CREDENTIAL_OR_PII_READ, CRITICAL_RESOURCE_WRITE, SAFE>\"}\n";
     }
 
