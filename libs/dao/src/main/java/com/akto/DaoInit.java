@@ -500,6 +500,7 @@ public class DaoInit {
         SequenceModelDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
+        EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
     }
 
