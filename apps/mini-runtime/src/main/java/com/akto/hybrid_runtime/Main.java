@@ -2,6 +2,7 @@ package com.akto.hybrid_runtime;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -23,9 +24,8 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.behaviour_modelling.SessionAnalyzer;
 import com.akto.behaviour_modelling.SequenceAnalyzerConfig;
-import com.akto.behaviour_modelling.impl.ApiSequencesFlusher;
-import com.akto.behaviour_modelling.impl.IpBasedIdentifier;
-import com.akto.behaviour_modelling.impl.RawCountAccumulator;
+import com.akto.behaviour_modelling.impl.SequenceCountFlusher;
+import com.akto.behaviour_modelling.impl.SessionIdentifier;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.kafka.Kafka;
@@ -585,7 +585,12 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
-        Map<String, SessionAnalyzer> sessionAnalyzerMap = new HashMap<>();
+        Map<String, SessionAnalyzer> sessionAnalyzerMap = new ConcurrentHashMap<>();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            for (SessionAnalyzer sessionAnalyzer : sessionAnalyzerMap.values()) {
+                sessionAnalyzer.shutdown();
+            }
+        }));
 
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
@@ -1092,16 +1097,14 @@ public class Main {
 
                 // aktoPolicyNew is fully built by the time HttpCallParser constructor returns
                 SessionAnalyzer sessionAnalyzer = new SessionAnalyzer(
-                    new SequenceAnalyzerConfig(
-                        2,
-                        10 * 60 * 1000L, // 10 minutes
-                        new IpBasedIdentifier(),
-                        RawCountAccumulator::new,
-                        new ApiSequencesFlusher(),
+                    SequenceAnalyzerConfig.withDefaults(
+                        new SessionIdentifier(),
+                        new SequenceCountFlusher(),
                         parser.apiCatalogSync.aktoPolicyNew
                     )
                 );
                 sessionAnalyzerMap.put(accountId, sessionAnalyzer);
+                loggerMaker.warnAndAddToDb("New Session Based Sequence Analyser initialised for account: " + accountId);
             }
 
             HttpCallParser parser = httpCallParserMap.get(accountId);

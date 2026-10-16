@@ -14,10 +14,19 @@ import com.akto.dao.context.Context;
 import com.akto.dto.traffic.SampleData;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.util.Properties;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 public class KafkaProducerExample {
     // Kafka configuration
@@ -38,15 +47,19 @@ public class KafkaProducerExample {
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
         props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
 
-        RecordGeneratorMode mode = RecordGeneratorMode.SAMPLE_DATA;
+        // -Dmode=DEMO|FILE_READ|SAMPLE_DATA, -Daccount, -DurlFilter (regex, empty = all), -Dcollections (ids, comma separated),
+        // -Dfile (path; default: classpath kafka.txt), -DshiftToNow=true (move sample times so the newest is now)
+        RecordGeneratorMode mode = RecordGeneratorMode.valueOf(System.getProperty("mode", "SAMPLE_DATA"));
 
         List<ProducerRecord<String, String>> records;
         switch (mode) {
             case FILE_READ:
-                records = fileReadRecordGeneration("kafka.txt");
+                records = fileReadRecordGeneration(System.getProperty("file", "kafka.txt"));
                 break;
             case SAMPLE_DATA:
-                records = sampleDataRecordGenerator(1758787662);
+                records = sampleDataRecordGenerator(Integer.parseInt(System.getProperty("account", "1758787662")),
+                        System.getProperty("urlFilter", "typename"), System.getProperty("collections", ""),
+                        Boolean.parseBoolean(System.getProperty("shiftToNow", "false")));
                 break;
             case DEMO:
             default:
@@ -139,26 +152,52 @@ public class KafkaProducerExample {
         }
     }
 
-    public static List<ProducerRecord<String, String>> sampleDataRecordGenerator(int accountId) {
+    public static List<ProducerRecord<String, String>> sampleDataRecordGenerator(int accountId, String urlFilter,
+            String collections, boolean shiftToNow) {
         Context.accountId.set(accountId);
         DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
-        Bson filter = Filters.regex("_id.url", "typename");
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filter);
-        List<ProducerRecord<String, String>> records = new ArrayList<>();
+        List<Bson> filters = new ArrayList<>();
+        if (!urlFilter.isEmpty()) {
+            filters.add(Filters.regex("_id.url", urlFilter));
+        }
+        if (!collections.isEmpty()) {
+            filters.add(Filters.in("_id.apiCollectionId",
+                    Arrays.stream(collections.split(",")).map(String::trim).map(Integer::parseInt).collect(Collectors.toList())));
+        }
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filters.isEmpty() ? new BasicDBObject() : Filters.and(filters));
 
+        // Replay in request-time order so per-session sequences arrive as they happened
+        List<BasicDBObject> samples = new ArrayList<>();
         for (SampleData sampleDoc : sampleDataList) {
-            if(!sampleDoc.getId().getUrl().contains("typename")){
-                System.out.println("************invlaid url");
+            if (sampleDoc.getSamples() == null) {
                 continue;
             }
-            if (sampleDoc.getSamples() == null || sampleDoc.getSamples().isEmpty())
-                continue;
             for (String sample : sampleDoc.getSamples()) {
-                records.add(new ProducerRecord<>(TOPIC, null, sample));
+                samples.add(BasicDBObject.parse(sample));
             }
         }
+        samples.sort(Comparator.comparingLong(KafkaProducerExample::sampleTime));
+        long shift = 0;
+        if (shiftToNow && !samples.isEmpty()) {
+            shift = System.currentTimeMillis() / 1000 - sampleTime(samples.get(samples.size() - 1));
+        }
 
+        List<ProducerRecord<String, String>> records = new ArrayList<>();
+        for (BasicDBObject sample : samples) {
+            if (shift != 0) {
+                sample.put("time", String.valueOf(sampleTime(sample) + shift));
+            }
+            records.add(new ProducerRecord<>(TOPIC, null, sample.toJson()));
+        }
         return records;
+    }
+
+    private static long sampleTime(BasicDBObject sample) {
+        try {
+            return Long.parseLong(String.valueOf(sample.get("time")));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     public static List<ProducerRecord<String, String>> demoRecordGenerator() {
@@ -166,9 +205,9 @@ public class KafkaProducerExample {
         for (int i = 1; i <= 10; i++) {
             hosts.add("host-" + i + "-auth-type.enigma");
         }
-        List<String> paths = java.util.Arrays.asList("json-one", "/json-two", "/json/-three", "/json-four",
+        List<String> paths = Arrays.asList("json-one", "/json-two", "/json/-three", "/json-four",
                 "/json/5/test");
-        // List<String> paths = java.util.Arrays.asList("json-one", "/json-two");
+        // List<String> paths = Arrays.asList("json-one", "/json-two");
         Random random = new Random();
         List<ProducerRecord<String, String>> records = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
@@ -217,18 +256,21 @@ public class KafkaProducerExample {
 
     public static List<ProducerRecord<String, String>> fileReadRecordGeneration(String filePath) {
         List<ProducerRecord<String, String>> records = new ArrayList<>();
-        try (java.io.InputStream is = KafkaProducerExample.class.getClassLoader().getResourceAsStream("kafka.txt")) {
+        try (InputStream is = Files.exists(Paths.get(filePath)) ? Files.newInputStream(Paths.get(filePath))
+                : KafkaProducerExample.class.getClassLoader().getResourceAsStream(filePath)) {
             if (is == null) {
-                throw new RuntimeException("Resource kafka.txt not found in classpath");
+                throw new RuntimeException(filePath + " not found as a file or classpath resource");
             }
-            try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is))) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    records.add(new ProducerRecord<>(TOPIC, null, line));
+                    if (!line.trim().isEmpty()) {
+                        records.add(new ProducerRecord<>(TOPIC, null, line));
+                    }
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("Error reading kafka.txt from resources: " + e.getMessage(), e);
+            throw new RuntimeException("Error reading " + filePath + ": " + e.getMessage(), e);
         }
         return records;
     }
