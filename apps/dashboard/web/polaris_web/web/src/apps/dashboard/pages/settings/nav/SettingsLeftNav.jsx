@@ -28,7 +28,8 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/users")
     }] : []
 
-    const roleArr = window.USER_ROLE === 'ADMIN' && rbacAccess && rbacAccessAdvanced ? [{
+    // role in the product being viewed; USER_ROLE is only the product the page loaded in
+    const roleArr = func.currentProductBaseRole() === 'ADMIN' && rbacAccess && rbacAccessAdvanced ? [{
         label: 'Roles',
         icon: ProfileMajor,
         selected: page === "roles" || path.includes("/settings/roles/"),
