@@ -576,6 +576,7 @@ public class DaoInit {
         EndpointInfoViewDao.instance.createIndicesIfAbsent();
         ApiCollectionStatsDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
+        EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();
