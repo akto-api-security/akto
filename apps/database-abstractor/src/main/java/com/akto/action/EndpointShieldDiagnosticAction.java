@@ -10,7 +10,6 @@ import com.akto.utils.DiagnosticReportSummary;
 import com.opensymphony.xwork2.ActionSupport;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 import lombok.Getter;
 import lombok.Setter;
@@ -56,7 +55,6 @@ public class EndpointShieldDiagnosticAction extends ActionSupport {
 
         d.setId(new ObjectId());       // always a new document; set here so the id can be returned
         d.setCreatedAt(Context.now()); // server time, not the device clock
-        d.setExpiresAt(new Date((d.getCreatedAt() + EndpointShieldDiagnostic.RETENTION_DAYS * 86400L) * 1000L));
         d.setReport(Util.truncateUtf8(d.getReport(), EndpointShieldDiagnostic.MAX_REPORT_BYTES));
         // The stored summary is derived from the report here, not taken from the
         // device, so every installer/agent version is summarised by the same rules.
