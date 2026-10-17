@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.Date;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,7 +19,14 @@ import org.bson.types.ObjectId;
 @NoArgsConstructor
 public class EndpointShieldDiagnostic {
 
+    /**
+     * Growth is bounded three ways: at most RETENTION_PER_DEVICE reports per device
+     * (trimmed on insert), each report at most MAX_REPORT_BYTES, and every report
+     * expires RETENTION_DAYS after it was stored (TTL index on expiresAt) — which
+     * also clears devices that stopped reporting and are never trimmed again.
+     */
     public static final int RETENTION_PER_DEVICE = 20;
+    public static final int RETENTION_DAYS = 90;
     public static final int MAX_REPORT_BYTES = 512 * 1024;
     public static final int MAX_FINDINGS = 10;
     /** Identifier fields (deviceId, agentId, installId, executionId, profile); longer is rejected. */
@@ -86,6 +94,10 @@ public class EndpointShieldDiagnostic {
     /** Epoch seconds, set by the server. */
     public static final String CREATED_AT = "createdAt";
     private int createdAt;
+
+    /** When MongoDB deletes the report (TTL index, expireAfterSeconds 0); a BSON Date, so the TTL fires. */
+    public static final String EXPIRES_AT = "expiresAt";
+    private Date expiresAt;
 
     public static final String[] SOURCES = {
             "install", "verify-failed", "pkg-failed", "post-provision", "on-demand", "manual"
