@@ -4,7 +4,6 @@ import com.akto.dto.EndpointShieldDiagnostic;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.Indexes;
-import java.util.concurrent.TimeUnit;
 
 public class EndpointShieldDiagnosticDao extends AccountsContextDao<EndpointShieldDiagnostic> {
 
@@ -31,9 +30,5 @@ public class EndpointShieldDiagnosticDao extends AccountsContextDao<EndpointShie
                         Indexes.ascending(EndpointShieldDiagnostic.DEVICE_ID),
                         Indexes.descending(EndpointShieldDiagnostic.CREATED_AT)),
                 new IndexOptions().name("deviceId_createdAt"));
-        // reports expire RETENTION_DAYS after they are stored (expiresAt is set on insert)
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                Indexes.ascending(EndpointShieldDiagnostic.EXPIRES_AT),
-                new IndexOptions().name("expiresAt_ttl").expireAfter(0L, TimeUnit.SECONDS));
     }
 }
