@@ -13,6 +13,7 @@ import { DEFAULT_VALUE, isExtensionAgent, hasFailedDeployment, installIdToEpoch,
 import ModuleEnvConfigComponent from "../../settings/health_logs/ModuleEnvConfig";
 import settingRequests from "../../settings/api";
 import DetailGrid from "../agentic/DetailGrid";
+import DiagnosticsTab from "./DiagnosticsTab";
 import { usePermissions } from "@/util/permissions";
 
 const ANIMATION_DURATION = 0.2;
@@ -713,6 +714,14 @@ function AgentDetails({
         });
     }, [allowedEnvFields, selectedAgent]);
 
+    // The device's diagnostic history (installer, agent setup, on-demand reports).
+    const DiagnosticsTabDef = {
+        id: 'diagnostics',
+        content: 'Diagnostics',
+        component: <DiagnosticsTab agent={selectedAgent} />,
+        panelID: 'diagnostics-panel',
+    };
+
     const ConfigureTab = {
         id: 'configure',
         content: 'Configure',
@@ -787,6 +796,10 @@ function AgentDetails({
                     status="critical"
                     title="Last deployment failed"
                     action={{ content: 'View error logs', onAction: showInstallErrors }}
+                    secondaryAction={{
+                        content: 'View diagnostic report',
+                        onAction: () => setSelectedTab(prev => ({ id: 'diagnostics', nonce: prev.nonce + 1 })),
+                    }}
                 >
                     <VerticalStack gap="2">
                         <Text as="p">
@@ -873,7 +886,7 @@ function AgentDetails({
                 installFailureBanner,
                 <LayoutWithTabs
                     key="tabs"
-                    tabs={[McpServersTab, DeviceTab, AppsTab, AgentLogsTab, ConfigureTab]}
+                    tabs={[McpServersTab, DeviceTab, AppsTab, AgentLogsTab, DiagnosticsTabDef, ConfigureTab]}
                     currTab={handleTabChange}
                     selectedTabId={selectedTab.id}
                     selectedTabNonce={selectedTab.nonce}
