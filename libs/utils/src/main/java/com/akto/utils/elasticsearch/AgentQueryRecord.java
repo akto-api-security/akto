@@ -288,7 +288,7 @@ public class AgentQueryRecord {
                 sessionIdentifier,
                 requestPayload,
                 responsePayload,
-                Context.now() * 1000L,
+                recordTimeMs(p, tagsMap),
                 inputTokens,
                 outputTokens,
                 traceId,
@@ -298,6 +298,15 @@ public class AgentQueryRecord {
         );
         record.setGuardrailVerdict(p.getGuardrailVerdict());
         return record;
+    }
+
+    /**
+     * When the conversation happened. Polled connectors (IBM watsonx Orchestrate) send traces
+     * minutes to days after they happened, so their own time is kept; live traffic is stamped now.
+     */
+    static long recordTimeMs(HttpResponseParams p, Map<String, String> tagsMap) {
+        boolean polled = tagsMap != null && Constants.AI_AGENT_SOURCE_IBM_WATSONX.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+        return polled && p.getTime() > 0 ? p.getTime() * 1000L : Context.now() * 1000L;
     }
 
     static String sessionIdFromUrl(String url) {

@@ -373,7 +373,8 @@ public class HttpCallParser {
                 || source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                 || source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
                 || source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
-                || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK));
+                || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
+                || source.equals(Constants.AI_AGENT_SOURCE_IBM_WATSONX));
     }
 
     public static String getHostnameForCollection(HttpResponseParams responseParam, Map<String, String> tagsMap) {
@@ -425,7 +426,8 @@ public class HttpCallParser {
                 }
             }
 
-            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK) || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)){
+            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK) || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
+                    || source.equals(Constants.AI_AGENT_SOURCE_IBM_WATSONX)){
                 return botName;
             }
             // Reconstruct full hostname: bot-name.base-hostname
