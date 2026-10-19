@@ -18,6 +18,9 @@ public class Model {
 
     public final static String PARAM_MODEL = "model";
     public final static String PARAM_API_KEY = "apiKey";
+    // Env-configured Azure deployment tier (see AzureOpenAIPromptHandler.ModelTier), used by
+    // Akto's own service chains instead of an explicit endpoint/key.
+    public final static String PARAM_TIER = "tier";
     public final static String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
     public final static String PARAM_OLLAMA_ENDPOINT = "ollamaAIEndpoint";
     public final static String PARAM_DATABRICKS_ENDPOINT = "databricksEndpoint";

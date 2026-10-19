@@ -10,6 +10,9 @@ public class McpToolMaliciousnessAnalyzer extends AzureOpenAIPromptHandler {
     public static final String TOOL_DESCRIPTION = "toolDescription";
 
     @Override
+    protected String getServiceKey() { return "mcp-tool-maliciousness"; }
+
+    @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
         if (!queryData.containsKey(TOOL_NAME)) {
             throw new ValidationException("Missing mandatory param: " + TOOL_NAME);

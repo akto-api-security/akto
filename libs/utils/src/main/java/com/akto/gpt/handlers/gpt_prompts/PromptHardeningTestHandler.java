@@ -16,6 +16,9 @@ import java.util.regex.Matcher;
 public class PromptHardeningTestHandler extends AzureOpenAIPromptHandler {
 
     @Override
+    protected String getServiceKey() { return "prompt-hardening"; }
+
+    @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
         if (queryData == null) {
             throw new ValidationException("Query data cannot be null");

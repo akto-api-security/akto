@@ -18,6 +18,9 @@ public class TestExecutorModifier extends AzureOpenAIPromptHandler {
     public final static String _AKTO_GPT_AI = "AKTO_GPT_AI";
 
     @Override
+    protected String getServiceKey() { return "test-editor"; }
+
+    @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
         // validate request if present
         if (queryData.containsKey(_REQUEST)) {
