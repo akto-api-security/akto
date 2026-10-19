@@ -292,13 +292,83 @@ public class TestArgusCollectionScope extends ArgusScopeTestBase {
         // every account-wide setting action is marked in struts.xml
         String struts = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("src/main/resources/struts.xml")));
         for (String action : new String[]{"modifyThreatConfiguration", "toggleArchivalEnabled", "deleteAllMaliciousEvents",
-                "modifyThreatActorStatus", "startPolicyBackfillReplay", "generateThreatReport", "addTestRoles",
+                "modifyThreatActorStatus", "startPolicyBackfillReplay", "generateThreatReport",
                 "addAuthMechanism", "addCustomAuthType", "updateUrlSettings", "saveDefaultPayload", "addApiToken", "deleteApiToken"}) {
             int start = struts.indexOf("<action name=\"api/" + action + "\"");
             assertTrue(action, start >= 0);
             String block = struts.substring(start, struts.indexOf("</action>", start));
             assertTrue(action, block.contains("<param name=\"collectionScope\">ACCOUNT_WIDE</param>"));
         }
+        // test roles are shared per role through Scope Roles instead (checked in TestRolesAction)
+        for (String action : new String[]{"addTestRoles", "updateTestRoles", "saveTestRoleMeta", "deleteTestRole",
+                "addAuthToRole", "updateAuthInRole", "deleteAuthFromRole"}) {
+            int start = struts.indexOf("<action name=\"api/" + action + "\"");
+            String block = struts.substring(start, struts.indexOf("</action>", start));
+            assertFalse(action, block.contains("ACCOUNT_WIDE"));
+        }
+    }
+
+    // ── Test roles shared through Scope Roles ──────────────────────────────────
+
+    private static com.akto.action.testing.TestRolesAction testRolesAction(int userId, String roleName) {
+        as(userId, CONTEXT_SOURCE.AGENTIC);
+        com.akto.action.testing.TestRolesAction action = new com.akto.action.testing.TestRolesAction();
+        Map<String, Object> session = new HashMap<>();
+        session.put("user", user(userId));
+        action.setSession(session);
+        action.setRoleName(roleName);
+        return action;
+    }
+
+    private static void insertTestRole(String name, String... scopeRoles) {
+        com.akto.dto.testing.TestRoles role = com.akto.dao.testing.TestRolesDao.instance.createTestRole(name, new org.bson.types.ObjectId(), "someone@example.com");
+        if (scopeRoles.length > 0) {
+            com.akto.dao.testing.TestRolesDao.instance.updateOne(com.mongodb.client.model.Filters.eq("_id", role.getId()),
+                    com.mongodb.client.model.Updates.set(com.akto.dto.testing.TestRoles.SCOPE_ROLES, Arrays.asList(scopeRoles)));
+        }
+    }
+
+    @Test
+    public void testTestRolesFollowScopeRoles() {
+        com.akto.dao.testing.TestRolesDao.instance.getMCollection().drop();
+        insertTestRole("SHARED_WITH_TEAM", "TEAM_A_ADMIN", "SECURITY ENGINEER");
+        insertTestRole("OTHER_TEAMS", "SECURITY ENGINEER", "THREAT ENGINEER");
+        insertTestRole("NOT_SCOPED");
+        String error = com.akto.action.testing.TestRolesAction.NOT_SHARED_WITH_ROLE;
+
+        // a team limited to collections changes only the test roles scoped to its custom role, not those of its base role
+        com.akto.action.testing.TestRolesAction list = testRolesAction(TEAM_A, null);
+        assertEquals("SUCCESS", list.fetchAllRolesAndLogicalGroups());
+        assertEquals(Collections.singletonList("SHARED_WITH_TEAM"), list.getEditableTestRoleNames());
+        assertEquals("SUCCESS", testRolesAction(TEAM_A, "SHARED_WITH_TEAM").updateTestRoles());
+        for (String other : new String[]{"OTHER_TEAMS", "NOT_SCOPED"}) {
+            com.akto.action.testing.TestRolesAction update = testRolesAction(TEAM_A, other);
+            assertEquals(other, "ERROR", update.updateTestRoles());
+            assertEquals(error, update.getActionErrors().iterator().next());
+            assertEquals(other, "ERROR", testRolesAction(TEAM_A, other).addAuthToRole());
+            assertEquals(other, "ERROR", testRolesAction(TEAM_A, other).deleteAuthFromRole());
+        }
+
+        // it can change the scope of its own test roles only
+        com.akto.action.testing.TestRolesAction other = testRolesAction(TEAM_A, "OTHER_TEAMS");
+        other.setScopeRoles(Collections.singletonList("TEAM_A_ADMIN"));
+        assertEquals("ERROR", other.saveTestRoleMeta());
+        com.akto.action.testing.TestRolesAction share = testRolesAction(TEAM_A, "SHARED_WITH_TEAM");
+        share.setScopeRoles(Arrays.asList("team_a_admin", "DEVELOPER"));
+        assertEquals("SUCCESS", share.saveTestRoleMeta());
+
+        // a test role it creates is scoped to its own role
+        com.akto.action.testing.TestRolesAction create = testRolesAction(TEAM_A, "TEAM_A_NEW");
+        assertEquals("SUCCESS", create.createTestRole());
+        assertEquals(Collections.singletonList("TEAM_A_ADMIN"),
+                com.akto.dao.testing.TestRolesDao.instance.findOne(com.akto.dto.testing.TestRoles.NAME, "TEAM_A_NEW").getScopeRoles());
+
+        // users not limited to collections are unaffected
+        com.akto.action.testing.TestRolesAction adminList = testRolesAction(ADMIN, null);
+        assertEquals("SUCCESS", adminList.fetchAllRolesAndLogicalGroups());
+        assertNull(adminList.getEditableTestRoleNames());
+        assertEquals("SUCCESS", testRolesAction(ADMIN, "OTHER_TEAMS").updateTestRoles());
+        assertEquals("SUCCESS", testRolesAction(THREAT_ENGINEER_ALL, "NOT_SCOPED").updateTestRoles());
     }
 
     // ── SSO group -> role (shared by every SSO provider) ───────────────────────

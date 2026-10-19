@@ -56,8 +56,14 @@ function TestRoleSettings() {
   const isNew = !isDataInState && !isDataInSearch
   const pageTitle = isNew ? "Add " + mapLabel("test", getDashboardCategory()) + " role" : "Configure " + mapLabel("test", getDashboardCategory()) + " role"
   const { canCallAll } = usePermissions()
-  const canSave = canCallAll(isNew ? 'api/addTestRoles' : 'api/updateTestRoles', ...(func.checkForFeatureSaas("TEST_ROLE_SCOPE_ROLES") ? ['api/saveTestRoleMeta'] : []))
   const [initialItems, setInitialItems] = useState({ name: "" });
+  // test roles a user limited to collections may change (shared with their role); null when not limited
+  const [editableTestRoleNames, setEditableTestRoleNames] = useState(null)
+  useEffect(() => {
+    api.fetchTestRoles().then((res) => setEditableTestRoleNames(res?.editableTestRoleNames || null)).catch(() => {})
+  }, [])
+  const sharedWithRole = isNew || !editableTestRoleNames || editableTestRoleNames.includes(initialItems.name || searchParams.get("name"))
+  const canSave = sharedWithRole && canCallAll(isNew ? 'api/addTestRoles' : 'api/updateTestRoles', ...(func.checkForFeatureSaas("TEST_ROLE_SCOPE_ROLES") ? ['api/saveTestRoleMeta'] : []))
   const [conditions, dispatchConditions] = useReducer(
     produce((draft, action) => conditionsReducer(draft, action)),
     []);
@@ -354,14 +360,15 @@ function TestRoleSettings() {
     />
   );
 
-  let components = [
+  // another team's test role: its auth details aren't shown
+  let components = sharedWithRole ? [
     descriptionCard,
     conditionsCard,
     authComponent,
     savedParamComponent,
-  ];
+  ] : [descriptionCard, conditionsCard];
   if (!canSave) {
-    components = [<Banner key="read-only" status="info">Read-only: your role can't save changes to test roles. Ask an admin if you need it.</Banner>, ...components]
+    components = [<Banner key="read-only" status="info">{sharedWithRole ? "Read-only: your role can't save changes to test roles. Ask an admin if you need it." : "Read-only: This test role isn't shared with your role. Ask an admin to add your role to its Scope Roles."}</Banner>, ...components]
   }
 
   return (

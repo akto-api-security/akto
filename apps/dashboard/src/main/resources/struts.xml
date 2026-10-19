@@ -7933,7 +7933,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User created a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7956,7 +7955,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated test role meta</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">TEST_ROLE_SCOPE_ROLES</param>
@@ -7986,7 +7984,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -8009,7 +8006,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -8032,7 +8028,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted an auth mechanism from a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -8055,7 +8050,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated an auth mechanism in a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -8078,7 +8072,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added an auth mechanism to a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
