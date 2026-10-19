@@ -35,6 +35,8 @@ public final class AIAgentConnectorConstants {
     public static final String JOB_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR = "VERTEX_AI_CUSTOM_DEPLOYED_MODEL_CONNECTOR";
     // Wraps AIAgentConnectorExecutor's copilot-shield binary execution, once per discovered environment.
     public static final String JOB_TYPE_COPILOT_STUDIO_MULTI_ENV_CONNECTOR = "COPILOT_STUDIO_MULTI_ENV_CONNECTOR";
+    // Polls IBM watsonx Orchestrate (discovery + conversation traces), see jobs/executors/ibmwatsonx.
+    public static final String JOB_TYPE_IBM_WATSONX_CONNECTOR = "IBM_WATSONX_CONNECTOR";
 
     // Connector Types
     public static final String CONNECTOR_TYPE_N8N = "N8N";
@@ -47,6 +49,16 @@ public final class AIAgentConnectorConstants {
     public static final String CONNECTOR_TYPE_ANTHROPIC = "ANTHROPIC";
     public static final String CONNECTOR_TYPE_OPENAI = "OPENAI";
     public static final String CONNECTOR_TYPE_COPILOT_STUDIO_MULTI_ENV = "COPILOT_STUDIO_MULTI_ENV";
+    public static final String CONNECTOR_TYPE_IBM_WATSONX = "IBM_WATSONX";
+
+    // Configuration Keys - IBM watsonx Orchestrate (WATSONX_CURSOR / WATSONX_SEEN_TRACE_IDS are
+    // written by the executor to resume where the previous run stopped)
+    public static final String CONFIG_WATSONX_INSTANCE_URL = "WATSONX_INSTANCE_URL";
+    public static final String CONFIG_WATSONX_API_KEY = "WATSONX_API_KEY";
+    public static final String CONFIG_WATSONX_CURSOR = "WATSONX_CURSOR";
+    public static final String CONFIG_WATSONX_SEEN_TRACE_IDS = "WATSONX_SEEN_TRACE_IDS";
+    public static final String CONFIG_WATSONX_DISCOVERY_HASH = "WATSONX_DISCOVERY_HASH";
+    public static final String CONFIG_WATSONX_DISCOVERY_SENT_AT = "WATSONX_DISCOVERY_SENT_AT";
 
     // Binary Names
     public static final String BINARY_NAME_N8N = "n8n-shield";

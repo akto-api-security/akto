@@ -82,7 +82,13 @@ import {
     DESCRIPTION_OPENAI,
     DOCS_URL_OPENAI,
     INTERVAL_OPENAI,
-    OPENAI_FIELDS
+    OPENAI_FIELDS,
+    CONNECTOR_TYPE_IBM_WATSONX,
+    CONNECTOR_NAME_IBM_WATSONX,
+    DESCRIPTION_IBM_WATSONX,
+    DOCS_URL_IBM_WATSONX,
+    INTERVAL_IBM_WATSONX,
+    IBM_WATSONX_FIELDS
 } from "./constants/aiAgentConnectorConstants"
 import DataDogConnector from "./components/DataDogConnector"
 import MicrosoftDefenderConnector from "./components/MicrosoftDefenderConnector"
@@ -585,21 +591,17 @@ const googleVertexAIObj = {
 
 const ibmWatsonxObj = {
     icon: '/public/ibm_watsonx.svg',
-    label: "IBM Watsonx",
-    text: "Import IBM Watsonx AI agents seamlessly into AKTO.",
-    docsUrl: 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security',
+    label: CONNECTOR_NAME_IBM_WATSONX,
+    text: "Discover IBM watsonx Orchestrate agents and monitor their conversations in AKTO.",
+    docsUrl: DOCS_URL_IBM_WATSONX,
     key: "IBM_WATSONX",
-    component : <AiAgentScan
-        description="Import your IBM Watsonx AI agents, seamlessly in AKTO."
-        defaultRequestBody={{
-            "input": "Why is the sky blue?",
-            "model_id": "meta-llama/llama-2-70b-chat",
-            "parameters": {
-                "max_new_tokens": 100,
-                "temperature": 0.7
-            }
-        }}
-        docsLink='https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security'
+    component: <AIAgentConnectorImport
+        connectorType={CONNECTOR_TYPE_IBM_WATSONX}
+        connectorName={CONNECTOR_NAME_IBM_WATSONX}
+        description={DESCRIPTION_IBM_WATSONX}
+        fields={IBM_WATSONX_FIELDS}
+        docsUrl={DOCS_URL_IBM_WATSONX}
+        recurringIntervalSeconds={INTERVAL_IBM_WATSONX}
     />
 }
 

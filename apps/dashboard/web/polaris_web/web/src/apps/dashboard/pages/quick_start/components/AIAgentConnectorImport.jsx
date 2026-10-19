@@ -94,7 +94,8 @@ const AIAgentConnectorImport = ({
             }
         }).catch((err) => {
             console.error(`Error initiating ${connectorName} import:`, err);
-            func.setToast(true, true, `Ensure that you have added the correct ${connectorName} credentials.`);
+            const serverMessage = err?.response?.data?.actionErrors?.[0];
+            func.setToast(true, true, serverMessage || `Ensure that you have added the correct ${connectorName} credentials.`);
         }).finally(() => {
             setLoading(false);
             // Reset form

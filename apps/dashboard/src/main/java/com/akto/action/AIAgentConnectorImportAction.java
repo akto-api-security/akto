@@ -6,9 +6,16 @@ import com.akto.dao.jobs.AccountJobDao;
 import com.akto.dto.jobs.AccountJob;
 import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
+import com.akto.jobs.executors.ibmwatsonx.WatsonxApiException;
+import com.akto.jobs.executors.ibmwatsonx.WatsonxAuth;
+import com.akto.jobs.executors.ibmwatsonx.WatsonxClient;
+import com.akto.jobs.executors.ibmwatsonx.WatsonxTransport;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import org.bson.conversions.Bson;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -92,6 +99,10 @@ public class AIAgentConnectorImportAction extends UserAction {
     private String openaiOrgId;
     private String openaiApiBaseUrl;
 
+    // IBM watsonx Orchestrate connector parameters
+    private String watsonxInstanceUrl;
+    private String watsonxApiKey;
+
     /**
      * Unified method to initiate import for any AI Agent Connector.
      * The connector type is determined by the connectorType parameter.
@@ -121,6 +132,10 @@ public class AIAgentConnectorImportAction extends UserAction {
                 : DEFAULT_RECURRING_INTERVAL_SECONDS;
 
             String jobType = getJobTypeForConnector(connectorType);
+
+            if (CONNECTOR_TYPE_IBM_WATSONX.equals(connectorType)) {
+                return saveWatsonxJob(config, jobType, interval);
+            }
 
             // Create entry in per-account jobs collection
             // Convert Map<String, String> config to Map<String, Object> for generic storage
@@ -341,11 +356,88 @@ public class AIAgentConnectorImportAction extends UserAction {
                 config.put(CONFIG_OPENAI_API_BASE_URL, openaiBaseUrl);
                 break;
 
+            case CONNECTOR_TYPE_IBM_WATSONX:
+                String instanceUrl = WatsonxClient.normalizeInstanceUrl(watsonxInstanceUrl);
+                if (instanceUrl == null || watsonxApiKey == null || watsonxApiKey.trim().isEmpty()) {
+                    addActionError("Enter the Service instance URL (https://…/instances/<id>, from watsonx Orchestrate → "
+                            + "Settings → API details) and the API key.");
+                    return null;
+                }
+                config.put(CONFIG_WATSONX_INSTANCE_URL, instanceUrl);
+                config.put(CONFIG_WATSONX_API_KEY, watsonxApiKey.trim());
+                break;
+
             default:
                 loggerMaker.error("Unsupported connector type: " + connectorType, LogDb.DASHBOARD);
                 return null;
         }
 
         return config;
+    }
+
+    /**
+     * IBM watsonx Orchestrate: checks the instance URL and API key with IBM before saving, then
+     * creates the job, or, when this instance already has one (e.g. the API key was replaced),
+     * updates it so it continues from where it stopped instead of starting over.
+     */
+    private String saveWatsonxJob(Map<String, String> config, String jobType, int interval) {
+        String instanceUrl = config.get(CONFIG_WATSONX_INSTANCE_URL);
+        try {
+            WatsonxTransport transport = new WatsonxTransport.OkHttp();
+            WatsonxClient client = new WatsonxClient(instanceUrl,
+                    new WatsonxAuth(instanceUrl, config.get(CONFIG_WATSONX_API_KEY), transport, System::currentTimeMillis), transport);
+            client.agents();
+        } catch (WatsonxApiException e) {
+            loggerMaker.error("IBM watsonx Orchestrate check failed for " + instanceUrl + ": " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError(e.isAuthFailure()
+                    ? "IBM watsonx Orchestrate rejected the API key. Generate a new one in Orchestrate → Settings → API details."
+                    : "Could not read agents from this IBM watsonx Orchestrate instance (" + e.getMessage()
+                        + "). Check the Service instance URL.");
+            return Action.ERROR.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.error("IBM watsonx Orchestrate check failed for " + instanceUrl + ": " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Could not reach the IBM watsonx Orchestrate instance. Check the Service instance URL.");
+            return Action.ERROR.toUpperCase();
+        }
+
+        int now = Context.now();
+        Bson sameInstance = Filters.and(
+                Filters.eq(AccountJob.JOB_TYPE, jobType),
+                Filters.eq(AccountJob.CONFIG + "." + CONFIG_WATSONX_INSTANCE_URL, instanceUrl));
+        AccountJob existing = AccountJobDao.instance.findOne(sameInstance);
+        if (existing == null) {
+            AccountJob accountJob = new AccountJob(Context.accountId.get(), jobType, connectorType,
+                    new HashMap<String, Object>(config), interval, now, now);
+            accountJob.setJobStatus(JobStatus.SCHEDULED);
+            accountJob.setScheduleType(ScheduleType.RECURRING);
+            accountJob.setScheduledAt(now);
+            accountJob.setHeartbeatAt(0);
+            accountJob.setStartedAt(0);
+            accountJob.setFinishedAt(0);
+            AccountJobDao.instance.insertOne(accountJob);
+            this.jobId = accountJob.getId().toHexString();
+            loggerMaker.info("Created IBM watsonx Orchestrate job " + this.jobId + " for " + instanceUrl, LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        // Same instance again: new credentials, keep the cursor (and everything the job saved).
+        List<Bson> updates = new ArrayList<>();
+        for (Map.Entry<String, String> entry : config.entrySet()) {
+            updates.add(Updates.set(AccountJob.CONFIG + "." + entry.getKey(), entry.getValue()));
+        }
+        updates.add(Updates.set(AccountJob.RECURRING_INTERVAL_SECONDS, interval));
+        updates.add(Updates.set(AccountJob.LAST_UPDATED_AT, now));
+        updates.add(Updates.set(AccountJob.SCHEDULE_TYPE, ScheduleType.RECURRING.name()));
+        updates.add(Updates.unset(AccountJob.ERROR));
+        if (existing.getJobStatus() != JobStatus.RUNNING) {
+            // run soon with the new key (a running job picks it up on its next run)
+            updates.add(Updates.set(AccountJob.JOB_STATUS, JobStatus.SCHEDULED.name()));
+            updates.add(Updates.set(AccountJob.SCHEDULED_AT, now));
+        }
+        AccountJobDao.instance.updateOne(Filters.eq(AccountJob.ID, existing.getId()), Updates.combine(updates));
+        this.jobId = existing.getId().toHexString();
+        loggerMaker.info("Updated IBM watsonx Orchestrate job " + this.jobId + " for " + instanceUrl
+                + " (credentials replaced, progress kept)", LogDb.DASHBOARD);
+        return Action.SUCCESS.toUpperCase();
     }
 }

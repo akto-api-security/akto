@@ -14,6 +14,7 @@ export const CONNECTOR_TYPE_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'VERTEX_AI_CUSTOM_
 export const CONNECTOR_TYPE_SALESFORCE = 'SALESFORCE';
 export const CONNECTOR_TYPE_ANTHROPIC = 'ANTHROPIC';
 export const CONNECTOR_TYPE_OPENAI = 'OPENAI';
+export const CONNECTOR_TYPE_IBM_WATSONX = 'IBM_WATSONX';
 
 // Connector Names (Display)
 export const CONNECTOR_NAME_N8N = 'N8N';
@@ -26,6 +27,7 @@ export const CONNECTOR_NAME_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Vertex AI Custom 
 export const CONNECTOR_NAME_SALESFORCE = 'Salesforce';
 export const CONNECTOR_NAME_ANTHROPIC = 'Anthropic';
 export const CONNECTOR_NAME_OPENAI = 'OpenAI';
+export const CONNECTOR_NAME_IBM_WATSONX = 'IBM watsonx Orchestrate';
 
 // Documentation URLs
 export const DOCS_URL_N8N = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/others/workflow-automation/n8n';
@@ -38,6 +40,7 @@ export const DOCS_URL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'https://ai-security-doc
 export const DOCS_URL_SALESFORCE = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/salesforce';
 export const DOCS_URL_ANTHROPIC = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security';
 export const DOCS_URL_OPENAI = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security';
+export const DOCS_URL_IBM_WATSONX = 'https://ai-security-docs.akto.io/akto-argus-agentic-ai-security-for-homegrown-ai/connectors/ai-agent-security/connect-akto-ibm';
 
 // Recurring Interval Seconds (in seconds)
 export const INTERVAL_N8N = 300; // 5 minutes
@@ -49,6 +52,7 @@ export const INTERVAL_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 300; // 5 minutes
 export const INTERVAL_SALESFORCE = 300; // 5 minutes
 export const INTERVAL_ANTHROPIC = 600; // 10 minutes
 export const INTERVAL_OPENAI = 300; // 5 minutes
+export const INTERVAL_IBM_WATSONX = 300; // 5 minutes
 
 // Field Names
 export const FIELD_N8N_URL = 'n8nUrl';
@@ -92,6 +96,8 @@ export const FIELD_ANTHROPIC_API_BASE_URL = 'anthropicApiBaseUrl';
 export const FIELD_OPENAI_API_KEY = 'openaiApiKey';
 export const FIELD_OPENAI_ORG_ID = 'openaiOrgId';
 export const FIELD_OPENAI_API_BASE_URL = 'openaiApiBaseUrl';
+export const FIELD_WATSONX_INSTANCE_URL = 'watsonxInstanceUrl';
+export const FIELD_WATSONX_API_KEY = 'watsonxApiKey';
 
 // Vertex AI Custom Deployed Model Fields
 export const FIELD_VERTEX_AI_PROJECT_ID = 'vertexAIProjectId';
@@ -122,6 +128,7 @@ export const DESCRIPTION_VERTEX_AI_CUSTOM_DEPLOYED_MODEL = 'Connect to your GCP 
 export const DESCRIPTION_SALESFORCE = 'Connect to your Salesforce instance to import agents and AI capabilities seamlessly into AKTO.';
 export const DESCRIPTION_ANTHROPIC = "Pull conversation and usage data from Anthropic's Compliance API to bring employee Claude activity under Akto guardrails.";
 export const DESCRIPTION_OPENAI = "Pull conversation and usage data from OpenAI's Compliance API to bring employee ChatGPT activity under Akto guardrails.";
+export const DESCRIPTION_IBM_WATSONX = 'Connect your IBM watsonx Orchestrate instance to discover agents, external agents, models, MCP servers, controls and permissions, and monitor agent conversations in AKTO.';
 
 // N8N Field Configuration
 export const N8N_FIELDS = [
@@ -512,6 +519,36 @@ export const SALESFORCE_FIELDS = [
         placeholder: '*******',
         configKey: FIELD_INGESTION_API_KEY,
         helpText: 'API key for authenticating with the data ingestion service (X-API-KEY header)',
+        required: true
+    }
+];
+
+// IBM watsonx Orchestrate Field Configuration
+export const IBM_WATSONX_FIELDS = [
+    {
+        name: FIELD_WATSONX_INSTANCE_URL,
+        label: 'Instance URL',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://api.<region>.watson-orchestrate.ibm.com/instances/<instance-id>',
+        configKey: FIELD_WATSONX_INSTANCE_URL,
+        helpText: 'Service instance URL from watsonx Orchestrate → Settings → API details',
+        required: true
+    },
+    {
+        name: FIELD_WATSONX_API_KEY,
+        label: 'API Key',
+        type: FIELD_TYPE_PASSWORD,
+        placeholder: '*******',
+        configKey: FIELD_WATSONX_API_KEY,
+        helpText: 'API key generated in watsonx Orchestrate → Settings → API details',
+        required: true
+    },
+    {
+        name: FIELD_DATA_INGESTION_URL,
+        label: 'URL for Data Ingestion Service',
+        type: FIELD_TYPE_URL,
+        placeholder: 'https://ingestion.example.com',
+        helpText: 'URL of your Akto data ingestion service',
         required: true
     }
 ];
