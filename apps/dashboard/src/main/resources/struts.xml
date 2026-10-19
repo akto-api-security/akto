@@ -13836,6 +13836,54 @@
             </result>
         </action>
 
+        <action name="api/previewTrafficRetentionCleanup" class="com.akto.action.settings.TrafficRetentionAction" method="previewTrafficRetentionCleanup">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ACCOUNT_WIDE</param>
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ</param>
+                <param name="actionDescription">User previewed deleting APIs with no recent traffic</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="root">preview</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/startTrafficRetentionCleanup" class="com.akto.action.settings.TrafficRetentionAction" method="startTrafficRetentionCleanup">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="collectionScope">ACCOUNT_WIDE</param>
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User started deleting APIs with no recent traffic</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+                <param name="includeProperties">^started$,^cutoffEpoch$</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchIssuesSnapshot" class="com.akto.action.DashboardAction" method="fetchIssuesSnapshot">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

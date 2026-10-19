@@ -9,6 +9,7 @@ import SampleData from '../../../components/shared/SampleData'
 import { DeleteMajor, CircleCancelMajor, CircleTickMajor } from "@shopify/polaris-icons"
 import { usePermissions, whenAllowed, NO_PERMISSION_REASON } from "@/util/permissions"
 import AllowedAction from '../../../components/shared/AllowedAction'
+import TrafficRetentionCleanup from './TrafficRetentionCleanup'
 
 function AdvancedTrafficFilters() {
     const [topLevelActive, setTopLevelActive] = useState(false);
@@ -228,7 +229,11 @@ function AdvancedTrafficFilters() {
         )
     }
 
-    const components = [<MainComp key={"main-comp-filter"} />]
+    const isAktoUser = window.USER_NAME && window.USER_NAME.endsWith("@akto.io")
+    const components = [
+        <MainComp key={"main-comp-filter"} />,
+        ...(isAktoUser ? [<TrafficRetentionCleanup key={"traffic-retention-cleanup"} />] : [])
+    ]
 
     return (
         <PageWithMultipleCards

@@ -63,6 +63,20 @@ const trafficFiltersRequest = {
             method: 'post',
             data: {deleteAPIsInstantly}
         })
+    },
+    previewTrafficRetentionCleanup(days){
+        return request({
+            url: '/api/previewTrafficRetentionCleanup',
+            method: 'post',
+            data: {days}
+        })
+    },
+    startTrafficRetentionCleanup(cutoffEpoch){
+        return request({
+            url: '/api/startTrafficRetentionCleanup',
+            method: 'post',
+            data: {cutoffEpoch}
+        })
     }
 }
 

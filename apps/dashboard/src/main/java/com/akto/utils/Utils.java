@@ -743,17 +743,30 @@ public class Utils {
     }
 
     public static void deleteApis(List<Key> toBeDeleted) {
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
+        deleteApisFromNonStiDaos(toBeDeleted);
+    }
 
+    /**
+     * Same deletion as {@link #deleteApis} but single_type_info goes LAST. For callers that pick
+     * their candidates from STI: the 7 deletes are not atomic, so if one fails midway the API must
+     * still be an STI candidate, and a re-run then finishes the job instead of orphaning the rows
+     * left in the other collections.
+     */
+    public static void deleteApisStiLast(List<Key> toBeDeleted) {
+        deleteApisFromNonStiDaos(toBeDeleted);
+        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
+    }
+
+    private static void deleteApisFromNonStiDaos(List<Key> toBeDeleted) {
         String id = "_id.";
 
-        AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SingleTypeInfoDao.instance, "");
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, ApiInfoDao.instance, id);
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SampleDataDao.instance, id);
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, TrafficInfoDao.instance, id);
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveSampleDataDao.instance, id);
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, SensitiveParamInfoDao.instance, "");
         AccountsContextDaoWithRbac.deleteApisPerDao(toBeDeleted, FilterSampleDataDao.instance, id);
-
     }
 
     public static List<String> getUniqueValuesOfList(List<String> input) {
