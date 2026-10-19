@@ -50,7 +50,7 @@ export function buildEvidenceVulnerabilitySegments(evidenceLine, requestText, re
 
     const whole = findInSides(evidenceLine, sides);
     if (whole) {
-        return [{ phrase: whole.phrase, location: whole.location }];
+        return [{ phrase: whole.phrase, location: whole.location, primary: true }];
     }
 
     const pieces = splitPieces(evidenceLine);
@@ -74,5 +74,5 @@ export function buildEvidenceVulnerabilitySegments(evidenceLine, requestText, re
 
     return resolved
         .filter(Boolean)
-        .map((r) => ({ phrase: r.phrase, location: r.location }));
+        .map((r) => ({ phrase: r.phrase, location: r.location, primary: true }));
 }
