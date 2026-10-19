@@ -172,6 +172,7 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
 
   const decorations = [];
   let firstStart = Infinity;
+  let firstPrimaryStart = Infinity;
 
   const locateRanges = isEndpointSecurityCategory()
     ? locateAllSegmentRanges
@@ -205,6 +206,9 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
         }
 
         firstStart = Math.min(firstStart, range.start);
+        if (segment?.primary === true) {
+          firstPrimaryStart = Math.min(firstPrimaryStart, range.start);
+        }
 
         const options = {
           inlineClassName: "vulnerability-highlight",
@@ -239,7 +243,12 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
 
     // Scroll the first piece of evidence into view so users don't have to hunt
     // through a large response.
-    if (Number.isFinite(firstStart)) {
+    if (Number.isFinite(firstPrimaryStart)) {
+      const pos = model.getPositionAt(firstPrimaryStart);
+      if (pos) {
+        ref.revealPositionInCenter(pos);
+      }
+    } else if (Number.isFinite(firstStart)) {
       const pos = model.getPositionAt(firstStart);
       if (pos) {
         ref.revealLineInCenter(pos.lineNumber);

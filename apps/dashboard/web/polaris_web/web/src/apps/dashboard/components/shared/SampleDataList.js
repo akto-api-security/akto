@@ -90,10 +90,11 @@ function DetectionReason({ sampleData }) {
     )
 }
 
-function VulnerabilityEvidence({ segments }) {
-    if (!Array.isArray(segments) || segments.length === 0) {
+function VulnerabilityEvidence({ segments: locatedSegments, evidenceLine }) {
+    if (!Array.isArray(locatedSegments) || locatedSegments.length === 0) {
         return null;
     }
+    const segments = evidenceLine ? [{ location: locatedSegments[0]?.location, phrase: evidenceLine }] : locatedSegments;
 
     const hasLowConfidence = SHOW_LOW_CONFIDENCE_HINT
         && segments.some((seg) => String(seg?.confidence || '').toLowerCase() === 'low');
@@ -151,7 +152,7 @@ function VulnerabilityEvidence({ segments }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine} = props;
 
     const [page, setPage] = useState(0);
 
@@ -199,7 +200,7 @@ function SampleDataList(props) {
          {showDetectionReason ? <DetectionReason sampleData={currentSample} /> : null}
          <SchemaValidationError sampleData={currentSample} />
          {SHOW_VULNERABILITY_EVIDENCE ? (
-           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} />
+           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} evidenceLine={evidenceLine} />
          ) : null}
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">

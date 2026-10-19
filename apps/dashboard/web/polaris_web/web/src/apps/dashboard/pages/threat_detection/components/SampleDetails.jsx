@@ -28,6 +28,8 @@ import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+import { buildEvidenceVulnerabilitySegments } from "../utils/evidenceHighlight";
+import sampleDataTransform from "../../../components/shared/customDiffEditor";
 import { usePermissions, withPermissions } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
 
@@ -453,6 +455,7 @@ function SampleDetails(props) {
     }
 
     const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
+    const valuesTabRedactHeaders = window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : [];
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
@@ -507,9 +510,18 @@ function SampleDetails(props) {
                     vertical={true}
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
-                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
+                        let vulnerabilitySegments = [];
+                        if (useGuardrailDescription) {
+                            const { requestText, responseText } = sampleDataTransform.buildRenderedText(
+                                { message: result.orig, highlightPaths: [] },
+                                { redactHeaders: valuesTabRedactHeaders }
+                            );
+                            vulnerabilitySegments = buildEvidenceVulnerabilitySegments(moreInfoData?.evidenceLine, requestText, responseText);
+                        }
+                        return { message: result.orig, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
                     }) : []}
-                    redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
+                    redactHeaders={valuesTabRedactHeaders}
+                    evidenceLine={useGuardrailDescription ? moreInfoData?.evidenceLine : undefined}
                     onAddAsSearchFilter={onAddAsSearchFilter}
                     showDetectionReason
                 />
