@@ -1325,33 +1325,52 @@ public class ThreatActorService {
 
     List<FetchThreatsForActorResponse.ActivityData> activities = new ArrayList<>();
 
-    List<Document> activityPipeline = new ArrayList<>();
-    activityPipeline.add(new Document("$match", activityQuery));
-    activityPipeline.addAll(ThreatUtils.configScanLatestDocStages(contextSource));
-    if (activityPipeline.size() == 1) {
-      activityPipeline.add(new Document("$sort", new Document("detectedAt", -1)));
-    }
-    activityPipeline.add(new Document("$limit", limit));
+    List<MaliciousEventDto> events = new ArrayList<>();
+    if ("ENDPOINT".equalsIgnoreCase(contextSource)) {
+      Document nonConfigQuery = new Document(activityQuery)
+          .append("latestApiEndpoint", new Document("$not", ThreatUtils.CONFIG_ENDPOINT_PATTERN));
+      maliciousEventDao.getCollection(accountId)
+          .find(nonConfigQuery)
+          .sort(Sorts.descending("detectedAt"))
+          .limit(limit)
+          .into(events);
 
-    try (MongoCursor<MaliciousEventDto> cursor = maliciousEventDao.getCollection(accountId)
-        .aggregate(activityPipeline)
-        .cursor()) {
-      while (cursor.hasNext()) {
-        MaliciousEventDto event = cursor.next();
-        FetchThreatsForActorResponse.ActivityData.Builder activityBuilder = FetchThreatsForActorResponse.ActivityData.newBuilder()
-            .setUrl(event.getLatestApiEndpoint())
-            .setDetectedAt(event.getDetectedAt())
-            .setSubCategory(event.getFilterId())
-            .setSeverity(event.getSeverity())
-            .setMethod(event.getLatestApiMethod().name())
-            .setHost(event.getHost() != null ? event.getHost() : "");
+      List<Document> configPipeline = new ArrayList<>();
+      configPipeline.add(new Document("$match",
+          new Document(activityQuery).append("latestApiEndpoint", ThreatUtils.CONFIG_ENDPOINT_PATTERN)));
+      configPipeline.addAll(ThreatUtils.configScanLatestDocStages(contextSource));
+      configPipeline.add(new Document("$limit", limit));
+      maliciousEventDao.getCollection(accountId)
+          .aggregate(configPipeline)
+          .allowDiskUse(true)
+          .into(events);
 
-        if (isAgenticOrEndpoint) {
-          activityBuilder.setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata()));
-        }
-
-        activities.add(activityBuilder.build());
+      events.sort((x, y) -> Long.compare(y.getDetectedAt(), x.getDetectedAt()));
+      if (events.size() > limit) {
+        events = new ArrayList<>(events.subList(0, limit));
       }
+    } else {
+      maliciousEventDao.getCollection(accountId)
+          .find(activityQuery)
+          .sort(Sorts.descending("detectedAt"))
+          .limit(limit)
+          .into(events);
+    }
+
+    for (MaliciousEventDto event : events) {
+      FetchThreatsForActorResponse.ActivityData.Builder activityBuilder = FetchThreatsForActorResponse.ActivityData.newBuilder()
+          .setUrl(event.getLatestApiEndpoint())
+          .setDetectedAt(event.getDetectedAt())
+          .setSubCategory(event.getFilterId())
+          .setSeverity(event.getSeverity())
+          .setMethod(event.getLatestApiMethod().name())
+          .setHost(event.getHost() != null ? event.getHost() : "");
+
+      if (isAgenticOrEndpoint) {
+        activityBuilder.setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata()));
+      }
+
+      activities.add(activityBuilder.build());
     }
 
     return FetchThreatsForActorResponse.newBuilder().addAllActivities(activities).build();
