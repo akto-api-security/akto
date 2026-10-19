@@ -94,7 +94,8 @@ function VulnerabilityEvidence({ segments: locatedSegments, evidenceLine }) {
     if (!Array.isArray(locatedSegments) || locatedSegments.length === 0) {
         return null;
     }
-    const segments = evidenceLine ? [{ location: locatedSegments[0]?.location, phrase: evidenceLine }] : locatedSegments;
+    const evidenceLocation = locatedSegments.some((s) => String(s?.location || 'RESPONSE').toUpperCase() !== 'REQUEST') ? 'RESPONSE' : 'REQUEST';
+    const segments = evidenceLine ? [{ location: evidenceLocation, phrase: evidenceLine }] : locatedSegments;
 
     const hasLowConfidence = SHOW_LOW_CONFIDENCE_HINT
         && segments.some((seg) => String(seg?.confidence || '').toLowerCase() === 'low');
