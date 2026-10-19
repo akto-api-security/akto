@@ -3,6 +3,7 @@ package com.akto.dao;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import com.akto.dao.context.Context;
@@ -14,6 +15,7 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.traffic.Key;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.util.Constants;
@@ -113,6 +115,73 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         if (useApiCollectionId) filters.add(Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId));
 
         return Filters.and(filters);
+    }
+
+    /**
+     * Request-side host header STIs of ANY subType. Unlike {@link #filterForHostHeader} this has no
+     * subType clause on purpose: a host that classifies as an IP or a number gets a non-GENERIC
+     * subType, so a live API can hold a stale GENERIC host STI next to a fresh IP_ADDRESS one.
+     * Taking the max lastSeen across all of them is what makes "last traffic seen" per API safe.
+     */
+    public static Bson filterForHostHeaderAnySubType(int apiCollectionId) {
+        return Filters.and(
+            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+            Filters.eq(SingleTypeInfo._IS_HEADER, true),
+            Filters.eq(SingleTypeInfo._PARAM, "host"),
+            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId)
+        );
+    }
+
+    /**
+     * APIs of one collection whose newest host-header STI lastSeen (epoch seconds) is before
+     * cutoffEpoch. An API with no host-header STI is never returned: unknown is not stale.
+     *
+     * Only the standard method names are considered (not OTHER, not lower-case): the delete helpers
+     * match method by enum name, so anything else would be counted here but never deleted.
+     *
+     * Throws on any Mongo failure instead of returning an empty list: the caller must be able to
+     * tell "read failed" from "nothing stale".
+     */
+    private static final long STALE_API_QUERY_MAX_TIME_SECONDS = 30;
+
+    public List<Key> fetchApisNotSeenSince(int apiCollectionId, int cutoffEpoch) {
+        final String maxLastSeen = "maxLastSeen";
+
+        List<String> deletableMethods = new ArrayList<>();
+        for (Method m : Method.values()) {
+            if (m != Method.OTHER) deletableMethods.add(m.name());
+        }
+
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + SingleTypeInfo._API_COLLECTION_ID)
+                .append(SingleTypeInfo._URL, "$" + SingleTypeInfo._URL)
+                .append(SingleTypeInfo._METHOD, "$" + SingleTypeInfo._METHOD);
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(Filters.and(
+            filterForHostHeaderAnySubType(apiCollectionId),
+            Filters.in(SingleTypeInfo._METHOD, deletableMethods)
+        )));
+        pipeline.add(Aggregates.project(Projections.fields(
+            Projections.include(SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo.LAST_SEEN),
+            Projections.excludeId()
+        )));
+        pipeline.add(Aggregates.group(groupedId, Accumulators.max(maxLastSeen, "$" + SingleTypeInfo.LAST_SEEN)));
+        pipeline.add(Aggregates.match(Filters.lt(maxLastSeen, (long) cutoffEpoch)));
+
+        List<Key> stale = new ArrayList<>();
+        try (MongoCursor<BasicDBObject> cursor = getMCollection().aggregate(pipeline, BasicDBObject.class)
+                .allowDiskUse(true).maxTime(STALE_API_QUERY_MAX_TIME_SECONDS, TimeUnit.SECONDS).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject id = (BasicDBObject) cursor.next().get(Constants.ID);
+                stale.add(new Key(
+                    id.getInt(SingleTypeInfo._API_COLLECTION_ID),
+                    id.getString(SingleTypeInfo._URL),
+                    Method.fromString(id.getString(SingleTypeInfo._METHOD)),
+                    -1, 0, 0
+                ));
+            }
+        }
+        return stale;
     }
 
     public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
