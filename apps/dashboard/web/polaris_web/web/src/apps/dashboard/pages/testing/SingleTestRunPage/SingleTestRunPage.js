@@ -57,7 +57,7 @@ import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import TestingRunEndpointsModal from './TestingRunEndpointsModal';
-import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { getDashboardCategory, mapLabel, categoryToShortName } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import { saveAs } from 'file-saver';
 import SeveritySelector from '../../issues/components/SeveritySelector';
@@ -971,8 +971,10 @@ function SingleTestRunPage() {
 
     await api.generatePDFReport(filtersObj, []).then((res) => {
       const responseId = res.split("=")[1];
-      const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
-      const redirectUrl = `/dashboard/testing/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+      const params = new URLSearchParams();
+      if (summaryMode === true) params.set('summaryMode', 'true');
+      params.set('category', categoryToShortName[getDashboardCategory()] || 'API');
+      const redirectUrl = `/dashboard/testing/summary/${responseId.split("}")[0]}?${params.toString()}`;
       window.open(redirectUrl, '_blank');
     })
   }
