@@ -1,7 +1,7 @@
 package com.akto.hybrid_runtime;
 
 import com.akto.dto.traffic.SensitiveDataCount;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,8 +11,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class SensitiveDataCounterTest {
 
@@ -49,7 +49,7 @@ public class SensitiveDataCounterTest {
         assertEquals(Long.valueOf(1), totals.get("1|EMAIL_X|" + (HOUR + 3600)));
         assertEquals(Long.valueOf(1), totals.get("2|EMAIL_X|" + HOUR));
         assertEquals(4, totals.size());
-        assertTrue("a successful flush leaves nothing pending", counter.snapshot().isEmpty());
+        assertTrue(counter.snapshot().isEmpty(), "a successful flush leaves nothing pending");
     }
 
     @Test
