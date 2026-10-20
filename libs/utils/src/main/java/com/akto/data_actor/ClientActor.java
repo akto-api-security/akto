@@ -4620,10 +4620,11 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public String getLLMResponseV2(JSONObject promptPayload) {
+    public String getLLMResponseV2(JSONObject promptPayload, String serviceKey) {
         try {
             JSONObject requestJson = new JSONObject();
             requestJson.put("llmPayload", promptPayload);
+            requestJson.put("serviceKey", serviceKey);
 
             OriginalHttpRequest request = new OriginalHttpRequest(
                 url + "/getLLMResponseV2",

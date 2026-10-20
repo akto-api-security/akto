@@ -344,7 +344,7 @@ public abstract class DataActor {
 
     public abstract String getLLMPromptResponse(JSONObject promptPayload);
 
-    public abstract String getLLMResponseV2(JSONObject promptPayload);
+    public abstract String getLLMResponseV2(JSONObject promptPayload, String serviceKey);
 
     public abstract List<SlackWebhook> fetchSlackWebhooks();
 
