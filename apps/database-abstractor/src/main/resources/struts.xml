@@ -93,7 +93,9 @@
         <action name="api/updateModuleInfoForHeartbeat" class="com.akto.action.DbAction" method="updateModuleInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^moduleInfo.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -427,7 +429,9 @@
         <action name="api/bulkWriteTestingRunIssues" class="com.akto.action.DbAction" method="bulkWriteTestingRunIssues">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -564,7 +568,9 @@
         <action name="api/bulkWriteSensitiveParamInfo" class="com.akto.action.DbAction" method="bulkWriteSensitiveParamInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>   
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -710,7 +716,9 @@
         <action name="api/insertAgenticTestingLog" class="com.akto.action.DbAction" method="insertAgenticTestingLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -886,7 +894,9 @@
         <action name="api/insertAnalyserLog" class="com.akto.action.DbAction" method="insertAnalyserLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1607,7 +1617,9 @@
         <action name="api/bulkUpdateLastTestedField" class="com.akto.action.DbAction" method="bulkUpdateLastTestedField">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1780,7 +1792,9 @@
         <action name="api/bulkWriteDependencyNodes" class="com.akto.action.DbAction" method="bulkWriteDependencyNodes">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -1845,7 +1859,9 @@
         <action name="api/bulkWriteSuspectSampleData" class="com.akto.action.DbAction" method="bulkWriteSuspectSampleData">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2367,7 +2383,9 @@
         <action name="api/bulkinsertApiHitCount" class="com.akto.action.DbAction" method="bulkinsertApiHitCount">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2378,7 +2396,9 @@
         <action name="api/insertDataIngestionLog" class="com.akto.action.DbAction" method="insertDataIngestionLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2389,7 +2409,9 @@
         <action name="api/insertMCPAuditDataLog" class="com.akto.action.DbAction" method="insertMCPAuditDataLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2580,7 +2602,9 @@
         <action name="api/bulkWriteOverageInfo" class="com.akto.action.DbAction" method="bulkWriteOverageInfo">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2807,7 +2831,9 @@
         <action name="api/insertPuppeteerLog" class="com.akto.action.DbAction" method="insertPuppeteerLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2818,7 +2844,9 @@
         <action name="api/insertSmartTestingLog" class="com.akto.action.DbAction" method="insertSmartTestingLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2829,7 +2857,9 @@
         <action name="api/insertDastLog" class="com.akto.action.DbAction" method="insertDastLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -2851,7 +2881,9 @@
         <action name="api/insertGuardrailsServiceLog" class="com.akto.action.DbAction" method="insertGuardrailsServiceLog">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
