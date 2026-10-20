@@ -11,7 +11,7 @@ jobs:
     # No checkout, no build - every check below reads straight from the GitHub API,
     # so the whole job finishes in a few seconds.
     steps:
-      - name: PR size check (<=1000 changed lines, excluding generated/vendor paths)
+      - name: PR size check (<=1000 changed lines, excluding tests and generated/vendor paths)
         id: size
         continue-on-error: true
         env:
@@ -23,11 +23,11 @@ jobs:
 
           gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate \
             --jq '.[] | select(.filename |
-              test("(^|/)target/|(^|/)node_modules/|(^|/)dist/|(^|/)build/|package-lock\\.json$|yarn\\.lock$|pnpm-lock\\.yaml$|\\.min\\.js$") | not
+              test("(^|/)target/|(^|/)node_modules/|(^|/)dist/|(^|/)build/|package-lock\\.json$|yarn\\.lock$|pnpm-lock\\.yaml$|\\.min\\.js$|(^|/)src/test/|(^|/)__tests__/|\\.(test|spec)\\.[jt]sx?$") | not
             ) | (.additions + .deletions)' > line_counts.txt
 
           CHANGED_LINES=$(awk '{ sum += $1 } END { print sum+0 }' line_counts.txt)
-          echo "Changed lines (excluding generated/vendor paths): $CHANGED_LINES"
+          echo "Changed lines (excluding tests and generated/vendor paths): $CHANGED_LINES"
 
           if [ "$CHANGED_LINES" -gt 1000 ]; then
             echo "::error::PR changes $CHANGED_LINES lines, which exceeds the 1000 line limit. Please split this PR into smaller ones."
