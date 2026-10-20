@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Sends custom webhooks configured with {@link CustomWebhook.WebhookOptions#SENSITIVE_DATA_THRESHOLD_ALERTS}.
@@ -39,6 +41,9 @@ public class SensitiveDataThresholdAlerts {
     private static final Gson gson = new Gson();
 
     public static final int RUN_INTERVAL_SECONDS = 3600;
+
+    /** Accounts whose count indexes this process has already made sure of. */
+    private static final Set<Integer> indexedAccounts = ConcurrentHashMap.newKeySet();
 
     /** Totals per collection for one type from an hour on, above a count. Abstracted for tests. */
     public interface CountSource {
@@ -75,6 +80,8 @@ public class SensitiveDataThresholdAlerts {
 
     /** Checks every active webhook with this option in the current account. */
     public static void run() {
+        ensureCountIndexes();
+
         List<CustomWebhook> webhooks = CustomWebhooksDao.instance.findAll(Filters.and(
                 Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS,
                         CustomWebhook.WebhookOptions.SENSITIVE_DATA_THRESHOLD_ALERTS.name()),
@@ -89,6 +96,22 @@ public class SensitiveDataThresholdAlerts {
                 loggerMaker.errorAndAddToDb(e, "sensitive data threshold alert failed for webhook "
                         + webhook.getId() + ": " + e.getMessage());
             }
+        }
+    }
+
+    /**
+     * Cyborg writes the counts but does not index them; that happens here, for every account, whether
+     * or not it has a webhook: without the unique index each increment scans the whole collection and
+     * concurrent runtimes can create the same bucket twice, and without the TTL indexes nothing expires.
+     */
+    static void ensureCountIndexes() {
+        int accountId = Context.accountId.get();
+        if (!indexedAccounts.add(accountId)) return;
+        try {
+            SensitiveDataCountDao.instance.createIndicesIfAbsent();
+        } catch (Exception e) {
+            indexedAccounts.remove(accountId);
+            loggerMaker.errorAndAddToDb(e, "could not create sensitive data count indexes: " + e.getMessage());
         }
     }
 

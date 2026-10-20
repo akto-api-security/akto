@@ -71,6 +71,33 @@ public class SensitiveDataThresholdAlertsIT {
         Files.write(Paths.get(receiverLog), new byte[0]);
     }
 
+    @Test
+    public void testRunIndexesAnAccountWithoutWebhooks() {
+        int account = 1000003;
+        Context.accountId.set(account);
+        SensitiveDataCountDao.instance.getMCollection().drop();
+        com.akto.dao.MCollection.clients[0].getDatabase(String.valueOf(account))
+                .getCollection(SensitiveDataCountDao.APPLIED_REQUESTS_COLLECTION).drop();
+        CustomWebhooksDao.instance.getMCollection().drop();
+
+        SensitiveDataThresholdAlerts.run();
+
+        Map<String, Document> counts = new HashMap<>();
+        for (Document i : SensitiveDataCountDao.instance.getMCollection().listIndexes()) counts.put(i.getString("name"), i);
+        Document unique = counts.get("subType_hour_apiCollectionId");
+        assertEquals(new Document("subType", 1).append("hour", 1).append("apiCollectionId", 1), unique.get("key", Document.class));
+        assertEquals(Boolean.TRUE, unique.getBoolean("unique"));
+        assertEquals(0, ((Number) counts.get("expireAt_ttl").get("expireAfterSeconds")).longValue());
+
+        Map<String, Document> requests = new HashMap<>();
+        for (Document i : com.akto.dao.MCollection.clients[0].getDatabase(String.valueOf(account))
+                .getCollection(SensitiveDataCountDao.APPLIED_REQUESTS_COLLECTION).listIndexes()) requests.put(i.getString("name"), i);
+        assertEquals(24 * 3600L, ((Number) requests.get("createdAt_ttl").get("expireAfterSeconds")).longValue());
+
+        SensitiveDataThresholdAlerts.run();   // already indexed: nothing to do, nothing fails
+        Context.accountId.set(ACCOUNT);
+    }
+
     private static int now() {
         return Context.now();
     }
