@@ -1,4 +1,4 @@
-package com.akto.action.llm;
+package com.akto.llm;
 
 public class LlmCallException extends Exception {
 

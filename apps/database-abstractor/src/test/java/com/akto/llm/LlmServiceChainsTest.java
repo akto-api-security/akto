@@ -1,4 +1,4 @@
-package com.akto.action.llm;
+package com.akto.llm;
 
 import com.akto.dao.agents.LlmServiceConfigDao;
 import com.akto.dto.agents.LlmServiceConfig;

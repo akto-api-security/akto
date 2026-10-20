@@ -1,4 +1,4 @@
-package com.akto.action.llm;
+package com.akto.llm;
 
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +36,7 @@ public class AnthropicMessagesClient {
     // target.getParams() is this repo's equivalent of master's target.readApiKey()/getModelName() —
     // this Model has no such convenience methods, both keys live only in its params map.
     // public (unlike master): the caller, LLMService, lives in a different package (com.akto.action,
-    // not com.akto.action.llm) here, where master's AzureOpenAIPromptHandler caller is same-package.
+    // not com.akto.llm) here, where master's AzureOpenAIPromptHandler caller is same-package.
     public static String call(Model target, String prompt, int maxTokens) throws Exception {
         Map<String, String> params = target.getParams();
         String apiKey = params != null ? params.get(Model.PARAM_API_KEY) : null;

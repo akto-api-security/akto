@@ -1,6 +1,6 @@
 package com.akto.action;
 
-import com.akto.action.llm.ServiceKey;
+import com.akto.llm.ServiceKey;
 import com.opensymphony.xwork2.Action;
 import org.junit.Test;
 

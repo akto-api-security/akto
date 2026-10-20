@@ -1,4 +1,4 @@
-package com.akto.action.llm;
+package com.akto.llm;
 
 import java.util.ArrayList;
 import java.util.Collections;
