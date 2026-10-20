@@ -64,6 +64,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
@@ -176,6 +177,8 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForSuspectSampleData;
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
+    List<SensitiveDataCount> sensitiveDataCounts;
+    String idempotencyKey;
     TestScript testScript;
     @Getter @Setter
     String testScriptType;
@@ -3318,6 +3321,18 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkIncSensitiveDataCounts() {
+        // Written straight to Mongo even when kafka write mode is on: it is a handful of small upserts
+        // per runtime per minute, not the bulk volume that mode exists for.
+        try {
+            DbLayer.bulkIncSensitiveDataCounts(idempotencyKey, sensitiveDataCounts);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error bulkIncSensitiveDataCounts: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String bulkWriteDependencyNodes() {
         try {
             loggerMaker.infoAndAddToDb("bulkWriteDependencyNodes called");
@@ -5813,6 +5828,22 @@ public class DbAction extends ActionSupport {
 
     public void setDependencyNodeList(List<DependencyNode> dependencyNodeList) {
         this.dependencyNodeList = dependencyNodeList;
+    }
+
+    public List<SensitiveDataCount> getSensitiveDataCounts() {
+        return sensitiveDataCounts;
+    }
+
+    public void setSensitiveDataCounts(List<SensitiveDataCount> sensitiveDataCounts) {
+        this.sensitiveDataCounts = sensitiveDataCounts;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 
     public int getStartTimestamp() {
