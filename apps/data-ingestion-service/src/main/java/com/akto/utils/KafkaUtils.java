@@ -38,6 +38,7 @@ public class KafkaUtils {
         // Older Bedrock processors send ip=0.0.0.0; the caller is in bedrock-identity-arn.
         // Rewrite before publish so guardrail activity Actor is the identity, not the placeholder.
         BedrockIdentityActor.apply(payload);
+        BedrockSessionResolver.apply(payload);
         BasicDBObject obj = buildMessageObject(payload);
         topicPublisher.publish(obj.toString(), API_LOGS_TOPIC, publishToGuardrails);
     }
