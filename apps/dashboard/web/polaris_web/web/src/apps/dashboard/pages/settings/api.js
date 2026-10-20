@@ -1014,6 +1014,15 @@ const settingRequests = {
             data: {}
         })
     },
+    async backfillTraceSessions(startTime, endTime) {
+        return await request({
+            url: '/api/backfillTraceSessions',
+            method: 'post',
+            // Grouping a long history can outlast the 60s default.
+            timeout: 300000,
+            data: { startTime, endTime }
+        })
+    },
     async deleteDuplicateEntries() {
         return await request({
             url: '/api/deleteDuplicateEntries',
