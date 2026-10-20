@@ -3,13 +3,20 @@ package com.akto.dao;
 import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
@@ -73,6 +80,55 @@ public class TestSensitiveDataCountDao extends MongoBasedTest {
         SensitiveDataCountDao.instance.bulkInc("", Collections.singletonList(
                 new SensitiveDataCount(1, "PASSPORT", HOUR, 1)));
         assertEquals(11, stored(1, "PASSPORT", HOUR).getCount());
+    }
+
+    @Test
+    public void testPartialFailureIsNotAppliedTwice() {
+        // $inc fails on this bucket while the rest of the batch applies
+        SensitiveDataCountDao.instance.getMCollection().withDocumentClass(Document.class).insertOne(
+                new Document(SensitiveDataCount.API_COLLECTION_ID, 2).append(SensitiveDataCount.SUB_TYPE, "PASSPORT")
+                        .append(SensitiveDataCount.HOUR, HOUR).append(SensitiveDataCount.COUNT, "not a number"));
+        List<SensitiveDataCount> batch = Arrays.asList(
+                new SensitiveDataCount(1, "PASSPORT", HOUR, 10),
+                new SensitiveDataCount(2, "PASSPORT", HOUR, 10),
+                new SensitiveDataCount(3, "PASSPORT", HOUR, 10));
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+            SensitiveDataCountDao.instance.bulkInc("key-1", batch);
+        }
+        assertEquals(10, stored(1, "PASSPORT", HOUR).getCount());
+        assertEquals(10, stored(3, "PASSPORT", HOUR).getCount());
+    }
+
+    @Test
+    public void testConcurrentWritersToTheSameNewBuckets() throws Exception {
+        SensitiveDataCountDao.instance.getMCollection().createIndex(
+                Indexes.ascending(SensitiveDataCount.SUB_TYPE, SensitiveDataCount.HOUR, SensitiveDataCount.API_COLLECTION_ID),
+                new IndexOptions().unique(true));
+        int writers = 20, collections = 50;
+        List<SensitiveDataCount> batch = new ArrayList<>();
+        for (int c = 0; c < collections; c++) {
+            batch.add(new SensitiveDataCount(c, "PASSPORT", HOUR, 1));
+            batch.add(new SensitiveDataCount(c, "EMAIL", HOUR, 2));
+        }
+
+        ExecutorService pool = Executors.newFixedThreadPool(writers);
+        List<Future<?>> done = new ArrayList<>();
+        for (int w = 0; w < writers; w++) {
+            String key = "writer-" + w;
+            done.add(pool.submit(() -> {
+                com.akto.dao.context.Context.accountId.set(ACCOUNT_ID);
+                SensitiveDataCountDao.instance.bulkInc(key, batch);
+            }));
+        }
+        for (Future<?> f : done) f.get();
+        pool.shutdown();
+
+        assertEquals(2 * collections, SensitiveDataCountDao.instance.count(new Document()));
+        for (int c = 0; c < collections; c++) {
+            assertEquals(writers, stored(c, "PASSPORT", HOUR).getCount());
+            assertEquals(2L * writers, stored(c, "EMAIL", HOUR).getCount());
+        }
     }
 
     @Test

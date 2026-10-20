@@ -2,7 +2,9 @@ package com.akto.dao;
 
 import com.akto.dto.traffic.SensitiveDataCount;
 import com.mongodb.ErrorCategory;
+import com.mongodb.MongoBulkWriteException;
 import com.mongodb.MongoWriteException;
+import com.mongodb.bulk.BulkWriteError;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
@@ -14,6 +16,8 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,6 +31,8 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
 
     public static final String COLLECTION_NAME = "sensitive_data_counts";
     public static final SensitiveDataCountDao instance = new SensitiveDataCountDao();
+
+    private static final Logger logger = LoggerFactory.getLogger(SensitiveDataCountDao.class);
 
     /** Longest alert window we expect (a month), plus margin. */
     public static final int RETENTION_DAYS = 40;
@@ -54,6 +60,10 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
      * Applies the increments once per idempotency key: a retry of a request that already went through
      * (say, one whose response timed out) is skipped. The key is recorded before applying and removed
      * again if applying fails, so a failed request can still be retried.
+     *
+     * If only part of the batch fails, the key is kept, so a retry cannot apply the rest a second time,
+     * and the failed increments get one more try here. If they fail again they are dropped: a lost
+     * increment is better than a doubled one.
      */
     public void bulkInc(String idempotencyKey, List<SensitiveDataCount> increments) {
         if (idempotencyKey == null || idempotencyKey.isEmpty()) {
@@ -66,8 +76,23 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
             if (e.getError().getCategory() == ErrorCategory.DUPLICATE_KEY) return;
             throw e;
         }
+        List<SensitiveDataCount> valid = new ArrayList<>();
+        for (SensitiveDataCount inc : increments == null ? new ArrayList<SensitiveDataCount>() : increments) {
+            if (isValid(inc)) valid.add(inc);
+        }
         try {
-            bulkInc(increments);
+            bulkInc(valid);
+        } catch (MongoBulkWriteException e) {
+            List<SensitiveDataCount> failed = new ArrayList<>();
+            for (BulkWriteError error : e.getWriteErrors()) {
+                failed.add(valid.get(error.getIndex()));
+            }
+            try {
+                bulkInc(failed);
+            } catch (RuntimeException retryError) {
+                logger.error("dropped " + failed.size() + " of " + valid.size()
+                        + " sensitive data count increments for request " + idempotencyKey, retryError);
+            }
         } catch (RuntimeException e) {
             appliedRequests().deleteOne(Filters.eq("_id", idempotencyKey));
             throw e;
@@ -104,7 +129,7 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
 
         List<WriteModel<SensitiveDataCount>> writes = new ArrayList<>(increments.size());
         for (SensitiveDataCount inc : increments) {
-            if (inc == null || inc.getSubType() == null || inc.getCount() <= 0) continue;
+            if (!isValid(inc)) continue;
 
             Bson filter = Filters.and(
                     Filters.eq(SensitiveDataCount.API_COLLECTION_ID, inc.getApiCollectionId()),
@@ -124,5 +149,9 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
         if (writes.isEmpty()) return;
 
         getMCollection().bulkWrite(writes, new BulkWriteOptions().ordered(false));
+    }
+
+    private static boolean isValid(SensitiveDataCount inc) {
+        return inc != null && inc.getSubType() != null && inc.getCount() > 0;
     }
 }
