@@ -8,6 +8,7 @@ import org.junit.Test;
 import java.io.InputStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -78,7 +79,7 @@ public class BedrockIdentityActorTest {
         payload.setRequestHeaders("{\"host\":\"bedrock-runtime.us-east-1.amazonaws.com\"}");
         payload.setTag("{\"bedrock-identity-arn\":\"arn:aws:sts::123456789012:assumed-role/aria-usertask-role/edf60249dbcf44b19f0c10eedfe1790f\"}");
         BedrockIdentityActor.apply(payload);
-        assertEquals("aria-usertask-role", payload.getIp());
+        assertEquals("ECS-edf60249dbcf44b19f0c10eedfe1790f-aria-usertask-role", payload.getIp());
     }
 
     @Test
@@ -106,5 +107,148 @@ public class BedrockIdentityActorTest {
         payload.setRequestHeaders("{\"bedrock-identity-arn\":[\"arn:aws:iam::123456789012:user/alice\"]}");
         BedrockIdentityActor.apply(payload);
         assertEquals("alice", payload.getIp());
+    }
+
+    // ---------- machine sessions: kind, id and role ----------
+
+    private static final String ROLE_ARN = "arn:aws:sts::123456789012:assumed-role/";
+
+    @Test
+    public void actor_ec2InstanceSession() {
+        assertEquals("EC2-i-0abc1234def56789a-deploy-role",
+                BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN + "deploy-role/i-0abc1234def56789a"));
+    }
+
+    @Test
+    public void actor_ecsTaskSession() {
+        assertEquals("ECS-0123456789abcdef0123456789abcdef-aria-usertask-role",
+                BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN + "aria-usertask-role/0123456789abcdef0123456789abcdef"));
+    }
+
+    @Test
+    public void actor_bedrockAgentsSession() {
+        assertEquals("BedrockAgents-AGENT12345-11111111-2222-3333-4444-555555555555-AmazonBedrockExecutionRoleForAgents_ABC123",
+                BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN
+                        + "AmazonBedrockExecutionRoleForAgents_ABC123/BedrockAgents-AGENT12345-11111111-2222-3333-4444-555555555555"));
+    }
+
+    @Test
+    public void actor_uuidSession() {
+        assertEquals("SESSION-11111111-2222-3333-4444-555555555555-app-role",
+                BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN + "app-role/11111111-2222-3333-4444-555555555555"));
+    }
+
+    @Test
+    public void actor_readableSessionAndNoSessionAreUnchanged() {
+        assertEquals("order-processor", BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN + "lambda-role/order-processor"));
+        assertEquals("deadbeef", BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN + "app-role/deadbeef"));
+        assertEquals("my-role", BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN + "my-role"));
+    }
+
+    @Test
+    public void actor_neverContainsAColon() {
+        String[] sessions = {"i-0abc1234def56789a", "0123456789abcdef0123456789abcdef",
+                "BedrockAgents-AGENT12345-0f1e2d3c", "11111111-2222-3333-4444-555555555555"};
+        for (String session : sessions) {
+            assertFalse(session, BedrockIdentityActor.actorFromIdentityArn(ROLE_ARN + "r/" + session).contains(":"));
+        }
+    }
+
+    // ---------- apply(): every Bedrock collector version ----------
+
+    private static IngestDataBatch bedrockPayload(String ip, String identityArn) {
+        IngestDataBatch payload = new IngestDataBatch();
+        payload.setIp(ip);
+        payload.setRequestHeaders("{\"host\":\"bedrock-runtime.us-east-1.amazonaws.com\",\"bedrock-identity-arn\":\""
+                + identityArn + "\"}");
+        return payload;
+    }
+
+    @Test
+    public void apply_replacesTheRoleNameSentByNewerCollectors() {
+        IngestDataBatch payload = bedrockPayload("aria-usertask-role",
+                ROLE_ARN + "aria-usertask-role/0123456789abcdef0123456789abcdef");
+        BedrockIdentityActor.apply(payload);
+        assertEquals("ECS-0123456789abcdef0123456789abcdef-aria-usertask-role", payload.getIp());
+    }
+
+    @Test
+    public void apply_keepsTheSamePersonSentByNewerCollectors() {
+        IngestDataBatch payload = bedrockPayload("jane.doe", ROLE_ARN + "my-app-role/jane.doe");
+        BedrockIdentityActor.apply(payload);
+        assertEquals("jane.doe", payload.getIp());
+    }
+
+    @Test
+    public void apply_rewritesEmptyAndNullIp() {
+        IngestDataBatch empty = bedrockPayload("", ROLE_ARN + "deploy-role/i-0abc1234");
+        BedrockIdentityActor.apply(empty);
+        assertEquals("EC2-i-0abc1234-deploy-role", empty.getIp());
+
+        IngestDataBatch missing = bedrockPayload(null, ROLE_ARN + "deploy-role/i-0abc1234");
+        BedrockIdentityActor.apply(missing);
+        assertEquals("EC2-i-0abc1234-deploy-role", missing.getIp());
+    }
+
+    @Test
+    public void apply_neverOverwritesARealIp() {
+        String[] realIps = {"203.0.113.9", "203.0.113.9:443", "2001:db8::1", "[2001:db8::1]:443", "::1"};
+        for (String ip : realIps) {
+            IngestDataBatch payload = bedrockPayload(ip, ROLE_ARN + "deploy-role/i-0abc1234");
+            BedrockIdentityActor.apply(payload);
+            assertEquals(ip, ip, payload.getIp());
+        }
+    }
+
+    @Test
+    public void apply_keepsTheCollectorValueWhenTheArnIsAResource() {
+        IngestDataBatch payload = bedrockPayload("discovery-actor", "arn:aws:bedrock:us-east-1:123456789012:agent/ABCDEF");
+        BedrockIdentityActor.apply(payload);
+        assertEquals("discovery-actor", payload.getIp());
+    }
+
+    @Test
+    public void apply_leavesPayloadsWithoutTheIdentityArnUntouched() {
+        IngestDataBatch other = new IngestDataBatch();
+        other.setIp("some-actor");
+        other.setRequestHeaders("{\"host\":\"api.example.com\",\"x-user\":\"arn:aws:iam::123456789012:user/alice\"}");
+        other.setTag("{\"source\":\"IBM_WATSONX\"}");
+        BedrockIdentityActor.apply(other);
+        assertEquals("some-actor", other.getIp());
+
+        IngestDataBatch placeholder = new IngestDataBatch();
+        placeholder.setIp("0.0.0.0");
+        placeholder.setRequestHeaders("not json");
+        BedrockIdentityActor.apply(placeholder);
+        assertEquals("0.0.0.0", placeholder.getIp());
+    }
+
+    @Test
+    public void apply_ignoresTheKeyNameWhenItIsOnlyAValue() {
+        IngestDataBatch payload = new IngestDataBatch();
+        payload.setIp("some-actor");
+        payload.setRequestHeaders("{\"x-note\":\"bedrock-identity-arn\"}");
+        BedrockIdentityActor.apply(payload);
+        assertEquals("some-actor", payload.getIp());
+    }
+
+    @Test
+    public void apply_ignoresNullPayload() {
+        BedrockIdentityActor.apply(null);
+    }
+
+    @Test
+    public void isRealIp_classifiesAddressesAndPlaceholders() {
+        assertTrue(BedrockIdentityActor.isRealIp("10.0.1.15"));
+        assertTrue(BedrockIdentityActor.isRealIp(" 10.0.1.15 "));
+        assertTrue(BedrockIdentityActor.isRealIp("fe80::1%eth0"));
+        assertFalse(BedrockIdentityActor.isRealIp("0.0.0.0"));
+        assertFalse(BedrockIdentityActor.isRealIp("0.0.0.0:0"));
+        assertFalse(BedrockIdentityActor.isRealIp("::"));
+        assertFalse(BedrockIdentityActor.isRealIp("null"));
+        assertFalse(BedrockIdentityActor.isRealIp(null));
+        assertFalse(BedrockIdentityActor.isRealIp("aria-usertask-role"));
+        assertFalse(BedrockIdentityActor.isRealIp("ECS-0123456789abcdef0123456789abcdef-aria-usertask-role"));
+        assertFalse(BedrockIdentityActor.isRealIp("EC2-i-0abc1234-deploy-role"));
     }
 }
