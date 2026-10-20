@@ -20,6 +20,8 @@ public class ModuleInfo {
     public static final String NAME = "name";
     private String name;
     public static final String ADDITIONAL_DATA = "additionalData";
+    // set by the heartbeat writer in cyborg; module_info has a TTL index on it
+    public static final String EXPIRES_AT = "expiresAt";
     private Map<String, Object> additionalData;
 
     @Getter @Setter
