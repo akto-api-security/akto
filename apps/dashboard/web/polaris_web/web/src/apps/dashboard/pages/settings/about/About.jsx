@@ -111,8 +111,6 @@ function About() {
     const [disableMalEventButton, setDisableMalEventButton] = useState(false)
     const [resetAccessTypeModal, setResetAccessTypeModal] = useState(false)
     const [disableResetAccessTypeButton, setDisableResetAccessTypeButton] = useState(false)
-    const [groupTracesModal, setGroupTracesModal] = useState(false)
-    const [disableGroupTracesButton, setDisableGroupTracesButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -414,17 +412,6 @@ function About() {
         })
     }
 
-    const handleGroupTraces = async() => {
-        setGroupTracesModal(false)
-        setDisableGroupTracesButton(true)
-        await settingRequests.backfillTraceSessions(0, func.timeNow()).then((res) => {
-            func.setToast(true, false, `Grouped ${res?.backfillUpdated || 0} traces into conversations.`)
-        }).catch(() => {
-            func.setToast(true, true, "Failed to group existing traces. Please try again.")
-        })
-        setDisableGroupTracesButton(false)
-    }
-
     const handleResetCollectionAccessTypes = async() => {
         setResetAccessTypeModal(false)
         setDisableResetAccessTypeButton(true)
@@ -637,38 +624,6 @@ function About() {
                     <VerticalStack>
                         <Text>This will recalculate the access type for all collections based on their APIs.</Text>
                         <Text>Are you sure you want to proceed?</Text>
-                    </VerticalStack>
-                </Modal.Section>
-            </Modal>
-
-            {window?.USER_NAME?.toLowerCase()?.includes("@akto.io") &&
-                <VerticalStack gap={2}>
-                    <Text color='subdued' variant='bodyMd'>Group existing Bedrock traces into conversations</Text>
-                    <Box width='80px'>
-                        <AllowedAction allowed={canCall('api/backfillTraceSessions')}>
-                            <Button disabled={disableGroupTracesButton} onClick={() => setGroupTracesModal(true)}>Group</Button>
-                        </AllowedAction>
-                    </Box>
-                </VerticalStack>
-            }
-
-            <Modal
-                open={groupTracesModal}
-                primaryAction={{
-                    content: "Yes, Group",
-                    onAction: handleGroupTraces
-                }}
-                secondaryActions={[{
-                    content: "Cancel",
-                    onAction: () => {setGroupTracesModal(false)}
-                }]}
-                title="Group existing traces"
-                onClose={() => {setGroupTracesModal(false)}}
-            >
-                <Modal.Section>
-                    <VerticalStack>
-                        <Text>Bedrock traces stored before conversation grouping was enabled will be grouped by prompt, with up to 20 minutes between calls.</Text>
-                        <Text>Traces that already belong to a conversation are not changed. Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>
             </Modal>

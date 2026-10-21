@@ -14,7 +14,6 @@ import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.utils.search.SearchClient;
 import com.akto.utils.search.SearchClientFactory;
-import com.akto.utils.search.TraceSessionBackfill;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -277,28 +276,6 @@ public class LLMObservabilityAction extends UserAction {
             total   = 0;
         }
         return SUCCESS.toUpperCase();
-    }
-
-    // ── Group Bedrock traces stored before ingest assigned sessions ─────────────
-
-    @Getter private int backfillUpdated = 0;
-
-    @Audit(description = "User grouped existing Bedrock traces into conversations",
-           resource = Resource.TRACES_CONTENT,
-           operation = Operation.UPDATE)
-    public String backfillTraceSessions() {
-        if (!isUserRoleAdmin() || endTime <= startTime) {
-            addActionError("Admin access and a valid startTime/endTime are required");
-            return ERROR.toUpperCase();
-        }
-        try {
-            backfillUpdated = TraceSessionBackfill.run(SearchClientFactory.instance(), Context.accountId.get(), startMs(), endMs());
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            logger.error("backfillTraceSessions error: " + e.getMessage());
-            addActionError("Failed to group existing traces: " + e.getMessage());
-            return ERROR.toUpperCase();
-        }
     }
 
     private boolean isUserRoleAdmin() {

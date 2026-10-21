@@ -18,7 +18,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -1332,87 +1331,6 @@ public class ElasticSearchClient extends SearchClient {
             logger.error("scrollQueryData error for accountId=" + accountId + ": " + e.getMessage());
         } finally {
             if (scrollId != null) releaseScroll(scrollId);
-        }
-    }
-
-    // ── Session backfill (TraceSessionBackfill) ───────────────────────────────
-
-    @Override
-    public void scrollRecordsWithoutSession(int accountId, String serviceIdPrefix, long startMs, long endMs,
-                                            int pageSize, int maxRecords, Consumer<AgentQueryRecord> handler) {
-        if (!isConfigured()) throw new IllegalStateException("Elasticsearch is not configured");
-        String scrollId = null;
-        int delivered = 0;
-        try {
-            JSONObject query = buildQuery(accountId, startMs, endMs, null, null, null);
-            JSONObject bool = query.getJSONObject("bool");
-            bool.getJSONArray("must")
-                .put(new JSONObject().put("prefix", new JSONObject().put(AgentQueryRecord.F_SERVICE_ID_KW, serviceIdPrefix)))
-                // No session yet: the field is absent, or stored as an empty string.
-                .put(new JSONObject().put("bool", new JSONObject()
-                    .put("minimum_should_match", 1)
-                    .put("should", new JSONArray()
-                        .put(new JSONObject().put("bool", new JSONObject().put("must_not", new JSONArray()
-                            .put(new JSONObject().put("exists", new JSONObject().put("field", AgentQueryRecord.F_SESSION_IDENTIFIER))))))
-                        .put(new JSONObject().put("term", new JSONObject().put(AgentQueryRecord.F_SESSION_IDENTIFIER_KW, ""))))));
-            JSONObject requestBody = new JSONObject()
-                .put("query", query)
-                .put("size", pageSize)
-                .put("sort", new JSONArray().put(new JSONObject().put(AgentQueryRecord.F_TIMESTAMP, new JSONObject().put("order", "asc"))));
-            JSONObject response = httpPost(trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search?scroll=" + SCROLL_KEEP_ALIVE, requestBody.toString());
-            if (response == null) throw new IllegalStateException("Elasticsearch search failed");
-
-            scrollId = response.optString("_scroll_id", null);
-            JSONArray hits = extractHits(response);
-            while (hits != null && hits.length() > 0 && delivered < maxRecords) {
-                for (int i = 0; i < hits.length() && delivered < maxRecords; i++) {
-                    AgentQueryRecord rec = parseHit(hits.getJSONObject(i));
-                    if (rec != null) { handler.accept(rec); delivered++; }
-                }
-                if (delivered >= maxRecords || scrollId == null) break;
-                JSONObject scrollBody = new JSONObject().put("scroll", SCROLL_KEEP_ALIVE).put("scroll_id", scrollId);
-                response = httpPost(trimTrailingSlash(ES_HOST) + "/_search/scroll", scrollBody.toString());
-                if (response == null) throw new IllegalStateException("Elasticsearch scroll failed");
-                scrollId = response.optString("_scroll_id", scrollId);
-                hits = extractHits(response);
-            }
-        } catch (JSONException e) {
-            throw new IllegalStateException("Elasticsearch scroll failed: " + e.getMessage(), e);
-        } finally {
-            if (scrollId != null) releaseScroll(scrollId);
-        }
-    }
-
-    @Override
-    public int bulkUpdateSessionIds(Map<String, String> sessionIdByDocId) {
-        if (sessionIdByDocId == null || sessionIdByDocId.isEmpty()) return 0;
-        try {
-            StringBuilder sb = new StringBuilder();
-            for (Map.Entry<String, String> e : sessionIdByDocId.entrySet()) {
-                sb.append(new JSONObject().put("update", new JSONObject().put("_id", e.getKey()))).append('\n');
-                sb.append(new JSONObject().put("doc", new JSONObject().put(AgentQueryRecord.F_SESSION_IDENTIFIER, e.getValue()))).append('\n');
-            }
-            Request.Builder rb = new Request.Builder()
-                .url(trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_bulk")
-                .method("POST", RequestBody.create(sb.toString(), MediaType.parse("application/x-ndjson")))
-                .addHeader("Content-Type", "application/x-ndjson");
-            addAuthHeader(rb);
-            try (Response resp = http.newCall(rb.build()).execute()) {
-                ResponseBody body = resp.body();
-                if (!resp.isSuccessful() || body == null) {
-                    throw new IllegalStateException("Elasticsearch bulk update failed (" + resp.code() + ")");
-                }
-                // _bulk answers 200 even when single items fail, so count the items that succeeded.
-                JSONArray items = new JSONObject(body.string()).optJSONArray("items");
-                int updated = 0;
-                for (int i = 0; items != null && i < items.length(); i++) {
-                    JSONObject item = items.getJSONObject(i).optJSONObject("update");
-                    if (item != null && item.optInt("status", 0) / 100 == 2) updated++;
-                }
-                return updated;
-            }
-        } catch (IOException | JSONException e) {
-            throw new IllegalStateException("Elasticsearch bulk update failed: " + e.getMessage(), e);
         }
     }
 

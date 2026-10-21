@@ -134,20 +134,6 @@ public abstract class SearchClient {
     /** Used by UserAnalysisCron to write classified topic/subTopic back to the backend. */
     public abstract void bulkUpdateTopics(List<TopicUpdate> updates);
 
-    /**
-     * Records whose serviceId starts with serviceIdPrefix and that have no sessionIdentifier, oldest
-     * first (TraceSessionBackfill). Only Elasticsearch supports it; ADX tables are append-only.
-     */
-    public void scrollRecordsWithoutSession(int accountId, String serviceIdPrefix, long startMs, long endMs,
-        int pageSize, int maxRecords, Consumer<AgentQueryRecord> handler) {
-        throw new UnsupportedOperationException("session backfill is not supported by this search backend");
-    }
-
-    /** Writes sessionIdentifier onto each document id in the map; returns how many documents were updated. */
-    public int bulkUpdateSessionIds(Map<String, String> sessionIdByDocId) {
-        throw new UnsupportedOperationException("session backfill is not supported by this search backend");
-    }
-
     // ── Shared, backend-agnostic helpers ───────────────────────────────────────
 
     /**
