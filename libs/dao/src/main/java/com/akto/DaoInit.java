@@ -472,6 +472,7 @@ public class DaoInit {
         RuntimePersistentLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DastLogsDao.instance.createIndicesIfAbsent();
+        MiniTestingOrchestratorLogsDao.instance.createIndicesIfAbsent();
         AgenticTestingLogsDao.instance.createIndicesIfAbsent();
         SmartTestingLogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
