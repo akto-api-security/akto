@@ -111,6 +111,8 @@ function About() {
     const [disableMalEventButton, setDisableMalEventButton] = useState(false)
     const [resetAccessTypeModal, setResetAccessTypeModal] = useState(false)
     const [disableResetAccessTypeButton, setDisableResetAccessTypeButton] = useState(false)
+    const [groupActivitiesModal, setGroupActivitiesModal] = useState(false)
+    const [disableGroupActivitiesButton, setDisableGroupActivitiesButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -412,6 +414,17 @@ function About() {
         })
     }
 
+    const handleGroupActivities = async() => {
+        setGroupActivitiesModal(false)
+        setDisableGroupActivitiesButton(true)
+        await settingRequests.backfillActivityGroupKeys().then((res) => {
+            func.setToast(true, false, `Grouped ${res?.backfilledGroupKeys || 0} existing guardrail activities.`)
+        }).catch(() => {
+            func.setToast(true, true, "Failed to group existing guardrail activities. Please try again.")
+        })
+        setDisableGroupActivitiesButton(false)
+    }
+
     const handleResetCollectionAccessTypes = async() => {
         setResetAccessTypeModal(false)
         setDisableResetAccessTypeButton(true)
@@ -624,6 +637,38 @@ function About() {
                     <VerticalStack>
                         <Text>This will recalculate the access type for all collections based on their APIs.</Text>
                         <Text>Are you sure you want to proceed?</Text>
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
+
+            {window?.USER_NAME?.toLowerCase()?.includes("@akto.io") &&
+                <VerticalStack gap={2}>
+                    <Text color='subdued' variant='bodyMd'>Group existing guardrail activities</Text>
+                    <Box width='80px'>
+                        <AllowedAction allowed={canCall('api/backfillActivityGroupKeys')}>
+                            <Button disabled={disableGroupActivitiesButton} onClick={() => setGroupActivitiesModal(true)}>Group</Button>
+                        </AllowedAction>
+                    </Box>
+                </VerticalStack>
+            }
+
+            <Modal
+                open={groupActivitiesModal}
+                primaryAction={{
+                    content: "Yes, Group",
+                    onAction: handleGroupActivities
+                }}
+                secondaryActions={[{
+                    content: "Cancel",
+                    onAction: () => {setGroupActivitiesModal(false)}
+                }]}
+                title="Group existing guardrail activities"
+                onClose={() => {setGroupActivitiesModal(false)}}
+            >
+                <Modal.Section>
+                    <VerticalStack>
+                        <Text>Guardrail activities stored before grouping was enabled will be grouped like new ones: the same prompt from the same Bedrock caller, with up to 20 minutes between them, shows as one activity.</Text>
+                        <Text>Activities that are already grouped are not changed. Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>
             </Modal>
