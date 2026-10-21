@@ -79,6 +79,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String eventType;
   String actor;
   String filterId;
+  List<String> eventIds; // a grouped activity row's events, shown as its attempts
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -359,6 +360,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             put("event_type", eventType);
             put("actor", actor);
             put("filterId", filterId);
+            if (eventIds != null && !eventIds.isEmpty()) {
+              put("event_ids", eventIds);
+            }
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -379,11 +383,19 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                 this.maliciousPayloadsResponses =
                     m.getMaliciousPayloadsResponseList().stream()
                         .map(
-                            smr ->
-                                new MaliciousPayloadsResponse(
-                                    smr.getOrig(),
-                                    smr.getMetadata(),
-                                    smr.getTs()))
+                            smr -> {
+                              MaliciousPayloadsResponse payload = new MaliciousPayloadsResponse(smr.getOrig(), smr.getMetadata(), smr.getTs());
+                              payload.setEventId(smr.getEventId());
+                              payload.setRefId(smr.getRefId());
+                              payload.setFilterId(smr.getFilterId());
+                              payload.setSeverity(smr.getSeverity());
+                              payload.setEndpoint(smr.getEndpoint());
+                              payload.setMethod(smr.getMethod());
+                              payload.setEvidenceLine(smr.getEvidenceLine());
+                              payload.setRemediation(smr.getRemediation());
+                              payload.setStatus(smr.getStatus());
+                              return payload;
+                            })
                         .collect(Collectors.toList());
               });
     } catch (Exception e) {
@@ -914,6 +926,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setFilterId(String filterId) {
     this.filterId = filterId;
+  }
+
+  public void setEventIds(List<String> eventIds) {
+    this.eventIds = eventIds;
   }
 
   public Map<String, Integer> getSort() {

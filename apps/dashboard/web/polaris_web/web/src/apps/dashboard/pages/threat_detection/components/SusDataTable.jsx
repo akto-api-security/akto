@@ -6,7 +6,8 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents, showsActivityGrouping } from "../utils/activityGroups";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
@@ -292,6 +293,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // Event ids behind each grouped activity row (repeated Bedrock prompt from one caller), by the id of
   // the row's latest event.
   const activityGroupRef = useRef({});
+  const [groupActivities, setGroupActivities] = useState(true);
+  const [groupToggles, setGroupToggles] = useState(0);
   const humanResponseByIdRef = useRef({});
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const hostNameMap = PersistStore((state) => state.hostNameMap);
@@ -404,8 +407,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     }
   };
 
-  // A grouped activity row stands for all its events, so actions on it apply to every one of them.
-  const expandActivityGroups = (ids) => [...new Set(ids.flatMap((id) => activityGroupRef.current[id] || [id]))];
+  const expandActivityGroups = (ids) => expandToGroupEvents(ids, activityGroupRef.current);
 
   const handleBulkHumanApproval = async (rowIds, response) => {
     if (!Array.isArray(rowIds) || rowIds.length === 0) return;
@@ -1057,7 +1059,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       skillEvaluationMode,
       configEvaluationMode,
       riskScoreFilterType,
-      riskScoreFilterValue
+      riskScoreFilterValue,
+      undefined,
+      !groupActivities
     );
 
     // Store the total count for filtered results
@@ -1162,9 +1166,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
           // A grouped activity (same prompt from the same Bedrock caller) shows how many events it holds.
           detectionType: x?.groupCount > 1 ? (
-            <Tooltip content={`Same prompt from the same caller ${x.groupCount} times, ${func.epochToDateTime(x.groupFirstDetectedAt)} to ${func.epochToDateTime(x.timestamp)}`}>
-              <Badge status="attention">{`${x.groupCount} events`}</Badge>
-            </Tooltip>
+            <ActivityGroupBadges count={x.groupCount} firstDetectedAt={x.groupFirstDetectedAt} lastDetectedAt={x.timestamp} policies={x.groupFilterIds} />
           ) : (
             <Badge status={isSessionBased ? 'info' : 'default'}>
               {isSessionBased ? 'Session' : 'Single Prompt'}
@@ -1289,7 +1291,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       p.skillEvaluationMode,
       p.configEvaluationMode,
       p.riskScoreFilterType,
-      p.riskScoreFilterValue
+      p.riskScoreFilterValue,
+      undefined,
+      showsActivityGrouping() // export every event, not one row per grouped activity
     );
     let events = res?.maliciousEvents || [];
     // "Needs Approval" is a client-side view over ACTIVE events (see fetchData above) — apply the
@@ -1485,11 +1489,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         onSelect={handleSelectedTab}
         mode={IndexFiltersMode.Default}
         searchAccessory={
-          <AdvancedPayloadSearch
-            filters={advancedFilters}
-            onChange={handleAdvancedFiltersChange}
-            showTags={false}
-          />
+          <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <ActivityGroupingToggle pressed={groupActivities} onToggle={() => { setGroupActivities(!groupActivities); setGroupToggles(n => n + 1); }} />
+            <AdvancedPayloadSearch
+              filters={advancedFilters}
+              onChange={handleAdvancedFiltersChange}
+              showTags={false}
+            />
+          </HorizontalStack>
         }
         searchBelow={advancedFilters.length > 0 ? (
           <AdvancedPayloadSearch
@@ -1498,7 +1505,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             showButton={false}
           />
         ) : null}
-        callFromOutside={advancedFetchKey + refreshNonce}
+        callFromOutside={advancedFetchKey + refreshNonce + groupToggles}
         clearSelectionKey={refreshNonce}
       />
 

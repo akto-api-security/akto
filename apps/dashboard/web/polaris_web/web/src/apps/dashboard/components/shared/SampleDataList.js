@@ -153,13 +153,18 @@ function VulnerabilityEvidence({ segments: locatedSegments, evidenceLine }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine, onPageChange} = props;
 
     const [page, setPage] = useState(0);
 
     useEffect(() => {
       setPage(0);
     }, [sampleData])
+
+    // Lets the parent show details of the sample on screen (e.g. one attempt of a grouped activity).
+    useEffect(() => {
+      onPageChange?.(page);
+    }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
   
     const currentSample = sampleData[Math.min(page, sampleData.length - 1)];
     const parsedSample = func.parseWebSocketSampleMessage(currentSample?.message)

@@ -59,11 +59,11 @@ public class DashboardMaliciousEvent {
   private String evidenceLine;
   private String humanResponse;
   // Grouped activity row (repeated Bedrock prompt from one caller): how many events are behind it, the
-  // first one's time, and their ids.
-  private String groupKey;
+  // first one's time, their ids, and the policies they tripped.
   private int groupCount;
   private long groupFirstDetectedAt;
   private List<String> groupEventIds;
+  private List<String> groupFilterIds;
   public DashboardMaliciousEvent() {}
 
   public DashboardMaliciousEvent(
@@ -333,14 +333,6 @@ public class DashboardMaliciousEvent {
     this.humanResponse = humanResponse;
   }
 
-  public String getGroupKey() {
-    return groupKey;
-  }
-
-  public void setGroupKey(String groupKey) {
-    this.groupKey = groupKey;
-  }
-
   public int getGroupCount() {
     return groupCount;
   }
@@ -363,6 +355,14 @@ public class DashboardMaliciousEvent {
 
   public void setGroupEventIds(List<String> groupEventIds) {
     this.groupEventIds = groupEventIds;
+  }
+
+  public List<String> getGroupFilterIds() {
+    return groupFilterIds;
+  }
+
+  public void setGroupFilterIds(List<String> groupFilterIds) {
+    this.groupFilterIds = groupFilterIds;
   }
 
   public String getEvidenceLine() {
