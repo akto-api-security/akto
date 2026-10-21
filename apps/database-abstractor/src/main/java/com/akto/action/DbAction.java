@@ -4254,6 +4254,29 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    // Same once-per-account capped-collection guarantee as dast_logs, for the orchestrator's logs.
+    private static final Set<Integer> miniTestingOrchestratorLogsReady = ConcurrentHashMap.newKeySet();
+
+    public String insertMiniTestingOrchestratorLog() {
+        try {
+            int accountId = Context.accountId.get();
+            if (miniTestingOrchestratorLogsReady.add(accountId)) {
+                try {
+                    MiniTestingOrchestratorLogsDao.instance.createIndicesIfAbsent();
+                } catch (Exception e) {
+                    miniTestingOrchestratorLogsReady.remove(accountId);
+                    loggerMaker.errorAndAddToDb(e, "Error ensuring logs_mini_testing_orchestrator capped collection for accountId=" + accountId);
+                }
+            }
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            MiniTestingOrchestratorLogsDao.instance.insertOne(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertMiniTestingOrchestratorLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String insertAwsApiGatewayLog() {
         try {
             // Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));

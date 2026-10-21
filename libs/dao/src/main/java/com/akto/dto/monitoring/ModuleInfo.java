@@ -118,7 +118,9 @@ public class ModuleInfo {
         AGENTIC_TESTING,
         GUARDRAIL,
         SMART_TESTING,
-        ACCOUNT_JOB_EXECUTOR
+        ACCOUNT_JOB_EXECUTOR,
+        // autoscaler for MINI_TESTING pods; heartbeats from mini-testing-orchestrator
+        MINI_TESTING_ORCHESTRATOR
     }
 
 }
