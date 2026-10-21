@@ -32,6 +32,12 @@ export const orgUuidFromUserId = (userId) => {
     return ORG_UUID_RE.test(candidate) ? candidate : '';
 };
 
+// One option per value; values are the dropdown's React keys, and duplicates break its filtering.
+const uniqueByValue = (options) => {
+    const seen = new Set();
+    return options.filter(o => !seen.has(o.value) && seen.add(o.value));
+};
+
 // Agentic users (Atlas only) and the targeting options built from them; args only feed the preview.
 export const useAgenticUserOptions = ({ applyToAllUsers, targetTags, negatedTargetTags, targetDeviceIds, negatedTargetDeviceIds }) => {
     const [agenticUsers, setAgenticUsers] = useState([]);
@@ -82,7 +88,7 @@ export const useAgenticUserOptions = ({ applyToAllUsers, targetTags, negatedTarg
             const label = u.userEmail && u.userEmail !== name ? `${u.userEmail} · ${name}` : name;
             options.push({ label, value: name });
         });
-        return options.sort((a, b) => a.label.localeCompare(b.label));
+        return uniqueByValue(options).sort((a, b) => a.label.localeCompare(b.label));
     }, [agenticUsers]);
 
     // One row per device — the "Devices" targeting pool. Device rows stay keyed on the device ID
@@ -91,7 +97,7 @@ export const useAgenticUserOptions = ({ applyToAllUsers, targetTags, negatedTarg
     // Identities with no device on record don't appear here; they're only selectable via the
     // separate "Users" pool above.
     const availableDevices = useMemo(() => {
-        const options = [];
+        let options = [];
         (agenticUsers || []).forEach(u => {
             const name = u.userName || u.userEmail;
             if (!name) return;
@@ -99,6 +105,7 @@ export const useAgenticUserOptions = ({ applyToAllUsers, targetTags, negatedTarg
                 options.push({ label: `${name} · ${deviceIdSuffix(deviceId)}`, value: deviceId });
             });
         });
+        options = uniqueByValue(options);
         // Two different device IDs can render the same suffix — a "{host}-{first8}" label and a
         // raw machine ID can share those 8 characters — which would show as two identical rows
         // the user cannot tell apart. Spell out the full ID for any label that isn't unique.
