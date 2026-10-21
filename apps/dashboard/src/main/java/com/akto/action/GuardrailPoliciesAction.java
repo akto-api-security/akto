@@ -3,8 +3,6 @@ package com.akto.action;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.RBACDao;
-import com.akto.dao.monitoring.ModuleInfoDao;
-import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.EnterpriseLicenseComplianceCatalog;
 import com.akto.dao.context.Context;
@@ -281,45 +279,7 @@ public class GuardrailPoliciesAction extends UserAction {
             // itself is never persisted (see GuardrailPolicies#targetUserNames, @BsonIgnore);
             // userMetadata is the durable record of which identities were picked, so it's always
             // re-resolved fresh from live sources here rather than trusting whatever the client sent.
-            List<String> pickedUserNames = new ArrayList<>();
-            if (policy.getTargetUserNames() != null) {
-                for (String userName : policy.getTargetUserNames()) {
-                    if (StringUtils.isNotBlank(userName)) pickedUserNames.add(userName.trim());
-                }
-            }
-            List<AgenticUsers> resolvedUserMetadata = new ArrayList<>();
-            if (!pickedUserNames.isEmpty()) {
-                // Each pick is resolved as EITHER a userId or a userName — the picker sends the
-                // full userId for an org-scoped Claude identity (one doc per org, all sharing one
-                // userName, so the username alone cannot say which org was meant) and the username
-                // for everything else. The DAO ORs the two fields, and the shapes don't collide, so
-                // handing it the same list twice resolves both kinds in one query.
-                resolvedUserMetadata.addAll(AgentUsersDao.instance.findByUserIdsOrUserNames(pickedUserNames, pickedUserNames));
-
-                // A pick whose only source is module_info reporting (browser extension / Claude
-                // Desktop app) has no agent_users doc at all, so the lookup above can't find it —
-                // re-verify against module_info directly (never trust a client-supplied email) and
-                // always keep the username, attaching an email when module_info actually has one.
-                // Track the PICK each resolved row answered, not just its username: an org-scoped
-                // identity is picked by userId while its row still carries the plain shared
-                // username, so matching on username alone would call that pick unresolved and
-                // synthesize a junk row whose userName is really a userId.
-                Set<String> resolvedPicks = new HashSet<>();
-                for (AgenticUsers u : resolvedUserMetadata) {
-                    if (u.getUserName() != null) resolvedPicks.add(u.getUserName());
-                    if (u.getUserId() != null) resolvedPicks.add(u.getUserId());
-                }
-                Map<String, String> moduleInfoEmailsByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
-                for (String userName : pickedUserNames) {
-                    if (resolvedPicks.contains(userName)) continue;
-                    AgenticUsers snapshot = new AgenticUsers();
-                    snapshot.setUserName(userName);
-                    snapshot.setUserEmail(moduleInfoEmailsByUsername.get(userName));
-                    resolvedUserMetadata.add(snapshot);
-                    resolvedPicks.add(userName);
-                }
-            }
-            policy.setUserMetadata(resolvedUserMetadata);
+            policy.setUserMetadata(AgentUsersDao.instance.resolveUserMetadata(policy.getTargetUserNames()));
 
             List<Bson> updates = buildPolicyUpdates(policy, contextSource);
 

@@ -12,21 +12,10 @@ import (
 // auditTypeBrowserLLM is the mcp_audit_info type the dashboard writes for browser LLM sites.
 const auditTypeBrowserLLM = "browser-llm"
 
-// rejectedLLMSites collects the browser LLM sites marked Rejected in Audit Data.
-func rejectedLLMSites(auditPolicies map[string]*types.AuditPolicy) map[string]struct{} {
-	sites := make(map[string]struct{})
-	for _, p := range auditPolicies {
-		if p != nil && strings.EqualFold(p.Type, auditTypeBrowserLLM) && strings.EqualFold(strings.TrimSpace(p.Remarks), "rejected") {
-			sites[strings.ToLower(p.ResourceName)] = struct{}{}
-		}
-	}
-	return sites
-}
-
 // matchRejectedLLMSite exact-matches the extension's host against rejected sites. Discovery names a row either
 // <site> (host minus <user>.<browser>) or, for hosts it keeps whole, the host itself, so both are checked;
 // a blocked site never blocks its parent or subdomains.
-func matchRejectedLLMSite(host string, sites map[string]struct{}) (string, bool) {
+func matchRejectedLLMSite(host string, sites map[string]auditScope) (string, bool) {
 	host = strings.ToLower(strings.TrimSpace(host))
 	if host == "" {
 		return "", false
@@ -56,7 +45,7 @@ func (s *Service) checkRejectedLLM(params *models.ValidateRequestParams, valCtx 
 
 	host := extractHostHeader(valCtx.RequestHeaders)
 	site, rejected := matchRejectedLLMSite(host, sites)
-	if !rejected {
+	if !rejected || !sites[site].matches(deviceLabelFromMcpServerName(host), requestUserEmail(valCtx)) {
 		return nil
 	}
 

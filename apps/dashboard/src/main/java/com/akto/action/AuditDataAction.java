@@ -1,9 +1,11 @@
 package com.akto.action;
 
+import com.akto.dao.AgentUsersDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.McpAllowlistDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.McpAllowlist;
 import com.akto.dto.McpAuditInfo;
@@ -13,17 +15,22 @@ import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
+import com.akto.util.McpClientRegistry;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.utils.ArgusCollectionScope;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Field;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -36,12 +43,15 @@ import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -52,7 +62,7 @@ public class AuditDataAction extends UserAction {
     private static final int MAX_SEARCH_LENGTH = 256;
 
     // Audit types with their own tabs, kept out of the All / MCP views.
-    private static final List<String> NON_MCP_AUDIT_TYPES = Arrays.asList(McpAuditInfo.TYPE_AGENT_SKILL, Constants.AKTO_BROWSER_LLM_TAG);
+    private static final List<String> NON_MCP_AUDIT_TYPES = Arrays.asList(McpAuditInfo.TYPE_AGENT_SKILL, Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_AI_AGENT_TAG);
 
     /**
      * Escapes regex metacharacters in caller-supplied search input and caps its
@@ -499,11 +509,11 @@ public class AuditDataAction extends UserAction {
             Accumulators.max(McpAuditInfo.UPDATED_TIMESTAMP, "$" + McpAuditInfo.UPDATED_TIMESTAMP),
             Accumulators.first(McpAuditInfo.COMPONENT_RISK_ANALYSIS, "$" + McpAuditInfo.COMPONENT_RISK_ANALYSIS),
             Accumulators.first(McpAuditInfo.API_ACCESS_TYPES, "$" + McpAuditInfo.API_ACCESS_TYPES),
-            Accumulators.addToSet("remarksArr", new BasicDBObject()
+            Accumulators.addToSet("remarksArr", withScopeFields(new BasicDBObject()
                 .append(McpAuditInfo.REMARKS, "$" + McpAuditInfo.REMARKS)
                 .append(McpAuditInfo.MARKED_BY, "$" + McpAuditInfo.MARKED_BY)
                 .append(McpAuditInfo.APPROVAL_CONDITIONS, "$" + McpAuditInfo.APPROVAL_CONDITIONS)
-            ),
+            )),
             Accumulators.addToSet("groupedHostCollectionIds", "$" + McpAuditInfo.HOST_COLLECTION_ID),
             Accumulators.addToSet("groupedHexIds", new BasicDBObject("$toString", "$_id")),
             Accumulators.sum("groupedCount", 1)
@@ -584,11 +594,11 @@ public class AuditDataAction extends UserAction {
             Accumulators.max(McpAuditInfo.UPDATED_TIMESTAMP, "$" + McpAuditInfo.UPDATED_TIMESTAMP),
             Accumulators.first(McpAuditInfo.COMPONENT_RISK_ANALYSIS, "$" + McpAuditInfo.COMPONENT_RISK_ANALYSIS),
             Accumulators.first(McpAuditInfo.API_ACCESS_TYPES, "$" + McpAuditInfo.API_ACCESS_TYPES),
-            Accumulators.addToSet("remarksArr", new BasicDBObject()
+            Accumulators.addToSet("remarksArr", withScopeFields(new BasicDBObject()
                 .append(McpAuditInfo.REMARKS, "$" + McpAuditInfo.REMARKS)
                 .append(McpAuditInfo.MARKED_BY, "$" + McpAuditInfo.MARKED_BY)
                 .append(McpAuditInfo.APPROVAL_CONDITIONS, "$" + McpAuditInfo.APPROVAL_CONDITIONS)
-            ),
+            )),
             Accumulators.addToSet("groupedHostCollectionIds", "$" + McpAuditInfo.HOST_COLLECTION_ID),
             Accumulators.addToSet("groupedHexIds", new BasicDBObject("$toString", "$_id")),
             Accumulators.sum("groupedCount", 1)
@@ -657,6 +667,7 @@ public class AuditDataAction extends UserAction {
         int chosenPriority = Integer.MAX_VALUE;
         String displayRemarks = null;
         Object displayMarkedBy = null;
+        Map<String, Object> displayEntry = null;
         Object activeConditionalCond = null; // approvalConditions from the active conditional entry, if any
         Object rejectedCond = null;          // non-expired approvalConditions from any Rejected entry
 
@@ -675,6 +686,7 @@ public class AuditDataAction extends UserAction {
                 chosenPriority = p;
                 displayRemarks = r;
                 displayMarkedBy = entry.get(McpAuditInfo.MARKED_BY);
+                displayEntry = entry;
             }
         }
 
@@ -698,8 +710,21 @@ public class AuditDataAction extends UserAction {
             } else {
                 row.removeField(McpAuditInfo.APPROVAL_CONDITIONS);
             }
+            // A shown block carries its own scope, not that of a newer unblocked row in the group.
+            if (chosenPriority == 0) {
+                for (String field : SCOPE_FIELDS) row.put(field, displayEntry.get(field));
+            }
         }
         row.removeField("remarksArr");
+    }
+
+    private static final List<String> SCOPE_FIELDS = Arrays.asList(McpAuditInfo.TARGET_TAGS, McpAuditInfo.NEGATED_TARGET_TAGS,
+        McpAuditInfo.TARGET_DEVICE_IDS, McpAuditInfo.NEGATED_TARGET_DEVICE_IDS, McpAuditInfo.USER_METADATA, McpAuditInfo.NEGATED_TARGET_USER_NAMES);
+
+    // Adds each row's block scope to its remarksArr entry.
+    private static BasicDBObject withScopeFields(BasicDBObject entry) {
+        for (String field : SCOPE_FIELDS) entry.append(field, "$" + field);
+        return entry;
     }
 
     /**
@@ -857,6 +882,8 @@ public class AuditDataAction extends UserAction {
                 }
                 updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
             }
+            // Same scope on the server rows and their cascaded tools; cleared unless blocking.
+            updates.addAll(scopeUpdates());
 
             Bson combined = Updates.combine(updates);
             if (targetIds.size() == 1) {
@@ -928,10 +955,36 @@ public class AuditDataAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    // LLMs tab: same flow as fetchAuditData's flat path, pinned to type=browser-llm (one row per site).
-    // Not scoped by contextSource: rows written via mini-runtime don't carry it, and browser LLMs are endpoint-only.
+    // LLMs / AI Agents tab: browser-llm (default) or ai-agent.
+    @Setter
+    private String auditType;
+    // AI Agents tab: agents to mark, by name; they have no row until first marked.
+    @Setter
+    private List<String> resourceNames;
+    // Who a block applies to, same fields as guardrail policies; none set = everyone.
+    @Setter
+    private Map<String, List<String>> targetTags;
+    @Setter
+    private Map<String, Boolean> negatedTargetTags;
+    @Setter
+    private List<String> targetDeviceIds;
+    @Setter
+    private boolean negatedTargetDeviceIds;
+    @Setter
+    private List<String> targetUserNames;
+    @Setter
+    private boolean negatedTargetUserNames;
+
+    private String resolveAuditType() {
+        return Constants.AKTO_AI_AGENT_TAG.equals(auditType) ? Constants.AKTO_AI_AGENT_TAG : Constants.AKTO_BROWSER_LLM_TAG;
+    }
+
+    // LLMs / AI Agents tab: fetchAuditData's flat path pinned to one type; not scoped by contextSource (endpoint-only).
     public String fetchLlmAuditData() {
         try {
+            if (Constants.AKTO_AI_AGENT_TAG.equals(resolveAuditType())) {
+                return fetchAiAgentAuditData();
+            }
             if (sortKey == null || sortKey.isEmpty()) {
                 sortKey = McpAuditInfo.LAST_DETECTED;
             }
@@ -942,7 +995,7 @@ public class AuditDataAction extends UserAction {
                 skip = 0;
             }
 
-            Bson llmFilter = Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_BROWSER_LLM_TAG);
+            Bson llmFilter = Filters.eq(McpAuditInfo.TYPE, resolveAuditType());
             Bson filter = llmFilter;
 
             String safeSearch = sanitizeSearch(searchString);
@@ -984,13 +1037,20 @@ public class AuditDataAction extends UserAction {
         }
     }
 
-    // LLMs tab: same as updateAuditData for the selected rows, pinned to type=browser-llm; no MCP-only
-    // blockAll / cascade handling. Guardrails blocks prompts to Rejected sites.
+    // LLMs / AI Agents tab: updateAuditData for the selected rows of one type, without MCP blockAll / cascade.
     public String updateLlmAuditData() {
         User user = getSUser();
         String markedBy = user.getLogin();
 
         try {
+            // Only Allow / Block; guardrails enforces Rejected rows.
+            if (!McpAuditInfo.REMARKS_APPROVED.equals(remarks) && !McpAuditInfo.REMARKS_REJECTED.equals(remarks)) {
+                addActionError("Invalid status");
+                return ERROR.toUpperCase();
+            }
+            if (Constants.AKTO_AI_AGENT_TAG.equals(resolveAuditType())) {
+                return updateAiAgentAuditData(markedBy);
+            }
             List<ObjectId> targetIds = new ArrayList<>();
             if (hexIds != null) {
                 for (String h : hexIds) {
@@ -1012,25 +1072,132 @@ public class AuditDataAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
-            int currentTime = Context.now();
-            List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set(McpAuditInfo.REMARKS, remarks));
-            updates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
-            updates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, currentTime));
-            if (McpAuditInfo.REMARKS_APPROVED.equals(remarks)) {
-                updates.add(Updates.set(McpAuditInfo.APPROVED_AT, currentTime));
-            }
-            updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
-
             McpAuditInfoDao.instance.updateMany(
-                Filters.and(Filters.in(Constants.ID, targetIds), Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_BROWSER_LLM_TAG)),
-                Updates.combine(updates)
+                Filters.and(Filters.in(Constants.ID, targetIds), Filters.eq(McpAuditInfo.TYPE, resolveAuditType())),
+                Updates.combine(decisionUpdates(markedBy))
             );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error updating LLM audit data: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
         }
 
+        return SUCCESS.toUpperCase();
+    }
+
+    // Allow / Block fields shared by the LLMs and AI Agents tabs.
+    private List<Bson> decisionUpdates(String markedBy) {
+        int currentTime = Context.now();
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(McpAuditInfo.REMARKS, remarks));
+        updates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
+        updates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, currentTime));
+        if (McpAuditInfo.REMARKS_APPROVED.equals(remarks)) {
+            updates.add(Updates.set(McpAuditInfo.APPROVED_AT, currentTime));
+        }
+        updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
+        updates.addAll(scopeUpdates());
+        return updates;
+    }
+
+    // A block keeps its scope; allowing clears it, so the row applies to everyone again.
+    private List<Bson> scopeUpdates() {
+        boolean blocked = McpAuditInfo.REMARKS_REJECTED.equals(remarks);
+        List<Bson> updates = new ArrayList<>();
+        updates.add(blocked && targetTags != null && !targetTags.isEmpty()
+            ? Updates.set(McpAuditInfo.TARGET_TAGS, targetTags) : Updates.unset(McpAuditInfo.TARGET_TAGS));
+        updates.add(blocked && negatedTargetTags != null && !negatedTargetTags.isEmpty()
+            ? Updates.set(McpAuditInfo.NEGATED_TARGET_TAGS, negatedTargetTags) : Updates.unset(McpAuditInfo.NEGATED_TARGET_TAGS));
+        updates.add(blocked && targetDeviceIds != null && !targetDeviceIds.isEmpty()
+            ? Updates.set(McpAuditInfo.TARGET_DEVICE_IDS, targetDeviceIds) : Updates.unset(McpAuditInfo.TARGET_DEVICE_IDS));
+        List<AgenticUsers> userMetadata = blocked ? AgentUsersDao.instance.resolveUserMetadata(targetUserNames) : Collections.emptyList();
+        updates.add(userMetadata.isEmpty() ? Updates.unset(McpAuditInfo.USER_METADATA) : Updates.set(McpAuditInfo.USER_METADATA, userMetadata));
+        updates.add(Updates.set(McpAuditInfo.NEGATED_TARGET_DEVICE_IDS, blocked && negatedTargetDeviceIds));
+        updates.add(Updates.set(McpAuditInfo.NEGATED_TARGET_USER_NAMES, blocked && negatedTargetUserNames));
+        return updates;
+    }
+
+    // AI Agents tab: Agentic assets' agents joined with their decisions; filtered, sorted and paged in memory.
+    private String fetchAiAgentAuditData() {
+        List<McpAuditInfo> agents = new AgenticObserveAction().fetchAiAgentAuditRows();
+        Map<String, McpAuditInfo> decisions = aiAgentDecisions(agents);
+
+        List<String> remarksChoices = popListFilter(filters, McpAuditInfo.REMARKS);
+        List<String> markedByChoices = popListFilter(filters, McpAuditInfo.MARKED_BY);
+        List<String> range = popListFilter(filters, McpAuditInfo.LAST_DETECTED);
+        double from = range != null && range.size() == 2 ? Double.parseDouble(range.get(0)) : Double.NEGATIVE_INFINITY;
+        double to = range != null && range.size() == 2 ? Double.parseDouble(range.get(1)) : Double.POSITIVE_INFINITY;
+        String search = StringUtils.trimToEmpty(searchString).toLowerCase(Locale.ROOT);
+        boolean onlyBlocked = remarksChoices != null && remarksChoices.size() == 1 && McpAuditInfo.REMARKS_REJECTED.equals(remarksChoices.get(0));
+        boolean onlyAllowed = remarksChoices != null && remarksChoices.size() == 1 && !onlyBlocked;
+
+        List<McpAuditInfo> rows = new ArrayList<>();
+        Set<String> markedByUsers = new TreeSet<>();
+        for (McpAuditInfo agent : agents) {
+            McpAuditInfo row = decisions.getOrDefault(agent.getResourceName(), agent);
+            row.setLastDetected(agent.getLastDetected());
+            if (StringUtils.isNotBlank(row.getMarkedBy())) markedByUsers.add(row.getMarkedBy());
+            boolean blocked = McpAuditInfo.REMARKS_REJECTED.equals(row.getRemarks());
+            if ((onlyBlocked && !blocked) || (onlyAllowed && blocked)) continue;
+            if (markedByChoices != null && !markedByChoices.contains(row.getMarkedBy())) continue;
+            if (row.getLastDetected() < from || row.getLastDetected() > to) continue;
+            if (!search.isEmpty() && !row.getResourceName().toLowerCase(Locale.ROOT).contains(search)
+                    && !McpClientRegistry.formatDisplayName(row.getResourceName()).toLowerCase(Locale.ROOT).contains(search)) continue;
+            rows.add(row);
+        }
+
+        Comparator<McpAuditInfo> order = McpAuditInfo.UPDATED_TIMESTAMP.equals(sortKey)
+            ? Comparator.comparingInt(McpAuditInfo::getUpdatedTimestamp)
+            : Comparator.comparingInt(McpAuditInfo::getLastDetected);
+        rows.sort(sortOrder == 1 ? order : order.reversed());
+
+        this.total = rows.size();
+        int start = Math.min(Math.max(skip, 0), rows.size());
+        this.auditData = rows.subList(start, Math.min(start + (limit > 0 ? limit : 20), rows.size()));
+        auditFilterOptions = new BasicDBObject();
+        auditFilterOptions.put("markedBy", new ArrayList<>(markedByUsers));
+        return SUCCESS.toUpperCase();
+    }
+
+    // Decision rows of these agents; adds names picked up since marking so guardrails keeps matching them.
+    private static Map<String, McpAuditInfo> aiAgentDecisions(List<McpAuditInfo> agents) {
+        Map<String, List<String>> rawValuesByName = new HashMap<>();
+        for (McpAuditInfo agent : agents) rawValuesByName.put(agent.getResourceName(), agent.getRawValues());
+        Map<String, McpAuditInfo> decisions = new HashMap<>();
+        List<WriteModel<McpAuditInfo>> writes = new ArrayList<>();
+        for (McpAuditInfo d : McpAuditInfoDao.instance.findAll(Filters.and(
+                Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_AI_AGENT_TAG), Filters.in(McpAuditInfo.RESOURCE_NAME, rawValuesByName.keySet())))) {
+            decisions.put(d.getResourceName(), d);
+            List<String> raws = rawValuesByName.get(d.getResourceName());
+            if (d.getRawValues() == null || !d.getRawValues().containsAll(raws)) {
+                writes.add(new UpdateOneModel<>(Filters.eq(Constants.ID, d.getId()), Updates.addEachToSet(McpAuditInfo.RAW_VALUES, raws)));
+            }
+        }
+        if (!writes.isEmpty()) {
+            McpAuditInfoDao.instance.getMCollection().bulkWrite(writes, new BulkWriteOptions().ordered(false));
+        }
+        return decisions;
+    }
+
+    // AI Agents tab: upserts each selected agent's decision row; unknown names are ignored.
+    private String updateAiAgentAuditData(String markedBy) {
+        Set<String> selected = resourceNames == null ? Collections.emptySet() : new HashSet<>(resourceNames);
+        List<WriteModel<McpAuditInfo>> writes = new ArrayList<>();
+        List<Bson> decision = decisionUpdates(markedBy);
+        for (McpAuditInfo agent : new AgenticObserveAction().fetchAiAgentAuditRows()) {
+            if (!selected.contains(agent.getResourceName())) continue;
+            List<Bson> updates = new ArrayList<>(decision);
+            updates.add(Updates.max(McpAuditInfo.LAST_DETECTED, agent.getLastDetected()));
+            updates.add(Updates.addEachToSet(McpAuditInfo.RAW_VALUES, agent.getRawValues()));
+            updates.add(Updates.setOnInsert(McpAuditInfo.CONTEXT_SOURCE, CONTEXT_SOURCE.ENDPOINT.name()));
+            writes.add(new UpdateOneModel<>(
+                Filters.and(Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_AI_AGENT_TAG), Filters.eq(McpAuditInfo.RESOURCE_NAME, agent.getResourceName())),
+                Updates.combine(updates), new UpdateOptions().upsert(true)));
+        }
+        if (writes.isEmpty()) {
+            addActionError("No AI agent selected");
+            return ERROR.toUpperCase();
+        }
+        McpAuditInfoDao.instance.getMCollection().bulkWrite(writes, new BulkWriteOptions().ordered(false));
         return SUCCESS.toUpperCase();
     }
 

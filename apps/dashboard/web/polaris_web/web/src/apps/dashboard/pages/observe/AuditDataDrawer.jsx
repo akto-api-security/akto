@@ -103,6 +103,7 @@ function AuditDataDrawer({
     startTimestamp,
     endTimestamp,
     onRequestConditional,
+    onRequestBlock,
     onAfterUpdate,
     onAddToAllowlist,
     isEndpointSecurity,
@@ -165,13 +166,14 @@ function AuditDataDrawer({
         ? auditItem.groupedHostCollectionIds
         : null
 
-    const updateServer = async (remarks) => {
+    // scope: who a block applies to (see BlockScopeModal); empty = everyone.
+    const updateServer = async (remarks, scope = {}) => {
         if (!auditItem) return
         setBusy(true)
         try {
             await api.updateAuditData(
                 auditItem.hexId, remarks, null,
-                auditItem.groupedHexIds, cascadeIds, null
+                auditItem.groupedHexIds, cascadeIds, null, scope
             )
             func.setToast(true, false, `Server ${remarks === "Approved" ? "allowed" : remarks === "Rejected" ? "blocked" : "updated"}`)
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
@@ -182,7 +184,7 @@ function AuditDataDrawer({
         }
     }
 
-    const blockForAllAgents = async () => {
+    const blockForAllAgents = async (scope = {}) => {
         if (!auditItem) return
         const serverName = auditItem.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : null
         if (!serverName) {
@@ -193,7 +195,7 @@ function AuditDataDrawer({
         try {
             await api.updateAuditData(
                 auditItem.hexId, "Rejected", null,
-                auditItem.groupedHexIds, cascadeIds, serverName
+                auditItem.groupedHexIds, cascadeIds, serverName, scope
             )
             func.setToast(true, false, "Server blocked for all agents")
             if (typeof onAfterUpdate === "function") onAfterUpdate("server")
@@ -272,6 +274,7 @@ function AuditDataDrawer({
         addHandlerAvailable: typeof onAddToAllowlist === "function",
     })
 
+    const serverDisplayName = auditItem?.mcpServerName && auditItem.mcpServerName !== "-" ? auditItem.mcpServerName : "this server"
     const serverActionItems = withPermissions([
         {
             content: "Allow this server",
@@ -282,14 +285,19 @@ function AuditDataDrawer({
         {
             content: "Block this server",
             destructive: true,
-            onAction: () => updateServer("Rejected"),
+            // Blocks go through the parent's Block dialog, which asks who the block applies to.
+            onAction: () => typeof onRequestBlock === "function"
+                ? onRequestBlock(serverDisplayName, (scope) => updateServer("Rejected", scope))
+                : updateServer("Rejected"),
             disabled: !flags.block,
             requires: 'api/updateAuditData',
         },
         {
             content: "Block for all agents",
             destructive: true,
-            onAction: () => blockForAllAgents(),
+            onAction: () => typeof onRequestBlock === "function"
+                ? onRequestBlock(serverDisplayName, (scope) => blockForAllAgents(scope), true)
+                : blockForAllAgents(),
             requires: 'api/updateAuditData',
         },
         {

@@ -2352,7 +2352,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User updated LLM access in audit data</param>
+                <param name="actionDescription">User updated LLM / AI agent access in audit data</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
