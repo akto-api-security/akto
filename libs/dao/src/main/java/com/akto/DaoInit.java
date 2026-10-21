@@ -533,6 +533,7 @@ public class DaoInit {
         AwsApiGatewayLogsDao.instance.createIndicesIfAbsent();
         GuardrailsServiceLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
+        MiniTestingOrchestratorLogsDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
         LoadersDao.instance.createIndicesIfAbsent();
         TestingRunResultDao.instance.createIndicesIfAbsent();
