@@ -563,6 +563,7 @@ public class Main {
         AllMetrics.instance.init(LogDb.TESTING, false, dataActor, Context.getActualAccountId(), customMiniTestingServiceName, ModuleInfo.ModuleType.MINI_TESTING.name());
 
         if(currentTestInfo != null){
+            OrchestratorControl.markResuming();
             try {
                 loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId);
                 Organization organization = OrgUtils.getOrganizationCached(accountId);
@@ -600,6 +601,12 @@ public class Main {
         singleTypeInfoInit(accountId);
 
         while (true) {
+            if (!OrchestratorControl.tryStartPolling()) {
+                // drained by mini-testing-orchestrator ahead of a scale-down: claim nothing
+                PrometheusMetricsHandler.markModuleIdle();
+                Thread.sleep(1000);
+                continue;
+            }
             TestExecutor testExecutor = new TestExecutor();
             // Reset current execution fallback flag for new test cycle
             testExecutor.resetCurrentExecutionFallback();
@@ -630,6 +637,7 @@ public class Main {
             }
 
             if (testingRun == null) {
+                OrchestratorControl.markPollIdle();
                 Thread.sleep(1000);
                 continue;
             }
@@ -641,14 +649,17 @@ public class Main {
                         .filter(Objects::nonNull)
                         .anyMatch(name -> name.equalsIgnoreCase(customMiniTestingServiceName));
                 if (!eligible) {
+                    OrchestratorControl.markPollIdle();
                     Thread.sleep(1000);
                     continue;
                 }
             } else if (testingRun.getMiniTestingServiceName() != null
                     && !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName)) {
+                OrchestratorControl.markPollIdle();
                 Thread.sleep(1000);
                 continue;
             }
+            OrchestratorControl.markRunClaimed();
 
             if (handleRerunTestingRunResult(trrs)) {
                 continue;
