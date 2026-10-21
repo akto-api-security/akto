@@ -17,8 +17,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Records per-request Prometheus metrics for /api/* traffic: count, latency, response size, and
@@ -34,13 +35,19 @@ public class InfraMetricsFilter implements Filter {
     private static final LoggerMaker loggerMaker = new LoggerMaker(InfraMetricsFilter.class, LogDb.DB_ABS);
 
     /**
-     * Captures the HTTP status set downstream (defaults to 200 when nothing sets it) and counts the
-     * bytes written to the response body. The writer is routed through the counting stream so chars
-     * are counted as encoded bytes.
+     * Captures the HTTP status set downstream (defaults to 200 when nothing sets it) and the response
+     * body size. The size comes from setContentLength when the app declares it (Struts' JSONUtil does,
+     * with the exact encoded byte count), so the common path does no per-byte work; only responses
+     * without a Content-Length (gzip/streamed) are counted as they're written.
+     *
+     * Neither the stream nor the writer buffers anything of its own: every write goes straight to the
+     * container, so flush/reset/sendError behave exactly as unwrapped (Struts' JSONUtil never flushes
+     * its writer; the container does at end of request).
      */
     private static class StatusCapturingResponse extends HttpServletResponseWrapper {
         private int status = HttpServletResponse.SC_OK;
         private long bytesWritten = 0;
+        private long contentLength = -1; // -1 = not declared; count bytes as they're written
         private ServletOutputStream countingStream;
         private PrintWriter countingWriter;
 
@@ -54,19 +61,25 @@ public class InfraMetricsFilter implements Filter {
         @SuppressWarnings("deprecation")
         public void setStatus(int sc, String sm) { this.status = sc; super.setStatus(sc, sm); }
 
-        @Override public void sendError(int sc) throws IOException { this.status = sc; super.sendError(sc); }
+        @Override public void sendError(int sc) throws IOException { this.status = sc; this.contentLength = -1; super.sendError(sc); }
 
-        @Override public void sendError(int sc, String msg) throws IOException { this.status = sc; super.sendError(sc, msg); }
+        @Override public void sendError(int sc, String msg) throws IOException { this.status = sc; this.contentLength = -1; super.sendError(sc, msg); }
 
         @Override public void sendRedirect(String location) throws IOException { this.status = HttpServletResponse.SC_FOUND; super.sendRedirect(location); }
+
+        @Override public void setContentLength(int len) { this.contentLength = len; super.setContentLength(len); }
+
+        @Override public void reset() { this.contentLength = -1; this.bytesWritten = 0; super.reset(); }
+
+        @Override public void resetBuffer() { this.bytesWritten = 0; super.resetBuffer(); }
 
         @Override
         public ServletOutputStream getOutputStream() throws IOException {
             if (countingStream == null) {
                 final ServletOutputStream delegate = super.getOutputStream();
                 countingStream = new ServletOutputStream() {
-                    @Override public void write(int b) throws IOException { delegate.write(b); bytesWritten++; }
-                    @Override public void write(byte[] b, int off, int len) throws IOException { delegate.write(b, off, len); bytesWritten += len; }
+                    @Override public void write(int b) throws IOException { delegate.write(b); if (contentLength < 0) bytesWritten++; }
+                    @Override public void write(byte[] b, int off, int len) throws IOException { delegate.write(b, off, len); if (contentLength < 0) bytesWritten += len; }
                     @Override public void flush() throws IOException { delegate.flush(); }
                     @Override public void close() throws IOException { delegate.close(); }
                 };
@@ -77,23 +90,98 @@ public class InfraMetricsFilter implements Filter {
         @Override
         public PrintWriter getWriter() throws IOException {
             if (countingWriter == null) {
-                countingWriter = new PrintWriter(new OutputStreamWriter(getOutputStream(), getCharacterEncoding()));
+                countingWriter = new CountingPrintWriter(super.getWriter(), getCharacterEncoding());
             }
             return countingWriter;
         }
 
-        @Override
-        public void flushBuffer() throws IOException {
-            if (countingWriter != null) countingWriter.flush();
-            super.flushBuffer();
-        }
-
         int getCapturedStatus() { return status; }
 
-        /** Flushes any buffered writer chars first so they're counted. */
-        long getBytesWritten() {
-            if (countingWriter != null) countingWriter.flush();
-            return bytesWritten;
+        /** Declared Content-Length when set, otherwise the bytes counted while writing. */
+        long getBytesWritten() { return contentLength >= 0 ? contentLength : bytesWritten; }
+
+        /**
+         * Pass-through writer over the container's writer that counts the bytes the chars will encode
+         * to. UTF-8 and single-byte charsets are counted by scanning chars in place (no per-write
+         * allocation); any other charset falls back to encoding the chunk.
+         */
+        private final class CountingPrintWriter extends PrintWriter {
+            private final boolean utf8;
+            private final Charset otherCharset; // null for UTF-8 and single-byte charsets
+            private boolean pendingHighSurrogate;
+
+            CountingPrintWriter(PrintWriter delegate, String encoding) {
+                super(delegate);
+                Charset charset;
+                try {
+                    charset = Charset.forName(encoding == null ? "ISO-8859-1" : encoding); // servlet default
+                } catch (Exception e) {
+                    charset = StandardCharsets.UTF_8;
+                }
+                this.utf8 = StandardCharsets.UTF_8.equals(charset);
+                boolean singleByte = StandardCharsets.ISO_8859_1.equals(charset) || StandardCharsets.US_ASCII.equals(charset);
+                this.otherCharset = (utf8 || singleByte) ? null : charset;
+            }
+
+            @Override
+            public void write(int c) {
+                super.write(c);
+                if (contentLength >= 0) return;
+                if (otherCharset != null) {
+                    bytesWritten += String.valueOf((char) c).getBytes(otherCharset).length;
+                } else {
+                    count((char) c);
+                }
+            }
+
+            @Override
+            public void write(char[] buf, int off, int len) {
+                super.write(buf, off, len);
+                if (contentLength >= 0) return;
+                if (otherCharset != null) {
+                    bytesWritten += new String(buf, off, len).getBytes(otherCharset).length;
+                    return;
+                }
+                for (int i = off; i < off + len; i++) count(buf[i]);
+            }
+
+            @Override
+            public void write(String str, int off, int len) {
+                super.write(str, off, len);
+                if (contentLength >= 0) return;
+                if (otherCharset != null) {
+                    bytesWritten += str.substring(off, off + len).getBytes(otherCharset).length;
+                    return;
+                }
+                for (int i = off; i < off + len; i++) count(str.charAt(i));
+            }
+
+            // PrintWriter.println() writes the separator straight to the delegate; route it through write().
+            @Override
+            public void println() {
+                write(System.lineSeparator());
+            }
+
+            private void count(char c) {
+                if (!utf8) {
+                    bytesWritten++;
+                    return;
+                }
+                if (pendingHighSurrogate) {
+                    pendingHighSurrogate = false;
+                    if (Character.isLowSurrogate(c)) return; // pair already counted as 4 bytes
+                }
+                if (c < 0x80) {
+                    bytesWritten += 1;
+                } else if (c < 0x800) {
+                    bytesWritten += 2;
+                } else if (Character.isHighSurrogate(c)) {
+                    bytesWritten += 4;
+                    pendingHighSurrogate = true;
+                } else {
+                    bytesWritten += 3;
+                }
+            }
         }
     }
 
@@ -128,9 +216,12 @@ public class InfraMetricsFilter implements Filter {
                 String accountId = acc != null ? String.valueOf(acc) : CyborgMetrics.UNKNOWN;
 
                 CyborgMetrics.recordHttpRequest(uri, method, status, accountId, duration);
-                CyborgMetrics.recordHttpResponseSize(uri, method, status, wrapped.getBytesWritten());
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, String.format("InfraMetricsFilter error: %s", e.toString()), LogDb.DB_ABS);
+                long responseBytes = wrapped.getBytesWritten();
+                if (responseBytes > 0) { // 0 = no app-written body (container error page etc.); don't skew the size histogram
+                    CyborgMetrics.recordHttpResponseSize(uri, method, status, responseBytes);
+                }
+            } catch (Throwable t) { // metrics must never fail the request, not even on an Error
+                loggerMaker.errorAndAddToDb(String.format("InfraMetricsFilter error: %s", t), LogDb.DB_ABS);
             }
         }
     }
