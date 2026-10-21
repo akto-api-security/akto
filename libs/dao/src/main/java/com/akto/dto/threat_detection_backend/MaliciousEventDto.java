@@ -39,10 +39,11 @@ public class MaliciousEventDto {
   // Bedrock caller ARN + prompt hash: events with the same key close together in time are one activity.
   private String groupKey;
   // Set only by the grouped activity list (never stored): how many events are behind this row, the first
-  // one's time, and their ids.
+  // one's time, their ids, and the policies they tripped.
   private Integer groupCount;
   private Long groupFirstDetectedAt;
   private List<String> groupEventIds;
+  private List<String> groupFilterIds;
   public static final String HUMAN_RESPONSE = "humanResponse";
   @JsonProperty("humanResponse")
   private String humanResponse;
@@ -570,6 +571,14 @@ public class MaliciousEventDto {
 
   public void setGroupEventIds(List<String> groupEventIds) {
     this.groupEventIds = groupEventIds;
+  }
+
+  public List<String> getGroupFilterIds() {
+    return groupFilterIds;
+  }
+
+  public void setGroupFilterIds(List<String> groupFilterIds) {
+    this.groupFilterIds = groupFilterIds;
   }
 
   public String getHumanResponse() {

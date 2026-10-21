@@ -672,7 +672,7 @@ public class MaliciousEventService {
 
     // Repeated Bedrock activities (same caller and prompt within the gap) are listed as one row.
     boolean groupActivities = ThreatUtils.groupsActivities(accountId) && "AGENTIC".equalsIgnoreCase(contextSource)
-        && !dedupeLatestPerHostActorEndpoint;
+        && !dedupeLatestPerHostActorEndpoint && !(filter.hasUngroupActivities() && filter.getUngroupActivities());
 
     Document dedupeGroupKey = new Document("host", "$host")
         .append("actor", "$actor")
@@ -799,11 +799,13 @@ public class MaliciousEventService {
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .setSessionId(resolvedSessionId);
         if (evt.getGroupKey() != null && evt.getGroupCount() != null) {
-          builder.setGroupKey(evt.getGroupKey())
-              .setGroupCount(evt.getGroupCount())
+          builder.setGroupCount(evt.getGroupCount())
               .setGroupFirstDetectedAt(evt.getGroupFirstDetectedAt() != null ? evt.getGroupFirstDetectedAt() : evt.getDetectedAt());
           if (evt.getGroupEventIds() != null) {
             builder.addAllGroupEventIds(evt.getGroupEventIds());
+          }
+          if (evt.getGroupFilterIds() != null) {
+            builder.addAllGroupFilterIds(evt.getGroupFilterIds());
           }
         }
         if (!minimalFields) {
@@ -1141,24 +1143,23 @@ public class MaliciousEventService {
     return new Document("$let", new Document("vars", new Document("m", regexFind)).append("in", inExpr));
   }
 
-  // Gives activities stored before grouping existed their groupKey, so they group like new ones. Only
-  // keyless events that can carry a Bedrock ARN are read, so running it again is safe; undo with
-  // $unset groupKey.
+  // Gives stored activities the current groupKey, so they group like new ones: events from before
+  // grouping existed, and events keyed by an earlier version of the key. Only events whose key changes
+  // are written, so running it again is safe; undo with $unset groupKey.
   public int backfillActivityGroupKeys(String accountId) {
     if (!ThreatUtils.groupsActivities(accountId)) {
       return 0;
     }
     createIndexIfAbsent(accountId);
     MongoCollection<Document> events = maliciousEventDao.getCollection(accountId).withDocumentClass(Document.class);
-    Document keyless = new Document("groupKey", new Document("$exists", false))
-        .append("latestApiOrig", new Document("$regex", "bedrock-identity-arn"));
+    Document bedrockEvents = new Document("latestApiOrig", new Document("$regex", "bedrock-identity-arn"));
     int updated = 0;
     List<WriteModel<Document>> batch = new ArrayList<>();
-    try (MongoCursor<Document> cursor = events.find(keyless).projection(Projections.include("_id", "latestApiOrig")).batchSize(500).cursor()) {
+    try (MongoCursor<Document> cursor = events.find(bedrockEvents).projection(Projections.include("_id", "latestApiOrig", "groupKey")).batchSize(500).cursor()) {
       while (cursor.hasNext()) {
         Document event = cursor.next();
         String groupKey = ThreatUtils.activityGroupKey(event.getString("latestApiOrig"));
-        if (groupKey == null) {
+        if (groupKey == null || groupKey.equals(event.getString("groupKey"))) {
           continue;
         }
         batch.add(new UpdateOneModel<>(Filters.eq("_id", event.get("_id")), Updates.set("groupKey", groupKey)));

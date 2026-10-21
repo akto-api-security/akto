@@ -392,9 +392,10 @@ public class ThreatUtils {
     /**
      * Pipeline stages that turn matching events into activity rows. Events with the same groupKey whose
      * detectedAt is within ACTIVITY_GROUP_GAP_SECONDS of the previous one form one row: the latest event,
-     * plus groupCount, groupFirstDetectedAt and groupEventIds (every event in it, so actions on the row
-     * reach exactly the events the current filters grouped). Events without a groupKey stay one row each. The stored
-     * payload is dropped first; the list never returns it and it is most of each event's size.
+     * plus groupCount, groupFirstDetectedAt, groupEventIds (every event in it, so actions on the row reach
+     * exactly the events the current filters grouped) and groupFilterIds (the policies they tripped).
+     * Events without a groupKey stay one row each. The stored payload is dropped first; the list never
+     * returns it and it is most of each event's size.
      */
     public static List<Document> activityGroupStages(Document query) {
         Document hasKey = new Document("$eq", Arrays.asList(new Document("$type", "$groupKey"), "string"));
@@ -419,10 +420,11 @@ public class ThreatUtils {
                 .append("doc", new Document("$first", "$$ROOT"))
                 .append("groupCount", new Document("$sum", 1))
                 .append("groupFirstDetectedAt", new Document("$min", "$detectedAt"))
-                .append("groupEventIds", new Document("$push", "$_id"))),
+                .append("groupEventIds", new Document("$push", "$_id"))
+                .append("groupFilterIds", new Document("$addToSet", "$filterId"))),
             new Document("$replaceRoot", new Document("newRoot", new Document("$mergeObjects", Arrays.asList("$doc",
                 new Document("groupCount", "$groupCount").append("groupFirstDetectedAt", "$groupFirstDetectedAt")
-                    .append("groupEventIds", "$groupEventIds"))))),
+                    .append("groupEventIds", "$groupEventIds").append("groupFilterIds", "$groupFilterIds"))))),
             new Document("$unset", Arrays.asList("prevDetectedAt", "startsActivity", "activityNo"))
         );
     }
@@ -434,8 +436,8 @@ public class ThreatUtils {
 
     /**
      * Grouping key of a guardrail activity: the Bedrock caller ARN (bedrock-identity-arn request header)
-     * plus the prompt (requestPayload) of its stored envelope. Null when the envelope carries no ARN, so
-     * only Bedrock activities are ever grouped.
+     * plus the normalized prompt (requestPayload) of its stored envelope. Null when the envelope carries
+     * no ARN, so only Bedrock activities are ever grouped.
      */
     public static String activityGroupKey(String envelope) {
         if (envelope == null || envelope.isEmpty()) {
@@ -458,10 +460,29 @@ public class ThreatUtils {
             if (!(arn instanceof String) || ((String) arn).isEmpty()) {
                 return null;
             }
-            return UUID.nameUUIDFromBytes((arn + "\n" + prompt).getBytes(StandardCharsets.UTF_8)).toString();
+            return UUID.nameUUIDFromBytes((arn + "\n" + normalizePrompt((String) prompt)).getBytes(StandardCharsets.UTF_8)).toString();
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static final Pattern REDACTION_MARKER = Pattern.compile("\\[[a-z_]*redacted[a-z_]*\\]");
+    private static final Pattern LONG_ID = Pattern.compile("\\b[0-9a-f]{8}(-?[0-9a-f]{4}){3}-?[0-9a-f]{12}\\b|\\b[0-9a-f]{12,}\\b");
+    private static final Pattern NOT_LETTERS = Pattern.compile("[^a-z]+");
+    private static final int PROMPT_WORDS_COMPARED = 40;
+
+    // An agent's repeated prompt differs only in what it fills in on each step (turn numbers, ids,
+    // redacted values, the data it pastes after its instructions), so only the words of its opening
+    // are compared: same opening words in the same order is the same prompt.
+    static String normalizePrompt(String prompt) {
+        String text = prompt.toLowerCase(Locale.ROOT);
+        text = REDACTION_MARKER.matcher(text).replaceAll(" ");
+        text = LONG_ID.matcher(text).replaceAll(" ");
+        String words = NOT_LETTERS.matcher(text).replaceAll(" ").trim();
+        // No words left (only numbers or ids): compare the prompt as it is rather than as empty.
+        if (words.isEmpty()) return prompt;
+        String[] split = words.split(" ", PROMPT_WORDS_COMPARED + 1);
+        return split.length <= PROMPT_WORDS_COMPARED ? words : String.join(" ", Arrays.copyOf(split, PROMPT_WORDS_COMPARED));
     }
 
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
