@@ -74,7 +74,7 @@ public abstract class AzureOpenAIPromptHandler {
         
         payload.put("messages", messages);
         synchronized (PromptHandler.llmLock) {
-            return DataActorFactory.fetchInstance().getLLMResponseV2(payload);
+            return DataActorFactory.fetchInstance().getLLMResponseV2(payload, "mini-testing-test-editor");
         }
     }
     

@@ -740,7 +740,7 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public String getLLMResponseV2(JSONObject promptPayload) {
+    public String getLLMResponseV2(JSONObject promptPayload, String serviceKey) {
         // no implementation needed.
         return null;
     }
