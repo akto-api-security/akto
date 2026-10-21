@@ -246,6 +246,42 @@ class HttpCallParserAiAgentCallerTest {
                 "the agentic tag lives on the host collection; a colliding hostName must not hide it");
     }
 
+
+    /**
+     * Read and write inside updateApiCollectionTags must resolve to the same document. The write
+     * goes to hostName.hashCode(); if the read came from hostNameToIdMap it could land on a
+     * service-tag collection sharing that hostname, and that collection's tags were then written
+     * over the host collection - destroying its agentic classification and copying across tags that
+     * belong to a different service.
+     */
+    @Test
+    void outboundCallDoesNotOverwriteTheCalleesOwnTags() {
+        String sharedHost = "vector-store.internal.svc";
+        int hostId = seedCallee(sharedHost, Constants.AKTO_RAG_DATABASE_TAG);
+
+        int otherId = ApiCollection.generateServiceTagCollectionId("search-service");
+        ApiCollection other = new ApiCollection(otherId, "search-service", Context.now(),
+                new HashSet<>(), sharedHost, 0, false, true);
+        other.setServiceTag("search-service");
+        other.setTagsList(new ArrayList<>(Collections.singletonList(
+                new CollectionTags(Context.now(), "team", "search", CollectionTags.TagSource.KUBERNETES))));
+        other.setHostNames(new ArrayList<>());
+        ApiCollectionsDao.instance.insertOne(other);
+
+        newParser().createApiCollectionId(
+                request(sharedHost, "/v1/documents/search", OUTBOUND, "catalog-service"));
+
+        ApiCollection callee = ApiCollectionsDao.instance.findOne(Filters.eq("_id", hostId));
+        List<String> keys = new ArrayList<>();
+        callee.getTagsList().forEach(t -> keys.add(t.getKeyName()));
+        assertTrue(keys.contains(Constants.AKTO_RAG_DATABASE_TAG),
+                "an outbound call must not strip the callee's own agentic tag");
+        assertFalse(keys.contains("team"),
+                "another collection's tags must not be copied onto the callee");
+        assertFalse(keys.contains(Constants.AKTO_AI_AGENT_CALLER_TAG),
+                "ai-agent-caller belongs on the caller, never on the host that was called");
+    }
+
     // ---------- guards that must still hold ----------
 
     @Test

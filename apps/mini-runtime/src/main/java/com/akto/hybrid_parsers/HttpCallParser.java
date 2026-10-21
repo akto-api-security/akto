@@ -1382,7 +1382,20 @@ public class HttpCallParser {
      * @param httpResponseParams
      */
     public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams, String accessType) {
-        int apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
+        // The host branch below writes to createCollectionBasedOnHostName(hostNameMapKey.hashCode()),
+        // so the id read here has to be the same document or one collection's tags get written onto
+        // another. hostName is not unique - a service-tag collection also records the host it was
+        // seen on - and hostNameToIdMap keeps one id per host, so for a shared hostname it can
+        // resolve to the wrong collection, and which one wins depends on load order. Prefer the
+        // host collection's own id, falling back to the map (and leaving the NON_HOSTNAME_KEY
+        // branch, which writes by vxlanId, untouched).
+        int apiCollectionId;
+        if (!hostNameMapKey.contains(NON_HOSTNAME_KEY)
+                && apiCollectionsMap.containsKey(hostNameMapKey.hashCode())) {
+            apiCollectionId = hostNameMapKey.hashCode();
+        } else {
+            apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
+        }
         updateApiCollectionTags(apiCollectionId, httpResponseParams, hostNameMapKey, false, accessType);
     }
 
