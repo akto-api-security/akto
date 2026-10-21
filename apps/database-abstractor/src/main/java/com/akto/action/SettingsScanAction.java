@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.llm.ModelTier;
+import com.akto.llm.ServiceKey;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.google.gson.Gson;
@@ -273,9 +275,8 @@ public class SettingsScanAction extends ActionSupport {
         Map<String, Object> payload = new HashMap<>();
         payload.put("messages", messages);
         payload.put("temperature", 0);
-        payload.put("max_tokens", 16000);
-
-        Map<String, Object> llmResponse = LLMService.callLLM(payload);
+        payload.put("max_tokens", ServiceKey.ENDPOINT_SHIELD_SETTINGS_SCAN.getMaxTokens());
+        Map<String, Object> llmResponse = LLMService.callLLM(payload, ServiceKey.ENDPOINT_SHIELD_SETTINGS_SCAN, ModelTier.GPT_4O_MINI);
         if (llmResponse == null) throw new RuntimeException("Empty LLM response");
 
         List<Map<String, Object>> choices = (List<Map<String, Object>>) llmResponse.get("choices");
