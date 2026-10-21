@@ -1582,7 +1582,14 @@ public class HttpCallParser {
             // attribution must not depend on that entitlement (it adds a tag to the CALLER and
             // never makes a collection gen-ai/mcp, so it cannot move a collection between quotas),
             // hence the ungated re-check. Short-circuits for entitled accounts.
+            // The two checks above re-derive "is the callee an AI asset" from THIS request, so a
+            // caller is only attributed when the request it happened to make matches an LLM rule
+            // literally. A host Akto has already classified does not count - which is why a caller
+            // on /chat/completions was dropped while one on /v1/chat/completions was tagged, same
+            // gateway. Consulting the callee's stored tag covers all three agentic families, and is
+            // immune to path variation and to body redaction.
             if (isAgenticEndpoint
+                    || calleeIsKnownAgentic(hostName)
                     || GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParam).getFirst()) {
                 markAiAgentCaller(httpResponseParam, tagsMap, direction, hostName);
             }
@@ -2281,6 +2288,41 @@ public class HttpCallParser {
      * the pod that made the call. The callee is identified by its Host header and tagged by the
      * normal gen-ai / mcp-server / rag flow; this only annotates the other side of the call.
      */
+    private static final List<String> AGENTIC_COLLECTION_TAGS = Arrays.asList(
+            Constants.AKTO_GEN_AI_TAG, Constants.AKTO_MCP_SERVER_TAG, Constants.AKTO_RAG_DATABASE_TAG);
+
+    /**
+     * True when the host being called already carries gen-ai / mcp-server / rag-database on its own
+     * collection. Purely a lookup of what Akto has already decided about the callee - it never
+     * classifies anything, so it cannot move a collection between quota buckets.
+     *
+     * Mixed hosts get split into "<host>-agentic", so check that variant too: the agentic tag can
+     * live on either document depending on which one the detection landed on.
+     */
+    private boolean calleeIsKnownAgentic(String calleeHost) {
+        if (calleeHost == null || calleeHost.isEmpty()) {
+            return false;
+        }
+        return hasAgenticTag(calleeHost) || hasAgenticTag(calleeHost + AGENTIC_COLLECTION_PREFIX);
+    }
+
+    private boolean hasAgenticTag(String hostName) {
+        Integer collectionId = hostNameToIdMap.get(hostName);
+        if (collectionId == null) {
+            return false;
+        }
+        ApiCollection collection = apiCollectionsMap.get(collectionId);
+        if (collection == null || collection.getTagsList() == null) {
+            return false;
+        }
+        for (CollectionTags tag : collection.getTagsList()) {
+            if (AGENTIC_COLLECTION_TAGS.contains(tag.getKeyName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void markAiAgentCaller(HttpResponseParams httpResponseParams, Map<String, String> tagsMap,
             String direction, String calleeHost) {
         // Every early return below logs, so a missing tag can be traced to one branch. The
@@ -2305,12 +2347,20 @@ public class HttpCallParser {
         int callerCollectionId = ApiCollection.generateServiceTagCollectionId(callerService);
         ApiCollection callerCollection = apiCollectionsMap.get(callerCollectionId);
         if (callerCollection == null) {
-            // The caller has no collection of its own - nothing calls it, so its inbound traffic
-            // never created one. createCollectionForServiceTag upserts, so writing here would
-            // materialise an empty collection; skip and log so the gap is measurable.
+            // The caller has no collection of its own: createApiCollectionIdByServiceTag only runs
+            // on inbound traffic, so a service that merely CALLS things never gets one. Dropping
+            // the signal here loses the only record that this service uses AI, so create a stub
+            // instead - createCollectionForServiceTag below upserts it. Reached at most once per
+            // caller (alreadyTagged and the sync window guard the rest), and only when the callee
+            // is a confirmed AI asset, so this cannot materialise a collection per unlabelled peer.
             loggerMaker.infoAndAddToDb("ai-agent-caller: no collection " + callerCollectionId
-                    + " for caller service " + callerService + ", skipping");
-            return;
+                    + " for caller service " + callerService + ", creating stub. callee=" + calleeHost);
+            callerCollection = new ApiCollection(callerCollectionId, callerService, Context.now(),
+                    new HashSet<>(), null, 0, false, true);
+            callerCollection.setServiceTag(callerService);
+            callerCollection.setTagsList(new ArrayList<>());
+            // setOnInsert writes whatever it is handed, so hand it an empty list rather than null.
+            callerCollection.setHostNames(new ArrayList<>());
         }
 
         List<CollectionTags> existingTags = callerCollection.getTagsList();
