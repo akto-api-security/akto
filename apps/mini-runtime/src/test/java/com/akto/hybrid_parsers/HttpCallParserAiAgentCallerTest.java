@@ -215,6 +215,36 @@ class HttpCallParserAiAgentCallerTest {
         assertNotNull(callerTag(callerId), "a known mcp-server destination should attribute its caller");
     }
 
+    /**
+     * hostName is not unique: a service-tag collection also records the host it was seen on, so
+     * several documents can share one hostName and hostNameToIdMap (one id per host) keeps only the
+     * last. On real data three collections shared "cegapi.qa.agoda.is" and the map resolved to a
+     * service-tag one carrying no agentic tag, hiding the rag-database tag on the host collection
+     * and silently dropping every RAG caller. The host collection is keyed by hostName.hashCode().
+     */
+    @Test
+    void agenticTagIsFoundWhenOtherCollectionsShareTheHostname() {
+        String sharedHost = "cegapi.qa.agoda.is";
+        seedCallee(sharedHost, Constants.AKTO_RAG_DATABASE_TAG);   // id = sharedHost.hashCode()
+
+        // Two service-tag collections that also carry the same hostName, inserted after the host
+        // collection so they win hostNameToIdMap.
+        for (String svc : new String[] { "ceg-consumer", "cegapi" }) {
+            int id = ApiCollection.generateServiceTagCollectionId(svc);
+            ApiCollection c = new ApiCollection(id, svc, Context.now(), new HashSet<>(), sharedHost, 0, false, true);
+            c.setServiceTag(svc);
+            c.setTagsList(new ArrayList<>());
+            c.setHostNames(new ArrayList<>());
+            ApiCollectionsDao.instance.insertOne(c);
+        }
+
+        newParser().createApiCollectionId(
+                request(sharedHost, "/ceg/crm/activitylog/insert", OUTBOUND, "cegapi"));
+
+        assertNotNull(callerTag(ApiCollection.generateServiceTagCollectionId("cegapi")),
+                "the agentic tag lives on the host collection; a colliding hostName must not hide it");
+    }
+
     // ---------- guards that must still hold ----------
 
     @Test

@@ -2297,17 +2297,24 @@ public class HttpCallParser {
     }
 
     private boolean hasAgenticTag(String hostName) {
-        Integer collectionId = hostNameToIdMap.get(hostName);
-        if (collectionId == null) {
-            return false;
+        // hostNameToIdMap is one id per host, but hostName is NOT unique across collections - a
+        // service-tag collection also carries the host it was seen on. On real data three
+        // collections shared "cegapi.qa.agoda.is" and the map resolved to a service-tag one with no
+        // agentic tag, hiding the rag-database tag that sat on the host collection. The host
+        // collection is keyed by hostName.hashCode() (see createCollectionBasedOnHostName), so look
+        // that up first and keep the map only as a fallback.
+        if (isAgentic(apiCollectionsMap.get(hostName.hashCode()))) {
+            return true;
         }
-        ApiCollection collection = apiCollectionsMap.get(collectionId);
-        if (collection == null) {
-            return false;
-        }
-        return collection.isGenAICollection()
-                || collection.isMcpCollection()
-                || collection.isRagDatabaseCollection();
+        Integer mapped = hostNameToIdMap.get(hostName);
+        return mapped != null && isAgentic(apiCollectionsMap.get(mapped));
+    }
+
+    private boolean isAgentic(ApiCollection collection) {
+        return collection != null
+                && (collection.isGenAICollection()
+                        || collection.isMcpCollection()
+                        || collection.isRagDatabaseCollection());
     }
 
     /**
