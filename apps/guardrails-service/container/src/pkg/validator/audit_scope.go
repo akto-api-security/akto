@@ -22,8 +22,7 @@ func (sc auditScope) matches(deviceLabel, email string) bool {
 	if sc.ApplyToDeviceIds == nil && sc.ApplyToUserEmails == nil && len(sc.UserMetadata) == 0 {
 		return true
 	}
-	// deviceIDsContain is a case-insensitive whole-string match, which is also how emails compare.
-	if deviceIDsContain(sc.ApplyToDeviceIds, deviceLabel) || deviceIDsContain(sc.ApplyToUserEmails, email) {
+	if deviceIDsContain(sc.ApplyToDeviceIds, deviceLabel) || emailsContain(sc.ApplyToUserEmails, email) {
 		return true
 	}
 	if len(sc.UserMetadata) == 0 {
@@ -86,4 +85,17 @@ func requestUserEmail(valCtx *mcp.ValidationContext) string {
 		return email
 	}
 	return browserUserEmail(valCtx.Tag)
+}
+
+// emailsContain reports whether emails holds email, case-insensitively; an empty email never matches.
+func emailsContain(emails []string, email string) bool {
+	if email == "" {
+		return false
+	}
+	for _, e := range emails {
+		if strings.EqualFold(e, email) {
+			return true
+		}
+	}
+	return false
 }
