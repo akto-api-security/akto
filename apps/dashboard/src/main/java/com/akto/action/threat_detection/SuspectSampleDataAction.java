@@ -89,6 +89,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
   @Getter @Setter int backfilledGroupKeys;
+  @Getter @Setter Boolean ungroupActivities; // one event per row, as before grouping
   @Getter @Setter String humanResponse;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
   @Getter @Setter String searchText; // free-text match across filterId/host/actor
@@ -206,6 +207,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("sortBySeverity", this.sortBySeverity);
     }
 
+    if (Boolean.TRUE.equals(this.ungroupActivities)) {
+      filter.put("ungroupActivities", true);
+    }
+
     if (this.riskScoreFilterType != null && !this.riskScoreFilterType.isEmpty()) {
       filter.put("riskScoreFilterType", this.riskScoreFilterType);
     }
@@ -275,10 +280,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             event.setRemediation(smr.getRemediation());
                             event.setEvidenceLine(smr.getEvidenceLine());
                             event.setHumanResponse(smr.getHumanResponse());
-                            event.setGroupKey(smr.getGroupKey());
                             event.setGroupCount(smr.getGroupCount());
                             event.setGroupFirstDetectedAt(smr.getGroupFirstDetectedAt());
                             event.setGroupEventIds(smr.getGroupEventIdsList());
+                            event.setGroupFilterIds(smr.getGroupFilterIdsList());
                             if (!smr.getOwaspCategoriesList().isEmpty()) {
                                 event.setOwaspCategories(smr.getOwaspCategoriesList().stream()
                                     .map(o -> new DashboardMaliciousEvent.OwaspCategory(

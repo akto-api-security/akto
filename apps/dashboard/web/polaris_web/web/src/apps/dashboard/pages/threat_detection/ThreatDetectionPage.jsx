@@ -457,6 +457,8 @@ function ThreatDetectionPage() {
             templateId: data.filterId,
             status: data.status || '',
             eventId: data.id || '',
+            // A grouped activity's events, shown as its attempts.
+            groupEventIds: data.groupCount > 1 ? (data.groupEventIds || []) : [],
             jiraTicketUrl: data.jiraTicketUrl || '',
             severity: data.severity || '',
             sessionId: data.sessionId || '',
@@ -655,7 +657,8 @@ function ThreatDetectionPage() {
             queryParams.refId,
             queryParams.eventType,
             queryParams?.actor || "",
-            queryParams.filterId
+            queryParams.filterId,
+            rowContext?.groupEventIds || []
           );
 
           if (!isMountedRef.current) {

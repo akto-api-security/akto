@@ -64,6 +64,8 @@ public class ThreatActorService {
   private final com.akto.threat.backend.dao.SplunkIntegrationDao splunkIntegrationDao = com.akto.threat.backend.dao.SplunkIntegrationDao.instance;
   private final com.akto.threat.backend.dao.ActorInfoDao actorInfoDao = com.akto.threat.backend.dao.ActorInfoDao.instance;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorService.class, LoggerMaker.LogDb.THREAT_DETECTION);
+  // Attempts shown for a grouped activity row: its latest events, so a long agent loop stays quick to open.
+  private static final int MAX_GROUP_ATTEMPTS = 50;
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
@@ -1023,6 +1025,10 @@ public class ThreatActorService {
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
 
+  private static String nullToEmpty(String value) {
+    return value != null ? value : "";
+  }
+
   private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<MaliciousEventDto> respList){
     if (respList == null) {
       return Collections.emptyList();
@@ -1033,7 +1039,16 @@ public class ThreatActorService {
             FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
             setOrig(HttpResponseParams.getSampleStringFromProtoString(event.getLatestApiOrig())).
             setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
-            setTs(event.getDetectedAt()).build());
+            setTs(event.getDetectedAt()).
+            setEventId(nullToEmpty(event.getId())).
+            setRefId(nullToEmpty(event.getRefId())).
+            setFilterId(nullToEmpty(event.getFilterId())).
+            setSeverity(nullToEmpty(event.getSeverity())).
+            setEndpoint(nullToEmpty(event.getLatestApiEndpoint())).
+            setMethod(event.getLatestApiMethod() != null ? event.getLatestApiMethod().name() : "").
+            setEvidenceLine(nullToEmpty(event.getEvidenceLine())).
+            setRemediation(nullToEmpty(event.getRemediation())).
+            setStatus(event.getStatus() != null ? event.getStatus().name() : "").build());
     }
     return maliciousPayloadsResponse;
   } 
@@ -1049,7 +1064,12 @@ public class ThreatActorService {
     Bson filters = Filters.eq("refId", refId);
     FindIterable<MaliciousEventDto> respList;
 
-    if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
+    if (request.getEventIdsCount() > 0) {
+        // A grouped activity row: its events, newest first, as the attempts to page through.
+        respList = maliciousEventDao.getCollection(accountId).find(Filters.in("_id", request.getEventIdsList()))
+            .sort(Sorts.descending("detectedAt")).limit(MAX_GROUP_ATTEMPTS);
+        maliciousPayloadsResponse.addAll(this.fetchMaliciousPayloadsResponse(respList));
+    } else if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
         loggerMaker.warnAndAddToDb("fetchAggregateMaliciousRequests BEFORE_FIND (AGGREGATED) elapsed=" + (System.currentTimeMillis() - t0) + "ms", LoggerMaker.LogDb.THREAT_DETECTION);
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),

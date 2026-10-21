@@ -50,6 +50,7 @@ import { extractServiceName } from "@/apps/dashboard/pages/observe/agentic/const
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
+import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents as expandRowsToEvents } from "@/apps/dashboard/pages/threat_detection/utils/activityGroups";
 import { fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
@@ -268,9 +269,7 @@ function DetectedCellRenderer({ value, data }) {
     return (
         <HorizontalStack gap="2" blockAlign="center" wrap={false}>
             <span>{time}</span>
-            <Tooltip content={`Same prompt from the same caller ${data.groupCount} times, ${func.epochToDateTime(data.groupFirstDetectedAt)} to ${time}`}>
-                <Badge status="attention">{`${data.groupCount} events`}</Badge>
-            </Tooltip>
+            <ActivityGroupBadges count={data.groupCount} firstDetectedAt={data.groupFirstDetectedAt} lastDetectedAt={value} policies={data.groupFilterIds} />
         </HorizontalStack>
     );
 }
@@ -631,10 +630,10 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         deviceId: rawHost,
         remediation: event.remediation || null,
         humanResponse: String(event.humanResponse || HUMAN_RESPONSE.PENDING).toUpperCase(),
-        groupKey: event.groupKey || null,
         groupCount: event.groupCount || 0,
         groupFirstDetectedAt: event.groupFirstDetectedAt || null,
         groupEventIds: event.groupEventIds || [],
+        groupFilterIds: event.groupFilterIds || [],
     };
 }
 
@@ -937,13 +936,12 @@ function Violations() {
     const selectedCard = currentTab === "active" ? "open" : ((isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab || isHumanApprovalTab) ? "other-view" : "other");
     const gridRef = useRef(null);
 
-    // A grouped activity row stands for all its events, so actions on it apply to every one of them.
     const expandToGroupEvents = useCallback((ids) => {
         const eventIdsByRow = {};
         gridRef.current?.api?.forEachNode(node => {
             if (node.data?.groupCount > 1 && node.data.groupEventIds?.length) eventIdsByRow[node.data.id] = node.data.groupEventIds;
         });
-        return [...new Set(ids.flatMap(id => eventIdsByRow[id] || [id]))];
+        return expandRowsToEvents(ids, eventIdsByRow);
     }, []);
 
     const prevSelectedIdRef = useRef(null);
@@ -951,6 +949,23 @@ function Violations() {
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
     const guardrailComplianceMapRef = useRef({});
+
+    // One attempt of a grouped activity, as its own row (built like every table row); it keeps the
+    // row's id and group so actions still apply to the whole activity.
+    const toAttemptRow = useCallback((row, attempt) => ({
+        ...transformEvent({
+            id: attempt.eventId, refId: attempt.refId, filterId: attempt.filterId, severity: attempt.severity,
+            metadata: attempt.metadata, url: attempt.endpoint, method: attempt.method, timestamp: attempt.ts,
+            payload: attempt.orig, evidenceLine: attempt.evidenceLine, remediation: attempt.remediation, status: attempt.status,
+            host: row.host, actor: row.actor, apiCollectionId: row.apiCollectionId, eventType: row.eventType,
+            sessionId: row.sessionId, humanResponse: row.humanResponse,
+        }, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current),
+        id: row.id,
+        groupCount: row.groupCount,
+        groupEventIds: row.groupEventIds,
+        groupFilterIds: row.groupFilterIds,
+        groupFirstDetectedAt: row.groupFirstDetectedAt,
+    }), [collectionsMap]);
     const [usernameMap, setUsernameMap] = useState({});
 
     useEffect(() => {
@@ -1105,6 +1120,7 @@ function Violations() {
 
     // ─── Card selection (Open vs Other) ─────────────────────────────────────
     const [tableKey, setTableKey] = useState(0);
+    const [groupActivities, setGroupActivities] = useState(true);
     const triggerTableRefresh = useCallback(() => setTableKey(k => k + 1), []);
 
     const handleAssetClick = useCallback((hosts) => {
@@ -1440,6 +1456,8 @@ function Violations() {
             configEvaluationMode,
             riskScoreFilter?.type,
             riskScoreFilter?.filter,
+            undefined,
+            !groupActivities,
         ).then(result => {
             const rawEvents = result?.maliciousEvents || [];
             let transformed = rawEvents.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));
@@ -1459,7 +1477,7 @@ function Violations() {
             }
             return { value: transformed, total, rawEvents };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters, groupActivities]);
 
     const onServerFetch = useCallback((args) => {
         lastServerFetchArgsRef.current = args;
@@ -1691,11 +1709,14 @@ function Violations() {
                 searchValue={payloadSearch}
                 onSearchChange={setPayloadSearch}
                 searchAccessory={
-                    <AdvancedPayloadSearch
-                        filters={advancedFilters}
-                        onChange={setAdvancedFilters}
-                        showTags={false}
-                    />
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <ActivityGroupingToggle pressed={groupActivities} onToggle={() => { setGroupActivities(!groupActivities); triggerTableRefresh(); }} />
+                        <AdvancedPayloadSearch
+                            filters={advancedFilters}
+                            onChange={setAdvancedFilters}
+                            showTags={false}
+                        />
+                    </HorizontalStack>
                 }
                 searchBelow={advancedFilters.length > 0 ? (
                     <AdvancedPayloadSearch
@@ -1784,6 +1805,7 @@ function Violations() {
         <ViolationFlyout
             key="flyout"
             violation={selectedViolation}
+            toAttemptRow={toAttemptRow}
             show={selectedViolation !== null}
             onClose={() => setSelectedViolation(null)}
             onAddAsSearchFilter={handleAddSearchFilter}
