@@ -2729,11 +2729,6 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return !!window?.USER_NAME && window.USER_NAME.toLowerCase().indexOf("@akto.io") > 0;
     },
 
-    isAgenticPostureEnabled(){
-      const agenticPostureAccounts = [1000000, 1703087742, 1726615470];
-      return this.isAktoUser() && agenticPostureAccounts.includes(Number(window?.ACTIVE_ACCOUNT));
-    },
-
     isTempAccount(){
       if (!window?.USER_NAME) return false;
       
