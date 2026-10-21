@@ -334,6 +334,10 @@ class HttpCallParserAiAgentCallerTest {
         ApiCollection created = ApiCollectionsDao.instance.findOne(Filters.eq("_id", callerId));
         assertNotNull(created, "a caller seen using AI should be recorded even with no inbound traffic");
         assertEquals(outboundOnlyService, created.getServiceTag());
+        // hostName is what decides the tab the collections table files it under; null lands it in
+        // CUSTOM where it is easy to miss, so the stub names itself.
+        assertEquals(outboundOnlyService, created.getHostName(),
+                "a stub with no hostName is filed under the CUSTOM tab instead of HOSTNAME");
         assertNotNull(callerTag(callerId), "the stub exists precisely to carry the ai-agent-caller tag");
     }
 
