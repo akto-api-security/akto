@@ -31,6 +31,18 @@ public class CyborgMetricsTest {
     }
 
     @Test
+    public void recordHttpResponseSize_emitsSizeHistogram_noAccountId() {
+        CyborgMetrics.recordHttpResponseSize("/api/fetchSampleData", "POST", "200", 2048L);
+
+        String out = InfraMetricsListener.registry.scrape("text/plain; version=0.0.4; charset=utf-8");
+
+        assertTrue("size histogram present", out.contains("http_response_size_bytes_bucket"));
+        assertTrue("size sum recorded", lineExists(out, "http_response_size_bytes_sum", "uri=\"/api/fetchSampleData\""));
+        assertFalse("no per-tenant bytes counter", out.contains("http_response_bytes_total"));
+        assertFalse("account_id NOT on size histogram", lineExists(out, "http_response_size_bytes", "account_id="));
+    }
+
+    @Test
     public void recordOutboundHttpRequest_emitsClientMetricsWithHostAndPath() {
         CyborgMetrics.recordOutboundHttpRequest("tbs.akto.io", "/api/threat_detection/record_malicious_event", "POST", 200, 15L);
 
