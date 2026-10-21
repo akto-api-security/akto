@@ -57,8 +57,9 @@ export const CountPopover = ({ count, label, items, text }) => {
                         {filtered.length === 0
                             ? <Text tone="subdued" variant="bodySm">No {label} found</Text>
                             : <HorizontalStack gap="2" wrap>
-                                {filtered.map(item => (
-                                    <Tag key={item.value}>{item.label}</Tag>
+                                {/* Index in the key: items can repeat a value (one user stored twice), which breaks filtering. */}
+                                {filtered.map((item, i) => (
+                                    <Tag key={`${i}-${item.value}`}>{item.label}</Tag>
                                 ))}
                               </HorizontalStack>
                         }
@@ -201,7 +202,8 @@ export const ConditionRows = ({ conditions, typeOptions, dispatch, operator = 'O
                                     id={`cond-type-${condition.type}-${index}`}
                                     menuItems={rowTypeOptions}
                                     disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
-                                    initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
+                                    // value, not initial: Dropdown re-syncs value, so the count updates once users load.
+                                    value={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
                                     selected={(val) => {
                                         dispatch({ type: 'updateKey', index, key: 'type', obj: val });
                                         dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
