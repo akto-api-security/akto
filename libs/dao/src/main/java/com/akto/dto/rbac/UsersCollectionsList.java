@@ -219,6 +219,7 @@ public class UsersCollectionsList {
             Filters.nor(
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG)),
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG)),
                 getEndpointSourceFilter()
             )
@@ -237,12 +238,14 @@ public class UsersCollectionsList {
                 );
                 break;
             case AGENTIC:
-                // For agentic context, include both MCP and GenAI collections, EXCLUDE endpoint collections
+                // For agentic context, include MCP, GenAI and ai-agent-caller collections (a service
+                // seen calling an AI asset is an agentic asset too), EXCLUDE endpoint collections
                 finalFilter = Filters.and(
                     Filters.exists(ApiCollection.TAGS_STRING),
                     Filters.or(
                         Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG))
                     ),
                     Filters.nor(getEndpointSourceFilter())
                 );
