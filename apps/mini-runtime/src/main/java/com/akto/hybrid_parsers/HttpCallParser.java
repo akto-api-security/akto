@@ -2369,12 +2369,18 @@ public class HttpCallParser {
             // is a confirmed AI asset, so this cannot materialise a collection per unlabelled peer.
             loggerMaker.infoAndAddToDb("ai-agent-caller: no collection " + callerCollectionId
                     + " for caller service " + callerService + ", creating stub. callee=" + calleeHost);
+            // hostName is what puts a collection on the HOSTNAME tab (CollectionAttrsSync derives
+            // the tab from it); with null it lands under CUSTOM and is easy to miss. We never see
+            // the caller's own host - the request's Host header is the CALLEE's - so use the service
+            // name. That also keeps the id consistent, since generateServiceTagCollectionId is the
+            // same hashCode a host collection would be keyed by. The displayed name is unaffected:
+            // for a collection with a serviceTag the table shows the name, not "<host> - <name>".
             callerCollection = new ApiCollection(callerCollectionId, callerService, Context.now(),
-                    new HashSet<>(), null, 0, false, true);
+                    new HashSet<>(), callerService, 0, false, true);
             callerCollection.setServiceTag(callerService);
             callerCollection.setTagsList(new ArrayList<>());
             // setOnInsert writes whatever it is handed, so hand it an empty list rather than null.
-            callerCollection.setHostNames(new ArrayList<>());
+            callerCollection.setHostNames(new ArrayList<>(Collections.singletonList(callerService)));
         }
 
         List<CollectionTags> existingTags = callerCollection.getTagsList();
