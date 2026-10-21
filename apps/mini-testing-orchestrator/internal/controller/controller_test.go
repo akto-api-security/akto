@@ -500,3 +500,32 @@ func TestPodIdleForLessThanDelayIsKept(t *testing.T) {
 		t.Fatalf("replicas = %d, want 1", got)
 	}
 }
+
+// A pod still marked from an earlier tick that claims a run as its drain is
+// renewed keeps the run: its deletion cost is cleared before replicas drop, so
+// the ReplicaSet can only pick the pod drained this tick.
+func TestOldDeletionCostClearedBeforeScaleDown(t *testing.T) {
+	prober := &fakeProber{
+		status:      map[string]probe.Status{"10.0.0.1": {Busy: true}, "10.0.0.2": {Draining: true}, "10.0.0.3": {}},
+		busyOnDrain: map[string]bool{"10.0.0.2": true},
+	}
+	c, client := newController([]runtime.Object{
+		deployment(3),
+		runningPod("busy", "10.0.0.1", 3*time.Hour, nil),
+		runningPod("was-drained", "10.0.0.2", 2*time.Hour, map[string]string{DeletionCostAnnotation: drainedDeletionCost}),
+		runningPod("idle", "10.0.0.3", time.Hour, nil),
+	}, prober, 0)
+
+	if err := c.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := replicas(t, client); got != 2 {
+		t.Fatalf("replicas = %d, want 2", got)
+	}
+	if got := annotation(t, client, "was-drained"); got != "" {
+		t.Errorf("pod that claimed a run still marked for deletion: %q", got)
+	}
+	if got := annotation(t, client, "idle"); got != drainedDeletionCost {
+		t.Errorf("idle pod deletion cost = %q, want %q", got, drainedDeletionCost)
+	}
+}

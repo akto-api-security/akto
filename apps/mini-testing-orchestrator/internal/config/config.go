@@ -114,6 +114,18 @@ func (c Config) validate() error {
 		return fmt.Errorf("SCALE_UP_STEP must be >= 1, got %d", c.ScaleUpStep)
 	case c.PollInterval <= 0:
 		return fmt.Errorf("POLL_INTERVAL must be positive")
+	case c.ScaleDownDelay < 0:
+		return fmt.Errorf("SCALE_DOWN_DELAY must not be negative")
+	case c.PodStatusTimeout <= 0:
+		return fmt.Errorf("POD_STATUS_TIMEOUT must be positive")
+	case c.NotReadyGrace <= 0:
+		return fmt.Errorf("NOT_READY_GRACE must be positive")
+	case c.StuckAfter <= 0:
+		return fmt.Errorf("STUCK_AFTER must be positive")
+	case c.SummaryEvery <= 0:
+		return fmt.Errorf("SUMMARY_EVERY must be positive")
+	case c.HeartbeatEvery <= 0:
+		return fmt.Errorf("HEARTBEAT_INTERVAL must be positive")
 	}
 	return nil
 }

@@ -548,6 +548,24 @@ func (c *Controller) scaleDown(ctx context.Context, dep *appsv1.Deployment, pods
 	if len(failures) > 0 {
 		c.events.Warn("some pods could not be drained", "failures", strings.Join(failures, "; "))
 	}
+
+	// Only the pods drained above may carry the low deletion cost when replicas
+	// drop. Any other pod still marked from an earlier tick (one that claimed a
+	// run as its drain lapsed, or whose drain failed now) could otherwise be the
+	// one the ReplicaSet deletes.
+	keep := map[string]bool{}
+	for _, name := range removed {
+		keep[name] = true
+	}
+	for _, p := range pods {
+		if keep[p.pod.Name] || p.pod.Annotations[DeletionCostAnnotation] != drainedDeletionCost {
+			continue
+		}
+		if err := c.setDeletionCost(ctx, p.pod, nil); err != nil {
+			c.events.Warn("scale down skipped: could not clear an old deletion cost", "pod", p.pod.Name, "err", err)
+			return nil
+		}
+	}
 	return c.setReplicas(ctx, dep, int32(obs.Current), replicas,
 		fmt.Sprintf("%s; drained %v, pending removed %d, broken removed %d", d.Reason, removed, fromPending, fromBroken))
 }

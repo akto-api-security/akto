@@ -67,6 +67,8 @@ public class OrchestratorControl {
                     + "s without this pod being removed; taking test runs again");
         }
         if (isDraining()) {
+            // no run is held while drained; a stale holdingRun would read as busy
+            holdingRun = false;
             claiming = false;
             return false;
         }
@@ -86,13 +88,23 @@ public class OrchestratorControl {
         }
     }
 
-    /** Call before resuming a run left over from before a restart. */
-    public static void markResuming() {
+    /**
+     * Call before resuming a run left over from before a restart. Returns false if the
+     * orchestrator drained this pod meanwhile: it may already be on its way out, so the run is
+     * left for another pod to pick up, as when a pod is lost.
+     */
+    public static boolean markResuming() {
         if (!ENABLED) {
-            return;
+            return true;
         }
         claiming = true;
+        if (isDraining()) {
+            claiming = false;
+            loggerMaker.warnAndAddToDb("Not resuming the previous test run: this pod was drained by mini-testing-orchestrator");
+            return false;
+        }
         holdingRun = true;
+        return true;
     }
 
     /** Call once a poll returned a run this pod will take. */

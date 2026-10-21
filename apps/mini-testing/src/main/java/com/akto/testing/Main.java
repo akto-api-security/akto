@@ -562,8 +562,7 @@ public class Main {
         
         AllMetrics.instance.init(LogDb.TESTING, false, dataActor, Context.getActualAccountId(), customMiniTestingServiceName, ModuleInfo.ModuleType.MINI_TESTING.name());
 
-        if(currentTestInfo != null){
-            OrchestratorControl.markResuming();
+        if(currentTestInfo != null && OrchestratorControl.markResuming()){
             try {
                 loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId);
                 Organization organization = OrgUtils.getOrganizationCached(accountId);
