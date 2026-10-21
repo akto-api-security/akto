@@ -66,6 +66,7 @@ import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
+import com.akto.dto.agents.LlmServiceConfig;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.DependencyNode.ParamInfo;
@@ -305,6 +306,7 @@ public class DaoInit {
         ClassModel<CopilotStudioIntegration> copilotStudioIntegrationClassModel = ClassModel.builder(CopilotStudioIntegration.class).enableDiscriminator(true).build();
         ClassModel<EndpointAgentOrganization> endpointAgentOrganizationClassModel = ClassModel.builder(EndpointAgentOrganization.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldDiagnostic> endpointShieldDiagnosticClassModel = ClassModel.builder(EndpointShieldDiagnostic.class).enableDiscriminator(true).build();
+        ClassModel<LlmServiceConfig> llmServiceConfigClassModel = ClassModel.builder(LlmServiceConfig.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -338,7 +340,7 @@ public class DaoInit {
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
                 , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel, endpointCaRootClassModel, endpointDeviceCaClassModel
                 , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel
-                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel, endpointAgentOrganizationClassModel, endpointShieldDiagnosticClassModel).automatic(true).build());
+                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel, endpointAgentOrganizationClassModel, endpointShieldDiagnosticClassModel, llmServiceConfigClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

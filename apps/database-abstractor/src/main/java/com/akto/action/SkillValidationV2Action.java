@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import com.akto.llm.ModelTier;
+import com.akto.llm.ServiceKey;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.OwaspAstCategory;
@@ -596,11 +598,10 @@ public class SkillValidationV2Action extends ActionSupport {
         Map<String, Object> payload = new HashMap<>();
         payload.put("messages", messages);
         payload.put("temperature", 0);
-        // The inventory lists benign behaviors too, so responses are longer than a verdict-only reply.
-        // Azure books this figure against the deployment's TPM at admission, so keep it tight.
-        payload.put("max_tokens", 5000);
-
-        Map<String, Object> llmResponse = LLMService.callLLM(payload);
+        // 5000: the inventory lists benign behaviors too, so responses are longer than a verdict-only
+        // reply. Azure books this figure against the deployment's TPM at admission, so keep it tight.
+        payload.put("max_tokens", ServiceKey.ENDPOINT_SHIELD_SKILL_VALIDATION.getMaxTokens());
+        Map<String, Object> llmResponse = LLMService.callLLM(payload, ServiceKey.ENDPOINT_SHIELD_SKILL_VALIDATION, ModelTier.GPT_4O_MINI);
         if (llmResponse == null) throw new RuntimeException("Empty LLM response");
 
         List<Map<String, Object>> choices = (List<Map<String, Object>>) llmResponse.get("choices");

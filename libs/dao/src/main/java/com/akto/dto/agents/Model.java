@@ -24,6 +24,9 @@ public class Model {
 
     public static final String PARAM_MODEL = "model";
     public static final String PARAM_API_KEY = "apiKey";
+    // Azure deployment tier (see com.akto.action.llm.ModelTier), used by the default LLM
+    // service chain instead of an explicit endpoint/key.
+    public static final String PARAM_TIER = "tier";
     public static final String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
 
     @BsonId
