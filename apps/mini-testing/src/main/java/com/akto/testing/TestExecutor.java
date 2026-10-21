@@ -153,6 +153,10 @@ public class TestExecutor {
                 createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, null, testConfigMap);
                 continue;
             }
+            if (skipIfSampleTooLarge(sample, apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, null, testConfigMap)) {
+                countDownLatch(latch);
+                continue;
+            }
             if(sample.contains("originalRequestPayload")){
                 // make map of original request payload if this key is present
                 Map<String, Object> json = gson.fromJson(sample, Map.class);
@@ -490,6 +494,10 @@ public class TestExecutor {
                     createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap);
                     continue;
                 }
+                if (skipIfSampleTooLarge(sample, apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap)) {
+                    countDownLatch(latch);
+                    continue;
+                }
                 if(sample.contains("originalRequestPayload")){
                     // make map of original request payload if this key is present
                     Map<String, Object> json = gson.fromJson(sample, Map.class);
@@ -637,6 +645,34 @@ public class TestExecutor {
     private void createAndSaveSampleNotFoundResultForOneTestSubcategory(ApiInfoKey apiInfoKey, ObjectId testingRunId,
             ObjectId testingRunResultSummaryId, List<String> testingRunSubCategories,
             Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap, Map<String, TestConfig> testConfigMap) {
+        createAndSaveSkippedResultForOneTestSubcategory(apiInfoKey, testingRunId, testingRunResultSummaryId,
+                testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap,
+                Collections.singletonList(TestError.NO_PATH.getMessage()));
+    }
+
+    // Whole sample (request + response + headers) above this skips all tests on the API; 0 disables.
+    private static final int MAX_SAMPLE_PAYLOAD_KB = Integer.parseInt(System.getenv().getOrDefault("MAX_SAMPLE_PAYLOAD_KB", "75"));
+
+    private boolean skipIfSampleTooLarge(String sample, ApiInfoKey apiInfoKey, ObjectId testingRunId,
+            ObjectId testingRunResultSummaryId, List<String> testingRunSubCategories,
+            Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap, Map<String, TestConfig> testConfigMap) {
+        if (MAX_SAMPLE_PAYLOAD_KB <= 0 || sample.length() <= MAX_SAMPLE_PAYLOAD_KB * 1024L) {
+            return false;
+        }
+        String detail = "Sample payload " + (sample.length() / 1024) + " KB exceeds the " + MAX_SAMPLE_PAYLOAD_KB
+                + " KB limit (MAX_SAMPLE_PAYLOAD_KB)";
+        loggerMaker.infoAndAddToDb("Skipping tests for " + apiInfoKey + ": " + detail);
+        // the dashboard's Skipped tab matches on the first error, so it must be a known skip message
+        createAndSaveSkippedResultForOneTestSubcategory(apiInfoKey, testingRunId, testingRunResultSummaryId,
+                testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap,
+                Arrays.asList(TestError.SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage(), detail));
+        return true;
+    }
+
+    private void createAndSaveSkippedResultForOneTestSubcategory(ApiInfoKey apiInfoKey, ObjectId testingRunId,
+            ObjectId testingRunResultSummaryId, List<String> testingRunSubCategories,
+            Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap, Map<String, TestConfig> testConfigMap,
+            List<String> errors) {
         try {
             for (String testSubCategory : testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null
@@ -649,7 +685,10 @@ public class TestExecutor {
                         String testSubType = testConfig.getInfo().getSubCategory();
                         TestingRunResult runResult = generateFailedRunResultForMessage(
                                 testingRunId, apiInfoKey, testSuperType, testSubType,
-                                testingRunResultSummaryId, new ArrayList<>(), TestError.NO_PATH.getMessage());
+                                testingRunResultSummaryId, new ArrayList<>(), errors.get(0));
+                        if (errors.size() > 1) {
+                            ((TestResult) runResult.getTestResults().get(0)).setErrors(errors);
+                        }
                         this.insertResultsAndMakeIssues(Collections.singletonList(runResult),
                                 testingRunResultSummaryId);
                         break;

@@ -73,8 +73,6 @@ public class ConsumerUtil {
     public static ExecutorService executor = Executors.newFixedThreadPool(150, workerThreadFactory);
     private static final int maxRunTimeForTests = Constants.MINI_TESTING_TASK_TIMEOUT_SECONDS;
     private static final int STALL_TIMEOUT_SECONDS = 420; // > maxRunTimeForTests with margin
-    // Whole sample (request + response + headers) above this is skipped; 0 disables.
-    private static final int MAX_SAMPLE_PAYLOAD_KB = Integer.parseInt(System.getenv().getOrDefault("MAX_SAMPLE_PAYLOAD_KB", "75"));
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     private static final ConcurrentHashMap<ApiInfoKey, Integer> testedApisMap = new ConcurrentHashMap<>();
@@ -129,14 +127,6 @@ public class ConsumerUtil {
             } else {
                 String sample = messagesList.get(messagesList.size() - 1);
                 metrics.recordPayloadSize(sample == null ? 0 : sample.length());
-                if (MAX_SAMPLE_PAYLOAD_KB > 0 && sample != null && sample.length() > MAX_SAMPLE_PAYLOAD_KB * 1024L) {
-                    metrics.markSkipped();
-                    String skipMsg = "Skipping test: sample " + (sample.length() / 1024) + " KB exceeds MAX_SAMPLE_PAYLOAD_KB="
-                            + MAX_SAMPLE_PAYLOAD_KB + " for apiInfoKey=" + apiInfoKey + " subcategory=" + subCategory + " summaryId=" + summaryId;
-                    loggerMaker.infoAndAddToDb(skipMsg);
-                    debugLogToDb(singleTestPayload.getAccountId(), skipMsg);
-                    return;
-                }
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
 
                 // RUN_TEST wall + CPU. Recorded in a finally so a test that times out / throws still
