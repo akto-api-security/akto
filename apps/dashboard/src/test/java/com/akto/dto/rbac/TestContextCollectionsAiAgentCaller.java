@@ -45,6 +45,8 @@ public class TestContextCollectionsAiAgentCaller extends MongoBasedTest {
 
     @Before
     public void seedCollections() {
+        // Earlier tests leave userId / contextSource set, which RBAC-filters ApiCollectionsDao reads.
+        Context.resetContextThreadLocals();
         Context.accountId.set(ACCOUNT_ID);
         ApiCollectionsDao.instance.getMCollection().drop();
         seed(CALLER_ID, "payments-worker", Constants.AKTO_AI_AGENT_CALLER_TAG);
