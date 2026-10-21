@@ -48,7 +48,8 @@ public class EndpointDeviceCa {
 
     /** Name constraints actually encoded into the certificate. Recorded because the
      *  constraint set is policy that can change — without this you cannot tell what an
-     *  already-issued certificate is permitted to do. */
+     *  already-issued certificate is permitted to do. Empty means unconstrained — the
+     *  certificate may sign for any host. */
     public static final String PERMITTED_DOMAINS = "permittedDomains";
     private List<String> permittedDomains;
 

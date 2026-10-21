@@ -111,27 +111,6 @@ public class CertificateAuthority {
 
     public static final int ROOT_CA_VALIDITY_DAYS = 3650;
 
-    /**
-     * Hosts a device CA is permitted to sign for, encoded as X.509 name constraints.
-     *
-     * This is the single highest-value control in the design. Without it, a key lifted off
-     * one laptop is a general interception capability — banking, mail, anything. With it,
-     * macOS itself refuses any leaf outside this list, so the worst case collapses to the
-     * AI hosts the proxy already routes. The PAC scopes interception to the same set, so
-     * constraining here costs nothing operationally.
-     *
-     * RFC 5280 DNS constraints match the domain and all subdomains, so "claude.ai" covers
-     * "api.claude.ai" without a separate entry.
-     */
-    public static final List<String> DEFAULT_PERMITTED_DOMAINS = java.util.Collections.unmodifiableList(
-            java.util.Arrays.asList(
-                    "claude.ai",
-                    "anthropic.com",
-                    "claudeusercontent.com",
-                    "chatgpt.com",
-                    "openai.com",
-                    "oaiusercontent.com"));
-
     public static class GeneratedRoot {
         public final String certPem;
         public final String privateKeyPem;
@@ -212,9 +191,8 @@ public class CertificateAuthority {
      *
      * Everything except the public key is imposed here. The CSR's own subject and any
      * extensions it requests are discarded: a caller able to choose its own basicConstraints
-     * or name constraints could mint an unconstrained CA, which is a fleet-wide compromise
-     * rather than a device-level one. Treat the CSR as a carrier for a public key and
-     * nothing else.
+     * could mint a CA that issues further CAs. Treat the CSR as a carrier for a public key
+     * and nothing else.
      */
     public static SignedDeviceCa signDeviceCa(String csrPem, String deviceId, int accountId,
                                               String rootCertPem, String rootKeyPem,
@@ -272,9 +250,18 @@ public class CertificateAuthority {
         builder.addExtension(Extension.extendedKeyUsage, false,
                 new ExtendedKeyUsage(KeyPurposeId.id_kp_serverAuth));
 
-        List<String> domains = (permittedDomains == null || permittedDomains.isEmpty())
-                ? DEFAULT_PERMITTED_DOMAINS : permittedDomains;
-        builder.addExtension(Extension.nameConstraints, true, buildNameConstraints(domains));
+        // No name constraints by default: the proxy intercepts whatever the account routes to
+        // it — built-in AI hosts plus any generic domain added from the dashboard — so the
+        // device CA must be able to sign for any host. Accepted trade-off: a key lifted off
+        // one laptop can impersonate any site on every device trusting this account's root
+        // until the intermediate expires (DEVICE_CA_VALIDITY_DAYS). pathLen 0 and the
+        // serverAuth EKU above still apply. A non-empty permittedDomains re-imposes the
+        // constraint (RFC 5280: each entry covers the domain and its subdomains).
+        List<String> domains = permittedDomains == null
+                ? java.util.Collections.<String>emptyList() : permittedDomains;
+        if (!domains.isEmpty()) {
+            builder.addExtension(Extension.nameConstraints, true, buildNameConstraints(domains));
+        }
 
         JcaX509ExtensionUtils utils = new JcaX509ExtensionUtils();
         builder.addExtension(Extension.subjectKeyIdentifier, false,
