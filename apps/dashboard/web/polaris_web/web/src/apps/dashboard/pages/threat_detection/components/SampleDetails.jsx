@@ -511,17 +511,18 @@ function SampleDetails(props) {
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
                     sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
                         let vulnerabilitySegments = [];
+                        let evidenceLine;
                         if (useGuardrailDescription) {
+                            evidenceLine = result.evidenceLine || moreInfoData?.evidenceLine;
                             const { requestText, responseText } = sampleDataTransform.buildRenderedText(
                                 { message: result.orig, highlightPaths: [] },
                                 { redactHeaders: valuesTabRedactHeaders }
                             );
-                            vulnerabilitySegments = buildEvidenceVulnerabilitySegments(moreInfoData?.evidenceLine, requestText, responseText);
+                            vulnerabilitySegments = buildEvidenceVulnerabilitySegments(evidenceLine, requestText, responseText);
                         }
-                        return { message: result.orig, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
+                        return { message: result.orig, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments, evidenceLine }
                     }) : []}
                     redactHeaders={valuesTabRedactHeaders}
-                    evidenceLine={useGuardrailDescription ? moreInfoData?.evidenceLine : undefined}
                     onAddAsSearchFilter={onAddAsSearchFilter}
                     showDetectionReason
                 />

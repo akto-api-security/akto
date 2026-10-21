@@ -153,7 +153,7 @@ function VulnerabilityEvidence({ segments: locatedSegments, evidenceLine }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false} = props;
 
     const [page, setPage] = useState(0);
 
@@ -201,7 +201,7 @@ function SampleDataList(props) {
          {showDetectionReason ? <DetectionReason sampleData={currentSample} /> : null}
          <SchemaValidationError sampleData={currentSample} />
          {SHOW_VULNERABILITY_EVIDENCE ? (
-           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} evidenceLine={evidenceLine} />
+           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} evidenceLine={currentSample?.evidenceLine} />
          ) : null}
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">

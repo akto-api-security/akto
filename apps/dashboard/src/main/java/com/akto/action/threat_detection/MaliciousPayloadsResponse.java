@@ -5,11 +5,13 @@ public class MaliciousPayloadsResponse {
     private String orig;
     private String metadata;
     private long ts;
+    private String evidenceLine;
 
-    public MaliciousPayloadsResponse(String orig, String metadata, long ts) {
+    public MaliciousPayloadsResponse(String orig, String metadata, long ts, String evidenceLine) {
         this.orig = orig;
         this.metadata = metadata;
         this.ts = ts;
+        this.evidenceLine = evidenceLine;
     }
 
     public MaliciousPayloadsResponse(String orig, long ts) {
@@ -39,6 +41,14 @@ public class MaliciousPayloadsResponse {
 
     public void setTs(long ts) {
         this.ts = ts;
+    }
+
+    public String getEvidenceLine() {
+        return evidenceLine;
+    }
+
+    public void setEvidenceLine(String evidenceLine) {
+        this.evidenceLine = evidenceLine;
     }
 
 }

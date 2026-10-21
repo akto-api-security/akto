@@ -196,6 +196,7 @@ message FetchMaliciousEventsResponse {
     string orig = 1;
     uint64 ts = 2;
     string metadata = 3;
+    string evidence_line = 4;
   }
   repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
 }
