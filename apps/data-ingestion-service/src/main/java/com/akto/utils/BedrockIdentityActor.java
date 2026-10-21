@@ -223,7 +223,7 @@ public final class BedrockIdentityActor {
         return parts.isEmpty() ? "" : parts.get(parts.size() - 1);
     }
 
-    static String firstIdentityArn(String requestHeaders, String tag) {
+    private static String firstIdentityArn(String requestHeaders, String tag) {
         String fromHeaders = lookupIgnoreCase(parseObject(requestHeaders), IDENTITY_ARN_KEY);
         if (!fromHeaders.isEmpty()) {
             return fromHeaders;
@@ -231,7 +231,7 @@ public final class BedrockIdentityActor {
         return lookupIgnoreCase(parseObject(tag), IDENTITY_ARN_KEY);
     }
 
-    static BasicDBObject parseObject(String json) {
+    private static BasicDBObject parseObject(String json) {
         if (json == null || json.trim().isEmpty()) {
             return null;
         }
@@ -242,7 +242,7 @@ public final class BedrockIdentityActor {
         }
     }
 
-    static String lookupIgnoreCase(BasicDBObject obj, String key) {
+    private static String lookupIgnoreCase(BasicDBObject obj, String key) {
         if (obj == null || key == null) {
             return "";
         }
