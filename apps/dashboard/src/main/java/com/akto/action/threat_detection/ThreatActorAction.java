@@ -383,7 +383,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                 new MaliciousPayloadsResponse(
                                     smr.getOrig(),
                                     smr.getMetadata(),
-                                    smr.getTs()))
+                                    smr.getTs(),
+                                    smr.getEvidenceLine()))
                         .collect(Collectors.toList());
               });
     } catch (Exception e) {

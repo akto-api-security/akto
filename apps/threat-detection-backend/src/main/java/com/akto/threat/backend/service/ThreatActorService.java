@@ -1033,6 +1033,7 @@ public class ThreatActorService {
             FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
             setOrig(HttpResponseParams.getSampleStringFromProtoString(event.getLatestApiOrig())).
             setMetadata(ThreatUtils.fetchMetadataString(event.getMetadata() != null ? event.getMetadata() : "")).
+            setEvidenceLine(event.getEvidenceLine() != null ? event.getEvidenceLine() : "").
             setTs(event.getDetectedAt()).build());
     }
     return maliciousPayloadsResponse;
