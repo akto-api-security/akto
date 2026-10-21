@@ -432,12 +432,21 @@ func deviceIDsContain(ids []string, label string) bool {
 	if label == "" {
 		return false
 	}
+	label = collapseDashes(label)
 	for _, id := range ids {
-		if strings.EqualFold(id, label) {
+		if strings.EqualFold(collapseDashes(id), label) {
 			return true
 		}
 	}
 	return false
+}
+
+// collapseDashes folds dash runs, as hooks dash each byte of a non-ASCII name ("rohan---s" vs "rohan-s").
+func collapseDashes(s string) string {
+	for strings.Contains(s, "--") {
+		s = strings.ReplaceAll(s, "--", "-")
+	}
+	return s
 }
 
 // filterPoliciesByDevice filters device/user-targeted policies, combining two independent ways a
