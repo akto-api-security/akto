@@ -12,10 +12,11 @@ export default {
         return resp
     },
 
-    async fetchTestingRunResultSummaries(testingRunHexId, startTimestamp, endTimestamp) {
+    async fetchTestingRunResultSummaries(testingRunHexId, startTimestamp, endTimestamp, suppressErrorToast = false) {
         const resp = await request({
             url: '/api/fetchTestingRunResultSummaries',
             method: 'post',
+            suppressErrorToast,
             data: {
                 testingRunHexId,
                 startTimestamp,
