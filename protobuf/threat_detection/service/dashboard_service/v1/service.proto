@@ -41,7 +41,7 @@ message ListMaliciousRequestsResponse {
       string evidence_line = 28;  // Verbatim line of the prompt that triggered the violation (scrubbed)
       string human_response = 29;  // PENDING, APPROVED, BLOCKED
       // Grouped activity rows (repeated Bedrock prompt from one caller): this row is the latest event.
-      reserved 30;  // was group_key; the dashboard needs only the event ids
+      string group_key = 30;  // no longer sent; kept so a dashboard and threat backend on different versions still parse each other
       int32 group_count = 31;  // events in the activity; 0 for events that can't be grouped (no Bedrock ARN)
       int64 group_first_detected_at = 32;
       repeated string group_event_ids = 33;  // every event in the activity, for actions on the whole row
