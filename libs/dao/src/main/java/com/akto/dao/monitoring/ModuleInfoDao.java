@@ -72,4 +72,20 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         }
         return result;
     }
+
+    // Ported from the dashboard: each username's reported email.
+    public Map<String, String> fetchUsernameToEmailForEndpointShield() {
+        List<ModuleInfo> modules = findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD),
+            Projections.include(ModuleInfo.ADDITIONAL_DATA));
+        Map<String, String> result = new HashMap<>();
+        for (ModuleInfo m : modules) {
+            Map<String, Object> ad = m.getAdditionalData();
+            if (ad == null || ad.get("username") == null || ad.get("email") == null) continue;
+            String username = String.valueOf(ad.get("username")).trim();
+            String email = String.valueOf(ad.get("email")).trim();
+            if (username.isEmpty() || email.isEmpty()) continue;
+            result.putIfAbsent(username, email);
+        }
+        return result;
+    }
 }
