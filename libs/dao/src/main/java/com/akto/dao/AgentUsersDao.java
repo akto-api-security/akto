@@ -5,6 +5,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -26,6 +27,8 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     public static final AgentUsersDao instance = new AgentUsersDao();
     private static final Logger logger = LoggerFactory.getLogger(AgentUsersDao.class);
     private static final int MAX_TAGS_PER_SOURCE = 50;
+    // The tag picker's "Select all" value; matches any value of its key.
+    private static final String ALL_TAG_VALUES = "__all__";
 
     public void createIndicesIfAbsent() {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
@@ -271,13 +274,8 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
         return trimmedName;
     }
 
-    /**
-     * Generalizes findDeviceIdsByTeamsRolesAndDeviceIds to arbitrary tag keys: entries in
-     * tagFilters AND together; within one key, any of its values match (OR). Each key and the
-     * device-id pick can independently be negated.
-     */
-    public List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
-                                             List<String> deviceIds, boolean negatedDeviceIds) {
+    // One condition per tag key; any of its values match, and a negated key excludes its users.
+    private static List<Bson> tagConditions(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters) {
         List<Bson> conditions = new ArrayList<>();
         if (tagFilters != null) {
             for (Map.Entry<String, List<String>> entry : tagFilters.entrySet()) {
@@ -287,9 +285,9 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                         .map(v -> v.trim().toLowerCase())
                         .collect(Collectors.toList());
                 if (values.isEmpty()) continue;
-                Bson positiveMatch = Filters.elemMatch(AgenticUsers.DEVICE_TAGS, Filters.and(
-                        Filters.eq(DeviceTag.KEY, entry.getKey().trim().toLowerCase()),
-                        Filters.in(DeviceTag.VALUE, values)));
+                Bson keyMatch = Filters.eq(DeviceTag.KEY, entry.getKey().trim().toLowerCase());
+                Bson positiveMatch = Filters.elemMatch(AgenticUsers.DEVICE_TAGS, values.contains(ALL_TAG_VALUES)
+                        ? keyMatch : Filters.and(keyMatch, Filters.in(DeviceTag.VALUE, values)));
                 boolean negated = negatedTagFilters != null && Boolean.TRUE.equals(negatedTagFilters.get(entry.getKey()));
                 // deviceTags is a union array across sources — a device can carry both a matching
                 // and non-matching value for the same key. Negate the whole elemMatch ($nor), not
@@ -297,6 +295,34 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                 conditions.add(negated ? Filters.nor(positiveMatch) : positiveMatch);
             }
         }
+        return conditions;
+    }
+
+    // Lower-cased emails of tagged users, else module_info's email, else an email-shaped username.
+    public List<String> findUserEmailsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters) {
+        List<Bson> conditions = tagConditions(tagFilters, negatedTagFilters);
+        if (conditions.isEmpty()) return new ArrayList<>();
+        Map<String, String> moduleInfoEmails = null;
+        Set<String> emails = new HashSet<>();
+        for (AgenticUsers user : instance.findAll(Filters.and(conditions), Projections.include(AgenticUsers.USER_EMAIL, AgenticUsers.USER_NAME))) {
+            String email = user.getUserEmail();
+            if (email == null || email.trim().isEmpty()) {
+                if (moduleInfoEmails == null) moduleInfoEmails = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
+                email = moduleInfoEmails.getOrDefault(user.getUserName(), user.getUserName());
+            }
+            if (email != null && email.contains("@")) emails.add(email.trim().toLowerCase());
+        }
+        return new ArrayList<>(emails);
+    }
+
+    /**
+     * Generalizes findDeviceIdsByTeamsRolesAndDeviceIds to arbitrary tag keys: entries in
+     * tagFilters AND together; within one key, any of its values match (OR). Each key and the
+     * device-id pick can independently be negated.
+     */
+    public List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
+                                             List<String> deviceIds, boolean negatedDeviceIds) {
+        List<Bson> conditions = tagConditions(tagFilters, negatedTagFilters);
         boolean hasTagFilters = !conditions.isEmpty();
         boolean hasDeviceIds = deviceIds != null && !deviceIds.isEmpty();
         if (!hasTagFilters && !hasDeviceIds) {

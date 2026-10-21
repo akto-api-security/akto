@@ -6479,10 +6479,34 @@ public class DbAction extends ActionSupport {
         this.remarksList = remarksList;
     }
 
+    // Resolves a block's tags / devices to device ids like guardrail policies, and tags to emails for browser traffic.
+    private static void resolveAuditScopes(List<McpAuditInfo> rows) {
+        if (rows == null) return;
+        // A server block cascades its scope to every tool row, so each distinct scope is resolved once.
+        Map<List<Object>, McpAuditInfo> resolved = new HashMap<>();
+        for (McpAuditInfo row : rows) {
+            boolean hasTags = row.getTargetTags() != null && !row.getTargetTags().isEmpty();
+            boolean hasDevices = row.getTargetDeviceIds() != null && !row.getTargetDeviceIds().isEmpty();
+            if (!hasTags && !hasDevices) continue;
+            List<Object> scopeKey = Arrays.asList(row.getTargetTags(), row.getNegatedTargetTags(), row.getTargetDeviceIds(), row.isNegatedTargetDeviceIds());
+            McpAuditInfo same = resolved.get(scopeKey);
+            if (same != null) {
+                row.setApplyToDeviceIds(same.getApplyToDeviceIds());
+                row.setApplyToUserEmails(same.getApplyToUserEmails());
+                continue;
+            }
+            row.setApplyToDeviceIds(DbLayer.findDeviceIdsByTags(row.getTargetTags(), row.getNegatedTargetTags(), row.getTargetDeviceIds(), row.isNegatedTargetDeviceIds()));
+            // Emails only for tag-only scopes, since picked devices narrow the tag match.
+            row.setApplyToUserEmails(hasDevices ? new ArrayList<>() : DbLayer.findUserEmailsByTags(row.getTargetTags(), row.getNegatedTargetTags()));
+            resolved.put(scopeKey, row);
+        }
+    }
+
     public String fetchMcpAuditInfo() {
         try {
             loggerMaker.infoAndAddToDb("Fetching MCP audit info with updatedAfter: " + updatedAfter + ", remarksList: " + remarksList, LogDb.DB_ABS);
             this.mcpAuditInfoList = DbLayer.fetchMcpAuditInfo(updatedAfter, remarksList);
+            resolveAuditScopes(this.mcpAuditInfoList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAuditInfo: " + e.toString());
             return Action.ERROR.toUpperCase();
