@@ -49,9 +49,17 @@ public class LLMRuleCustomPathTest {
         assertLlm("/chat/completions", "a gateway mounted without the /v1 prefix is still an LLM gateway");
     }
 
+    /**
+     * The endpoint list is deliberately explicit rather than collapsed to "/completions", which
+     * String.contains would make a superset of all four spellings. Pinning the boundary so that
+     * broadening it later is a conscious edit rather than an accident.
+     */
     @Test
-    public void completionsWithoutV1IsRecognised() {
-        assertLlm("/completions", "the legacy completions endpoint, un-prefixed");
+    public void bareCompletionsIsNotMatched() {
+        Pair<Boolean, String> result =
+                GenAiCollectionUtils.checkAndTagLLMCollection(request("/completions", LLM_BODY));
+        assertFalse(result.getFirst(),
+                "only the /v1 forms and /chat/completions are listed; bare /completions is not");
     }
 
     @Test

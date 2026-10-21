@@ -122,10 +122,9 @@ public class LLMRule {
             new LLMRule(
                     "Custom",
                     Arrays.asList(),
-                    // Matched with String.contains, so "/completions" also covers /v1/completions,
-                    // /chat/completions and /v1/chat/completions. Self-hosted gateways are routinely
-                    // mounted without the /v1 prefix and were being missed entirely.
-                    Arrays.asList("/completions"),
+                    // Self-hosted gateways are routinely mounted without the /v1 prefix, and callers
+                    // hitting /chat/completions were being missed entirely.
+                    Arrays.asList("/v1/completions","/v1/chat/completions","/chat/completions"),
                     Arrays.asList("\"model\""))
 
     );
