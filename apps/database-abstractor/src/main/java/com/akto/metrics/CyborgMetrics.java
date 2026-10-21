@@ -29,9 +29,9 @@ public class CyborgMetrics {
             Duration.ofSeconds(5)
     };
 
-    // Response body size buckets: 1KB, 10KB, 100KB, 1MB, 5MB, 10MB.
+    // Response body size buckets: 1KB, 10KB, 50KB, 100KB, 500KB, 1MB, 5MB.
     private static final double[] RESPONSE_SIZE_SLOS = new double[] {
-            1_024, 10_240, 102_400, 1_048_576, 5_242_880, 10_485_760
+            1_024, 10_240, 51_200, 102_400, 512_000, 1_048_576, 5_242_880
     };
 
     private CyborgMetrics() {
