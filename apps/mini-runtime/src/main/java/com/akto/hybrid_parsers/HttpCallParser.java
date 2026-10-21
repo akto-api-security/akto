@@ -2282,16 +2282,6 @@ public class HttpCallParser {
     }
 
     /**
-     * Tags the CALLER's collection when its service is seen calling an AI agent / LLM endpoint.
-     *
-     * Only outbound traffic carries the caller's identity: the daemonset resolves the labels of
-     * the pod that made the call. The callee is identified by its Host header and tagged by the
-     * normal gen-ai / mcp-server / rag flow; this only annotates the other side of the call.
-     */
-    private static final List<String> AGENTIC_COLLECTION_TAGS = Arrays.asList(
-            Constants.AKTO_GEN_AI_TAG, Constants.AKTO_MCP_SERVER_TAG, Constants.AKTO_RAG_DATABASE_TAG);
-
-    /**
      * True when the host being called already carries gen-ai / mcp-server / rag-database on its own
      * collection. Purely a lookup of what Akto has already decided about the callee - it never
      * classifies anything, so it cannot move a collection between quota buckets.
@@ -2312,17 +2302,21 @@ public class HttpCallParser {
             return false;
         }
         ApiCollection collection = apiCollectionsMap.get(collectionId);
-        if (collection == null || collection.getTagsList() == null) {
+        if (collection == null) {
             return false;
         }
-        for (CollectionTags tag : collection.getTagsList()) {
-            if (AGENTIC_COLLECTION_TAGS.contains(tag.getKeyName())) {
-                return true;
-            }
-        }
-        return false;
+        return collection.isGenAICollection()
+                || collection.isMcpCollection()
+                || collection.isRagDatabaseCollection();
     }
 
+    /**
+     * Tags the CALLER's collection when its service is seen calling an AI agent / LLM endpoint.
+     *
+     * Only outbound traffic carries the caller's identity: the daemonset resolves the labels of
+     * the pod that made the call. The callee is identified by its Host header and tagged by the
+     * normal gen-ai / mcp-server / rag flow; this only annotates the other side of the call.
+     */
     private void markAiAgentCaller(HttpResponseParams httpResponseParams, Map<String, String> tagsMap,
             String direction, String calleeHost) {
         // Every early return below logs, so a missing tag can be traced to one branch. The
