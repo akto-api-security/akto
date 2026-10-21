@@ -55,9 +55,10 @@ class HttpCallParserAiAgentCallerTest {
 
     /** Must be one of HttpCallParser.AI_AGENT_CALLER_TAGGING_ACCOUNTS or every case no-ops. */
     private static final int ACCOUNT_ID = 1736798101;
-    private static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
-    private static final String CALLER_SERVICE = "ceg-translation-api";
-    private static final String GATEWAY = "qa.genai-gateway.svc:8080";
+    /** The key the mirroring daemonset writes the caller's service name under. */
+    private static final String SERVICE_TAG_KEY = HttpCallParser.SERVICE_TAG_KEY;
+    private static final String CALLER_SERVICE = "translation-service";
+    private static final String GATEWAY = "llm-gateway.internal.svc:8080";
 
     private static final String INBOUND = "1";
     private static final String OUTBOUND = "2";
@@ -192,12 +193,12 @@ class HttpCallParserAiAgentCallerTest {
 
     @Test
     void ragCallee_tagsCaller() {
-        String ragHost = "cegapi.qa.agoda.is";
+        String ragHost = "vector-store.internal.svc";
         seedCallee(ragHost, Constants.AKTO_RAG_DATABASE_TAG);
-        int callerId = seedCaller("ceg-consumer");
+        int callerId = seedCaller("search-service");
 
         newParser().createApiCollectionId(
-                request(ragHost, "/ceg/crm/activitylog/insert", OUTBOUND, "ceg-consumer"));
+                request(ragHost, "/v1/documents/search", OUTBOUND, "search-service"));
 
         assertNotNull(callerTag(callerId),
                 "RAG is not reachable through the LLM rules, so this only works off the stored tag");
@@ -205,12 +206,12 @@ class HttpCallParserAiAgentCallerTest {
 
     @Test
     void mcpCallee_tagsCaller() {
-        String mcpHost = "vulnpilot-mcp.qa.agoda.is";
+        String mcpHost = "tools-mcp.internal.svc";
         seedCallee(mcpHost, Constants.AKTO_MCP_SERVER_TAG);
-        int callerId = seedCaller("agoda-routing");
+        int callerId = seedCaller("routing-service");
 
         // A redacted JSON-RPC body can never match MCP_METHOD_SET, so the body is deliberately inert.
-        newParser().createApiCollectionId(request(mcpHost, "/mcp", OUTBOUND, "agoda-routing"));
+        newParser().createApiCollectionId(request(mcpHost, "/mcp", OUTBOUND, "routing-service"));
 
         assertNotNull(callerTag(callerId), "a known mcp-server destination should attribute its caller");
     }
@@ -218,18 +219,18 @@ class HttpCallParserAiAgentCallerTest {
     /**
      * hostName is not unique: a service-tag collection also records the host it was seen on, so
      * several documents can share one hostName and hostNameToIdMap (one id per host) keeps only the
-     * last. On real data three collections shared "cegapi.qa.agoda.is" and the map resolved to a
+     * last. On real data three collections shared "vector-store.internal.svc" and the map resolved to a
      * service-tag one carrying no agentic tag, hiding the rag-database tag on the host collection
      * and silently dropping every RAG caller. The host collection is keyed by hostName.hashCode().
      */
     @Test
     void agenticTagIsFoundWhenOtherCollectionsShareTheHostname() {
-        String sharedHost = "cegapi.qa.agoda.is";
+        String sharedHost = "vector-store.internal.svc";
         seedCallee(sharedHost, Constants.AKTO_RAG_DATABASE_TAG);   // id = sharedHost.hashCode()
 
         // Two service-tag collections that also carry the same hostName, inserted after the host
         // collection so they win hostNameToIdMap.
-        for (String svc : new String[] { "ceg-consumer", "cegapi" }) {
+        for (String svc : new String[] { "search-service", "catalog-service" }) {
             int id = ApiCollection.generateServiceTagCollectionId(svc);
             ApiCollection c = new ApiCollection(id, svc, Context.now(), new HashSet<>(), sharedHost, 0, false, true);
             c.setServiceTag(svc);
@@ -239,9 +240,9 @@ class HttpCallParserAiAgentCallerTest {
         }
 
         newParser().createApiCollectionId(
-                request(sharedHost, "/ceg/crm/activitylog/insert", OUTBOUND, "cegapi"));
+                request(sharedHost, "/v1/documents/search", OUTBOUND, "catalog-service"));
 
-        assertNotNull(callerTag(ApiCollection.generateServiceTagCollectionId("cegapi")),
+        assertNotNull(callerTag(ApiCollection.generateServiceTagCollectionId("catalog-service")),
                 "the agentic tag lives on the host collection; a colliding hostName must not hide it");
     }
 
@@ -249,12 +250,12 @@ class HttpCallParserAiAgentCallerTest {
 
     @Test
     void ordinaryCallee_doesNotTagCaller() {
-        String plainHost = "booking-api-qa.agoda.local";
+        String plainHost = "orders-api.internal.svc";
         seedCallee(plainHost, null);
         int callerId = seedCaller(CALLER_SERVICE);
 
         newParser().createApiCollectionId(
-                request(plainHost, "/v1/bookings/search", OUTBOUND, CALLER_SERVICE));
+                request(plainHost, "/v1/orders/search", OUTBOUND, CALLER_SERVICE));
 
         assertNull(callerTag(callerId), "a destination with no agentic tag must not produce a caller tag");
     }
@@ -286,7 +287,7 @@ class HttpCallParserAiAgentCallerTest {
     @Test
     void callerWithNoCollection_getsStubCarryingTheTag() {
         seedCallee(GATEWAY, Constants.AKTO_GEN_AI_TAG);
-        String outboundOnlyService = "askgodabot";
+        String outboundOnlyService = "batch-worker";
         int callerId = ApiCollection.generateServiceTagCollectionId(outboundOnlyService);
         assertNull(ApiCollectionsDao.instance.findOne(Filters.eq("_id", callerId)),
                 "precondition: this service has never received traffic, so it has no collection");
@@ -302,12 +303,12 @@ class HttpCallParserAiAgentCallerTest {
 
     @Test
     void stubIsNotCreatedForOrdinaryDestinations() {
-        String plainHost = "booking-api-qa.agoda.local";
+        String plainHost = "orders-api.internal.svc";
         seedCallee(plainHost, null);
         String outboundOnlyService = "some-batch-job";
         int callerId = ApiCollection.generateServiceTagCollectionId(outboundOnlyService);
 
-        newParser().createApiCollectionId(request(plainHost, "/v1/bookings", OUTBOUND, outboundOnlyService));
+        newParser().createApiCollectionId(request(plainHost, "/v1/orders", OUTBOUND, outboundOnlyService));
 
         assertNull(ApiCollectionsDao.instance.findOne(Filters.eq("_id", callerId)),
                 "stub creation is gated on the callee being an AI asset, so ordinary peers create nothing");

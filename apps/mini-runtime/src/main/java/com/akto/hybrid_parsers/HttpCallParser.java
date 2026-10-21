@@ -2299,7 +2299,7 @@ public class HttpCallParser {
     private boolean hasAgenticTag(String hostName) {
         // hostNameToIdMap is one id per host, but hostName is NOT unique across collections - a
         // service-tag collection also carries the host it was seen on. On real data three
-        // collections shared "cegapi.qa.agoda.is" and the map resolved to a service-tag one with no
+        // collections shared one hostname and the map resolved to a service-tag one with no
         // agentic tag, hiding the rag-database tag that sat on the host collection. The host
         // collection is keyed by hostName.hashCode() (see createCollectionBasedOnHostName), so look
         // that up first and keep the map only as a fallback.

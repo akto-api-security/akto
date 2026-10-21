@@ -70,7 +70,7 @@ public class LLMRuleCustomPathTest {
 
     @Test
     public void hostPrefixedPathIsRecognised() {
-        assertLlm("qa.genai-gateway.svc:8080/chat/completions",
+        assertLlm("llm-gateway.internal.svc:8080/chat/completions",
                 "matching is on the whole url, so a host-prefixed form must work too");
     }
 
@@ -94,7 +94,7 @@ public class LLMRuleCustomPathTest {
     @Test
     public void unrelatedPathIsNotLlm() {
         Pair<Boolean, String> result =
-                GenAiCollectionUtils.checkAndTagLLMCollection(request("/api/v1/bookings/search", LLM_BODY));
+                GenAiCollectionUtils.checkAndTagLLMCollection(request("/api/v1/orders/search", LLM_BODY));
         assertFalse(result.getFirst(), "a json body mentioning model must not be enough on its own");
     }
 
