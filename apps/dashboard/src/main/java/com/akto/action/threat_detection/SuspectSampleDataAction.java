@@ -1,7 +1,9 @@
 package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.RBAC.Role;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
@@ -86,6 +88,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter List<String> hosts;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
+  @Getter @Setter int backfilledGroupKeys;
   @Getter @Setter String humanResponse;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
   @Getter @Setter String searchText; // free-text match across filterId/host/actor
@@ -272,6 +275,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             event.setRemediation(smr.getRemediation());
                             event.setEvidenceLine(smr.getEvidenceLine());
                             event.setHumanResponse(smr.getHumanResponse());
+                            event.setGroupKey(smr.getGroupKey());
+                            event.setGroupCount(smr.getGroupCount());
+                            event.setGroupFirstDetectedAt(smr.getGroupFirstDetectedAt());
+                            event.setGroupEventIds(smr.getGroupEventIdsList());
                             if (!smr.getOwaspCategoriesList().isEmpty()) {
                                 event.setOwaspCategories(smr.getOwaspCategoriesList().stream()
                                     .map(o -> new DashboardMaliciousEvent.OwaspCategory(
@@ -288,6 +295,31 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       return ERROR.toUpperCase();
     }
 
+    return SUCCESS.toUpperCase();
+  }
+
+  // Gives activities stored before grouping existed their group key, so repeated Bedrock prompts
+  // group like new ones. Only events without a key are touched, so running it again is safe.
+  public String backfillActivityGroupKeys() {
+    if (RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()) != Role.ADMIN) {
+      addActionError("Only admins can group existing activities");
+      return ERROR.toUpperCase();
+    }
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/backfill_activity_group_keys", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+    post.setEntity(new StringEntity("{}", ContentType.APPLICATION_JSON));
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
+      if (resp.getStatusLine().getStatusCode() != 200) {
+        addActionError("Failed to group existing activities");
+        return ERROR.toUpperCase();
+      }
+      this.backfilledGroupKeys = objectMapper.readTree(responseBody).path("updated").asInt(0);
+    } catch (Exception e) {
+      addActionError("Failed to group existing activities");
+      return ERROR.toUpperCase();
+    }
     return SUCCESS.toUpperCase();
   }
 

@@ -1014,6 +1014,15 @@ const settingRequests = {
             data: {}
         })
     },
+    async backfillActivityGroupKeys() {
+        return await request({
+            url: '/api/backfillActivityGroupKeys',
+            method: 'post',
+            // Reads every existing activity once; can outlast the 60s default on large accounts.
+            timeout: 300000,
+            data: {}
+        })
+    },
     async deleteDuplicateEntries() {
         return await request({
             url: '/api/deleteDuplicateEntries',

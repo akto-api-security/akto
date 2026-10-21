@@ -261,6 +261,20 @@ function HumanResponseCellRenderer({ value, data, onHumanApproval }) {
 // Column defs are built dynamically so we can inject backend filter values. showApprove/onApprove
 // add the Needs Approval tab's Action column. On Human Approval the Status column is
 // pending/approved/blocked (every row already has event status HUMAN_APPROVAL).
+// A grouped activity (same prompt from the same Bedrock caller) shows how many events it holds.
+function DetectedCellRenderer({ value, data }) {
+    const time = value != null ? func.epochToDateTime(value) : "";
+    if (!(data?.groupCount > 1)) return time;
+    return (
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <span>{time}</span>
+            <Tooltip content={`Same prompt from the same caller ${data.groupCount} times, ${func.epochToDateTime(data.groupFirstDetectedAt)} to ${time}`}>
+                <Badge status="attention">{`${data.groupCount} events`}</Badge>
+            </Tooltip>
+        </HorizontalStack>
+    );
+}
+
 function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval) {
     const humanStatusCol = {
         field: "humanResponse",
@@ -284,6 +298,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: isHumanApprovalTab ? "Reported" : "Detected",
             minWidth: 150,
             valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
+            cellRenderer: DetectedCellRenderer,
             // Most recent first by default. Declared here (rather than defaulting inside
             // onServerFetch) so the header's sort indicator matches what's actually requested.
             sort: "desc",
@@ -616,6 +631,10 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         deviceId: rawHost,
         remediation: event.remediation || null,
         humanResponse: String(event.humanResponse || HUMAN_RESPONSE.PENDING).toUpperCase(),
+        groupKey: event.groupKey || null,
+        groupCount: event.groupCount || 0,
+        groupFirstDetectedAt: event.groupFirstDetectedAt || null,
+        groupEventIds: event.groupEventIds || [],
     };
 }
 
@@ -917,6 +936,16 @@ function Violations() {
     // orthogonal views, since they're not a status.
     const selectedCard = currentTab === "active" ? "open" : ((isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab || isHumanApprovalTab) ? "other-view" : "other");
     const gridRef = useRef(null);
+
+    // A grouped activity row stands for all its events, so actions on it apply to every one of them.
+    const expandToGroupEvents = useCallback((ids) => {
+        const eventIdsByRow = {};
+        gridRef.current?.api?.forEachNode(node => {
+            if (node.data?.groupCount > 1 && node.data.groupEventIds?.length) eventIdsByRow[node.data.id] = node.data.groupEventIds;
+        });
+        return [...new Set(ids.flatMap(id => eventIdsByRow[id] || [id]))];
+    }, []);
+
     const prevSelectedIdRef = useRef(null);
     const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
@@ -1198,7 +1227,7 @@ function Violations() {
         if (!row?.id) return;
         try {
             const result = await threatDetectionApi.updateMaliciousEventStatus({
-                eventIds: [row.id],
+                eventIds: expandToGroupEvents([row.id]),
                 humanResponse: response,
             });
             if (result?.updateSuccess) {
@@ -1212,7 +1241,7 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to update human approval");
         }
-    }, [triggerTableRefresh]);
+    }, [expandToGroupEvents, triggerTableRefresh]);
 
     const colDefs = useMemo(
         () => buildColDefs(filterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval),
@@ -1499,7 +1528,7 @@ function Violations() {
     }, []);
 
     const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel) => {
-        const ids = getSelectedIds();
+        const ids = expandToGroupEvents(getSelectedIds());
         if (!ids.length) return;
         try {
             const response = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: ids, status });
@@ -1513,10 +1542,10 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to update selected events");
         }
-    }, [getSelectedIds, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
 
     const handleBulkDelete = useCallback(async () => {
-        const ids = getSelectedIds();
+        const ids = expandToGroupEvents(getSelectedIds());
         setDeleteConfirmOpen(false);
         if (!ids.length) return;
         try {
@@ -1531,10 +1560,10 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to delete selected events");
         }
-    }, [getSelectedIds, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
 
     const handleBulkHumanApproval = useCallback(async (response) => {
-        const ids = getSelectedPendingIds();
+        const ids = expandToGroupEvents(getSelectedPendingIds());
         if (!ids.length) {
             func.setToast(true, true, "No pending events selected");
             return;
@@ -1552,7 +1581,7 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to update selected events");
         }
-    }, [getSelectedPendingIds, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedPendingIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
 
     const bulkActions = useMemo(() => {
         // AgGridTable disables (with the reason) actions whose `requires` the role can't call
