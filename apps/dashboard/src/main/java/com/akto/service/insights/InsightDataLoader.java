@@ -26,6 +26,7 @@ import com.akto.dto.nhi_governance.NhiIdentity;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -33,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -325,9 +327,14 @@ public class InsightDataLoader {
     /** contextSource == current, or the field is entirely missing (legacy docs predate it). */
     private List<McpAuditInfo> loadAuditRows(CONTEXT_SOURCE contextSource) {
         try {
-            Bson filter = Filters.or(
-                    Filters.eq(McpAuditInfo.CONTEXT_SOURCE, contextSource != null ? contextSource.name() : null),
-                    Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
+            // Browser LLM and AI agent decisions aren't MCP components; the type check sits in each branch so Mongo fetches each row once.
+            // eq(null) already matches a missing field, so the null case needs a single branch.
+            Bson notLlm = Filters.nin(McpAuditInfo.TYPE, Arrays.asList(Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_AI_AGENT_TAG));
+            Bson filter = contextSource == null
+                    ? Filters.and(Filters.eq(McpAuditInfo.CONTEXT_SOURCE, null), notLlm)
+                    : Filters.or(
+                            Filters.and(Filters.eq(McpAuditInfo.CONTEXT_SOURCE, contextSource.name()), notLlm),
+                            Filters.and(Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false), notLlm));
             return McpAuditInfoDao.instance.findAll(filter, 0, 5000, null);
         } catch (Exception e) {
             logger.error("InsightDataLoader: loadAuditRows failed: " + e.getMessage());

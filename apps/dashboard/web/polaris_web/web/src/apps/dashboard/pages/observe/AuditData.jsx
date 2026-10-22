@@ -14,20 +14,22 @@ import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import PersistStore from "../../../main/PersistStore";
 import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
+import BlockScopeModal, { blockScopeOf, BlockScopeSummary } from "../../components/modals/BlockScopeModal";
 import RegistryBadge from "../../components/shared/RegistryBadge";
 import AllowlistBadge from "../../components/shared/AllowlistBadge";
 import ComponentRiskAnalysisBadges from "./components/ComponentRiskAnalysisBadges";
 import { isEndpointSecurityCategory } from "../../../main/labelHelper";
 import AuditDataDrawer from "./AuditDataDrawer";
 import CollectionIcon from "../../components/shared/CollectionIcon";
+import formatDisplayName from "./agentic/mcpClientHelper";
 import settingsApi from "../settings/api";
 import { intersectServerActionFlags, getRegistryOverride } from "./auditServerActionFlags";
 import "../../components/shared/style.css";
 import { usePermissions, permissions, loadPermissions } from "@/util/permissions";
 
-const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills', VENDORS: 'vendors' };
+const TAB_IDS = { ALL: 'all', MCP_SERVERS: 'mcp_servers', SKILLS: 'skills', VENDORS: 'vendors', LLMS: 'llms', AI_AGENTS: 'ai_agents' };
 const TABS_DEFAULT = ['All', 'MCP Servers', 'Skills'];
-const TABS_ENDPOINT_SECURITY_BASE = ['MCP Servers', 'Skills'];
+const TABS_ENDPOINT_SECURITY_BASE = ['MCP Servers', 'Skills', 'LLMs', 'AI Agents'];
 // Vendors is still only for the internal test account — see LeftNav's same gate on the AI
 // Security Posture nav item, which this tab was built to support.
 const TABS_ENDPOINT_SECURITY = [...TABS_ENDPOINT_SECURITY_BASE, 'Vendors'];
@@ -201,13 +203,51 @@ const headingsVendors = [
     },
 ]
 
+const headingsLlms = [
+    {
+        title: 'LLM',
+        text: 'LLM',
+        value: 'llmComp',
+    },
+    {
+        title: 'Last Detected',
+        text: "Last Detected",
+        value: "lastDetectedComp",
+        sortActive: true,
+        sortKey: 'lastDetected',
+        type: CellType.TEXT
+    },
+    {
+        title: 'Updated',
+        text: "Updated",
+        value: "updatedTimestampComp",
+        sortKey: 'updatedTimestamp',
+        sortActive: true,
+        type: CellType.TEXT
+    },
+    {
+        title: 'Status',
+        text: "Status",
+        value: "statusComp",
+    },
+    {
+        title: 'Marked By',
+        text: "Marked By",
+        value: "markedBy",
+        type: CellType.TEXT
+    },
+]
+
 const sortOptions = [
     { label: 'Last Detected', value: 'lastDetected asc', directionLabel: 'Oldest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Last Detected', value: 'lastDetected desc', directionLabel: 'Newest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Updated', value: 'updatedTimestamp asc', directionLabel: 'Oldest', sortKey: 'updatedTimestamp', columnIndex: 4 },
     { label: 'Updated', value: 'updatedTimestamp desc', directionLabel: 'Newest', sortKey: 'updatedTimestamp', columnIndex: 4 },
-   
+
 ];
+
+// LLMs table has no AI Agent column, so sortable columns sit one position earlier.
+const sortOptionsLlms = sortOptions.map(o => ({ ...o, columnIndex: o.columnIndex - 1 }));
 
 const MCP_TYPE_CHOICES = [
     { label: "Tool", value: "mcp-tool" },
@@ -286,6 +326,29 @@ let filtersEndpointSecurity = [
         choices: [],
     }
 ]
+
+// AI Agents tab: same table as LLMs, one row per Agentic assets AI Agent.
+const headingsAiAgents = [{ ...headingsLlms[0], title: 'AI Agent', text: 'AI Agent' }, ...headingsLlms.slice(1)]
+
+let filtersLlms = [
+    {
+        key: 'markedBy',
+        label: 'Marked By',
+        title: 'Marked By',
+        choices: [],
+    },
+    {
+        key: 'remarks',
+        label: 'Status',
+        title: 'Status',
+        choices: [
+            { label: "Allowed", value: "Approved" },
+            { label: "Blocked", value: "Rejected" }
+        ],
+    }
+]
+
+let filtersAiAgents = filtersLlms.map(f => ({ ...f, choices: [...f.choices] }))
 
 const resourceName = {
     singular: 'audit record',
@@ -381,6 +444,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName, collectionRegis
             </HorizontalStack> :
             <VerticalStack gap="1">
                 <Text variant="bodyMd">{temp?.remarks}</Text>
+                {temp?.remarks === 'Rejected' && <BlockScopeSummary row={temp} />}
                 {temp?.approvalConditions && (
                     <Box paddingBlockStart="1">
                         <VerticalStack gap="0">
@@ -441,6 +505,8 @@ function AuditData() {
     const [conditionalChildren, setConditionalChildren] = useState(null);
     // When opening conditional approval from bulk selection (1+ MCP server rows); same approval applies to each.
     const [conditionalBulkRows, setConditionalBulkRows] = useState(null);
+    // Open Block dialog: { title, description, initialScope, onBlock(scope) }.
+    const [blockRequest, setBlockRequest] = useState(null);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -469,27 +535,34 @@ function AuditData() {
     const [selected, setSelected] = useState(
         func.getTableTabIndexById(0, definedTableTabs, initialSelectedTab)
     );
-    const [tabCounts, setTabCounts] = useState({ all: 0, mcp_servers: 0, skills: 0, vendors: 0 });
+    const [tabCounts, setTabCounts] = useState({ all: 0, mcp_servers: 0, skills: 0, vendors: 0, llms: 0, ai_agents: 0 });
 
     // Skills are flat AGENT_SKILL records in both modes; only the MCP tab differs
     // between endpoint-security (merged) and default (flat). Vendors are neither —
     // they're derived from endpoint-shield traffic, not mcp_audit_info/api_info rows.
     const isSkillsTab = selectedTab === TAB_IDS.SKILLS;
     const isVendorsTab = selectedTab === TAB_IDS.VENDORS;
-    const useEndpointMergedView = isEndpointSecurity && !isSkillsTab && !isVendorsTab;
+    const isAiAgentsTab = selectedTab === TAB_IDS.AI_AGENTS;
+    // LLMs and AI Agents share one table, backed by browser-llm / ai-agent audit rows.
+    const isLlmsTab = selectedTab === TAB_IDS.LLMS || isAiAgentsTab;
+    const auditType = isAiAgentsTab ? 'ai-agent' : 'browser-llm';
+    const rowNoun = isAiAgentsTab ? 'AI agent' : 'LLM';
+    const useEndpointMergedView = isEndpointSecurity && !isSkillsTab && !isVendorsTab && !isLlmsTab;
 
     const filters = useMemo(() => {
         if (useEndpointMergedView) return filtersEndpointSecurity;
         if (isVendorsTab) return [];
+        if (isLlmsTab) return isAiAgentsTab ? filtersAiAgents : filtersLlms;
         return getTabFilters(selectedTab);
-    }, [useEndpointMergedView, isVendorsTab, selectedTab]);
+    }, [useEndpointMergedView, isVendorsTab, isLlmsTab, isAiAgentsTab, selectedTab]);
 
     const headings = useMemo(() => {
         if (useEndpointMergedView) return headingsEndpointSecurity;
         if (isSkillsTab) return headingsSkills;
         if (isVendorsTab) return headingsVendors;
+        if (isLlmsTab) return isAiAgentsTab ? headingsAiAgents : headingsLlms;
         return headingsDefault;
-    }, [useEndpointMergedView, isSkillsTab, isVendorsTab]);
+    }, [useEndpointMergedView, isSkillsTab, isVendorsTab, isLlmsTab, isAiAgentsTab]);
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex);
@@ -570,7 +643,8 @@ function AuditData() {
         });
     };
 
-    const bulkUpdateServers = async (remarks, selectedIds) => {
+    // scope: who a block applies to (see BlockScopeModal); empty = everyone.
+    const bulkUpdateServers = async (remarks, selectedIds, scope = {}) => {
         const rows = getRowsForSelectedIds(selectedIds);
         if (!rows.length) return;
         const hexIds = [];
@@ -591,7 +665,7 @@ function AuditData() {
         const unique = [...new Set(hexIds)];
         if (!unique.length) return;
         try {
-            await api.updateAuditData(unique[0], remarks, null, unique, cascades.length ? cascades : null, null);
+            await api.updateAuditData(unique[0], remarks, null, unique, cascades.length ? cascades : null, null, scope);
             func.setToast(true, false, "Updated selected servers");
             window.location.reload();
         } catch (e) {
@@ -686,6 +760,84 @@ function AuditData() {
             });
         }
         return actions;
+    };
+
+    // bulkUpdateServers for LLM / AI agent rows; scope is who a block applies to (empty = everyone).
+    const bulkUpdateLlms = async (remarks, selectedIds, scope = {}) => {
+        // AI agent rows are keyed by name: they have no record until first marked.
+        const ids = [...new Set(getRowsForSelectedIds(selectedIds).map((row) => isAiAgentsTab ? row.resourceName : row.hexId).filter(Boolean))];
+        if (!ids.length) return;
+        try {
+            await api.updateLlmAuditData(ids, remarks, auditType, scope);
+            func.setToast(true, false, `Updated selected ${rowNoun}s`);
+            window.location.reload();
+        } catch (e) {
+            func.setToast(true, true, "Bulk update failed");
+        }
+    };
+
+    const llmPromotedBulkActions = (selectedIds) => {
+        if (selectedIds === "All" || !Array.isArray(selectedIds) || selectedIds.length === 0) {
+            return [];
+        }
+        const n = selectedIds.length;
+        const rows = getRowsForSelectedIds(selectedIds);
+        const countPhrase = `${n} selected ${rowNoun}${n === 1 ? "" : "s"}`;
+        const actions = [];
+        // Only offer the action that changes something, like the Skills tab.
+        if (rows.some((r) => r?.isBlocked)) {
+            actions.push({
+                content: n === 1 ? `Allow this ${rowNoun}` : `Allow ${countPhrase}`,
+                onAction: () => bulkUpdateLlms("Approved", selectedIds),
+                requires: 'api/updateLlmAuditData',
+            });
+        }
+        if (!rows.every((r) => r?.isBlocked)) {
+            actions.push({
+                content: n === 1 ? `Block this ${rowNoun}` : `Block ${countPhrase}`,
+                destructive: true,
+                onAction: () => setBlockRequest({ ...blockDialogCopy(rows), initialScope: null, onBlock: (scope) => bulkUpdateLlms("Rejected", selectedIds, scope) }),
+                requires: 'api/updateLlmAuditData',
+            });
+        } else {
+            // Already blocked: change who the block applies to; a single row starts from its current scope.
+            actions.push({
+                content: "Change who is blocked",
+                onAction: () => setBlockRequest({ ...blockDialogCopy(rows), initialScope: n === 1 ? blockScopeOf(rows[0]) : null, onBlock: (scope) => bulkUpdateLlms("Rejected", selectedIds, scope) }),
+                requires: 'api/updateLlmAuditData',
+            });
+        }
+        return actions;
+    };
+
+    const mcpBlockDialogCopy = (serverNames) => {
+        const subject = serverNames.length === 1 ? serverNames[0] : `these ${serverNames.length} MCP servers`;
+        return {
+            title: serverNames.length === 1 ? `Block ${serverNames[0]}` : `Block ${serverNames.length} MCP servers`,
+            description: `Guardrails stop tool, resource and prompt calls to ${subject} for the people you choose.`,
+        };
+    };
+
+    // Drawer block actions open the same dialog, then run their update with the chosen scope.
+    const handleRequestBlock = (serverName, runBlock, forAllAgents = false) => {
+        const copy = mcpBlockDialogCopy([serverName]);
+        setBlockRequest({
+            ...copy,
+            title: forAllAgents ? `Block ${serverName} for all agents` : copy.title,
+            initialScope: null,
+            onBlock: runBlock,
+        });
+    };
+
+    const blockDialogCopy = (rows) => {
+        const name = (r) => isAiAgentsTab ? formatDisplayName(r.resourceName) : r.resourceName;
+        const subject = rows.length === 1 ? name(rows[0]) : `these ${rows.length} ${rowNoun}s`;
+        return {
+            title: rows.length === 1 ? `Block ${name(rows[0])}` : `Block ${rows.length} ${rowNoun}s`,
+            description: isAiAgentsTab
+                ? `Guardrails stop prompts and MCP calls from ${subject} for the people you choose.`
+                : `Guardrails stop prompts sent to ${subject} for the people you choose.`,
+        };
     };
 
     const getActionsList = (item) => {
@@ -838,10 +990,26 @@ function AuditData() {
                 content: blockLabel,
                 destructive: true,
                 disabled: !flags.block,
-                onAction: () => guard(flags.block, () => bulkUpdateServers("Rejected", selectedIds)),
+                onAction: () => guard(flags.block, () => setBlockRequest({
+                    ...mcpBlockDialogCopy(rows.map(r => r.mcpServerName)),
+                    initialScope: null,
+                    onBlock: (scope) => bulkUpdateServers("Rejected", selectedIds, scope),
+                })),
                 requires: 'api/updateAuditData',
             },
         ];
+        // Already blocked: change who the block applies to; a single row starts from its current scope.
+        if (rows.length === selectedIds.length && rows.every(r => r?.remarks === 'Rejected')) {
+            actions.push({
+                content: "Change who is blocked",
+                onAction: () => setBlockRequest({
+                    ...mcpBlockDialogCopy(rows.map(r => r.mcpServerName)),
+                    initialScope: n === 1 ? blockScopeOf(rows[0]) : null,
+                    onBlock: (scope) => bulkUpdateServers("Rejected", selectedIds, scope),
+                }),
+                requires: 'api/updateAuditData',
+            });
+        }
         if (flags.conditional && rows.length === selectedIds.length) {
             actions.push({
                 content: n === 1 ? "Conditionally allow this server" : "Conditionally allow selected servers",
@@ -944,6 +1112,52 @@ function AuditData() {
                     endpointRowCacheRef.current[String(dataObj.id)] = dataObj;
                 });
                 total = filtered.length;
+            } catch (e) {}
+            setTabCounts((prev) => ({ ...prev, [selectedTab]: total }));
+            setLoading(false);
+            return { value: ret, total };
+        }
+
+        // LLMs / AI Agents tab: one row per site / agent, same flow as the MCP tab's flat fetch.
+        if (isLlmsTab) {
+            try {
+                const res = await api.fetchLlmAuditData(sortKey, sortOrder, skip, limit,
+                    { ...filterParams, lastDetected: [startTimestamp, endTimestamp] }, queryValue, auditType);
+                endpointRowCacheRef.current = {};
+                (res?.auditData || []).forEach((r) => {
+                    const dataObj = convertDataIntoTableFormat(r, null, null);
+                    const isBlocked = r?.remarks === 'Rejected';
+                    dataObj.id = isAiAgentsTab ? r.resourceName : r.hexId;
+                    dataObj.resourceName = r.resourceName;
+                    dataObj.isBlocked = isBlocked;
+                    // Block scope, read back by "Change who is blocked".
+                    dataObj.userMetadata = r.userMetadata;
+                    dataObj.targetTags = r.targetTags;
+                    dataObj.negatedTargetTags = r.negatedTargetTags;
+                    dataObj.targetDeviceIds = r.targetDeviceIds;
+                    dataObj.negatedTargetDeviceIds = r.negatedTargetDeviceIds;
+                    dataObj.negatedTargetUserNames = r.negatedTargetUserNames;
+                    // Same Status cell as the Skills tab.
+                    dataObj.statusComp = (
+                        <VerticalStack gap="0">
+                            <Text variant="bodyMd" color={isBlocked ? 'critical' : 'success'}>
+                                {isBlocked ? 'Blocked' : 'Allowed'}
+                            </Text>
+                            {isBlocked && <BlockScopeSummary row={r} />}
+                        </VerticalStack>
+                    );
+                    dataObj.llmComp = (
+                        <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                            <Box className="audit-table-icon">
+                                <CollectionIcon hostName={r.resourceName} assetTagValue={r.resourceName} displayName={r.resourceName} />
+                            </Box>
+                            <Text>{isAiAgentsTab ? formatDisplayName(r.resourceName) : r.resourceName}</Text>
+                        </HorizontalStack>
+                    );
+                    ret.push(dataObj);
+                    endpointRowCacheRef.current[String(dataObj.id)] = dataObj;
+                });
+                total = res?.total || 0;
             } catch (e) {}
             setTabCounts((prev) => ({ ...prev, [selectedTab]: total }));
             setLoading(false);
@@ -1127,6 +1341,14 @@ function AuditData() {
                 filtersEndpointSecurity[2].choices = Array.from(agents).sort().map(a => ({ label: a, value: a }))
                 filtersEndpointSecurity[3].choices = Array.from(servers).sort().map(s => ({ label: s, value: s }))
             } catch (e) {}
+            try {
+                const llmRes = await api.fetchLlmAuditData('lastDetected', -1, 0, 1, {}, '')
+                filtersLlms[0].choices = (llmRes?.auditFilterOptions?.markedBy || []).map(u => ({ label: u, value: u }))
+            } catch (e) {}
+            try {
+                const agentRes = await api.fetchLlmAuditData('lastDetected', -1, 0, 1, {}, '', 'ai-agent')
+                filtersAiAgents[0].choices = (agentRes?.auditFilterOptions?.markedBy || []).map(u => ({ label: u, value: u }))
+            } catch (e) {}
             setFilterVersion(v => v + 1)
         }
     }
@@ -1179,6 +1401,15 @@ function AuditData() {
             }
         };
 
+        const countLlms = async (type) => {
+            try {
+                const res = await api.fetchLlmAuditData('lastDetected', -1, 0, 1, { lastDetected: [startTimestamp, endTimestamp] }, '', type);
+                return res?.total || 0;
+            } catch {
+                return 0;
+            }
+        };
+
         (async () => {
             const targets = [];
             // [tabId, typeFilter, merge, scopeByCollection]
@@ -1207,6 +1438,16 @@ function AuditData() {
                 const vendorsTotal = await countVendors();
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.VENDORS]: vendorsTotal }));
+            }
+            if (isEndpointSecurity && selectedTab !== TAB_IDS.LLMS) {
+                const llmsTotal = await countLlms('browser-llm');
+                if (cancelled) return;
+                setTabCounts((prev) => ({ ...prev, [TAB_IDS.LLMS]: llmsTotal }));
+            }
+            if (isEndpointSecurity && selectedTab !== TAB_IDS.AI_AGENTS) {
+                const agentsTotal = await countLlms('ai-agent');
+                if (cancelled) return;
+                setTabCounts((prev) => ({ ...prev, [TAB_IDS.AI_AGENTS]: agentsTotal }));
             }
         })();
 
@@ -1239,11 +1480,11 @@ function AuditData() {
             primaryAction={primaryActions}
             components = {[
                 <GithubServerTable
-                        key={startTimestamp + endTimestamp + (useEndpointMergedView ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(useEndpointMergedView) + String(registryConfigured) + `-${selectedTab}`}
+                        key={startTimestamp + endTimestamp + (useEndpointMergedView || isLlmsTab ? filterVersion : filtersDefault[1].choices.length + filtersDefault[3].choices.length) + String(useEndpointMergedView) + String(registryConfigured) + `-${selectedTab}`}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
-                        sortOptions={sortOptions}
+                        sortOptions={isLlmsTab ? sortOptionsLlms : sortOptions}
                         disambiguateLabel={disambiguateLabel}
                         loading={loading}
                         loadingText="Loading audit data..."
@@ -1274,7 +1515,9 @@ function AuditData() {
                                 }
                                 : isVendorsTab
                                     ? { selectable: true, promotedBulkActions: vendorPromotedBulkActions}
-                                    : { getActions: (item) => getActionsList(item), hasRowActions: true }
+                                    : isLlmsTab
+                                        ? { selectable: true, promotedBulkActions: llmPromotedBulkActions }
+                                        : { getActions: (item) => getActionsList(item), hasRowActions: true }
                         )}
                 />,
             ]}
@@ -1289,6 +1532,7 @@ function AuditData() {
                         startTimestamp={startTimestamp}
                         endTimestamp={endTimestamp}
                         onRequestConditional={handleRequestConditional}
+                        onRequestBlock={handleRequestBlock}
                         onAfterUpdate={handleAfterDrawerUpdate}
                         onAddToAllowlist={(item) => addToMcpAllowlist(item?.mcpServerName)}
                         isEndpointSecurity={isEndpointSecurity}
@@ -1322,6 +1566,18 @@ function AuditData() {
                         api.updateAuditData(selectedAuditItem?.hexId, null, approvalData).then(() => window.location.reload())
                     }}
                     auditItem={selectedAuditItem}
+                />
+            )}
+            {blockRequest && (
+                <BlockScopeModal
+                    title={blockRequest.title}
+                    description={blockRequest.description}
+                    initialScope={blockRequest.initialScope}
+                    onClose={() => setBlockRequest(null)}
+                    onBlock={async (scope) => {
+                        await blockRequest.onBlock(scope);
+                        setBlockRequest(null);
+                    }}
                 />
             )}
         </>

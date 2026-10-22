@@ -6,7 +6,7 @@ import { EvidenceBlock, HumanApprovalActions, isHumanApprovalPending as isPendin
 import NearbyMessages from "./NearbyMessages";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import testingApi from "../../testing/api"
 import threatDetectionApi from "../api"
 import guardrailApi from "../../guardrails/api"
@@ -21,13 +21,15 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation, extractBehaviour, storedRemediationMarkdown } from "../utils/formatUtils";
+import { extractOverviewAndRemediation, extractBehaviour, extractRuleViolated, resolveComplianceClauseMap, storedRemediationMarkdown } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import OwaspTag from "../../guardrails/components/OwaspTag";
 import ComplianceTags from "../../guardrails/components/ComplianceTags";
 import { parseConfigEvidence } from "../../guardrails/violations/violationsData";
+import { buildEvidenceVulnerabilitySegments } from "../utils/evidenceHighlight";
+import sampleDataTransform from "../../../components/shared/customDiffEditor";
 import { usePermissions, withPermissions } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
 
@@ -169,7 +171,30 @@ function ApproveServerButton({ policyName, serverId, alreadyApproved }) {
 }
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter, humanResponse: humanResponseProp } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData: rowInfo, threatFiltersMap, eventId, eventStatus, onStatusUpdate, onAddAsSearchFilter, humanResponse: humanResponseProp } = props
+
+    // Several attempts (e.g. a grouped activity's events): show the selected attempt's own details,
+    // derived the same way as for its table row. Actions still apply to the row.
+    const [attemptIndex, setAttemptIndex] = useState(0);
+    const attempt = Array.isArray(data) && data.length > 1 ? data[attemptIndex] : null;
+    const moreInfoData = useMemo(() => {
+        if (!attempt?.filterId) return rowInfo;
+        const { guardrailComplianceMap } = SessionStore.getState();
+        return {
+            ...rowInfo,
+            templateId: attempt.filterId,
+            severity: attempt.severity || rowInfo?.severity,
+            url: attempt.endpoint || rowInfo?.url,
+            method: attempt.method || rowInfo?.method,
+            metadata: attempt.metadata,
+            ruleViolated: extractRuleViolated(attempt.metadata),
+            behaviour: extractBehaviour(attempt.metadata),
+            evidenceLine: attempt.evidenceLine,
+            remediation: attempt.remediation,
+            complianceMap: resolveComplianceClauseMap({ filterId: attempt.filterId, metadata: attempt.metadata },
+                isAgenticSecurityCategory() || isEndpointSecurityCategory(), threatFiltersMap || {}, guardrailComplianceMap || {}),
+        };
+    }, [rowInfo, attempt, threatFiltersMap]);
     const resolvedThreatFiltersMap = threatFiltersMap || {};
     const { canCall, canCallAll } = usePermissions();
 
@@ -453,6 +478,20 @@ function SampleDetails(props) {
     }
 
     const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
+    const valuesTabRedactHeaders = window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : [];
+    // Built once per set of attempts: the pager goes back to the first attempt whenever this list changes,
+    // so paging (which re-renders with the selected attempt's details) must not rebuild it.
+    const attemptSamples = useMemo(() => (Array.isArray(data) ? data : []).map((result) => {
+        let vulnerabilitySegments = [];
+        if (useGuardrailDescription) {
+            const { requestText, responseText } = sampleDataTransform.buildRenderedText(
+                { message: result.orig, highlightPaths: [] },
+                { redactHeaders: valuesTabRedactHeaders }
+            );
+            vulnerabilitySegments = buildEvidenceVulnerabilitySegments(result.evidenceLine || rowInfo?.evidenceLine, requestText, responseText);
+        }
+        return { message: result.orig, highlightPaths: [], metadata: result.metadata, vulnerabilitySegments }
+    }), [data, rowInfo?.evidenceLine]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const ValuesTab = data.length > 0 && {
         id: 'values',
@@ -502,14 +541,14 @@ function SampleDetails(props) {
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
                 <SampleDataList
                     key={`Sample values-${eventId || 'default'}`}
+                    onPageChange={setAttemptIndex}
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
                     isWebSocket={func.isWebSocketApiType(moreInfoData?.apiType)}
-                    sampleData={data && Array.isArray(data) && data.length > 0 ? data.map((result) => {
-                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
-                    }) : []}
-                    redactHeaders={window.ACTIVE_ACCOUNT === 1758787662 ? ['authorization'] : []}
+                    sampleData={attemptSamples}
+                    redactHeaders={valuesTabRedactHeaders}
+                    evidenceLine={useGuardrailDescription ? moreInfoData?.evidenceLine : undefined}
                     onAddAsSearchFilter={onAddAsSearchFilter}
                     showDetectionReason
                 />

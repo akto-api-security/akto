@@ -42,7 +42,8 @@ public class ScriptAction extends UserAction {
     }
 
     private static final Set<Integer> whiteListedAccounts = new HashSet<>(Arrays.asList(
-        1764738582
+        1764738582,
+        1789954857
     ));
 
     boolean isWhiteListedAccount(){

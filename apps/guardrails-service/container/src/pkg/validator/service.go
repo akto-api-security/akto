@@ -52,8 +52,12 @@ type policyCache struct {
 	// anomalyByPolicy maps policy ID (== policy name) to its anomaly config.
 	// Only policies with anomaly detection enabled appear here.
 	anomalyByPolicy map[string]*anomalyCfg
-	lastFetched     time.Time
-	mu              sync.RWMutex
+	// rejectedLLMSites holds browser LLM sites marked Rejected in Audit Data, with who each block applies to.
+	rejectedLLMSites map[string]auditScope
+	// rejectedAIAgents maps names of AI agents marked Rejected in Audit Data to their row and scope.
+	rejectedAIAgents map[string]rejectedAgent
+	lastFetched      time.Time
+	mu               sync.RWMutex
 }
 
 // collectionTag represents a single key-value tag on a collection
@@ -429,12 +433,21 @@ func deviceIDsContain(ids []string, label string) bool {
 	if label == "" {
 		return false
 	}
+	label = collapseDashes(label)
 	for _, id := range ids {
-		if strings.EqualFold(id, label) {
+		if strings.EqualFold(collapseDashes(id), label) {
 			return true
 		}
 	}
 	return false
+}
+
+// collapseDashes folds dash runs, as hooks dash each byte of a non-ASCII name ("rohan---s" vs "rohan-s").
+func collapseDashes(s string) string {
+	for strings.Contains(s, "--") {
+		s = strings.ReplaceAll(s, "--", "-")
+	}
+	return s
 }
 
 // filterPoliciesByDevice filters device/user-targeted policies, combining two independent ways a
@@ -1047,7 +1060,7 @@ func (s *Service) runPolicyRefresher() {
 func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
-	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, decisions, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -1063,6 +1076,8 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.blockedHosts = blockedHostRules
 	s.cache.anomalyByPolicy = anomalyMap
 	s.cache.ignorePhraseMatchersByPolicy = ignorePhraseMatchersByPolicy
+	s.cache.rejectedLLMSites = decisions.llmSites
+	s.cache.rejectedAIAgents = decisions.agents
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
@@ -1595,7 +1610,12 @@ func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCt
 		Severity:     "HIGH",
 		Reason:       reason,
 	}
+	return s.reportAndBlock(params, valCtx, payloadToValidate, sessionID, requestID, metadata, behaviour)
+}
 
+// reportAndBlock tracks the block on the session, reports the threat and returns a block result.
+func (s *Service) reportAndBlock(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string, metadata types.ThreatMetadata, behaviour string) *mcp.ValidationResult {
+	reason := metadata.Reason
 	if s.sessionMgr != nil && sessionID != "" {
 		s.sessionMgr.TrackResponse(sessionID, requestID, reason, true)
 		s.sessionMgr.UpdateBlockedReason(sessionID, reason)
@@ -1826,7 +1846,7 @@ func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.Validate
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, map[string]*anomalyCfg, error) {
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, map[string]*anomalyCfg, auditDecisions, error) {
 	var rawGuardrailPolicies, rawAuditPolicies []byte
 
 	g := new(errgroup.Group)
@@ -1848,7 +1868,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil
 	})
 	if err := g.Wait(); err != nil {
-		return nil, nil, nil, false, nil, nil, nil, err
+		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -1863,7 +1883,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
 			zap.String("rawResponse", string(rawGuardrailPolicies)))
-		return nil, nil, nil, false, nil, nil, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
 	s.logger.Info("Parsed guardrail policies",
@@ -1990,7 +2010,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("compiledRules", len(compiledRules)),
 		zap.Int("ignorePhrasePolicies", len(ignorePhraseMatchersByPolicy)))
 
-	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, nil
+	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, rejectedAuditDecisions(rawAuditPolicies), nil
 }
 
 // validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
@@ -2382,6 +2402,16 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	if blockResult := s.checkBlockedHost(params, valCtx, payloadBare, sessionID, requestID, policies); blockResult != nil {
 		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadBare, sessionID)
 		return blockResult, activityID, nil
+	}
+
+	// Browser LLM / AI agent rejected in Audit Data; like MCP audit, enforced only when a policy applies.
+	if len(policies) > 0 {
+		if blockResult := s.checkRejectedLLM(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+			return blockResult, "", nil
+		}
+		if blockResult := s.checkRejectedAgent(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+			return blockResult, "", nil
+		}
 	}
 
 	// Anomaly detection: check each filtered policy's anomaly config.
@@ -2983,8 +3013,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 
 		var reqResult, respResult *mcp.ValidationResult
 
-		// Validate request payload if present
-		if data.RequestPayload != "" {
+		// Validate request payload if present, unless the http-proxy caller opted out
+		if data.RequestPayload != "" && data.RequestGuardrails != "false" {
 			s.logger.Debug("Processing request",
 				zap.Int("index", i),
 				zap.String("method", data.Method),
@@ -3074,8 +3104,8 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			}
 		}
 
-		// Validate response payload if present
-		if data.ResponsePayload != "" {
+		// Validate response payload if present, unless the http-proxy caller opted out
+		if data.ResponsePayload != "" && data.ResponseGuardrails != "false" {
 			respPayload := s.extractPayloadForValidation(data.ResponsePayload, data.Method, data.Path, false)
 			processResult, err := s.processor.ProcessResponse(ctx, respPayload, valCtx, itemPolicies)
 			if err != nil {

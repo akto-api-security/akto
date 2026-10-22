@@ -38,7 +38,7 @@ import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurit
 import useAgenticFilter, { FILTER_TYPES, parseFilterFromUrl } from "./useAgenticFilter";
 import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData, fetchAndCacheAgenticTrafficRiskBundle, fetchAndCacheAgenticSensitiveInfo } from "../agentic/constants";
 import AgentEndpointTreeTable from "./AgentEndpointTreeTable";
-import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "./endpointShieldHelper";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection, getResolvedUsernameForCollection } from "./endpointShieldHelper";
 import { sendQuery } from "../../agentic/services/agenticService";
 import AgenticThinkingBox from "../../agentic/components/AgenticThinkingBox";
 import ConversationHistory from "../../testing/TestRunResultPage/components/ConversationHistory";
@@ -334,6 +334,9 @@ const issueFields = (collection, severityInfoMap) => {
     }
 }
 
+const hasInferenceHooksTag = (envType) =>
+    Array.isArray(envType) && envType.some(tag => tag?.keyName === "inference-hooks");
+
 // Transform raw collection data to plain data (without JSX) for filtering/sorting
 // This function is passed to the table component for lazy transformation
 const transformRawCollectionData = (rawCollection, transformMaps) => {
@@ -427,7 +430,10 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         disableClick: rawCollection.deactivated || false,
         deactivatedRiskScore: rawCollection.deactivated ? (riskScore - 10) : riskScore,
         activatedRiskScore: -1 * (rawCollection.deactivated ? riskScore : (riskScore - 10)),
-        username: getUsernameForCollection(rawCollection, usernameMap),
+        // Inference-hook collections have no Endpoint Shield module, so they also read the username collection tag.
+        username: hasInferenceHooksTag(rawEnvType)
+            ? getResolvedUsernameForCollection(rawCollection, usernameMap)
+            : getUsernameForCollection(rawCollection, usernameMap),
         ...tagKeyValues  // Add individual tag key-value pairs for filtering
     };
 };

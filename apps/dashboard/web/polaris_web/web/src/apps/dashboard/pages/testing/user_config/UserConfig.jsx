@@ -36,8 +36,9 @@ function UserConfig() {
     const [commonTestTemplate2, setCommonTestTemplate2] = useState("");
     const [initialDeltaTime, setInitialDeltaTime] = useState(120) ;
     const { canCall } = usePermissions()
-    // rate limit, ignore time and pre/post scripts are admin settings
+    // rate limit and ignore time are admin settings
     const canSeeAdminSettings = canCall('api/fetchAdminSettings')
+    const canEditScripts = canCall('api/addScript')
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
 
@@ -70,7 +71,7 @@ function UserConfig() {
                 LocalStore.getState().setDefaultIgnoreSummaryTime(val)
             })
         }
-        if (adminSettingsAllowed) try {
+        if (permissions.canCall('api/addScript')) try {
             await api.fetchScript('PRE_REQUEST').then((resp)=> {
                 if (resp && resp.testScript) {
                     const js = resp.testScript.javascript ?? ""
@@ -350,7 +351,7 @@ function UserConfig() {
 
     let components = canSeeAdminSettings ? [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime, commonTemplateComponent] : [<TestCollectionConfiguration/>, commonTemplateComponent]
 
-    if (canSeeAdminSettings && func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
+    if (canEditScripts && func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
         components.push(preRequestScriptComponent)
         components.push(postRequestScriptComponent)
     }

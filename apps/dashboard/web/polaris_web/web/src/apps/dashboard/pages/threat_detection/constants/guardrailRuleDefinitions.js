@@ -727,6 +727,64 @@ This is **working as intended**. The host was blocked on purpose by your organis
 `
     },
 
+    // ─── Blocked LLM (Audit Data → LLMs) ───────────────────────────────────────
+    {
+        prefixes: ["LLMAccessRejected"],
+        heading: "Blocked LLM",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A prompt was sent to an LLM website that an administrator has blocked in Audit Data → LLMs. Users can still open the website, but prompts sent to it are blocked."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "Blocking an LLM website prevents company data from being shared with AI services that have not been approved for use within the organisation."
+            }
+        ],
+        remediation: `## Recommended actions
+
+### Review the request
+1. Identify the user and the LLM website from the event details.
+2. Check the **Values** tab for any sensitive or confidential data in the prompt.
+
+### Update access
+- **To allow the website:** go to Audit Data → LLMs, select the website and click **Allow**. The change applies within a minute.
+- **To keep it blocked:** no action is required. Direct the user to an approved AI tool.
+
+### Ongoing review
+Review the LLMs tab in Audit Data regularly and allow or block newly discovered websites.
+`
+    },
+
+    // ─── Blocked AI Agent (Audit Data → AI Agents) ─────────────────────────────
+    {
+        prefixes: ["AIAgentAccessRejected"],
+        heading: "Blocked AI Agent",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A request was made by an AI agent that an administrator has blocked in Audit Data → AI Agents. All prompts and MCP calls from this agent are blocked for the users and devices the block covers."
+            },
+            {
+                heading: "Why is it blocked?",
+                body: "Blocking an AI agent prevents company data and systems from being accessed by agents that have not been approved for use within the organisation."
+            }
+        ],
+        remediation: `## Recommended actions
+
+### Review the request
+1. Identify the user, device and AI agent from the event details.
+2. Check the **Values** tab for any sensitive or confidential data in the request.
+
+### Update access
+- **To allow the agent:** go to Audit Data → AI Agents, select the agent and click **Allow**. The change applies within a minute.
+- **To keep it blocked:** no action is required. Direct the user to an approved AI agent.
+
+### Ongoing review
+Review the AI Agents tab in Audit Data regularly and allow or block newly discovered agents.
+`
+    },
+
     // ─── Audit Controls (ComponentAccess, Approval, IP, Endpoint) ──────────────
     {
         prefixes: ["ComponentAccessRejected", "ApprovalConditionsNotDefined", "ApprovalExpired", "IPNotInAllowedList", "EndpointNotWhitelisted"],

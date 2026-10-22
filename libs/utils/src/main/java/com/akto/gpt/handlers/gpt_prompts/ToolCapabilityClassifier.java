@@ -13,6 +13,9 @@ import javax.validation.ValidationException;
  */
 public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "tool-capability"; }
+
     public static final String TOOL_NAME = "toolName";
     public static final String SAMPLE_DATA = "sampleData";
     public static final String DANGEROUS = "dangerous";
@@ -36,10 +39,10 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
         catch (Exception e) { return null; }
     }
 
-    // The verdict is ~25 tokens (measured); 300 keeps a stray reasoning burst from returning empty
+    // The verdict is ~25 tokens (measured); 500 keeps a stray reasoning burst from returning empty
     // content, which the cron would otherwise retry on every run.
     @Override
-    protected int getMaxTokens() { return 300; }
+    protected int getMaxTokens() { return 500; }
 
     @Override
     protected double getTemperature() { return 0.0; }

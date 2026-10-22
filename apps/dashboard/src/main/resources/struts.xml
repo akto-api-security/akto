@@ -593,6 +593,115 @@
             </result>
         </action>
 
+        <!-- Endpoint Shield diagnostics (device panel → Diagnostics tab) -->
+        <action name="api/runEndpointShieldDiagnostic" class="com.akto.action.endpoint_shield.EndpointShieldDiagnosticsAction" method="runEndpointShieldDiagnostic">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User ran diagnostics on an endpoint device</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^commandId$</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointShieldDiagnosticRuns" class="com.akto.action.endpoint_shield.EndpointShieldDiagnosticsAction" method="fetchEndpointShieldDiagnosticRuns">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^runs.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/cancelEndpointShieldDiagnosticRun" class="com.akto.action.endpoint_shield.EndpointShieldDiagnosticsAction" method="cancelEndpointShieldDiagnosticRun">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User cancelled a diagnostics run on an endpoint device</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^commandId$</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointShieldDiagnostics" class="com.akto.action.endpoint_shield.EndpointShieldDiagnosticsAction" method="fetchEndpointShieldDiagnostics">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchEndpointShieldDiagnostic" class="com.akto.action.endpoint_shield.EndpointShieldDiagnosticsAction" method="fetchEndpointShieldDiagnostic">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchEndpointShieldAgents" class="com.akto.action.settings.ModuleInfoAction" method="fetchEndpointShieldAgents">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2210,6 +2319,47 @@
             </result>
             <result name="SUCCESS" type="json">
             </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchLlmAuditData" class="com.akto.action.AuditDataAction" method="fetchLlmAuditData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateLlmAuditData" class="com.akto.action.AuditDataAction" method="updateLlmAuditData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">SENSITIVE_DATA</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated LLM / AI agent access in audit data</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -7783,7 +7933,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User created a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7806,7 +7955,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated test role meta</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">TEST_ROLE_SCOPE_ROLES</param>
@@ -7836,7 +7984,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7859,7 +8006,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7882,7 +8028,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User deleted an auth mechanism from a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7905,7 +8050,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated an auth mechanism in a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -7928,7 +8072,6 @@
                 <param name="featureLabel">TEST_ROLES</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added an auth mechanism to a test role</param>
-                <param name="collectionScope">ACCOUNT_WIDE</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -10061,7 +10204,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">TEST_SCRIPTS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User updated a script</param>
             </interceptor-ref>
@@ -10090,7 +10233,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_ACTIONS</param>
+                <param name="featureLabel">TEST_SCRIPTS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
@@ -10115,7 +10258,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="featureLabel">TEST_SCRIPTS</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User added a script</param>
             </interceptor-ref>
@@ -12614,6 +12757,41 @@
                     name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json"> </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/backfillActivityGroupKeys"
+            class="com.akto.action.threat_detection.SuspectSampleDataAction"
+            method="backfillActivityGroupKeys">
+            <interceptor-ref name="json" />
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User grouped existing guardrail activities</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^backfilledGroupKeys</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

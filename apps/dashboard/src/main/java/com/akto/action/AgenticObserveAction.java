@@ -729,6 +729,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         String pluginStatus;
         String pluginScope;
 
+        String hookUsername;
         DeviceAcc(String deviceId) { this.deviceId = deviceId; }
 
         BasicDBObject toResponse() {
@@ -783,6 +784,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Double r = risk.get(idStr);
             double collRisk = r != null ? r : 0.0;
             DeviceAcc d = devices.computeIfAbsent(deviceId, DeviceAcc::new);
+            if (d.hookUsername == null) d.hookUsername = inferenceHookUsername(c);
             if (collRisk > d.riskScore) d.riskScore = collRisk;
             if (collTraffic > d.lastSeenEpoch) d.lastSeenEpoch = collTraffic;
             if (serviceName != null) d.services.add(serviceName);
@@ -803,6 +805,20 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         List<BasicDBObject> out = new ArrayList<>();
         for (DeviceAcc d : devices.values()) out.add(d.toResponse());
         return out;
+    }
+
+    // Inference-hook collections have no Endpoint Shield module, so their username comes from the username collection tag.
+    private static String inferenceHookUsername(ApiCollection c) {
+        List<CollectionTags> tags = c.getEnvType();
+        if (tags == null) return null;
+        boolean isHook = false;
+        for (CollectionTags t : tags) {
+            if (t != null && "inference-hooks".equals(t.getKeyName())) {
+                isHook = true;
+                break;
+            }
+        }
+        return isHook ? findUsernameFromEnvTypeTags(tags) : null;
     }
 
     private static String resolveUsernameByDeviceId(String deviceId, Map<String, String> usernameMap) {
@@ -861,7 +877,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             List<BasicDBObject> rows = new ArrayList<>();
             for (DeviceAcc d : devices.values()) {
                 BasicDBObject row = d.toResponse();
-                row.put("username", resolveUsernameByDeviceId(d.deviceId, usernames));
+                String resolvedUsername = resolveUsernameByDeviceId(d.deviceId, usernames);
+                if ("-".equals(resolvedUsername) && d.hookUsername != null) resolvedUsername = d.hookUsername;
+                row.put("username", resolvedUsername);
                 rows.add(row);
             }
 
@@ -1009,6 +1027,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             EndpointGroup g = groups.computeIfAbsent(deviceId, id -> {
                 EndpointGroup ng = new EndpointGroup(id);
                 ng.username = resolveUsernameByDeviceId(id, usernameMap);
+                if ("-".equals(ng.username)) {
+                    String hookUsername = inferenceHookUsername(c);
+                    if (hookUsername != null) ng.username = hookUsername;
+                }
                 return ng;
             });
             g.children.add(child);
@@ -3900,5 +3922,51 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             addActionError("Error fetching device endpoints stats: " + e.getMessage());
             return ERROR.toUpperCase();
         }
+    }
+
+    // Agentic assets' AI Agents as audit rows (resourceName = group key), the source of Audit Data -> AI Agents.
+    public List<McpAuditInfo> fetchAiAgentAuditRows() {
+        ClassificationCacheEntry cached = getOrBuildClassification(getOrComputeTrafficMap(), getOrComputeRiskScoreMap(), Collections.emptyMap());
+        List<McpAuditInfo> rows = new ArrayList<>();
+        for (GroupSummary g : cached.groups.values()) {
+            if (!AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) continue;
+            McpAuditInfo row = new McpAuditInfo();
+            row.setType(Constants.AKTO_AI_AGENT_TAG);
+            row.setResourceName(g.groupKey);
+            row.setLastDetected(g.maxTrafficTimestamp);
+            row.setRawValues(new ArrayList<>(aiAgentRawValues(g)));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    // Names guardrails matches the agent on: tag values plus host segments that aren't another known agent.
+    private static Set<String> aiAgentRawValues(GroupSummary g) {
+        Set<String> raws = new TreeSet<>();
+        if (!"agent".equals(g.rowType)) {
+            raws.add(g.groupKey.toLowerCase(Locale.ROOT));
+            return raws;
+        }
+        for (String v : g.rawTagValues) raws.add(v.toLowerCase(Locale.ROOT));
+        for (String host : g.hostNames) {
+            String seg = hostAgentSegment(host);
+            if (seg != null && !namesOtherAgent(seg, g.groupKey)) raws.add(seg);
+        }
+        return raws;
+    }
+
+    // "claude" on a cursor row is another agent; "ollama-devstral-latest" isn't, despite the substring "vs".
+    private static boolean namesOtherAgent(String seg, String key) {
+        String segKey = McpClientRegistry.resolveClientKey(seg);
+        McpClientRegistry.ClientInfo info = McpClientRegistry.findClientInfo(segKey);
+        return !key.equals(segKey) && info != null && segKey.equals(info.keyword);
+    }
+
+    // Agent segment of "{device}.{agent}.{server}", or everything after "ai-agent" in "{device}.ai-agent.{agent}".
+    private static String hostAgentSegment(String host) {
+        String[] parts = DOT_SPLIT.split(host.toLowerCase(Locale.ROOT));
+        if (parts.length < 3) return null;
+        if (Constants.AKTO_AI_AGENT_TAG.equals(parts[1])) return StringUtils.trimToNull(String.join(".", Arrays.copyOfRange(parts, 2, parts.length)));
+        return parts[1];
     }
 }

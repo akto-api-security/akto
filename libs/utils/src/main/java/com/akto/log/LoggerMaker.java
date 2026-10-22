@@ -108,7 +108,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY, GUARDRAILS_SERVICE, ACCOUNT_JOB_EXECUTOR, SMART_TESTING, DAST
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION, ENDPOINT_SHIELD, AGENTIC_TESTING, AWS_API_GATEWAY, GUARDRAILS_SERVICE, ACCOUNT_JOB_EXECUTOR, SMART_TESTING, DAST, MINI_TESTING_ORCHESTRATOR
     }
 
     private static AccountSettings accountSettings = null;
@@ -454,6 +454,9 @@ public class LoggerMaker  {
                 break;
             case DAST:
                 logs = DastLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
+                break;
+            case MINI_TESTING_ORCHESTRATOR:
+                logs = MiniTestingOrchestratorLogsDao.instance.findAll(filters, 0, 1_000_000, sortAscending, standardProjection);
                 break;
             default:
                 break;

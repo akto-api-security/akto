@@ -17,6 +17,9 @@ public class InsightNarrativeHandler extends AbstractGroundedNarrativeHandler {
     private static final int MAX_WORDS = 260;
     private static final int MAX_SUMMARY_FIELD_WORDS = 60;
 
+    @Override
+    protected String getServiceKey() { return "insights-overview"; }
+
     /** Package-private (not private): InsightNarrativeHandlerTest exercises the literal-rejection
      *  guard directly against hand-built responses, rather than only through a real `call()`. */
     @Override

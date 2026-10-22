@@ -16,6 +16,9 @@ import java.util.List;
  */
 public class AgentDomainClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "agent-domain"; }
+
     public static final String DESCRIPTION = "description";
     public static final String DOMAINS = "domains";
 

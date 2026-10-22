@@ -36,6 +36,14 @@ public class MaliciousEventDto {
   private List<OwaspCategory> owaspCategories;
   private String remediation;
   private String evidenceLine;
+  // Bedrock caller ARN + prompt hash: events with the same key close together in time are one activity.
+  private String groupKey;
+  // Set only by the grouped activity list (never stored): how many events are behind this row, the first
+  // one's time, their ids, and the policies they tripped.
+  private Integer groupCount;
+  private Long groupFirstDetectedAt;
+  private List<String> groupEventIds;
+  private List<String> groupFilterIds;
   public static final String HUMAN_RESPONSE = "humanResponse";
   @JsonProperty("humanResponse")
   private String humanResponse;
@@ -121,6 +129,7 @@ public class MaliciousEventDto {
     this.remediation = builder.remediation;
     this.humanResponse = builder.humanResponse;
     this.evidenceLine = builder.evidenceLine;
+    this.groupKey = builder.groupKey;
   }
 
   public static class Builder {
@@ -152,6 +161,7 @@ public class MaliciousEventDto {
     private String remediation;
     private String humanResponse;
     private String evidenceLine;
+    private String groupKey;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -275,6 +285,11 @@ public class MaliciousEventDto {
 
     public Builder setRemediation(String remediation) {
       this.remediation = remediation;
+      return this;
+    }
+
+    public Builder setGroupKey(String groupKey) {
+      this.groupKey = groupKey;
       return this;
     }
 
@@ -524,6 +539,46 @@ public class MaliciousEventDto {
 
   public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
     this.owaspCategories = owaspCategories;
+  }
+
+  public String getGroupKey() {
+    return groupKey;
+  }
+
+  public void setGroupKey(String groupKey) {
+    this.groupKey = groupKey;
+  }
+
+  public Integer getGroupCount() {
+    return groupCount;
+  }
+
+  public void setGroupCount(Integer groupCount) {
+    this.groupCount = groupCount;
+  }
+
+  public Long getGroupFirstDetectedAt() {
+    return groupFirstDetectedAt;
+  }
+
+  public void setGroupFirstDetectedAt(Long groupFirstDetectedAt) {
+    this.groupFirstDetectedAt = groupFirstDetectedAt;
+  }
+
+  public List<String> getGroupEventIds() {
+    return groupEventIds;
+  }
+
+  public void setGroupEventIds(List<String> groupEventIds) {
+    this.groupEventIds = groupEventIds;
+  }
+
+  public List<String> getGroupFilterIds() {
+    return groupFilterIds;
+  }
+
+  public void setGroupFilterIds(List<String> groupFilterIds) {
+    this.groupFilterIds = groupFilterIds;
   }
 
   public String getHumanResponse() {

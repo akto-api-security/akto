@@ -144,6 +144,13 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+            .post("/backfill_activity_group_keys")
+            .blockingHandler(ctx -> {
+                int updated = dsService.backfillActivityGroupKeys(ctx.get("accountId"));
+                ctx.response().setStatusCode(200).end("{\"updated\": " + updated + "}");
+            });
+
+        router
             .post("/list_malicious_requests")
             .blockingHandler(ctx -> {
                 String contextSource = getContextSourceHeader(ctx);

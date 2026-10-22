@@ -50,6 +50,7 @@ import { extractServiceName } from "@/apps/dashboard/pages/observe/agentic/const
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import P95LatencyGraph from "@/apps/dashboard/components/charts/P95LatencyGraph";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
+import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents as expandRowsToEvents } from "@/apps/dashboard/pages/threat_detection/utils/activityGroups";
 import { fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
@@ -261,6 +262,18 @@ function HumanResponseCellRenderer({ value, data, onHumanApproval }) {
 // Column defs are built dynamically so we can inject backend filter values. showApprove/onApprove
 // add the Needs Approval tab's Action column. On Human Approval the Status column is
 // pending/approved/blocked (every row already has event status HUMAN_APPROVAL).
+// A grouped activity (same prompt from the same Bedrock caller) shows how many events it holds.
+function DetectedCellRenderer({ value, data }) {
+    const time = value != null ? func.epochToDateTime(value) : "";
+    if (!(data?.groupCount > 1)) return time;
+    return (
+        <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <span>{time}</span>
+            <ActivityGroupBadges count={data.groupCount} firstDetectedAt={data.groupFirstDetectedAt} lastDetectedAt={value} policies={data.groupFilterIds} />
+        </HorizontalStack>
+    );
+}
+
 function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval) {
     const humanStatusCol = {
         field: "humanResponse",
@@ -284,6 +297,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: isHumanApprovalTab ? "Reported" : "Detected",
             minWidth: 150,
             valueFormatter: p => p.value != null ? func.epochToDateTime(p.value) : "",
+            cellRenderer: DetectedCellRenderer,
             // Most recent first by default. Declared here (rather than defaulting inside
             // onServerFetch) so the header's sort indicator matches what's actually requested.
             sort: "desc",
@@ -616,6 +630,10 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         deviceId: rawHost,
         remediation: event.remediation || null,
         humanResponse: String(event.humanResponse || HUMAN_RESPONSE.PENDING).toUpperCase(),
+        groupCount: event.groupCount || 0,
+        groupFirstDetectedAt: event.groupFirstDetectedAt || null,
+        groupEventIds: event.groupEventIds || [],
+        groupFilterIds: event.groupFilterIds || [],
     };
 }
 
@@ -917,11 +935,37 @@ function Violations() {
     // orthogonal views, since they're not a status.
     const selectedCard = currentTab === "active" ? "open" : ((isSkillsEvaluationsTab || isNeedsApprovalTab || isMisconfiguredTab || isHumanApprovalTab) ? "other-view" : "other");
     const gridRef = useRef(null);
+
+    const expandToGroupEvents = useCallback((ids) => {
+        const eventIdsByRow = {};
+        gridRef.current?.api?.forEachNode(node => {
+            if (node.data?.groupCount > 1 && node.data.groupEventIds?.length) eventIdsByRow[node.data.id] = node.data.groupEventIds;
+        });
+        return expandRowsToEvents(ids, eventIdsByRow);
+    }, []);
+
     const prevSelectedIdRef = useRef(null);
     const gridFilterKey = useRef(`violations-${Date.now()}`);
     const collectionsMap = PersistStore((state) => state.collectionsMap);
     const usernameMapRef = useRef({});
     const guardrailComplianceMapRef = useRef({});
+
+    // One attempt of a grouped activity, as its own row (built like every table row); it keeps the
+    // row's id and group so actions still apply to the whole activity.
+    const toAttemptRow = useCallback((row, attempt) => ({
+        ...transformEvent({
+            id: attempt.eventId, refId: attempt.refId, filterId: attempt.filterId, severity: attempt.severity,
+            metadata: attempt.metadata, url: attempt.endpoint, method: attempt.method, timestamp: attempt.ts,
+            payload: attempt.orig, evidenceLine: attempt.evidenceLine, remediation: attempt.remediation, status: attempt.status,
+            host: row.host, actor: row.actor, apiCollectionId: row.apiCollectionId, eventType: row.eventType,
+            sessionId: row.sessionId, humanResponse: row.humanResponse,
+        }, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current),
+        id: row.id,
+        groupCount: row.groupCount,
+        groupEventIds: row.groupEventIds,
+        groupFilterIds: row.groupFilterIds,
+        groupFirstDetectedAt: row.groupFirstDetectedAt,
+    }), [collectionsMap]);
     const [usernameMap, setUsernameMap] = useState({});
 
     useEffect(() => {
@@ -1076,6 +1120,7 @@ function Violations() {
 
     // ─── Card selection (Open vs Other) ─────────────────────────────────────
     const [tableKey, setTableKey] = useState(0);
+    const [groupActivities, setGroupActivities] = useState(true);
     const triggerTableRefresh = useCallback(() => setTableKey(k => k + 1), []);
 
     const handleAssetClick = useCallback((hosts) => {
@@ -1198,7 +1243,7 @@ function Violations() {
         if (!row?.id) return;
         try {
             const result = await threatDetectionApi.updateMaliciousEventStatus({
-                eventIds: [row.id],
+                eventIds: expandToGroupEvents([row.id]),
                 humanResponse: response,
             });
             if (result?.updateSuccess) {
@@ -1212,7 +1257,7 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to update human approval");
         }
-    }, [triggerTableRefresh]);
+    }, [expandToGroupEvents, triggerTableRefresh]);
 
     const colDefs = useMemo(
         () => buildColDefs(filterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval),
@@ -1411,6 +1456,8 @@ function Violations() {
             configEvaluationMode,
             riskScoreFilter?.type,
             riskScoreFilter?.filter,
+            undefined,
+            !groupActivities,
         ).then(result => {
             const rawEvents = result?.maliciousEvents || [];
             let transformed = rawEvents.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));
@@ -1430,7 +1477,7 @@ function Violations() {
             }
             return { value: transformed, total, rawEvents };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters, groupActivities]);
 
     const onServerFetch = useCallback((args) => {
         lastServerFetchArgsRef.current = args;
@@ -1499,7 +1546,7 @@ function Violations() {
     }, []);
 
     const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel) => {
-        const ids = getSelectedIds();
+        const ids = expandToGroupEvents(getSelectedIds());
         if (!ids.length) return;
         try {
             const response = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: ids, status });
@@ -1513,10 +1560,10 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to update selected events");
         }
-    }, [getSelectedIds, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
 
     const handleBulkDelete = useCallback(async () => {
-        const ids = getSelectedIds();
+        const ids = expandToGroupEvents(getSelectedIds());
         setDeleteConfirmOpen(false);
         if (!ids.length) return;
         try {
@@ -1531,10 +1578,10 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to delete selected events");
         }
-    }, [getSelectedIds, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
 
     const handleBulkHumanApproval = useCallback(async (response) => {
-        const ids = getSelectedPendingIds();
+        const ids = expandToGroupEvents(getSelectedPendingIds());
         if (!ids.length) {
             func.setToast(true, true, "No pending events selected");
             return;
@@ -1552,7 +1599,7 @@ function Violations() {
         } catch {
             func.setToast(true, true, "Failed to update selected events");
         }
-    }, [getSelectedPendingIds, clearBulkSelection, triggerTableRefresh]);
+    }, [getSelectedPendingIds, expandToGroupEvents, clearBulkSelection, triggerTableRefresh]);
 
     const bulkActions = useMemo(() => {
         // AgGridTable disables (with the reason) actions whose `requires` the role can't call
@@ -1662,11 +1709,14 @@ function Violations() {
                 searchValue={payloadSearch}
                 onSearchChange={setPayloadSearch}
                 searchAccessory={
-                    <AdvancedPayloadSearch
-                        filters={advancedFilters}
-                        onChange={setAdvancedFilters}
-                        showTags={false}
-                    />
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <ActivityGroupingToggle pressed={groupActivities} onToggle={() => { setGroupActivities(!groupActivities); triggerTableRefresh(); }} />
+                        <AdvancedPayloadSearch
+                            filters={advancedFilters}
+                            onChange={setAdvancedFilters}
+                            showTags={false}
+                        />
+                    </HorizontalStack>
                 }
                 searchBelow={advancedFilters.length > 0 ? (
                     <AdvancedPayloadSearch
@@ -1755,6 +1805,7 @@ function Violations() {
         <ViolationFlyout
             key="flyout"
             violation={selectedViolation}
+            toAttemptRow={toAttemptRow}
             show={selectedViolation !== null}
             onClose={() => setSelectedViolation(null)}
             onAddAsSearchFilter={handleAddSearchFilter}

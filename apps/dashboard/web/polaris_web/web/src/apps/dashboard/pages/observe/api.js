@@ -51,7 +51,8 @@ export default {
         });
         return resp;
     },
-    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null) {
+    // scope: who a block applies to (see BlockScopeModal); empty = everyone.
+    async updateAuditData(hexId, remarks, approvalData = null, hexIds = null, cascadeHostCollectionIds = null, mcpServerForAllAgents = null, scope = {}) {
         const data = { hexId };
         if (Array.isArray(hexIds) && hexIds.length > 0) {
             data.hexIds = hexIds;
@@ -66,6 +67,7 @@ export default {
             data.approvalData = approvalData;
         } else {
             data.remarks = remarks;
+            Object.assign(data, scope);
         }
 
         const resp = await request({
@@ -97,6 +99,22 @@ export default {
             data: {},
         });
         return resp?.vendorAudit || [];
+    },
+    // LLMs / AI Agents tab: 'browser-llm' (default) or 'ai-agent' rows, shaped like fetchAuditData.
+    async fetchLlmAuditData(sortKey, sortOrder, skip, limit, filters, searchString, auditType) {
+        return request({
+            url: '/api/fetchLlmAuditData',
+            method: 'post',
+            data: { sortKey, sortOrder, skip, limit, filters, searchString, auditType },
+        });
+    },
+    // ids are record hexIds, or agent names for 'ai-agent'; scope is who a block applies to (empty = everyone).
+    async updateLlmAuditData(ids, remarks, auditType, scope = {}) {
+        return request({
+            url: '/api/updateLlmAuditData',
+            method: 'post',
+            data: { ...(auditType === 'ai-agent' ? { resourceNames: ids } : { hexIds: ids }), remarks, auditType, ...scope },
+        });
     },
     async addVendorAllowlistEntries(vendorNames) {
         const list = Array.isArray(vendorNames) ? vendorNames : [vendorNames];

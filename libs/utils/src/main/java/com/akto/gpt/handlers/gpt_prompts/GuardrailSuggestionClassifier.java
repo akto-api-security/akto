@@ -17,6 +17,9 @@ import java.util.List;
  */
 public class GuardrailSuggestionClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "guardrail-suggestion"; }
+
     public static final String HOST_NAME = "hostName";
     public static final String HARMFUL_TOPICS = "harmfulTopics";
 

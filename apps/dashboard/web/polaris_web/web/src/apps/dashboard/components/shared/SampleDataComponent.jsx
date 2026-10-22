@@ -138,14 +138,14 @@ function SampleDataComponent(props) {
             const { requestData, responseData } = transform.buildDiffData(requestJson, responseJson, originalRequestJson, originalResponseJson)
 
             setSampleJsonData({
-                request: { ...requestData, vulnerabilitySegments: segmentsFromMetadata ? [] : llmRequestSegments },
-                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : llmResponseSegments }
+                request: { ...requestData, vulnerabilitySegments: llmRequestSegments },
+                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? [...responseVulnerabilitySegments, ...llmResponseSegments] : llmResponseSegments }
             })
         }else{
             setSampleJsonData({ 
                 // Threat metadata segments highlight in request; LLM analysis segments are routed by their location field (REQUEST vs RESPONSE)
-                request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? vulnerabilitySegments : llmRequestSegments },
-                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : llmResponseSegments } : {},
+                request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? [...vulnerabilitySegments, ...llmRequestSegments] : llmRequestSegments },
+                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? [...responseVulnerabilitySegments, ...llmResponseSegments] : llmResponseSegments } : {},
             })
         }
     }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type, redactHeaders, isWebSocket])

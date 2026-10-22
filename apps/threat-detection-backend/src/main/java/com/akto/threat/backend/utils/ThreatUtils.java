@@ -17,6 +17,7 @@ import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -189,31 +190,47 @@ public class ThreatUtils {
         return conditions;
     }
 
-    // Collapse repeated config-scan re-detections into one.
-    public static List<Document> configScanDedupeStages(String contextSource) {
-        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
-            return Collections.emptyList();
-        }
+    private static Document configScanDedupeKey() {
         Document isConfigEvent = new Document("$regexMatch",
             new Document("input", new Document("$ifNull", Arrays.asList("$latestApiEndpoint", "")))
                 .append("regex", "/config/"));
 
-        Document dedupeKey = new Document("$cond", Arrays.asList(
+        return new Document("$cond", Arrays.asList(
             isConfigEvent,
             new Document("host", "$host").append("actor", "$actor").append("category", "$category")
                 .append("latestApiEndpoint", "$latestApiEndpoint"),
             new Document("uniqueId", "$_id")));
+    }
+
+    public static List<Document> configScanDedupeStages(String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return Collections.emptyList();
+        }
 
         return Arrays.asList(
             new Document("$sort", new Document("detectedAt", -1)),
             new Document("$group",
-                new Document("_id", dedupeKey)
+                new Document("_id", configScanDedupeKey())
                     .append("host", new Document("$first", "$host"))
                     .append("category", new Document("$first", "$category"))
                     .append("subCategory", new Document("$first", "$subCategory"))
                     .append("status", new Document("$first", "$status"))
                     .append("severity", new Document("$first", "$severity"))
+                    .append("detectedAt", new Document("$first", "$detectedAt"))
                     .append("successfulExploit", new Document("$first", "$successfulExploit"))));
+    }
+
+    public static List<Document> configScanLatestDocStages(String contextSource) {
+        if (!"ENDPOINT".equalsIgnoreCase(contextSource)) {
+            return Collections.emptyList();
+        }
+
+        return Arrays.asList(
+            new Document("$sort", new Document("detectedAt", -1)),
+            new Document("$group",
+                new Document("_id", configScanDedupeKey()).append("doc", new Document("$first", "$$ROOT"))),
+            new Document("$replaceRoot", new Document("newRoot", "$doc")),
+            new Document("$sort", new Document("detectedAt", -1)));
     }
 
     public static boolean isAgenticOrEndpointContext(String contextSource) {
@@ -353,6 +370,121 @@ public class ThreatUtils {
         }
     }
 
+    // Guardrail activities from one Bedrock caller repeating the same prompt (an agent re-sends it on
+    // every step, tripping the same policies each time) within this gap of each other are one activity.
+    public static final long ACTIVITY_GROUP_GAP_SECONDS = 20 * 60;
+    public static final String ACTIVITY_GROUP_INDEX = "idx_groupKey_detectedAt";
+    public static final Bson ACTIVITY_GROUP_INDEX_KEYS = Indexes.ascending("groupKey", "detectedAt");
+    private static final String BEDROCK_IDENTITY_ARN_HEADER = "bedrock-identity-arn";
+    private static final Set<String> GROUPED_ACTIVITY_ACCOUNTS = parseAccountList(
+        System.getenv().getOrDefault("AKTO_GROUPED_ACTIVITY_ACCOUNTS", "1703087742"));
+
+    private static Set<String> parseAccountList(String csv) {
+        Set<String> accounts = new HashSet<>();
+        for (String id : csv.split(",")) {
+            if (!id.trim().isEmpty()) {
+                accounts.add(id.trim());
+            }
+        }
+        return accounts;
+    }
+
+    /**
+     * Pipeline stages that turn matching events into activity rows. Events with the same groupKey whose
+     * detectedAt is within ACTIVITY_GROUP_GAP_SECONDS of the previous one form one row: the latest event,
+     * plus groupCount, groupFirstDetectedAt, groupEventIds (every event in it, so actions on the row reach
+     * exactly the events the current filters grouped) and groupFilterIds (the policies they tripped).
+     * Events without a groupKey stay one row each. The stored payload is dropped first; the list never
+     * returns it and it is most of each event's size.
+     */
+    public static List<Document> activityGroupStages(Document query) {
+        Document hasKey = new Document("$eq", Arrays.asList(new Document("$type", "$groupKey"), "string"));
+        Document byKeyOldestFirst = new Document("partitionBy", "$groupKey").append("sortBy", new Document("detectedAt", 1));
+        return Arrays.asList(
+            new Document("$match", query),
+            new Document("$unset", "latestApiOrig"),
+            new Document("$setWindowFields", new Document(byKeyOldestFirst).append("output", new Document("prevDetectedAt",
+                new Document("$shift", new Document("output", "$detectedAt").append("by", -1))))),
+            new Document("$set", new Document("startsActivity", new Document("$cond", Arrays.asList(
+                new Document("$or", Arrays.asList(
+                    new Document("$not", Arrays.asList(hasKey)),
+                    new Document("$eq", Arrays.asList("$prevDetectedAt", null)),
+                    new Document("$gt", Arrays.asList(new Document("$subtract", Arrays.asList("$detectedAt", "$prevDetectedAt")),
+                        ACTIVITY_GROUP_GAP_SECONDS)))),
+                1, 0)))),
+            new Document("$setWindowFields", new Document(byKeyOldestFirst).append("output", new Document("activityNo",
+                new Document("$sum", "$startsActivity").append("window", new Document("documents", Arrays.asList("unbounded", "current")))))),
+            new Document("$sort", new Document("detectedAt", -1)),
+            new Document("$group", new Document("_id", new Document("$cond", Arrays.asList(hasKey,
+                    new Document("groupKey", "$groupKey").append("activityNo", "$activityNo"), "$_id")))
+                .append("doc", new Document("$first", "$$ROOT"))
+                .append("groupCount", new Document("$sum", 1))
+                .append("groupFirstDetectedAt", new Document("$min", "$detectedAt"))
+                .append("groupEventIds", new Document("$push", "$_id"))
+                .append("groupFilterIds", new Document("$addToSet", "$filterId"))),
+            new Document("$replaceRoot", new Document("newRoot", new Document("$mergeObjects", Arrays.asList("$doc",
+                new Document("groupCount", "$groupCount").append("groupFirstDetectedAt", "$groupFirstDetectedAt")
+                    .append("groupEventIds", "$groupEventIds").append("groupFilterIds", "$groupFilterIds"))))),
+            new Document("$unset", Arrays.asList("prevDetectedAt", "startsActivity", "activityNo"))
+        );
+    }
+
+    /** Whether repeated Bedrock activities are grouped for this account (opt-in per account). */
+    public static boolean groupsActivities(String accountId) {
+        return accountId != null && GROUPED_ACTIVITY_ACCOUNTS.contains(accountId);
+    }
+
+    /**
+     * Grouping key of a guardrail activity: the Bedrock caller ARN (bedrock-identity-arn request header)
+     * plus the normalized prompt (requestPayload) of its stored envelope. Null when the envelope carries
+     * no ARN, so only Bedrock activities are ever grouped.
+     */
+    public static String activityGroupKey(String envelope) {
+        if (envelope == null || envelope.isEmpty()) {
+            return null;
+        }
+        try {
+            Map<String, Object> fields = OBJECT_MAPPER.readValue(envelope, new TypeReference<Map<String, Object>>() {});
+            Object prompt = fields.get("requestPayload");
+            Object headers = fields.get("requestHeaders");
+            if (!(prompt instanceof String) || ((String) prompt).isEmpty() || !(headers instanceof String)) {
+                return null;
+            }
+            Map<String, Object> headerMap = OBJECT_MAPPER.readValue((String) headers, new TypeReference<Map<String, Object>>() {});
+            Object arn = null;
+            for (Map.Entry<String, Object> header : headerMap.entrySet()) {
+                if (BEDROCK_IDENTITY_ARN_HEADER.equalsIgnoreCase(header.getKey())) {
+                    arn = header.getValue();
+                }
+            }
+            if (!(arn instanceof String) || ((String) arn).isEmpty()) {
+                return null;
+            }
+            return UUID.nameUUIDFromBytes((arn + "\n" + normalizePrompt((String) prompt)).getBytes(StandardCharsets.UTF_8)).toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static final Pattern REDACTION_MARKER = Pattern.compile("\\[[a-z_]*redacted[a-z_]*\\]");
+    private static final Pattern LONG_ID = Pattern.compile("\\b[0-9a-f]{8}(-?[0-9a-f]{4}){3}-?[0-9a-f]{12}\\b|\\b[0-9a-f]{12,}\\b");
+    private static final Pattern NOT_LETTERS = Pattern.compile("[^a-z]+");
+    private static final int PROMPT_WORDS_COMPARED = 40;
+
+    // An agent's repeated prompt differs only in what it fills in on each step (turn numbers, ids,
+    // redacted values, the data it pastes after its instructions), so only the words of its opening
+    // are compared: same opening words in the same order is the same prompt.
+    static String normalizePrompt(String prompt) {
+        String text = prompt.toLowerCase(Locale.ROOT);
+        text = REDACTION_MARKER.matcher(text).replaceAll(" ");
+        text = LONG_ID.matcher(text).replaceAll(" ");
+        String words = NOT_LETTERS.matcher(text).replaceAll(" ").trim();
+        // No words left (only numbers or ids): compare the prompt as it is rather than as empty.
+        if (words.isEmpty()) return prompt;
+        String[] split = words.split(" ", PROMPT_WORDS_COMPARED + 1);
+        return split.length <= PROMPT_WORDS_COMPARED ? words : String.join(" ", Arrays.copyOf(split, PROMPT_WORDS_COMPARED));
+    }
+
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
         // Get the collection from DAO - this will create the collection if it doesn't exist
         MongoCollection<?> collection = maliciousEventDao.getCollection(accountId);
@@ -392,6 +524,12 @@ public class ThreatUtils {
             if (!existingIndexes.contains(entry.getKey())) {
                 collection.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
             }
+        }
+
+        // Only accounts that group activities have keyed events; partial so it stays small.
+        if (groupsActivities(accountId) && !existingIndexes.contains(ACTIVITY_GROUP_INDEX)) {
+            collection.createIndex(ACTIVITY_GROUP_INDEX_KEYS, new IndexOptions().name(ACTIVITY_GROUP_INDEX)
+                .partialFilterExpression(new Document("groupKey", new Document("$type", "string"))));
         }
     }
 

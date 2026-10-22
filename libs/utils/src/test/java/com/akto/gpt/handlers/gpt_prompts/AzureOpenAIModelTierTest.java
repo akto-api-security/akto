@@ -1,9 +1,17 @@
 package com.akto.gpt.handlers.gpt_prompts;
 
 import com.akto.gpt.handlers.gpt_prompts.AzureOpenAIPromptHandler.ModelTier;
+import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+
+import java.io.File;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -73,7 +81,7 @@ class AzureOpenAIModelTierTest {
     @Test
     void nano_sendsEachHandlersOwnCapAsMaxCompletionTokens() throws Exception {
         // No reasoning allowance is added: to give a handler more room, raise its getMaxTokens().
-        assertEquals(300, new ToolCapabilityClassifier().buildPayload("x").getInt("max_completion_tokens"));
+        assertEquals(500, new ToolCapabilityClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(300, new AgentDomainClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(2000, new GuardrailSuggestionClassifier().buildPayload("x").getInt("max_completion_tokens"));
         assertEquals(600, new ConversationContinuityClassifier().buildPayload("x").getInt("max_completion_tokens"));
@@ -99,6 +107,83 @@ class AzureOpenAIModelTierTest {
         assertEquals("minimal", new ArgusInsightCardNarrativeHandler().getReasoningEffort());
         assertEquals("minimal", new ToolCapabilityClassifier().getReasoningEffort());
         assertEquals("minimal", new UserQueryTopicClassifier().getReasoningEffort());
+    }
+
+    // Every concrete handler in this package, found from the compiled classes so a new one is covered automatically.
+    private static List<AzureOpenAIPromptHandler> allHandlers() throws Exception {
+        File dir = new File(AzureOpenAIPromptHandler.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        Assumptions.assumeTrue(dir.isDirectory());
+        List<AzureOpenAIPromptHandler> handlers = new ArrayList<>();
+        File[] files = new File(dir, AzureOpenAIPromptHandler.class.getPackage().getName().replace('.', '/')).listFiles();
+        for (File f : files) {
+            if (!f.getName().endsWith(".class") || f.getName().contains("$")) continue;
+            Class<?> c = Class.forName(AzureOpenAIPromptHandler.class.getPackage().getName() + "." + f.getName().replace(".class", ""));
+            if (AzureOpenAIPromptHandler.class.isAssignableFrom(c) && !Modifier.isAbstract(c.getModifiers())) {
+                handlers.add((AzureOpenAIPromptHandler) c.getDeclaredConstructor().newInstance());
+            }
+        }
+        return handlers;
+    }
+
+    @Test
+    void everyHandlerHasAWellFormedServiceKeyAndHandlersSharingOneAgreeOnTheirTier() throws Exception {
+        List<AzureOpenAIPromptHandler> handlers = allHandlers();
+        assertTrue(handlers.size() >= 20, "found " + handlers.size());
+        Map<String, ModelTier> tierByService = new HashMap<>();
+        for (AzureOpenAIPromptHandler h : handlers) {
+            String name = h.getClass().getSimpleName();
+            String key = h.getServiceKey();
+            assertNotNull(key, name + " has no service key");
+            assertTrue(key.matches("[a-z]+(-[a-z]+)*"), name + ": " + key);
+            ModelTier prior = tierByService.putIfAbsent(key, h.getModelTier());
+            if (prior != null) assertEquals(prior, h.getModelTier(), "handlers sharing '" + key + "' must share a tier");
+        }
+    }
+
+    @Test
+    void theTestEditorFamilyIsOneServiceStillOnGpt4oMini() {
+        AzureOpenAIPromptHandler[] family = {
+            new TestExecutorModifier(), new TestFilterModifier(), new TestValidatorModifier(), new McpMethodAnalyzer(), new MagicValidator()
+        };
+        for (AzureOpenAIPromptHandler h : family) {
+            assertEquals("test-editor", h.getServiceKey(), h.getClass().getSimpleName());
+            assertEquals(ModelTier.GPT_4O_MINI, h.getModelTier(), h.getClass().getSimpleName());
+        }
+        assertEquals("insights-overview", new InsightNarrativeHandler().getServiceKey());
+    }
+
+    @Test
+    void aChainTargetGetsItsOwnTiersRequestShapeRegardlessOfTheHandlersTier() throws Exception {
+        InsightNarrativeHandler nanoHandler = new InsightNarrativeHandler();
+        JSONObject toMini = nanoHandler.buildPayload("x", ModelTier.GPT_4O_MINI);
+        assertTrue(toMini.has("max_tokens"));
+        assertTrue(toMini.has("temperature"));
+        assertFalse(toMini.has("reasoning_effort"));
+
+        AnalyzeVulnerabilityPromptHandler miniHandler = new AnalyzeVulnerabilityPromptHandler();
+        JSONObject toNano = miniHandler.buildPayload("x", ModelTier.GPT_5_NANO);
+        assertEquals("minimal", toNano.getString("reasoning_effort"));
+        assertEquals(1200, toNano.getInt("max_completion_tokens"));
+        assertFalse(toNano.has("temperature"));
+    }
+
+    @Test
+    void aServiceChainWithNothingConfiguredFailsExactlyLikeAPlainAzureCall() {
+        Assumptions.assumeTrue(System.getenv("AZURE_OPENAI_HOST") == null);
+        LlmServiceChains.reset();
+        RuntimeException e = assertThrows(RuntimeException.class, () -> new InsightNarrativeHandler().call("x"));
+        assertTrue(e.getMessage().contains("AZURE_OPENAI_HOST"));
+    }
+
+    @Test
+    void anUnconfiguredInstallStillReportsAnErrorInsteadOfClassifyingEverythingSafe() {
+        // On-prem without Azure env: a swallowed failure would reach processResponse as NOT_FOUND,
+        // which ToolCapabilityClassifier reads as SAFE.
+        Assumptions.assumeTrue(System.getenv("AZURE_OPENAI_HOST") == null);
+        LlmServiceChains.reset();
+        BasicDBObject result = new ToolCapabilityClassifier().handle(new BasicDBObject(ToolCapabilityClassifier.TOOL_NAME, "delete_everything"));
+        assertTrue(result.containsField("error"), result.toString());
+        assertFalse(result.containsField(ToolCapabilityClassifier.CAPABILITY));
     }
 
     @Test

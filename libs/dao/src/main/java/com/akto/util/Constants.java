@@ -96,6 +96,14 @@ public class Constants {
     public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
     public static final String AKTO_MCP_CLIENT_TAG = "mcp-client";
     public static final String AKTO_AI_AGENT_TAG = "ai-agent";
+    /**
+     * Marks a collection whose service was seen CALLING an AI asset, written by mini-runtime on
+     * outbound traffic.
+     *
+     * Deliberately not AKTO_AI_AGENT_TAG ("ai-agent"): that names the agent itself, which is the
+     * opposite side of the call.
+     */
+    public static final String AKTO_AI_AGENT_CALLER_TAG = "ai-agent-caller";
     public static final String AKTO_BROWSER_LLM_AGENT_TAG = "browser-llm-agent";
     public static final String AKTO_SKILL_TAG = "skill";
     public static final String AKTO_SAAS_AGENT_TAG = "saas-agent";

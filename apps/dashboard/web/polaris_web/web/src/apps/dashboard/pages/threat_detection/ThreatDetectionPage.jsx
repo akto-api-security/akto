@@ -457,6 +457,8 @@ function ThreatDetectionPage() {
             templateId: data.filterId,
             status: data.status || '',
             eventId: data.id || '',
+            // A grouped activity's events, shown as its attempts.
+            groupEventIds: data.groupCount > 1 ? (data.groupEventIds || []) : [],
             jiraTicketUrl: data.jiraTicketUrl || '',
             severity: data.severity || '',
             sessionId: data.sessionId || '',
@@ -467,6 +469,7 @@ function ThreatDetectionPage() {
             host: data.host || '',
             remediation: data.remediation || '',
             humanResponse: data.humanResponse || '',
+            evidenceLineFull: data.evidenceLineFull || '',
         });
 
         setShowDetails(true);
@@ -487,7 +490,8 @@ function ThreatDetectionPage() {
                 metadata: data.metadata || '',
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata) || '',
                 host: data.host || '',
-                remediation: data.remediation || ''
+                remediation: data.remediation || '',
+                evidenceLine: data.evidenceLineFull || ''
             },
             currentEventId: data.id || '',
             currentEventStatus: data.status || '',
@@ -653,7 +657,8 @@ function ThreatDetectionPage() {
             queryParams.refId,
             queryParams.eventType,
             queryParams?.actor || "",
-            queryParams.filterId
+            queryParams.filterId,
+            rowContext?.groupEventIds || []
           );
 
           if (!isMountedRef.current) {
@@ -682,6 +687,7 @@ function ThreatDetectionPage() {
               behaviour: rowContext?.behaviourRaw || extractBehaviour(rowContext?.metadata) || '',
               host: rowContext?.host || '',
               remediation: rowContext?.remediation || '',
+              evidenceLine: rowContext?.evidenceLineFull || '',
               complianceMap: rowContext?.complianceMapData || (() => {
                 if (!queryParams.filterId) return {};
                 const { threatFiltersMap, guardrailComplianceMap } = SessionStore.getState();

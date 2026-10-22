@@ -199,6 +199,32 @@ public class TestRbacGuards extends MongoBasedTest {
         }
     }
 
+    @Test
+    public void testScriptsPermission() {
+        Context.accountId.set(ACCOUNT_ID);
+        Context.contextSource.set(CONTEXT_SOURCE.API);
+        RBACDao.instance.getMCollection().drop();
+        CustomRoleDao.instance.getMCollection().drop();
+
+        // admins edit scripts by default; every other built-in role can only read them, as before
+        for (Role role : Role.values()) {
+            ReadWriteAccess expected = role == Role.ADMIN ? ReadWriteAccess.READ_WRITE : ReadWriteAccess.READ;
+            assertEquals(role.name(), expected, role.getReadWriteAccessForFeature(Feature.TEST_SCRIPTS));
+        }
+
+        Map<String, String> withScripts = new HashMap<>();
+        withScripts.put(Feature.TEST_SCRIPTS.name(), ReadWriteAccess.READ_WRITE.name());
+        insertRole("DEVELOPER_WITH_SCRIPTS", Role.DEVELOPER, false, withScripts);
+        storedRole(311, "DEVELOPER_WITH_SCRIPTS");
+        assertEquals(ReadWriteAccess.READ_WRITE, access(311, Feature.TEST_SCRIPTS));
+
+        Map<String, String> noScripts = new HashMap<>();
+        noScripts.put(Feature.TEST_SCRIPTS.name(), ReadWriteAccess.NO_ACCESS.name());
+        insertRole("ADMIN_WITHOUT_SCRIPTS", Role.ADMIN, false, noScripts);
+        storedRole(312, "ADMIN_WITHOUT_SCRIPTS");
+        assertEquals(ReadWriteAccess.NO_ACCESS, access(312, Feature.TEST_SCRIPTS));
+    }
+
     private static RoleAction roleAction(String name, Map<String, String> overrides) {
         RoleAction action = new RoleAction();
         Map<String, Object> session = new HashMap<>();

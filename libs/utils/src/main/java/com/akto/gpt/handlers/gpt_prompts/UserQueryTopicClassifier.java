@@ -11,6 +11,9 @@ import java.util.List;
 
 public class UserQueryTopicClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "query-topic"; }
+
     public static final String QUERY_PAYLOAD    = "queryPayload";
     public static final String RESPONSE_PAYLOAD = "responsePayload";
     public static final String EXISTING_SUMMARY = "existingSummary";

@@ -533,6 +533,7 @@ public class DaoInit {
         AwsApiGatewayLogsDao.instance.createIndicesIfAbsent();
         GuardrailsServiceLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
+        MiniTestingOrchestratorLogsDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
         LoadersDao.instance.createIndicesIfAbsent();
         TestingRunResultDao.instance.createIndicesIfAbsent();
@@ -576,6 +577,7 @@ public class DaoInit {
         EndpointInfoViewDao.instance.createIndicesIfAbsent();
         ApiCollectionStatsDao.instance.createIndicesIfAbsent();
         EndpointShieldLogsDao.instance.createIndicesIfAbsent();
+        EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
         ModuleInfoDao.instance.createIndicesIfAbsent();
         AgentConversationDao.instance.createIndexIfAbsent();
         AgentConversationResultDao.instance.createIndexIfAbsent();

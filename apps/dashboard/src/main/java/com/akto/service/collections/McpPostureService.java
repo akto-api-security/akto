@@ -176,8 +176,10 @@ public class McpPostureService extends TimedService {
     }
 
     private Data recentAlerts(int skip, int limit) {
-        // alerts nobody has marked yet
-        Bson open = Filters.or(Filters.eq(McpAuditInfo.MARKED_BY, ""), Filters.eq(McpAuditInfo.MARKED_BY, null));
+        // alerts nobody has marked yet; browser LLM sites and AI agents aren't MCP components
+        Bson open = Filters.and(
+                Filters.nin(McpAuditInfo.TYPE, Arrays.asList(Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_AI_AGENT_TAG)),
+                Filters.or(Filters.eq(McpAuditInfo.MARKED_BY, ""), Filters.eq(McpAuditInfo.MARKED_BY, null)));
         List<Alert> alerts = timed("recent mcp alerts", () -> McpAuditInfoDao.instance.findAll(open, skip, limit,
                 Sorts.descending(McpAuditInfo.LAST_DETECTED),
                 Projections.include(McpAuditInfo.TYPE, McpAuditInfo.LAST_DETECTED, McpAuditInfo.RESOURCE_NAME)).stream()

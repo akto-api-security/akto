@@ -39,6 +39,9 @@ import com.mongodb.BasicDBObject;
  */
 public class GuardrailClauseAttributionHandler extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "guardrail-compliance"; }
+
     // Query data keys
     public static final String FRAMEWORK = "framework";
     public static final String POLICY_NAME = "policyName";

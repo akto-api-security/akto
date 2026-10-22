@@ -7,12 +7,12 @@
   {
     "name": "task-role-hex-session",
     "arn": "arn:aws:sts::123456789012:assumed-role/aria-usertask-role/edf60249dbcf44b19f0c10eedfe1790f",
-    "actor": "aria-usertask-role"
+    "actor": "ECS-edf60249dbcf44b19f0c10eedfe1790f-aria-usertask-role"
   },
   {
     "name": "task-role-uuid-session",
     "arn": "arn:aws:sts::123456789012:assumed-role/aria-usertask-role/11111111-2222-3333-4444-555555555555",
-    "actor": "aria-usertask-role"
+    "actor": "SESSION-11111111-2222-3333-4444-555555555555-aria-usertask-role"
   },
   {
     "name": "sso-username",
@@ -27,7 +27,7 @@
   {
     "name": "ec2-instance-session",
     "arn": "arn:aws:sts::123456789012:assumed-role/ec2-role/i-0abc123def456789a",
-    "actor": "ec2-role"
+    "actor": "EC2-i-0abc123def456789a-ec2-role"
   },
   {
     "name": "assumed-role-no-session",
@@ -103,5 +103,50 @@
     "name": "malformed",
     "arn": "arn:aws:sts",
     "actor": ""
+  },
+  {
+    "name": "ecs-task-session-uppercase-hex",
+    "arn": "arn:aws:sts::123456789012:assumed-role/task-role/0123456789ABCDEF0123456789ABCDEF",
+    "actor": "ECS-0123456789ABCDEF0123456789ABCDEF-task-role"
+  },
+  {
+    "name": "ec2-instance-session-short-id",
+    "arn": "arn:aws:sts::123456789012:assumed-role/deploy-role/i-0abc1234",
+    "actor": "EC2-i-0abc1234-deploy-role"
+  },
+  {
+    "name": "bedrock-agents-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/AmazonBedrockExecutionRoleForAgents_ABC123/BedrockAgents-AGENT12345-11111111-2222-3333-4444-555555555555",
+    "actor": "BedrockAgents-AGENT12345-11111111-2222-3333-4444-555555555555-AmazonBedrockExecutionRoleForAgents_ABC123"
+  },
+  {
+    "name": "bedrock-agents-session-custom-role",
+    "arn": "arn:aws:sts::123456789012:assumed-role/my-agent-role/BedrockAgents-ABCDE12345-0f1e2d3c",
+    "actor": "BedrockAgents-ABCDE12345-0f1e2d3c-my-agent-role"
+  },
+  {
+    "name": "long-hex-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/app-role/0123456789abcdef0123456789abcdefabcd",
+    "actor": "SESSION-0123456789abcdef0123456789abcdefabcd-app-role"
+  },
+  {
+    "name": "short-hex-session-is-a-name",
+    "arn": "arn:aws:sts::123456789012:assumed-role/app-role/deadbeef",
+    "actor": "deadbeef"
+  },
+  {
+    "name": "lambda-function-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/lambda-exec-role/order-processor",
+    "actor": "order-processor"
+  },
+  {
+    "name": "sso-role-with-hex-session-stays-session",
+    "arn": "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_Admin_abc/0123456789abcdef0123456789abcdef",
+    "actor": "0123456789abcdef0123456789abcdef"
+  },
+  {
+    "name": "not-bedrock-agents-prefix",
+    "arn": "arn:aws:sts::123456789012:assumed-role/app-role/BedrockAgents",
+    "actor": "BedrockAgents"
   }
 ]

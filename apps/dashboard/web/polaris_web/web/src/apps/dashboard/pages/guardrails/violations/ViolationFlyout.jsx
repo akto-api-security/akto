@@ -7,7 +7,9 @@ import {
     ChoiceList,
     Divider,
     HorizontalStack,
+    Key,
     Modal,
+    Pagination,
     Popover,
     Tabs,
     Text,
@@ -403,29 +405,42 @@ function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
 
 // ─── Flyout ─────────────────────────────────────────────────────────────────────
 
-export default function ViolationFlyout({ violation, show, onClose, onStatusUpdate, onHumanApproval }) {
+export default function ViolationFlyout({ violation: rowViolation, toAttemptRow, show, onClose, onStatusUpdate, onHumanApproval }) {
     const [selectedTab, setSelectedTab] = useState(0);
-    const [enrichedPayload, setEnrichedPayload] = useState(null);
+    // Captured events to show: the row's own, or every event of a grouped activity, newest first.
+    const [attemptPayloads, setAttemptPayloads] = useState([]);
+    const [attemptIndex, setAttemptIndex] = useState(0);
+    const enrichedPayload = attemptPayloads[attemptIndex]?.orig || null;
+    // Paging a grouped activity shows the selected event's own details, not just its payload.
+    const attempt = attemptPayloads.length > 1 ? attemptPayloads[attemptIndex] : null;
+    const violation = useMemo(
+        // On close the row goes away a render before the previous row's attempts are cleared.
+        () => (rowViolation && attempt && toAttemptRow ? toAttemptRow(rowViolation, attempt) : rowViolation),
+        [attempt, toAttemptRow, rowViolation]
+    );
 
-    useEffect(() => { setSelectedTab(0); }, [violation?.id]);
+    useEffect(() => { setSelectedTab(0); }, [rowViolation?.id]);
 
     // The list endpoint's row doesn't always carry the full captured request/response
     // (row.payload can be empty even though the event has one) - the same gap the old
     // Threat Activity flyout covers by fetching it on open via refId/eventType/filterId.
     // Do the same here, only when the row itself has nothing to show.
+    // A grouped activity row also fetches its other events, so each prompt can be paged through.
     useEffect(() => {
-        setEnrichedPayload(null);
-        if (violation?.payload || !violation?.refId || !violation?.eventType || !violation?.filterId) return;
+        setAttemptPayloads([]);
+        setAttemptIndex(0);
+        const groupEventIds = rowViolation?.groupCount > 1 ? (rowViolation.groupEventIds || []) : [];
+        if ((rowViolation?.payload && groupEventIds.length === 0) || !rowViolation?.refId || !rowViolation?.eventType || !rowViolation?.filterId) return;
         let cancelled = false;
-        threatDetectionApi.fetchMaliciousRequest(violation.refId, violation.eventType, violation.actor || "", violation.filterId)
+        threatDetectionApi.fetchMaliciousRequest(rowViolation.refId, rowViolation.eventType, rowViolation.actor || "", rowViolation.filterId, groupEventIds)
             .then(res => {
                 if (cancelled) return;
-                const orig = res?.maliciousPayloadsResponses?.[0]?.orig;
-                if (orig) setEnrichedPayload(redactSampleDataByKeywords(orig));
+                const attempts = (res?.maliciousPayloadsResponses || []).filter(p => p?.orig);
+                setAttemptPayloads(attempts.map(p => ({ ...p, orig: redactSampleDataByKeywords(p.orig) })));
             })
             .catch(() => {});
         return () => { cancelled = true; };
-    }, [violation?.id, violation?.refId, violation?.eventType, violation?.filterId, violation?.actor, violation?.payload]);
+    }, [rowViolation?.id, rowViolation?.refId, rowViolation?.eventType, rowViolation?.filterId, rowViolation?.actor, rowViolation?.payload, rowViolation?.groupCount, rowViolation?.groupEventIds]);
 
     const detail = useMemo(() => {
         if (!violation) return null;
@@ -474,7 +489,26 @@ export default function ViolationFlyout({ violation, show, onClose, onStatusUpda
     function renderTabContent(id) {
         switch (id) {
             case "overview":        return <OverviewSection row={violation} detail={detail} />;
-            case "promptResponse":  return <PromptResponseSection detail={detail} host={violation.host} anchorTimestamp={violation.detected} />;
+            case "promptResponse":  return (
+                <>
+                    {attemptPayloads.length > 1 && (
+                        <Box paddingBlockStart="3" paddingInlineEnd="4" paddingInlineStart="4">
+                            <HorizontalStack align="end">
+                                <Pagination
+                                    label={`${attemptIndex + 1} of ${attemptPayloads.length}`}
+                                    hasPrevious={attemptIndex > 0}
+                                    previousKeys={[Key.LeftArrow]}
+                                    onPrevious={() => setAttemptIndex(i => i - 1)}
+                                    hasNext={attemptIndex < attemptPayloads.length - 1}
+                                    nextKeys={[Key.RightArrow]}
+                                    onNext={() => setAttemptIndex(i => i + 1)}
+                                />
+                            </HorizontalStack>
+                        </Box>
+                    )}
+                    <PromptResponseSection detail={detail} host={violation.host} anchorTimestamp={violation.detected} />
+                </>
+            );
             case "chat":        return <ChatSessionSection messages={detail?.chatSession} highlights={detail?.evidence?.highlights || []} />;
             case "file":
                 if (violation.type === "Tool") {

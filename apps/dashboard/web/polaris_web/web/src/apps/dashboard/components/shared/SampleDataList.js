@@ -90,10 +90,12 @@ function DetectionReason({ sampleData }) {
     )
 }
 
-function VulnerabilityEvidence({ segments }) {
-    if (!Array.isArray(segments) || segments.length === 0) {
+function VulnerabilityEvidence({ segments: locatedSegments, evidenceLine }) {
+    if (!Array.isArray(locatedSegments) || locatedSegments.length === 0) {
         return null;
     }
+    const evidenceLocation = locatedSegments.some((s) => String(s?.location || 'RESPONSE').toUpperCase() !== 'REQUEST') ? 'RESPONSE' : 'REQUEST';
+    const segments = evidenceLine ? [{ location: evidenceLocation, phrase: evidenceLine }] : locatedSegments;
 
     const hasLowConfidence = SHOW_LOW_CONFIDENCE_HINT
         && segments.some((seg) => String(seg?.confidence || '').toLowerCase() === 'low');
@@ -151,13 +153,18 @@ function VulnerabilityEvidence({ segments }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine, onPageChange} = props;
 
     const [page, setPage] = useState(0);
 
     useEffect(() => {
       setPage(0);
     }, [sampleData])
+
+    // Lets the parent show details of the sample on screen (e.g. one attempt of a grouped activity).
+    useEffect(() => {
+      onPageChange?.(page);
+    }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
   
     const currentSample = sampleData[Math.min(page, sampleData.length - 1)];
     const parsedSample = func.parseWebSocketSampleMessage(currentSample?.message)
@@ -199,7 +206,7 @@ function SampleDataList(props) {
          {showDetectionReason ? <DetectionReason sampleData={currentSample} /> : null}
          <SchemaValidationError sampleData={currentSample} />
          {SHOW_VULNERABILITY_EVIDENCE ? (
-           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} />
+           <VulnerabilityEvidence segments={validatedCurrentSample?.vulnerabilitySegments} evidenceLine={evidenceLine} />
          ) : null}
         <HorizontalStack align='space-between'>
           <HorizontalStack gap="2">

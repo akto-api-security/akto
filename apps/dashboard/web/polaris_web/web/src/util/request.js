@@ -24,7 +24,7 @@ const service = axios.create({
 })
 
 const err = async (error) => {
-  if (error?.config?.url && (
+  if (error?.config?.suppressErrorToast || error?.config?.url && (
     error.config.url.includes('api/fetchTestResultsStatsCount')
     || error.config.url.includes('api/fetchTestRunStatusSummaries')
     || error.config.url.includes('api/fetchOpenApiSchema')
