@@ -170,10 +170,6 @@ func (s *Service) ReplayWithPolicy(
 		return []ReplayVerdict{}, nil
 	}
 
-	if s.schemaFetcher != nil {
-		s.schemaFetcher.RefreshIfNeeded()
-	}
-
 	prepared := preparePolicy(policy, s.logger)
 	var preparedBaseline *preparedPolicy
 	if baseline != nil {
