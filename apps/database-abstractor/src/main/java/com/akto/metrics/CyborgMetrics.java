@@ -2,6 +2,7 @@ package com.akto.metrics;
 
 import com.akto.listener.InfraMetricsListener;
 import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
 
@@ -26,6 +27,11 @@ public class CyborgMetrics {
             Duration.ofMillis(25), Duration.ofMillis(100), Duration.ofMillis(250),
             Duration.ofMillis(500), Duration.ofSeconds(1), Duration.ofMillis(2500),
             Duration.ofSeconds(5)
+    };
+
+    // Response body size buckets: 1KB, 10KB, 50KB, 100KB, 500KB, 1MB, 5MB.
+    private static final double[] RESPONSE_SIZE_SLOS = new double[] {
+            1_024, 10_240, 51_200, 102_400, 512_000, 1_048_576, 5_242_880
     };
 
     private CyborgMetrics() {
@@ -65,6 +71,29 @@ public class CyborgMetrics {
                 .maximumExpectedValue(Duration.ofSeconds(5))
                 .register(InfraMetricsListener.registry)
                 .record(durationMs, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Record the response body size of one HTTP request as a size histogram (by uri/method/status).
+     * Tenant-agnostic like the latency histogram; _sum/_count give total bytes and request count.
+     *
+     * @param uri           request URI (bounded /api/<action> set)
+     * @param method        HTTP method
+     * @param status        HTTP status code as string
+     * @param responseBytes number of bytes written to the response body
+     */
+    public static void recordHttpResponseSize(String uri, String method, String status, long responseBytes) {
+        DistributionSummary.builder("http_response_size")
+                .description("HTTP response body size")
+                .baseUnit("bytes")
+                .tags(Arrays.asList(
+                        Tag.of("uri", uri),
+                        Tag.of("method", method),
+                        Tag.of("status", status)
+                ))
+                .serviceLevelObjectives(RESPONSE_SIZE_SLOS)
+                .register(InfraMetricsListener.registry)
+                .record(responseBytes);
     }
 
     /**

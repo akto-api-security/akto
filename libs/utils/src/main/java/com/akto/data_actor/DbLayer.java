@@ -136,6 +136,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
@@ -3423,6 +3424,10 @@ public class DbLayer {
         DependencyAnalyserUtils.syncWithDb(dependencyNodeList);
     }
 
+    public static void bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments) {
+        SensitiveDataCountDao.instance.bulkInc(idempotencyKey, increments);
+    }
+
     public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
         return SingleTypeInfoDao.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
     }
@@ -3909,6 +3914,13 @@ public class DbLayer {
             if (!Constants.AKTO_MCP_TOOLS_TAG.equals(auditInfo.getType())) {
                 updateList.add(Updates.set(McpAuditInfo.BLOCK_ALL, true));
             }
+            // Inherit who the block applies to, so a new device's record doesn't block everyone.
+            updateList.add(Updates.set(McpAuditInfo.TARGET_TAGS, blockedEntry.getTargetTags()));
+            updateList.add(Updates.set(McpAuditInfo.NEGATED_TARGET_TAGS, blockedEntry.getNegatedTargetTags()));
+            updateList.add(Updates.set(McpAuditInfo.TARGET_DEVICE_IDS, blockedEntry.getTargetDeviceIds()));
+            updateList.add(Updates.set(McpAuditInfo.NEGATED_TARGET_DEVICE_IDS, blockedEntry.isNegatedTargetDeviceIds()));
+            updateList.add(Updates.set(McpAuditInfo.USER_METADATA, blockedEntry.getUserMetadata()));
+            updateList.add(Updates.set(McpAuditInfo.NEGATED_TARGET_USER_NAMES, blockedEntry.isNegatedTargetUserNames()));
         }
 
         Bson updates = Updates.combine(updateList.toArray(new Bson[0]));
@@ -4116,6 +4128,15 @@ public class DbLayer {
             return AgentUsersDao.instance.findDeviceIdsByTags(tagFilters, negatedTagFilters, deviceIds, negatedDeviceIds);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTags: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public static List<String> findUserEmailsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters) {
+        try {
+            return AgentUsersDao.instance.findUserEmailsByTags(tagFilters, negatedTagFilters);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findUserEmailsByTags: " + e.getMessage());
             return new ArrayList<>();
         }
     }

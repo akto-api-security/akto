@@ -64,6 +64,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_collector.TrafficCollectorMetrics;
@@ -176,6 +177,8 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForSuspectSampleData;
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
+    List<SensitiveDataCount> sensitiveDataCounts;
+    String idempotencyKey;
     TestScript testScript;
     @Getter @Setter
     String testScriptType;
@@ -3318,6 +3321,18 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkIncSensitiveDataCounts() {
+        // Written straight to Mongo even when kafka write mode is on: it is a handful of small upserts
+        // per runtime per minute, not the bulk volume that mode exists for.
+        try {
+            DbLayer.bulkIncSensitiveDataCounts(idempotencyKey, sensitiveDataCounts);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error bulkIncSensitiveDataCounts: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String bulkWriteDependencyNodes() {
         try {
             loggerMaker.infoAndAddToDb("bulkWriteDependencyNodes called");
@@ -4234,6 +4249,29 @@ public class DbAction extends ActionSupport {
             DastLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertDastLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    // Same once-per-account capped-collection guarantee as dast_logs, for the orchestrator's logs.
+    private static final Set<Integer> miniTestingOrchestratorLogsReady = ConcurrentHashMap.newKeySet();
+
+    public String insertMiniTestingOrchestratorLog() {
+        try {
+            int accountId = Context.accountId.get();
+            if (miniTestingOrchestratorLogsReady.add(accountId)) {
+                try {
+                    MiniTestingOrchestratorLogsDao.instance.createIndicesIfAbsent();
+                } catch (Exception e) {
+                    miniTestingOrchestratorLogsReady.remove(accountId);
+                    loggerMaker.errorAndAddToDb(e, "Error ensuring logs_mini_testing_orchestrator capped collection for accountId=" + accountId);
+                }
+            }
+            Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            MiniTestingOrchestratorLogsDao.instance.insertOne(dbLog);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertMiniTestingOrchestratorLog " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -5815,6 +5853,22 @@ public class DbAction extends ActionSupport {
         this.dependencyNodeList = dependencyNodeList;
     }
 
+    public List<SensitiveDataCount> getSensitiveDataCounts() {
+        return sensitiveDataCounts;
+    }
+
+    public void setSensitiveDataCounts(List<SensitiveDataCount> sensitiveDataCounts) {
+        this.sensitiveDataCounts = sensitiveDataCounts;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
+    }
+
     public int getStartTimestamp() {
         return startTimestamp;
     }
@@ -6448,10 +6502,34 @@ public class DbAction extends ActionSupport {
         this.remarksList = remarksList;
     }
 
+    // Resolves a block's tags / devices to device ids like guardrail policies, and tags to emails for browser traffic.
+    private static void resolveAuditScopes(List<McpAuditInfo> rows) {
+        if (rows == null) return;
+        // A server block cascades its scope to every tool row, so each distinct scope is resolved once.
+        Map<List<Object>, McpAuditInfo> resolved = new HashMap<>();
+        for (McpAuditInfo row : rows) {
+            boolean hasTags = row.getTargetTags() != null && !row.getTargetTags().isEmpty();
+            boolean hasDevices = row.getTargetDeviceIds() != null && !row.getTargetDeviceIds().isEmpty();
+            if (!hasTags && !hasDevices) continue;
+            List<Object> scopeKey = Arrays.asList(row.getTargetTags(), row.getNegatedTargetTags(), row.getTargetDeviceIds(), row.isNegatedTargetDeviceIds());
+            McpAuditInfo same = resolved.get(scopeKey);
+            if (same != null) {
+                row.setApplyToDeviceIds(same.getApplyToDeviceIds());
+                row.setApplyToUserEmails(same.getApplyToUserEmails());
+                continue;
+            }
+            row.setApplyToDeviceIds(DbLayer.findDeviceIdsByTags(row.getTargetTags(), row.getNegatedTargetTags(), row.getTargetDeviceIds(), row.isNegatedTargetDeviceIds()));
+            // Emails only for tag-only scopes, since picked devices narrow the tag match.
+            row.setApplyToUserEmails(hasDevices ? new ArrayList<>() : DbLayer.findUserEmailsByTags(row.getTargetTags(), row.getNegatedTargetTags()));
+            resolved.put(scopeKey, row);
+        }
+    }
+
     public String fetchMcpAuditInfo() {
         try {
             loggerMaker.infoAndAddToDb("Fetching MCP audit info with updatedAfter: " + updatedAfter + ", remarksList: " + remarksList, LogDb.DB_ABS);
             this.mcpAuditInfoList = DbLayer.fetchMcpAuditInfo(updatedAfter, remarksList);
+            resolveAuditScopes(this.mcpAuditInfoList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAuditInfo: " + e.toString());
             return Action.ERROR.toUpperCase();

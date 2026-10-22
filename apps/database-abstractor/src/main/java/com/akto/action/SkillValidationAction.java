@@ -1,5 +1,7 @@
 package com.akto.action;
 
+import com.akto.llm.ModelTier;
+import com.akto.llm.ServiceKey;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.ComponentRiskAnalysis;
 import com.akto.dto.OwaspAstCategory;
@@ -370,9 +372,8 @@ public class SkillValidationAction extends ActionSupport {
         Map<String, Object> payload = new HashMap<>();
         payload.put("messages", messages);
         payload.put("temperature", 0);
-        payload.put("max_tokens", 2000);
-
-        Map<String, Object> llmResponse = LLMService.callLLM(payload);
+        payload.put("max_tokens", ServiceKey.ENDPOINT_SHIELD_SKILL_VALIDATION.getMaxTokens());
+        Map<String, Object> llmResponse = LLMService.callLLM(payload, ServiceKey.ENDPOINT_SHIELD_SKILL_VALIDATION, ModelTier.GPT_4O_MINI);
         if (llmResponse == null) throw new RuntimeException("Empty LLM response");
 
         List<Map<String, Object>> choices = (List<Map<String, Object>>) llmResponse.get("choices");

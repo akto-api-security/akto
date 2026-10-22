@@ -1789,6 +1789,19 @@
             </result>
         </action>
 
+        <action name="api/bulkIncSensitiveDataCounts" class="com.akto.action.DbAction" method="bulkIncSensitiveDataCounts">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/bulkWriteDependencyNodes" class="com.akto.action.DbAction" method="bulkWriteDependencyNodes">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2511,6 +2524,19 @@
         </result>
       </action>
 
+      <action name="api/getLLMResponseV3" class="com.akto.action.LLMAction" method="getLLMResponseV3">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack" />
+        <result name="SUCCESS" type="json">
+          <param name="includeProperties">^content$</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
       <action name="api/fetchAgentModels" class="com.akto.action.AgentModelAction" method="fetchAgentModels">
         <interceptor-ref name="json"/>
         <interceptor-ref name="defaultStack" />
@@ -2860,6 +2886,17 @@
             <result name="SUCCESS" type="json">
                 <param name="excludeProperties">.*</param>
             </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/insertMiniTestingOrchestratorLog" class="com.akto.action.DbAction" method="insertMiniTestingOrchestratorLog">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

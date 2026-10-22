@@ -66,9 +66,9 @@ public class EndpointCaAction extends ActionSupport {
      * Signs a device CSR as an intermediate CA.
      *
      * The CSR contributes its public key and nothing else — subject, basic constraints and
-     * name constraints are all imposed by CertificateAuthority. A caller able to choose its
-     * own constraints could mint an unconstrained CA, which turns a device-level compromise
-     * into a fleet-level one.
+     * EKU are all imposed by CertificateAuthority. No name constraints: the device CA must
+     * sign for any host the account routes through the proxy, including generic domains
+     * added from the dashboard.
      */
     public String signDeviceCa() {
         try {
