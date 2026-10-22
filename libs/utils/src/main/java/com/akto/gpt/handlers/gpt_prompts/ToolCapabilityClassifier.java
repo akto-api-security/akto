@@ -13,6 +13,9 @@ import javax.validation.ValidationException;
  */
 public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "tool-capability"; }
+
     public static final String TOOL_NAME = "toolName";
     public static final String SAMPLE_DATA = "sampleData";
     public static final String DANGEROUS = "dangerous";
@@ -26,14 +29,20 @@ public class ToolCapabilityClassifier extends AzureOpenAIPromptHandler {
 
     private static final int MAX_SAMPLE_CHARS = 10000;
 
+    // Closed five-label verdict, ~20 output tokens: cheap-tier work (see ModelTier).
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }
         catch (Exception e) { return null; }
     }
 
+    // The verdict is ~25 tokens (measured); 500 keeps a stray reasoning burst from returning empty
+    // content, which the cron would otherwise retry on every run.
     @Override
-    protected int getMaxTokens() { return 2000; }
+    protected int getMaxTokens() { return 500; }
 
     @Override
     protected double getTemperature() { return 0.0; }

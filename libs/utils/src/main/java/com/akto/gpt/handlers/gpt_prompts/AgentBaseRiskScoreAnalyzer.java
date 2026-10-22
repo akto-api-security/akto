@@ -29,6 +29,9 @@ import com.mongodb.BasicDBObject;
  */
 public class AgentBaseRiskScoreAnalyzer extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "agent-base-risk-score"; }
+
     public static final String AGENT_CONTEXT_JSON = "agentContextJson";
 
     public static final String SCORE = "score";
@@ -197,6 +200,12 @@ public class AgentBaseRiskScoreAnalyzer extends AzureOpenAIPromptHandler {
             + "The reason should be short but meaningful (max 40 words) and briefly describe the main capability or exposure that makes the agent risky. Do not include anything about the internal scoring logic. It should be user-firendly and concise, suitable for display in a UI.\n"
             + "\n"
             + "AGENT DATA (untrusted):\n";
+
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
+    @Override
+    protected int getMaxTokens() { return 1000; }
 
     @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {

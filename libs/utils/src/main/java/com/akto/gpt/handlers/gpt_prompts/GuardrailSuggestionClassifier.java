@@ -17,6 +17,9 @@ import java.util.List;
  */
 public class GuardrailSuggestionClassifier extends AzureOpenAIPromptHandler {
 
+    @Override
+    protected String getServiceKey() { return "guardrail-suggestion"; }
+
     public static final String HOST_NAME = "hostName";
     public static final String HARMFUL_TOPICS = "harmfulTopics";
 
@@ -28,14 +31,21 @@ public class GuardrailSuggestionClassifier extends AzureOpenAIPromptHandler {
 
     private static final int MAX_HARMFUL_TOPICS_CHARS = 2000;
 
+    // Starter-policy prefill the user reviews and edits before saving: cheap-tier work.
+    @Override
+    protected ModelTier getModelTier() { return ModelTier.GPT_5_NANO; }
+
     @Override
     protected JSONObject getResponseFormat() {
         try { return new JSONObject("{\"type\":\"json_object\"}"); }
         catch (Exception e) { return null; }
     }
 
+    // Each denied topic costs ~100 output tokens (name, description, sample phrases); a live run with
+    // 3 topics used 324 of the old 400-token cap, so anything beyond ~3 topics was cut off mid-JSON.
+    // 10 topics measured ~780 tokens; the 2000-char input cap allows ~20 topics, so 2000 covers it.
     @Override
-    protected int getMaxTokens() { return 400; }
+    protected int getMaxTokens() { return 2000; }
 
     @Override
     protected double getTemperature() { return 0.0; }
