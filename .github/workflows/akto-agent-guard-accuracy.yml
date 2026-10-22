@@ -1,0 +1,98 @@
+name: Agent Guard Prompt Accuracy
+
+# Scores the scanner prompts a PR changes on the guardrails-prompt-dataset, with master's prompts and with the PR's,
+# and posts the comparison as a PR comment (updated in place on every push). Report only: it never fails the PR on
+# accuracy. Needs repo secrets AGENT_GUARD_EVAL_VLLM_BASE_URL, AGENT_GUARD_EVAL_VLLM_API_KEY and
+# GUARDRAILS_DATASET_TOKEN (read access to akto-api-security/guardrails-prompt-dataset).
+
+on:
+  pull_request:
+    paths:
+      - "apps/agent-guard/python-service/worker-py/src/prompts/**"
+      - "apps/agent-guard/python-service/worker-py/src/llm_scanner.py"
+      - "apps/agent-guard/python-service/worker-py/scripts/eval_accuracy.py"
+      - ".github/workflows/akto-agent-guard-accuracy.yml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:   # a new push cancels the previous run: the model endpoint is shared and rate-limited
+  group: agent-guard-accuracy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  accuracy:
+    name: Prompt accuracy
+    # Fork PRs get no secrets, so they are skipped rather than failed.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: apps/agent-guard/python-service/worker-py
+    env:
+      VLLM_BASE_URL: ${{ secrets.AGENT_GUARD_EVAL_VLLM_BASE_URL }}
+      VLLM_API_KEY: ${{ secrets.AGENT_GUARD_EVAL_VLLM_API_KEY }}
+      VLLM_MODEL: gemma-4-26b-a4b-it
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check out master's version for comparison
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+
+      - name: Check out the dataset
+        uses: actions/checkout@v4
+        with:
+          repository: akto-api-security/guardrails-prompt-dataset
+          token: ${{ secrets.GUARDRAILS_DATASET_TOKEN }}
+          path: dataset
+
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: "apps/agent-guard/python-service/worker-py/pyproject.toml"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Pick the scanners this PR affects
+        id: pick
+        run: |
+          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}")
+          echo "scanners=$(uv run python scripts/eval_accuracy.py scanners $files)" >> "$GITHUB_OUTPUT"
+
+      - name: Score master's prompts
+        if: steps.pick.outputs.scanners != ''
+        run: >-
+          uv run python scripts/eval_accuracy.py run --scanners "${{ steps.pick.outputs.scanners }}"
+          --src "$GITHUB_WORKSPACE/base/apps/agent-guard/python-service/worker-py/src"
+          --dataset "$GITHUB_WORKSPACE/dataset" --out "$RUNNER_TEMP/base.json"
+
+      - name: Score this PR's prompts
+        if: steps.pick.outputs.scanners != ''
+        run: >-
+          uv run python scripts/eval_accuracy.py run --scanners "${{ steps.pick.outputs.scanners }}"
+          --src src --dataset "$GITHUB_WORKSPACE/dataset" --out "$RUNNER_TEMP/head.json"
+
+      - name: Post the report
+        if: steps.pick.outputs.scanners != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          uv run python scripts/eval_accuracy.py report "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/head.json" > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+                 --jq '.[] | select(.body | startswith("<!-- agent-guard-accuracy -->")) | .id' | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$RUNNER_TEMP/report.md" > /dev/null
+          else
+            gh pr comment "$PR" --body-file "$RUNNER_TEMP/report.md"
+          fi
