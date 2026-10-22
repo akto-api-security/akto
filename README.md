@@ -216,7 +216,7 @@ docker run -v ./:/out  \ # needed to generate test report on host machine
 
 <details>  
   <summary><h3>Debug</h3></summary>
-1. To debug front end, install Vue.js Chrome extension from [here](https://devtools.vuejs.org/guide/installation.html).
+1. To debug front end, install the Vue.js devtools browser extension from [here](https://devtools.vuejs.org/getting-started/installation).
 2. To debug backend, run the following before running web server - 
   a. Set MAVEN_OPTS variable to enable debugging on your Java process
         
