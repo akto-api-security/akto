@@ -432,6 +432,35 @@ async def test_other_errors_fall_back_without_flagging_down(monkeypatch):
     assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
 
 
+async def test_hung_primary_times_out_marks_down_and_falls_back(monkeypatch):
+    import asyncio
+
+    import providers
+
+    class Hung(_Primary):
+        async def complete(self, prompt):
+            await asyncio.sleep(60)
+
+    fb = _fallback(monkeypatch, Hung())
+    fb.primary_timeout_s = 0.05
+    assert await fb.complete("hi") == "from backup"
+    assert providers._PRIMARY_AVAILABLE[fb.health_url] is False
+
+
+async def test_arbiter_primary_gets_its_timeout_and_backup_gets_extra_time():
+    from providers import FallbackProvider
+
+    # Current default config: backup entry has no timeoutMs, so it gets the 5s default.
+    cfg = [
+        _entry("gemma_fast_arbiter", "FINAL_ARBITER", model="gemma-4-26b-a4b-it", timeoutMs=5000),
+        {"provider": "gemma_foundry", "model": "google--gemma-4-e2b-it-2", "modelRole": "FINAL_ARBITER_BACKUP"},
+    ]
+    await _run(cfg, {"gemma_fast_arbiter": SAFE})
+    fb = next(sc.provider for sc in FakeScanner.built if isinstance(sc.provider, FallbackProvider))
+    assert (fb.primary_timeout_s, fb.backup_timeout_s) == (5.0, 5.0)
+    assert FakeScanner.calls == ["gemma_fast_arbiter"]
+
+
 async def test_primary_without_health_path_is_never_monitored(monkeypatch):
     class Plain(_Primary):
         health_path = ""
