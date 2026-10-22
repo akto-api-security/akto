@@ -58,10 +58,12 @@ public class SseStreamingUtil {
                         builder.addHeader(h.getKey(), h.getValue());
                     }
                 }
-                RequestBody body = RequestBody.create(
-                        config.body != null ? config.body : "",
-                        MediaType.parse("application/json"));
-                builder.post(body);
+                if (config.body != null && !config.body.isEmpty()) {
+                    RequestBody body = RequestBody.create(config.body, MediaType.parse("application/json"));
+                    builder.post(body);
+                } else {
+                    builder.get();
+                }
 
                 Call call = client.newCall(builder.build());
                 callRef.set(call);
