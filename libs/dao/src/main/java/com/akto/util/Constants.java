@@ -47,6 +47,7 @@ public class Constants {
     public static final String AKTO_GUARDRAIL_MODE_OBSERVE = "observe";
 
     public static final String AKTO_COLLECTION_CONTEXT_TAG_KEY = "source";
+    public static final String AKTO_ENDPOINT_SOURCE_VALUE = "ENDPOINT";
 
     public static final String AKTO_AGENT_EMAIL_TAG = "ai-agent-email";
 

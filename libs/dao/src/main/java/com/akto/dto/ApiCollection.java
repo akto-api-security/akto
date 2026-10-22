@@ -501,6 +501,16 @@ public class ApiCollection {
         this.accessType = accessType;
     }
 
+    public boolean isEndpointCollection() {
+        if (CollectionUtils.isEmpty(this.getTagsList())) {
+            return false;
+        }
+        return this.getTagsList().stream().anyMatch(t ->
+            Constants.AKTO_COLLECTION_CONTEXT_TAG_KEY.equals(t.getKeyName()) &&
+            Constants.AKTO_ENDPOINT_SOURCE_VALUE.equals(t.getValue())
+        );
+    }
+
     public boolean isGenAICollection() {
         if (!CollectionUtils.isEmpty(this.getTagsList())) {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()));
