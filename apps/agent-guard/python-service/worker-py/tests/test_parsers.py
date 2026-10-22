@@ -80,6 +80,15 @@ def test_qwen_ban_topics_sets_matched_topic():
     assert r["details"]["matchedTopic"] == "Weapons"
 
 
+def test_qwen_truncated_label_maps_to_full_label():
+    # max_tokens=3 stops after the first label token: "Safety: Cont" for Controversial
+    for raw, label, valid in (("Safety: Safe", "Safe", True), ("Safety: Unsafe", "Unsafe", False),
+                              ("Safety: Cont", "Controversial", False)):
+        r = parse_qwen3guard_result("Toxicity", raw)
+        assert r["is_valid"] is valid
+        assert r["details"]["safety"] == label
+
+
 def test_qwen_unknown_safety_raises():
     import pytest
 
