@@ -3,8 +3,13 @@ from litellm.proxy.proxy_server import UserAPIKeyAuth
 from fastapi import HTTPException
 from typing import Dict, Literal, Tuple, Optional, Any
 from collections import OrderedDict
+import asyncio
+import codecs
+import contextlib
+import difflib
 import hashlib
 import httpx
+import inspect
 import json
 import os
 import re
@@ -45,10 +50,50 @@ HTTP_PROXY_PATH = "/api/http-proxy"
 MCP_INGEST_PATH = os.getenv("MCP_INGEST_PATH", "/mcp")
 NON_MCP_TOOL_PATH_PREFIX = os.getenv("NON_MCP_TOOL_PATH_PREFIX", "/tool")
 CALL_HEADERS_CACHE_TTL_SECONDS = float(os.getenv("CALL_HEADERS_CACHE_TTL_SECONDS", str(15 * 60)))
-# AGENTIC by default; ENDPOINT routes the traffic to Atlas.
+# AGENTIC sends traffic to Argus, ENDPOINT to Atlas.
 AKTO_CONTEXT_SOURCE = os.getenv("AKTO_CONTEXT_SOURCE", "AGENTIC").strip().upper()
 if AKTO_CONTEXT_SOURCE not in ("AGENTIC", "ENDPOINT"):
     AKTO_CONTEXT_SOURCE = "AGENTIC"
+
+
+def _json_object_env(name: str) -> Optional[dict]:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return None
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        value = None
+    if not isinstance(value, dict):
+        logger.warning(f"{name} is not a JSON object, ignoring it")
+        return None
+    return value
+
+
+# Sent as akto_metadata, e.g. {"policy_name": "PII Strict, Secrets"}; unset sends none.
+AKTO_METADATA = _json_object_env("AKTO_METADATA")
+# Check model replies, streams and MCP tool results; false turns every reply check off.
+RESPONSE_GUARDRAILS = os.getenv("RESPONSE_GUARDRAILS", "true").strip().lower() == "true"
+STREAM_RESPONSE_GUARDRAILS = RESPONSE_GUARDRAILS and os.getenv("STREAM_RESPONSE_GUARDRAILS", "true").strip().lower() == "true"
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, "").strip() or default)
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# Check a stream every N text chunks, and at its end.
+STREAMING_SAMPLING_RATE = _positive_int_env("STREAMING_SAMPLING_RATE", 5)
+# call_type LiteLLM uses for an MCP tool call.
+MCP_CALL_TYPE = "call_mcp_tool"
+# The only calls whose replies are checked; their check records them, so the success log skips them.
+CHECKED_REPLY_CALL_TYPES = {"completion", "acompletion", "text_completion", "atext_completion", "anthropic_messages",
+                            "responses", "aresponses"}
+# Credential-like header names, dropped from MCP headers on older LiteLLM.
+CREDENTIAL_HEADER_HINTS = ("auth", "key", "token", "secret", "password", "credential", "cookie")
 
 # The guardrails service reads message content only as a plain string. Anthropic
 # Messages style content BLOCKS - content: [{"type": "text", "text": "..."}] - are
@@ -67,8 +112,7 @@ if AKTO_CONTEXT_SOURCE not in ("AGENTIC", "ENDPOINT"):
 #     same, content flattened to a string      -> blocked 4/4
 #     headers reduced / tags reduced           -> allowed (not the cause)
 #
-# Verdict-only: the request forwarded to the provider and the payload sent for
-# ingestion both keep the original structure, so inventory data is unchanged.
+# Verdict-only: the full request still goes to the provider and is recorded with the reply or 403.
 VERDICT_FLATTEN_CONTENT = os.getenv("VERDICT_FLATTEN_CONTENT", "true").strip().lower() == "true"
 VERDICT_DROP_BODY_KEYS = tuple(
     k.strip() for k in os.getenv("VERDICT_DROP_BODY_KEYS", "stream,tools").split(",") if k.strip()
@@ -78,8 +122,7 @@ VERDICT_DROP_BODY_KEYS = tuple(
 # requests: an identical prompt-injection blocks at 63 chars yet is allowed
 # inside an 86KB coding-agent request, where the user's text is buried under a
 # large system prompt and tool catalogue. When the payload is big enough for
-# that to bite, send only the newest user turn for the VERDICT call. Ingestion
-# is never narrowed and always records the complete request.
+# that to bite, send only the newest user turn for the VERDICT call; the full request is still recorded.
 #   "auto"      (default) narrow to the newest user turn when messages exceed
 #               the threshold below
 #   "true"      always narrow to the newest user turn
@@ -115,7 +158,8 @@ INVALID_AGENT_CHARS = re.compile(r"[^a-z0-9\-._]")
 INVALID_TOOL_NAME_CHARS = re.compile(r"[^a-zA-Z0-9._~-]+")
 # Never mirror credentials/session cookies to the ingestion service; host/content-type
 # are always overridden below to reflect the mirrored envelope, not the original request.
-EXCLUDED_FORWARD_HEADERS = {"authorization", "cookie", "host", "content-type", "content-length"}
+EXCLUDED_FORWARD_HEADERS = {"authorization", "cookie", "host", "content-type", "content-length",
+                            "x-api-key", "x-litellm-api-key", "api-key", "x-mcp-auth"}
 
 
 class GuardrailsHandler(CustomLogger):
@@ -131,7 +175,7 @@ class GuardrailsHandler(CustomLogger):
         # doesn't pass it to async_should_run_agentic_loop - so we stash it here for the
         # tool-call hook to pick back up by the same call_id.
         self._call_headers_cache: dict = {}
-        # litellm_call_ids already ingested by ingest_blocked_request. Raising
+        # litellm_call_ids whose block the blocking verdict call already recorded. Raising
         # HTTPException also triggers async_log_failure_event, so without this the
         # connector's own blocks would be recorded twice (measured: 2 ingests).
         self._own_block_ingested: "OrderedDict[str, None]" = OrderedDict()
@@ -160,19 +204,21 @@ class GuardrailsHandler(CustomLogger):
             return {}
         return headers
 
-    def build_http_proxy_params(self, *, guardrails: bool, ingest_data: bool) -> dict:
+    def build_http_proxy_params(self, *, guardrails: bool, ingest_data: bool, response_guardrails: bool = False) -> dict:
         params = {"akto_connector": AKTO_CONNECTOR_NAME}
         if guardrails:
             params["guardrails"] = "true"
+        if response_guardrails:
+            params["response_guardrails"] = "true"
         if ingest_data:
             params["ingest_data"] = "true"
         return params
 
-    async def post_http_proxy(self, *, guardrails: bool, ingest_data: bool, http_proxy_payload: dict) -> httpx.Response:
+    async def post_http_proxy(self, *, guardrails: bool, ingest_data: bool, http_proxy_payload: dict, response_guardrails: bool = False) -> httpx.Response:
         endpoint = f"{DATA_INGESTION_SERVICE_URL}{HTTP_PROXY_PATH}"
         return await self.client.post(
             endpoint,
-            params=self.build_http_proxy_params(guardrails=guardrails, ingest_data=ingest_data),
+            params=self.build_http_proxy_params(guardrails=guardrails, ingest_data=ingest_data, response_guardrails=response_guardrails),
             json=http_proxy_payload,
         )
 
@@ -183,41 +229,35 @@ class GuardrailsHandler(CustomLogger):
         
         guardrails_result = result.get("data", {}).get("guardrailsResult", {}) or {}
         allowed = guardrails_result.get("Allowed", True)
+        # Like native, only a "block" (or unset) behaviour blocks; alert, warn and approval verdicts pass.
+        if str(guardrails_result.get("behaviour") or guardrails_result.get("Behaviour") or "").strip().lower() not in ("block", ""):
+            allowed = True
         reason = guardrails_result.get("Reason", "")
         modified_payload = guardrails_result.get("ModifiedPayload")
-        
+        # /validate/response echoes the payload with Modified=false when nothing changed.
+        if guardrails_result.get("Modified") is False:
+            modified_payload = None
+
         return allowed, reason, modified_payload
     
-    def apply_redaction(self, data: dict, modified_payload: str) -> dict:
-        """Apply PII redactions from Akto's ModifiedPayload to the request data.
-        
-        Akto returns the ENTIRE redacted request body in ModifiedPayload:
-        {"body": {"messages": [...], "model": "...", "stream": false}}
-        
-        Simply replace the entire data dict with the redacted body.
-        """
+    def apply_redaction(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth], kwargs: dict,
+                        modified_payload: Any) -> Tuple[dict, bool]:
+        """Akto's masking applied as text substitutions, keeping every other field and block; False if it can't be."""
         try:
-            # Parse ModifiedPayload JSON string
-            if isinstance(modified_payload, str):
-                payload_obj = json.loads(modified_payload)
-            else:
-                payload_obj = modified_payload
-            
-            # Extract the redacted body - this is the FULL request with redactions applied
-            redacted_body = payload_obj.get("body")
-            if not redacted_body:
-                logger.info("ModifiedPayload has no 'body' field, skipping redaction")
-                return data
-            
-            # Akto returns the complete redacted request - use it directly
-            logger.info(f"Applied Akto redactions: {redacted_body.get('messages', [])}")
-            return redacted_body
-            
+            judged = json.loads(self.normalize_verdict_payload(self.build_payload(
+                self._validation_view(data), call_type, None, user_api_key_dict, kwargs=kwargs))["requestPayload"])["body"]
+            spans = self._masked_spans(judged, self._modified_body(modified_payload))
         except Exception as e:
-            logger.error(f"Failed to apply redaction from ModifiedPayload: {e}", exc_info=True)
-            return data
+            logger.error(f"Unreadable request masking: {e}")
+            return data, False
+        keys = [k for k in ("messages", "system", "input") if k in data]
+        masked = {**data, **{k: self._replace_text(data[k], spans) for k in keys}}
+        if not spans or any(old in text for old, _ in spans for text in self._texts([masked[k] for k in keys])):
+            return data, False
+        logger.info(f"Applied Akto masking to the request ({len(spans)} spans)")
+        return masked, True
 
-    def extract_request_path(self, kwargs: Optional[dict] = None) -> str:
+    def extract_request_path(self, kwargs: Optional[dict] = None, user_api_key_dict: Optional[UserAPIKeyAuth] = None) -> str:
         fallback = "/chat/completions"
         try:
             if kwargs is not None:
@@ -228,6 +268,10 @@ class GuardrailsHandler(CustomLogger):
                 if request_route:
                     logger.info(f"Extracted path from metadata.user_api_key_request_route: {request_route}")
                     return request_route
+            # Pass-through routes have no route in metadata at pre-call; the key auth has it.
+            key_route = getattr(user_api_key_dict, "request_route", None)
+            if isinstance(key_route, str) and key_route:
+                return key_route
 
             logger.info(f"Using fallback path: {fallback}")
             return fallback
@@ -238,8 +282,14 @@ class GuardrailsHandler(CustomLogger):
         name = INVALID_AGENT_CHARS.sub("-", name.strip().lower())
         return name[:200] or None
 
+    @staticmethod
+    def _litellm_metadata(data: dict, kwargs: Optional[dict] = None) -> dict:
+        """LiteLLM's request metadata (litellm_metadata on /v1/messages and /v1/responses)."""
+        return (data.get("litellm_metadata") or data.get("metadata")
+                or (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata") or {})
+
     def extract_agent_name(self, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Optional[str]:
-        metadata = data.get("metadata") or (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata") or {}
+        metadata = self._litellm_metadata(data, kwargs)
 
         # 1. metadata.agent_name - explicit per-request override, if the application sends one.
         agent = metadata.get("agent_name")
@@ -272,9 +322,10 @@ class GuardrailsHandler(CustomLogger):
         call_type: str,
         user_api_key_dict: Optional[UserAPIKeyAuth],
         kwargs: Optional[dict] = None,
+        record: bool = True,
     ) -> dict:
         if SYNC_MODE:
-            return await self.validate_and_block(data, call_type, user_api_key_dict, kwargs)
+            return await self.validate_and_block(data, call_type, user_api_key_dict, kwargs, record=record)
 
         return data
 
@@ -286,7 +337,9 @@ class GuardrailsHandler(CustomLogger):
         **kwargs,
     ) -> dict:
         self._cache_request_headers_from_data(data)
-        return await self.handle_validation_hook(data, call_type, user_api_key_dict, kwargs)
+        # Record LiteLLM's MCP tool check, not the MCP REST route's duplicate one.
+        record = not (call_type == MCP_CALL_TYPE and "mcp_tool_name" not in data)
+        return await self.handle_validation_hook(data, call_type, user_api_key_dict, kwargs, record=record)
 
     def _cache_request_headers_from_data(self, data: dict) -> None:
         litellm_call_id = data.get("litellm_call_id")
@@ -302,7 +355,8 @@ class GuardrailsHandler(CustomLogger):
         call_type: Literal["completion", "text_completion", "embeddings", "image_generation", "moderation", "audio_transcription"],
         **kwargs,
     ) -> dict:
-        return await self.handle_validation_hook(data, call_type, user_api_key_dict, kwargs)
+        # Re-checks what async_pre_call_hook already checked and recorded.
+        return await self.handle_validation_hook(data, call_type, user_api_key_dict, kwargs, record=False)
 
     def _parse_tool_arguments(self, raw_args: Any) -> dict:
         if isinstance(raw_args, dict):
@@ -556,6 +610,67 @@ class GuardrailsHandler(CustomLogger):
             tags=tags,
         )
 
+    @staticmethod
+    def _safe_mcp_headers(raw: dict) -> dict:
+        """Raw MCP headers without credentials, cleaned as LiteLLM cleans them for logging."""
+        try:
+            from litellm.proxy._experimental.mcp_server.utils import logging_safe_mcp_headers
+            return dict(logging_safe_mcp_headers(raw))
+        except ImportError:
+            # Older LiteLLM: drop upstream MCP credentials (x-mcp-*) and credential-like headers.
+            return {k: v for k, v in raw.items() if not k.lower().startswith("x-mcp-")
+                    and not any(hint in k.lower() for hint in CREDENTIAL_HEADER_HINTS)}
+
+    async def _mcp_request_headers(self, data: dict, kwargs: Optional[dict] = None) -> dict:
+        """Client headers of an MCP call, from LiteLLM's MCP auth context when available."""
+        try:
+            from litellm.proxy._experimental.mcp_server.server import get_auth_context
+            context = get_auth_context()
+            if inspect.isawaitable(context):  # async in older LiteLLM versions
+                context = await context
+            if context and context[5]:
+                return self._safe_mcp_headers(dict(context[5]))
+        except Exception:
+            pass
+        psr = data.get("proxy_server_request") or ((kwargs or {}).get("litellm_params") or {}).get("proxy_server_request") or {}
+        return psr.get("headers") or (data.get("metadata") or {}).get("headers") or {}
+
+    async def build_mcp_payload(
+        self,
+        data: dict,
+        kwargs: Optional[dict] = None,
+        user_api_key_dict: Optional[UserAPIKeyAuth] = None,
+        *,
+        result_texts: Optional[list] = None,
+    ) -> dict:
+        """An MCP tool call as /mcp JSON-RPC, like the native guardrail."""
+        tool = str(data.get("mcp_tool_name") or data.get("name") or "unknown")
+        server = str(data.get("mcp_server_name") or "unknown")
+        arguments = data.get("mcp_arguments") or data.get("arguments")
+        arguments = arguments if isinstance(arguments, dict) else {}
+        metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+        headers = await self._mcp_request_headers(data, kwargs)
+
+        tags = self.build_tool_call_tags(is_mcp=True, tool_name=tool, mcp_server_name=server, mcp_tool_name=tool, model="")
+        request_payload = self.build_tool_call_jsonrpc(tool, arguments)
+        for k, v in {**self._key_identity_tags(user_api_key_dict), **self.key_metadata_tags({"metadata": metadata}),
+                     **self.client_identity_tags(kwargs, data)}.items():
+            tags.setdefault(k, v)
+        response_body = None
+        if result_texts is not None:
+            response_body = {"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": t} for t in result_texts]}}
+        client_ip = headers.get("x-forwarded-for", "").split(",")[0].strip() or headers.get("x-real-ip", "") or "0.0.0.0"
+        return self.build_http_proxy_envelope(
+            path=MCP_INGEST_PATH,
+            request_headers=self.build_forwarded_headers(headers, self._resolve_host({"metadata": metadata}, user_api_key_dict), kwargs),
+            response_headers={"content-type": "application/json"},
+            request_payload=request_payload,
+            response_payload=json.dumps(response_body) if response_body is not None else None,
+            ip=client_ip,
+            status_code=200,
+            tags=tags,
+        )
+
     async def async_should_run_agentic_loop(
         self,
         response: Any,
@@ -595,6 +710,8 @@ class GuardrailsHandler(CustomLogger):
                 tool_args = call["arguments"]
                 tool_result = tool_results_by_id.get(call.get("id"))
                 is_mcp, mcp_server_name, mcp_tool_name = self.parse_mcp_tool_name(tool_name)
+                if is_mcp and self._response_checks_on(STREAM_RESPONSE_GUARDRAILS if stream else RESPONSE_GUARDRAILS):
+                    continue  # the reply's tool-call check records it, with its verdict
                 logger.info(
                     f"[tool-call-hook] Detected tool_call: name={tool_name} is_mcp={is_mcp} "
                     f"mcp_server={mcp_server_name or None} provider={custom_llm_provider} "
@@ -631,16 +748,13 @@ class GuardrailsHandler(CustomLogger):
             user_api_key_dict = metadata.get("user_api_key_dict")
             call_type = kwargs.get("call_type", "completion")
 
-            request_data = {
-                "model": kwargs.get("model", ""),
-                "messages": kwargs.get("messages", []),
-                "stream": kwargs.get("stream", False),
-                "tools": kwargs.get("tools", []),
-            }
+            request_data = self._logged_request(kwargs)
 
-            model_response_dict = response_obj.model_dump() if response_obj else None
+            model_response_dict = self._dump(response_obj) if response_obj else None
 
             if SYNC_MODE:
+                if self._recorded_by_checks(call_type, bool(kwargs.get("stream")), model_response_dict):
+                    return
                 await self.ingest_data(request_data, call_type, model_response_dict, user_api_key_dict, kwargs)
             else:
                 await self.async_validate_and_ingest(request_data, call_type, model_response_dict, user_api_key_dict, kwargs)
@@ -652,8 +766,8 @@ class GuardrailsHandler(CustomLogger):
 
         Without this, anything that does not reach the provider successfully is
         invisible: the only other ingestion paths are async_log_success_event
-        (fires on success only) and ingest_blocked_request (fires only when THIS
-        connector blocks). So a request rejected by another guardrail - e.g. an
+        (fires on success only) and the recorded verdict calls (THIS connector's
+        own checks). So a request rejected by another guardrail - e.g. an
         AWS Bedrock guardrail returning 400 - was recorded nowhere, and neither
         were provider errors, rate limits or timeouts.
 
@@ -667,7 +781,7 @@ class GuardrailsHandler(CustomLogger):
             exception = kwargs.get("exception")
             call_id = kwargs.get("litellm_call_id")
 
-            # Our own 403 is already recorded by ingest_blocked_request; recording
+            # Our own 403 is already recorded by the blocking verdict call; recording
             # it again here would double-count every block.
             if call_id and str(call_id) in self._own_block_ingested:
                 self._own_block_ingested.pop(str(call_id), None)
@@ -681,12 +795,7 @@ class GuardrailsHandler(CustomLogger):
             user_api_key_dict = metadata.get("user_api_key_dict")
             call_type = kwargs.get("call_type", "completion")
 
-            request_data = {
-                "model": kwargs.get("model", ""),
-                "messages": kwargs.get("messages", []),
-                "stream": kwargs.get("stream", False),
-                "tools": kwargs.get("tools", []),
-            }
+            request_data = self._logged_request(kwargs)
 
             status_code = getattr(exception, "status_code", None)
             try:
@@ -714,16 +823,478 @@ class GuardrailsHandler(CustomLogger):
         except Exception as e:
             logger.error(f"Guardrails failure-event ingestion error: {e}")
 
-    async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> dict:
+    def _response_checks_on(self, enabled: bool) -> bool:
+        return SYNC_MODE and enabled and bool(DATA_INGESTION_SERVICE_URL)
+
+    @staticmethod
+    def _checkable_reply(response_dict: Any) -> bool:
+        """True for a model reply (chat, Anthropic or Responses API), not embeddings, images etc."""
+        return isinstance(response_dict, dict) and bool(
+            response_dict.get("choices") or response_dict.get("content") or response_dict.get("output"))
+
+    def _recorded_by_checks(self, call_type: str, stream: bool, response_dict: Any) -> bool:
+        """True when a response check records this call, so the success log skips it."""
+        if not DATA_INGESTION_SERVICE_URL:
+            return False
+        if call_type == MCP_CALL_TYPE:
+            return RESPONSE_GUARDRAILS
+        if call_type not in CHECKED_REPLY_CALL_TYPES:
+            return False
+        if stream:
+            return STREAM_RESPONSE_GUARDRAILS
+        return RESPONSE_GUARDRAILS and self._checkable_reply(response_dict)
+
+    async def async_post_call_success_hook(self, data: dict, user_api_key_dict: UserAPIKeyAuth, response: Any) -> Any:
+        """Checks a non-streamed reply and its MCP tool calls; blocks with 403 or applies masking."""
+        if not self._response_checks_on(RESPONSE_GUARDRAILS):
+            return response
         try:
-            allowed, reason, modified_payload = await self.call_guardrails_validation(data, call_type, user_api_key_dict, kwargs)
-            
+            response_dict = response.model_dump() if hasattr(response, "model_dump") else response
+        except Exception:
+            return response
+        if not self._checkable_reply(response_dict):
+            return response
+        modified = await self._check_response(data, response_dict, user_api_key_dict)
+        if modified and not self._apply_reply_redaction(response, modified):
+            raise await self._block_reply(data, user_api_key_dict, "sensitive data in the response")
+        try:
+            tool_calls = self._extract_tool_calls(response)
+        except Exception as e:
+            logger.error(f"Reply tool calls unreadable, not checked (fail-open): {e}")
+            tool_calls = []
+        await self._check_reply_tool_calls(data, tool_calls, user_api_key_dict)
+        return response
+
+    async def async_post_call_streaming_iterator_hook(self, user_api_key_dict: UserAPIKeyAuth, response: Any, request_data: dict):
+        """Checks a streamed reply every N text chunks and at its end; only checked text goes out."""
+        if not self._response_checks_on(STREAM_RESPONSE_GUARDRAILS) or self._reply_call_type(request_data) not in CHECKED_REPLY_CALL_TYPES:
+            async for chunk in response:  # streams it can't read (e.g. pass-through) pass as before
+                yield chunk
+            return
+        parts: list = []
+        tool_calls: dict = {}
+        unchecked = 0
+        # Chunks wait for a check covering their text; the last one waits for the end check.
+        held: list = []
+        # Raw SSE events can span chunks, so only complete events are read.
+        decoder, sse = codecs.getincrementaldecoder("utf-8")(errors="ignore"), ""
+
+        def args_len() -> int:
+            return sum(len(c["arguments"]) for c in tool_calls.values())
+
+        def read(readable: Any) -> bool:
+            before = args_len()
+            try:
+                text = self._stream_text(readable)
+                self._collect_stream_tool_calls(readable, tool_calls)
+            except Exception as e:
+                logger.error(f"Unreadable stream chunk, passed unchecked (fail-open): {e}")
+                text = ""
+            if text:
+                parts.append(text)
+            return bool(text) or args_len() > before  # tool arguments are checked as they stream too
+
+        ended = False
+        # A mid-stream check runs while chunks keep arriving, with how many held chunks it covers.
+        pending: Optional[Tuple[asyncio.Future, int]] = None
+        try:
+            async for chunk in response:
+                readable = chunk
+                if isinstance(chunk, (bytes, str)):
+                    sse += (decoder.decode(chunk) if isinstance(chunk, bytes) else chunk).replace("\r\n", "\n")
+                    readable, _, sse = sse.rpartition("\n\n")
+                if read(readable):
+                    unchecked += 1
+                held.append(chunk)
+                if pending and pending[0].done():
+                    await pending[0]
+                    for c in held[:pending[1]]:
+                        yield c
+                    held, pending = held[pending[1]:], None
+                if pending is None and unchecked >= STREAMING_SAMPLING_RATE:
+                    unchecked = 0
+                    pending = (asyncio.ensure_future(self._check_stream(
+                        request_data, "".join(parts), {k: dict(v) for k, v in tool_calls.items()}, user_api_key_dict,
+                        final=False)), len(held) - 1)
+            if sse:
+                read(sse)
+            ended = True
+            if pending:
+                await pending[0]
+            await self._check_stream(request_data, "".join(parts), tool_calls, user_api_key_dict)
+            await self._check_reply_tool_calls(request_data, list(tool_calls.values()), user_api_key_dict)
+            for c in held:
+                yield c
+        except GeneratorExit:
+            if not ended:  # the client left mid-stream, so record the reply so far
+                with contextlib.suppress(Exception):
+                    await self._check_response(request_data, self._text_reply("".join(parts)), user_api_key_dict, can_mask=False)
+            raise
+        finally:
+            if pending and not pending[0].done():
+                pending[0].cancel()
+
+    async def async_post_mcp_tool_call_hook(self, kwargs: dict, response_obj: Any, start_time: Any, end_time: Any) -> Any:
+        """Checks an MCP tool result; a blocked one is replaced, as LiteLLM ignores errors here."""
+        if not self._response_checks_on(RESPONSE_GUARDRAILS):
+            return None
+        try:
+            result = response_obj.mcp_tool_call_response or []
+            # LiteLLM <= 1.89 hands over the CallToolResult as (field, value) pairs and ignores this hook's
+            # return, so its content list is changed in place.
+            fields = dict(p for p in result if isinstance(p, tuple) and len(p) == 2)
+            content = fields.get("content") if isinstance(fields.get("content"), list) else None
+            items = list(content if content is not None else result)
+
+            def put(new_items: list) -> Any:
+                if content is not None:
+                    content[:] = new_items
+                else:
+                    response_obj.mcp_tool_call_response = new_items
+                return response_obj
+
+            texts = [t for t in (self._get_attr(c, "text") for c in items) if isinstance(t, str)]
+            data = self._mcp_call_from_kwargs(kwargs)
+            payload = await self.build_mcp_payload(data, kwargs, result_texts=texts)
+            allowed, reason, modified = await self._verdict(payload, response_side=True, record=True)
+            if allowed and not modified:
+                return None
+            masked = self._masked_mcp_texts(modified) if allowed else None
+            if masked is not None and len(masked) == len(texts):
+                replacements = iter(masked)
+                logger.info(f"Masked MCP tool result: {data['mcp_tool_name']}")
+                return put([self._with_text(c, next(replacements)) if isinstance(self._get_attr(c, "text"), str) else c for c in items])
+            message = f"Blocked by Akto Guardrails: {reason}" if reason else "Blocked by Akto Guardrails"
+            await self._ingest_blocked(lambda: payload, reason)
+            logger.info(f"Blocked MCP tool result: {data['mcp_tool_name']} ({reason})")
+            try:
+                from mcp.types import TextContent
+                return put([TextContent(type="text", text=message)])
+            except ImportError:
+                return put([{"type": "text", "text": message}])
+        except Exception as e:
+            logger.error(f"MCP tool result guardrail error (fail-open): {e}")
+            return None
+
+    async def _check_response(self, data: dict, response_dict: dict, user_api_key_dict: Optional[UserAPIKeyAuth],
+                              *, record: bool = True, can_mask: bool = True) -> Optional[str]:
+        """Checks and records a reply; raises 403 when blocked, else returns any masked payload."""
+        kwargs = self._kwargs_from_data(data)
+        call_type = self._reply_call_type(data)
+        try:
+            payload = self.build_payload(data, call_type, response_dict, user_api_key_dict, kwargs=kwargs)
+        except Exception as e:
+            logger.error(f"Response guardrail payload error (fail-open): {e}")
+            return None
+        allowed, reason, modified = await self._verdict(payload, response_side=True, record=record)
+        if allowed and not (modified and not can_mask):
+            return modified
+        reason = reason if not allowed else "sensitive data in the response"
+        raise (await self._block_reply(data, user_api_key_dict, reason)) if record else self._blocked(reason)
+
+    async def _check_stream(self, data: dict, text: str, tool_calls: dict, user_api_key_dict: Optional[UserAPIKeyAuth],
+                            *, final: bool = True) -> None:
+        """Only the final check records, or a mid-stream check that blocks."""
+        reply = self._text_reply(text, list(tool_calls.values()))
+        try:
+            # A streamed reply can't be masked once sent, so masking blocks it.
+            await self._check_response(data, reply, user_api_key_dict, record=final, can_mask=False)
+        except HTTPException:
+            if not final:
+                with contextlib.suppress(HTTPException):
+                    await self._check_response(data, reply, user_api_key_dict, can_mask=False)
+            raise
+
+    async def _check_reply_tool_calls(self, data: dict, tool_calls: list, user_api_key_dict: Optional[UserAPIKeyAuth]) -> None:
+        """Checks and records the reply's mcp__<server>__<tool> calls; a blocked one blocks the reply."""
+        kwargs = self._kwargs_from_data(data)
+        for call in tool_calls:
+            is_mcp, server, tool = self.parse_mcp_tool_name(call.get("name") or "")
+            if not is_mcp:
+                continue
+            try:
+                mcp_call = {
+                    "mcp_tool_name": tool,
+                    "mcp_arguments": self._parse_tool_arguments(call.get("arguments") or None),
+                    "mcp_server_name": server,
+                    "metadata": (kwargs.get("litellm_params") or {}).get("metadata") or {},
+                    "proxy_server_request": data.get("proxy_server_request"),
+                }
+                payload = await self.build_mcp_payload(mcp_call, kwargs, user_api_key_dict)
+            except Exception as e:
+                logger.error(f"MCP tool call guardrail payload error (fail-open): {e}")
+                continue
+            allowed, reason, modified = await self._verdict(payload, record=True)
+            if not allowed or modified:
+                reason = reason or "sensitive data in an MCP tool call"
+                await self._ingest_blocked(lambda: payload, reason)
+                raise self._blocked(reason)
+
+    @staticmethod
+    def _blocked(reason: str) -> HTTPException:
+        return HTTPException(status_code=403, detail=f"Blocked by Akto Guardrails: {reason}" if reason else "Blocked by Akto Guardrails")
+
+    async def _ingest_blocked(self, build: Any, reason: str) -> None:
+        """Records a block as a 403, like other Akto connectors; never raises."""
+        try:
+            payload = build()
+            if inspect.isawaitable(payload):
+                payload = await payload
+            blocked_by = {"x-blocked-by": "Akto Proxy"}
+            await self._ingest_only({**payload, "statusCode": "403", "status": "403",
+                                     "responseHeaders": json.dumps({"content-type": "application/json", **blocked_by}),
+                                     "responsePayload": json.dumps({"body": {**blocked_by, "reason": reason or "Policy violation"}})})
+        except Exception as e:
+            logger.error(f"Blocked request ingestion failed: {e}")
+
+    async def _block_reply(self, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth], reason: str) -> HTTPException:
+        """Records a blocked reply as a 403 and returns the error to raise."""
+        kwargs = self._kwargs_from_data(data)
+        await self._ingest_blocked(
+            lambda: self.build_payload(data, self._reply_call_type(data), None, user_api_key_dict, kwargs=kwargs), reason)
+        return self._blocked(reason)
+
+    @staticmethod
+    def _reply_call_type(data: dict) -> str:
+        return str(getattr(data.get("litellm_logging_obj"), "call_type", None) or data.get("call_type") or "completion")
+
+    @staticmethod
+    def _modified_body(modified_payload: Any) -> Any:
+        """The body of a ModifiedPayload ({"body": ...}, or a bare JSON document), or None."""
+        try:
+            body = json.loads(modified_payload) if isinstance(modified_payload, str) else modified_payload
+            body = body.get("body", body) if isinstance(body, dict) else body
+            return json.loads(body) if isinstance(body, str) else body
+        except (TypeError, ValueError):
+            return None
+
+    def _apply_reply_redaction(self, response: Any, modified_payload: Any) -> bool:
+        """Writes masked text into the reply (chat, text completion, Anthropic, Responses); all or nothing."""
+        body = self._modified_body(modified_payload)
+        get = self._get_attr
+        try:
+            # Chat choices hold a message; text completion choices hold text.
+            targets = [(get(c, "message"), "content", body["choices"][i]["message"]["content"]) if get(c, "message") is not None
+                       else (c, "text", body["choices"][i]["text"]) for i, c in enumerate(get(response, "choices") or [])]
+            content = get(response, "content")
+            targets += [(b, "text", body["content"][j]["text"])
+                        for j, b in enumerate(content if isinstance(content, list) else []) if get(b, "type") == "text"]
+            targets += [(p, "text", body["output"][k]["content"][m]["text"])
+                        for k, item in enumerate(get(response, "output") or [])
+                        for m, p in enumerate(get(item, "content") or []) if get(p, "type") == "output_text"]
+        except (KeyError, IndexError, TypeError):
+            return False
+        if not targets or not all(c is not None and isinstance(t, (str, type(None))) for c, _, t in targets):
+            return False
+        for container, key, text in targets:
+            if isinstance(container, dict):
+                container[key] = text
+            else:
+                setattr(container, key, text)
+        logger.info("Applied Akto masking to the reply")
+        return True
+
+    @staticmethod
+    def _string_paths(value: Any, path: tuple = ()) -> dict:
+        if isinstance(value, str):
+            return {path: value}
+        items = value.items() if isinstance(value, dict) else enumerate(value) if isinstance(value, list) else ()
+        return {p: text for k, v in items for p, text in GuardrailsHandler._string_paths(v, path + (k,)).items()}
+
+    @staticmethod
+    def _masked_spans(judged: Any, masked: Any) -> list:
+        """(original, masked) word spans Akto changed between the text it judged and its masked copy."""
+        before, after = GuardrailsHandler._string_paths(judged), GuardrailsHandler._string_paths(masked)
+        spans = []
+        for path in before.keys() & after.keys():
+            old, new = before[path].split(" "), after[path].split(" ")
+            for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, old, new, autojunk=False).get_opcodes():
+                if tag != "equal" and i2 > i1:
+                    spans.append((" ".join(old[i1:i2]), " ".join(new[j1:j2])))
+        return spans
+
+    @staticmethod
+    def _replace_text(value: Any, spans: list) -> Any:
+        """value with each span substituted in its text: string content, text blocks and nested content."""
+        if isinstance(value, str):
+            for old, new in spans:
+                value = value.replace(old, new)
+            return value
+        if isinstance(value, list):
+            return [GuardrailsHandler._replace_text(v, spans) for v in value]
+        if isinstance(value, dict):
+            return {k: GuardrailsHandler._replace_text(v, spans) if k in ("content", "text") else v for k, v in value.items()}
+        return value
+
+    @staticmethod
+    def _texts(value: Any) -> list:
+        """The strings _replace_text edits."""
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return [t for v in value for t in GuardrailsHandler._texts(v)]
+        if isinstance(value, dict):
+            return [t for k in ("content", "text") for t in GuardrailsHandler._texts(value.get(k))]
+        return []
+
+    def _masked_mcp_texts(self, modified_payload: Any) -> Optional[list]:
+        body = self._modified_body(modified_payload)
+        try:
+            texts = [c.get("text") for c in body["result"]["content"]]
+        except (KeyError, TypeError, AttributeError):
+            return None
+        return texts if all(isinstance(t, str) for t in texts) else None
+
+    def _mcp_call_from_kwargs(self, kwargs: dict) -> dict:
+        """An MCP tool call's data from LiteLLM's logging kwargs."""
+        call = kwargs.get("mcp_tool_call_metadata") or {}
+        litellm_params = kwargs.get("litellm_params") or {}
+        return {
+            "mcp_tool_name": self._get_attr(call, "name"),
+            "mcp_arguments": self._get_attr(call, "arguments"),
+            "mcp_server_name": self._get_attr(call, "mcp_server_name"),
+            "metadata": litellm_params.get("metadata") or {},
+            "proxy_server_request": litellm_params.get("proxy_server_request"),
+        }
+
+    @staticmethod
+    def _mcp_texts(response_dict: Any) -> list:
+        """Text items of a logged MCP tool result (a content list, or a result holding one)."""
+        items = response_dict.get("content") if isinstance(response_dict, dict) else response_dict
+        return [i["text"] for i in items or [] if isinstance(i, dict) and isinstance(i.get("text"), str)]
+
+    @staticmethod
+    def _with_text(item: Any, text: str) -> Any:
+        if isinstance(item, dict):
+            return {**item, "text": text}
+        return item.model_copy(update={"text": text}) if hasattr(item, "model_copy") else item
+
+    @staticmethod
+    def _kwargs_from_data(data: dict) -> dict:
+        """kwargs-shaped view of a call hook's request; the MCP pre-check's comes from its logger."""
+        details = getattr(data.get("litellm_logging_obj"), "model_call_details", None)
+        if not data.get("litellm_call_id") and isinstance(details, dict) and details.get("litellm_call_id"):
+            return details
+        md = data.get("litellm_metadata")
+        if not isinstance(md, dict) or not md:
+            md = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+        return {
+            "litellm_params": {"metadata": md, "proxy_server_request": data.get("proxy_server_request")},
+            "litellm_call_id": data.get("litellm_call_id"),
+        }
+
+    @staticmethod
+    def _dump(value: Any) -> Any:
+        """JSON-ready response; an MCP tool call logs a list of content items."""
+        if isinstance(value, list):
+            return [GuardrailsHandler._dump(v) for v in value]
+        return value.model_dump() if hasattr(value, "model_dump") else value
+
+    @staticmethod
+    def _text_reply(text: str, tool_calls: Optional[list] = None) -> dict:
+        message = {"role": "assistant", "content": text}
+        if tool_calls:
+            message["tool_calls"] = [{"type": "function", "function": c} for c in tool_calls]
+        return {"choices": [{"message": message}]}
+
+    @staticmethod
+    def _sse_events(chunk: Any) -> Optional[list]:
+        """Events of a raw SSE chunk (Anthropic /v1/messages) or a dict chunk; None for a typed chunk."""
+        if isinstance(chunk, dict):
+            return [chunk]
+        if not isinstance(chunk, (bytes, str)):
+            return None
+        raw = chunk.decode("utf-8", "ignore") if isinstance(chunk, bytes) else chunk
+        events = []
+        for line in raw.splitlines():
+            if line.startswith("data:"):
+                try:
+                    event = json.loads(line[5:].strip())
+                except ValueError:
+                    continue
+                if isinstance(event, dict):
+                    events.append(event)
+        return events
+
+    @staticmethod
+    def _stream_text(chunk: Any) -> str:
+        """Reply text in a stream chunk (chat, text completion, Responses API or Anthropic SSE)."""
+        events = GuardrailsHandler._sse_events(chunk)
+        if events is None:
+            choices = getattr(chunk, "choices", None)
+            if choices:
+                # Chat chunks hold a delta, text completion chunks hold text.
+                content = getattr(getattr(choices[0], "delta", None), "content", None) or getattr(choices[0], "text", None)
+                return content if isinstance(content, str) else ""
+            # Responses API: reply text only, not reasoning or function call argument deltas.
+            if getattr(chunk, "type", None) != "response.output_text.delta":
+                return ""
+            delta = getattr(chunk, "delta", None)
+            return delta if isinstance(delta, str) else ""
+        return "".join(e["delta"]["text"] for e in events
+                       if isinstance(e.get("delta"), dict) and isinstance(e["delta"].get("text"), str))
+
+    def _collect_stream_tool_calls(self, chunk: Any, calls: dict) -> None:
+        """Assembles streamed tool calls (chat deltas or Anthropic tool_use blocks) into calls."""
+        events = self._sse_events(chunk)
+        if events is None:
+            choices = getattr(chunk, "choices", None) or []
+            delta = getattr(choices[0], "delta", None) if choices else None
+            for tc in getattr(delta, "tool_calls", None) or []:
+                fn = self._get_attr(tc, "function")
+                entry = calls.setdefault(("chat", self._get_attr(tc, "index", 0)), {"name": "", "arguments": ""})
+                entry["name"] = entry["name"] or self._get_attr(fn, "name") or ""
+                entry["arguments"] += self._get_attr(fn, "arguments") or ""
+            return
+        for event in events:
+            block = event.get("content_block") if isinstance(event.get("content_block"), dict) else {}
+            delta = event.get("delta") if isinstance(event.get("delta"), dict) else {}
+            key = ("messages", event.get("index"))
+            if event.get("type") == "content_block_start" and block.get("type") == "tool_use":
+                calls[key] = {"name": block.get("name") or "", "arguments": ""}
+            elif delta.get("type") == "input_json_delta" and key in calls:
+                calls[key]["arguments"] += delta.get("partial_json") or ""
+
+    @staticmethod
+    def _logged_request(kwargs: dict) -> dict:
+        """The request as LiteLLM logs it; the Anthropic system prompt only survives in the original body."""
+        body = ((kwargs.get("litellm_params") or {}).get("proxy_server_request") or {}).get("body") or {}
+        return {
+            "model": kwargs.get("model", ""),
+            "messages": kwargs.get("messages", []),
+            "stream": kwargs.get("stream", False),
+            "tools": kwargs.get("tools", []),
+            "system": body.get("system") if isinstance(body, dict) else None,
+        }
+
+    async def validate_and_block(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None,
+                                 kwargs: Optional[dict] = None, *, record: bool = True) -> dict:
+        # Call hooks get no litellm_params, so path and identity come from the request.
+        verdict_kwargs = kwargs if (kwargs or {}).get("litellm_params") else self._kwargs_from_data(data)
+        try:
+            allowed, reason, modified_payload = await self.call_guardrails_validation(
+                data, call_type, user_api_key_dict, verdict_kwargs, record=record)
+            is_mcp = call_type == MCP_CALL_TYPE
+            if is_mcp and modified_payload:
+                # MCP arguments can't be masked, so masking blocks them.
+                allowed = False
+            elif allowed and modified_payload:
+                data, masked = self.apply_redaction(data, call_type, user_api_key_dict, verdict_kwargs, modified_payload)
+                allowed = masked  # masking that can't be applied blocks
+                reason = reason or ("" if masked else "sensitive data that could not be masked")
+
             if not allowed:
                 # Remember this turn so it can be stripped from history later -
                 # the client keeps rejected messages and resends them.
-                self.remember_blocked(data, kwargs)
-                await self.ingest_blocked_request(data, call_type, reason, user_api_key_dict, kwargs)
-                own_id = (kwargs or {}).get("litellm_call_id")
+                if not is_mcp:
+                    self.remember_blocked(data, kwargs)
+                # Record the verdict if this re-check didn't, then the 403.
+                if not record:
+                    await self.call_guardrails_validation(data, call_type, user_api_key_dict, verdict_kwargs, record=True)
+                await self._ingest_blocked(
+                    lambda: self.build_mcp_payload(data, verdict_kwargs, user_api_key_dict) if is_mcp
+                    else self.build_payload(data, call_type, None, user_api_key_dict, kwargs=verdict_kwargs), reason)
+                own_id = verdict_kwargs.get("litellm_call_id")
                 if own_id:
                     self._own_block_ingested[str(own_id)] = None
                     while len(self._own_block_ingested) > 500:
@@ -733,15 +1304,6 @@ class GuardrailsHandler(CustomLogger):
                     detail=f"Blocked by Akto Guardrails: {reason}" if reason else "Blocked by Akto Guardrails",
                 )
             
-            # If Akto returned a redacted version, apply it to the user message.
-            # When the verdict ran on a narrowed view, ModifiedPayload contains
-            # only that turn, so splice rather than replace the whole body.
-            if modified_payload:
-                if self._should_narrow(data):
-                    data = self._merge_redacted_last_user(data, modified_payload)
-                else:
-                    data = self.apply_redaction(data, modified_payload)
-
             # Allowed: remove any turn blocked earlier in this session so the
             # model never sees content the guardrail already rejected.
             data = self.strip_quarantined_history(data, kwargs)
@@ -758,8 +1320,14 @@ class GuardrailsHandler(CustomLogger):
             return
 
         try:
-            http_proxy_payload = self.build_payload(data, call_type, response_dict, user_api_key_dict, status_code=200, kwargs=kwargs)
-            response = await self.post_http_proxy(guardrails=True, ingest_data=True, http_proxy_payload=http_proxy_payload)
+            if call_type == MCP_CALL_TYPE:
+                http_proxy_payload = await self.build_mcp_payload(
+                    self._mcp_call_from_kwargs(kwargs or {}), kwargs, user_api_key_dict, result_texts=self._mcp_texts(response_dict))
+            else:
+                http_proxy_payload = self.build_payload(data, call_type, response_dict, user_api_key_dict, status_code=200, kwargs=kwargs)
+            # The reply is checked too, so its violations are reported; nothing is blocked in async mode.
+            response = await self.post_http_proxy(guardrails=True, response_guardrails=RESPONSE_GUARDRAILS and response_dict is not None,
+                                                  ingest_data=True, http_proxy_payload=http_proxy_payload)
             if response.status_code == 200:
                 allowed, reason, _ = self.parse_guardrails_result(response.json())
                 if not allowed:
@@ -783,7 +1351,8 @@ class GuardrailsHandler(CustomLogger):
         if VALIDATE_LAST_USER_MESSAGE_ONLY in ("true", "all_user"):
             return True
         try:
-            return len(json.dumps(msgs, default=str)) > GUARDRAIL_NARROW_THRESHOLD_BYTES
+            # Coding agents' large system prompts count too.
+            return len(json.dumps([msgs, data.get("system")], default=str)) > GUARDRAIL_NARROW_THRESHOLD_BYTES
         except Exception:
             return False
 
@@ -843,6 +1412,7 @@ class GuardrailsHandler(CustomLogger):
             trimmed = dict(data)
             trimmed["messages"] = kept
             trimmed["tools"] = []
+            trimmed.pop("system", None)
             logger.info(
                 f"Narrowed guardrail view: {len(msgs)} messages -> {len(kept)} user turns "
                 f"({len(json.dumps(kept, default=str)):,}B after stripping harness context)"
@@ -862,6 +1432,7 @@ class GuardrailsHandler(CustomLogger):
         trimmed = dict(data)
         trimmed["messages"] = [last_user]
         trimmed["tools"] = []
+        trimmed.pop("system", None)
         logger.info(
             f"Narrowed guardrail view: {len(msgs)} messages -> newest user turn "
             f"({len(json.dumps(last_user, default=str)):,}B after stripping harness context)"
@@ -873,53 +1444,67 @@ class GuardrailsHandler(CustomLogger):
             logger.info(f"Verdict text sent to Akto ({len(txt)} chars): {txt[:400]!r}")
         return trimmed
 
-    def _merge_redacted_last_user(self, data: dict, modified_payload: Any) -> dict:
-        """Splice Akto's redacted turn back in, preserving conversation history.
-
-        We only showed Akto one turn, so ModifiedPayload carries only that turn.
-        apply_redaction() replaces the whole body wholesale, which here would
-        silently drop every other message."""
-        try:
-            obj = json.loads(modified_payload) if isinstance(modified_payload, str) else modified_payload
-            redacted = ((obj or {}).get("body") or {}).get("messages") or []
-            if not redacted:
-                return data
-            new_turn = redacted[-1]
-            msgs = list(data.get("messages") or [])
-            for i in range(len(msgs) - 1, -1, -1):
-                if isinstance(msgs[i], dict) and msgs[i].get("role") == "user":
-                    merged = dict(data)
-                    merged["messages"] = msgs[:i] + [new_turn] + msgs[i + 1:]
-                    logger.info(f"Applied Akto redaction to newest user turn ({len(msgs)} messages preserved)")
-                    return merged
-            return data
-        except Exception as e:
-            logger.error(f"Failed to merge redaction (keeping original): {e}")
-            return data
-
-    async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> Tuple[bool, str, Optional[str]]:
+    async def call_guardrails_validation(self, data: dict, call_type: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None,
+                                         kwargs: Optional[dict] = None, *, record: bool = True) -> Tuple[bool, str, Optional[str]]:
         if not DATA_INGESTION_SERVICE_URL:
             return True, "", None
 
+        if call_type == MCP_CALL_TYPE:
+            return await self._verdict(await self.build_mcp_payload(data, kwargs, user_api_key_dict), record=record)
         # _validation_view scopes WHAT gets judged; normalize_verdict_payload fixes
         # the SHAPE it is judged in. Both apply to the verdict copy only.
-        http_proxy_payload = self.normalize_verdict_payload(
+        return await self._verdict(self.normalize_verdict_payload(
             self.build_payload(self._validation_view(data), call_type, None, user_api_key_dict, kwargs=kwargs)
-        )
+        ), record=record)
 
+    async def _verdict(self, http_proxy_payload: dict, *, response_side: bool = False, record: bool = False) -> Tuple[bool, str, Optional[str]]:
+        """One request- or response-side verdict, failing open; record also records the traffic."""
         try:
-            response = await self.post_http_proxy(guardrails=True, ingest_data=False, http_proxy_payload=http_proxy_payload)
-            if response.status_code != 200:
-                logger.info(f"Guardrails validation returned HTTP {response.status_code} (fail-open)")
-                return True, "", None
-
-            return self.parse_guardrails_result(response.json())
-        except (httpx.RequestError, httpx.TimeoutException, ValueError) as e:
+            response = await self.post_http_proxy(
+                guardrails=not response_side, response_guardrails=response_side, ingest_data=record,
+                http_proxy_payload=http_proxy_payload)
+        except Exception as e:
+            # Unreachable: recording would only wait out a second timeout.
             logger.info(f"Guardrails validation failed (fail-open): {e}")
             return True, "", None
+        if response.status_code != 200:
+            logger.info(f"Guardrails validation returned HTTP {response.status_code} (fail-open)")
+            if record:
+                await self._ingest_only(http_proxy_payload)  # the check didn't record it
+            return True, "", None
+        try:
+            return self.parse_guardrails_result(response.json())
         except Exception as e:
             logger.error(f"Guardrails validation error (fail-open): {e}")
             return True, "", None
+
+    async def _ingest_only(self, http_proxy_payload: dict) -> None:
+        """Records traffic without a check; never raises."""
+        try:
+            await self.post_http_proxy(guardrails=False, ingest_data=True, http_proxy_payload=http_proxy_payload)
+        except Exception as e:
+            logger.error(f"Ingestion failed: {e}")
+
+    @staticmethod
+    def _blocks_text(blocks: list) -> str:
+        """Text in content blocks: text, plain-text documents and search results."""
+        texts = []
+        for block in blocks:
+            if not isinstance(block, dict):
+                continue
+            kind = block.get("type", "text")
+            if kind == "text":
+                texts.append(block.get("text") or "")
+            elif kind in ("document", "search_result"):
+                source = block.get("source")
+                if isinstance(source, dict) and source.get("type") == "text":
+                    texts.append(source.get("data") or "")
+                elif isinstance(source, dict) and source.get("type") == "content":
+                    texts.append(GuardrailsHandler._blocks_text(source.get("content") or []))
+                if isinstance(block.get("content"), list):
+                    texts.append(GuardrailsHandler._blocks_text(block["content"]))
+                texts += [block.get(k) for k in ("title", "context") if isinstance(block.get(k), str)]
+        return " ".join(t for t in texts if t).strip()
 
     @staticmethod
     def normalize_verdict_payload(payload: dict) -> dict:
@@ -948,12 +1533,11 @@ class GuardrailsHandler(CustomLogger):
                         continue
                     content = message.get("content")
                     if isinstance(content, list):
-                        message["content"] = " ".join(
-                            block.get("text", "")
-                            for block in content
-                            if isinstance(block, dict) and block.get("type", "text") == "text"
-                        ).strip()
+                        message["content"] = GuardrailsHandler._blocks_text(content)
                         changed = True
+                if isinstance(body.get("system"), list):
+                    body["system"] = GuardrailsHandler._blocks_text(body["system"])
+                    changed = True
 
             if changed:
                 normalized = dict(payload)
@@ -1004,19 +1588,6 @@ class GuardrailsHandler(CustomLogger):
             log_http_error=True,
         )
 
-    async def ingest_blocked_request(self, data: dict, call_type: str, reason: str, user_api_key_dict: Optional[UserAPIKeyAuth] = None, kwargs: Optional[dict] = None) -> None:
-        if not DATA_INGESTION_SERVICE_URL or not SYNC_MODE:
-            return
-
-        await self.ingest_response(
-            data,
-            call_type,
-            {"x-blocked-by": "Akto Proxy", "reason": reason},
-            403,
-            user_api_key_dict,
-            kwargs,
-        )
-
     def _tag_value(self, value: Any) -> str:
         """Tag maps are string-valued; stringify scalars, JSON-encode anything nested."""
         if isinstance(value, str):
@@ -1031,7 +1602,7 @@ class GuardrailsHandler(CustomLogger):
         server-side identity (key_type/app_name/app_slug/... for application keys, or any
         custom metadata an admin stamped on the key) is queryable in Akto alongside the
         traffic - no application-side change required."""
-        metadata = data.get("metadata") or (kwargs.get("litellm_params", {}) if kwargs else {}).get("metadata") or {}
+        metadata = self._litellm_metadata(data, kwargs)
         key_metadata = metadata.get("user_api_key_metadata") or {}
         return {str(k): self._tag_value(v) for k, v in key_metadata.items() if v is not None}
 
@@ -1108,6 +1679,16 @@ class GuardrailsHandler(CustomLogger):
 
         return tags
 
+    @staticmethod
+    def _key_identity_tags(user_api_key_dict: Optional[UserAPIKeyAuth]) -> dict:
+        """The LiteLLM key's alias, team, user and email as tags."""
+        tags = {}
+        for attr in ("key_alias", "team_id", "user_id", "user_email"):
+            value = getattr(user_api_key_dict, attr, None) if user_api_key_dict else None
+            if value:
+                tags[attr] = value
+        return tags
+
     def build_tags(self, call_type: str, data: dict, user_api_key_dict: Optional[UserAPIKeyAuth] = None, litellm_call_id: Optional[str] = None, kwargs: Optional[dict] = None) -> dict:
         tags = {"gen-ai": "Gen AI", "litellm": "LiteLLM"}
         if call_type:
@@ -1119,19 +1700,7 @@ class GuardrailsHandler(CustomLogger):
         # fired from this request - lets the dashboard join a completion to its tool calls.
         if litellm_call_id:
             tags["litellm_call_id"] = litellm_call_id
-        if user_api_key_dict:
-            try:
-                key_alias = getattr(user_api_key_dict, "key_alias", None)
-                team_id = getattr(user_api_key_dict, "team_id", None)
-                user_id = getattr(user_api_key_dict, "user_id", None)
-                if key_alias:
-                    tags["key_alias"] = key_alias
-                if team_id:
-                    tags["team_id"] = team_id
-                if user_id:
-                    tags["user_id"] = user_id
-            except Exception as e:
-                logger.error(f"Failed to enrich tags: {e}")
+        tags.update(self._key_identity_tags(user_api_key_dict))
         # Surface all virtual-key metadata as tags, without clobbering the core tags above.
         for k, v in self.key_metadata_tags(data, kwargs).items():
             tags.setdefault(k, v)
@@ -1338,7 +1907,8 @@ class GuardrailsHandler(CustomLogger):
         own headers win on a clash so nothing it sent is overwritten."""
         headers_out = {
             k: v for k, v in (request_headers_raw or {}).items()
-            if k.lower() not in EXCLUDED_FORWARD_HEADERS
+            # Also any *authorization header, e.g. x-mcp-<server>-authorization.
+            if k.lower() not in EXCLUDED_FORWARD_HEADERS and "authorization" not in k.lower()
         }
         for k, v in self.session_trace_headers(kwargs).items():
             headers_out.setdefault(k, v)
@@ -1369,7 +1939,7 @@ class GuardrailsHandler(CustomLogger):
         ingestion, guardrails validation, tool-call ingestion) shares this shape;
         only path/headers/payloads/ip/status/tags differ per call site."""
         timestamp = str(int(datetime.now(timezone.utc).timestamp() * 1000))
-        return {
+        envelope = {
             "path": path,
             "requestHeaders": json.dumps(request_headers),
             "responseHeaders": json.dumps(response_headers),
@@ -1395,6 +1965,9 @@ class GuardrailsHandler(CustomLogger):
             "metadata": json.dumps(tags),
             "contextSource": AKTO_CONTEXT_SOURCE,
         }
+        if AKTO_METADATA:
+            envelope["akto_metadata"] = json.dumps(AKTO_METADATA)
+        return envelope
 
     def build_payload(self, data: dict, call_type: str, response_obj: Optional[Any], user_api_key_dict: Optional[UserAPIKeyAuth] = None, status_code: int = 200, kwargs: Optional[dict] = None) -> dict:
         request_body = {
@@ -1403,8 +1976,12 @@ class GuardrailsHandler(CustomLogger):
             "stream": data.get("stream", False),
             "tools": data.get("tools", []),
         }
+        # Responses API prompt (input) and Anthropic system prompt (system).
+        for key in ("input", "system"):
+            if data.get(key) is not None:
+                request_body[key] = data[key]
 
-        request_path = self.extract_request_path(kwargs)
+        request_path = self.extract_request_path(kwargs, user_api_key_dict)
         litellm_call_id = (kwargs or {}).get("litellm_call_id")
         tags = self.build_tags(call_type, data, user_api_key_dict, litellm_call_id, kwargs)
         host = self._resolve_host(data, user_api_key_dict, kwargs)
