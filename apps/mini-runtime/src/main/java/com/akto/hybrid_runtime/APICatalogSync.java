@@ -249,6 +249,11 @@ public class APICatalogSync {
         loggerMaker.info("aggregator: " + (System.currentTimeMillis() - start));
         origAggregator.urls = new ConcurrentHashMap<>();
 
+        boolean endpointCollection = isEndpointCollection(aggregator, apiCollectionId);
+        if (endpointCollection) {
+            loggerMaker.debugInfoAddToDb("ENDPOINT collection " + apiCollectionId + ": skipping known-template match, parameterisation and merging for " + aggregator.urls.size() + " urls");
+        }
+
         Set<Map.Entry<URLStatic, Set<HttpResponseParams>>> entries = aggregator.urls.entrySet();
         for (Map.Entry<URLStatic, Set<HttpResponseParams>> entry : entries) {
             Set<HttpResponseParams> value = entry.getValue();
@@ -272,12 +277,16 @@ public class APICatalogSync {
 
         int totalApiCount = pendingRequests.size();
         start = System.currentTimeMillis();
-        tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
+        if (!endpointCollection) {
+            tryWithKnownURLTemplates(pendingRequests, deltaCatalog, dbCatalog, apiCollectionId );
+        }
         loggerMaker.info("tryWithKnownURLTemplates: " + (System.currentTimeMillis() - start));
 
         if (!mergeAsyncOutside) {
             start = System.currentTimeMillis();
-            tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
+            if (!endpointCollection) {
+                tryMergingWithKnownStrictURLs(pendingRequests, dbCatalog, deltaCatalog);
+            }
             loggerMaker.info("tryMergingWithKnownStrictURLs: " + (System.currentTimeMillis() - start));
         } else {
             if (DataControlFetcher.discardNewApi()) {
@@ -289,8 +298,10 @@ public class APICatalogSync {
                 RequestTemplate pendingTemplate = pendingRequests.get(pending);
 
                 URLTemplate parameterisedTemplate = null;
-                if((apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
+                if(!endpointCollection && (apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
                     parameterisedTemplate = tryParamteresingUrl(pending, this.mergeUrlsOnVersions);
+                } else if (endpointCollection) {
+                    loggerMaker.debugInfoAddToDb("ENDPOINT collection " + apiCollectionId + ": keeping url static " + pending.getMethod() + " " + pending.getUrl());
                 }
 
                 if(parameterisedTemplate != null){
@@ -322,6 +333,44 @@ public class APICatalogSync {
 
         loggerMaker.info("processTime: " + RequestTemplate.insertTime + " " + RequestTemplate.processTime + " " + RequestTemplate.deleteTime);
 
+    }
+
+    private static final Set<Integer> ENDPOINT_COLLECTION_IDS = ConcurrentHashMap.newKeySet();
+    private static final Gson endpointTagGson = new Gson();
+
+    private static boolean hasEndpointSourceTag(String tags) {
+        if (tags == null || !tags.contains("ENDPOINT")) {
+            return false;
+        }
+        try {
+            Map<?, ?> tagMap = endpointTagGson.fromJson(tags, Map.class);
+            return tagMap != null && "ENDPOINT".equals(tagMap.get("source"));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean isEndpointTraffic(HttpResponseParams responseParams, int apiCollectionId) {
+        if (ENDPOINT_COLLECTION_IDS.contains(apiCollectionId)) {
+            return true;
+        }
+        if (!hasEndpointSourceTag(responseParams.getTags())) {
+            return false;
+        }
+        ENDPOINT_COLLECTION_IDS.add(apiCollectionId);
+        loggerMaker.debugInfoAddToDb("Collection " + apiCollectionId + " marked as ENDPOINT, URL merging disabled");
+        return true;
+    }
+
+    private static boolean isEndpointCollection(URLAggregator aggregator, int apiCollectionId) {
+        for (Set<HttpResponseParams> responses : aggregator.urls.values()) {
+            for (HttpResponseParams responseParams : responses) {
+                if (isEndpointTraffic(responseParams, apiCollectionId)) {
+                    return true;
+                }
+            }
+        }
+        return ENDPOINT_COLLECTION_IDS.contains(apiCollectionId);
     }
 
     private static Map<Integer, Map<String, Set<String>>> groupByTokenSize(Map<String, Set<String>> catalog) {
