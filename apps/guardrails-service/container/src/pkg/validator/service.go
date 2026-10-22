@@ -96,6 +96,10 @@ type Service struct {
 	allowlistRefreshGroup singleflight.Group
 	threatAPIClient       *threatapi.Client
 	orgEmailDomains       []string // this account's work email domains, see orgEmailDomainsByAccount
+	// redactionCache holds display redactions for POST /api/redact/payloads; nil when disabled.
+	redactionCache *mcp.RedactionCache
+	// displayRedactor masks one payload; mcp.RedactForDisplay, replaceable in tests.
+	displayRedactor func(ctx context.Context, payload string) mcp.DisplayRedaction
 }
 
 // NewService creates a new validator service
@@ -164,9 +168,12 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	LogFieldMappingStartup()
 
 	svc := &Service{
-		config:              cfg,
-		dbClient:            dbClient,
-		processor:           defaultProcessor,
+		config:    cfg,
+		dbClient:  dbClient,
+		processor: defaultProcessor,
+		redactionCache: mcp.NewRedactionCache(cfg.RedactionCacheMaxEntries,
+			time.Duration(cfg.RedactionCacheTTLSec)*time.Second, cfg.RedactionCacheMaxPayloadBytes),
+		displayRedactor:     mcp.RedactForDisplay,
 		logger:              logger,
 		cache:               &policyCache{},
 		mcpListCache:        &mcpListCache{},
