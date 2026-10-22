@@ -152,7 +152,7 @@ Akto is really powerful in Cloud deployment if you can provide your application'
   <summary><h3> Manual Setup Instructions</h3> </summary>
 
 ### Prerequisites
-OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), MongoDB (v5.0.3+ [link](https://www.mongodb.com/docs/manual/administration/install-community/))
+OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://archive.apache.org/dist/maven/maven-3/3.6.3/binaries/)), MongoDB (v5.0.3+ [link](https://www.mongodb.com/docs/manual/administration/install-community/))
 
 
 #### Clone repo
