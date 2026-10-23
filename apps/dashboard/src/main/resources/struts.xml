@@ -15020,12 +15020,10 @@
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
-            <!-- Audit logs are enabled by default for all accounts, so the API_AUDIT_LOGS usage check is disabled (access stays admin-only via roleAccessInterceptor) -->
-            <!--
-            <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">API_AUDIT_LOGS</param>
-            </interceptor-ref>
-            -->
+            <!-- Audit logs enabled by default for all accounts (admin-only), so the API_AUDIT_LOGS usage check is commented out -->
+            <!-- <interceptor-ref name="usageInterceptor"> -->
+                <!-- <param name="featureLabel">API_AUDIT_LOGS</param> -->
+            <!-- </interceptor-ref> -->
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -15038,14 +15036,11 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <!-- Only returned by usageInterceptor, which is disabled above -->
-            <!--
-            <result name="UNAUTHORIZED" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            -->
+            <!-- <result name="UNAUTHORIZED" type="json"> -->
+                <!-- <param name="statusCode">403</param> -->
+                <!-- <param name="ignoreHierarchy">false</param> -->
+                <!-- <param name="includeProperties">^actionErrors.*</param> -->
+            <!-- </result> -->
         </action>
 
         <action name="api/checkIfDependencyGraphAvailable" class="com.akto.action.DependencyAction" method="checkIfDependencyGraphAvailable">
