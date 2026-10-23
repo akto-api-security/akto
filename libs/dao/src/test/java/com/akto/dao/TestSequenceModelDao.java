@@ -33,8 +33,7 @@ public class TestSequenceModelDao extends MongoBasedTest {
         Context.accountId.set(ACCOUNT_ID);
         SequenceCountDao.instance.getMCollection().drop();
         SequenceModelDao.instance.getMCollection().drop();
-        SequenceCountDao.instance.createIndicesIfAbsent();
-        SequenceModelDao.instance.createIndicesIfAbsent();
+        SequenceModelDao.INDEXED_ACCOUNTS.clear();
         currentBucket = (Context.now() / 3600) * 3600;
         previousBucket = currentBucket - 3600;
     }
@@ -94,12 +93,7 @@ public class TestSequenceModelDao extends MongoBasedTest {
                 Filters.eq(SequenceCount.BUCKET_START, currentBucket)), Document.class).first();
         assertEquals(91L, ((Number) doc.get(SequenceCount.COUNT)).longValue());
 
-        SequenceModel root = model("", "a");
-        assertEquals(2000L, root.getCount24h());
-        assertEquals(17200L, root.getContextTotal24h());
-        assertNull(root.getParentContextKey());
-        assertFalse(root.isCollapsed());
-        assertEquals(1.0, root.getPrecedence(), 1e-12);
+        assertNull(model("", "a"));
 
         SequenceModel ac = model("a", "c");
         assertEquals(169L, ac.getCount24h());
@@ -126,11 +120,26 @@ public class TestSequenceModelDao extends MongoBasedTest {
         for (SequenceModel m : SequenceModelDao.instance.findAll(Filters.empty())) {
             keys.add(m.getContextKey() + "->" + m.getNext());
         }
-        assertEquals(12, keys.size());
+        assertEquals(9, keys.size());
 
         List<Document> countIndexes = SequenceCountDao.instance.getMCollection().listIndexes().into(new ArrayList<Document>());
-        assertEquals(5, countIndexes.size());
+        assertEquals(4, countIndexes.size());
         List<Document> modelIndexes = SequenceModelDao.instance.getMCollection().listIndexes().into(new ArrayList<Document>());
-        assertEquals(3, modelIndexes.size());
+        assertEquals(2, modelIndexes.size());
+    }
+
+    @Test
+    public void testRootOnlyBatchDoesNotRebuildChildren() {
+        List<SequenceCount> first = new ArrayList<>();
+        addSplit(first, new ArrayList<String>(), 2000, 15000, 200);
+        addSplit(first, Collections.singletonList("a"), 1555, 13718, 169);
+        SequenceModelDao.instance.writeSequenceCounts(first);
+        assertNotNull(model("a", "b"));
+
+        SequenceModelDao.instance.getMCollection().deleteMany(Filters.empty());
+        List<SequenceCount> rootOnly = new ArrayList<>();
+        addSplit(rootOnly, new ArrayList<String>(), 10, 10, 10);
+        SequenceModelDao.instance.writeSequenceCounts(rootOnly);
+        assertEquals(0, SequenceModelDao.instance.getMCollection().countDocuments());
     }
 }

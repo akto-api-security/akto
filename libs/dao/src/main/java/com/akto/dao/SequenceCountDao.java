@@ -46,7 +46,6 @@ public class SequenceCountDao extends AccountsContextDao<SequenceCount> {
         MCollection.createUniqueIndex(getDBName(), getCollName(),
                 new String[] { SequenceCount.CONTEXT_KEY, SequenceCount.NEXT, SequenceCount.BUCKET_START }, true);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { SequenceCount.PARENT_CONTEXT_KEY }, true);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[] { SequenceCount.NEXT, SequenceCount.CONTEXT_KEY }, true);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending(SequenceCount.EXPIRES_AT),
                 new IndexOptions().name("expiresAt_ttl").expireAfter(0L, TimeUnit.SECONDS));
     }
