@@ -7,8 +7,7 @@ import func from "@/util/func"
 import { usePermissions } from "@/util/permissions"
 import Store from "../../../store";
 import PersistStore from "../../../../main/PersistStore"
-import { CATEGORY_ENDPOINT_SECURITY } from "../../../../main/labelHelper"
-
+import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 const SettingsLeftNav = () => {
     const navigate = useNavigate()
     
@@ -142,7 +141,7 @@ const SettingsLeftNav = () => {
                     //     onClick: () => navigate("/dashboard/settings")
                     // },
                     {
-                        label: 'Undo Demerged APIs',
+                        label: 'Undo Demerged ' + mapLabel('APIs', getDashboardCategory()),
                         icon: UndoMajor,
                         selected: page === 'undo-demerge-apis',
                         route: "/dashboard/settings/undo-demerge-apis",

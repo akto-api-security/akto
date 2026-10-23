@@ -1,5 +1,11 @@
 export const labelMap = {
   "API Security": {
+    "API Groups": "API Groups",
+    "API Group": "API Group",
+    "Select API collection": "Select API collection",
+    "API Tags": "API Tags",
+    "API Access Type": "API Access Type",
+    "Select API access types": "Select API access types",
     "API Security Posture": "API Security Posture",
     "API Discovery": "API Discovery",
     "API collections": "API Collections",
@@ -75,6 +81,12 @@ export const labelMap = {
     "Latest attack sub-category": "Latest attack sub-category",
   },
   "DAST": {
+    "API Groups": "API Groups",
+    "API Group": "API Group",
+    "Select API collection": "Select API collection",
+    "API Tags": "API Tags",
+    "API Access Type": "API Access Type",
+    "Select API access types": "Select API access types",
     "API Security Posture": "Security Posture",
     "API Discovery": "DAST Discovery",
     "API Collections": "DAST Collections",
@@ -150,6 +162,13 @@ export const labelMap = {
     "Latest attack sub-category": "Latest attack sub-category"
   },
   "MCP Security": {
+    "API Groups": "MCP component Groups",
+    "API Group": "MCP component Group",
+    "API group": "MCP component group",
+    "Select API collection": "Select MCP collection",
+    "API Tags": "MCP component Tags",
+    "API Access Type": "MCP component Access Type",
+    "Select API access types": "Select MCP component access types",
     "API Security Posture": "MCP Security Posture",
     "API Discovery": "MCP Discovery",
     "API collections": "MCP Collections",
@@ -224,6 +243,13 @@ export const labelMap = {
     "Endpoints": "Tools",
   },
   "Gen AI": {
+    "API Groups": "AI Agent component Groups",
+    "API Group": "AI Agent component Group",
+    "API group": "AI Agent component group",
+    "Select API collection": "Select AI Agent collection",
+    "API Tags": "AI Agent component Tags",
+    "API Access Type": "AI Agent component Access Type",
+    "Select API access types": "Select AI Agent component access types",
     "API Security Posture": "AI Agent Security Posture",
     "API Discovery": "AI Agent Discovery",
     "API collections": "AI Agent Collections",
@@ -294,6 +320,12 @@ export const labelMap = {
     "Endpoints": "Components",
   },
   "Agentic Security": {
+    "API Groups": "Agentic Component Groups",
+    "API Group": "Agentic Component Group",
+    "Select API collection": "Select Agentic collection",
+    "API Tags": "Agentic Component Tags",
+    "API Access Type": "Agentic Component Access Type",
+    "Select API access types": "Select Agentic component access types",
     "Quick Start": "Connectors",
     "API Security Posture": "Agentic Security Posture",
     "API Discovery": "Agentic AI Discovery",
@@ -379,6 +411,12 @@ export const labelMap = {
     "Threat Category": "Guardrail Trigger"
   },
   "Endpoint Security": {
+    "API Groups": "Agentic Component Groups",
+    "API Group": "Agentic Component Group",
+    "Select API collection": "Select Agentic collection",
+    "API Tags": "Agentic Component Tags",
+    "API Access Type": "Agentic Component Access Type",
+    "Select API access types": "Select Agentic component access types",
     "Quick Start": "Connectors",
     "API Security Posture": "Agentic Security Posture",
     "API Discovery": "Agentic AI Discovery",

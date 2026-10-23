@@ -5,6 +5,7 @@ import { DeleteMajor, ViewMinor, HideMinor, CircleTickMajor, CircleAlertMajor } 
 import { COPILOT_OAUTH } from "./TestRoleConstants"
 import { usePermissions } from "@/util/permissions"
 import AllowedAction from "../../../components/shared/AllowedAction"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function ParamsCard({dataObj, handleDelete, showEdit}) {
     const [hideValues, setHideValues] = useState(true)
@@ -70,7 +71,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                 <VerticalStack gap={3}>
 
                     {headerKey.length > 0 ? <VerticalStack gap={2}>
-                        <TitleComponent title={"API header conditions"} />
+                        <TitleComponent title={mapLabel('API', getDashboardCategory()) + " header conditions"} />
                         <Box paddingInlineStart={4}>{headerKey.length > 0 ? <LineComponent title={headerKey + " :"} value={headerValue}/> : <Text variant="headingMd">-</Text>}</Box>
                     </VerticalStack> : null}
 

@@ -12,6 +12,7 @@ import GlobalVarModal from "./GlobalVarModal";
 import { useLocation } from "react-router-dom";
 import { usePermissions } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const headers = [
     {
@@ -292,7 +293,7 @@ function DependencyTable() {
 
             const forwardLink = (
                 <HorizontalStack gap={1}>
-                    <Text> API collection created successfully. Click </Text>
+                    <Text> {mapLabel('API', getDashboardCategory())} collection created successfully. Click </Text>
                     <Link url={url}>here</Link>
                     <Text> to view collection.</Text>
                 </HorizontalStack>

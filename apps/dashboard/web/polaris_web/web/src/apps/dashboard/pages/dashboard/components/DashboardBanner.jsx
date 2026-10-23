@@ -6,6 +6,7 @@ import GridRows from '../../../components/shared/GridRows'
 import BannerRow from './BannerRow'
 import { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_THUMBNAIL, HOMEDASHBOARD_VIDEO_URL } from '../../../../main/onboardingData'
 import LocalStore from '../../../../main/LocalStorageStore'
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 function InfoComponent({title, items})  {
     return(
         <VerticalStack gap={4}>
@@ -99,7 +100,7 @@ function DashboardBanner() {
     return (
         <BannerLayout
             title="Get started with your Dashboard"
-            text={"Welcome to Akto Dashboard! It will provide an overview of your API Security Posture, identify critical issues, assess risks, and monitor sensitive data."}
+            text={"Welcome to Akto Dashboard! It will provide an overview of your " + mapLabel('API Security Posture', getDashboardCategory()) + ", identify critical issues, assess risks, and monitor sensitive data."}
             linkButton={true}
             buttonText={"Learn more"}
             buttonUrl={"https://docs.akto.io/readme"}

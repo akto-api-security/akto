@@ -13,6 +13,7 @@ import { handleIpsChange } from '../../../components/shared/ipUtils'
 import UpdateIpsComponent from '../../../components/shared/UpdateIpsComponent'
 import AllowedAction from '../../../components/shared/AllowedAction'
 import { usePermissions } from '@/util/permissions'
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 export const timezonesAvailable = [
     { label: "Baker Island Time (BIT) UTC-12:00", value: "Etc/GMT+12" },
@@ -635,7 +636,7 @@ function About() {
             >
                 <Modal.Section>
                     <VerticalStack>
-                        <Text>This will recalculate the access type for all collections based on their APIs.</Text>
+                        <Text>This will recalculate the access type for all collections based on their {mapLabel('APIs', getDashboardCategory())}.</Text>
                         <Text>Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>

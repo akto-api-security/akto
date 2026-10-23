@@ -1129,7 +1129,7 @@ function SingleTestRunPage() {
                   <Tooltip
                     content={
                       <VerticalStack gap="2">
-                        <Text variant="bodyMd">API request error statistics breakdown:</Text>
+                        <Text variant="bodyMd">{mapLabel('API request', getDashboardCategory())} error statistics breakdown:</Text>
                         <VerticalStack gap="1">
                           {issues.map((issue) => (
                             <Text key={issue.key} variant="bodySm">{`- ${issue.label}: ${issue.countLabel}`}</Text>
@@ -1143,7 +1143,7 @@ function SingleTestRunPage() {
                     hasUnderline={false}
                   >
                     <HorizontalStack gap="1" align="center">
-                      <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API error stats:</Text>
+                      <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>{mapLabel('API', getDashboardCategory())} error stats:</Text>
                     </HorizontalStack>
                   </Tooltip>
                   <HorizontalStack gap="2" align="center">

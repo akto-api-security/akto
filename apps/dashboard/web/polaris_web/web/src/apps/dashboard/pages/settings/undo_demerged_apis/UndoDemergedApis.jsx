@@ -8,6 +8,7 @@ import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleC
 import TitleWithInfo from '../../../components/shared/TitleWithInfo'
 import { usePermissions, whenAllowed } from '@/util/permissions'
 import AllowedAction from '../../../components/shared/AllowedAction'
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const UndoDemergedApis = () => {
     const [mergedApis, setMergedApis] = useState([])
@@ -97,7 +98,7 @@ const UndoDemergedApis = () => {
 
     const secondaryActionsComp = (
         <HorizontalStack gap={"2"}>
-            <AllowedAction allowed={canUndo}><Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged APIs</Button></AllowedAction>
+            <AllowedAction allowed={canUndo}><Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged {mapLabel('APIs', getDashboardCategory())}</Button></AllowedAction>
                 {window.USER_NAME?.toLowerCase()?.includes("@akto.io") ? <AllowedAction allowed={canCall('api/deleteDuplicateEntries')}><Button onClick={() => deleteDuplicateEntries()}>Delete duplicates</Button></AllowedAction> : null}
         </HorizontalStack>
         

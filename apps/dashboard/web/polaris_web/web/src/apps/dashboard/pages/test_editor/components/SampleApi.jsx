@@ -477,14 +477,14 @@ const SampleApi = () => {
                     <EmptySampleApi
                         iconSrc={"/public/file_plus.svg"}
                         headingText={"Discover APIs to get started"}
-                        description={"You have an inactive API collection or one with no data. Create or populate a collection now to get started."}
+                        description={"You have an inactive " + mapLabel('API', getDashboardCategory()) + " collection or one with no data. Create or populate a collection now to get started."}
                         buttonText={"Create new a API collection"}
                         redirectUrl={"/dashboard/observe/inventory"}
                     />
                 </Box> :
                 <>{
                     editorData?.message?.length === 0 ?
-                    <Box padding={3} minHeight="84.4vh"><Text>Sample data is not available for this API endpoint. Please choose a different endpoint.</Text></Box>
+                    <Box padding={3} minHeight="84.4vh"><Text>Sample data is not available for this {mapLabel('API endpoint', getDashboardCategory())}. Please choose a different endpoint.</Text></Box>
                         : <><SampleData data={editorData} minHeight="80.4vh"  editorLanguage="custom_http" />
                         {resultComponent}</>
                 }</>
@@ -529,7 +529,7 @@ const SampleApi = () => {
                     <DropdownSearch
                         id={"select-api-collection"}
                         label="Select collection"
-                        placeholder="Select API collection"
+                        placeholder={mapLabel('Select API collection', getDashboardCategory())}
                         optionsList={allCollectionsOptions}
                         setSelected={setCopyCollectionId}
                         value={mapCollectionIdToName?.[copyCollectionId]}
@@ -541,8 +541,8 @@ const SampleApi = () => {
                     <DropdownSearch
                         id={"select-api-endpoint"}
                         disabled={apiEndpointsOptions.length === 0}
-                        label="API"
-                        placeholder="Select API endpoint"
+                        label={mapLabel('API', getDashboardCategory())}
+                        placeholder={"Select " + mapLabel('API endpoint', getDashboardCategory())}
                         optionsList={apiEndpointsOptions}
                         setSelected={setCopySelectedApiEndpoint}
                         value={copyEndpointLabel}

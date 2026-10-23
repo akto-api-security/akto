@@ -260,7 +260,7 @@ const primaryActions = (
     <HorizontalStack gap={"2"}>
         <AllowedAction allowed={canCall('api/resetDataTypeRetro')}><Button id={"reset-data-type"} onClick={handleReset}>Reset</Button></AllowedAction>
         <DateRangeFilter initialDispatch = {currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})}/>
-        <AllowedAction allowed={canCall('api/addApisToCustomCollection')}><Button id={"all-data-types"} primary onClick={() => setModal(!modal)}>Create API group</Button></AllowedAction>
+        <AllowedAction allowed={canCall('api/addApisToCustomCollection')}><Button id={"all-data-types"} primary onClick={() => setModal(!modal)}>Create {mapLabel('API group', getDashboardCategory())}</Button></AllowedAction>
     </HorizontalStack>
 )
 

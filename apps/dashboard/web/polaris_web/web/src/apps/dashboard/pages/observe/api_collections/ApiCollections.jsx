@@ -77,7 +77,7 @@ const headers = [
             filterKey: "splitApiCollectionName",
             textValue: 'splitApiCollectionName',
             showFilter: true,
-            titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title="API Collection name" />
+            titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel('API collection name', getDashboardCategory())} />
         },
         {
             title: "Endpoint ID",
