@@ -32,7 +32,8 @@ import {
     settledValue,
     logRejected,
 } from "./constants";
-import { hasMisconfiguredConfigTag } from "./mcpClientHelper";
+import { CLIENT_TYPES, hasMisconfiguredConfigTag } from "./mcpClientHelper";
+import AgenticCountBadges from "./AgenticCountBadges";
 
 const definedTableTabs = ["Users", "Devices"];
 
@@ -188,13 +189,15 @@ function UsersAndDevices() {
         const maliciousSkills = enrichRef.current.maliciousSkills;
         return rows.map((row) => {
             const hasMalicious = (row.uniqueSkillNames || []).some((s) => maliciousSkills.has(s));
-            const extraBadges = hasMalicious ? [<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>] : [];
-            const pluginCount = (row.uniquePluginNames || []).length;
-            if (pluginCount > 0) {
-                extraBadges.push(
-                    <Badge key="plugins" size="small" status="info">{`${pluginCount} ${pluginCount === 1 ? 'plugin' : 'plugins'}`}</Badge>
-                );
-            }
+            const extraBadges = [
+                <AgenticCountBadges
+                    key="counts"
+                    countsByType={row.countsByType || {}}
+                    skillCount={(row.uniqueSkillNames || []).length}
+                    pluginCount={row.countsByType?.[CLIENT_TYPES.PLUGIN] || 0}
+                />,
+            ];
+            if (hasMalicious) extraBadges.push(<Badge key="malicious" size="small" status="critical">Malicious Skills</Badge>);
             return {
                 ...row,
                 groupNameDisplay: buildGroupNameDisplay(row, extraBadges),
