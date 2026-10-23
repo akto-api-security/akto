@@ -46,7 +46,6 @@ import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.akto.util.filter.DictionaryFilter;
-import com.akto.util.filter.HeaderFilter;
 import com.akto.utils.RedactSampleData;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
@@ -56,6 +55,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 
+import com.akto.hybrid_runtime.redaction.OrigRedactor;
+import com.akto.hybrid_runtime.redaction.PayloadRedaction;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
@@ -92,17 +93,6 @@ public class APICatalogSync {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
 
-    /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
-        The apiCollectionId - -1 has nothing to do with this.
-        Since we do not know the collectionId for MCP Server, we have set it to -1.
-     */
-    private static final Set<MergedUrls> MERGED_URLS_FOR_MCP = new HashSet<>(Arrays.asList(
-        new MergedUrls("tools/call/STRING", "POST", -1),
-        new MergedUrls("tools/call/INTEGER", "POST", -1),
-        new MergedUrls("tools/call/FLOAT", "POST", -1),
-        new MergedUrls("tools/call/OBJECT_ID", "POST", -1),
-        new MergedUrls("tools/call/VERSIONED", "POST", -1)
-    ));
 
     private boolean mergeUrlsOnVersions;
 
@@ -1450,6 +1440,7 @@ public class APICatalogSync {
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit,
         SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI);
+        this.origRedactor = PayloadRedaction.newOrigRedactor();
         List<Object> writesForParams = new ArrayList<>();
         List<Object> writesForSensitiveSampleData = new ArrayList<>();
         List<Object> writesForTraffic = new ArrayList<>();
@@ -1622,6 +1613,7 @@ public class APICatalogSync {
             dataActor.bulkWriteSensitiveParamInfo(writesForSensitiveParamInfo);
         }
 
+        this.origRedactor = null;
         refreshDbState(fetchAllSTI);
     }
 
@@ -1638,6 +1630,9 @@ public class APICatalogSync {
 
     private static final Gson gson = new Gson();
     private static final String AKTO_UUID = "akto_uuid";
+
+    // Per-sync guardrails redactor (null when disabled); recreated each syncWithDB so its memo is bounded.
+    private volatile OrigRedactor origRedactor;
 
     public List<BulkUpdates> getDBUpdatesForSampleDataHybrid(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
         List<SampleData> sampleData = new ArrayList<>();
@@ -1721,6 +1716,15 @@ public class APICatalogSync {
         for (int i = 0; i < sampleData.size(); i += batchSize) {
             int end = Math.min(i + batchSize, sampleData.size());
             List<SampleData> batch = sampleData.subList(i, end);
+            // Outside runWithTimeout: redaction has its own budget. Skipped under full redaction.
+            OrigRedactor redactor = origRedactor;
+            if (redactor != null && !accountLevelRedact && !apiCollectionLevelRedact) {
+                List<String> origs = new ArrayList<>();
+                for (SampleData sd : batch) {
+                    origs.addAll(sd.getSamples());
+                }
+                redactor.prepare(origs);
+            }
             int accId = Context.accountId.get();
             List<SampleData> lastExecutedBatch = new ArrayList<>();
             try {
@@ -1738,10 +1742,12 @@ public class APICatalogSync {
 
     private void processSampleBatch(List<SampleData> batch, boolean accountLevelRedact, boolean apiCollectionLevelRedact,
             List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples, List<SampleData> lastExecutedBatch) {
+        int skippedSamples = 0; // not stored because guardrail redaction was unavailable (skip-on-unavailable)
         for (SampleData sample: batch) {
             if (sample.getSamples().size() == 0) {
                 continue;
             }
+            int skippedInSample = 0;
             List<String> finalSamples = new ArrayList<>();
             List<String> sampleIds = new ArrayList<>();
             ArrayList<String> updates = new ArrayList<>();
@@ -1749,7 +1755,17 @@ public class APICatalogSync {
                 try {
                     lastExecutedBatch.clear();
                     lastExecutedBatch.add(sample);
-                    String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
+                    OrigRedactor.Result masked = (origRedactor != null && !accountLevelRedact && !apiCollectionLevelRedact)
+                            ? origRedactor.lookup(s) : null;
+                    String redactedSample = RedactSampleData.redactIfRequired(masked != null ? masked.orig : s,
+                            accountLevelRedact, apiCollectionLevelRedact);
+                    if (masked != null && masked.skip) {
+                        skippedInSample++;
+                        continue;
+                    }
+                    if (masked != null && masked.marker != null) {
+                        redactedSample = OrigRedactor.withMarker(redactedSample, masked.marker);
+                    }
                     if (accountLevelRedact || apiCollectionLevelRedact) {
                         Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
                         UUID uuid = UUID.randomUUID();
@@ -1787,6 +1803,10 @@ public class APICatalogSync {
                     loggerMaker.errorAndAddToDb(e,"Error while redacting data" );
                 }
             }
+            skippedSamples += skippedInSample;
+            if (finalSamples.isEmpty() && skippedInSample > 0) {
+                continue; // every sample was skipped as unredacted: write nothing rather than an empty endpoint
+            }
             UpdatePayload updatePayload = new UpdatePayload("samples", finalSamples, "pushEach");
             updates.add(updatePayload.toString());
 
@@ -1802,6 +1822,10 @@ public class APICatalogSync {
             filterMap.put("_id", sample.getId());
             bulkUpdates.add(new BulkUpdates(filterMap, updates));
         }
+        if (skippedSamples > 0) {
+            loggerMaker.errorAndAddToDb("Guardrail redaction unavailable; " + skippedSamples
+                    + " sample(s) not stored in this batch (skip-on-unavailable is on)");
+        }
     }
 
     public DbUpdateReturnHybrid getDBUpdatesForParamsHybrid(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {
@@ -1811,6 +1835,23 @@ public class APICatalogSync {
         ArrayList<BulkUpdates> bulkUpdates = new ArrayList<>();
         ArrayList<BulkUpdates> bulkUpdatesForSampleData = new ArrayList<>();
         int now = Context.now();
+
+        OrigRedactor redactor = origRedactor;
+        if (redactor != null && !(redactSampleData || collectionLevelRedact)) {
+            List<String> examples = new ArrayList<>();
+            for (SingleTypeInfo info : deltaInfoMap.values()) {
+                if (info != null && info.getExamples() != null) {
+                    for (Object example : info.getExamples()) {
+                        if (example instanceof String) {
+                            examples.add((String) example);
+                        }
+                    }
+                }
+            }
+            redactor.prepare(examples);
+        }
+        int skippedExamples = 0; // not stored because guardrail redaction was unavailable (skip-on-unavailable)
+
         for(String key: deltaInfoMap.keySet()) {
             ArrayList<String> updates = new ArrayList<>();
 
@@ -1871,23 +1912,34 @@ public class APICatalogSync {
 
             if (!(redactSampleData || collectionLevelRedact) && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
                 Set<Object> updatedSampleData = new HashSet<>();
+                int skippedBefore = skippedExamples;
                 for (Object example : deltaInfo.getExamples()) {
                     try{
                         String exampleStr = (String) example;
-                        String s = RedactSampleData.redactDataTypes(exampleStr);
+                        OrigRedactor.Result masked = redactor != null ? redactor.lookup(exampleStr) : null;
+                        if (masked != null && masked.skip) {
+                            skippedExamples++;
+                            continue;
+                        }
+                        String s = RedactSampleData.redactDataTypes(masked != null ? masked.orig : exampleStr);
+                        if (masked != null && masked.marker != null) {
+                            s = OrigRedactor.withMarker(s, masked.marker);
+                        }
                         updatedSampleData.add(s);
                     } catch (Exception e) {
                         ;
                     }
                 }
                 deltaInfo.setExamples(updatedSampleData);
-                ArrayList<String> sampleDataUpdates = new ArrayList<>();
-                updatePayload = new UpdatePayload(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), "pushEach");
-                AllMetrics.instance.setCyborgApiPayloadSize(updatePayload.getSize());
-                sampleDataUpdates.add(updatePayload.toString());
-                updatePayload = new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()), "setOnInsert");
-                sampleDataUpdates.add(updatePayload.toString());
-                bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
+                if (!(updatedSampleData.isEmpty() && skippedExamples > skippedBefore)) {
+                    ArrayList<String> sampleDataUpdates = new ArrayList<>();
+                    updatePayload = new UpdatePayload(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), "pushEach");
+                    AllMetrics.instance.setCyborgApiPayloadSize(updatePayload.getSize());
+                    sampleDataUpdates.add(updatePayload.toString());
+                    updatePayload = new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()), "setOnInsert");
+                    sampleDataUpdates.add(updatePayload.toString());
+                    bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
+                }
             }
 
             boolean isEligible = true;
@@ -1905,6 +1957,11 @@ public class APICatalogSync {
                 bulkUpdates.add(new BulkUpdates(SingleTypeInfoDao.createFiltersMap(deltaInfo), updates));
             }
 
+        }
+
+        if (skippedExamples > 0) {
+            loggerMaker.errorAndAddToDb("Guardrail redaction unavailable; " + skippedExamples
+                    + " sensitive example(s) not stored in this sync (skip-on-unavailable is on)");
         }
 
         for(SingleTypeInfo deleted: currentDelta.getDeletedInfo()) {

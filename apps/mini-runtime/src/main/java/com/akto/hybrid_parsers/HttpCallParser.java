@@ -2,6 +2,7 @@ package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.hybrid_runtime.redaction.PayloadRedaction;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
@@ -1889,7 +1890,7 @@ public class HttpCallParser {
         String payload = httpResponseParam.getRequestParams().getPayload();
         if (payload != null && payload.length() > 3) {
             loggerMaker.info("Actually storing agent record" + record.getSpanId());
-            dataActor.storeAgentQueryData(record);
+            PayloadRedaction.storeAgentRecord(record, httpResponseParam, dataActor::storeAgentQueryData);
         }
     }
 

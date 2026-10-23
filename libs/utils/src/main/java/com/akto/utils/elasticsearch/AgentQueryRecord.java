@@ -5,6 +5,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -50,7 +51,10 @@ public class AgentQueryRecord {
     private String guardrailReason;
     private String guardrailSeverity;
 
-    private static final String HEADER_PREFIX    = "x-akto-installer-";
+    // "UNAVAILABLE" or "BASIC" when redaction was not complete; null (omitted by Gson) otherwise.
+    private String payloadRedaction;
+
+    private static final String HEADER_PREFIX   = "x-akto-installer-";
     private static final String HEADER_DEVICE_ID = "device_id";
     private static final String HEADER_USER_EMAIL = "user_email";
     private static final String HEADER_SESSION_ID = "akto_session_id";
@@ -61,7 +65,7 @@ public class AgentQueryRecord {
 
     private static final int URL_SESSION_ACCOUNT_ID = 1785654409;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AgentQueryRecord.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AgentQueryRecord.class, LogDb.RUNTIME);
 
     private static final int ATLAS_SESSION_TTL = Constants.ONE_DAY_TIMESTAMP;
     private static final Map<String, Integer> ATLAS_SESSION_LAST_SEEN = new ConcurrentHashMap<>();
@@ -130,6 +134,24 @@ public class AgentQueryRecord {
     public String getGuardrailRule()      { return guardrailRule; }
     public String getGuardrailReason()    { return guardrailReason; }
     public String getGuardrailSeverity()  { return guardrailSeverity; }
+    public String getPayloadRedaction()   { return payloadRedaction; }
+
+    /** Copy with new payloads; every other field and the token counts are kept. A null payload keeps the current one. */
+    public AgentQueryRecord withPayloads(String queryPayload, String responsePayload, String payloadRedaction) {
+        AgentQueryRecord copy = new AgentQueryRecord(docId, accountId, serviceId, deviceId, userName,
+                sessionIdentifier,
+                queryPayload != null ? queryPayload : this.queryPayload,
+                responsePayload != null ? responsePayload : this.responsePayload,
+                timeStampMs, inputTokens, outputTokens, traceId, spanId, isAtlasTraffic);
+        copy.guardrailViolated = guardrailViolated;
+        copy.guardrailAction = guardrailAction;
+        copy.guardrailPolicy = guardrailPolicy;
+        copy.guardrailRule = guardrailRule;
+        copy.guardrailReason = guardrailReason;
+        copy.guardrailSeverity = guardrailSeverity;
+        copy.payloadRedaction = payloadRedaction;
+        return copy;
+    }
 
     /** Reads the guardrail result the ingestion gateway recorded on the traffic. Absent for traffic
      *  that was never checked, and for anything ingested before this was added. */
