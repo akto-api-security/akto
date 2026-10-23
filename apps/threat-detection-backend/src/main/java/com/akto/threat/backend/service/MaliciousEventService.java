@@ -4,6 +4,7 @@ import com.akto.dao.AgenticSessionContextDao;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
+import com.akto.threat.backend.utils.FilterFields;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
@@ -623,8 +624,8 @@ public class MaliciousEventService {
     }
 
     applyRiskScoreFilter(query, filter);
-    andDocument(query, agenticTypeCondition(filter.getAgenticTypesList()));
-    andDocument(query, behaviourCondition(filter.getBehavioursList()));
+    andDocument(query, withStoredFieldFallback(agenticTypeStoredCondition(filter.getAgenticTypesList()), agenticTypeCondition(filter.getAgenticTypesList())));
+    andDocument(query, withStoredFieldFallback(behaviourStoredCondition(filter.getBehavioursList()), behaviourCondition(filter.getBehavioursList())));
 
     // if (filter.hasLabel()) {
     //   String labelString = filter.getLabel();
@@ -1073,12 +1074,50 @@ public class MaliciousEventService {
     return new Document("riskScoreNum", letExpr);
   }
 
-  // Order is precedence, mirroring deriveAgenticType in the dashboard's violationsData.js.
-  private static final String[][] AGENTIC_TYPE_RULES = {
-      {"Tool", "tool"}, {"Skill", "skill"}, {"Resource", "resource"}, {"Prompt", "prompt"},
-      {"Config", "config|setting"}, {"Tool", "mcp|server"}, {"Prompt", "message|completion|chat"}
-  };
-  private Document agenticTypeCondition(List<String> types) {
+  private static final String[][] AGENTIC_TYPE_RULES = FilterFields.TYPE_RULES;
+  // Events stored after the filter fields existed match on the field; older ones keep matching on the regex
+  // until the backfill has covered them (agenticType is set on every Endpoint/Agentic/MCP event it touches).
+  static Document withStoredFieldFallback(Document stored, Document regex) {
+    if (stored == null || regex == null) {
+      return null;
+    }
+    return new Document("$or", Arrays.asList(
+        stored,
+        new Document("$and", Arrays.asList(new Document("agenticType", new Document("$exists", false)), regex))));
+  }
+
+  static Document agenticTypeStoredCondition(List<String> types) {
+    if (types == null || types.isEmpty()) {
+      return null;
+    }
+    return new Document("agenticType", new Document("$in", new ArrayList<>(types)));
+  }
+
+  static Document behaviourStoredCondition(List<String> behaviours) {
+    if (behaviours == null || behaviours.isEmpty()) {
+      return null;
+    }
+    List<String> values = new ArrayList<>();
+    boolean flagged = false;
+    for (String b : behaviours) {
+      values.add(b);
+      if ("flag".equalsIgnoreCase(b)) {
+        flagged = true;
+        values.add("warn");
+      }
+    }
+    Document byValue = new Document("agenticType", new Document("$exists", true))
+        .append("behaviour", new Document("$in", values));
+    if (!flagged) {
+      return byValue;
+    }
+    // The UI shows an event with no behaviour as Flagged.
+    Document noBehaviour = new Document("agenticType", new Document("$exists", true))
+        .append("behaviour", new Document("$exists", false));
+    return new Document("$or", Arrays.asList(byValue, noBehaviour));
+  }
+
+  static Document agenticTypeCondition(List<String> types) {
     if (types == null || types.isEmpty()) {
       return null;
     }
@@ -1104,7 +1143,7 @@ public class MaliciousEventService {
     return anyOf.isEmpty() ? null : new Document("$or", anyOf);
   }
 
-  private Document behaviourCondition(List<String> behaviours) {
+  static Document behaviourCondition(List<String> behaviours) {
     if (behaviours == null || behaviours.isEmpty()) {
       return null;
     }

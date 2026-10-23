@@ -485,6 +485,16 @@ public class ThreatUtils {
         return split.length <= PROMPT_WORDS_COMPARED ? words : String.join(" ", Arrays.copyOf(split, PROMPT_WORDS_COMPARED));
     }
 
+    private static void createFilterFieldIndexIfAbsent(MongoCollection<?> collection, Set<String> existingIndexes, String field) {
+        String name = "idx_context_status_" + field + "_detectedAt";
+        if (existingIndexes.contains(name)) {
+            return;
+        }
+        collection.createIndex(
+            Indexes.compoundIndex(Indexes.ascending("contextSource"), Indexes.ascending("status"), Indexes.ascending(field), Indexes.descending("detectedAt")),
+            new IndexOptions().name(name).partialFilterExpression(new Document(field, new Document("$exists", true))));
+    }
+
     public static void createIndexIfAbsent(String accountId, MaliciousEventDao maliciousEventDao) {
         // Get the collection from DAO - this will create the collection if it doesn't exist
         MongoCollection<?> collection = maliciousEventDao.getCollection(accountId);
@@ -525,6 +535,10 @@ public class ThreatUtils {
                 collection.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
             }
         }
+
+        // Only Endpoint/Agentic/MCP events carry these fields; partial so other contexts add nothing to the index.
+        createFilterFieldIndexIfAbsent(collection, existingIndexes, "agenticType");
+        createFilterFieldIndexIfAbsent(collection, existingIndexes, "behaviour");
 
         // Only accounts that group activities have keyed events; partial so it stays small.
         if (groupsActivities(accountId) && !existingIndexes.contains(ACTIVITY_GROUP_INDEX)) {
