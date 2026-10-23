@@ -151,6 +151,13 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+            .post("/backfill_filter_fields")
+            .blockingHandler(ctx -> {
+                int updated = dsService.backfillFilterFields(ctx.get("accountId"));
+                ctx.response().setStatusCode(200).end("{\"updated\": " + updated + "}");
+            });
+
+        router
             .post("/list_malicious_requests")
             .blockingHandler(ctx -> {
                 String contextSource = getContextSourceHeader(ctx);
