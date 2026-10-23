@@ -275,8 +275,8 @@ function DetectedCellRenderer({ value, data }) {
 }
 
 // Skill and Config events already have their own tabs, so they are not offered here.
-const COLUMN_FILTER_ACCOUNT_ID = 1791484402;
-const columnFiltersEnabled = () => isEndpointSecurityCategory() && Number(window.ACTIVE_ACCOUNT) === COLUMN_FILTER_ACCOUNT_ID;
+const TYPE_FILTER_ACCOUNT_ID = 1791484402;
+const typeFilterEnabled = () => isEndpointSecurityCategory() && Number(window.ACTIVE_ACCOUNT) === TYPE_FILTER_ACCOUNT_ID;
 
 const AGENTIC_TYPE_FILTER_VALUES = ["Prompt", "Tool", "Resource"];
 const ACTION_FILTER_LABELS = { block: "Blocked", alert: "Alert", flag: "Flagged" };
@@ -314,7 +314,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "Type",
             minWidth: 100,
             sortable: false,
-            ...(columnFiltersEnabled() && !hideTypeFilter ? { filter: "agSetColumnFilter", filterParams: { values: AGENTIC_TYPE_FILTER_VALUES } } : {}),
+            ...(typeFilterEnabled() && !hideTypeFilter ? { filter: "agSetColumnFilter", filterParams: { values: AGENTIC_TYPE_FILTER_VALUES } } : {}),
             cellRenderer: TypeCellRenderer,
         },
         {
@@ -388,7 +388,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "Agentic Asset",
             minWidth: 160,
             sortable: false,
-            ...(columnFiltersEnabled() ? { filter: "agSetColumnFilter", filterParams: { values: filterValues.assetLabels || [] } } : {}),
+            ...(isEndpointSecurityCategory() ? { filter: "agSetColumnFilter", filterParams: { values: filterValues.assetLabels || [] } } : {}),
             cellRenderer: AssetCellRenderer,
         },
         {
@@ -396,7 +396,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "Actions",
             minWidth: 110,
             sortable: false,
-            ...(columnFiltersEnabled() ? {
+            ...(isEndpointSecurityCategory() ? {
                 filter: "agSetColumnFilter",
                 filterParams: {
                     values: Object.keys(ACTION_FILTER_LABELS),
@@ -1446,7 +1446,7 @@ function Violations() {
     const fetchViolations = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
         const severityFilter = filters?.severity || [];
         let hostFilter = [...new Set([...(filters?.user || []), ...activeAssetFilter])];
-        const atlasFilters = columnFiltersEnabled();
+        const atlasFilters = isEndpointSecurityCategory();
         const assetColumnHosts = (atlasFilters ? filters?.agenticAsset || [] : []).flatMap(label => assetHostsByLabel[label] || []);
         if (assetColumnHosts.length > 0) {
             hostFilter = hostFilter.length > 0 ? hostFilter.filter(h => assetColumnHosts.includes(h)) : assetColumnHosts;
@@ -1497,7 +1497,7 @@ function Violations() {
             undefined,
             !groupActivities,
             {
-                agenticTypes: atlasFilters && !isSkillsEvaluationsTab && !isMisconfiguredTab ? filters?.type : undefined,
+                agenticTypes: typeFilterEnabled() && !isSkillsEvaluationsTab && !isMisconfiguredTab ? filters?.type : undefined,
                 behaviours: atlasFilters ? filters?.action : undefined,
             },
         ).then(result => {
