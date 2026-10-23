@@ -134,3 +134,45 @@ func TestParseRSAPublicKey_PEMArmored(t *testing.T) {
 		t.Fatalf("parseRSAPublicKey(armored) failed: %v", err)
 	}
 }
+
+func pinDeploymentAccount(t *testing.T, id string) {
+	t.Helper()
+	orig := deploymentAccountID
+	deploymentAccountID = func() string { return id }
+	t.Cleanup(func() { deploymentAccountID = orig })
+}
+
+func TestMiddleware_TokenForThisDeploymentPasses(t *testing.T) {
+	pinDeploymentAccount(t, "1718012345")
+	priv, pub := mustKeyPair(t)
+	token := signToken(t, priv, jwt.MapClaims{"accountId": 1718012345})
+
+	status, accountID, set := runRequest(t, pub, token)
+	if status != http.StatusOK || !set || accountID != 1718012345 {
+		t.Fatalf("status=%d set=%v accountId=%d, want 200 true 1718012345", status, set, accountID)
+	}
+}
+
+func TestMiddleware_TokenForAnotherAccountRejected(t *testing.T) {
+	pinDeploymentAccount(t, "1718000000")
+	priv, pub := mustKeyPair(t)
+	token := signToken(t, priv, jwt.MapClaims{"accountId": 1718012345}) // validly signed, wrong account
+
+	status, _, set := runRequest(t, pub, token)
+	if status != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", status)
+	}
+	if set {
+		t.Fatal("accountId must not be set for a rejected token")
+	}
+}
+
+func TestMiddleware_UnknownDeploymentAccountSkipsCheck(t *testing.T) {
+	pinDeploymentAccount(t, "")
+	priv, pub := mustKeyPair(t)
+	token := signToken(t, priv, jwt.MapClaims{"accountId": 1718012345})
+
+	if status, _, _ := runRequest(t, pub, token); status != http.StatusOK {
+		t.Fatalf("status = %d, want 200 when the deployment account is unknown", status)
+	}
+}
