@@ -4,42 +4,21 @@ import com.akto.hybrid_runtime.redaction.RedactionResult.RedactionStatus;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.SecretUtils;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-
+import com.google.gson.*;
+import okhttp3.*;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongSupplier;
 
-/**
- * Asks guardrails-service to mask payloads (POST /api/redact/payloads). The only code in mini-runtime
- * that talks to it.
- *
- * Every item that was sent gets a result, always. A timeout, a refused call, an open circuit
- * breaker, a malformed answer or an item the service did not answer all become UNAVAILABLE, so a
- * failure can never read as "nothing to mask". There are no retries: the caller stores the payload
- * as it is, marked unredacted, and the next occurrence tries again.
- */
+/** The only mini-runtime code that calls POST /api/redact/payloads. Every item gets a result; any failure is UNAVAILABLE, never "nothing to mask". */
 public class GuardrailRedactionClient {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailRedactionClient.class, LogDb.RUNTIME);
     private static final String PATH = "/api/redact/payloads";
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
 
-    /** One HTTP exchange; replaced by a fake in tests. Returns the response body of a 2xx answer. */
     interface Transport {
         String post(String url, String body, String token, int connectTimeoutMs, int callTimeoutMs) throws IOException;
     }
@@ -56,7 +35,6 @@ public class GuardrailRedactionClient {
         this.clock = clock;
     }
 
-    /** Null when redaction is not enabled. */
     public static GuardrailRedactionClient fromEnv(RedactionConfig config) {
         if (config == null || !config.enabled) {
             return null;
@@ -64,20 +42,12 @@ public class GuardrailRedactionClient {
         return new GuardrailRedactionClient(config, new OkHttpTransport(), System::currentTimeMillis);
     }
 
-    /**
-     * Redacts the items. Nothing about the request other than method, host and path is sent: which
-     * policies apply is guardrails-service's decision alone. Returns a result for every item id.
-     * Calls are made chunk by chunk until deadlineAtMs (epoch millis); chunks that do not fit
-     * before it are answered UNAVAILABLE without a call.
-     */
     public Map<String, RedactionResult> redact(List<RedactionItem> items, long deadlineAtMs) {
         Map<String, RedactionResult> results = new HashMap<>();
         if (items == null || items.isEmpty()) {
             return results;
         }
 
-        // A side over the size cap is never sent; it is answered locally. The other side still goes.
-        // An item with no payload at all has nothing to redact and is not sent.
         List<RedactionItem> sendable = new ArrayList<>(items.size());
         Map<String, boolean[]> oversize = new HashMap<>();
         for (RedactionItem item : items) {
@@ -115,7 +85,6 @@ public class GuardrailRedactionClient {
         return payload != null && payload.length() > config.maxPayloadBytes;
     }
 
-    /** Adds UNAVAILABLE for any side that was held back for size. */
     private static RedactionResult withOversizeSides(RedactionItem original, RedactionResult answer, boolean[] tooBig) {
         if (tooBig == null) {
             return answer;
@@ -151,8 +120,7 @@ public class GuardrailRedactionClient {
             return parsed;
         } catch (Exception e) {
             recordFailure();
-            // Never log payloads. Transport errors name only the endpoint and cause; for anything else
-            // (a parse error quotes the text it choked on) only the type is logged.
+            // Never log payloads: parse errors quote the text they choked on, so only the type is logged.
             loggerMaker.errorAndAddToDb("Payload redaction call failed for " + chunk.size() + " item(s): "
                     + (e instanceof IOException ? e.toString() : e.getClass().getSimpleName()));
             return allUnavailable(chunk);
@@ -190,11 +158,6 @@ public class GuardrailRedactionClient {
         return root.toString();
     }
 
-    /**
-     * Matches the answer to the items by id. An item the service did not answer, or a side it left
-     * out, is UNAVAILABLE. A REDACTED or REDACTED_BASIC side without a payload is UNAVAILABLE too: an
-     * empty string must never replace a real payload.
-     */
     static Map<String, RedactionResult> parseResponse(List<RedactionItem> chunk, String responseBody) {
         Map<String, JsonObject> byId = new HashMap<>();
         JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();

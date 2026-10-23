@@ -31,7 +31,7 @@ public class GuardrailRedactionE2EIT {
     private static final String SENSITIVE = "{\"msg\":\"mail jane@example.com, key AKIAIOSFODNN7EXAMPLE, ask Jane Doe\"}";
 
     private static RedactionConfig config(String url) {
-        return new RedactionConfig(true, url, 1000, 8000, 20000, 100, 1 << 20, 5, 30000, 10, 0);
+        return new RedactionConfig(true, url, 1000, 8000, 20000, 100, 1 << 20, 5, 30000, 10, 0, false);
     }
 
     private static GuardrailRedactionClient liveClient() {
@@ -75,7 +75,7 @@ public class GuardrailRedactionE2EIT {
         orig.put("akto_vxlan_id", 123);
         String message = mapper.writeValueAsString(orig);
 
-        OrigRedactor redactor = new OrigRedactor(liveClient(), 20_000);
+        OrigRedactor redactor = new OrigRedactor(liveClient(), 20_000, false);
         redactor.prepare(Collections.singletonList(message));
         OrigRedactor.Result result = redactor.lookup(message);
 

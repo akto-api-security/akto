@@ -1,9 +1,6 @@
 package com.akto.hybrid_runtime.redaction;
 
-/**
- * One request/response pair of a single endpoint call, as sent to guardrails-service. A null or
- * empty payload means "not sent": that side is not evaluated and has no result.
- */
+/** One request/response pair sent to guardrails-service; a null or empty payload means "not sent". */
 public class RedactionItem {
 
     private final String id;

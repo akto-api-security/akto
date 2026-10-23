@@ -1631,10 +1631,7 @@ public class APICatalogSync {
     private static final Gson gson = new Gson();
     private static final String AKTO_UUID = "akto_uuid";
 
-    /**
-     * Masks stored sample payloads through guardrails-service for the sync in progress; null when
-     * that is not enabled. Created at the start of each syncWithDB so its memo never outlives one sync.
-     */
+    // Per-sync guardrails redactor (null when disabled); recreated each syncWithDB so its memo is bounded.
     private volatile OrigRedactor origRedactor;
 
     public List<BulkUpdates> getDBUpdatesForSampleDataHybrid(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
@@ -1719,8 +1716,7 @@ public class APICatalogSync {
         for (int i = 0; i < sampleData.size(); i += batchSize) {
             int end = Math.min(i + batchSize, sampleData.size());
             List<SampleData> batch = sampleData.subList(i, end);
-            // Outside the batch timeout below: redaction has its own budget and must not eat the
-            // time the batch needs. Full redaction already masks every value, so it is skipped then.
+            // Outside runWithTimeout: redaction has its own budget. Skipped under full redaction.
             OrigRedactor redactor = origRedactor;
             if (redactor != null && !accountLevelRedact && !apiCollectionLevelRedact) {
                 List<String> origs = new ArrayList<>();
@@ -1759,8 +1755,6 @@ public class APICatalogSync {
                 try {
                     lastExecutedBatch.clear();
                     lastExecutedBatch.add(sample);
-                    // A sample that could not be fully masked is stored marked (BASIC: regex scrub only,
-                    // UNAVAILABLE: as it is), never as if it were clean.
                     OrigRedactor.Result masked = (origRedactor != null && !accountLevelRedact && !apiCollectionLevelRedact)
                             ? origRedactor.lookup(s) : null;
                     String redactedSample = RedactSampleData.redactIfRequired(masked != null ? masked.orig : s,
@@ -1842,7 +1836,6 @@ public class APICatalogSync {
         ArrayList<BulkUpdates> bulkUpdatesForSampleData = new ArrayList<>();
         int now = Context.now();
 
-        // Sensitive examples are raw messages; mask their payloads in one batch before the loop.
         OrigRedactor redactor = origRedactor;
         if (redactor != null && !(redactSampleData || collectionLevelRedact)) {
             List<String> examples = new ArrayList<>();
@@ -1938,7 +1931,6 @@ public class APICatalogSync {
                     }
                 }
                 deltaInfo.setExamples(updatedSampleData);
-                // Every example was skipped as unredacted: write no sensitive sample document at all.
                 if (!(updatedSampleData.isEmpty() && skippedExamples > skippedBefore)) {
                     ArrayList<String> sampleDataUpdates = new ArrayList<>();
                     updatePayload = new UpdatePayload(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), "pushEach");

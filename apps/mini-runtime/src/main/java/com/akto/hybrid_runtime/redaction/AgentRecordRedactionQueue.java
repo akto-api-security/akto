@@ -3,28 +3,12 @@ package com.akto.hybrid_runtime.redaction;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
-/**
- * Redacts agent query records off the consumer thread. The consumer thread submits a record and
- * moves on; one daemon worker takes records in batches, masks their payloads through
- * guardrails-service and hands them to the sink (the data actor).
- *
- * By default a record is never dropped. If the queue is full, the service fails, a payload cannot
- * be redacted or anything unexpected happens, the record goes to the sink as it is, marked
- * payloadRedaction=UNAVAILABLE. With {@link RedactionConfig#skipWhenUnavailable} such a record is
- * instead not stored (counted and logged); a record that was redacted, even at BASIC strength, is
- * always stored.
- */
+/** Redacts agent records on one worker thread so the consumer never waits. Unredacted ones are stored marked UNAVAILABLE, or dropped when skipWhenUnavailable is set. */
 public class AgentRecordRedactionQueue {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentRecordRedactionQueue.class, LogDb.RUNTIME);
@@ -35,7 +19,7 @@ public class AgentRecordRedactionQueue {
         final String host;
         final String path;
         final Consumer<AgentQueryRecord> sink;
-        // Set once the record has been handed to the sink, so a later fallback never stores it twice.
+        // Set once handed to the sink, so a later fallback never stores the record twice.
         boolean delivered;
 
         Pending(AgentQueryRecord record, String method, String host, String path, Consumer<AgentQueryRecord> sink) {
@@ -51,8 +35,6 @@ public class AgentRecordRedactionQueue {
     private final RedactionConfig config;
     private final BlockingQueue<Pending> queue;
     private final AtomicLong overflowed = new AtomicLong();
-    private final AtomicLong redacted = new AtomicLong();
-    private final AtomicLong unavailable = new AtomicLong();
     private final AtomicLong skipped = new AtomicLong();
 
     public AgentRecordRedactionQueue(GuardrailRedactionClient client, RedactionConfig config) {
@@ -64,7 +46,6 @@ public class AgentRecordRedactionQueue {
         worker.start();
     }
 
-    /** Queues the record, or stores it unredacted and marked when the queue is full. */
     public void submit(AgentQueryRecord record, String method, String host, String path, Consumer<AgentQueryRecord> sink) {
         if (!queue.offer(new Pending(record, method, host, path, sink))) {
             long n = overflowed.incrementAndGet();
@@ -98,7 +79,6 @@ public class AgentRecordRedactionQueue {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Throwable t) {
-                // processBatch stores its own records; this only guards the loop itself.
                 loggerMaker.errorAndAddToDb("Agent record redaction worker error: " + t.getClass().getSimpleName());
             }
         }
@@ -118,10 +98,6 @@ public class AgentRecordRedactionQueue {
         }
     }
 
-    /**
-     * Hands a record to the sink once. A skipped record never reaches the sink. A sink that throws loses that record (the same as the data
-     * actor failing before this feature existed) but never the rest of the batch.
-     */
     private void deliver(Pending p, AgentQueryRecord record) {
         p.delivered = true;
         if (config.skipWhenUnavailable && RedactionResult.MARKER_UNAVAILABLE.equals(record.getPayloadRedaction())) {
@@ -140,7 +116,6 @@ public class AgentRecordRedactionQueue {
     }
 
     private void deliverUnavailable(Pending p) {
-        unavailable.incrementAndGet();
         deliver(p, p.record.withPayloads(null, null, OrigRedactor.MARKER_UNAVAILABLE));
     }
 
@@ -174,23 +149,6 @@ public class AgentRecordRedactionQueue {
 
         String query = q == null ? null : q.getPayload();
         String response = r == null ? null : r.getPayload();
-
-        if (RedactionResult.MARKER_UNAVAILABLE.equals(marker)) {
-            unavailable.incrementAndGet();
-        } else if (query != null || response != null) {
-            redacted.incrementAndGet();
-        }
-        // A null payload keeps the record's own, so an UNAVAILABLE side is stored as it is.
         return record.withPayloads(query, response, marker);
-    }
-
-    /** For tests and diagnostics. */
-    Map<String, Long> stats() {
-        Map<String, Long> m = new HashMap<>();
-        m.put("overflowed", overflowed.get());
-        m.put("redacted", redacted.get());
-        m.put("unavailable", unavailable.get());
-        m.put("skipped", skipped.get());
-        return m;
     }
 }

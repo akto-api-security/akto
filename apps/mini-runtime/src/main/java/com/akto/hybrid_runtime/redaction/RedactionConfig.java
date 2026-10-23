@@ -1,10 +1,5 @@
 package com.akto.hybrid_runtime.redaction;
 
-/**
- * Settings for redacting stored payloads through guardrails-service. Disabled unless
- * AKTO_GUARDRAIL_REDACTION_ENABLED is true and AKTO_GUARDRAIL_REDACTION_URL is set; there is
- * deliberately no default URL, so an install never sends payloads to a host it did not choose.
- */
 public final class RedactionConfig {
 
     static final String ENABLED_ENV = "AKTO_GUARDRAIL_REDACTION_ENABLED";
@@ -12,34 +7,18 @@ public final class RedactionConfig {
     static final String SKIP_ON_UNAVAILABLE_ENV = "AKTO_GUARDRAIL_REDACTION_SKIP_ON_UNAVAILABLE";
 
     public final boolean enabled;
-    /** Base URL of guardrails-service, without the /api path. */
     public final String baseUrl;
     public final int connectTimeoutMs;
-    /** One HTTP call. Kept below GS's own deadline would be wrong: GS answers within it or reports UNAVAILABLE. */
     public final int callTimeoutMs;
-    /** Total time one prepare/queue batch may spend across all its calls; later items become UNAVAILABLE. */
     public final int budgetMs;
-    /** Items per call. Must not exceed GUARDRAILS_REDACT_MAX_ITEMS on the service (default 100). */
     public final int chunkSize;
-    /** Payloads over this are not sent; the service answers UNAVAILABLE for them anyway. */
     public final int maxPayloadBytes;
     public final int breakerThreshold;
     public final int breakerOpenMs;
     public final int queueCapacity;
     public final int lingerMs;
-    /**
-     * What to do with a payload that guardrails-service did not redact (UNAVAILABLE: service down,
-     * deadline, breaker open, oversize). False (default) stores it unredacted and marked; true does
-     * not store it at all. A BASIC result (scanner down, regex scrub applied) is always stored.
-     */
+    /** true: do not store payloads that could not be redacted (BASIC is still stored); false: store them marked UNAVAILABLE. */
     public final boolean skipWhenUnavailable;
-
-    RedactionConfig(boolean enabled, String baseUrl, int connectTimeoutMs, int callTimeoutMs, int budgetMs,
-                    int chunkSize, int maxPayloadBytes, int breakerThreshold, int breakerOpenMs,
-                    int queueCapacity, int lingerMs) {
-        this(enabled, baseUrl, connectTimeoutMs, callTimeoutMs, budgetMs, chunkSize, maxPayloadBytes,
-                breakerThreshold, breakerOpenMs, queueCapacity, lingerMs, false);
-    }
 
     RedactionConfig(boolean enabled, String baseUrl, int connectTimeoutMs, int callTimeoutMs, int budgetMs,
                     int chunkSize, int maxPayloadBytes, int breakerThreshold, int breakerOpenMs,

@@ -2,46 +2,23 @@ package com.akto.hybrid_runtime.redaction;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Masks the request and response payloads inside stored sample messages (the raw "orig" JSON that
- * becomes sample data and sensitive sample data) through guardrails-service.
- *
- * One instance covers one sync. {@link #prepare} sends every distinct sample it has not seen to the
- * service in batches and remembers the outcome; {@link #lookup} then answers per sample, so a
- * payload that is both a sample and a sensitive example is sent once.
- *
- * Only the requestPayload and responsePayload fields are rewritten; every other field of the
- * message is left exactly as it was. A sample whose payload could not be redacted is returned
- * unchanged and flagged, and the caller stores it with {@link #withMarker}.
- */
+/** Masks requestPayload/responsePayload inside stored sample messages, once per distinct message per sync. */
 public class OrigRedactor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(OrigRedactor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    /** Marker key written into a stored sample whose payloads were not fully redacted. */
     public static final String MARKER_KEY = "aktoPayloadRedaction";
     public static final String MARKER_UNAVAILABLE = RedactionResult.MARKER_UNAVAILABLE;
     public static final String MARKER_BASIC = RedactionResult.MARKER_BASIC;
 
-    /**
-     * The message to store, and the marker it must carry (null when it was fully redacted or clean).
-     * When {@link #skip} is true the message must not be stored at all.
-     */
     public static final class Result {
         public final String orig;
         public final String marker;
@@ -71,13 +48,7 @@ public class OrigRedactor {
     private final GuardrailRedactionClient client;
     private final long deadlineAtMs;
     private final boolean skipWhenUnavailable;
-    // Concurrent: processSampleBatch reads on a worker thread that can outlive its batch timeout
-    // while the next prepare is already writing.
     private final Map<String, Result> memo = new ConcurrentHashMap<>();
-
-    public OrigRedactor(GuardrailRedactionClient client, int budgetMs) {
-        this(client, budgetMs, false);
-    }
 
     public OrigRedactor(GuardrailRedactionClient client, int budgetMs, boolean skipWhenUnavailable) {
         this.client = client;
@@ -85,18 +56,15 @@ public class OrigRedactor {
         this.skipWhenUnavailable = skipWhenUnavailable;
     }
 
-    /** Skipping applies to UNAVAILABLE only; BASIC (regex scrub applied) and clean results are stored. */
     private Result result(String orig, String marker) {
         return new Result(orig, marker, skipWhenUnavailable && MARKER_UNAVAILABLE.equals(marker));
     }
 
-    /** Redacts every message not already handled in this sync. Never throws. */
     public void prepare(Collection<String> origs) {
         try {
             doPrepare(origs);
         } catch (Exception e) {
-            // Anything not memoised is answered UNAVAILABLE by lookup, so nothing reads as redacted.
-            // Only the exception type is logged: parser messages quote the raw payload.
+            // Only the type is logged: parser messages quote the raw payload.
             loggerMaker.errorAndAddToDb("Payload redaction pre-pass failed: " + e.getClass().getSimpleName());
         }
     }
@@ -116,7 +84,6 @@ public class OrigRedactor {
             try {
                 p = toPending(key, orig, pending.size());
             } catch (Exception e) {
-                // A message that cannot be read cannot be shown to be clean: it is not redacted.
                 loggerMaker.error("Could not read a sample message for payload redaction: " + e.getClass().getSimpleName());
                 memo.put(key, result(orig, MARKER_UNAVAILABLE));
                 continue;
@@ -141,7 +108,6 @@ public class OrigRedactor {
         }
     }
 
-    /** Null when the message has no payload to redact. Throws when it cannot be read. */
     private Pending toPending(String key, String orig, int index) throws Exception {
         JsonNode node = mapper.readTree(orig);
         if (node == null || !node.isObject()) {
@@ -168,11 +134,9 @@ public class OrigRedactor {
             return result(p.orig, marker);
         }
         String masked = serialize(p.root);
-        // If the masked message cannot be written, the original is kept and must say so.
         return masked != null ? result(masked, marker) : result(p.orig, MARKER_UNAVAILABLE);
     }
 
-    /** True when the field was replaced with its masked form. */
     private static boolean applySide(Pending p, String field, String sentPayload, RedactionResult.Side side) {
         if (sentPayload == null || side == null || side.getPayload() == null) {
             return false;
@@ -181,7 +145,6 @@ public class OrigRedactor {
         return true;
     }
 
-    /** The message as JSON, or null if it cannot be written. */
     private static String serialize(ObjectNode root) {
         try {
             return mapper.writeValueAsString(root);
@@ -191,16 +154,11 @@ public class OrigRedactor {
         }
     }
 
-    /**
-     * The message to store for this sample. A message that was never prepared (the pre-pass
-     * failed, or was skipped) gets the UNAVAILABLE marker: it is explicitly unredacted, not assumed clean.
-     */
     public Result lookup(String orig) {
         Result known = orig == null ? null : memo.get(sha256(orig));
         return known != null ? known : result(orig, MARKER_UNAVAILABLE);
     }
 
-    /** Adds a redaction marker to a message about to be stored. Returns it unchanged if it cannot be parsed. */
     public static String withMarker(String stored, String marker) {
         try {
             JsonNode node = mapper.readTree(stored);
@@ -224,7 +182,6 @@ public class OrigRedactor {
         return s == null || s.isEmpty();
     }
 
-    /** Host from the request headers, which a sample stores as a JSON string (or object) of header values. */
     private static String hostOf(ObjectNode root) {
         try {
             JsonNode headers = root.get("requestHeaders");
@@ -245,7 +202,6 @@ public class OrigRedactor {
                 }
             }
         } catch (Exception ignored) {
-            // an unreadable header block means no host, which only narrows policy scoping
         }
         return "";
     }

@@ -51,9 +51,7 @@ public class AgentQueryRecord {
     private String guardrailReason;
     private String guardrailSeverity;
 
-    // Set to "UNAVAILABLE" when payload redaction was enabled but could not be applied to this
-    // record, so a stored raw payload is never mistaken for a redacted one. Null when redaction
-    // is off or succeeded; Gson omits nulls, so records written before this feature are unchanged.
+    // "UNAVAILABLE" or "BASIC" when redaction was not complete; null (omitted by Gson) otherwise.
     private String payloadRedaction;
 
     private static final String HEADER_PREFIX   = "x-akto-installer-";
@@ -138,14 +136,7 @@ public class AgentQueryRecord {
     public String getGuardrailSeverity()  { return guardrailSeverity; }
     public String getPayloadRedaction()   { return payloadRedaction; }
 
-    /**
-     * Copy of this record with different payloads. Every other field is carried over, including
-     * the guardrail verdict that setGuardrailVerdict wrote, and inputTokens/outputTokens stay as
-     * computed from the original payloads - masking must not change the counts. A null payload
-     * argument keeps the current one.
-     *
-     * @param payloadRedaction marker for the stored record, null when none applies.
-     */
+    /** Copy with new payloads; every other field and the token counts are kept. A null payload keeps the current one. */
     public AgentQueryRecord withPayloads(String queryPayload, String responsePayload, String payloadRedaction) {
         AgentQueryRecord copy = new AgentQueryRecord(docId, accountId, serviceId, deviceId, userName,
                 sessionIdentifier,
