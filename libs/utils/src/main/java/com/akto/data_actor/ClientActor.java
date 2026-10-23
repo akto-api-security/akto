@@ -46,6 +46,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.akto.util.SecretUtils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -606,12 +607,58 @@ public class ClientActor extends DataActor {
         // }
     }
 
+    // see HostStiSync, DISABLE_INCREMENTAL_STI_FETCH=true always does the full fetch
+    private static final boolean INCREMENTAL_STI_FETCH_DISABLED = "true".equalsIgnoreCase(System.getenv("DISABLE_INCREMENTAL_STI_FETCH"));
+    private static final int HOST_STI_MAX_PAGES = 80;
+
+    private final Map<Integer, HostStiSync> hostStiSyncByAccountId = new HashMap<>();
+    private final HostStiSync.Source hostStiSource = new HostStiSync.Source() {
+        @Override
+        public HostStiSync.FullFetch fetchAll() {
+            return fetchAllStisFull(true);
+        }
+
+        @Override
+        public Map<String, String> fetchSeenSince(int lastSeenGte) {
+            return fetchRawHostStis(null, lastSeenGte);
+        }
+
+        @Override
+        public Map<String, String> fetchCreatedAfter(String lastStiId) {
+            return fetchRawHostStis(lastStiId, 0);
+        }
+
+        @Override
+        public long countStis() {
+            return fetchHostStiCount();
+        }
+
+        @Override
+        public List<SingleTypeInfo> parseStis(Collection<String> rawStis) {
+            return parseRawStis(rawStis);
+        }
+    };
+
     public List<SingleTypeInfo> fetchAllStis() {
+        if (INCREMENTAL_STI_FETCH_DISABLED) {
+            return fetchAllStisFull(false).stis;
+        }
+        Integer accountId = Context.accountId.get();
+        HostStiSync hostStiSync;
+        synchronized (hostStiSyncByAccountId) {
+            hostStiSync = hostStiSyncByAccountId.computeIfAbsent(accountId == null ? 0 : accountId, key -> new HostStiSync(hostStiSource, Context::now));
+        }
+        return hostStiSync.fetch();
+    }
+
+    private HostStiSync.FullFetch fetchAllStisFull(boolean keepRawStis) {
         Map<String, List<String>> headers = buildHeaders();
         List<SingleTypeInfo> allStis = new ArrayList<>();
+        Map<String, String> rawStis = new HashMap<>();
+        boolean complete = false;
         String lastStiId = null;
 
-        for (int i =0; i<80; i++) {
+        for (int i = 0; i < HOST_STI_MAX_PAGES; i++) {
             BasicDBObject obj = new BasicDBObject();
             obj.put("lastStiId", lastStiId);
             OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST",  obj.toString(), headers, "");
@@ -620,23 +667,26 @@ public class ClientActor extends DataActor {
                 String responsePayload = response.getBody();
                 if (response.getStatusCode() != 200 || responsePayload == null) {
                     loggerMaker.errorAndAddToDb("invalid response in fetchAllStis", LoggerMaker.LogDb.RUNTIME);
-                    return allStis;
+                    return new HostStiSync.FullFetch(allStis, rawStis, false);
                 }
                 BasicDBObject payloadObj;
                 try {
                     payloadObj =  BasicDBObject.parse(responsePayload);
                     BasicDBList stiList = (BasicDBList) payloadObj.get("stis");
-                    if (stiList.isEmpty()) break;
+                    if (stiList.isEmpty()) {
+                        complete = true;
+                        break;
+                    }
 
                     for (Object stiObj: stiList) {
-                        BasicDBObject obj2 = (BasicDBObject) stiObj;
-                        obj2.put("id", obj2.get("strId"));
-                        BasicDBObject subType = (BasicDBObject) obj2.get("subType");
-                        obj2.remove("subType");
-                        SingleTypeInfo s = objectMapper.readValue(obj2.toJson(), SingleTypeInfo.class);
-                        s.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
-                        allStis.add(s);
-                        lastStiId = s.getId().toHexString();
+                        BasicDBObject stiDoc = (BasicDBObject) stiObj;
+                        String rawSti = keepRawStis ? stiDoc.toJson() : null;
+                        SingleTypeInfo sti = JSONUtils.parseSingleTypeInfo(stiDoc, objectMapper);
+                        allStis.add(sti);
+                        lastStiId = sti.getId().toHexString();
+                        if (keepRawStis) {
+                            rawStis.put(lastStiId, rawSti);
+                        }
                     }
                 } catch(Exception e) {
                     loggerMaker.errorAndAddToDb("error extracting response in fetchAllStis" + e, LoggerMaker.LogDb.RUNTIME);
@@ -646,8 +696,80 @@ public class ClientActor extends DataActor {
             }
         }
 
+        return new HostStiSync.FullFetch(allStis, rawStis, complete);
+    }
 
-        return allStis;
+    // raw JSON of the host-header STIs after the _id afterStiId (null = from the start), seen at or after lastSeenGte (0 = any time)
+    private Map<String, String> fetchRawHostStis(String afterStiId, int lastSeenGte) {
+        Map<String, List<String>> headers = buildHeaders();
+        Map<String, String> rawStis = new HashMap<>();
+        String lastStiId = afterStiId;
+
+        for (int i = 0; i < HOST_STI_MAX_PAGES; i++) {
+            BasicDBObject requestBody = new BasicDBObject();
+            requestBody.put("lastStiId", lastStiId);
+            if (lastSeenGte > 0) {
+                requestBody.put("lastSeenGte", lastSeenGte);
+            }
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiBasedOnHostHeaders", "", "POST", requestBody.toString(), headers, "");
+            try {
+                OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("invalid response in fetchRawHostStis", LoggerMaker.LogDb.RUNTIME);
+                    return null;
+                }
+                BasicDBList stiList = (BasicDBList) BasicDBObject.parse(responsePayload).get("stis");
+                if (stiList.isEmpty()) {
+                    return rawStis;
+                }
+                for (Object stiObj: stiList) {
+                    BasicDBObject hostSti = (BasicDBObject) stiObj;
+                    lastStiId = hostSti.getString("strId");
+                    if (lastStiId == null) {
+                        return null;
+                    }
+                    rawStis.put(lastStiId, hostSti.toJson());
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in fetchRawHostStis " + e, LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+        }
+
+        // page limit reached, there may be more
+        return null;
+    }
+
+    // -1 if the count is not available, e.g. on a database-abstractor without this endpoint
+    private long fetchHostStiCount() {
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchStiCountBasedOnHostHeaders", "", "POST", new BasicDBObject().toString(), buildHeaders(), "");
+        try {
+            // no retries, a missing endpoint would only wait out the backoff
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                return -1;
+            }
+            Object stiCount = BasicDBObject.parse(responsePayload).get("count");
+            return stiCount instanceof Number ? ((Number) stiCount).longValue() : -1;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchHostStiCount " + e, LoggerMaker.LogDb.RUNTIME);
+            return -1;
+        }
+    }
+
+    List<SingleTypeInfo> parseRawStis(Collection<String> rawStis) {
+        List<SingleTypeInfo> parsedStis = new ArrayList<>(rawStis.size());
+        try {
+            for (String rawSti: rawStis) {
+                parsedStis.add(JSONUtils.parseSingleTypeInfo(BasicDBObject.parse(rawSti), objectMapper));
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error parsing host STIs " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return parsedStis;
     }
 
     public List<SingleTypeInfo> fetchStiInBatches(int batchCount, int lastStiFetchTs) {
