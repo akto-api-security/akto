@@ -23,12 +23,16 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class SequenceModelDao extends AccountsContextDao<SequenceModel> {
 
     public static final SequenceModelDao instance = new SequenceModelDao();
 
     public static final int WINDOW_BUCKETS = 24;
+    public static final String ROOT_CONTEXT_KEY = "";
+
+    static final Set<Integer> INDEXED_ACCOUNTS = ConcurrentHashMap.newKeySet();
 
     private SequenceModelDao() {}
 
@@ -46,8 +50,6 @@ public class SequenceModelDao extends AccountsContextDao<SequenceModel> {
         createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
         MCollection.createUniqueIndex(getDBName(), getCollName(),
                 new String[] { SequenceModel.CONTEXT_KEY, SequenceModel.NEXT }, true);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { SequenceModel.COLLAPSED, SequenceModel.ORDER }, true);
     }
 
     public static class ContextStats {
@@ -58,6 +60,11 @@ public class SequenceModelDao extends AccountsContextDao<SequenceModel> {
     }
 
     public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        Integer accountId = Context.accountId.get();
+        if (accountId != null && INDEXED_ACCOUNTS.add(accountId)) {
+            SequenceCountDao.instance.createIndicesIfAbsent();
+            createIndicesIfAbsent();
+        }
         Map<String, String> touched = SequenceCountDao.instance.incrementCounts(sequenceCounts);
         if (touched.isEmpty()) return;
         recompute(touched, Context.now());
@@ -67,10 +74,15 @@ public class SequenceModelDao extends AccountsContextDao<SequenceModel> {
         int windowStart = (now / SequenceCountDao.BUCKET_SECONDS) * SequenceCountDao.BUCKET_SECONDS
                 - (WINDOW_BUCKETS - 1) * SequenceCountDao.BUCKET_SECONDS;
 
+        // Root ("") counts are read for collapse and precedence, but the root is never rebuilt:
+        // every order-1 context is its child, so expanding it would rebuild the whole model.
         Set<String> affected = new HashSet<>(touched.keySet());
+        affected.remove(ROOT_CONTEXT_KEY);
+        if (affected.isEmpty()) return;
+        Set<String> touchedContexts = new HashSet<>(affected);
         SequenceCountDao.instance.getMCollection().distinct(SequenceCount.CONTEXT_KEY,
                 Filters.and(
-                        Filters.in(SequenceCount.PARENT_CONTEXT_KEY, touched.keySet()),
+                        Filters.in(SequenceCount.PARENT_CONTEXT_KEY, touchedContexts),
                         Filters.gte(SequenceCount.BUCKET_START, windowStart)
                 ), String.class).into(affected);
 
