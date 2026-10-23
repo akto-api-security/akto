@@ -1740,11 +1740,14 @@ public class DbAction extends ActionSupport {
 //    }
 
     private String lastStiId = null;
+    // request input only (setter, no getter), so it is never echoed in responses. Clients that predate it do not send
+    // it and get every STI, as before
+    private int lastSeenGte = 0;
     public String fetchStiBasedOnHostHeaders() {
         long startTime = System.currentTimeMillis();
         try {
             ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
-            stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
+            stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId, lastSeenGte);
 
             long duration = System.currentTimeMillis() - startTime;
             if (duration > 5000) {
@@ -1754,6 +1757,17 @@ public class DbAction extends ActionSupport {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    // -1 when the count can't be known cheaply, see DbLayer.countStiBasedOnHostHeaders
+    public String fetchStiCountBasedOnHostHeaders() {
+        try {
+            count = DbLayer.countStiBasedOnHostHeaders();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchStiCountBasedOnHostHeaders " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -5843,6 +5857,10 @@ public class DbAction extends ActionSupport {
 
     public void setLastStiId(String lastStiId) {
         this.lastStiId = lastStiId;
+    }
+
+    public void setLastSeenGte(int lastSeenGte) {
+        this.lastSeenGte = lastSeenGte;
     }
 
     public List<DependencyNode> getDependencyNodeList() {
