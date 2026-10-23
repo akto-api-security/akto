@@ -1077,7 +1077,7 @@ public class MaliciousEventService {
   private static final String[][] AGENTIC_TYPE_RULES = FilterFields.TYPE_RULES;
   // Events stored after the filter fields existed match on the field; older ones keep matching on the regex
   // until the backfill has covered them (agenticType is set on every Endpoint/Agentic/MCP event it touches).
-  private Document withStoredFieldFallback(Document stored, Document regex) {
+  static Document withStoredFieldFallback(Document stored, Document regex) {
     if (stored == null || regex == null) {
       return null;
     }
@@ -1086,14 +1086,14 @@ public class MaliciousEventService {
         new Document("$and", Arrays.asList(new Document("agenticType", new Document("$exists", false)), regex))));
   }
 
-  private Document agenticTypeStoredCondition(List<String> types) {
+  static Document agenticTypeStoredCondition(List<String> types) {
     if (types == null || types.isEmpty()) {
       return null;
     }
     return new Document("agenticType", new Document("$in", new ArrayList<>(types)));
   }
 
-  private Document behaviourStoredCondition(List<String> behaviours) {
+  static Document behaviourStoredCondition(List<String> behaviours) {
     if (behaviours == null || behaviours.isEmpty()) {
       return null;
     }
@@ -1117,7 +1117,7 @@ public class MaliciousEventService {
     return new Document("$or", Arrays.asList(byValue, noBehaviour));
   }
 
-  private Document agenticTypeCondition(List<String> types) {
+  static Document agenticTypeCondition(List<String> types) {
     if (types == null || types.isEmpty()) {
       return null;
     }
@@ -1143,7 +1143,7 @@ public class MaliciousEventService {
     return anyOf.isEmpty() ? null : new Document("$or", anyOf);
   }
 
-  private Document behaviourCondition(List<String> behaviours) {
+  static Document behaviourCondition(List<String> behaviours) {
     if (behaviours == null || behaviours.isEmpty()) {
       return null;
     }

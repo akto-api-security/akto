@@ -1,6 +1,7 @@
 package com.akto.threat.backend.tasks;
 
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
+import com.akto.dto.type.URLMethods;
 import com.akto.kafka.KafkaConfig;
 import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.akto.threat.backend.constants.MongoDBCollection;
@@ -360,6 +361,147 @@ public class FlushMessagesToDBTest {
                 IgnoredEventCache.isIgnoredInCache(accountId, apiEndpoint, filterId),
                 times(1)
             );
+        }
+    }
+
+    private MaliciousEventDto eventWith(String contextSource, String url, String metadata) {
+        MaliciousEventDto event = MaliciousEventDto.newBuilder()
+            .setContextSource(contextSource)
+            .setLatestApiEndpoint(url)
+            .setLatestApiMethod(URLMethods.Method.POST)
+            .setFilterId("filter-derived")
+            .setMetadata(metadata)
+            .setStatus(MaliciousEventDto.Status.ACTIVE)
+            .setDetectedAt(System.currentTimeMillis())
+            .build();
+        event.setId("event-derived");
+        return event;
+    }
+
+    private MaliciousEventDto ingest(MaliciousEventDto event) throws Exception {
+        Map<String, Object> message = new HashMap<>();
+        message.put("eventType", MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
+        message.put("payload", mapper.writeValueAsString(event));
+        message.put("accountId", "1000");
+
+        try (MockedStatic<IgnoredEventCache> mockedCache = mockStatic(IgnoredEventCache.class)) {
+            mockedCache.when(() -> IgnoredEventCache.isIgnoredInCache(any(), any(), any())).thenReturn(false);
+
+            FlushMessagesToDB instance = new FlushMessagesToDB(kafkaConfig, mongoClient);
+            java.lang.reflect.Method writeMessage = FlushMessagesToDB.class.getDeclaredMethod("writeMessage", String.class);
+            writeMessage.setAccessible(true);
+            writeMessage.invoke(instance, gson.toJson(message));
+
+            ArgumentCaptor<MaliciousEventDto> captor = ArgumentCaptor.forClass(MaliciousEventDto.class);
+            verify(maliciousEventCollection, times(1)).insertOne(captor.capture());
+            return captor.getValue();
+        }
+    }
+
+    @Test
+    public void testIngest_EndpointToolCall_StoresToolTypeToolKindAndBehaviour() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("ENDPOINT", "/claude/guardrail/tool-call", "policy_name: \"P\"\nbehaviour: \"block\"\n"));
+        assertEquals("Tool", stored.getAgenticType());
+        assertEquals("TOOL", stored.getEndpointKind());
+        assertEquals("block", stored.getBehaviour());
+    }
+
+    @Test
+    public void testIngest_EndpointPlainPostPath_IsPromptAndKeepsPost() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("ENDPOINT", "/claude/guardrail", "behaviour: \"alert\"\n"));
+        assertEquals("Prompt", stored.getAgenticType());
+        assertEquals("POST", stored.getEndpointKind());
+        assertEquals("alert", stored.getBehaviour());
+    }
+
+    @Test
+    public void testIngest_EndpointConfigPath_IsConfig() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("ENDPOINT", "/claude/config/settings.json", "behaviour: \"alert\"\n"));
+        assertEquals("Config", stored.getAgenticType());
+        assertEquals("CONFIG", stored.getEndpointKind());
+    }
+
+    @Test
+    public void testIngest_AgenticSkillPath_IsSkill() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("AGENTIC", "/skills/pdf", "behaviour: \"block\"\n"));
+        assertEquals("Skill", stored.getAgenticType());
+        assertEquals("SKILL", stored.getEndpointKind());
+    }
+
+    @Test
+    public void testIngest_McpServerPath_IsToolInNewUiAndServerInOldUi() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("MCP", "/mcp/server/ab12", "behaviour: \"block\"\n"));
+        assertEquals("Tool", stored.getAgenticType());
+        assertEquals("SERVER", stored.getEndpointKind());
+    }
+
+    @Test
+    public void testIngest_ResourcePath_IsResource() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("ENDPOINT", "/mcp/resource/read/x", "behaviour: \"block\"\n"));
+        assertEquals("Resource", stored.getAgenticType());
+        assertEquals("RESOURCE", stored.getEndpointKind());
+    }
+
+    @Test
+    public void testIngest_EndpointWithoutBehaviour_StoresTypeButNoBehaviour() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("ENDPOINT", "/claude/guardrail", "policy_name: \"P\"\n"));
+        assertEquals("Prompt", stored.getAgenticType());
+        assertNull(stored.getBehaviour());
+    }
+
+    @Test
+    public void testIngest_ApiSecurityEvent_GetsNoDerivedFields() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("API", "/claude/guardrail/tool-call", "behaviour: \"block\"\n"));
+        assertNull(stored.getAgenticType());
+        assertNull(stored.getEndpointKind());
+        assertNull(stored.getBehaviour());
+        assertEquals("/claude/guardrail/tool-call", stored.getLatestApiEndpoint());
+    }
+
+    @Test
+    public void testIngest_DastEvent_GetsNoDerivedFields() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith("DAST", "/skills/pdf", "behaviour: \"block\"\n"));
+        assertNull(stored.getAgenticType());
+        assertNull(stored.getEndpointKind());
+        assertNull(stored.getBehaviour());
+    }
+
+    @Test
+    public void testIngest_EventWithoutContextSource_GetsNoDerivedFields() throws Exception {
+        MaliciousEventDto stored = ingest(eventWith(null, "/claude/guardrail/tool-call", "behaviour: \"block\"\n"));
+        assertNull(stored.getAgenticType());
+        assertNull(stored.getEndpointKind());
+        assertNull(stored.getBehaviour());
+    }
+
+    @Test
+    public void testIngest_DerivationDoesNotChangeTheReportedFields() throws Exception {
+        MaliciousEventDto sent = eventWith("ENDPOINT", "/claude/guardrail/tool-call", "behaviour: \"block\"\n");
+        MaliciousEventDto stored = ingest(sent);
+        assertEquals(sent.getId(), stored.getId());
+        assertEquals(sent.getFilterId(), stored.getFilterId());
+        assertEquals(sent.getLatestApiEndpoint(), stored.getLatestApiEndpoint());
+        assertEquals(sent.getLatestApiMethod(), stored.getLatestApiMethod());
+        assertEquals(sent.getMetadata(), stored.getMetadata());
+        assertEquals(sent.getContextSource(), stored.getContextSource());
+        assertEquals(sent.getStatus(), stored.getStatus());
+    }
+
+    @Test
+    public void testIngest_IgnoredEvent_IsStillNotInsertedAndNothingIsDerived() throws Exception {
+        MaliciousEventDto event = eventWith("ENDPOINT", "/claude/guardrail/tool-call", "behaviour: \"block\"\n");
+        Map<String, Object> message = new HashMap<>();
+        message.put("eventType", MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
+        message.put("payload", mapper.writeValueAsString(event));
+        message.put("accountId", "1000");
+
+        try (MockedStatic<IgnoredEventCache> mockedCache = mockStatic(IgnoredEventCache.class)) {
+            mockedCache.when(() -> IgnoredEventCache.isIgnoredInCache(any(), any(), any())).thenReturn(true);
+            FlushMessagesToDB instance = new FlushMessagesToDB(kafkaConfig, mongoClient);
+            java.lang.reflect.Method writeMessage = FlushMessagesToDB.class.getDeclaredMethod("writeMessage", String.class);
+            writeMessage.setAccessible(true);
+            writeMessage.invoke(instance, gson.toJson(message));
+            verify(maliciousEventCollection, never()).insertOne(any(MaliciousEventDto.class));
         }
     }
 }

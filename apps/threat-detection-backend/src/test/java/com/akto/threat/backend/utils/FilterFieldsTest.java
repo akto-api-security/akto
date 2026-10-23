@@ -83,4 +83,90 @@ public class FilterFieldsTest {
         assertEquals("CONFIG", endpoint.getEndpointKind());
         assertEquals("block", endpoint.getBehaviour());
     }
+
+    @Test
+    public void caseSensitivityDiffersBetweenTheTwoUis() {
+        assertEquals("Tool", FilterFields.agenticType("/Resource/TOOL"));
+        assertEquals("POST", FilterFields.endpointKind("/Resource/TOOL", "POST"));
+    }
+
+    @Test
+    public void queryStringIsIgnoredOnlyByTheOldUiBadge() {
+        assertEquals("Tool", FilterFields.agenticType("/x?bl=server_y"));
+        assertEquals("POST", FilterFields.endpointKind("/x?bl=server_y", "POST"));
+    }
+
+    @Test
+    public void pluginPathIsPluginOnlyForTheOldUiBadge() {
+        assertEquals("Tool", FilterFields.agenticType("/claude/plugin/x/tool"));
+        assertEquals("PLUGIN", FilterFields.endpointKind("/claude/plugin/x/tool", "POST"));
+    }
+
+    @Test
+    public void urlWithNoKeywordStaysPostAndPrompt() {
+        assertEquals("Prompt", FilterFields.agenticType("/claude/guardrail"));
+        assertEquals("POST", FilterFields.endpointKind("/claude/guardrail", "POST"));
+        assertEquals("OTHER", FilterFields.endpointKind("/claude/guardrail", "OTHER"));
+    }
+
+    @Test
+    public void toolConfigSkillResourceServerKeepTheirOwnKind() {
+        assertEquals("TOOL", FilterFields.endpointKind("/claude/guardrail/tool-call", "POST"));
+        assertEquals("CONFIG", FilterFields.endpointKind("/claude/config/settings.json", "POST"));
+        assertEquals("SKILL", FilterFields.endpointKind("/skills/pdf", "POST"));
+        assertEquals("RESOURCE", FilterFields.endpointKind("/mcp/resource/read/x", "POST"));
+        assertEquals("SERVER", FilterFields.endpointKind("/mcp/server/ab12", "POST"));
+    }
+
+    @Test
+    public void behaviourIsStoredAsWritten() {
+        assertEquals("BLOCK", FilterFields.behaviour("behaviour: \"BLOCK\"\n"));
+        assertEquals("warn", FilterFields.behaviour("policy_name: \"P\"\nbehaviour: \"warn\"\n"));
+    }
+
+    @Test
+    public void deriveReturnsAllThreeForEveryAgenticContext() {
+        for (String context : new String[] {"ENDPOINT", "AGENTIC", "MCP"}) {
+            FilterFields.Derived d = FilterFields.derive(context, "/claude/guardrail/tool-call", "POST", "behaviour: \"alert\"\n");
+            assertEquals("Tool", d.agenticType, context);
+            assertEquals("TOOL", d.endpointKind, context);
+            assertEquals("alert", d.behaviour, context);
+        }
+    }
+
+    @Test
+    public void applyOnAnEmptyEventDoesNotThrowAndFillsNothingForMissingContext() {
+        MaliciousEventDto empty = new MaliciousEventDto();
+        FilterFields.apply(empty);
+        assertNull(empty.getAgenticType());
+        assertNull(empty.getEndpointKind());
+        assertNull(empty.getBehaviour());
+    }
+
+    @Test
+    public void applyWithoutMetadataOrMethodStillSetsTheType() {
+        MaliciousEventDto event = MaliciousEventDto.newBuilder()
+            .setContextSource("ENDPOINT")
+            .setLatestApiEndpoint("/claude/guardrail")
+            .build();
+        FilterFields.apply(event);
+        assertEquals("Prompt", event.getAgenticType());
+        assertNull(event.getBehaviour());
+    }
+
+    @Test
+    public void applyOverwritesNothingForApiSecurityEvenWithToolLikeUrl() {
+        for (String context : new String[] {"API", "DAST", "GEN_AI"}) {
+            MaliciousEventDto event = MaliciousEventDto.newBuilder()
+                .setContextSource(context)
+                .setLatestApiEndpoint("/claude/guardrail/tool-call")
+                .setLatestApiMethod(URLMethods.Method.POST)
+                .setMetadata("behaviour: \"block\"\n")
+                .build();
+            FilterFields.apply(event);
+            assertNull(event.getAgenticType(), context);
+            assertNull(event.getEndpointKind(), context);
+            assertNull(event.getBehaviour(), context);
+        }
+    }
 }
