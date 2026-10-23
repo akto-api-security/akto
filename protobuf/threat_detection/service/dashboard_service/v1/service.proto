@@ -87,6 +87,8 @@ message ListMaliciousRequestsRequest {
       optional string risk_score_filter_type = 21 [json_name = "riskScoreFilterType"];  // equals, greaterThan, lessThan
       optional double risk_score_filter_value = 22 [json_name = "riskScoreFilterValue"];
       optional bool ungroup_activities = 23;  // list repeated Bedrock activities one event per row
+      repeated string agentic_types = 24;  // Prompt, Tool, Skill, Resource, Config — derived from the endpoint
+      repeated string behaviours = 25;  // block, alert, flag — read from the event metadata
     }
 
     // The number of alerts to return

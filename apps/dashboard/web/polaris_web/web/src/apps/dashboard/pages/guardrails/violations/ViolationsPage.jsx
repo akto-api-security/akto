@@ -274,7 +274,16 @@ function DetectedCellRenderer({ value, data }) {
     );
 }
 
-function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval) {
+// Skill and Config events already have their own tabs, so they are not offered here.
+const AGENTIC_TYPE_FILTER_VALUES = ["Prompt", "Tool", "Resource"];
+const ACTION_FILTER_LABELS = { block: "Blocked", alert: "Alert", flag: "Flagged" };
+
+function userDisplayName(host, usernameMap) {
+    const resolved = getUsernameForCollection({ displayName: host }, usernameMap || {});
+    return (resolved && resolved !== "-") ? resolved : String(host).split('.')[0];
+}
+
+function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval, hideTypeFilter) {
     const humanStatusCol = {
         field: "humanResponse",
         headerName: "Status",
@@ -307,6 +316,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "Type",
             minWidth: 100,
             sortable: false,
+            ...(isEndpointSecurityCategory() && !hideTypeFilter ? { filter: "agSetColumnFilter", filterParams: { values: AGENTIC_TYPE_FILTER_VALUES } } : {}),
             cellRenderer: TypeCellRenderer,
         },
         {
@@ -326,7 +336,10 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "User",
             minWidth: 140,
             filter: "agSetColumnFilter",
-            filterParams: { values: filterValues.hosts || [] },
+            filterParams: {
+                values: filterValues.hosts || [],
+                valueFormatter: (p) => userDisplayName(p.value, filterValues.usernameMap),
+            },
             cellRenderer: UserCellRenderer,
         }] : []),
         ...(isAgenticSecurityCategory() ? [{
@@ -380,6 +393,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "Agentic Asset",
             minWidth: 160,
             sortable: false,
+            ...(isEndpointSecurityCategory() ? { filter: "agSetColumnFilter", filterParams: { values: filterValues.assetLabels || [] } } : {}),
             cellRenderer: AssetCellRenderer,
         },
         {
@@ -387,6 +401,13 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "Actions",
             minWidth: 110,
             sortable: false,
+            ...(isEndpointSecurityCategory() ? {
+                filter: "agSetColumnFilter",
+                filterParams: {
+                    values: Object.keys(ACTION_FILTER_LABELS),
+                    valueFormatter: (p) => ACTION_FILTER_LABELS[p.value] || p.value,
+                },
+            } : {}),
             cellRenderer: ActionCellRenderer,
         },
         {
@@ -1259,9 +1280,25 @@ function Violations() {
         }
     }, [expandToGroupEvents, triggerTableRefresh]);
 
+    // Same label the Agentic Asset column renders, so each filter option maps to the hosts behind it.
+    const assetHostsByLabel = useMemo(() => {
+        const byLabel = {};
+        (filterValues.hosts || []).forEach((host) => {
+            const label = formatAssetDisplayName(host);
+            if (label) (byLabel[label] = byLabel[label] || []).push(host);
+        });
+        return byLabel;
+    }, [filterValues.hosts]);
+
+    const extendedFilterValues = useMemo(() => ({
+        ...filterValues,
+        usernameMap,
+        assetLabels: Object.keys(assetHostsByLabel).sort(),
+    }), [filterValues, usernameMap, assetHostsByLabel]);
+
     const colDefs = useMemo(
-        () => buildColDefs(filterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval),
-        [filterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval],
+        () => buildColDefs(extendedFilterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab || isMisconfiguredTab),
+        [extendedFilterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab, isMisconfiguredTab],
     );
 
     // ─── Fetch summary stats from existing backend APIs ─────────────────────
@@ -1414,7 +1451,14 @@ function Violations() {
     const lastServerFetchArgsRef = useRef({ filters: {} });
     const fetchViolations = useCallback(({ filters, sortKey, sortOrder, skip, limit, searchString }) => {
         const severityFilter = filters?.severity || [];
-        const hostFilter = [...new Set([...(filters?.user || []), ...activeAssetFilter])];
+        let hostFilter = [...new Set([...(filters?.user || []), ...activeAssetFilter])];
+        const atlasFilters = isEndpointSecurityCategory();
+        const assetColumnHosts = (atlasFilters ? filters?.agenticAsset || [] : []).flatMap(label => assetHostsByLabel[label] || []);
+        if (assetColumnHosts.length > 0) {
+            hostFilter = hostFilter.length > 0 ? hostFilter.filter(h => assetColumnHosts.includes(h)) : assetColumnHosts;
+            // An empty host list means "no host filter" to the backend, so an empty intersection needs a value that matches nothing.
+            if (hostFilter.length === 0) hostFilter = ["__no_match__"];
+        }
         // Union the column filter, the "Top Policies" card selection, and the pie's type filter
         // (all map to the backend latestAttack).
         const policyFilter = [...new Set([...(filters?.policyName || []), ...activePolicyFilter, ...activeTypeSubCategories])];
@@ -1458,6 +1502,10 @@ function Violations() {
             riskScoreFilter?.filter,
             undefined,
             !groupActivities,
+            {
+                agenticTypes: atlasFilters && !isSkillsEvaluationsTab && !isMisconfiguredTab ? filters?.type : undefined,
+                behaviours: atlasFilters ? filters?.action : undefined,
+            },
         ).then(result => {
             const rawEvents = result?.maliciousEvents || [];
             let transformed = rawEvents.map(e => transformEvent(e, collectionsMap, usernameMapRef.current, guardrailComplianceMapRef.current));
@@ -1477,7 +1525,7 @@ function Violations() {
             }
             return { value: transformed, total, rawEvents };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters, groupActivities]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, assetHostsByLabel, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters, groupActivities]);
 
     const onServerFetch = useCallback((args) => {
         lastServerFetchArgsRef.current = args;

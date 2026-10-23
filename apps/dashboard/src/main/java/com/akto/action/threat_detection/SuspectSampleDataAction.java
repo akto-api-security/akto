@@ -98,6 +98,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter Boolean matchClaudeConfig;
   @Getter @Setter String riskScoreFilterType;
   @Getter @Setter Double riskScoreFilterValue;
+  @Getter @Setter List<String> agenticTypes;
+  @Getter @Setter List<String> behaviours;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -216,6 +218,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
     if (this.riskScoreFilterValue != null) {
       filter.put("riskScoreFilterValue", this.riskScoreFilterValue);
+    }
+
+    if (this.agenticTypes != null && !this.agenticTypes.isEmpty()) {
+      filter.put("agenticTypes", this.agenticTypes);
+    }
+
+    if (this.behaviours != null && !this.behaviours.isEmpty()) {
+      filter.put("behaviours", this.behaviours);
     }
 
     Map<String, Integer> time_range = new HashMap<>();

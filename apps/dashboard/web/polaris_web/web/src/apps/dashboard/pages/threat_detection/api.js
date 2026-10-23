@@ -25,7 +25,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined, configEvaluationMode = undefined, riskScoreFilterType = undefined, riskScoreFilterValue = undefined, humanResponseFilter = undefined, ungroupActivities = false) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined, configEvaluationMode = undefined, riskScoreFilterType = undefined, riskScoreFilterValue = undefined, humanResponseFilter = undefined, ungroupActivities = false, extraFilters = {}) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -56,6 +56,8 @@ const threatDetectionRequests = {
                 ...(riskScoreFilterValue != null && riskScoreFilterValue !== "" ? { riskScoreFilterValue } : {}),
                 ...(humanResponseFilter ? { humanResponse: humanResponseFilter } : {}),
                 ...(ungroupActivities ? { ungroupActivities: true } : {}),
+                ...(extraFilters.agenticTypes?.length ? { agenticTypes: extraFilters.agenticTypes } : {}),
+                ...(extraFilters.behaviours?.length ? { behaviours: extraFilters.behaviours } : {}),
             },
             suppress403Toast: true
         })
