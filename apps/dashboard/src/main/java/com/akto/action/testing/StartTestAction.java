@@ -1442,6 +1442,23 @@ public class StartTestAction extends UserAction {
         // polling api
         try {
             List<TestingRunResultSummary> runningTrrs = TestingRunResultSummariesDao.instance.getCurrentRunningTestsSummaries();
+
+            // Keep only runs visible in the current dashboard context (API / Argus / Atlas / DAST) and to this user,
+            // same filter as the testing runs list and the queued count below.
+            if (!runningTrrs.isEmpty()) {
+                List<ObjectId> runningTestingRunIds = runningTrrs.stream()
+                    .map(TestingRunResultSummary::getTestingRunId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+                Set<ObjectId> visibleTestingRunIds = TestingRunDao.instance
+                    .findAllWithRbacAndContext(Filters.in(Constants.ID, runningTestingRunIds), 0, 0, null)
+                    .stream()
+                    .map(TestingRun::getId)
+                    .collect(Collectors.toSet());
+                runningTrrs.removeIf(summary -> !visibleTestingRunIds.contains(summary.getTestingRunId()));
+            }
+
             int totalRunningTests = 0;
             int totalInitiatedTests = 0;
             List<StatusForIndividualTest> currentTestsRunningList = new ArrayList<>();
