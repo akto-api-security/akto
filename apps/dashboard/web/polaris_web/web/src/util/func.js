@@ -2336,8 +2336,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
 
   hasAccessToNewPosture(){
     const activeAccount = window?.ACTIVE_ACCOUNT
-    const allowedAccountsForPosture = [1779231193, 1783981503, 1768175789, 1786073624,1758787662];
-    return allowedAccountsForPosture.some(x => x === activeAccount)
+    const allowedAccountsForPosture = [1779231193, 1783981503, 1768175789, 1786073624,1758787662, 1791484402, ];
+    return allowedAccountsForPosture.some(x => x === activeAccount) || this.isDemoAccount();
   },
 
   // Base role in the product being viewed (custom roles resolved by the server); USER_ROLE is for the product the page loaded in
