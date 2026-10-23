@@ -27,8 +27,8 @@ const TestingEndpointsModal = ({ showTestingEndpointsModal, setShowTestingEndpoi
             value: 'apiEndpointComp'
         },
         {
-            text: mapLabel(dashboardCategory, 'API') + ' collection name',
-            title: mapLabel(dashboardCategory, 'API') + ' collection name',
+            text: mapLabel('API', dashboardCategory) + ' collection name',
+            title: mapLabel('API', dashboardCategory) + ' collection name',
             value: 'apiCollectionName',
             isText: CellType.TEXT
         }
@@ -36,7 +36,7 @@ const TestingEndpointsModal = ({ showTestingEndpointsModal, setShowTestingEndpoi
 
     const emptyStateMarkup = (
         <EmptySearchResult
-            title={'No APIs found'}
+            title={'No ' + mapLabel('APIs', dashboardCategory) + ' found'}
             withIllustration
         />
     );
@@ -45,7 +45,7 @@ const TestingEndpointsModal = ({ showTestingEndpointsModal, setShowTestingEndpoi
         <Modal
             open={showTestingEndpointsModal}
             onClose={handleClose}
-            title={"See APIs"}
+            title={"See " + mapLabel('APIs', dashboardCategory)}
             fullScreen={true}
         >
             <Modal.Section>

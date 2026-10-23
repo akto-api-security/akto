@@ -147,7 +147,7 @@ function CollectionComponent(props) {
             <div style={{ flex: "3" }}>
                 <DropdownSearch
                     id={`api-collection-${index}`}
-                    placeholder="Select API collection"
+                    placeholder={mapLabel('Select API collection', dashboardCategory)}
                     optionsList={allCollectionsOptions}
                     setSelected={(collectionId) => handleCollectionSelected(collectionId)}
                     preSelected={[Number(getCollectionId(condition.data))]}
@@ -202,7 +202,7 @@ function CollectionComponent(props) {
         <Dropdown
             key={`condition-type-${index}`}
             menuItems={[{
-                label: mapLabel(dashboardCategory, 'Api') + ' list',
+                label: mapLabel('Api', dashboardCategory) + ' list',
                 value: 'CUSTOM',
             },
             {
@@ -222,7 +222,7 @@ function CollectionComponent(props) {
                 value: 'TAGS'
             },
             {
-                label: 'API Tags',
+                label: mapLabel('API Tags', dashboardCategory),
                 value: 'API_TAGS'
             },
             {
@@ -230,7 +230,7 @@ function CollectionComponent(props) {
                 value: 'AUTH_TYPE'
             },
             {
-                label: 'API Access Type',
+                label: mapLabel('API Access Type', dashboardCategory),
                 value: 'API_ACCESS_TYPES'
             }
         ]}
@@ -319,7 +319,7 @@ function CollectionComponent(props) {
                 return(
                     <DropdownSearch
                         id={`api-access-type-${index}`}
-                        placeholder="Select API access types"
+                        placeholder={mapLabel('Select API access types', dashboardCategory)}
                         optionsList={API_ACCESS_TYPES}
                         setSelected={(apiAccessTypes) => handleApiAccessTypesSelected(apiAccessTypes)}
                         preSelected={selectedApiAccessTypes}

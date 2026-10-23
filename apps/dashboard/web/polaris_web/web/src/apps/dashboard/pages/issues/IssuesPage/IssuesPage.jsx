@@ -38,7 +38,7 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
-import { getDashboardCategory, isAgenticSecurityCategory, mapLabel, categoryToShortName } from "../../../../main/labelHelper.js";
+import { getDashboardCategory, mapLabel, categoryToShortName } from "../../../../main/labelHelper.js";
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
 import SeveritySelector from "../components/SeveritySelector";
 import { usePermissions, withPermissions } from "@/util/permissions";
@@ -809,12 +809,12 @@ function IssuesPage() {
         {
             title: "Triage",
             icon: MarkFulfilledMinor,
-            description: "Prioritize, assign them to team members and manage API issues effectively.",
+            description: "Prioritize, assign them to team members and manage " + mapLabel('API', getDashboardCategory()) + " issues effectively.",
         },
         {
             title: "Download vulnerability report",
             icon: ReportMinor,
-            description: "Export and share detailed report of vulnerabilities in your APIs.",
+            description: "Export and share detailed report of vulnerabilities in your " + mapLabel('APIs', getDashboardCategory()) + ".",
         },
         {
             title: "Send them to GitHub",
@@ -1203,7 +1203,7 @@ function IssuesPage() {
                         <EmptyScreensLayout key={"emptyScreen"}
                             iconSrc={"/public/alert_hexagon.svg"}
                             headingText={"No issues yet!"}
-                            description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
+                            description={"There are currently no issues with your " + mapLabel('APIs', getDashboardCategory()) + ". Haven't run your tests yet? Start testing now to prevent any potential issues."}
                             buttonText={mapLabel("Run test", getDashboardCategory())}
                             infoItems={infoItems}
                             infoTitle={"Once you have issues:"}

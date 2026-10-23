@@ -185,7 +185,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                 priority: 'P0',
                 staticTitle: 'Sensitive data without proper controls',
                 title: 'Sensitive data without proper controls',
-                description: `${sensitiveAndUnauthenticatedCount} APIs returning sensitive data without encryption or proper authorization`,
+                description: `${sensitiveAndUnauthenticatedCount} ${mapLabel('APIs', getDashboardCategory())} returning sensitive data without encryption or proper authorization`,
                 team: 'Security & Development',
                 effort: 'High',
                 count: sensitiveAndUnauthenticatedCount,
@@ -200,7 +200,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                 priority: 'P0',
                 staticTitle: 'Patch critical vulnerabilities immediately',
                 title: 'Patch critical vulnerabilities immediately',
-                description: `${vulnerableApiCount} API flagged with critical severity issues that need immediate attention`,
+                description: `${vulnerableApiCount} ${mapLabel('API', getDashboardCategory())} flagged with critical severity issues that need immediate attention`,
                 team: 'Security & Development',
                 effort: 'High',
                 count: vulnerableApiCount,
@@ -237,7 +237,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
         setModalActive(false);
         const { title, displayName, description, actionItemType } = selectedActionItem;
         // Use labels parameter if provided, otherwise fall back to state
-        const labelsToUse = labels !== undefined ? labels : labelsText;
+        const labelsToUse = labels !== undefined ? labels : "";
 
         issuesApi.createGeneralJiraTicket({
             title: title || displayName || 'Action Item',

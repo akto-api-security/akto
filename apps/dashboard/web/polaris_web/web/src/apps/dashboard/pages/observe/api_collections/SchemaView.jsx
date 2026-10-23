@@ -8,6 +8,7 @@ import 'monaco-editor/esm/vs/language/json/monaco.contribution';
 import SwaggerUI from 'swagger-ui-react';
 import 'swagger-ui-react/swagger-ui.css';
 import api from '../api';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function SchemaView({ apiCollectionId }) {
     const [loading, setLoading] = useState(true);
@@ -215,7 +216,7 @@ function SchemaView({ apiCollectionId }) {
                     <>
                         <Card padding="4">
                             <VerticalStack gap="4">
-                                <Text variant="headingMd" fontWeight="semibold">API Schema Overview</Text>
+                                <Text variant="headingMd" fontWeight="semibold">{mapLabel('API', getDashboardCategory())} Schema Overview</Text>
                                 <HorizontalStack gap="8">
                                     <Box>
                                         <Text variant="bodySm" color="subdued">Servers</Text>

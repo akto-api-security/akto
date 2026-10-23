@@ -14,6 +14,7 @@ import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { AUTH_TYPES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import { usePermissions, whenAllowed } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function AuthTypes() {
     const headers = [
@@ -114,7 +115,7 @@ function AuthTypes() {
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/file_lock.svg"}
                     headingText={"No Auth type"}
-                    description={"Define custom auth mechanism based on where you send the auth key. We support auth key detection in header, payload and even cookies in your APIs."}
+                    description={"Define custom auth mechanism based on where you send the auth key. We support auth key detection in header, payload and even cookies in your " + mapLabel('APIs', getDashboardCategory()) + "."}
                     buttonText={"Create auth type"}
                     redirectUrl={canCall('api/addCustomAuthType') ? "/dashboard/settings/auth-types/details" : undefined}
                     learnText={"Creating auth type"}

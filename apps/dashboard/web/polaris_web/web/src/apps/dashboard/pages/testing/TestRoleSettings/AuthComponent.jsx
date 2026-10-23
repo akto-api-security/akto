@@ -26,6 +26,7 @@ import DigestAuth from '../user_config/DigestAuth';
 import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH, DIGEST_AUTH, COPILOT_OAUTH } from "./TestRoleConstants";
 import { usePermissions, whenAllowed } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 
 
@@ -560,7 +561,7 @@ const AuthComponent = ({
           >
             <VerticalStack gap={"4"}>
               <VerticalStack gap={"2"}>
-                <Text variant="headingMd">API header conditions</Text>
+                <Text variant="headingMd">{mapLabel('API', getDashboardCategory())} header conditions</Text>
                 <FormLayout>
                   <FormLayout.Group>
                     <TextField

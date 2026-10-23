@@ -9,6 +9,7 @@ import InputArgumentsDialog from './InputArgumentsDialog.jsx'
 import './start-node.css';
 import useStore from './store'
 import { Tooltip, Popper } from '@mui/material';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const BlankNode = (nodeData) => {
     const endpointsList = useStore(state => state.endpointsList)
@@ -103,7 +104,7 @@ const BlankNode = (nodeData) => {
                                 <Tooltip title={params.inputProps.value}>
                                     <TextField
                                         {...params}
-                                        placeholder="Select API"
+                                        placeholder={"Select " + mapLabel('API', getDashboardCategory())}
                                         InputProps={{
                                             ...params.InputProps,
                                             componentsProps: { input: params.inputProps },

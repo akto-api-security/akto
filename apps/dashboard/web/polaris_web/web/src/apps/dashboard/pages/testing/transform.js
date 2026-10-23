@@ -918,7 +918,7 @@ const transform = {
       },
       {
         icon: MarketingMajor,
-        title: "API endpoints affected",
+        title: mapLabel('API endpoints', getDashboardCategory()) + " affected",
         content: "",
         tooltipContent: "Affecting endpoints in your inventory for the same test"
       },

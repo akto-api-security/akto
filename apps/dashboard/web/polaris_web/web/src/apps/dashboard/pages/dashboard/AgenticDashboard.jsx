@@ -1119,7 +1119,7 @@ const AgenticDashboard = () => {
         'api-discovery-pie': isPieChartDataEmpty(apiDiscoveryData) ? (
             <EmptyCard
                 title={componentNames['api-discovery-pie']}
-                subTitleComponent={<Text alignment='center' color='subdued'>No API discovery data available for the selected time period</Text>}
+                subTitleComponent={<Text alignment='center' color='subdued'>No {mapLabel('API Discovery', getDashboardCategory())} data available for the selected time period</Text>}
                 itemId='api-discovery-pie'
                 onRemoveComponent={removeComponent}
                 tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered APIs categorized by shadow, sensitive, no auth, and normal'}

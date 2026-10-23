@@ -3,6 +3,7 @@ import ThreatActorConfigComponent from "./ThreatActorConfig.jsx"
 import RatelimitConfigComponent from "./RatelimitConfigComponent.jsx"
 import ParamEnumerationConfigComponent from "./ParamEnumerationConfigComponent.jsx"
 import ArchivalConfigComponent from "./ArchivalConfigComponent.jsx"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function ThreatConfiguration() {
 
@@ -14,7 +15,7 @@ function ThreatConfiguration() {
         />,
         <RatelimitConfigComponent
             title={"Rate Limit Configuration"}
-            description={"Configure rate limiting rules to protect your APIs from abuse."}
+            description={"Configure rate limiting rules to protect your " + mapLabel('APIs', getDashboardCategory()) + " from abuse."}
             key={"ratelimitConfig"}
         />,
         <ParamEnumerationConfigComponent

@@ -4,7 +4,6 @@ import { EmptySearchResult } from "@shopify/polaris";
 import LocalStore from '@/apps/main/LocalStorageStore';
 import api from '../api';
 import { labelMap } from '../../../../main/labelHelperMap';
-import issuesTransform from '@/apps/dashboard/pages/issues/transform';
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import observeApi from '../../observe/api';
@@ -310,8 +309,8 @@ function FlyoutTable({ actionItemType, count }) {
             hideQueryField={true}
             skipUrlFilters
             emptyStateMarkup={<EmptySearchResult
-                title={'No APIs found'}
-                description={'No APIs found for this action item type.'}
+                title={'No ' + mapLabel('APIs', getDashboardCategory()) + ' found'}
+                description={'No ' + mapLabel('APIs', getDashboardCategory()) + ' found for this action item type.'}
                 withIllustration
             />}
         />
