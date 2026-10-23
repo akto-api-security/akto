@@ -12,6 +12,7 @@ import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
+import com.akto.threat.backend.utils.FilterFields;
 import com.akto.threat.backend.utils.SplunkEvent;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -161,6 +162,7 @@ public class FlushMessagesToDB {
                        event.getLatestApiEndpoint() + " + " + event.getFilterId());
         } else {
             // No ignored event exists, safe to insert
+            FilterFields.apply(event);
             MaliciousEventDao.instance.insertOne(accountId, event);
             lastSuccessfulMongoWriteEpochMs.set(System.currentTimeMillis());
 

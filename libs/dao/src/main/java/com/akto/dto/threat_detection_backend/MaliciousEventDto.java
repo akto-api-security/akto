@@ -1,6 +1,7 @@
 package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
@@ -38,6 +39,13 @@ public class MaliciousEventDto {
   private String evidenceLine;
   // Bedrock caller ARN + prompt hash: events with the same key close together in time are one activity.
   private String groupKey;
+  // Derived from the URL and metadata when the event is stored; kept off the Kafka JSON (see FlushMessagesToDB).
+  @JsonIgnore
+  private String agenticType;
+  @JsonIgnore
+  private String endpointKind;
+  @JsonIgnore
+  private String behaviour;
   // Set only by the grouped activity list (never stored): how many events are behind this row, the first
   // one's time, their ids, and the policies they tripped.
   private Integer groupCount;
@@ -539,6 +547,36 @@ public class MaliciousEventDto {
 
   public void setOwaspCategories(List<OwaspCategory> owaspCategories) {
     this.owaspCategories = owaspCategories;
+  }
+
+  @JsonIgnore
+  public String getAgenticType() {
+    return agenticType;
+  }
+
+  @JsonIgnore
+  public void setAgenticType(String agenticType) {
+    this.agenticType = agenticType;
+  }
+
+  @JsonIgnore
+  public String getEndpointKind() {
+    return endpointKind;
+  }
+
+  @JsonIgnore
+  public void setEndpointKind(String endpointKind) {
+    this.endpointKind = endpointKind;
+  }
+
+  @JsonIgnore
+  public String getBehaviour() {
+    return behaviour;
+  }
+
+  @JsonIgnore
+  public void setBehaviour(String behaviour) {
+    this.behaviour = behaviour;
   }
 
   public String getGroupKey() {
