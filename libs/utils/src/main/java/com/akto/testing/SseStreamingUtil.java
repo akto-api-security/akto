@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -24,6 +25,10 @@ import okio.BufferedSource;
 public class SseStreamingUtil {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(SseStreamingUtil.class, LogDb.TESTING);
+
+    /** Caps parallel SSE subscriptions so staging rate limits (HTTP 429) do not drop the bot stream. */
+    private static final Semaphore STREAM_PERMITS = new Semaphore(4);
+    private static final int RATE_LIMIT_RETRIES = 6;
 
     public static final class StreamingResult {
         public final Thread thread;
@@ -43,8 +48,15 @@ public class SseStreamingUtil {
         AtomicReference<Call> callRef = new AtomicReference<>();
 
         Thread thread = new Thread(() -> {
+            boolean permitHeld = false;
             try {
                 loggerMaker.infoAndAddToDb("SSE streaming started for url: " + config.url);
+                if (!STREAM_PERMITS.tryAcquire(60, TimeUnit.SECONDS)) {
+                    loggerMaker.errorAndAddToDb("SSE permit wait timed out for url: " + config.url);
+                    return;
+                }
+                permitHeld = true;
+
                 boolean isSaasDeployment = "true".equals(System.getenv("IS_SAAS"));
                 if (HTTPClientHandler.instance == null) {
                     HTTPClientHandler.initHttpClientHandler(isSaasDeployment);
@@ -52,22 +64,17 @@ public class SseStreamingUtil {
                 boolean isHttps = config.url.startsWith("https");
                 OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(isHttps, true, null);
 
-                Request.Builder builder = new Request.Builder().url(config.url);
-                if (config.headers != null) {
-                    for (Map.Entry<String, String> h : config.headers.entrySet()) {
-                        builder.addHeader(h.getKey(), h.getValue());
-                    }
+                Response response = openStreamWithRetry(client, config, callRef);
+                if (response == null) {
+                    return;
                 }
-                RequestBody body = RequestBody.create(
-                        config.body != null ? config.body : "",
-                        MediaType.parse("application/json"));
-                builder.post(body);
-
-                Call call = client.newCall(builder.build());
-                callRef.set(call);
-                try (Response response = call.execute()) {
-                    BufferedSource source = response.body().source();
-                    loggerMaker.infoAndAddToDb("SSE connection established, status: " + response.code());
+                try (Response open = response) {
+                    BufferedSource source = open.body().source();
+                    loggerMaker.infoAndAddToDb("SSE connection established, status: " + open.code());
+                    if (open.code() < 200 || open.code() >= 300) {
+                        loggerMaker.errorAndAddToDb("SSE stream rejected, status " + open.code() + " for url: " + config.url);
+                        return;
+                    }
                     connected.countDown();
                     String line;
                     while ((line = source.readUtf8Line()) != null) {
@@ -89,6 +96,10 @@ public class SseStreamingUtil {
                 } else {
                     loggerMaker.errorAndAddToDb(e, "SSE streaming failed for url: " + config.url + " error: " + e.getMessage());
                 }
+            } finally {
+                if (permitHeld) {
+                    STREAM_PERMITS.release();
+                }
                 connected.countDown();
             }
         });
@@ -96,17 +107,56 @@ public class SseStreamingUtil {
         thread.start();
         try {
             loggerMaker.infoAndAddToDb("Waiting for SSE connection to be established for url: " + config.url);
-            boolean established = connected.await(30, TimeUnit.SECONDS);
+            boolean established = connected.await(90, TimeUnit.SECONDS);
             if (established) {
                 loggerMaker.infoAndAddToDb("SSE connection ready, proceeding with API call for url: " + config.url);
             } else {
-                loggerMaker.errorAndAddToDb("SSE connection timed out after 30s for url: " + config.url);
+                loggerMaker.errorAndAddToDb("SSE connection timed out after 90s for url: " + config.url);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             loggerMaker.errorAndAddToDb(e, "SSE connection wait interrupted for url: " + config.url);
         }
         return new StreamingResult(thread, chunks, callRef);
+    }
+
+    private static Request buildStreamRequest(StreamingRequestConfig config) {
+        Request.Builder builder = new Request.Builder().url(config.url);
+        if (config.headers != null) {
+            for (Map.Entry<String, String> h : config.headers.entrySet()) {
+                builder.addHeader(h.getKey(), h.getValue());
+            }
+        }
+        if (config.body != null && !config.body.isEmpty()) {
+            RequestBody body = RequestBody.create(config.body, MediaType.parse("application/json"));
+            builder.post(body);
+        } else {
+            builder.get();
+        }
+        return builder.build();
+    }
+
+    /** Retries HTTP 429/503 before the caller is allowed to send the chat message. */
+    private static Response openStreamWithRetry(OkHttpClient client, StreamingRequestConfig config,
+            AtomicReference<Call> callRef) throws Exception {
+        Response last = null;
+        for (int attempt = 1; attempt <= RATE_LIMIT_RETRIES; attempt++) {
+            Call call = client.newCall(buildStreamRequest(config));
+            callRef.set(call);
+            last = call.execute();
+            int code = last.code();
+            if (code != 429 && code != 503) {
+                return last;
+            }
+            loggerMaker.infoAndAddToDb("SSE rate limited status " + code + " attempt " + attempt
+                    + " for url: " + config.url);
+            last.close();
+            last = null;
+            if (attempt < RATE_LIMIT_RETRIES) {
+                Thread.sleep(1000L * attempt);
+            }
+        }
+        return null;
     }
 
     public static List<String> joinAndCollect(StreamingResult result) {
