@@ -26,6 +26,7 @@ import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -53,10 +54,6 @@ public class AtlasRiskScoreSyncCron {
                     public void accept(Account t) {
                         try {
                             int accountId = t.getId();
-                            if (accountId != 1783981503) {
-                                loggerMaker.infoAndAddToDb("Skipping Atlas risk score sync cron for account " + accountId);
-                                return;
-                            }
                             int startTimestamp = Context.now();
                             loggerMaker.infoAndAddToDb("Atlas risk score sync cron started for account " + accountId + " at " + startTimestamp);
 
@@ -91,7 +88,7 @@ public class AtlasRiskScoreSyncCron {
                                 Filters.gte("detectedAt", deltaStartTime),
                                 Filters.lte("detectedAt", deltaEndTime),
                                 Filters.eq("successfulExploit", true),
-                                Filters.eq("contextSource", "ENDPOINT")
+                                Filters.eq("contextSource", CONTEXT_SOURCE.ENDPOINT.name())
                             )));
                             pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
 
@@ -179,10 +176,10 @@ public class AtlasRiskScoreSyncCron {
         for (String s : severities) {
             float score = 0f;
             switch (s.toUpperCase()) {
-                case "CRITICAL": score = 4f; break;
-                case "HIGH":     score = 3f; break;
-                case "MEDIUM":   score = 2f; break;
-                case "LOW":      score = 1f; break;
+                case "CRITICAL": score = 3f; break;
+                case "HIGH":     score = 2f; break;
+                case "MEDIUM":   score = 1f; break;
+                case "LOW":      score = 0.5f; break;
                 default:         break;
             }
             max = Math.max(max, score);
