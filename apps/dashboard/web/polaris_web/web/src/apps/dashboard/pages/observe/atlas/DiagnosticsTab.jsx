@@ -7,9 +7,14 @@ import settingRequests from "../../settings/api"
 // Diagnostic reports for one device: taken by the installer on every deploy, by the
 // agent once it has set itself up, and on demand (Run diagnostics queues an
 // akto-diagnose remote command for this device). The backend keeps the newest 20.
+//
+// One install produces two reports with the same installId: the agent's (Agent
+// setup) and then the installer's, which it writes only after the agent's report
+// landed, since its outcome is "did the agent come up". They are shown together as
+// one install, in the order they were taken.
 
 const SOURCE_LABELS = {
-    'install': 'Install',
+    'install': 'Installer',
     'verify-failed': 'Install — agent never reported',
     'pkg-failed': 'Install — package failed',
     'post-provision': 'Agent setup',
@@ -39,6 +44,34 @@ const OutcomeBadge = ({ diagnostic }) => {
     const b = outcomeBadge(diagnostic?.outcome)
     return b ? <Badge status={b.status}>{b.label}</Badge> : null
 }
+
+const INSTALL_SOURCES = ['install', 'verify-failed', 'pkg-failed', 'post-provision']
+
+// Reports newest first -> one entry per install (its reports oldest first) or per
+// other report, newest first.
+export const groupDiagnostics = (diagnostics) => {
+    const groups = []
+    const byInstall = new Map()
+    diagnostics.forEach(d => {
+        const key = d.installId && INSTALL_SOURCES.includes(d.source) ? d.installId : null
+        if (key && byInstall.has(key)) {
+            byInstall.get(key).reports.unshift(d)
+            return
+        }
+        const group = { key: key || d.id, installId: key, reports: [d] }
+        if (key) byInstall.set(key, group)
+        groups.push(group)
+    })
+    return groups
+}
+
+// The report a group is summarised by: the agent's, which covers the user's hooks
+// and config; the installer's covers system scope only.
+const primaryReport = (group) => group.reports.find(d => d.source === 'post-provision') || group.reports[group.reports.length - 1]
+// The install's outcome: a failure from any of its reports, else the installer's.
+const groupOutcomeReport = (group) =>
+    group.reports.find(d => outcomeBadge(d.outcome)?.status === 'critical') ||
+    group.reports.find(d => d.source !== 'post-provision') || null
 
 const PROFILE_LABELS = { full: 'Full report', quick: 'Quick check' }
 const RUN_POLL_MS = 5000
@@ -194,14 +227,44 @@ function ReportViewer({ diagnostic, onBack }) {
     )
 }
 
-function SummaryCard({ diagnostic, onOpen }) {
+// Who took it, when, and for which install or on-demand run — the same order RunRow uses.
+const reportMeta = (d) => [
+    sourceLabel(d.source),
+    d.source === 'on-demand' || d.source === 'manual' ? PROFILE_LABELS[d.profile] : null,
+    d.requestedBy ? `by ${d.requestedBy}` : null,
+    func.prettifyEpoch(d.createdAt),
+    d.agentVersion ? `agent ${d.agentVersion}` : null,
+    d.installId ? `install ${d.installId}` : null,
+].filter(Boolean).join(' · ')
+
+function ReportRow({ diagnostic: d, onOpen, opening }) {
+    return (
+        <Box padding="2" borderColor="border-subdued" borderBlockEndWidth="1">
+            <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
+                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                    <VerdictBadge diagnostic={d} />
+                    <OutcomeBadge diagnostic={d} />
+                    <VerticalStack gap="0">
+                        <Text variant="bodySm" fontWeight="medium">{sourceLabel(d.source)}</Text>
+                        <Text variant="bodySm" color="subdued">
+                            {[func.prettifyEpoch(d.createdAt), !d.healthy && d.errorCount ? `${d.errorCount} error${d.errorCount > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')}
+                        </Text>
+                    </VerticalStack>
+                </HorizontalStack>
+                <Button plain loading={opening} onClick={onOpen}>View</Button>
+            </HorizontalStack>
+        </Box>
+    )
+}
+
+function SummaryCard({ diagnostic, onOpen, outcomeFrom, related = [], onOpenRelated, openingId }) {
     const findings = diagnostic.findings || []
     return (
         <Box background="bg-surface-secondary" padding="4" borderRadius="2">
             <VerticalStack gap="2">
                 <HorizontalStack align="space-between" blockAlign="center">
                     <HorizontalStack gap="2" blockAlign="center">
-                        <OutcomeBadge diagnostic={diagnostic} />
+                        <OutcomeBadge diagnostic={outcomeFrom || diagnostic} />
                         <VerdictBadge diagnostic={diagnostic} />
                         <Text variant="headingSm" as="h3">{verdictTitle(diagnostic.verdict) || 'Diagnostic report'}</Text>
                     </HorizontalStack>
@@ -213,14 +276,15 @@ function SummaryCard({ diagnostic, onOpen }) {
                         {findings.slice(0, 5).map((f, i) => <List.Item key={i}>{f}</List.Item>)}
                     </List>
                 )}
-                <Text as="p" variant="bodySm" color="subdued">
-                    {[
-                        sourceLabel(diagnostic.source),
-                        diagnostic.requestedBy ? `by ${diagnostic.requestedBy}` : null,
-                        func.prettifyEpoch(diagnostic.createdAt),
-                        diagnostic.agentVersion ? `agent ${diagnostic.agentVersion}` : null,
-                    ].filter(Boolean).join(' · ')}
-                </Text>
+                <Text as="p" variant="bodySm" color="subdued">{reportMeta(diagnostic)}</Text>
+                {related.length > 0 && (
+                    <VerticalStack gap="1">
+                        <Text variant="bodySm" color="subdued">Also from this install</Text>
+                        {related.map(d => (
+                            <ReportRow key={d.id} diagnostic={d} onOpen={() => onOpenRelated(d.id)} opening={openingId === d.id} />
+                        ))}
+                    </VerticalStack>
+                )}
             </VerticalStack>
         </Box>
     )
@@ -384,10 +448,11 @@ function DiagnosticsTab({ agent }) {
         return <Box paddingBlockStart="4"><ReportViewer diagnostic={opened} onBack={() => setOpened(null)} /></Box>
     }
 
-    const [latest, ...older] = diagnostics
-    // Runs worth showing: in flight, or ended without a report since the latest
+    const [latestGroup, ...olderGroups] = groupDiagnostics(diagnostics)
+    const latest = latestGroup && primaryReport(latestGroup)
+    // Runs worth showing: in flight, or ended without a report since the newest
     // one (a completed run with a stored report is simply that report).
-    const latestMs = (latest?.createdAt || 0) * 1000
+    const latestMs = (diagnostics[0]?.createdAt || 0) * 1000
     const shownRuns = runs.filter(r =>
         ACTIVE_RUN_STATES.includes(r.state) || (r.createdAt > latestMs && !(r.state === 'completed' && r.diagnosticId))
     ).slice(0, 3)
@@ -428,25 +493,23 @@ function DiagnosticsTab({ agent }) {
                     </Box>
                 ) : (
                     <VerticalStack gap="3">
-                        <SummaryCard diagnostic={latest} onOpen={() => open(latest.id)} />
-                        {older.length > 0 && (
+                        <SummaryCard diagnostic={latest} onOpen={() => open(latest.id)}
+                            outcomeFrom={latestGroup.installId ? groupOutcomeReport(latestGroup) : null}
+                            related={latestGroup.reports.filter(d => d.id !== latest.id)}
+                            onOpenRelated={open} openingId={openingId} />
+                        {olderGroups.length > 0 && (
                             <VerticalStack gap="1">
                                 <Text variant="bodySm" color="subdued">Earlier reports</Text>
-                                {older.map(d => (
-                                    <Box key={d.id} padding="2" borderColor="border-subdued" borderBlockEndWidth="1">
-                                        <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
-                                            <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                                                <VerdictBadge diagnostic={d} />
-                                                <OutcomeBadge diagnostic={d} />
-                                                <VerticalStack gap="0">
-                                                    <Text variant="bodySm" fontWeight="medium">{sourceLabel(d.source)}</Text>
-                                                    <Text variant="bodySm" color="subdued">
-                                                        {[func.prettifyEpoch(d.createdAt), !d.healthy && d.errorCount ? `${d.errorCount} error${d.errorCount > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')}
-                                                    </Text>
-                                                </VerticalStack>
-                                            </HorizontalStack>
-                                            <Button plain loading={openingId === d.id} onClick={() => open(d.id)}>View</Button>
-                                        </HorizontalStack>
+                                {olderGroups.map(g => g.reports.length === 1 ? (
+                                    <ReportRow key={g.key} diagnostic={g.reports[0]} onOpen={() => open(g.reports[0].id)} opening={openingId === g.reports[0].id} />
+                                ) : (
+                                    <Box key={g.key} paddingBlockStart="2">
+                                        <Text variant="bodySm" fontWeight="medium">{`Install · ${func.prettifyEpoch(g.reports[0].createdAt)} · ${g.installId}`}</Text>
+                                        <Box paddingInlineStart="4">
+                                            {g.reports.map(d => (
+                                                <ReportRow key={d.id} diagnostic={d} onOpen={() => open(d.id)} opening={openingId === d.id} />
+                                            ))}
+                                        </Box>
                                     </Box>
                                 ))}
                             </VerticalStack>
