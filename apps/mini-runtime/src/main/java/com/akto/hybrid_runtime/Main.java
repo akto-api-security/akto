@@ -2,14 +2,12 @@ package com.akto.hybrid_runtime;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
@@ -48,6 +46,7 @@ import com.akto.ingest.TrafficIngestQueue;
 import com.akto.utility.UtilityServer;
 import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.hybrid_runtime.redaction.PayloadRedaction;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.google.gson.Gson;
 import com.alibaba.fastjson2.JSON;
@@ -873,7 +872,7 @@ public class Main {
                     String payload = httpResponseParam.getRequestParams().getPayload();
                     if (payload.length() > 3) {
                         loggerMaker.info("Actually storing agent record" + record.getSpanId());
-                        dataActor.storeAgentQueryData(record);
+                        PayloadRedaction.storeAgentRecord(record, httpResponseParam, dataActor::storeAgentQueryData);
                     }
                 }
             }
