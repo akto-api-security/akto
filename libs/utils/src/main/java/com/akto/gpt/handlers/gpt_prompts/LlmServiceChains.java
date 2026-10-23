@@ -92,7 +92,13 @@ final class LlmServiceChains {
     }
 
     static List<Model> chainFor(String service, ModelTier handlerTier) {
-        Entry entry = CACHE.computeIfAbsent(service, s -> new Entry(defaults(handlerTier)));
+        // The first request for a service in this process loads its config inline (concurrent first
+        // requests wait for the same load); otherwise it would run on the default chain.
+        Entry entry = CACHE.computeIfAbsent(service, s -> {
+            Entry loaded = new Entry(defaults(handlerTier));
+            refresh(service, loaded);
+            return loaded;
+        });
         if (clock.getAsLong() - entry.loadedAt >= CONFIG_TTL_MS && entry.loading.compareAndSet(false, true)) {
             try {
                 refresher.execute(() -> refresh(service, entry));
