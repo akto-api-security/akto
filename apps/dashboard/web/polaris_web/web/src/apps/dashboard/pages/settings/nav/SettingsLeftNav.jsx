@@ -74,7 +74,6 @@ const SettingsLeftNav = () => {
         route: "/dashboard/settings/self-hosted",
         onClick: () => navigate("/dashboard/settings/self-hosted")
     }] : []
-    // Audit logs are available to every SaaS/on-prem account by default (no feature flag); only admins can view them
     const auditLogsArr = ((window.IS_SAAS === 'true' || window.DASHBOARD_MODE === 'ON_PREM') && func.isUserAdmin()) ? [{
         label: 'Audit logs',
         icon: ComposeMajor,
