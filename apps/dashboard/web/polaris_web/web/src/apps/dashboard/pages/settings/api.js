@@ -965,11 +965,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async deleteCloudflareWafIntegration() {
+    async deleteCloudflareWafIntegration(wafType) {
         return await request({
             url: '/api/deleteCloudflareWafIntegration',
             method: 'post',
-            data: {}
+            data: {wafType}
         })
     },
     async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies) {

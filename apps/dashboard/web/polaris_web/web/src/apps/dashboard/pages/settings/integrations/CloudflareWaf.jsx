@@ -70,7 +70,7 @@ function CloudflareWaf() {
     }
 
     async function deleteCloudflareWafIntegration() {
-        await settingRequests.deleteCloudflareWafIntegration()
+        await settingRequests.deleteCloudflareWafIntegration('CLOUDFLARE_WAF')
         window.IS_CLOUDFLARE_WAF_INTEGRATED = 'false'
         func.setToast(true, false, "Successfully deleted Cloudflare Waf Integration")
         fetchIntegration()

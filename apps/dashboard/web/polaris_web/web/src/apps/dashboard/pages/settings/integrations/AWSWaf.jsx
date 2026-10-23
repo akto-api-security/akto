@@ -21,6 +21,7 @@ function AWSWaf() {
     const wafCard = (
         <LegacyCard
             primaryFooterAction={{content: 'Save', onAction: () => addAwsWafIntegration(), ...whenAllowed(canCall('api/addAwsWafIntegration'))}}
+            secondaryFooterActions={[{content: 'Delete', onAction: () => deleteAwsWafIntegration(), ...whenAllowed(canCall('api/deleteCloudflareWafIntegration'))}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate AWS-WAF</Text>
@@ -59,6 +60,13 @@ function AWSWaf() {
       await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, severityLevels, threatPolicies)
       window.IS_AWS_WAF_INTEGRATED = 'true'
       func.setToast(true, false, "Successfully added Aws Waf Integration")
+      fetchIntegration()
+    }
+
+    async function deleteAwsWafIntegration() {
+      await settingRequests.deleteCloudflareWafIntegration('AWS_WAF')
+      window.IS_AWS_WAF_INTEGRATED = 'false'
+      func.setToast(true, false, "Successfully deleted Aws Waf Integration")
       fetchIntegration()
     }
 
