@@ -946,7 +946,8 @@ class GemmaFastProvider(OpenAIProvider):
 
 class GemmaFastArbiterProvider(OpenAIProvider):
     """Faster (Gemma) arbiter endpoint. No built-in fallback and no time bound of its own: a slow answer is
-    waited for, and a backup is a FINAL_ARBITER_BACKUP modelConfigs entry."""
+    waited for, and a backup is a FINAL_ARBITER_BACKUP modelConfigs entry (FallbackProvider then bounds
+    this endpoint by its entry's timeoutMs in the cascade)."""
 
     name = "gemma_fast_arbiter"
     include_metrics = True
@@ -1127,11 +1128,20 @@ def _health_url_of(primary: LLMProvider) -> str:
 
 
 class FallbackProvider(LLMProvider):
-    def __init__(self, primary: LLMProvider, backup_entry: dict[str, Any]):
+    def __init__(
+        self,
+        primary: LLMProvider,
+        backup_entry: dict[str, Any],
+        primary_timeout_s: float | None = None,
+        backup_timeout_s: float = 0.0,
+    ):
         self.primary = primary
         self.backup_entry = backup_entry
         self.name = primary.name
         self.health_url = _health_url_of(primary)
+        # Hung primary must raise TimeoutError, not the caller's CancelledError, or the backup never runs.
+        self.primary_timeout_s = primary_timeout_s
+        self.backup_timeout_s = backup_timeout_s  # extra time the caller allows for the backup after the primary
 
     async def complete(self, prompt: str) -> str:
         if self.health_url:
@@ -1139,10 +1149,10 @@ class FallbackProvider(LLMProvider):
             if not _PRIMARY_AVAILABLE.get(self.health_url, True):
                 return await self._complete_on_backup(prompt, "marked down by health check")
         try:
-            return await self.primary.complete(prompt)
+            return await asyncio.wait_for(self.primary.complete(prompt), self.primary_timeout_s)
         except Exception as exc:
-            if self.health_url and isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
-                _set_availability(self.health_url, False)  # refused/unreachable: skip it until the next probe says up
+            if self.health_url and isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, TimeoutError)):
+                _set_availability(self.health_url, False)  # refused/unreachable/hung: skip until the next probe
             return await self._complete_on_backup(prompt, repr(exc), exc)
 
     async def _complete_on_backup(self, prompt: str, why: str, exc: Exception | None = None) -> str:
