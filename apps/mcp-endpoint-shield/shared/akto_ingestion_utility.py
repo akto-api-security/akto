@@ -932,6 +932,47 @@ def get_latest_message_for_cursor(transcript_path: str, role: str, logger: loggi
         return ""
 
 
+def _cursor_reply_path(conversation_id: Any) -> str:
+    safe_id = "".join(c for c in str(conversation_id or "") if c.isalnum() or c in "-_")
+    return os.path.join(LOG_DIR, "cursor-replies", f"{safe_id}.jsonl") if safe_id else ""
+
+
+def save_cursor_reply(conversation_id: Any, text: str, logger: logging.Logger) -> None:
+    """Append an afterAgentResponse text chunk for the conversation's current turn.
+
+    Kept in its own per-conversation file (not the session state row) so the text
+    never becomes an x-akto-installer-* header and concurrent hooks can't drop it."""
+    path = _cursor_reply_path(conversation_id)
+    if not path or not text:
+        return
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(text) + "\n")
+    except OSError as e:
+        logger.error(f"Could not save cursor reply: {e}")
+
+
+def pop_cursor_reply(conversation_id: Any, logger: logging.Logger) -> str:
+    """Return and clear the reply saved by afterAgentResponse for this turn ('' if none)."""
+    path = _cursor_reply_path(conversation_id)
+    if not path or not os.path.exists(path):
+        return ""
+    try:
+        with open(path, encoding="utf-8") as f:
+            chunks = [json.loads(line) for line in f if line.strip()]
+        return "\n".join(c for c in chunks if isinstance(c, str) and c)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error(f"Could not read cursor reply: {e}")
+        return ""
+    finally:
+        # always clear so a bad or partial file can't leak into the next turn
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 def read_file_content(file_path: str, logger: logging.Logger) -> str:
     """Read and return the full text content of a file. Returns empty string on failure."""
     if not file_path or not os.path.exists(file_path):

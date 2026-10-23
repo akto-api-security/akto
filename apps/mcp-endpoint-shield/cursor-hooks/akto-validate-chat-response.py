@@ -13,7 +13,7 @@ import sys
 import urllib.request
 from typing import Any, Dict, Union
 
-from akto_ingestion_utility import installer_headers, resolve_session_info
+from akto_ingestion_utility import installer_headers, resolve_session_info, save_cursor_reply
 from akto_machine_id import get_machine_id, get_username
 
 # Configure logging
@@ -259,6 +259,9 @@ def main():
         logger.warning("Empty response received")
         print(json.dumps({}))
         sys.exit(0)
+
+    # Stash the reply for the stop hook (Cursor's equivalent of Claude's last_assistant_message)
+    save_cursor_reply(input_data.get("conversation_id"), response_text, logger)
 
     # Send to Akto for ingestion
     if AKTO_DATA_INGESTION_URL:

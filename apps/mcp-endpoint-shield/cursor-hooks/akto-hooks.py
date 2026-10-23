@@ -10,6 +10,7 @@ if not os.getenv("LOG_DIR"):
 
 from akto_ingestion_utility import (
     _extract_text_from_entry,
+    pop_cursor_reply,
     resolve_session_info,
     run_observability_hook,
     send_ingestion_data,
@@ -39,11 +40,15 @@ def ingest_last_turn(input_data: dict) -> None:
     """Send the turn's prompt -> reply span; Cursor only exposes transcript_path on stop."""
     logger = setup_logger("hook-executions.log")
     try:
+        # Reply comes from afterAgentResponse's text (like Claude's last_assistant_message);
+        # popped first so it is cleared for the next turn even if we bail out below.
+        reply = pop_cursor_reply(input_data.get("conversation_id"), logger)
         transcript_path = input_data.get("transcript_path")
         if not transcript_path:
             logger.info("No transcript path provided")
             return
-        prompt, reply = get_last_turn(transcript_path)
+        prompt, transcript_reply = get_last_turn(transcript_path)
+        reply = reply or transcript_reply
         if not prompt or not reply:
             logger.info("No complete interaction found in transcript")
             return
