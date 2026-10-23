@@ -26,6 +26,7 @@ import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -53,10 +54,6 @@ public class AtlasRiskScoreSyncCron {
                     public void accept(Account t) {
                         try {
                             int accountId = t.getId();
-                            if (accountId != 1783981503) {
-                                loggerMaker.infoAndAddToDb("Skipping Atlas risk score sync cron for account " + accountId);
-                                return;
-                            }
                             int startTimestamp = Context.now();
                             loggerMaker.infoAndAddToDb("Atlas risk score sync cron started for account " + accountId + " at " + startTimestamp);
 
@@ -91,7 +88,7 @@ public class AtlasRiskScoreSyncCron {
                                 Filters.gte("detectedAt", deltaStartTime),
                                 Filters.lte("detectedAt", deltaEndTime),
                                 Filters.eq("successfulExploit", true),
-                                Filters.eq("contextSource", "ENDPOINT")
+                                Filters.eq("contextSource", CONTEXT_SOURCE.ENDPOINT.name())
                             )));
                             pipeline.add(Aggregates.group(groupedId, Accumulators.addToSet("severities", "$severity")));
 
