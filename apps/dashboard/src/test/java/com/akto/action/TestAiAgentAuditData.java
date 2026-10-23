@@ -13,6 +13,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -52,6 +53,13 @@ public class TestAiAgentAuditData extends MongoBasedTest {
                 // Host names another agent: guardrails must not block Claude traffic when Cursor is blocked.
                 collection(4, "janedoe-mac.ai-agent.claude", "mcp-client", "cursor"),
                 collection(5, "janedoe-mac.cursor.github", "mcp-server", "")));
+    }
+
+    // These are thread-locals: left set, they leak into whichever test class runs next in this JVM.
+    @After
+    public void clearContext() {
+        Context.userId.remove();
+        Context.contextSource.remove();
     }
 
     private static ApiCollection collection(int id, String host, String key, String value) {
