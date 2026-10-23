@@ -278,11 +278,6 @@ function DetectedCellRenderer({ value, data }) {
 const AGENTIC_TYPE_FILTER_VALUES = ["Prompt", "Tool", "Resource"];
 const ACTION_FILTER_LABELS = { block: "Blocked", alert: "Alert", flag: "Flagged" };
 
-function userDisplayName(host, usernameMap) {
-    const resolved = getUsernameForCollection({ displayName: host }, usernameMap || {});
-    return (resolved && resolved !== "-") ? resolved : String(host).split('.')[0];
-}
-
 function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval, hideTypeFilter) {
     const humanStatusCol = {
         field: "humanResponse",
@@ -336,10 +331,7 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             headerName: "User",
             minWidth: 140,
             filter: "agSetColumnFilter",
-            filterParams: {
-                values: filterValues.hosts || [],
-                valueFormatter: (p) => userDisplayName(p.value, filterValues.usernameMap),
-            },
+            filterParams: { values: filterValues.hosts || [] },
             cellRenderer: UserCellRenderer,
         }] : []),
         ...(isAgenticSecurityCategory() ? [{
@@ -1292,9 +1284,8 @@ function Violations() {
 
     const extendedFilterValues = useMemo(() => ({
         ...filterValues,
-        usernameMap,
         assetLabels: Object.keys(assetHostsByLabel).sort(),
-    }), [filterValues, usernameMap, assetHostsByLabel]);
+    }), [filterValues, assetHostsByLabel]);
 
     const colDefs = useMemo(
         () => buildColDefs(extendedFilterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab || isMisconfiguredTab),
