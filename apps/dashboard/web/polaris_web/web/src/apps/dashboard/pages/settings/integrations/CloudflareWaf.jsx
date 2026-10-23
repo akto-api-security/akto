@@ -64,12 +64,14 @@ function CloudflareWaf() {
 
     async function addCloudflareWafIntegration(){
       await settingRequests.addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies)
+      window.IS_CLOUDFLARE_WAF_INTEGRATED = 'true'
       func.setToast(true, false, "Successfully added Cloudflare Waf Integration")
       fetchIntegration()
     }
 
     async function deleteCloudflareWafIntegration() {
         await settingRequests.deleteCloudflareWafIntegration()
+        window.IS_CLOUDFLARE_WAF_INTEGRATED = 'false'
         func.setToast(true, false, "Successfully deleted Cloudflare Waf Integration")
         fetchIntegration()
     }

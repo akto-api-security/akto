@@ -699,11 +699,11 @@ const settingRequests = {
             data: {roleName}
         })
     },
-    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies) {
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, severityLevels, threatPolicies) {
         return request({
             url: '/api/addAwsWafIntegration',
             method: 'post',
-            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies}
+            data: {awsAccessKey, awsSecretKey, region, severityLevels, threatPolicies}
         })
     },
     fetchAwsWafIntegration() {
