@@ -176,10 +176,10 @@ public class AtlasRiskScoreSyncCron {
         for (String s : severities) {
             float score = 0f;
             switch (s.toUpperCase()) {
-                case "CRITICAL": score = 3f; break;
-                case "HIGH":     score = 2f; break;
-                case "MEDIUM":   score = 1f; break;
-                case "LOW":      score = 0.5f; break;
+                case "CRITICAL": score = 4f; break;
+                case "HIGH":     score = 3f; break;
+                case "MEDIUM":   score = 2f; break;
+                case "LOW":      score = 1f; break;
                 default:         break;
             }
             max = Math.max(max, score);
