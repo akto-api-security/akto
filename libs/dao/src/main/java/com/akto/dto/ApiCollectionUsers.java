@@ -230,6 +230,16 @@ public class ApiCollectionUsers {
 
     }
 
+    /**
+     * Pulls the group id from exactly the apis matched by the conditions (non-negated, unlike
+     * {@link #removeFromCollectionsForCollectionId}, which pulls it from everything the conditions do NOT match).
+     */
+    public static void removeApisFromCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+        Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+        Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
+    }
+
     public static void keepOnlyApiCollectionId(int apiCollectionId) {
         // Set collectionIds to contain only the specified apiCollectionId
         Bson update = Updates.set(SingleTypeInfo._COLLECTION_IDS, Collections.singletonList(apiCollectionId));

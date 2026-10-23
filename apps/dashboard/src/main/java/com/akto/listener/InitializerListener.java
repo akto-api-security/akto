@@ -38,6 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -203,6 +204,8 @@ import com.akto.testing.workflow_node_executor.Utils;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.AccountTask;
+import com.akto.util.LastCronRunInfo;
+import com.akto.utils.crons.DormantAccountFilter;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -241,7 +244,6 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.akto.utils.crons.TestingAlertsCron;
 import com.akto.notifications.slack.CustomTextAlert;
-import com.akto.notifications.slack.SlackSender;
 import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.ReadPreference;
@@ -439,22 +441,63 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
+    // overlap between consecutive incremental windows, so docs written while the previous run was in flight are not missed
+    private static final int API_GROUPS_SYNC_BUFFER_SECONDS = 10 * 60;
+
     public void updateApiGroupsForAccounts() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
+                long runStartMs = System.currentTimeMillis();
+                Set<Integer> accountsWithRecentUserLogin = DormantAccountFilter.fetchAccountsWithRecentUserLogin();
+                AtomicInteger processedAccounts = new AtomicInteger();
+                AtomicInteger dormantAccounts = new AtomicInteger();
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        if (!OrganizationsDao.instance.checkFeatureAccess(t.getId(), AKTO_API_GROUP_CRONS)) {
-                            logger.info("Skipping update custom collections for account: " + t.getId());
+                        if (DormantAccountFilter.isDormant(t.getId(), accountsWithRecentUserLogin)) {
+                            dormantAccounts.incrementAndGet();
+                            logger.info("Skipping update api groups for dormant account: " + t.getId());
                             return;
                         }
-                        createFirstUnauthenticatedApiGroup();
+                        processedAccounts.incrementAndGet();
+                        long accountStartMs = System.currentTimeMillis();
+                        updateApiGroups();
+                        long groupsMs = System.currentTimeMillis() - accountStartMs;
                         backFillStatusCodeType();
+                        logger.info("update-api-groups AccountId: " + t.getId() + " api groups: " + groupsMs + " ms"
+                                + ", backFillStatusCodeType: " + (System.currentTimeMillis() - accountStartMs - groupsMs) + " ms"
+                                + ", total: " + (System.currentTimeMillis() - accountStartMs) + " ms");
                     }
                 }, "update-api-groups");
+                logger.info("update-api-groups run finished: accounts processed: " + processedAccounts.get()
+                        + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, 4, TimeUnit.HOURS);
+    }
+
+    /** Recomputes the automated api groups: only the delta since the last run, and everything once a day. */
+    private static void updateApiGroups() {
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
+        int lastSync = lastRunInfo == null ? 0 : lastRunInfo.getLastApiGroupsSync();
+        int lastFullSync = lastRunInfo == null ? 0 : lastRunInfo.getLastApiGroupsFullSync();
+
+        int now = Context.now();
+        boolean full = lastSync == 0 || (now - lastFullSync) >=  Constants.ONE_DAY_TIMESTAMP;
+        int since = Math.max(lastSync - API_GROUPS_SYNC_BUFFER_SECONDS, 0);
+
+        long startMs = System.currentTimeMillis();
+        createFirstUnauthenticatedApiGroup(since, full);
+
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_API_GROUPS_SYNC, now));
+        if (full) {
+            updates.add(Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_API_GROUPS_FULL_SYNC, now));
+        }
+        AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(), Updates.combine(updates), new UpdateOptions().upsert(true));
+        logger.info("AccountId: " + Context.accountId.get() + " api groups updated, mode: " + (full ? "full" : "incremental")
+                + ", since: " + since + ", took: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 
     public void setUpGuardrailServiceUrlLatencyScheduler() {
@@ -1990,7 +2033,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void createUnauthenticatedApiGroup() {
+    public static void createUnauthenticatedApiGroup(int since, boolean full) {
 
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
                 Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID));
@@ -2009,13 +2052,13 @@ public class InitializerListener implements ServletContextListener {
             ApiCollectionsDao.instance.insertOne(unauthenticatedApisGroup);
         }else{
             int startTime = Context.now();
-            ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
-            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed unauthenticated api group in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
+            UnauthenticatedEndpoint.updateCollections(since, full);
+            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed unauthenticated api group (full: " + full + ") in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
         }
 
     }
 
-    public static void createAllApisGroup() {
+    public static void createAllApisGroup(int since, boolean full) {
         ApiCollection collection = ApiCollectionsDao.instance
                 .findOne(Filters.eq("_id", 111111121));
         if (collection == null) {
@@ -2032,16 +2075,25 @@ public class InitializerListener implements ServletContextListener {
             ApiCollectionsDao.instance.insertOne(allApisGroup);
         }else{
             int startTime = Context.now();
-            ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
-            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed ALL apis group in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
+            if (full) {
+                ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
+            } else {
+                AllAPIsGroup.updateCollections(since);
+            }
+            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed ALL apis group (full: " + full + ") in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
         }
 
     }
 
 
-    public static void createFirstUnauthenticatedApiGroup(){
-        createUnauthenticatedApiGroup();
-        createAllApisGroup();
+    public static void createFirstUnauthenticatedApiGroup(int since, boolean full){
+        long startMs = System.currentTimeMillis();
+        createUnauthenticatedApiGroup(since, full);
+        long unauthenticatedMs = System.currentTimeMillis() - startMs;
+        createAllApisGroup(since, full);
+        // updateMany writes are queued on the shared collection-id executor, so these timings cover the scan and queueing
+        logger.info("AccountId: " + Context.accountId.get() + " unauthenticated group: " + unauthenticatedMs + " ms"
+                + ", all apis group: " + (System.currentTimeMillis() - startMs - unauthenticatedMs) + " ms");
     }
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
@@ -2751,11 +2803,11 @@ public class InitializerListener implements ServletContextListener {
 
                     // API group jobs
                     setUpUpdateCustomCollections();
-                    logger.warn("Setting up user analysis cron scheduler");
-                    userAnalysisCron.setUpUserAnalysisCronScheduler();
-                    logger.warn("User analysis cron scheduler setup complete");
+                    // Disabled temporarily: Azure OpenAI input-token cost.
+                    // logger.warn("Setting up user analysis cron scheduler");
+                    // userAnalysisCron.setUpUserAnalysisCronScheduler();
+                    // logger.warn("User analysis cron scheduler setup complete");
                     updateApiGroupsForAccounts();
-
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpGuardrailServiceUrlLatencyScheduler();

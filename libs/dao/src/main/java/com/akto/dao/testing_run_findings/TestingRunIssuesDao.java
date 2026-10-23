@@ -58,6 +58,9 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LAST_SEEN};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
+        fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LAST_UPDATED};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
         fieldNames = new String[] {TestingRunIssues.TEST_RUN_ISSUES_STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         fieldNames = new String[] {TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID};

@@ -24,6 +24,7 @@ import com.akto.dto.ApiInfo.AuthType;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -86,71 +87,143 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     public final static int UNAUTHENTICATED_GROUP_ID = 111_111_120;
 
-    public static void updateCollections(){
-        ApiCollectionUsers.reset(UNAUTHENTICATED_GROUP_ID);
-        Bson apiContextFilter = UsersCollectionsList.getApiContextFilter();
+    private static final Set<AuthType> UNAUTHENTICATED_AUTH_SET = Collections.singleton(AuthType.UNAUTHENTICATED);
 
+    /** Full recompute: used on first run, once a day, and when a group is recomputed explicitly. */
+    public static void updateCollections(){
+        updateCollections(0, true);
+    }
+
+    /**
+     * @param since only used when !full: apis whose lastSeen is older than this cannot have changed their auth types
+     *              (auth types only change in runtime upserts, which bump lastSeen), so they are not looked at.
+     * @param full  reset the group and rebuild it from every api info.
+     */
+    public static void updateCollections(int since, boolean full){
+        Set<Integer> allowedCollectionIds = fetchAllowedCollectionIds();
+        if (full) {
+            fullUpdate(allowedCollectionIds);
+        } else {
+            incrementalUpdate(allowedCollectionIds, since);
+        }
+    }
+
+    private static Set<Integer> fetchAllowedCollectionIds() {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
             Filters.and(
-                apiContextFilter,
+                UsersCollectionsList.getApiContextFilter(),
                 Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString())
             ), Projections.include("_id")
         );
+        Set<Integer> ids = new HashSet<>();
+        for (ApiCollection apiCollection : apiCollections) {
+            ids.add(apiCollection.getId());
+        }
+        return ids;
+    }
+
+    private static void fullUpdate(Set<Integer> allowedCollectionIds) {
+        ApiCollectionUsers.reset(UNAUTHENTICATED_GROUP_ID);
 
         Bson unauthenticatedFilter = Filters.in(
-            ApiInfo.ALL_AUTH_TYPES_FOUND, 
+            ApiInfo.ALL_AUTH_TYPES_FOUND,
             Collections.singletonList(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED))
         );
+        Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
+        int accountId = Context.accountId.get();
+        long startMs = System.currentTimeMillis();
+        logger.info(String.format("AccountId: %d Starting full update of unauthenticated data collection", accountId));
 
-        for(ApiCollection apiCollection: apiCollections){
-            
-            int lastTimeStampRecorded = Context.now() + (5*60) ;
-            int apiCollectionId = apiCollection.getId(); 
-            int skip = 0 ;
-
-            // create instance of the conditions class
-            UnauthenticatedEndpoint unauthenticatedEndpoint = new UnauthenticatedEndpoint();
-            logger.info(String.format("AccountId: %d Starting update unauthenticated data collection for %d ",
-                    Context.accountId.get(), apiCollectionId));
-
-            while (true) {
-                Bson filterQ = Filters.and(
-                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
-                    Filters.lt(ApiInfo.LAST_SEEN, lastTimeStampRecorded),
-                    unauthenticatedFilter
-                );
-                List<ApiInfo> apiInfosBatched = ApiInfoDao.instance.findAll(
-                    filterQ, skip, limit, Sorts.descending(ApiInfo.LAST_SEEN), Projections.include(
-                        "_id", ApiInfo.LAST_SEEN
-                    )
-                );
-
-                List<ApiInfoKey> apiInfoKeysTemp = new ArrayList<>();
-                for(ApiInfo apiInfo: apiInfosBatched){
-                    apiInfoKeysTemp.add(apiInfo.getId());
-                    lastTimeStampRecorded = Math.min(lastTimeStampRecorded, apiInfo.getLastSeen());
-                }
-                lastTimeStampRecorded += 2;
-                logger.info(String.format(
-                        "AccountId: %d Running update unauthenticated data collection for %d endpoints: %d skip: %d",
-                        Context.accountId.get(), apiCollectionId, apiInfoKeysTemp.size(), skip));
-                unauthenticatedEndpoint.setApiInfos(apiInfoKeysTemp);
-                if (apiInfoKeysTemp == null || apiInfoKeysTemp.size() == 0) {
-                    logger.info(String.format("AccountId: %d Finished update unauthenticated data collection for %d , found no api infos",
-                            Context.accountId.get(), apiCollectionId));
-                    break;
-                }
-                ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(unauthenticatedEndpoint), UNAUTHENTICATED_GROUP_ID);
-                skip += limit;
-
-                if(apiInfosBatched.size() < limit){
-                    logger.info(String.format("AccountId: %d Finished update unauthenticated data collection for %d ",
-                            Context.accountId.get(), apiCollectionId));
-                    break;
+        // single keyset scan over api_info instead of one query per api collection
+        Bson filter = unauthenticatedFilter;
+        int scanned = 0;
+        while (true) {
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter, 0, limit, sort, Projections.include("_id"));
+            if (apiInfos.isEmpty()) {
+                break;
+            }
+            List<ApiInfoKey> keys = new ArrayList<>();
+            for (ApiInfo apiInfo : apiInfos) {
+                if (allowedCollectionIds.contains(apiInfo.getId().getApiCollectionId())) {
+                    keys.add(apiInfo.getId());
                 }
             }
-        }
+            addToGroup(keys);
+            scanned += apiInfos.size();
 
+            if (apiInfos.size() < limit) {
+                break;
+            }
+            ApiInfoKey last = apiInfos.get(apiInfos.size() - 1).getId();
+            filter = Filters.and(unauthenticatedFilter,
+                    ApiInfoDao.keysetAfter(last.getApiCollectionId(), last.getUrl(), last.getMethod().name()));
+        }
+        logger.info(String.format("AccountId: %d Finished full update of unauthenticated data collection, scanned: %d, took: %d ms",
+                accountId, scanned, System.currentTimeMillis() - startMs));
+    }
+
+    private static void incrementalUpdate(Set<Integer> allowedCollectionIds, int since) {
+        int accountId = Context.accountId.get();
+        long startMs = System.currentTimeMillis();
+        logger.info(String.format("AccountId: %d Starting incremental update of unauthenticated data collection since %d",
+                accountId, since));
+
+        List<Integer> collectionIds = new ArrayList<>(allowedCollectionIds);
+        int changed = 0;
+        for (int i = 0; i < collectionIds.size(); i += limit) {
+            List<Integer> chunk = collectionIds.subList(i, Math.min(i + limit, collectionIds.size()));
+            Bson filter = Filters.and(
+                Filters.in(ApiInfo.ID_API_COLLECTION_ID, chunk),
+                Filters.gte(ApiInfo.LAST_SEEN, since)
+            );
+
+            List<ApiInfoKey> unauthenticated = new ArrayList<>();
+            List<ApiInfoKey> authenticated = new ArrayList<>();
+            try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find(filter)
+                    .projection(Projections.include("_id", ApiInfo.ALL_AUTH_TYPES_FOUND))
+                    .batchSize(limit).cursor()) {
+                while (cursor.hasNext()) {
+                    ApiInfo apiInfo = cursor.next();
+                    Set<Set<AuthType>> authTypesFound = apiInfo.getAllAuthTypesFound();
+                    boolean isUnauthenticated = authTypesFound != null && authTypesFound.contains(UNAUTHENTICATED_AUTH_SET);
+                    (isUnauthenticated ? unauthenticated : authenticated).add(apiInfo.getId());
+
+                    if (unauthenticated.size() >= limit) {
+                        addToGroup(unauthenticated);
+                        changed += unauthenticated.size();
+                        unauthenticated.clear();
+                    }
+                    if (authenticated.size() >= limit) {
+                        removeFromGroup(authenticated);
+                        changed += authenticated.size();
+                        authenticated.clear();
+                    }
+                }
+            }
+            addToGroup(unauthenticated);
+            removeFromGroup(authenticated);
+            changed += unauthenticated.size() + authenticated.size();
+        }
+        logger.info(String.format("AccountId: %d Finished incremental update of unauthenticated data collection, collections: %d, apis checked: %d, took: %d ms",
+                accountId, collectionIds.size(), changed, System.currentTimeMillis() - startMs));
+    }
+
+    private static void addToGroup(List<ApiInfoKey> keys) {
+        if (keys.isEmpty()) {
+            return;
+        }
+        UnauthenticatedEndpoint endpoint = new UnauthenticatedEndpoint();
+        endpoint.setApiInfos(new ArrayList<>(keys));
+        ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(endpoint), UNAUTHENTICATED_GROUP_ID);
+    }
+
+    private static void removeFromGroup(List<ApiInfoKey> keys) {
+        if (keys.isEmpty()) {
+            return;
+        }
+        UnauthenticatedEndpoint endpoint = new UnauthenticatedEndpoint();
+        endpoint.setApiInfos(new ArrayList<>(keys));
+        ApiCollectionUsers.removeApisFromCollectionId(Collections.singletonList(endpoint), UNAUTHENTICATED_GROUP_ID);
     }
 
 
