@@ -174,7 +174,8 @@ SESSION_STATE_PATH = os.path.join(LOG_DIR, "akto_session_state.json")
 #   extra_fields        -> other session fields to also forward (raw)
 _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
     "cursor": {
-        "session_id_field": None,
+        # conversation_id is on every Cursor hook; backend groups sessions by akto_session_id
+        "session_id_field": "conversation_id",
         "conversation_field": "conversation_id",
         "message_id_field": "generation_id",
         "message_id_strategy": "passthrough",
