@@ -259,6 +259,40 @@ public class TestPostureService extends MongoBasedTest {
         assertFalse(PostureService.policyHasComplianceMapping(sourceWarn));
     }
 
+    @Test
+    public void testPolicyComplianceFrameworksIncludesRedactionRules() {
+        GuardrailPolicies policy = policy("Redact PHI", "alert", null);
+        GuardrailPolicies.RedactionRule rule = new GuardrailPolicies.RedactionRule(true, "Mask patient MRNs and lab results", 0.5);
+        rule.setCompliance(Collections.singletonMap("HIPAA", Collections.<String>emptyList()));
+        policy.setRedactionRules(Collections.singletonList(rule));
+
+        // Redaction-only policy: mapped even though it has no LLM rule.
+        assertFalse(PostureService.policyEnforcing(policy));
+        assertTrue(PostureService.policyHasComplianceMapping(policy));
+        assertEquals(Collections.singleton("HIPAA"), PostureService.policyComplianceFrameworks(policy));
+
+        // Union with an enabled LLM rule's frameworks.
+        GuardrailPolicies.LLMRule llmRule = new GuardrailPolicies.LLMRule();
+        llmRule.setEnabled(true);
+        llmRule.setCompliance(Collections.singletonMap("GDPR", Collections.<String>emptyList()));
+        policy.setLlmRule(llmRule);
+        assertEquals(new HashSet<>(Arrays.asList("HIPAA", "GDPR")), PostureService.policyComplianceFrameworks(policy));
+
+        // Disabled or blank redaction rules don't count.
+        policy.setLlmRule(null);
+        rule.setEnabled(false);
+        assertFalse(PostureService.policyHasComplianceMapping(policy));
+        rule.setEnabled(true);
+        rule.setUserPrompt("  ");
+        assertFalse(PostureService.policyHasComplianceMapping(policy));
+
+        // Inactive policy doesn't count.
+        rule.setUserPrompt("Mask patient MRNs and lab results");
+        policy.setActive(false);
+        assertFalse(PostureService.policyHasComplianceMapping(policy));
+        assertFalse(PostureService.policyHasComplianceMapping(null));
+    }
+
     // ── kpi() / addGap() / gapRow() / safe() ─────────────────────────────────────
 
     @Test

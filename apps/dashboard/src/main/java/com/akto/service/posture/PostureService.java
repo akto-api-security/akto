@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -857,11 +858,25 @@ public class PostureService {
         return p != null && p.isActive() && p.getLlmRule() != null && p.getLlmRule().isEnabled();
     }
 
-    /** Same enforcing check, plus the policy must actually be mapped to at least one compliance
-     *  framework in its LLM rule. */
+    /** The policy must be mapped to at least one compliance framework by an enabled LLM or redaction rule. */
     static boolean policyHasComplianceMapping(GuardrailPolicies p) {
-        return policyEnforcing(p) && p.getLlmRule().getCompliance() != null
-                && !p.getLlmRule().getCompliance().isEmpty();
+        return !policyComplianceFrameworks(p).isEmpty();
+    }
+
+    /** Frameworks mapped by an active policy's enabled LLM rule and enabled, non-empty redaction rules. */
+    static Set<String> policyComplianceFrameworks(GuardrailPolicies p) {
+        Set<String> frameworks = new LinkedHashSet<>();
+        if (p == null || !p.isActive()) return frameworks;
+        if (policyEnforcing(p) && p.getLlmRule().getCompliance() != null) {
+            frameworks.addAll(p.getLlmRule().getCompliance().keySet());
+        }
+        for (GuardrailPolicies.RedactionRule r : safe(p.getRedactionRules())) {
+            if (r != null && r.isEnabled() && r.getUserPrompt() != null && !r.getUserPrompt().trim().isEmpty()
+                    && r.getCompliance() != null) {
+                frameworks.addAll(r.getCompliance().keySet());
+            }
+        }
+        return frameworks;
     }
 
     private BasicDBObject frameworkReadiness(int trendStartTs, int trendEndTs) {

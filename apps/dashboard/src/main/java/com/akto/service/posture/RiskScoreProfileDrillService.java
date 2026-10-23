@@ -497,8 +497,7 @@ final class RiskScoreProfileDrillService {
                 if (h.getTimestamp() > lastHitTs) lastHitTs = h.getTimestamp();
                 if (h.getPolicyName() != null) policyNames.add(h.getPolicyName());
                 GuardrailPolicies p = h.getPolicyName() != null ? policyByNameLower.get(h.getPolicyName().toLowerCase(Locale.ROOT)) : null;
-                if (p != null && PostureService.policyEnforcing(p) && p.getLlmRule().getCompliance() != null
-                        && p.getLlmRule().getCompliance().containsKey(framework)) {
+                if (PostureService.policyComplianceFrameworks(p).contains(framework)) {
                     metByMappedPolicy = true;
                 }
             }

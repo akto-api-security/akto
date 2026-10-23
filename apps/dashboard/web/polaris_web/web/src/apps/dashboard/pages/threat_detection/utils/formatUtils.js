@@ -102,6 +102,7 @@ export const truncateToChars = (text, maxChars = 30) => {
 const DB_COMPLIANCE_CAPABILITIES = [
   { capability: "deniedTopics", prefixes: ["BanTopics", "BanSubstrings", "deniedTopics", "denied_topic"] },
   { capability: "llmRule", prefixes: ["UserDefinedLLMRule", "LLMRule"] },
+  { capability: "redactionRules", prefixes: ["UserDefinedLLMRedactionRule"] },
 ];
 
 export const getDbComplianceCapability = (ruleViolated) => {
@@ -155,6 +156,7 @@ export const mergePolicyComplianceMap = (capabilityMap, guardrailPolicies = []) 
   (guardrailPolicies || []).forEach((policy) => {
     (policy.deniedTopics || []).forEach((topic) => addCompliance(dbComplianceKey(policy.name, "deniedTopics"), topic.compliance));
     addCompliance(dbComplianceKey(policy.name, "llmRule"), policy.llmRule?.compliance);
+    (policy.redactionRules || []).forEach((rule) => addCompliance(dbComplianceKey(policy.name, "redactionRules"), rule.compliance));
   });
   return capabilityMap;
 };
