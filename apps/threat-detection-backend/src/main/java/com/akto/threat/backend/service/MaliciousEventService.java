@@ -623,6 +623,8 @@ public class MaliciousEventService {
     }
 
     applyRiskScoreFilter(query, filter);
+    andDocument(query, agenticTypeCondition(filter.getAgenticTypesList()));
+    andDocument(query, behaviourCondition(filter.getBehavioursList()));
 
     // if (filter.hasLabel()) {
     //   String labelString = filter.getLabel();
@@ -1069,6 +1071,54 @@ public class MaliciousEventService {
     Document letExpr = new Document("$let",
         new Document("vars", new Document("m", regexFind)).append("in", parsedScore));
     return new Document("riskScoreNum", letExpr);
+  }
+
+  // Order is precedence, mirroring deriveAgenticType in the dashboard's violationsData.js.
+  private static final String[][] AGENTIC_TYPE_RULES = {
+      {"Tool", "tool"}, {"Skill", "skill"}, {"Resource", "resource"}, {"Prompt", "prompt"},
+      {"Config", "config|setting"}, {"Tool", "mcp|server"}, {"Prompt", "message|completion|chat"}
+  };
+  private Document agenticTypeCondition(List<String> types) {
+    if (types == null || types.isEmpty()) {
+      return null;
+    }
+    Set<String> wanted = new HashSet<>(types);
+    List<Document> anyOf = new ArrayList<>();
+    StringBuilder earlier = new StringBuilder();
+    for (String[] rule : AGENTIC_TYPE_RULES) {
+      if (wanted.contains(rule[0])) {
+        List<Document> allOf = new ArrayList<>();
+        allOf.add(new Document("latestApiEndpoint", Pattern.compile(rule[1], Pattern.CASE_INSENSITIVE)));
+        if (earlier.length() > 0) {
+          allOf.add(new Document("latestApiEndpoint",
+              new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
+        }
+        anyOf.add(new Document("$and", allOf));
+      }
+      earlier.append(earlier.length() > 0 ? "|" : "").append("(?:").append(rule[1]).append(")");
+    }
+    if (wanted.contains("Prompt")) {
+      anyOf.add(new Document("latestApiEndpoint",
+          new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
+    }
+    return anyOf.isEmpty() ? null : new Document("$or", anyOf);
+  }
+
+  private Document behaviourCondition(List<String> behaviours) {
+    if (behaviours == null || behaviours.isEmpty()) {
+      return null;
+    }
+    List<Document> anyOf = new ArrayList<>();
+    for (String b : behaviours) {
+      if ("flag".equalsIgnoreCase(b)) {
+        // The UI shows a warn, or an event with no behaviour, as Flagged.
+        anyOf.add(new Document("metadata", Pattern.compile("behaviour\"?\\s*:\\s*\"(warn|flag)\"")));
+        anyOf.add(new Document("metadata", new Document("$not", Pattern.compile("behaviour"))));
+      } else {
+        anyOf.add(new Document("metadata", Pattern.compile("behaviour\"?\\s*:\\s*\"" + Pattern.quote(b.toLowerCase()) + "\"")));
+      }
+    }
+    return new Document("$or", anyOf);
   }
 
   private void applyRiskScoreFilter(Document query, ListMaliciousRequestsRequest.Filter filter) {
