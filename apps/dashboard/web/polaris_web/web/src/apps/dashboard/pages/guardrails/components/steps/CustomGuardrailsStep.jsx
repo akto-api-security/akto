@@ -185,6 +185,75 @@ const CustomGuardrailsStep = ({
         }
     };
 
+    // Redaction compliance mirrors the detection flow and is stored on the first redaction rule.
+    const [redactionCompliance, setRedactionCompliance] = useState({ loading: false, suggested: {}, accepted: {} });
+    const redactionRequestIdRef = useRef(0);
+    const redactionDebounceTimerRef = useRef(null);
+    const isRedactionInitialMount = useRef(true);
+
+    // Functional update so a late suggestion never writes back a stale rule list.
+    const saveRedactionCompliance = (compliance) => {
+        setRedactionRules(prev => (prev || []).map((rule, i) => (i === 0 ? { ...rule, compliance } : rule)));
+    };
+
+    useEffect(() => {
+        const saved = redactionRule.compliance;
+        if (saved && Object.keys(saved).length > 0) {
+            const accepted = Object.keys(saved).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
+            setRedactionCompliance({ loading: false, suggested: saved, accepted, evaluated: true });
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isRedactionInitialMount.current) {
+            isRedactionInitialMount.current = false;
+            return;
+        }
+        const rule = (redactionRule.userPrompt || "").trim();
+        clearTimeout(redactionDebounceTimerRef.current);
+
+        if (rule.length < PROMPT_MIN_LENGTH) {
+            redactionRequestIdRef.current++;
+            setRedactionCompliance({ loading: false, suggested: {}, accepted: {} });
+            saveRedactionCompliance({});
+            return;
+        }
+
+        redactionDebounceTimerRef.current = setTimeout(() => {
+            fetchRedactionCompliance(rule);
+        }, 1000);
+
+        return () => clearTimeout(redactionDebounceTimerRef.current);
+    }, [redactionRule.userPrompt]);
+
+    const fetchRedactionCompliance = async (rule) => {
+        const reqId = ++redactionRequestIdRef.current;
+        setRedactionCompliance(prev => ({ ...prev, loading: true }));
+        try {
+            const resp = await guardrailApi.suggestGuardrailCompliance('redaction_rule', { llmRule: rule });
+            if (reqId !== redactionRequestIdRef.current) return;
+            const suggested = resp?.response?.mapComplianceToListClauses || {};
+            const accepted = Object.keys(suggested).reduce((acc, framework) => { acc[framework] = true; return acc; }, {});
+            setRedactionCompliance({ loading: false, suggested, accepted, evaluated: true });
+            saveRedactionCompliance(buildComplianceMap(suggested, accepted));
+        } catch (error) {
+            if (reqId !== redactionRequestIdRef.current) return;
+            console.error('Error fetching redaction compliance suggestions:', error);
+            setRedactionCompliance({ loading: false, suggested: {}, accepted: {} });
+        }
+    };
+
+    const toggleRedactionFramework = (framework) => {
+        const newAccepted = { ...redactionCompliance.accepted };
+        if (newAccepted[framework]) {
+            delete newAccepted[framework];
+        } else {
+            newAccepted[framework] = true;
+        }
+        setRedactionCompliance({ ...redactionCompliance, accepted: newAccepted });
+        saveRedactionCompliance(buildComplianceMap(redactionCompliance.suggested, newAccepted));
+    };
+
     const handleUrlChange = (value) => {
         setUrl(value);
         if (value && value.trim() && !validateUrl(value.trim())) {
@@ -293,6 +362,14 @@ const CustomGuardrailsStep = ({
                                         multiline={3}
                                         placeholder="e.g. Redact customer full names and home addresses"
                                         helpText="Be specific about what to mask. Anything not described here is left untouched. To redact a second, unrelated category, create another policy."
+                                    />
+
+                                    <ComplianceMappingTags
+                                        loading={redactionCompliance.loading}
+                                        complianceMap={buildComplianceMap(redactionCompliance.suggested, redactionCompliance.accepted)}
+                                        onRemove={toggleRedactionFramework}
+                                        onAdd={toggleRedactionFramework}
+                                        evaluated={!!redactionCompliance.evaluated}
                                     />
                                 </FormLayout>
                             </VerticalStack>

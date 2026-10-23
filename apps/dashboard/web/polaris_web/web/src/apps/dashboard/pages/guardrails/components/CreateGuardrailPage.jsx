@@ -133,7 +133,8 @@ const buildRedactionRules = (enabled, rules) => {
         .map(r => ({
             enabled: true,
             userPrompt: r.userPrompt.trim(),
-            confidenceScore: r.confidenceScore ?? 0.5
+            confidenceScore: r.confidenceScore ?? 0.5,
+            compliance: r.compliance && Object.keys(r.compliance).length > 0 ? r.compliance : undefined
         }));
 };
 
@@ -770,7 +771,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         const savedRedactionRules = (policy.redactionRules || []).map(r => ({
             enabled: r.enabled !== false,
             userPrompt: r.userPrompt || "",
-            confidenceScore: r.confidenceScore ?? 0.5
+            confidenceScore: r.confidenceScore ?? 0.5,
+            compliance: r.compliance || {}
         }));
         setRedactionRules(savedRedactionRules);
         setEnableLlmRedaction(savedRedactionRules.some(r => r.enabled && r.userPrompt.trim()));

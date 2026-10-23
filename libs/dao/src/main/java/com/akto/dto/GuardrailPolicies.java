@@ -480,6 +480,7 @@ public class GuardrailPolicies {
         private boolean enabled;
         private String userPrompt;
         private double confidenceScore;
+        private Map<String, List<String>> compliance;
 
         public RedactionRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;

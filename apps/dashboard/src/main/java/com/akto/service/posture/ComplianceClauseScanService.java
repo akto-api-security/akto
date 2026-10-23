@@ -70,8 +70,7 @@ public class ComplianceClauseScanService {
         // definition frameworkReadiness/complianceGapsSubScore already use.
         Map<String, Set<String>> policyNamesByFramework = new LinkedHashMap<>();
         for (GuardrailPolicies p : policies) {
-            if (!PostureService.policyHasComplianceMapping(p)) continue;
-            for (String rawFramework : p.getLlmRule().getCompliance().keySet()) {
+            for (String rawFramework : PostureService.policyComplianceFrameworks(p)) {
                 String canonical = ComplianceSubClauseCatalog.canonicalFramework(rawFramework);
                 if (canonical == null) continue; // not a framework this catalog knows sub-clauses for
                 policyNamesByFramework.computeIfAbsent(canonical, k -> new LinkedHashSet<>()).add(p.getName());
