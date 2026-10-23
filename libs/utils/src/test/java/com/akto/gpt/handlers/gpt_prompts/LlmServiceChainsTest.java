@@ -140,22 +140,52 @@ class LlmServiceChainsTest {
     }
 
     @Test
-    void firstCallNeverBlocksOnTheLoader() throws Exception {
+    void firstCallLoadsTheConfigInlineInsteadOfRunningOnTheDefault() throws Exception {
+        LlmServiceChains.refresher = r -> fail("the first load must not be left to the background");
+        configure(SVC, anthropic("haiku", "claude-haiku-5-5", "k"));
+        assertEquals(Arrays.asList("haiku", "GPT_5_NANO"), labels(LlmServiceChains.chainFor(SVC, NANO)));
+    }
+
+    @Test
+    void laterReloadsStayOffTheCallPath() throws Exception {
+        configure(SVC, anthropic("haiku", "claude-haiku-5-5", "k"));
+        LlmServiceChains.chainFor(SVC, NANO);
         List<Runnable> queued = new ArrayList<>();
         LlmServiceChains.refresher = queued::add;
-        AtomicInteger loads = new AtomicInteger();
-        configure(SVC, anthropic("haiku", "claude-haiku-5-5", "k"));
-        Function<String, LlmServiceConfig> inner = LlmServiceChains.loader;
-        LlmServiceChains.loader = s -> { loads.incrementAndGet(); return inner.apply(s); };
+        configure(SVC, anthropic("other", "claude-haiku-5-5", "k"));
+        now.addAndGet(LlmServiceChains.CONFIG_TTL_MS + 1);
 
-        assertEquals(Collections.singletonList("GPT_5_NANO"), labels(LlmServiceChains.chainFor(SVC, NANO)));
-        assertEquals(0, loads.get());
+        assertEquals(Arrays.asList("haiku", "GPT_5_NANO"), labels(LlmServiceChains.chainFor(SVC, NANO)));
         assertEquals(1, queued.size());
-        LlmServiceChains.chainFor(SVC, NANO); // refresh still in flight: no second one queued
+        LlmServiceChains.chainFor(SVC, NANO); // reload still in flight: no second one queued
         assertEquals(1, queued.size());
 
         queued.get(0).run();
-        assertEquals(Arrays.asList("haiku", "GPT_5_NANO"), labels(LlmServiceChains.chainFor(SVC, NANO)));
+        assertEquals(Arrays.asList("other", "GPT_5_NANO"), labels(LlmServiceChains.chainFor(SVC, NANO)));
+    }
+
+    @Test
+    void callsArrivingTogetherShareOneLoadAndAllGetTheConfig() throws Exception {
+        AtomicInteger loads = new AtomicInteger();
+        LlmServiceChains.loader = s -> {
+            loads.incrementAndGet();
+            try {
+                Thread.sleep(150);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return new LlmServiceConfig(s, Collections.singletonList(anthropic("haiku", "claude-haiku-5-5", "k")));
+        };
+        List<String> firstEntries = Collections.synchronizedList(new ArrayList<>());
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            Thread t = new Thread(() -> firstEntries.add(labels(LlmServiceChains.chainFor(SVC, NANO)).get(0)));
+            threads.add(t);
+            t.start();
+        }
+        for (Thread t : threads) t.join(10_000);
+        assertEquals(Collections.nCopies(5, "haiku"), firstEntries);
+        assertEquals(1, loads.get());
     }
 
     // --- fallback ---
