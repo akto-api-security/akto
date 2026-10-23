@@ -1,6 +1,7 @@
 package com.akto.filters;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.log.LoggerMaker;
 
@@ -26,6 +27,18 @@ public class AuthFilter implements Filter {
     // Tokens that must never be allowed to authenticate, regardless of signature validity.
     // Loaded from the comma-separated AKTO_DI_REVOKED_TOKENS env var (JWTs never contain commas).
     private static final Set<String> REVOKED_TOKENS = loadRevokedTokens();
+
+    // The account this deployment serves: the accountId claim of its own DATABASE_ABSTRACTOR_SERVICE_TOKEN,
+    // or null when that token is absent (then tokens of any account are accepted, as before).
+    private static final Integer DEPLOYMENT_ACCOUNT_ID = ClientActor.getAbstractorAccountIdFromEnvOrNull();
+
+    /**
+     * Every account's tokens are signed with the same key, so a valid signature alone would let one account's
+     * token in to another account's deployment: the token must also be for the account this deployment serves.
+     */
+    static boolean isForThisDeployment(int tokenAccountId, Integer deploymentAccountId) {
+        return deploymentAccountId == null || deploymentAccountId == tokenAccountId;
+    }
 
     private static Set<String> loadRevokedTokens() {
         Set<String> tokens = new HashSet<>();
@@ -105,7 +118,14 @@ public class AuthFilter implements Filter {
             } else {
                 claims = JwtAuthenticator.authenticate(accessTokenFromRequest);
             }
-            Context.accountId.set((int) claims.getBody().get("accountId"));
+            int tokenAccountId = (int) claims.getBody().get("accountId");
+            if (!isForThisDeployment(tokenAccountId, DEPLOYMENT_ACCOUNT_ID)) {
+                logger.error("Rejected a token for account {} on the deployment of account {}",
+                        tokenAccountId, DEPLOYMENT_ACCOUNT_ID);
+                httpServletResponse.sendError(401);
+                return;
+            }
+            Context.accountId.set(tokenAccountId);
         } catch (Exception e) {
             logger.error("Authentication failed: {}", e.getMessage());
             httpServletResponse.sendError(401);
