@@ -1,3 +1,4 @@
 fastapi==0.140.7
 uvicorn[standard]==0.32.0
 sentence-transformers==5.6.1
+certifi>=2026.10.19

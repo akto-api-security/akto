@@ -35,6 +35,7 @@ _INCONCLUSIVE = "INCONCLUSIVE"
 
 _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
+_DEFAULT_ARBITER_BACKUP_TIMEOUT_MS = 5000
 
 ScannerEntry = tuple[Any, dict[str, Any]]
 
@@ -43,9 +44,16 @@ def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
     return next((m for m in (model_configs or []) if m.get("modelRole") == role), None)
 
 
-def _with_backup(provider: Any, model_configs: Any) -> Any:
+def _timeout_s(entry: dict[str, Any], default_ms: int) -> float:
+    return (entry.get("timeoutMs") or default_ms) / 1000.0
+
+
+def _with_backup(provider: Any, model_configs: Any, primary_timeout_s: float | None = None) -> Any:
     backup_entry = _role_entry(model_configs, _ROLE_ARBITER_BACKUP)
-    return FallbackProvider(provider, backup_entry) if backup_entry else provider
+    if not backup_entry:
+        return provider
+    backup_timeout_s = _timeout_s(backup_entry, _DEFAULT_ARBITER_BACKUP_TIMEOUT_MS)
+    return FallbackProvider(provider, backup_entry, primary_timeout_s, backup_timeout_s)
 
 
 def build_arbiter(model_configs: Any, model_override: str = "") -> Any | None:
@@ -100,7 +108,7 @@ class ModelMapScanner:
             provider = build_provider_from_config(entry)
             if provider is not None:
                 if entry.get("modelRole") == _ROLE_ARBITER:
-                    provider = _with_backup(provider, model_map)
+                    provider = _with_backup(provider, model_map, _timeout_s(entry, _DEFAULT_ARBITER_TIMEOUT_MS))
                 scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
             else:
                 # build_provider_from_config already logged which env var was
@@ -171,7 +179,8 @@ class ModelMapScanner:
     def _submit(self, pairs: list[ScannerEntry], default_timeout_ms: int) -> dict[asyncio.Task, dict[str, Any]]:
         out: dict[asyncio.Task, dict[str, Any]] = {}
         for scanner, entry in pairs:
-            timeout = (entry.get("timeoutMs") or default_timeout_ms) / 1000.0
+            # FallbackProvider: extra room for the backup after a primary timeout
+            timeout = _timeout_s(entry, default_timeout_ms) + getattr(scanner.provider, "backup_timeout_s", 0.0)
             coro = scanner.scan(self.scanner_name, self.scanner_type, self.text, self.config)
             out[asyncio.ensure_future(asyncio.wait_for(coro, timeout))] = entry
         return out

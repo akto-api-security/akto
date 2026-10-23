@@ -9,7 +9,7 @@ RUN dnf update -y && dnf install -y python3 python3-pip && dnf clean all
 RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python3 -m pip install --no-cache-dir \
     rsa==4.9.1 pyasn1==0.6.4 httpx==0.28.1 detect-secrets==1.5.0 tiktoken==0.13.0 \
-    fastapi==0.139.0 'uvicorn[standard]==0.50.2' pydantic==2.13.4 psutil==7.2.2
+    fastapi==0.139.0 'uvicorn[standard]==0.50.2' pydantic==2.13.4 psutil==7.2.2 certifi==2026.10.19
 
 COPY pyproject.toml .
 COPY src/ ./src/
