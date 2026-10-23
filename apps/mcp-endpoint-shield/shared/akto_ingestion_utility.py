@@ -3,7 +3,6 @@ Common utilities for Akto AI agent hooks (Claude CLI, Cursor, and others).
 Shared config, HTTP, ingestion payload building, transcript reading, and hook runners.
 """
 import base64
-import contextlib
 import json
 import logging
 import os
@@ -413,49 +412,14 @@ def _state_key(input_data: Dict[str, Any], session_info: Dict[str, Any]) -> str:
     return "_latest"
 
 
-@contextlib.contextmanager
-def _session_state_lock():
-    """Cross-process lock on the state file. Hooks for every chat share one file and
-    fire concurrently, so unlocked read-modify-writes corrupt it or drop other rows."""
-    os.makedirs(os.path.dirname(SESSION_STATE_PATH), exist_ok=True)
-    with open(SESSION_STATE_PATH + ".lock", "a+") as lock_file:
-        if os.name == "nt":
-            import msvcrt
-            lock_file.seek(0)
-            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)  # retries ~10s, then OSError
-            try:
-                yield
-            finally:
-                lock_file.seek(0)
-                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
-        else:
-            import fcntl
-            fcntl.flock(lock_file, fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock_file, fcntl.LOCK_UN)
-
-
-def _read_session_state(logger: logging.Logger) -> Dict[str, Any]:
-    """Whole state file, or {} if missing/unreadable (a corrupt file is then rewritten)."""
+def load_session_state(key: str, logger: logging.Logger) -> Dict[str, Any]:
     if not os.path.exists(SESSION_STATE_PATH):
         return {}
     try:
         with open(SESSION_STATE_PATH, encoding="utf-8") as f:
             data = json.load(f)
-        return data if isinstance(data, dict) else {}
+        return data.get(key, {}) if isinstance(data, dict) else {}
     except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Could not read session state, starting fresh: {e}")
-        return {}
-
-
-def load_session_state(key: str, logger: logging.Logger) -> Dict[str, Any]:
-    try:
-        with _session_state_lock():
-            row = _read_session_state(logger).get(key, {})
-        return row if isinstance(row, dict) else {}
-    except OSError as e:
         logger.warning(f"Could not read session state: {e}")
         return {}
 
@@ -472,19 +436,24 @@ def save_session_state(
     identity fields that must be cleared on sign-out, since a merge can only ever
     add or overwrite — never delete."""
     try:
-        with _session_state_lock():
-            data = _read_session_state(logger)
-            row = data.get(key, {}) if isinstance(data.get(key), dict) else {}
-            row.update({k: v for k, v in session_info.items() if v is not None})
-            for drop in drop_keys:
-                row.pop(drop, None)
-            data[key] = row
-            tmp_path = f"{SESSION_STATE_PATH}.{os.getpid()}.tmp"
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(data, f)
-                f.write("\n")
-            os.replace(tmp_path, SESSION_STATE_PATH)
-    except (TypeError, ValueError, OSError) as e:
+        data: Dict[str, Any] = {}
+        if os.path.exists(SESSION_STATE_PATH):
+            with open(SESSION_STATE_PATH, encoding="utf-8") as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data = loaded
+        row = data.get(key, {}) if isinstance(data.get(key), dict) else {}
+        row.update({k: v for k, v in session_info.items() if v is not None})
+        for drop in drop_keys:
+            row.pop(drop, None)
+        data[key] = row
+        os.makedirs(os.path.dirname(SESSION_STATE_PATH), exist_ok=True)
+        tmp_path = SESSION_STATE_PATH + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+            f.write("\n")
+        os.replace(tmp_path, SESSION_STATE_PATH)
+    except (json.JSONDecodeError, OSError) as e:
         logger.error(f"Could not persist session state: {e}")
 
 
