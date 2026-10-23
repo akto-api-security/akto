@@ -60,7 +60,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int skip;
   int limit;
   static final int LIMIT = 50;
-  static final int COLUMN_FILTER_ACCOUNT_ID = 1791484402;
   List<String> ips;
   List<String> urls;
   List<Integer> apiCollectionIds;
@@ -221,14 +220,12 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("riskScoreFilterValue", this.riskScoreFilterValue);
     }
 
-    if (Context.accountId.get() == COLUMN_FILTER_ACCOUNT_ID) {
-      if (this.agenticTypes != null && !this.agenticTypes.isEmpty()) {
-        filter.put("agenticTypes", this.agenticTypes);
-      }
+    if (this.agenticTypes != null && !this.agenticTypes.isEmpty()) {
+      filter.put("agenticTypes", this.agenticTypes);
+    }
 
-      if (this.behaviours != null && !this.behaviours.isEmpty()) {
-        filter.put("behaviours", this.behaviours);
-      }
+    if (this.behaviours != null && !this.behaviours.isEmpty()) {
+      filter.put("behaviours", this.behaviours);
     }
 
     Map<String, Integer> time_range = new HashMap<>();
