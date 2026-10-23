@@ -1077,7 +1077,7 @@ function HomeDashboard() {
                         <Text variant='headingMd'>{mcpTotals.thirdPartyApis ?? '-'}</Text>
                     </VerticalStack>
                      <VerticalStack gap={1}>
-                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Policy Guardrail APIs</Text></Box>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Policy Guardrail {mapLabel('APIs', getDashboardCategory())}</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.policyGuardrailApis ?? '-'}</Text>
                     </VerticalStack>
                 </HorizontalGrid>
@@ -1557,7 +1557,7 @@ function HomeDashboard() {
                                 </Text>
                             </HorizontalStack>
                         ) : (
-                            <Text>Still counting the APIs of your collections: the numbers below are partial. Reload in a while to see them complete.</Text>
+                            <Text>Still counting the {mapLabel('APIs', getDashboardCategory())} of your collections: the numbers below are partial. Reload in a while to see them complete.</Text>
                         )}
                         {postureNotice.collections > 0 && (
                             <ProgressBar size="small" progress={Math.round(100 * postureNotice.counted / postureNotice.collections)} />

@@ -58,6 +58,12 @@ public class DashboardMaliciousEvent {
   private String remediation;
   private String evidenceLine;
   private String humanResponse;
+  // Grouped activity row (repeated Bedrock prompt from one caller): how many events are behind it, the
+  // first one's time, their ids, and the policies they tripped.
+  private int groupCount;
+  private long groupFirstDetectedAt;
+  private List<String> groupEventIds;
+  private List<String> groupFilterIds;
   public DashboardMaliciousEvent() {}
 
   public DashboardMaliciousEvent(
@@ -325,6 +331,38 @@ public class DashboardMaliciousEvent {
 
   public void setHumanResponse(String humanResponse) {
     this.humanResponse = humanResponse;
+  }
+
+  public int getGroupCount() {
+    return groupCount;
+  }
+
+  public void setGroupCount(int groupCount) {
+    this.groupCount = groupCount;
+  }
+
+  public long getGroupFirstDetectedAt() {
+    return groupFirstDetectedAt;
+  }
+
+  public void setGroupFirstDetectedAt(long groupFirstDetectedAt) {
+    this.groupFirstDetectedAt = groupFirstDetectedAt;
+  }
+
+  public List<String> getGroupEventIds() {
+    return groupEventIds;
+  }
+
+  public void setGroupEventIds(List<String> groupEventIds) {
+    this.groupEventIds = groupEventIds;
+  }
+
+  public List<String> getGroupFilterIds() {
+    return groupFilterIds;
+  }
+
+  public void setGroupFilterIds(List<String> groupFilterIds) {
+    this.groupFilterIds = groupFilterIds;
   }
 
   public String getEvidenceLine() {

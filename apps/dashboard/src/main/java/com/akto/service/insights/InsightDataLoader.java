@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -326,9 +327,9 @@ public class InsightDataLoader {
     /** contextSource == current, or the field is entirely missing (legacy docs predate it). */
     private List<McpAuditInfo> loadAuditRows(CONTEXT_SOURCE contextSource) {
         try {
-            // Browser LLM decisions aren't MCP components; the type check sits in each branch so Mongo fetches each row once.
+            // Browser LLM and AI agent decisions aren't MCP components; the type check sits in each branch so Mongo fetches each row once.
             // eq(null) already matches a missing field, so the null case needs a single branch.
-            Bson notLlm = Filters.ne(McpAuditInfo.TYPE, Constants.AKTO_BROWSER_LLM_TAG);
+            Bson notLlm = Filters.nin(McpAuditInfo.TYPE, Arrays.asList(Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_AI_AGENT_TAG));
             Bson filter = contextSource == null
                     ? Filters.and(Filters.eq(McpAuditInfo.CONTEXT_SOURCE, null), notLlm)
                     : Filters.or(

@@ -139,7 +139,7 @@ export default function LeftNav() {
     ];
     const isAllowedDashboardUser = window.USER_NAME && allowedDashboardUsers.includes(window.USER_NAME.toLowerCase());
 
-    const showAgenticPosture = isAgenticSecurityCategory() && func.isAgenticPostureEnabled();
+    const showAgenticPosture = isAgenticSecurityCategory();
 
     const navItems = useMemo(() => {
         let items = [

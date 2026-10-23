@@ -8,15 +8,18 @@ import com.akto.dao.ApiInfoDao;
 import com.akto.dao.CodeAnalysisApiInfoDao;
 import com.akto.dao.CodeAnalysisCollectionDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CodeAnalysisApi;
 import com.akto.dto.CodeAnalysisApiInfo;
 import com.akto.dto.CodeAnalysisApiLocation;
 import com.akto.dto.CodeAnalysisCollection;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.types.CappedSet;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
@@ -46,6 +49,15 @@ public class TestCodeAnalysisAction extends MongoBasedTest {
     
     @Test
     public void testSyncExtractedAPIs() {
+        // Reset RBAC scope state leaked by earlier tests, else the new collection is filtered out of traffic.
+        Context.contextSource.set(CONTEXT_SOURCE.API);
+        for (CONTEXT_SOURCE cs : CONTEXT_SOURCE.values()) {
+            UsersCollectionsList.deleteContextCollectionsForUser(ACCOUNT_ID, cs);
+        }
+        if (Context.userId.get() != null) {
+            UsersCollectionsList.deleteCollectionIdsFromCache(Context.userId.get(), ACCOUNT_ID);
+        }
+
         ApiCollectionsDao.instance.getMCollection().drop();
         ApiInfoDao.instance.getMCollection().drop();
         CodeAnalysisCollectionDao.instance.getMCollection().drop();

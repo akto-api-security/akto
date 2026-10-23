@@ -47,15 +47,3 @@ jobs:
 
       - name: Invalidate CDN cache
         run: aws cloudfront create-invalidation --distribution-id ${{secrets.AWS_CDN_DISTRIBUTION_ID}} --paths "/polaris_web/${{github.event.inputs.release_version}}/*"
-
-      - name: Send Github release notification to Slack
-        id: slack
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "Akto Dashboard v${{ github.event.inputs.release_version }} released Only UI!"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

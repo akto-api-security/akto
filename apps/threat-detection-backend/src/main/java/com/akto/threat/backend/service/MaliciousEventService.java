@@ -33,12 +33,14 @@ import com.akto.threat.backend.cache.DashboardFilterCache;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ParallelQueryExecutor;
 import com.akto.util.ThreatDetectionConstants;
+import com.mongodb.client.model.CountOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.WriteModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.DistinctIterable;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Sorts;
 import org.bson.Document;
@@ -205,6 +207,10 @@ public class MaliciousEventService {
     // Set contextSource if available
     if (contextSource != null && !contextSource.isEmpty()) {
         builder.setContextSource(contextSource);
+    }
+
+    if (ThreatUtils.groupsActivities(accountId)) {
+        builder.setGroupKey(ThreatUtils.activityGroupKey(evt.getLatestApiPayload()));
     }
 
     List<MaliciousEventDto.OwaspCategory> owaspCategories = evt.getOwaspCategoriesList()
@@ -617,6 +623,8 @@ public class MaliciousEventService {
     }
 
     applyRiskScoreFilter(query, filter);
+    andDocument(query, agenticTypeCondition(filter.getAgenticTypesList()));
+    andDocument(query, behaviourCondition(filter.getBehavioursList()));
 
     // if (filter.hasLabel()) {
     //   String labelString = filter.getLabel();
@@ -664,12 +672,19 @@ public class MaliciousEventService {
     boolean dedupeLatestPerHostActorEndpoint = "only".equalsIgnoreCase(configEvalMode)
         && "ENDPOINT".equalsIgnoreCase(contextSource);
 
+    // Repeated Bedrock activities (same caller and prompt within the gap) are listed as one row.
+    boolean groupActivities = ThreatUtils.groupsActivities(accountId) && "AGENTIC".equalsIgnoreCase(contextSource)
+        && !dedupeLatestPerHostActorEndpoint && !(filter.hasUngroupActivities() && filter.getUngroupActivities());
+
     Document dedupeGroupKey = new Document("host", "$host")
         .append("actor", "$actor")
         .append("latestApiEndpoint", "$latestApiEndpoint");
 
     long total;
     MongoCursor<MaliciousEventDto> cursor;
+    ActivityRows activityRows = groupActivities
+        ? listActivityRows(accountId, query, sort, sortBySeverity, sortByRiskScore, riskScoreDir, excludedFields, skip, limit)
+        : null;
     // $unset rejects an empty field list, so only add it when minimalFields populated excludedFields.
     List<Document> matchStages = new ArrayList<>();
     matchStages.add(new Document("$match", query));
@@ -700,22 +715,15 @@ public class MaliciousEventService {
       pipeline.add(new Document("$skip", skip));
       pipeline.add(new Document("$limit", limit));
       cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
+    } else if (activityRows != null) {
+      total = activityRows.total;
+      cursor = activityRows.cursor;
     } else if (sortBySeverity) {
       total = maliciousEventDao.countDocuments(accountId, query);
       // Use aggregation pipeline for custom severity sorting
       List<Document> pipeline = new ArrayList<>(matchStages);
       pipeline.addAll(Arrays.asList(
-              new Document("$addFields", new Document("severityRank",
-                  new Document("$switch", new Document()
-                      .append("branches", Arrays.asList(
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 1),
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 2),
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 3),
-                          new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 4)
-                      ))
-                      .append("default", 5)
-                  )
-              )),
+              new Document("$addFields", severityRankAddFields()),
               new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1))),
               new Document("$skip", skip),
               new Document("$limit", limit)
@@ -792,6 +800,16 @@ public class MaliciousEventService {
                 .setJiraTicketUrl(evt.getJiraTicketUrl() != null ? evt.getJiraTicketUrl() : "")
                 .setSeverity(evt.getSeverity() != null ? evt.getSeverity() : "HIGH")
                 .setSessionId(resolvedSessionId);
+        if (evt.getGroupKey() != null && evt.getGroupCount() != null) {
+          builder.setGroupCount(evt.getGroupCount())
+              .setGroupFirstDetectedAt(evt.getGroupFirstDetectedAt() != null ? evt.getGroupFirstDetectedAt() : evt.getDetectedAt());
+          if (evt.getGroupEventIds() != null) {
+            builder.addAllGroupEventIds(evt.getGroupEventIds());
+          }
+          if (evt.getGroupFilterIds() != null) {
+            builder.addAllGroupFilterIds(evt.getGroupFilterIds());
+          }
+        }
         if (!minimalFields) {
           builder.setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
               .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
@@ -949,6 +967,94 @@ public class MaliciousEventService {
   // metadata is stored as proto-text (`risk_score: "0.95"`) or JSON (`"riskScore": "0.95"`).
   private static final String RISK_SCORE_EXTRACT_REGEX = "(?:risk_score|riskScore)\\s*[:=]\\s*\"([0-9]*\\.?[0-9]+)\"";
 
+  private static final class ActivityRows {
+    final long total;
+    final MongoCursor<MaliciousEventDto> cursor;
+
+    ActivityRows(long total, MongoCursor<MaliciousEventDto> cursor) {
+      this.total = total;
+      this.cursor = cursor;
+    }
+  }
+
+  // Rows for an account that groups activities. Null if the grouped query fails, so the caller lists
+  // events one per row as it always has instead of showing nothing.
+  private ActivityRows listActivityRows(String accountId, Document query, Map<String, Integer> sort, boolean sortBySeverity,
+      boolean sortByRiskScore, int riskScoreDir, List<String> excludedFields, int skip, int limit) {
+    try {
+      // Keyed events are folded into activity rows; the rest stay one row each and come straight off
+      // the indexes. Each side is cut to the page window before the two are merged and paged.
+      Document keyed = new Document("$and", Arrays.asList(query, new Document("groupKey", new Document("$type", "string"))));
+      Document unkeyed = new Document("$and", Arrays.asList(query, new Document("groupKey", new Document("$not", new Document("$type", "string")))));
+      List<Document> rowStages = ThreatUtils.activityGroupStages(keyed);
+      // The planner prefers the contextSource indexes and then reads every event; keyed events are a
+      // small slice of the collection, so their own partial index is far cheaper.
+      Bson keyedIndex = ThreatUtils.ACTIVITY_GROUP_INDEX_KEYS;
+      MongoCollection<MaliciousEventDto> events = maliciousEventDao.getCollection(accountId);
+
+      List<Document> countPipeline = new ArrayList<>(rowStages);
+      countPipeline.add(new Document("$count", "total"));
+      MongoCursor<Document> countCursor = events
+          .aggregate(countPipeline, Document.class).hint(keyedIndex).allowDiskUse(true).cursor();
+      long keyedRows = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
+      countCursor.close();
+      // "No groupKey" can't use an index; all events minus keyed events can.
+      long keyedEvents = events.countDocuments(keyed, new CountOptions().hint(keyedIndex));
+      long total = keyedRows + maliciousEventDao.countDocuments(accountId, query) - keyedEvents;
+
+      List<Document> sortStages = new ArrayList<>();
+      if (sortBySeverity) {
+        sortStages.add(new Document("$addFields", severityRankAddFields()));
+        sortStages.add(new Document("$sort", new Document("severityRank", sort.getOrDefault("severity", 1)).append("detectedAt", -1)));
+      } else if (sortByRiskScore) {
+        sortStages.add(new Document("$addFields", riskScoreSortAddFields()));
+        sortStages.add(new Document("$sort", new Document("riskScoreNum", riskScoreDir).append("detectedAt", -1)));
+      } else {
+        int dir = sort.getOrDefault("detectedAt", -1);
+        // _id breaks ties so pages stay stable when several rows share a detectedAt.
+        sortStages.add(new Document("$sort", new Document("detectedAt", dir).append("_id", dir)));
+      }
+      List<String> dropped = new ArrayList<>(excludedFields);
+      if (!dropped.contains("latestApiOrig")) {
+        dropped.add("latestApiOrig");
+      }
+      Document pageWindow = new Document("$limit", skip + limit);
+
+      List<Document> unkeyedPage = new ArrayList<>();
+      unkeyedPage.add(new Document("$match", unkeyed));
+      unkeyedPage.addAll(sortStages);
+      unkeyedPage.add(pageWindow);
+      unkeyedPage.add(new Document("$unset", dropped));
+
+      // Keyed rows are the outer pipeline so the index hint applies to them.
+      List<Document> pipeline = new ArrayList<>(rowStages);
+      pipeline.addAll(sortStages);
+      pipeline.add(pageWindow);
+      pipeline.add(new Document("$unset", dropped));
+      pipeline.add(new Document("$unionWith", new Document("coll", events.getNamespace().getCollectionName())
+          .append("pipeline", unkeyedPage)));
+      pipeline.addAll(sortStages);
+      pipeline.add(new Document("$skip", skip));
+      pipeline.add(new Document("$limit", limit));
+      MongoCursor<MaliciousEventDto> cursor = events.aggregate(pipeline).hint(keyedIndex).allowDiskUse(true).cursor();
+      return new ActivityRows(total, cursor);
+    } catch (Exception e) {
+      logger.error("listActivityRows failed for accountId=" + accountId + ", listing ungrouped: " + e.getMessage());
+      return null;
+    }
+  }
+
+  // severityRank: CRITICAL=1 .. LOW=4, anything else 5, for the custom severity sort.
+  private static Document severityRankAddFields() {
+    return new Document("severityRank", new Document("$switch", new Document()
+        .append("branches", Arrays.asList(
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 1),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 2),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 3),
+            new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 4)))
+        .append("default", 5)));
+  }
+
   private static Document riskScoreSortAddFields() {
     Document regexFind = new Document("$regexFind",
         new Document("input", new Document("$ifNull", Arrays.asList("$metadata", "")))
@@ -965,6 +1071,54 @@ public class MaliciousEventService {
     Document letExpr = new Document("$let",
         new Document("vars", new Document("m", regexFind)).append("in", parsedScore));
     return new Document("riskScoreNum", letExpr);
+  }
+
+  // Order is precedence, mirroring deriveAgenticType in the dashboard's violationsData.js.
+  private static final String[][] AGENTIC_TYPE_RULES = {
+      {"Tool", "tool"}, {"Skill", "skill"}, {"Resource", "resource"}, {"Prompt", "prompt"},
+      {"Config", "config|setting"}, {"Tool", "mcp|server"}, {"Prompt", "message|completion|chat"}
+  };
+  private Document agenticTypeCondition(List<String> types) {
+    if (types == null || types.isEmpty()) {
+      return null;
+    }
+    Set<String> wanted = new HashSet<>(types);
+    List<Document> anyOf = new ArrayList<>();
+    StringBuilder earlier = new StringBuilder();
+    for (String[] rule : AGENTIC_TYPE_RULES) {
+      if (wanted.contains(rule[0])) {
+        List<Document> allOf = new ArrayList<>();
+        allOf.add(new Document("latestApiEndpoint", Pattern.compile(rule[1], Pattern.CASE_INSENSITIVE)));
+        if (earlier.length() > 0) {
+          allOf.add(new Document("latestApiEndpoint",
+              new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
+        }
+        anyOf.add(new Document("$and", allOf));
+      }
+      earlier.append(earlier.length() > 0 ? "|" : "").append("(?:").append(rule[1]).append(")");
+    }
+    if (wanted.contains("Prompt")) {
+      anyOf.add(new Document("latestApiEndpoint",
+          new Document("$not", Pattern.compile(earlier.toString(), Pattern.CASE_INSENSITIVE))));
+    }
+    return anyOf.isEmpty() ? null : new Document("$or", anyOf);
+  }
+
+  private Document behaviourCondition(List<String> behaviours) {
+    if (behaviours == null || behaviours.isEmpty()) {
+      return null;
+    }
+    List<Document> anyOf = new ArrayList<>();
+    for (String b : behaviours) {
+      if ("flag".equalsIgnoreCase(b)) {
+        // The UI shows a warn, or an event with no behaviour, as Flagged.
+        anyOf.add(new Document("metadata", Pattern.compile("behaviour\"?\\s*:\\s*\"(warn|flag)\"")));
+        anyOf.add(new Document("metadata", new Document("$not", Pattern.compile("behaviour"))));
+      } else {
+        anyOf.add(new Document("metadata", Pattern.compile("behaviour\"?\\s*:\\s*\"" + Pattern.quote(b.toLowerCase()) + "\"")));
+      }
+    }
+    return new Document("$or", anyOf);
   }
 
   private void applyRiskScoreFilter(Document query, ListMaliciousRequestsRequest.Filter filter) {
@@ -1037,6 +1191,39 @@ public class MaliciousEventService {
     }
 
     return new Document("$let", new Document("vars", new Document("m", regexFind)).append("in", inExpr));
+  }
+
+  // Gives stored activities the current groupKey, so they group like new ones: events from before
+  // grouping existed, and events keyed by an earlier version of the key. Only events whose key changes
+  // are written, so running it again is safe; undo with $unset groupKey.
+  public int backfillActivityGroupKeys(String accountId) {
+    if (!ThreatUtils.groupsActivities(accountId)) {
+      return 0;
+    }
+    createIndexIfAbsent(accountId);
+    MongoCollection<Document> events = maliciousEventDao.getCollection(accountId).withDocumentClass(Document.class);
+    Document bedrockEvents = new Document("latestApiOrig", new Document("$regex", "bedrock-identity-arn"));
+    int updated = 0;
+    List<WriteModel<Document>> batch = new ArrayList<>();
+    try (MongoCursor<Document> cursor = events.find(bedrockEvents).projection(Projections.include("_id", "latestApiOrig", "groupKey")).batchSize(500).cursor()) {
+      while (cursor.hasNext()) {
+        Document event = cursor.next();
+        String groupKey = ThreatUtils.activityGroupKey(event.getString("latestApiOrig"));
+        if (groupKey == null || groupKey.equals(event.getString("groupKey"))) {
+          continue;
+        }
+        batch.add(new UpdateOneModel<>(Filters.eq("_id", event.get("_id")), Updates.set("groupKey", groupKey)));
+        if (batch.size() >= 500) {
+          updated += events.bulkWrite(batch).getModifiedCount();
+          batch.clear();
+        }
+      }
+    }
+    if (!batch.isEmpty()) {
+      updated += events.bulkWrite(batch).getModifiedCount();
+    }
+    logger.info("backfillActivityGroupKeys accountId=" + accountId + " updated=" + updated);
+    return updated;
   }
 
   public void createIndexIfAbsent(String accountId) {

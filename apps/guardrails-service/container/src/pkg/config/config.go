@@ -61,6 +61,19 @@ type Config struct {
 	// fails open here *before* the caller gives up. <=0 disables the bound.
 	ValidationTimeoutMs int
 
+	// Payload redaction API (POST /api/redact/payloads) and the cache it shares with the live
+	// validate path. The cache holds redacted payloads, so its memory is bounded by
+	// RedactionCacheMaxEntries * RedactionCacheMaxPayloadBytes; a max of 0 disables it.
+	RedactionCacheMaxEntries      int
+	RedactionCacheTTLSec          int
+	RedactionCacheMaxPayloadBytes int
+	// RedactTimeoutMs bounds one /api/redact/payloads call. Keep it below the caller's own
+	// timeout so an unfinished item is reported UNAVAILABLE here rather than lost to a client timeout.
+	RedactTimeoutMs       int
+	RedactConcurrency     int // items evaluated at once within one call
+	RedactMaxItems        int // items accepted per call
+	RedactMaxPayloadBytes int // per payload; a larger one is answered UNAVAILABLE
+
 	GuardrailRemediationGenerate bool
 	GuardrailAverageSeverity     bool
 	File                         FileConfig
@@ -208,6 +221,13 @@ func LoadConfig() *Config {
 		NhiEnabled:                       getEnvAsBool("NHI_ENABLED", true),
 		NhiScanIntervalMin:               getEnvAsInt("NHI_SCAN_INTERVAL_MIN", 30),
 		ValidationTimeoutMs:              getEnvAsInt("GUARDRAILS_VALIDATION_TIMEOUT_MS", 2500),
+		RedactionCacheMaxEntries:         getEnvAsInt("GUARDRAILS_REDACTION_CACHE_MAX_ENTRIES", 4096),
+		RedactionCacheTTLSec:             getEnvAsInt("GUARDRAILS_REDACTION_CACHE_TTL_SEC", 300),
+		RedactionCacheMaxPayloadBytes:    getEnvAsInt("GUARDRAILS_REDACTION_CACHE_MAX_PAYLOAD_BYTES", 64*1024),
+		RedactTimeoutMs:                  getEnvAsInt("GUARDRAILS_REDACT_TIMEOUT_MS", 6000),
+		RedactConcurrency:                getEnvAsInt("GUARDRAILS_REDACT_CONCURRENCY", 8),
+		RedactMaxItems:                   getEnvAsInt("GUARDRAILS_REDACT_MAX_ITEMS", 100),
+		RedactMaxPayloadBytes:            getEnvAsInt("GUARDRAILS_REDACT_MAX_PAYLOAD_BYTES", 256*1024),
 		ThreatKafka:                      loadThreatKafkaConfig(),
 		GuardrailRemediationGenerate:     getEnvAsBool("GUARDRAILS_GENERATE_REMEDIATION", false),
 		GuardrailAverageSeverity:         getEnvAsBool("GUARDRAILS_AVERAGE_SEVERITY", false),

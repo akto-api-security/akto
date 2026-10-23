@@ -28,6 +28,8 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
     // Input type values
     public static final String TYPE_DENIED_TOPIC = "denied_topic";
     public static final String TYPE_LLM_RULE = "llm_rule";
+    // Text arrives under LLM_RULE, same as a detection rule.
+    public static final String TYPE_REDACTION_RULE = "redaction_rule";
 
     // Response keys
     public static final String CONTROL_TYPE = "controlType";
@@ -143,13 +145,22 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
         "shared in chat -> {\"controlType\":\"pii_detection\",\"compliance\":[\"GDPR\",\"PCI DSS\",\"SOC 2\"]}\n" +
         "Name: Competitor talk | Definition: Any discussion of competitor products or pricing -> " +
         "{\"controlType\":\"topic_restriction\",\"compliance\":[]}\n" +
-        "Name: test | Definition: test -> {\"controlType\":\"other\",\"compliance\":[]}\n";
+        "Name: test | Definition: test -> {\"controlType\":\"other\",\"compliance\":[]}\n" +
+        "EXAMPLES - redaction rules, which mask matching text in place instead of blocking the request. " +
+        "Masking content counts the same as detecting it:\n" +
+        "'Redact customer full names and home addresses' -> {\"controlType\":\"pii_detection\",\"compliance\":[\"GDPR\"]}\n" +
+        "'Mask patient names and diagnoses' -> {\"controlType\":\"phi_detection\",\"compliance\":[\"HIPAA\",\"GDPR\"]}\n" +
+        "'Mask card numbers and CVVs' -> {\"controlType\":\"pci_detection\",\"compliance\":[\"PCI DSS\"]}\n" +
+        "'Redact API keys, passwords and AWS access keys' -> {\"controlType\":\"keyword_blocklist\",\"compliance\":[\"ISO 27001\",\"CSA CCM\"]}\n" +
+        "'Redact competitor product names' -> {\"controlType\":\"keyword_blocklist\",\"compliance\":[]}\n";
 
     @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
         String inputType = queryData.getString(INPUT_TYPE);
-        if (inputType == null || (!inputType.equals(TYPE_DENIED_TOPIC) && !inputType.equals(TYPE_LLM_RULE))) {
-            throw new ValidationException(INPUT_TYPE + " must be '" + TYPE_DENIED_TOPIC + "' or '" + TYPE_LLM_RULE + "'");
+        if (inputType == null || (!inputType.equals(TYPE_DENIED_TOPIC) && !inputType.equals(TYPE_LLM_RULE)
+                && !inputType.equals(TYPE_REDACTION_RULE))) {
+            throw new ValidationException(INPUT_TYPE + " must be '" + TYPE_DENIED_TOPIC + "', '" + TYPE_LLM_RULE
+                + "' or '" + TYPE_REDACTION_RULE + "'");
         }
 
         if (TYPE_DENIED_TOPIC.equals(inputType)) {
@@ -188,7 +199,7 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
         } else {
             String llmRule = queryData.getString(LLM_RULE);
             if (llmRule == null || llmRule.trim().isEmpty()) {
-                throw new ValidationException(LLM_RULE + " is required for " + TYPE_LLM_RULE);
+                throw new ValidationException(LLM_RULE + " is required for " + inputType);
             }
             if (llmRule.length() > MAX_LLM_RULE_CHARS) {
                 throw new ValidationException(LLM_RULE + " exceeds " + MAX_LLM_RULE_CHARS + " characters");
@@ -213,6 +224,8 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
               .append("\nRULES:\n")
               .append("- Judge what the guardrail DETECTS, not the subject it mentions. ")
               .append("Blocking talk about medicine is not HIPAA. Blocking talk about banking is not PCI DSS.\n")
+              .append("- A redaction rule masks matching text instead of blocking. Treat what it masks as what it detects, ")
+              .append("so masking personal data satisfies the same condition as blocking it.\n")
               .append("- Business, brand or tone rules (competitors, pricing, politics, off-topic chat, politeness) ")
               .append("match no framework. Return an empty list.\n")
               .append("- If the guardrail is vague, a placeholder or a test ('test', 'abc', 'demo', random letters), ")
@@ -243,6 +256,9 @@ public class GuardrailComplianceSuggestionHandler extends AzureOpenAIPromptHandl
             if (samplePhrases != null) {
                 prompt.append("Example phrases: ").append(samplePhrases.toString()).append("\n");
             }
+        } else if (TYPE_REDACTION_RULE.equals(inputType)) {
+            prompt.append("A redaction rule that masks matching text in user input before it reaches the model.\n")
+                  .append("Rule: ").append(queryData.getString(LLM_RULE)).append("\n");
         } else {
             prompt.append("A detection rule applied to user input and model output.\n")
                   .append("Rule: ").append(queryData.getString(LLM_RULE)).append("\n");

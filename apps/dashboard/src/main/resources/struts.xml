@@ -1155,36 +1155,6 @@
             </result>
         </action>
 
-        <action name="api/backfillTraceSessions" class="com.akto.action.monitoring.LLMObservabilityAction" method="backfillTraceSessions">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">LOGS</param>
-                <param name="accessType">READ_WRITE</param>
-            </interceptor-ref>
-            <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">AGENT_TRAFFIC_LOGS</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json">
-                <param name="includeProperties">^backfillUpdated</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
         <action name="api/searchLLMPrompts" class="com.akto.action.monitoring.LLMObservabilityAction" method="searchPrompts">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2382,7 +2352,7 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">SENSITIVE_DATA</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User updated LLM access in audit data</param>
+                <param name="actionDescription">User updated LLM / AI agent access in audit data</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -12795,6 +12765,41 @@
             </result>
         </action>
 
+        <action name="api/backfillActivityGroupKeys"
+            class="com.akto.action.threat_detection.SuspectSampleDataAction"
+            method="backfillActivityGroupKeys">
+            <interceptor-ref name="json" />
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User grouped existing guardrail activities</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^backfilledGroupKeys</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param
+                    name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/deleteMaliciousEvents"
             class="com.akto.action.threat_detection.SuspectSampleDataAction"
             method="deleteMaliciousEvents">
@@ -15015,9 +15020,7 @@
                 <param name="featureLabel">ADMIN_ACTIONS</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
-            <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">API_AUDIT_LOGS</param>
-            </interceptor-ref>
+            <!-- Audit logs enabled by default for all accounts (admin-only), so no API_AUDIT_LOGS usage check -->
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -15027,11 +15030,6 @@
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="UNAUTHORIZED" type="json">
-                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>

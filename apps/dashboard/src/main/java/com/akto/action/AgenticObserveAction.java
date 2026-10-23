@@ -3923,4 +3923,50 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
     }
+
+    // Agentic assets' AI Agents as audit rows (resourceName = group key), the source of Audit Data -> AI Agents.
+    public List<McpAuditInfo> fetchAiAgentAuditRows() {
+        ClassificationCacheEntry cached = getOrBuildClassification(getOrComputeTrafficMap(), getOrComputeRiskScoreMap(), Collections.emptyMap());
+        List<McpAuditInfo> rows = new ArrayList<>();
+        for (GroupSummary g : cached.groups.values()) {
+            if (!AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) continue;
+            McpAuditInfo row = new McpAuditInfo();
+            row.setType(Constants.AKTO_AI_AGENT_TAG);
+            row.setResourceName(g.groupKey);
+            row.setLastDetected(g.maxTrafficTimestamp);
+            row.setRawValues(new ArrayList<>(aiAgentRawValues(g)));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    // Names guardrails matches the agent on: tag values plus host segments that aren't another known agent.
+    private static Set<String> aiAgentRawValues(GroupSummary g) {
+        Set<String> raws = new TreeSet<>();
+        if (!"agent".equals(g.rowType)) {
+            raws.add(g.groupKey.toLowerCase(Locale.ROOT));
+            return raws;
+        }
+        for (String v : g.rawTagValues) raws.add(v.toLowerCase(Locale.ROOT));
+        for (String host : g.hostNames) {
+            String seg = hostAgentSegment(host);
+            if (seg != null && !namesOtherAgent(seg, g.groupKey)) raws.add(seg);
+        }
+        return raws;
+    }
+
+    // "claude" on a cursor row is another agent; "ollama-devstral-latest" isn't, despite the substring "vs".
+    private static boolean namesOtherAgent(String seg, String key) {
+        String segKey = McpClientRegistry.resolveClientKey(seg);
+        McpClientRegistry.ClientInfo info = McpClientRegistry.findClientInfo(segKey);
+        return !key.equals(segKey) && info != null && segKey.equals(info.keyword);
+    }
+
+    // Agent segment of "{device}.{agent}.{server}", or everything after "ai-agent" in "{device}.ai-agent.{agent}".
+    private static String hostAgentSegment(String host) {
+        String[] parts = DOT_SPLIT.split(host.toLowerCase(Locale.ROOT));
+        if (parts.length < 3) return null;
+        if (Constants.AKTO_AI_AGENT_TAG.equals(parts[1])) return StringUtils.trimToNull(String.join(".", Arrays.copyOfRange(parts, 2, parts.length)));
+        return parts[1];
+    }
 }

@@ -11,6 +11,7 @@ import {
   } from '@shopify/polaris-icons';
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { TAGS_PAGE_DOCS_URL } from "../../../../main/onboardingData";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function Tags(){
 
@@ -87,7 +88,7 @@ function Tags(){
                 <EmptyScreensLayout key={"emptyScreen"}
                     iconSrc={"/public/tag_icon.svg"}
                     headingText={"No tags created"}
-                    description={"Tag your APIs with business keywords for easier grouping."}
+                    description={"Tag your " + mapLabel('APIs', getDashboardCategory()) + " with business keywords for easier grouping."}
                     buttonText={"Create tag"}
                     redirectUrl={"/dashboard/settings/tags/details"}
                     learnText={"Creating tags"}

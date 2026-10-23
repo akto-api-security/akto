@@ -360,7 +360,9 @@ def _qwen3guard_params(text: str, top_logprobs: int, temperature: float) -> dict
     """OpenAI-style chatCompletions params shared by all Qwen3Guard backends."""
     params: dict[str, Any] = {
         "messages": [{"role": "user", "content": text}],
-        "max_tokens": 64,
+        # The verdict and its logprobs come from the first label token after "Safety:" —
+        # " Safe" / " Unsafe" / " Cont"(roversial) — so "Safety", ":", label token is enough.
+        "max_tokens": 3,
         "temperature": temperature,
     }
     if top_logprobs > 0:
@@ -664,6 +666,19 @@ class BedrockMantleProvider(_BedrockAuthProvider):
 
 # ── Qwen3Guard parser (ported verbatim — sync) ────────────────────────────────
 
+_QWEN3GUARD_LABELS = ("safe", "unsafe", "controversial")
+
+
+def _qwen3guard_label(value: str) -> str | None:
+    """Full label for a Safety value or its first token ("Cont" -> "controversial")."""
+    value = value.strip().lower().lstrip(":").strip().strip("\"'")
+    if not value:
+        return None
+    for label in _QWEN3GUARD_LABELS:
+        if label.startswith(value) or value.startswith(label):
+            return label
+    return None
+
 
 def _confidence_from_logprobs(
     content_lp: list | None, chosen_label: str
@@ -692,24 +707,20 @@ def _confidence_from_logprobs(
         pool.append({"token": entry["token"], "logprob": entry["logprob"]})
     if not pool:
         return None, None, "no-top-logprobs"
-    labels = ("safe", "unsafe", "controversial")
-    agg = {label: 0.0 for label in labels}
+    agg = {label: 0.0 for label in _QWEN3GUARD_LABELS}
     mapped = False
     for cand in pool:
-        ct = cand.get("token", "").strip().lower()
-        if "safety:" in ct:
-            ct = ct.split("safety:")[-1].strip()
-        ct = ct.lstrip(":").strip().strip("\"'")
-        if not ct:
+        ct = cand.get("token", "")
+        if "safety:" in ct.lower():
+            ct = ct.lower().split("safety:")[-1]
+        label = _qwen3guard_label(ct)
+        if label is None:
             continue
-        for label in labels:
-            if label.startswith(ct) or ct.startswith(label):
-                try:
-                    agg[label] += math.exp(cand["logprob"])
-                    mapped = True
-                except (KeyError, TypeError, OverflowError):
-                    pass
-                break
+        try:
+            agg[label] += math.exp(cand["logprob"])
+            mapped = True
+        except (KeyError, TypeError, OverflowError):
+            pass
     total = sum(agg.values())
     if not mapped or total <= 0:
         return None, None, "unmapped"
@@ -733,7 +744,7 @@ def parse_qwen3guard_result(scanner_name: str, raw: str, logprobs_content: list 
             categories = val
     if not safety:
         raise ValueError(f"no Safety line in Qwen3Guard response: {raw[:200]!r}")
-    s = safety.lower()
+    s = _qwen3guard_label(safety)
     if s == "unsafe":
         is_valid, discrete_risk = False, 1.0
     elif s == "controversial":
@@ -759,7 +770,7 @@ def parse_qwen3guard_result(scanner_name: str, raw: str, logprobs_content: list 
         risk_score = discrete_risk
         decision_confidence = 1.0
 
-    details: dict[str, Any] = {"safety": safety, "confidence_source": source}
+    details: dict[str, Any] = {"safety": s.capitalize(), "confidence_source": source}
     if categories and categories.lower() != "none":
         details["categories"] = categories
         if scanner_name == "BanTopics":

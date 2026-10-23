@@ -1014,13 +1014,13 @@ const settingRequests = {
             data: {}
         })
     },
-    async backfillTraceSessions(startTime, endTime) {
+    async backfillActivityGroupKeys() {
         return await request({
-            url: '/api/backfillTraceSessions',
+            url: '/api/backfillActivityGroupKeys',
             method: 'post',
-            // Grouping a long history can outlast the 60s default.
+            // Reads every existing activity once; can outlast the 60s default on large accounts.
             timeout: 300000,
-            data: { startTime, endTime }
+            data: {}
         })
     },
     async deleteDuplicateEntries() {

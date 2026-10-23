@@ -30,6 +30,8 @@ import java.util.stream.Collectors;
 public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
     public static final AgentUsersDao instance = new AgentUsersDao();
     private static final Logger logger = LoggerFactory.getLogger(AgentUsersDao.class);
+    // The tag picker's "Select all" value; matches any value of its key.
+    private static final String ALL_TAG_VALUES = "__all__";
     private static final int MAX_TAGS_PER_SOURCE = 50;
 
     public void createIndicesIfAbsent() {
@@ -260,9 +262,9 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
                         .map(v -> v.trim().toLowerCase())
                         .collect(Collectors.toList());
                 if (values.isEmpty()) continue;
-                Bson positiveMatch = Filters.elemMatch(AgenticUsers.DEVICE_TAGS, Filters.and(
-                        Filters.eq(DeviceTag.KEY, entry.getKey().trim().toLowerCase()),
-                        Filters.in(DeviceTag.VALUE, values)));
+                Bson keyMatch = Filters.eq(DeviceTag.KEY, entry.getKey().trim().toLowerCase());
+                Bson positiveMatch = Filters.elemMatch(AgenticUsers.DEVICE_TAGS, values.contains(ALL_TAG_VALUES)
+                        ? keyMatch : Filters.and(keyMatch, Filters.in(DeviceTag.VALUE, values)));
                 boolean negated = negatedTagFilters != null && Boolean.TRUE.equals(negatedTagFilters.get(entry.getKey()));
                 // deviceTags is a union array across sources — a device can carry both a matching
                 // and non-matching value for the same key. Negate the whole elemMatch ($nor), not
@@ -316,6 +318,30 @@ public class AgentUsersDao extends AccountsContextDao<AgenticUsers>{
             tagDeviceIds.retainAll(new HashSet<>(deviceIds));
         }
         return new ArrayList<>(tagDeviceIds);
+    }
+
+    // userMetadata for picked users, resolved server-side; unknown picks keep their name and module_info email.
+    public List<AgenticUsers> resolveUserMetadata(List<String> picks) {
+        List<String> pickedUserNames = filterBlank(picks).stream().map(String::trim).collect(Collectors.toList());
+        List<AgenticUsers> resolvedUserMetadata = new ArrayList<>();
+        if (pickedUserNames.isEmpty()) return resolvedUserMetadata;
+        resolvedUserMetadata.addAll(findByUserIdsOrUserNames(pickedUserNames, pickedUserNames));
+
+        Set<String> resolvedPicks = new HashSet<>();
+        for (AgenticUsers u : resolvedUserMetadata) {
+            if (u.getUserName() != null) resolvedPicks.add(u.getUserName());
+            if (u.getUserId() != null) resolvedPicks.add(u.getUserId());
+        }
+        Map<String, String> moduleInfoEmailsByUsername = ModuleInfoDao.instance.fetchUsernameToEmailForEndpointShield();
+        for (String userName : pickedUserNames) {
+            if (resolvedPicks.contains(userName)) continue;
+            AgenticUsers snapshot = new AgenticUsers();
+            snapshot.setUserName(userName);
+            snapshot.setUserEmail(moduleInfoEmailsByUsername.get(userName));
+            resolvedUserMetadata.add(snapshot);
+            resolvedPicks.add(userName);
+        }
+        return resolvedUserMetadata;
     }
 
     /**

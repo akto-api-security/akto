@@ -60,7 +60,7 @@ const headings = [
         text: "Risk score",
         title: <HeadingWithTooltip
             title={"Risk score"}
-            content={"Risk score is calculated based on the amount of sensitive information the API shares and its current status regarding security issues."}
+            content={"Risk score is calculated based on the amount of sensitive information the " + mapLabel('API', getDashboardCategory()) + " shares and its current status regarding security issues."}
         />,
         value: "riskScoreComp",
         textValue: "riskScore",
@@ -119,7 +119,7 @@ const headings = [
         text: 'Last Seen',
         title: <HeadingWithTooltip 
                 title={"Last Seen"}
-                content={"Time when API was last detected in traffic."}
+                content={"Time when " + mapLabel('API', getDashboardCategory()) + " was last detected in traffic."}
             />,
         value: 'last_seen',
         isText: true,
@@ -131,7 +131,7 @@ const headings = [
         text: 'Discovered At',
         title: <HeadingWithTooltip
                 title={"Discovered At"}
-                content={"Time when API was first discovered in traffic."}
+                content={"Time when " + mapLabel('API', getDashboardCategory()) + " was first discovered in traffic."}
             />,
         value: 'added',
         isText: true,
@@ -143,7 +143,7 @@ const headings = [
         text: 'Last ' + mapLabel('Tested', getDashboardCategory()),
         title: <HeadingWithTooltip
                 title={"Last " + mapLabel('Tested', getDashboardCategory())}
-                content={"Time when API was last tested successfully."}
+                content={"Time when " + mapLabel('API', getDashboardCategory()) + " was last tested successfully."}
             />,
         value: 'lastTestedComp',
         sortActive: true,
@@ -1255,7 +1255,7 @@ function ApiEndpoints(props) {
         }
         return {
             headingText: "Discover APIs to get started",
-            description: "Your API collection is currently empty. Import APIs from other collections now."
+            description: "Your " + mapLabel('API', getDashboardCategory()) + " collection is currently empty. Import " + mapLabel('APIs', getDashboardCategory()) + " from other collections now."
         };
     }
 
@@ -1361,7 +1361,7 @@ function ApiEndpoints(props) {
                                         onAction: () => { handleRefresh(); setExportOpen(false) },
                                     },
                                     isApiGroup ? {
-                                        content: 'Re-compute API Group',
+                                        content: 'Re-compute ' + mapLabel('API Group', getDashboardCategory()),
                                         onAction: () => { computeApiGroup(); setExportOpen(false) },
                                         requires: 'api/computeCustomCollections'
                                     }: {}

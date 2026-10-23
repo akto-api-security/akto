@@ -7,6 +7,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents, showsActivityGrouping } from "../utils/activityGroups";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
@@ -289,6 +290,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   const [loading, setLoading] = useState(true);
   const misconfigRowMetaRef = useRef({});
+  // Event ids behind each grouped activity row (repeated Bedrock prompt from one caller), by the id of
+  // the row's latest event.
+  const activityGroupRef = useRef({});
+  const [groupActivities, setGroupActivities] = useState(true);
+  const [groupToggles, setGroupToggles] = useState(0);
   const humanResponseByIdRef = useRef({});
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const hostNameMap = PersistStore((state) => state.hostNameMap);
@@ -401,8 +407,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     }
   };
 
-  const handleBulkHumanApproval = async (selectedIds, response) => {
-    if (!Array.isArray(selectedIds) || selectedIds.length === 0) return;
+  const expandActivityGroups = (ids) => expandToGroupEvents(ids, activityGroupRef.current);
+
+  const handleBulkHumanApproval = async (rowIds, response) => {
+    if (!Array.isArray(rowIds) || rowIds.length === 0) return;
+    const selectedIds = expandActivityGroups(rowIds);
     try {
       const result = await api.updateMaliciousEventStatus({ eventIds: selectedIds, humanResponse: response });
       if (result?.updateSuccess) {
@@ -607,7 +616,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       return;
     }
 
-    const validIds = selectedIds.filter(id => id != null && id !== '');
+    const validIds = expandActivityGroups(selectedIds.filter(id => id != null && id !== ''));
 
     if (validIds.length === 0) {
       func.setToast(true, true, 'No valid events selected');
@@ -1050,7 +1059,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       skillEvaluationMode,
       configEvaluationMode,
       riskScoreFilterType,
-      riskScoreFilterValue
+      riskScoreFilterValue,
+      undefined,
+      !groupActivities
     );
 
     // Store the total count for filtered results
@@ -1059,7 +1070,11 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     if (isMisconfiguredSettings) {
       misconfigRowMetaRef.current = {};
     }
+    activityGroupRef.current = {};
     let ret = (res?.maliciousEvents || []).map((x) => {
+      if (x?.groupCount > 1 && x.groupEventIds?.length) {
+        activityGroupRef.current[x.id] = x.groupEventIds;
+      }
       if (isMisconfiguredSettings) {
         misconfigRowMetaRef.current[x.id] = { host: x.host, actor: x.actor, url: x.url };
       }
@@ -1149,7 +1164,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           </Badge>
         ),
         ...((isAgenticSecurityCategory() || isEndpointSecurityCategory()) && {
-          detectionType: (
+          // A grouped activity (same prompt from the same Bedrock caller) shows how many events it holds.
+          detectionType: x?.groupCount > 1 ? (
+            <ActivityGroupBadges count={x.groupCount} firstDetectedAt={x.groupFirstDetectedAt} lastDetectedAt={x.timestamp} policies={x.groupFilterIds} />
+          ) : (
             <Badge status={isSessionBased ? 'info' : 'default'}>
               {isSessionBased ? 'Session' : 'Single Prompt'}
             </Badge>
@@ -1273,7 +1291,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       p.skillEvaluationMode,
       p.configEvaluationMode,
       p.riskScoreFilterType,
-      p.riskScoreFilterValue
+      p.riskScoreFilterValue,
+      undefined,
+      showsActivityGrouping() // export every event, not one row per grouped activity
     );
     let events = res?.maliciousEvents || [];
     // "Needs Approval" is a client-side view over ACTIVE events (see fetchData above) — apply the
@@ -1469,11 +1489,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         onSelect={handleSelectedTab}
         mode={IndexFiltersMode.Default}
         searchAccessory={
-          <AdvancedPayloadSearch
-            filters={advancedFilters}
-            onChange={handleAdvancedFiltersChange}
-            showTags={false}
-          />
+          <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+            <ActivityGroupingToggle pressed={groupActivities} onToggle={() => { setGroupActivities(!groupActivities); setGroupToggles(n => n + 1); }} />
+            <AdvancedPayloadSearch
+              filters={advancedFilters}
+              onChange={handleAdvancedFiltersChange}
+              showTags={false}
+            />
+          </HorizontalStack>
         }
         searchBelow={advancedFilters.length > 0 ? (
           <AdvancedPayloadSearch
@@ -1482,7 +1505,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             showButton={false}
           />
         ) : null}
-        callFromOutside={advancedFetchKey + refreshNonce}
+        callFromOutside={advancedFetchKey + refreshNonce + groupToggles}
         clearSelectionKey={refreshNonce}
       />
 

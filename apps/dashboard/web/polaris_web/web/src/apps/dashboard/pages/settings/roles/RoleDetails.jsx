@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import func from "@/util/func";
 import settingRequests from "../api";
 import PersistStore from "../../../../main/PersistStore";
+import { mapLabel } from "../../../../main/labelHelper";
 import DetailsPage from "../../../components/DetailsPage";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import { usersCollectionRenderItem } from "../rbac/utils";
@@ -14,6 +15,7 @@ import {
 import { roleDetailsUrl, CreateRoleModal } from "./Roles";
 import { usePermissions } from "@/util/permissions";
 import Dropdown from "../../../components/layouts/Dropdown";
+import InfoTooltipIcon from "../../../components/shared/InfoTooltipIcon";
 
 const PRODUCT_LABELS = { API: 'API Security', AGENTIC: 'Akto ARGUS', ENDPOINT: 'Akto ATLAS', DAST: 'DAST' }
 
@@ -24,6 +26,12 @@ function isThreatFeatureGranted() {
         return true
     }
     return stiggFeatures?.THREAT_DETECTION?.isGranted === true
+}
+
+// permission labels follow the dashboard category: a mapped label as a whole, else its "Threat" word
+function categoryLabel(label, category) {
+    const mapped = mapLabel(label, category)
+    return mapped !== label ? mapped : label.replace('Threat', mapLabel('Threat', category))
 }
 
 function draftFrom(role) {
@@ -48,6 +56,7 @@ function RoleDetails() {
     const canDelete = canCall('api/deleteCustomRole')
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const threatGranted = isThreatFeatureGranted()
+    const dashboardCategory = PersistStore(state => state.dashboardCategory)
 
     const [loading, setLoading] = useState(true)
     const [loadFailed, setLoadFailed] = useState(null) // null, or why loading failed
@@ -129,7 +138,7 @@ function RoleDetails() {
     const effectiveAccess = (feature) => {
         const own = draft.permissionOverrides[feature]
         if (own) return own
-        // threat settings follow threat protection unless changed on their own
+        // threat settings follow threat detection unless changed on their own
         if (feature === 'THREAT_SETTINGS' && draft.permissionOverrides.THREAT_PROTECTION) return draft.permissionOverrides.THREAT_PROTECTION
         return baseAccess(feature)
     }
@@ -171,7 +180,7 @@ function RoleDetails() {
                 </HorizontalGrid>
                 {draft.baseRole === 'ADMIN' && draftLimited ? (
                     <Banner status="info">
-                        <Text as="p">Users with this role are limited to some collections, so they can't manage users, roles or SSO.</Text>
+                        <Text as="p">Users with this role are limited to some collections, so they can't manage SSO or edit roles. They can invite users and change roles only for the roles chosen under "Invite Permissions".</Text>
                     </Banner>
                 ) : null}
             </VerticalStack>
@@ -197,20 +206,21 @@ function RoleDetails() {
                         : `Same as ${getRoleDisplayName(draft.baseRole)}. Change only what this role needs.`}
                 </Text>
             </LegacyCard.Section>
-            {PERMISSION_GROUPS.filter(group => threatGranted || group.title !== 'Threat protection').map(group => (
-                <LegacyCard.Section key={group.title} title={group.title}>
+            {PERMISSION_GROUPS.filter(group => threatGranted || group.title !== 'Threat Detection').map(group => (
+                <LegacyCard.Section key={group.title} title={mapLabel(group.title, dashboardCategory)}>
                     <VerticalStack gap="3">
-                        {group.features.map(({ feature, label }) => {
+                        {group.features.map(({ feature, label, description }) => {
                             const isChanged = !!draft.permissionOverrides[feature]
                             const followsThreat = feature === 'THREAT_SETTINGS' && !isChanged && !!draft.permissionOverrides.THREAT_PROTECTION
                             return (
                                 <HorizontalStack key={feature} align="space-between" blockAlign="center" gap="4" wrap={false}>
                                     <VerticalStack gap="1">
                                         <HorizontalStack gap="2" blockAlign="center">
-                                            <Text>{label}</Text>
+                                            <Text>{categoryLabel(label, dashboardCategory)}</Text>
+                                            <InfoTooltipIcon content={description} />
                                             {isChanged ? <Badge status="attention">Changed</Badge> : null}
                                         </HorizontalStack>
-                                        {followsThreat ? <Text variant="bodySm" color="subdued">{`Follows threat protection: ${ACCESS_LABELS[effectiveAccess(feature)]}`}</Text> : null}
+                                        {followsThreat ? <Text variant="bodySm" color="subdued">{`Follows ${categoryLabel('API Threat Activity', dashboardCategory).toLowerCase()}: ${ACCESS_LABELS[effectiveAccess(feature)]}`}</Text> : null}
                                     </VerticalStack>
                                     <Box minWidth="220px">
                                         <Dropdown
@@ -243,7 +253,7 @@ function RoleDetails() {
             rule = { tagKey: tagKey.trim(), tagValue: rest.join('=').trim() }
         }
         if (draft.collectionRules.some(r => describeRule(r) === describeRule(rule))) {
-            func.setToast(true, true, "This rule is already added.")
+            func.setToast(true, true, "This rule already exists.")
             return
         }
         update({ collectionRules: [...draft.collectionRules, rule] })
@@ -261,10 +271,10 @@ function RoleDetails() {
         <LegacyCard title="Collections" key="collections">
             <LegacyCard.Section>
                 <Banner status={draftLimited ? "info" : undefined}>
-                    <Text as="p">{collectionsText} Leave both empty to give access to all collections.</Text>
+                    <Text as="p">{collectionsText}{draftLimited ? " Remove all chosen collections and rules to give access to all collections." : ""}</Text>
                 </Banner>
             </LegacyCard.Section>
-            <LegacyCard.Section title="Chosen collections">
+            <LegacyCard.Section title="Chosen Collections">
                 <VerticalStack gap="3">
                     {visibleSelected.length > 0 ? (
                         <HorizontalStack gap="2">
@@ -277,7 +287,7 @@ function RoleDetails() {
                         </HorizontalStack>
                     ) : <Text color="subdued">No collections chosen in this product.</Text>}
                     {hiddenSelected.length > 0 ? (
-                        <Text variant="bodySm" color="subdued">{`Also ${hiddenSelected.length} collection${hiddenSelected.length === 1 ? '' : 's'} from other products, or deleted. They stay as they are.`}</Text>
+                        <Text variant="bodySm" color="subdued">{`Plus ${hiddenSelected.length} collection${hiddenSelected.length === 1 ? '' : 's'} from other products or already deleted. ${hiddenSelected.length === 1 ? 'It is' : 'They are'} kept unchanged.`}</Text>
                     ) : null}
                     {canEdit ? (
                         <HorizontalStack>
@@ -286,7 +296,7 @@ function RoleDetails() {
                     ) : null}
                 </VerticalStack>
             </LegacyCard.Section>
-            <LegacyCard.Section title="Also include collections matching">
+            <LegacyCard.Section title="Also Include Collections Matching">
                 <VerticalStack gap="3">
                     <Text variant="bodySm" color="subdued">Collections added later that match a rule are included automatically.</Text>
                     {draft.collectionRules.length > 0 ? (
@@ -335,19 +345,19 @@ function RoleDetails() {
     const givableRoles = allRoles.filter(r => r.name !== role.name && isGivableByTeamAdmin(r))
     const canInvite = effectiveAccess('INVITE_MEMBERS') === 'READ_WRITE'
     const teamAdminCard = (
-        <LegacyCard title="Roles this role can give" key="team-admin" sectioned>
+        <LegacyCard title="Invite Permissions" key="team-admin" sectioned>
             <VerticalStack gap="3">
-                <Text color="subdued">
-                    For team admins: users of this role who are limited to collections can invite people and change roles only to these roles.
-                    Users who see all collections follow the usual role levels instead.
-                </Text>
+                <VerticalStack gap="1">
+                    <Text as="p">Users with this role can add users and assign them only the roles selected here.</Text>
+                    <Text as="p" variant="bodySm" color="subdued">Hint: Only roles limited to collections are listed, and roles based on Admin are never listed.</Text>
+                </VerticalStack>
                 {!canInvite ? (
                     <Banner status="info">
-                        <Text as="p">This role can't invite users. Set "Invite users and change their roles" to Read and write to use this list.</Text>
+                        <Text as="p">This list works only when "Invite Users and Change Their Roles" is set to "Read and write". Right now, users with this role can't add users.</Text>
                     </Banner>
                 ) : null}
                 {givableRoles.length === 0 ? (
-                    <Text color="subdued">No other roles are limited to collections yet. Only those can be given by team admins.</Text>
+                    <Text color="subdued">No other roles are limited to collections yet (roles based on Admin don't count), so there is nothing to select.</Text>
                 ) : (
                     <HorizontalStack gap="4">
                         {givableRoles.map(r => (
@@ -368,10 +378,10 @@ function RoleDetails() {
     )
 
     const usersCard = (
-        <LegacyCard title={`Users with this role (${usageSummary(usage)})`} key="users">
+        <LegacyCard title={inUse ? `Users With This Role (${usageSummary(usage)})` : "Users With This Role"} key="users">
             {members.length === 0 ? (
                 <LegacyCard.Section>
-                    <Text color="subdued">{(usage.invites || 0) > 0 ? "Only pending invites use this role." : "Nobody has this role yet. Give it from the Users page."}</Text>
+                    <Text color="subdued">{(usage.invites || 0) > 0 ? "Only pending invites use this role." : "No one has this role yet. Assign it from the Users page."}</Text>
                 </LegacyCard.Section>
             ) : (
                 <ResourceList
@@ -380,7 +390,7 @@ function RoleDetails() {
                     renderItem={(user) => {
                         const products = Object.entries(user?.scopeRoleMapping || {}).filter(([, r]) => r === roleName).map(([scope]) => PRODUCT_LABELS[scope] || scope)
                         return (
-                            <ResourceItem id={String(user.id)} onClick={() => navigate('/dashboard/settings/users')} accessibilityLabel={`Open users`}>
+                            <ResourceItem id={String(user.id)} onClick={() => navigate('/dashboard/settings/users')} accessibilityLabel="Open users page">
                                 <HorizontalStack align="space-between" blockAlign="center">
                                     <VerticalStack gap="1">
                                         <Text fontWeight="semibold">{user.name && user.name !== '-' ? user.name : user.login}</Text>
@@ -429,7 +439,7 @@ function RoleDetails() {
         <HorizontalStack gap="2">
             <Button onClick={() => setCopyOpen(true)}>Copy</Button>
             {!canDelete ? null : inUse ? (
-                <Tooltip content={`Used by ${usageSummary(usage)}. Give them another role first.`}>
+                <Tooltip content={`Used by ${usageSummary(usage)}. Assign them another role first.`}>
                     <Button destructive disabled>Delete</Button>
                 </Tooltip>
             ) : <Button destructive outline onClick={deleteRole}>Delete</Button>}
@@ -439,7 +449,7 @@ function RoleDetails() {
     const components = [detailsCard, permissionsCard, collectionsCard, teamAdminCard, usersCard]
     if (!canEdit) {
         components.unshift(
-            <Banner key="read-only" status="info"><Text as="p">Only admins of all collections can change roles.</Text></Banner>
+            <Banner key="read-only" status="info"><Text as="p">Only admins with access to all collections can edit roles.</Text></Banner>
         )
     }
 

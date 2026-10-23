@@ -1,11 +1,10 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Button, Modal, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
+import { Button, HorizontalStack, IndexFiltersMode, Text, Badge, Thumbnail, HorizontalGrid, Box } from "@shopify/polaris"
 import api from "../api"
 import { useEffect,useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import { useNavigate } from "react-router-dom"
-import dashboardFunc from "../../transform"
 // import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import { CellType } from "../../../components/tables/rows/GithubRow"
@@ -55,13 +54,13 @@ const headers = [
     },
     {
         title: mapLabel("API response", getDashboardCategory()),
-        text: "API response",
+        text: mapLabel('API response', getDashboardCategory()),
         value: "response",
         sortActive: true,
     },
     {
         title: mapLabel("API request", getDashboardCategory()),
-        text: "API request",
+        text: mapLabel('API request', getDashboardCategory()),
         value: "request",
         sortActive: true
     },

@@ -17,36 +17,35 @@ function getRoleDisplayName(role) {
 // Permissions an admin can change per custom role; anything not changed keeps the base role's access
 const PERMISSION_GROUPS = [
     {
-        title: 'People and settings',
+        title: 'People and Settings',
         features: [
-            { feature: 'INVITE_MEMBERS', label: 'Invite users and change their roles' },
-            { feature: 'INTEGRATIONS', label: 'Integrations' },
-            { feature: 'API_TOKENS', label: 'API tokens' },
+            { feature: 'INVITE_MEMBERS', label: 'Invite Users and Change Their Roles', description: "Invite new users and change the roles of existing users. Read lets users view the user list." },
+            { feature: 'INTEGRATIONS', label: 'Integrations', description: "Import agents into Akto from other platforms, or export them out. Read and write lets users add, edit and remove these connections." },
+            { feature: 'API_TOKENS', label: 'API Tokens', description: "Create and manage the API tokens used to call Akto programmatically. Tokens carry access, so limit this to trusted roles." },
         ]
     },
     {
-        title: 'Inventory and data',
+        title: 'Inventory and Data',
         features: [
-            { feature: 'API_COLLECTIONS', label: 'API collections and inventory' },
-            { feature: 'AI_AGENTS', label: 'AI agents' },
-            { feature: 'SENSITIVE_DATA', label: 'Sensitive data' },
-            { feature: 'SAMPLE_DATA', label: 'Request and response samples' },
+            { feature: 'API_COLLECTIONS', label: ' Collections and Inventory', description: "View and manage collections and the discovered inventory, including endpoints and their details." },
+            { feature: 'SENSITIVE_DATA', label: 'Sensitive Data', description: "See which sensitive data types (such as emails or tokens) were found in your APIs, and change how they are treated." },
+            { feature: 'SAMPLE_DATA', label: 'Request and Response Samples', description: "View the captured request and response samples for endpoints. These can contain real traffic data." },
         ]
     },
     {
         title: 'Testing',
         features: [
-            { feature: 'START_TEST_RUN', label: 'Run tests' },
-            { feature: 'TEST_RESULTS', label: 'Test results' },
-            { feature: 'ISSUES', label: 'Issues' },
-            { feature: 'TEST_SCRIPTS', label: 'Pre and post request scripts' },
+            { feature: 'START_TEST_RUN', label: 'Run Tests', description: "Start, schedule and stop security test runs. Read only shows test runs that already exist." },
+            { feature: 'TEST_RESULTS', label: 'Test Results', description: "View the results of test runs. Read and write also lets users edit test configuration and delete results." },
+            { feature: 'ISSUES', label: 'Issues', description: "View the security issues found by tests. Read and write lets users change an issue's status, such as ignoring or fixing it." },
+            { feature: 'TEST_SCRIPTS', label: 'Pre and Post Request Scripts', description: "Add scripts that run before or after test requests, for example to refresh auth tokens. Scripts execute code, so limit this to trusted roles." },
         ]
     },
     {
-        title: 'Threat protection',
+        title: 'Threat Detection',
         features: [
-            { feature: 'THREAT_PROTECTION', label: 'Threat protection and guardrail activity' },
-            { feature: 'THREAT_SETTINGS', label: 'Threat settings and data retention' },
+            { feature: 'THREAT_PROTECTION', label: 'API Threat Activity', description: "View detected activity and blocked requests. Read and write lets users act on them, such as changing event status." },
+            { feature: 'THREAT_SETTINGS', label: 'Threat Settings and Data Retention', description: "Change detection settings and how long the data is kept. If not set separately, this follows the access of the activity option above." },
         ]
     },
 ]

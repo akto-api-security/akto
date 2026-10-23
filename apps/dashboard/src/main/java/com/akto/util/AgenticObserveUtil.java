@@ -225,6 +225,11 @@ public final class AgenticObserveUtil {
         // detection) must classify as "MCP Server", not get swallowed into gen-ai/agent grouping
         // just because gen-ai happened to be tagged first.
         CollectionTags fallback = null;
+        // ai-agent-caller only says the service was seen CALLING an AI asset, so it is weaker than
+        // a tag describing the collection itself. Held separately rather than folded into fallback:
+        // both are assigned in one pass, so sharing the variable would let whichever tag happened
+        // to come first win, and a gen-ai collection that also calls an LLM would type as a caller.
+        CollectionTags callerFallback = null;
         for (CollectionTags tag : envType) {
             if (tag == null || StringUtils.isBlank(tag.getKeyName())) {
                 continue;
@@ -236,8 +241,11 @@ public final class AgenticObserveUtil {
             if (fallback == null && (Constants.AKTO_GEN_AI_TAG.equals(key) || Constants.AKTO_BROWSER_LLM_TAG.equals(key))) {
                 fallback = tag;
             }
+            if (callerFallback == null && Constants.AKTO_AI_AGENT_CALLER_TAG.equals(key)) {
+                callerFallback = tag;
+            }
         }
-        return fallback;
+        return fallback != null ? fallback : callerFallback;
     }
 
     public static String getTypeFromCollection(ApiCollection collection) {
@@ -280,6 +288,7 @@ public final class AgenticObserveUtil {
         if(hasMcpServer && !hasAiAgent){
             return CLIENT_TYPE_MCP_SERVER;
         }
+        boolean hasAiAgentCaller = false;
         for (CollectionTags tag : envType) {
             if (tag == null) {
                 continue;
@@ -293,6 +302,16 @@ public final class AgenticObserveUtil {
             if (Constants.AKTO_BROWSER_LLM_TAG.equals(tag.getKeyName())) {
                 return CLIENT_TYPE_LLM;
             }
+            if (Constants.AKTO_AI_AGENT_CALLER_TAG.equals(tag.getKeyName())) {
+                hasAiAgentCaller = true;
+            }
+        }
+        // Resolved only after the loop: a service that merely CALLS an AI asset is typed by that
+        // just when it carries no stronger tag. Returning inside the loop would make it depend on
+        // tag order and let a caller tag beat a gen-ai or browser-llm tag listed after it. Without
+        // this it would reach the MCP Server default below and be mislabelled as one.
+        if (hasAiAgentCaller) {
+            return CLIENT_TYPE_AI_AGENT;
         }
         return CLIENT_TYPE_MCP_SERVER;
     }

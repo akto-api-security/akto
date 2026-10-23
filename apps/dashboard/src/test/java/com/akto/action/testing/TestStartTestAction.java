@@ -18,6 +18,7 @@ import com.akto.dto.RBAC.Role;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingRun.State;
+import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.type.URLMethods;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.util.Constants;
@@ -338,6 +339,79 @@ public class TestStartTestAction extends MongoBasedTest {
 
         assertEquals(metadata, summary.getMetadata());
 
+    }
+
+    private ObjectId insertRunningTest(GlobalEnums.CONTEXT_SOURCE dashboardContext, int totalApis, int testResultsCount, int testInitiatedCount) {
+        TestingRun testingRun = new TestingRun(Context.now(), "", new CollectionWiseTestingEndpoints(1000), 0,
+                State.RUNNING, 0, "test", "", false);
+        testingRun.setDashboardContext(dashboardContext);
+        TestingRunDao.instance.insertOne(testingRun);
+
+        TestingRunResultSummary summary = new TestingRunResultSummary(Context.now(), 0, new HashMap<>(), totalApis,
+                testingRun.getId(), testingRun.getHexId(), testResultsCount, 0, testInitiatedCount);
+        TestingRunResultSummariesDao.instance.insertOne(summary);
+        return testingRun.getId();
+    }
+
+    @Test
+    public void testCurrentTestStateStatusFiltersByDashboardContext() {
+        TestingRunDao.instance.getMCollection().drop();
+        TestingRunResultSummariesDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+        OrganizationsDao.instance.getMCollection().drop();
+        RBACDao.instance.getMCollection().drop();
+
+        // fresh admin user, so cached collection lists from other tests don't apply
+        int userId = UUID.randomUUID().hashCode() & 0xfffffff;
+        Context.userId.set(userId);
+        RBACDao.instance.insertOne(new RBAC(userId, Role.ADMIN.name(), ACCOUNT_ID));
+
+        ObjectId apiRunId = insertRunningTest(GlobalEnums.CONTEXT_SOURCE.API, 10, 30, 5);
+        ObjectId agenticRunId = insertRunningTest(GlobalEnums.CONTEXT_SOURCE.AGENTIC, 4, 2, 3);
+
+        // API Security dashboard: only the API run
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+        StartTestAction startTestAction = new StartTestAction();
+        assertEquals(Action.SUCCESS.toUpperCase(), startTestAction.getCurrentTestStateStatus());
+        CurrentTestsStatus status = startTestAction.getCurrentTestsStatus();
+        assertEquals(1, status.getCurrentRunningTestsStatus().size());
+        assertEquals(apiRunId.toHexString(), status.getCurrentRunningTestsStatus().get(0).getTestingRunId());
+        assertEquals(30, status.getTotalTestsCompleted());
+        assertEquals(50, status.getTestRunsScheduled());
+
+        // Argus dashboard: only the agentic run
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.AGENTIC);
+        startTestAction = new StartTestAction();
+        assertEquals(Action.SUCCESS.toUpperCase(), startTestAction.getCurrentTestStateStatus());
+        status = startTestAction.getCurrentTestsStatus();
+        assertEquals(1, status.getCurrentRunningTestsStatus().size());
+        assertEquals(agenticRunId.toHexString(), status.getCurrentRunningTestsStatus().get(0).getTestingRunId());
+        assertEquals(2, status.getTotalTestsCompleted());
+        assertEquals(12, status.getTestRunsScheduled());
+
+        // Atlas dashboard: neither run, so the progress bar stays hidden
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.ENDPOINT);
+        startTestAction = new StartTestAction();
+        assertEquals(Action.SUCCESS.toUpperCase(), startTestAction.getCurrentTestStateStatus());
+        status = startTestAction.getCurrentTestsStatus();
+        assertEquals(0, status.getCurrentRunningTestsStatus().size());
+        assertEquals(0, status.getTotalTestsCompleted());
+        assertEquals(0, status.getTestRunsScheduled());
+
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+    }
+
+    @Test
+    public void testCurrentTestStateStatusWithNoRunningTests() {
+        TestingRunDao.instance.getMCollection().drop();
+        TestingRunResultSummariesDao.instance.getMCollection().drop();
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        StartTestAction startTestAction = new StartTestAction();
+        assertEquals(Action.SUCCESS.toUpperCase(), startTestAction.getCurrentTestStateStatus());
+        CurrentTestsStatus status = startTestAction.getCurrentTestsStatus();
+        assertEquals(0, status.getCurrentRunningTestsStatus().size());
+        assertEquals(0, status.getTotalTestsCompleted());
     }
 
     @Test

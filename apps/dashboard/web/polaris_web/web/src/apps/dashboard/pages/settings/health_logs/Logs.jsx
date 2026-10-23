@@ -53,6 +53,7 @@ const Logs = () => {
         { label: "AWS API Gateway", value: "AWS_API_GATEWAY" },
         { label: "Guardrails Service", value: "GUARDRAILS_SERVICE" },
         {label: "Smart Testing", value: "SMART_TESTING"},
+        { label: "Mini Testing Orchestrator", value: "MINI_TESTING_ORCHESTRATOR" },
         // dast_logs is only populated for DAST deployments, so hide the option elsewhere.
         ...(isDastCategory() ? [{ label: "DAST", value: "DAST" }] : []),
     ];

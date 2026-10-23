@@ -52,8 +52,10 @@ type policyCache struct {
 	// anomalyByPolicy maps policy ID (== policy name) to its anomaly config.
 	// Only policies with anomaly detection enabled appear here.
 	anomalyByPolicy map[string]*anomalyCfg
-	// rejectedLLMSites holds browser LLM sites marked Rejected in Audit Data.
-	rejectedLLMSites map[string]struct{}
+	// rejectedLLMSites holds browser LLM sites marked Rejected in Audit Data, with who each block applies to.
+	rejectedLLMSites map[string]auditScope
+	// rejectedAIAgents maps names of AI agents marked Rejected in Audit Data to their row and scope.
+	rejectedAIAgents map[string]rejectedAgent
 	lastFetched      time.Time
 	mu               sync.RWMutex
 }
@@ -94,6 +96,10 @@ type Service struct {
 	allowlistRefreshGroup singleflight.Group
 	threatAPIClient       *threatapi.Client
 	orgEmailDomains       []string // this account's work email domains, see orgEmailDomainsByAccount
+	// redactionCache holds display redactions for POST /api/redact/payloads; nil when disabled.
+	redactionCache *mcp.RedactionCache
+	// displayRedactor masks one payload; mcp.RedactForDisplay, replaceable in tests.
+	displayRedactor func(ctx context.Context, payload string) mcp.DisplayRedaction
 }
 
 // NewService creates a new validator service
@@ -162,9 +168,12 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	LogFieldMappingStartup()
 
 	svc := &Service{
-		config:              cfg,
-		dbClient:            dbClient,
-		processor:           defaultProcessor,
+		config:    cfg,
+		dbClient:  dbClient,
+		processor: defaultProcessor,
+		redactionCache: mcp.NewRedactionCache(cfg.RedactionCacheMaxEntries,
+			time.Duration(cfg.RedactionCacheTTLSec)*time.Second, cfg.RedactionCacheMaxPayloadBytes),
+		displayRedactor:     mcp.RedactForDisplay,
 		logger:              logger,
 		cache:               &policyCache{},
 		mcpListCache:        &mcpListCache{},
@@ -192,6 +201,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 	}()
 	go svc.runPolicyRefresher()
 	svc.startMcpAllowlistRefresher()
+	svc.schemaFetcher.StartRefresher()
 	return svc, nil
 }
 
@@ -430,12 +440,21 @@ func deviceIDsContain(ids []string, label string) bool {
 	if label == "" {
 		return false
 	}
+	label = collapseDashes(label)
 	for _, id := range ids {
-		if strings.EqualFold(id, label) {
+		if strings.EqualFold(collapseDashes(id), label) {
 			return true
 		}
 	}
 	return false
+}
+
+// collapseDashes folds dash runs, as hooks dash each byte of a non-ASCII name ("rohan---s" vs "rohan-s").
+func collapseDashes(s string) string {
+	for strings.Contains(s, "--") {
+		s = strings.ReplaceAll(s, "--", "-")
+	}
+	return s
 }
 
 // filterPoliciesByDevice filters device/user-targeted policies, combining two independent ways a
@@ -621,6 +640,8 @@ var orgEmailDomainsByAccount = map[string][]string{
 	"1786073624": {"supremelending.com"},
 	"1783981503": {"lguplus.co.kr"},
 	"1726615470": {"akto.io"},
+	"1791484402": {"cookunity.com"},
+	"1786100206": {"chargepoint.com"},
 }
 
 // requestAccountType resolves browser requests via browser-user-email and everything else via the proxy token email.
@@ -1048,7 +1069,7 @@ func (s *Service) runPolicyRefresher() {
 func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, error) {
 	s.logger.Info("Refreshing policies cache - fetching ALL policies")
 
-	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, err := s.fetchAndParsePolicies()
+	policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, decisions, err := s.fetchAndParsePolicies()
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -1064,7 +1085,8 @@ func (s *Service) refreshPolicies() ([]types.Policy, map[string]*types.AuditPoli
 	s.cache.blockedHosts = blockedHostRules
 	s.cache.anomalyByPolicy = anomalyMap
 	s.cache.ignorePhraseMatchersByPolicy = ignorePhraseMatchersByPolicy
-	s.cache.rejectedLLMSites = rejectedLLMSites(auditPolicies)
+	s.cache.rejectedLLMSites = decisions.llmSites
+	s.cache.rejectedAIAgents = decisions.agents
 	s.cache.lastFetched = time.Now()
 
 	s.logger.Info("Policy cache refreshed with ALL policies",
@@ -1833,7 +1855,7 @@ func (s *Service) checkErrorAnomaly(ctx context.Context, params *models.Validate
 }
 
 // fetchAndParsePolicies fetches policies from database abstractor and parses them
-func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, map[string]*anomalyCfg, error) {
+func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.AuditPolicy, map[string]*regexp.Regexp, bool, []mcp.BlockedHostRule, map[string]*ignorePhraseMatcher, map[string]*anomalyCfg, auditDecisions, error) {
 	var rawGuardrailPolicies, rawAuditPolicies []byte
 
 	g := new(errgroup.Group)
@@ -1855,7 +1877,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		return nil
 	})
 	if err := g.Wait(); err != nil {
-		return nil, nil, nil, false, nil, nil, nil, err
+		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, err
 	}
 
 	s.logger.Debug("Raw guardrail policies response",
@@ -1870,7 +1892,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		s.logger.Error("Failed to parse guardrail policies",
 			zap.Error(err),
 			zap.String("rawResponse", string(rawGuardrailPolicies)))
-		return nil, nil, nil, false, nil, nil, nil, fmt.Errorf("failed to parse guardrail policies: %w", err)
+		return nil, nil, nil, false, nil, nil, nil, auditDecisions{}, fmt.Errorf("failed to parse guardrail policies: %w", err)
 	}
 
 	s.logger.Info("Parsed guardrail policies",
@@ -1997,7 +2019,7 @@ func (s *Service) fetchAndParsePolicies() ([]types.Policy, map[string]*types.Aud
 		zap.Int("compiledRules", len(compiledRules)),
 		zap.Int("ignorePhrasePolicies", len(ignorePhraseMatchersByPolicy)))
 
-	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, nil
+	return policies, auditPolicies, compiledRules, hasAuditRules, blockedHostRules, ignorePhraseMatchersByPolicy, anomalyMap, rejectedAuditDecisions(rawAuditPolicies), nil
 }
 
 // validationContextFromParams builds mcp.ValidationContext from traffic params and explicit payload strings for the context.
@@ -2312,8 +2334,6 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	session.TrackRequestOnly(s.sessionMgr, sessionID, requestID, payload)
 
-	s.schemaFetcher.RefreshIfNeeded()
-
 	payloadBare := s.extractPayloadForValidation(payload, params.Method, params.Path, true)
 	s.logger.Info("ValidateRequest - payload prepared for validation",
 		zap.String("path", params.Path),
@@ -2393,9 +2413,12 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return blockResult, activityID, nil
 	}
 
-	// Browser LLM rejected in Audit Data; like MCP audit, enforced only when a policy applies.
+	// Browser LLM / AI agent rejected in Audit Data; like MCP audit, enforced only when a policy applies.
 	if len(policies) > 0 {
 		if blockResult := s.checkRejectedLLM(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+			return blockResult, "", nil
+		}
+		if blockResult := s.checkRejectedAgent(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
 			return blockResult, "", nil
 		}
 	}
@@ -2571,8 +2594,6 @@ func (s *Service) ValidateResponse(ctx context.Context, params *models.ValidateR
 			return &mcp.ValidationResult{Allowed: true, ModifiedPayload: responseBody}, "", nil
 		}
 	}
-
-	s.schemaFetcher.RefreshIfNeeded()
 
 	// Get cached policies (refreshes if stale)
 	policiesStart := time.Now()
@@ -2892,8 +2913,6 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 		zap.Int("count", len(batchData)),
 		zap.String("contextSource", contextSource),
 		zap.Bool("skipThreat", skipThreat))
-
-	s.schemaFetcher.RefreshIfNeeded()
 
 	type batchPolicyBundle struct {
 		policies      []types.Policy

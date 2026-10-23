@@ -25,7 +25,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined, configEvaluationMode = undefined, riskScoreFilterType = undefined, riskScoreFilterValue = undefined, humanResponseFilter = undefined) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit, label, hosts, latestApiOrigRegex, method = [], sortBySeverity = false, severity = [], skillEvaluationMode = undefined, configEvaluationMode = undefined, riskScoreFilterType = undefined, riskScoreFilterValue = undefined, humanResponseFilter = undefined, ungroupActivities = false, extraFilters = {}) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -55,6 +55,9 @@ const threatDetectionRequests = {
                 ...(riskScoreFilterType ? { riskScoreFilterType } : {}),
                 ...(riskScoreFilterValue != null && riskScoreFilterValue !== "" ? { riskScoreFilterValue } : {}),
                 ...(humanResponseFilter ? { humanResponse: humanResponseFilter } : {}),
+                ...(ungroupActivities ? { ungroupActivities: true } : {}),
+                ...(extraFilters.agenticTypes?.length ? { agenticTypes: extraFilters.agenticTypes } : {}),
+                ...(extraFilters.behaviours?.length ? { behaviours: extraFilters.behaviours } : {}),
             },
             suppress403Toast: true
         })
@@ -142,11 +145,12 @@ const threatDetectionRequests = {
             data,
         })
     },
-    fetchMaliciousRequest(refId, eventType, actor, filterId) {
+    // eventIds: a grouped activity row's events, returned as the attempts to page through.
+    fetchMaliciousRequest(refId, eventType, actor, filterId, eventIds = []) {
         return request({
             url: '/api/fetchAggregateMaliciousRequests',
             method: 'post',
-            data: {refId, eventType, actor, filterId}
+            data: {refId, eventType, actor, filterId, ...(eventIds.length > 0 ? { eventIds } : {})}
         })
     },
     fetchCountBySeverity(startTs, endTs, severityStatusFilter, skillEvaluationMode, configEvaluationMode) {

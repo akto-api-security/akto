@@ -124,7 +124,7 @@ async def test_qwen3guard_foundry_sends_and_parses_logprobs():
     body = _FakeClient.posts[0]["json"]
     assert body["logprobs"] is True
     assert body["top_logprobs"] == 5
-    assert body["max_tokens"] == 64
+    assert body["max_tokens"] == 3
     assert body["temperature"] == 0.0
 
 

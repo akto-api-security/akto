@@ -13,6 +13,7 @@ import { handleIpsChange } from '../../../components/shared/ipUtils'
 import UpdateIpsComponent from '../../../components/shared/UpdateIpsComponent'
 import AllowedAction from '../../../components/shared/AllowedAction'
 import { usePermissions } from '@/util/permissions'
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 export const timezonesAvailable = [
     { label: "Baker Island Time (BIT) UTC-12:00", value: "Etc/GMT+12" },
@@ -111,8 +112,8 @@ function About() {
     const [disableMalEventButton, setDisableMalEventButton] = useState(false)
     const [resetAccessTypeModal, setResetAccessTypeModal] = useState(false)
     const [disableResetAccessTypeButton, setDisableResetAccessTypeButton] = useState(false)
-    const [groupTracesModal, setGroupTracesModal] = useState(false)
-    const [disableGroupTracesButton, setDisableGroupTracesButton] = useState(false)
+    const [groupActivitiesModal, setGroupActivitiesModal] = useState(false)
+    const [disableGroupActivitiesButton, setDisableGroupActivitiesButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -414,15 +415,15 @@ function About() {
         })
     }
 
-    const handleGroupTraces = async() => {
-        setGroupTracesModal(false)
-        setDisableGroupTracesButton(true)
-        await settingRequests.backfillTraceSessions(0, func.timeNow()).then((res) => {
-            func.setToast(true, false, `Grouped ${res?.backfillUpdated || 0} traces into conversations.`)
+    const handleGroupActivities = async() => {
+        setGroupActivitiesModal(false)
+        setDisableGroupActivitiesButton(true)
+        await settingRequests.backfillActivityGroupKeys().then((res) => {
+            func.setToast(true, false, `Grouped ${res?.backfilledGroupKeys || 0} existing guardrail activities.`)
         }).catch(() => {
-            func.setToast(true, true, "Failed to group existing traces. Please try again.")
+            func.setToast(true, true, "Failed to group existing guardrail activities. Please try again.")
         })
-        setDisableGroupTracesButton(false)
+        setDisableGroupActivitiesButton(false)
     }
 
     const handleResetCollectionAccessTypes = async() => {
@@ -635,7 +636,7 @@ function About() {
             >
                 <Modal.Section>
                     <VerticalStack>
-                        <Text>This will recalculate the access type for all collections based on their APIs.</Text>
+                        <Text>This will recalculate the access type for all collections based on their {mapLabel('APIs', getDashboardCategory())}.</Text>
                         <Text>Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>
@@ -643,32 +644,32 @@ function About() {
 
             {window?.USER_NAME?.toLowerCase()?.includes("@akto.io") &&
                 <VerticalStack gap={2}>
-                    <Text color='subdued' variant='bodyMd'>Group existing Bedrock traces into conversations</Text>
+                    <Text color='subdued' variant='bodyMd'>Group existing guardrail activities</Text>
                     <Box width='80px'>
-                        <AllowedAction allowed={canCall('api/backfillTraceSessions')}>
-                            <Button disabled={disableGroupTracesButton} onClick={() => setGroupTracesModal(true)}>Group</Button>
+                        <AllowedAction allowed={canCall('api/backfillActivityGroupKeys')}>
+                            <Button disabled={disableGroupActivitiesButton} onClick={() => setGroupActivitiesModal(true)}>Group</Button>
                         </AllowedAction>
                     </Box>
                 </VerticalStack>
             }
 
             <Modal
-                open={groupTracesModal}
+                open={groupActivitiesModal}
                 primaryAction={{
                     content: "Yes, Group",
-                    onAction: handleGroupTraces
+                    onAction: handleGroupActivities
                 }}
                 secondaryActions={[{
                     content: "Cancel",
-                    onAction: () => {setGroupTracesModal(false)}
+                    onAction: () => {setGroupActivitiesModal(false)}
                 }]}
-                title="Group existing traces"
-                onClose={() => {setGroupTracesModal(false)}}
+                title="Group existing guardrail activities"
+                onClose={() => {setGroupActivitiesModal(false)}}
             >
                 <Modal.Section>
                     <VerticalStack>
-                        <Text>Bedrock traces stored before conversation grouping was enabled will be grouped by prompt, with up to 20 minutes between calls.</Text>
-                        <Text>Traces that already belong to a conversation are not changed. Are you sure you want to proceed?</Text>
+                        <Text>Guardrail activities stored before grouping was enabled will be grouped like new ones: the same prompt from the same Bedrock caller, with up to 20 minutes between them, shows as one activity.</Text>
+                        <Text>Activities that are already grouped are not changed. Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>
             </Modal>

@@ -261,6 +261,7 @@ func setupRouter(validationHandler *handlers.ValidationHandler, authMiddleware g
 		api.POST("/validate/replayWithPolicy", validationHandler.ReplayWithPolicy)
 		api.POST("/validate/response", validationHandler.ValidateResponse)
 		api.POST("/validate/file", validationHandler.ValidateFile)
+		api.POST("/redact/payloads", validationHandler.RedactPayloads)
 	}
 
 	return router

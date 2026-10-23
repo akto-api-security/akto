@@ -1,16 +1,14 @@
-import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Popover, TextField, Link, Tag, Banner, Badge, Button, InlineError } from "@shopify/polaris";
-import { DeleteMinor } from "@shopify/polaris-icons";
-import { useState, useEffect, useRef, useReducer, useMemo } from "react";
-import DropdownSearch, { ALL_VALUES_SENTINEL } from "../../../../components/shared/DropdownSearch";
-import Dropdown from "../../../../components/layouts/Dropdown";
+import { VerticalStack, HorizontalStack, Text, FormLayout, Box, Checkbox, RadioButton, Banner, Badge } from "@shopify/polaris";
+import { useEffect, useReducer } from "react";
+import { ALL_VALUES_SENTINEL } from "../../../../components/shared/DropdownSearch";
 import AssetIcon from "../../../observe/agentic/AssetIcon";
 import { formatDisplayName } from "../../../observe/agentic/mcpClientHelper";
 import OwaspTag from "../OwaspTag";
 import RuleEnforcementDropdown from "../RuleEnforcementDropdown";
 import { isEndpointSecurityCategory } from "../../../../../main/labelHelper";
-import { produce } from "immer";
-import func from "@/util/func";
-
+import { ConditionRows, CountPopover, conditionsReducer, usePruneStaleConditionValues, sortSelectedFirst } from "../targeting/ConditionRows";
+import DeviceUserTargetingCard from "../targeting/DeviceUserTargetingCard";
+import { scopePart, describeUserScope } from "../targeting/scopeSummary";
 
 export const ServerSettingsConfig = {
     number: 10,
@@ -27,41 +25,22 @@ export const ServerSettingsConfig = {
         const appSettings = (applyOnRequest || applyOnResponse) ?
             ` - ${applyOnRequest ? 'Req' : ''}${applyOnRequest && applyOnResponse ? '/' : ''}${applyOnResponse ? 'Res' : ''}` : '';
         const behaviourSuffix = policyBehaviour ? `Rule behaviour: ${policyBehaviour}` : '';
-        // Shared "N X" / "All X except N" phrasing — used for both the agentic-asset buckets and
-        // the device/tag/user targeting below.
-        const part = (negated, arr, singular) => {
-            const count = arr?.length || 0;
-            if (negated) return count > 0 ? `All ${singular} except ${count}` : `All ${singular}`;
-            if (count === 1 && arr[0] === ALL_VALUES_SENTINEL) return `All ${singular}`;
-            return count > 0 ? `${count} ${singular}` : null;
-        };
         let summary = '';
         if (applyToAllServers) {
             summary += 'All assets';
         } else {
             const parts = [
-                part(negatedMcpServers, selectedMcpServers, 'MCP'),
-                part(negatedAgentServers, selectedAgentServers, 'Agents'),
-                part(negatedLlmServers, selectedBrowserLlms, 'LLMs'),
+                scopePart(negatedMcpServers, selectedMcpServers, 'MCP'),
+                scopePart(negatedAgentServers, selectedAgentServers, 'Agents'),
+                scopePart(negatedLlmServers, selectedBrowserLlms, 'LLMs'),
             ].filter(Boolean);
             summary += parts.join(', ') || 'No assets';
         }
         if (applyToAllUsers) {
             summary += ' | All users';
         } else {
-            const userParts = [];
-            Object.entries(targetTags || {}).forEach(([key, values]) => {
-                if (values?.length > 0 || negatedTargetTags?.[key]) {
-                    const label = key.charAt(0).toUpperCase() + key.slice(1);
-                    const p = part(!!negatedTargetTags?.[key], values, `${label}${(values?.length || 0) !== 1 ? 's' : ''}`);
-                    if (p) userParts.push(p);
-                }
-            });
-            const devicePart = part(negatedTargetDeviceIds, targetDeviceIds, `Device${targetDeviceIds?.length !== 1 ? 's' : ''}`);
-            if (devicePart) userParts.push(devicePart);
-            const userPart = part(negatedTargetUserNames, targetUserNames, `User${targetUserNames?.length !== 1 ? 's' : ''}`);
-            if (userPart) userParts.push(userPart);
-            if (userParts.length > 0) summary += ` | ${userParts.join(', ')}`;
+            const userScope = describeUserScope({ targetTags, negatedTargetTags, targetDeviceIds, negatedTargetDeviceIds, targetUserNames, negatedTargetUserNames });
+            if (userScope) summary += ` | ${userScope}`;
         }
         if (skipEnterpriseAccounts) summary += ' | Personal accounts only';
         summary += `${appSettings} ${behaviourSuffix}`;
@@ -69,105 +48,10 @@ export const ServerSettingsConfig = {
     }
 };
 
-const conditionsReducer = produce((draft, action) => func.conditionsReducer(draft, action));
 
-const USER_BETA_BANNER_TEXT = "User targeting is in beta and currently supported only for Browser extensions and the Claude Desktop app.";
 
-// deviceId is the agent's device label, "{hostname}-{first8ofMachineID}" — the unique,
-// stable part is the segment after the LAST hyphen (the hostname itself may contain hyphens).
-// Falls back to a plain prefix slice for any value that doesn't follow that format.
-const deviceIdSuffix = (deviceId) => {
-    if (!deviceId) return '';
-    const idx = deviceId.lastIndexOf('-');
-    return idx >= 0 ? deviceId.slice(idx + 1) : deviceId.slice(0, 8);
-};
 
-const CountPopover = ({ count, label, items, text }) => {
-    const [active, setActive] = useState(false);
-    const [pinned, setPinned] = useState(false);
-    const [search, setSearch] = useState('');
-    const closeTimer = useRef(null);
 
-    const open = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setActive(true); };
-    const scheduleClose = () => {
-        if (pinned) return;
-        closeTimer.current = setTimeout(() => setActive(false), 200);
-    };
-    const pin = () => { open(); setPinned(true); };
-
-    const filtered = (items || []).filter(item =>
-        (item.label || '').toLowerCase().includes(search.toLowerCase())
-    );
-    return (
-        <Popover
-            active={active}
-            activator={
-                <span onMouseEnter={open} onMouseLeave={scheduleClose} style={{ cursor: 'pointer' }}>
-                    <Link>{text || `${count} ${label}`}</Link>
-                </span>
-            }
-            onClose={() => { setActive(false); setPinned(false); setSearch(''); }}
-        >
-            <div onMouseEnter={open} onMouseLeave={scheduleClose}>
-                <Popover.Pane fixed>
-                    <Box padding="2" minWidth="240px" maxWidth="320px">
-                        <TextField
-                            placeholder={`Search ${label}...`}
-                            value={search}
-                            onChange={setSearch}
-                            onFocus={pin}
-                            autoComplete="off"
-                        />
-                    </Box>
-                </Popover.Pane>
-                <Popover.Pane>
-                    <Box padding="3" maxWidth="320px">
-                        {filtered.length === 0
-                            ? <Text tone="subdued" variant="bodySm">No {label} found</Text>
-                            : <HorizontalStack gap="2" wrap>
-                                {filtered.map(item => (
-                                    <Tag key={item.value}>{item.label}</Tag>
-                                ))}
-                              </HorizontalStack>
-                        }
-                    </Box>
-                </Popover.Pane>
-            </div>
-        </Popover>
-    );
-};
-
-// Once (per condition list, per mount) after its options have loaded: drop any selected value
-// that no longer matches a live option for its type (a server/device removed from the list, or a
-// tag value no longer on any user). Without this, a condition's stored value count can silently
-// diverge from what's actually visible/checked/enforceable. `enabled` gates this off for Argus —
-// backward-compat values there may not yet have a matching option.
-const usePruneStaleConditionValues = (enabled, ready, conditions, dispatch, valSets) => {
-    const ranRef = useRef(false);
-    useEffect(() => {
-        if (!enabled || ranRef.current || !ready) return;
-        ranRef.current = true;
-        // Descending order: deleting a higher index never shifts the position of one not yet visited.
-        for (let index = conditions.length - 1; index >= 0; index--) {
-            const c = conditions[index];
-            const valSet = valSets[c.type];
-            if (!valSet) {
-                dispatch({ type: 'delete', index });
-                continue;
-            }
-            // Never prune a negated row's values: removing an excluded value silently WIDENS what the
-            // policy matches (e.g. an excluded server that's just offline right now must stay excluded).
-            if (c.negated) continue;
-            // Never prune the Include wildcard sentinel — it isn't a real option value by design.
-            if (c.values?.length === 1 && c.values[0] === ALL_VALUES_SENTINEL) continue;
-            if (valSet.size === 0) continue;
-            const valid = (c.values || []).filter(v => valSet.has(v));
-            if (valid.length !== (c.values || []).length) {
-                dispatch({ type: 'updateKey', index, key: 'values', obj: valid });
-            }
-        }
-    }, [ready]);
-};
 
 const ServerSettingsStep = ({
     applyToAllServers,
@@ -231,16 +115,6 @@ const ServerSettingsStep = ({
         return conds;
     });
 
-    const [userConditions, userDispatch] = useReducer(conditionsReducer, null, () => {
-        // A negated DEVICE/USER row with zero values ("Exclude nothing") is meaningful — keep it.
-        const conds = Object.entries(targetTags || {})
-            .filter(([, values]) => (values || []).length > 0)
-            .map(([key, values]) => ({ type: key, values, otherValues: [], negated: !!negatedTargetTags?.[key] }));
-        if ((targetDeviceIds || []).length > 0 || negatedTargetDeviceIds) conds.push({ type: 'DEVICE', values: targetDeviceIds, otherValues: [], negated: negatedTargetDeviceIds });
-        if ((targetUserNames || []).length > 0 || negatedTargetUserNames) conds.push({ type: 'USER', values: targetUserNames, otherValues: [], negated: negatedTargetUserNames });
-        return conds;
-    });
-
     useEffect(() => {
         setSelectedAgentServers(agenticConditions.filter(c => c.type === 'AGENT').flatMap(c => c.values).filter(Boolean));
         setSelectedMcpServers(agenticConditions.filter(c => c.type === 'MCP_SERVER').flatMap(c => c.values).filter(Boolean));
@@ -248,22 +122,6 @@ const ServerSettingsStep = ({
         // negatedX isn't synced here — it's owned by the Include/Exclude tab; syncing it here would stomp the tab's choice on every value change
     }, [agenticConditions]);
 
-    useEffect(() => {
-        if (isAtlas) {
-            const tagMap = {};
-            userConditions.filter(c => c.type !== 'DEVICE' && c.type !== 'USER').forEach(c => {
-                const values = (c.values || []).filter(Boolean);
-                if (values.length) tagMap[c.type] = values;
-            });
-            setTargetTags(tagMap);
-            // Devices and Users are two fully independent dropdown pools (see
-            // availableDevices/availableUsers) AND two independent backend fields — a Users pick
-            // must never land in targetDeviceIds, which is device-id-only and drives
-            // applyToDeviceIds resolution server-side.
-            setTargetDeviceIds(userConditions.filter(c => c.type === 'DEVICE').flatMap(c => c.values).filter(Boolean));
-            setTargetUserNames(userConditions.filter(c => c.type === 'USER').flatMap(c => c.values).filter(Boolean));
-        }
-    }, [userConditions]);
 
 
     const TYPE_PREFIXES = ['ai-agent.', 'mcp-server.', 'browser-llm.', 'skill.'];
@@ -278,34 +136,15 @@ const ServerSettingsStep = ({
             return { ...opt, label: formatDisplayName(svc), media: <AssetIcon type={assetType} assetTagValue={svc} size={16} /> };
         }).sort((a, b) => a.label.localeCompare(b.label));
 
-    const deviceOptionsSorted = useMemo(
-        () => (availableDevices || []).slice().sort((a, b) => a.label.localeCompare(b.label)),
-        [availableDevices]
-    );
-    const userOptionsSorted = useMemo(
-        () => (availableUsers || []).slice().sort((a, b) => a.label.localeCompare(b.label)),
-        [availableUsers]
-    );
-    const tagOptionsSortedByKey = useMemo(() => {
-        const map = {};
-        (availableTagKeyValues || []).forEach(({ key, values }) => {
-            map[key] = (values || []).map(v => ({ label: v, value: v })).sort((a, b) => a.label.localeCompare(b.label));
-        });
-        return map;
-    }, [availableTagKeyValues]);
-
     const getOptionsForType = (type) => {
         switch (type) {
             case 'AGENT': return enrichOptions(agentOptions, 'AI Agent');
             case 'MCP_SERVER': return enrichOptions(mcpOptions, 'MCP Server');
             case 'LLM': return enrichOptions(llmOptions, 'LLM');
-            case 'DEVICE': return deviceOptionsSorted;
-            case 'USER': return userOptionsSorted;
-            default: return tagOptionsSortedByKey[type] || [];
+            default: return [];
         }
     };
 
-    const DISPLAY_CAP = 1000;
 
     const compatibleMcpServers = isBlockMode ? (mcpServers || []).filter(s => s.isInline) : (mcpServers || []);
     const compatibleAgentServers = isBlockMode ? (agentServers || []).filter(s => s.isInline) : (agentServers || []);
@@ -317,13 +156,6 @@ const ServerSettingsStep = ({
         (browserLlmServers || []).some(s => !s.isInline)
     );
 
-    const sortSelectedFirst = (options, selected) => {
-        const selectedSet = new Set(selected);
-        return [
-            ...options.filter(o => selectedSet.has(o.value)),
-            ...options.filter(o => !selectedSet.has(o.value)),
-        ];
-    };
 
     // A selected/excluded value not currently in the live options list (e.g. offline right now) still needs a row so it renders checked, not silently invisible.
     // The wildcard sentinel isn't a real value — never give it its own row.
@@ -366,19 +198,6 @@ const ServerSettingsStep = ({
         }
     );
 
-    // Device Tags & Users: DEVICE and USER (two independent pools) plus any dynamic tag key (team, role, department, ...).
-    const deviceValueSet = new Set((availableDevices || []).map(o => o.value));
-    const userValueSet = new Set((availableUsers || []).map(o => o.value));
-    usePruneStaleConditionValues(
-        isAtlas,
-        deviceValueSet.size + userValueSet.size + (availableTagKeyValues || []).reduce((acc, k) => acc + (k.values || []).length, 0) > 0,
-        userConditions, userDispatch,
-        {
-            DEVICE: deviceValueSet,
-            USER: userValueSet,
-            ...Object.fromEntries((availableTagKeyValues || []).map(({ key, values }) => [key, new Set(values || [])])),
-        }
-    );
 
     const agenticTypeOptions = [
         { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT', disabled: agentOptions.length === 0 },
@@ -386,21 +205,6 @@ const ServerSettingsStep = ({
         { label: `LLM${llmOptions.length > 1 ? 's' : ''} [${llmOptions.length}]`, value: 'LLM', disabled: llmOptions.length === 0 },
     ];
 
-    const deviceCount = (availableDevices || []).length;
-    const userCount = (availableUsers || []).length;
-    const tagTypeOptions = (availableTagKeyValues || []).map(({ key, values }) => {
-        const label = key.charAt(0).toUpperCase() + key.slice(1);
-        const count = (values || []).length;
-        return { label: `${count > 1 ? `${label}s` : label} [${count}]`, value: key, disabled: count === 0 };
-    });
-    // Users and Devices are kept as two distinct, unambiguous options rather than one merged
-    // "Users" pool — selecting one makes explicit whether the row targets a person (by identity,
-    // beta) or a physical device (by device id, the mature/GA path).
-    const userTypeOptions = [
-        ...tagTypeOptions,
-        { label: `${userCount > 1 ? 'Users' : 'User'} [${userCount}] (Beta)`, value: 'USER', disabled: userCount === 0 },
-        { label: `${deviceCount > 1 ? 'Devices' : 'Device'} [${deviceCount}]`, value: 'DEVICE', disabled: deviceCount === 0 },
-    ];
 
     // Include/Exclude is independent per row (see negatedAgentServers/negatedMcpServers/negatedLlmServers on GuardrailPolicies); an empty Exclude row is the one case it can't stay type-scoped
     const agenticNegationProps = (type) => {
@@ -411,188 +215,9 @@ const ServerSettingsStep = ({
             default: return null;
         }
     };
-    // TAG keys are dynamic, so negation is per key rather than fixed booleans like the agentic
-    // buckets above; DEVICE and USER each only ever have one row, so they stay plain booleans.
-    const userNegationProps = (type) => {
-        switch (type) {
-            case 'DEVICE': return { negated: negatedTargetDeviceIds, onToggle: setNegatedTargetDeviceIds };
-            case 'USER': return { negated: negatedTargetUserNames, onToggle: setNegatedTargetUserNames };
-            default: return {
-                negated: !!negatedTargetTags?.[type],
-                onToggle: (val) => setNegatedTargetTags(prev => ({ ...(prev || {}), [type]: val })),
-            };
-        }
-    };
-    // Custom underline-tab strip, not Polaris LegacyTabs — LegacyTabs collapses into a "..." overflow menu at this popover's width
-    const NEGATION_TABS = [
-        { label: 'Include', value: false },
-        { label: 'Exclude', value: true },
-    ];
-    const negationHeader = (negated, onToggle) => (
-        <div style={{ display: 'flex' }}>
-            {NEGATION_TABS.map(tab => {
-                const isSelected = negated === tab.value;
-                return (
-                    <div
-                        key={tab.label}
-                        onClick={() => onToggle(tab.value)}
-                        style={{
-                            flex: 1,
-                            textAlign: 'center',
-                            padding: '10px 0 8px',
-                            cursor: 'pointer',
-                            borderBottom: isSelected ? '2px solid #6c5ce7' : '1px solid var(--p-border-subdued, #e1e3e5)',
-                        }}
-                    >
-                        <Text variant="bodyMd" fontWeight={isSelected ? 'semibold' : 'regular'} tone={isSelected ? undefined : 'subdued'}>
-                            {tab.label}
-                        </Text>
-                    </div>
-                );
-            })}
-        </div>
-    );
 
-    const typeLabel = (typeOptions, type) => (typeOptions.find(o => o.value === type)?.label || type)
-        .replace(/\s*\[\d+\]/, '')
-        .replace(/\s*\(Beta\)/i, '')
-        .trim();
 
-    const rowCaption = (typeOptions, condition, negated) => {
-        const opts = getOptionsForType(condition.type);
-        const label = typeLabel(typeOptions, condition.type);
-        const values = condition.values || [];
-        const isIncludeAll = !negated && values.length === 1 && values[0] === ALL_VALUES_SENTINEL;
-        const isExcludeNone = negated && values.length === 0;
-        if (isIncludeAll || isExcludeNone) {
-            return { text: `All ${label}`, items: opts, label };
-        }
-        if (values.length === 0) return null;
-        const items = values.map(v => ({ value: v, label: opts.find(o => o.value === v)?.label || v }));
-        return negated
-            ? { text: `All ${label} except ${values.length}`, items, label }
-            : { text: `${values.length} ${label}`, items, label };
-    };
 
-    const renderConditionRows = (conditions, typeOptions, dispatch, operator = 'OR', showError = false, getNegationProps = null) => {
-        const usedTypes = new Set(conditions.map(c => c.type));
-        const availableTypeOptions = typeOptions.filter(o => !o.disabled);
-        const allTypesFilled = availableTypeOptions.length === 0 || availableTypeOptions.every(o => usedTypes.has(o.value));
-        const nextUnusedType = availableTypeOptions.find(o => !usedTypes.has(o.value))?.value;
-        // Zero rows is unfinished; Exclude-with-nothing is a deliberate "apply to everything" scope, not an unfinished one
-        const isDirty = conditions.length === 0;
-
-        return (
-            <VerticalStack gap="3">
-                {conditions.map((condition, index) => {
-                    const otherUsedTypes = new Set(conditions.filter((_, i) => i !== index).map(c => c.type));
-                    const rowTypeOptions = typeOptions.map(o => ({
-                        ...o,
-                        disabled: o.disabled || otherUsedTypes.has(o.value),
-                    }));
-                    const negationProps = getNegationProps?.(condition.type);
-                    const negated = !!negationProps?.negated;
-                    return (
-                        <VerticalStack key={index} gap="2">
-                            <HorizontalStack gap="2" blockAlign="center">
-                                <div style={{ minWidth: 64, textAlign: 'right' }}>
-                                    {index === 0
-                                        ? <Text variant="bodyMd" tone="subdued" fontWeight="medium">Where my</Text>
-                                        : <Text variant="bodyMd" tone="subdued" fontWeight="medium">{operator.charAt(0).toUpperCase() + operator.slice(1).toLowerCase()}</Text>
-                                    }
-                                </div>
-                                <div style={{ flex: '1', minWidth: 0 }}>
-                                    <Dropdown
-                                        id={`cond-type-${condition.type}-${index}`}
-                                        menuItems={rowTypeOptions}
-                                        disabledOptions={rowTypeOptions.filter(o => o.disabled).map(o => o.value)}
-                                        initial={rowTypeOptions.find(o => o.value === condition.type)?.label || rowTypeOptions[0]?.label}
-                                        selected={(val) => {
-                                            dispatch({ type: 'updateKey', index, key: 'type', obj: val });
-                                            dispatch({ type: 'updateKey', index, key: 'values', obj: [] });
-                                            dispatch({ type: 'updateKey', index, key: 'otherValues', obj: [] });
-                                            negationProps?.onToggle(false);
-                                        }}
-                                    />
-                                </div>
-                                <Text variant="bodyMd" tone="subdued" fontWeight="medium">{getOptionsForType(condition.type).length > 1 ? 'are' : 'is'}</Text>
-                                <div style={{ flex: '2', minWidth: 0 }}>
-                                    <DropdownSearch
-                                        id={`cond-val-${condition.type}-${index}`}
-                                        placeholder="Select value"
-                                        headerContent={negationProps ? negationHeader(negated, (val) => {
-                                            if (val === negated) return; // clicking the already-active tab is a no-op
-                                            // Swap rather than clear: the polarity you're leaving keeps its picks in
-                                            // otherValues, restored if you switch back without touching the other tab.
-                                            // Only clears the first time you visit a tab you've never touched — never
-                                            // silently reinterprets one polarity's picks as the other's. Two updateKey
-                                            // dispatches, not one combined action — both read from this closure's
-                                            // condition snapshot, so dispatch order between them doesn't matter.
-                                            negationProps.onToggle(val);
-                                            dispatch({ type: 'updateKey', index, key: 'values', obj: condition.otherValues || [] });
-                                            dispatch({ type: 'updateKey', index, key: 'otherValues', obj: condition.values || [] });
-                                        }) : undefined}
-                                        optionsList={sortSelectedFirst(getOptionsForType(condition.type), condition.values || [])}
-                                        setSelected={(vals) => dispatch({ type: 'updateKey', index, key: 'values', obj: vals })}
-                                        preSelected={condition.values || []}
-                                        allowMultiple={true}
-                                        negated={negated}
-                                        onToggleNegated={negationProps?.onToggle}
-                                        disabled={getOptionsForType(condition.type).length === 0}
-                                        value={negated
-                                            ? ((condition.values || []).length > 0 ? `All except ${condition.values.length}` : 'All selected')
-                                            : ((condition.values || []).length === 1 && condition.values[0] === ALL_VALUES_SENTINEL ? 'All selected'
-                                                : (condition.values || []).length > 0 ? `${condition.values.length} selected` : undefined)}
-                                        sliceMaxVal={DISPLAY_CAP}
-                                    />
-                                </div>
-                                <Button icon={DeleteMinor} onClick={() => {
-                                    dispatch({ type: 'delete', index });
-                                    // Reset the toggle too, so "Exclude" can't linger with no row left to undo it
-                                    negationProps?.onToggle(false);
-                                }} />
-                            </HorizontalStack>
-                        </VerticalStack>
-                    );
-                })}
-                {(() => {
-                    const segments = conditions
-                        .map(c => rowCaption(typeOptions, c, !!getNegationProps?.(c.type)?.negated))
-                        .filter(Boolean);
-                    if (segments.length === 0) return null;
-                    return (
-                        <HorizontalStack gap="1" blockAlign="center" wrap>
-                            <Text variant="bodyMd" color="subdued">This includes</Text>
-                            {segments.flatMap((seg, i) => [
-                                <CountPopover key={`seg-${i}`} text={seg.text} label={seg.label} items={seg.items} />,
-                                i < segments.length - 1 && (
-                                    <Text key={`sep-${i}`} variant="bodyMd" color="subdued">
-                                        {i === segments.length - 2 ? '&' : ','}
-                                    </Text>
-                                )
-                            ]).filter(Boolean)}
-                            <Text variant="bodyMd" color="subdued">.</Text>
-                        </HorizontalStack>
-                    );
-                })()}
-                <HorizontalStack gap="4" blockAlign="center">
-                    {!allTypesFilled && <Button onClick={() => dispatch({ type: 'add', obj: { type: nextUnusedType, values: [] } })}>Add condition</Button>}
-                    {conditions.length > 0 && (
-                        <Button plain destructive onClick={() => {
-                            conditions.forEach(c => getNegationProps?.(c.type)?.onToggle(false));
-                            dispatch({ type: 'clear' });
-                        }}>Clear all</Button>
-                    )}
-                </HorizontalStack>
-                {showError && isDirty && (
-                    <InlineError message='Add at least one condition, or switch to "Apply to all".' fieldID="" />
-                )}
-                {conditions.some(c => c.type === 'USER') && (
-                    <Banner tone="info">{USER_BETA_BANNER_TEXT}</Banner>
-                )}
-            </VerticalStack>
-        );
-    };
 
     // Count items for "Apply to all" helpText — use same grouping as the dropdowns, with enriched display names.
     // Atlas: filterCollections() already produces one entry per service/platform key.
@@ -679,7 +304,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError, agenticNegationProps)}
+                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} />
                                         </Box>
                                     )}
                                 </VerticalStack>
@@ -688,93 +313,29 @@ const ServerSettingsStep = ({
                     </Box>
                 )}
                 {isAtlas && (
-                    <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
-                        <Box padding="4">
-                            <VerticalStack gap="4">
-                                <Text variant="headingSm">Device Tags & Users</Text>
-                                <VerticalStack gap="2">
-                                    <RadioButton
-                                        label={
-                                            <HorizontalStack gap="2" blockAlign="center">
-                                                <Text variant="bodyMd">Apply to all</Text>
-                                                <Badge tone="success">Recommended</Badge>
-                                            </HorizontalStack>
-                                        }
-                                        checked={applyToAllUsers}
-                                        id="apply_to_all_users"
-                                        name="userTargeting"
-                                        onChange={() => setApplyToAllUsers(true)}
-                                        helpText={deviceList.length > 0
-                                            ? (
-                                                <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                    <Text variant="bodyMd" tone="subdued">Applies to all</Text>
-                                                    <CountPopover count={deviceList.length} label="Users" items={deviceList} />
-                                                    <Text variant="bodyMd" tone="subdued">in your organization.</Text>
-                                                </HorizontalStack>
-                                            )
-                                            : "Applies to all users in your organization."
-                                        }
-                                    />
-                                    <RadioButton
-                                        label="Select Device Tags & Users"
-                                        checked={!applyToAllUsers}
-                                        id="select_users_teams"
-                                        name="userTargeting"
-                                        onChange={() => setApplyToAllUsers(false)}
-                                        disabled={!usersLoading && (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0}
-                                        helpText={(() => {
-                                            if (usersLoading) {
-                                                return "Loading device tags and users…";
-                                            }
-                                            const noOptions = (availableTagKeyValues || []).length === 0 && (availableDevices || []).length === 0 && (availableUsers || []).length === 0;
-                                            if (noOptions) {
-                                                return "No device tags or users found. Devices must report in before you can target them here.";
-                                            }
-                                            if (userConditions.length === 0) {
-                                                return "Choose specific device tags or Users.";
-                                            }
-                                            // Devices and Users are two independent pools (see targetDeviceIds/targetUserNames) —
-                                            // shown as two separate counts rather than one merged "N users" figure, which would
-                                            // hide which half of the selection actually contributed the count.
-                                            // Negated (Exclude) means "everyone except these picks" — mirror matchingDeviceRows'
-                                            // negation handling instead of showing the raw pick count/list, which would render
-                                            // an Exclude-3 selection as if only 3 people were in scope instead of the other ~97.
-                                            const matchedUserItems = negatedTargetUserNames
-                                                ? (availableUsers || []).filter(o => !(targetUserNames || []).includes(o.value))
-                                                : (targetUserNames || []).map(name => {
-                                                    const option = (availableUsers || []).find(o => o.value === name);
-                                                    return { value: name, label: option?.label || name };
-                                                });
-                                            const nonZeroItems = [
-                                                matchingDeviceRows.length > 0 && { count: matchingDeviceRows.length, label: "Devices", items: matchingDeviceRows.map(r => ({ value: r.deviceId, label: `${r.username} · ${deviceIdSuffix(r.deviceId)}` })) },
-                                                matchedUserItems.length > 0 && { count: matchedUserItems.length, label: "Users", items: matchedUserItems },
-                                            ].filter(Boolean);
-                                            if (nonZeroItems.length === 0) {
-                                                return "Applies to 0 devices or users with the current selection.";
-                                            }
-                                            return (
-                                                <HorizontalStack gap="1" blockAlign="center" wrap>
-                                                    <Text variant="bodyMd" tone="subdued">Applies to</Text>
-                                                    {nonZeroItems.flatMap((item, i) => [
-                                                        <CountPopover key={item.label} count={item.count} label={item.label} items={item.items} />,
-                                                        i < nonZeroItems.length - 1 && (
-                                                            <Text key={`sep-${i}`} variant="bodyMd" tone="subdued">and</Text>
-                                                        )
-                                                    ]).filter(Boolean)}
-                                                    <Text variant="bodyMd" tone="subdued">with the current selection.</Text>
-                                                </HorizontalStack>
-                                            );
-                                        })()}
-                                    />
-                                    {!applyToAllUsers && (
-                                        <Box paddingInlineStart="6">
-                                            {renderConditionRows(userConditions, userTypeOptions, userDispatch, 'AND', showUserConditionError, userNegationProps)}
-                                        </Box>
-                                    )}
-                                </VerticalStack>
-                            </VerticalStack>
-                        </Box>
-                    </Box>
+                    <DeviceUserTargetingCard
+                        applyToAllUsers={applyToAllUsers}
+                        setApplyToAllUsers={setApplyToAllUsers}
+                        targetTags={targetTags}
+                        setTargetTags={setTargetTags}
+                        targetDeviceIds={targetDeviceIds}
+                        setTargetDeviceIds={setTargetDeviceIds}
+                        targetUserNames={targetUserNames}
+                        setTargetUserNames={setTargetUserNames}
+                        negatedTargetTags={negatedTargetTags}
+                        setNegatedTargetTags={setNegatedTargetTags}
+                        negatedTargetDeviceIds={negatedTargetDeviceIds}
+                        setNegatedTargetDeviceIds={setNegatedTargetDeviceIds}
+                        negatedTargetUserNames={negatedTargetUserNames}
+                        setNegatedTargetUserNames={setNegatedTargetUserNames}
+                        availableTagKeyValues={availableTagKeyValues}
+                        availableDevices={availableDevices}
+                        availableUsers={availableUsers}
+                        matchingDeviceRows={matchingDeviceRows}
+                        usersLoading={usersLoading}
+                        deviceList={deviceList}
+                        showUserConditionError={showUserConditionError}
+                    />
                 )}
                 {isAtlas && (
                     <Box borderColor="border" borderWidth="1" borderRadius="2" background="bg-surface">
@@ -868,7 +429,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            {renderConditionRows(agenticConditions, agenticTypeOptions, agenticDispatch, 'OR', showConditionError, agenticNegationProps)}
+                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} />
                                             {hasIncompatibleServers && (
                                                 <Banner tone="info">
                                                     Some agentic assets are disabled. Block mode requires servers running in inline (sync) mode.

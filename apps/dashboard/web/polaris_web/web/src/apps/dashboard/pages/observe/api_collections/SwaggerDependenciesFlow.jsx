@@ -4,6 +4,7 @@ import FlowGraphLayout from './FlowGraphLayout';
 import { createCustomEdge, createCustomNode } from './FlowGraphComponents';
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { Box } from '@shopify/polaris';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const initialNodes = [];
 const initialEdges = [];
@@ -293,7 +294,7 @@ function SwaggerDependenciesFlow({ apiCollectionId, preSelectedApi }) {
   const totalUniqueEndpoints = allNodes.length > 0 ? allNodes.length : nodes.length;
 
   const bannerStats = [
-    { label: 'Total APIs', value: totalDependencies },
+    { label: mapLabel('Total APIs', getDashboardCategory()), value: totalDependencies },
     { label: 'Dependencies (Shown/Total)', value: `${shownConnections}/${totalConnections}` },
     { label: selectedApi ? 'Filtered Endpoints / Total' : 'Unique Endpoints', value: selectedApi ? `${nodes.length}/${totalUniqueEndpoints}` : totalUniqueEndpoints }
   ];
@@ -304,8 +305,8 @@ function SwaggerDependenciesFlow({ apiCollectionId, preSelectedApi }) {
         <Box paddingInline="5" paddingBlockEnd="4">
           <DropdownSearch
             id="api-filter-dropdown"
-            label="Filter by API"
-            placeholder="Select an API to view its dependencies"
+            label={"Filter by " + mapLabel('API', getDashboardCategory())}
+            placeholder={"Select an " + mapLabel('API', getDashboardCategory()) + " to view its dependencies"}
             optionsList={apiOptions}
             value={selectedApi}
             setSelected={handleApiSelection}

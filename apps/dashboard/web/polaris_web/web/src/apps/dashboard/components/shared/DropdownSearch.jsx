@@ -20,6 +20,8 @@ function DropdownSearch(props) {
     const [options, setOptions] = useState(deselectedOptions);
     const [loading, setLoading] = useState(false);
     const revealCountRef = useRef(sliceMaxVal || 20);
+    // Last typed search; the box shows "N selected" after a pick, which must not become the query.
+    const searchRef = useRef('');
     const [checked,setChecked] = useState(false)
     // Used only by the headerContent branch below (self-managed popover, see there)
     const [popoverActive, setPopoverActive] = useState(false)
@@ -73,6 +75,7 @@ function DropdownSearch(props) {
 
     const updateText = useCallback(
         (value, revealMore) => {
+            searchRef.current = value;
             setInputValue(value);
 
             if (!loading) {
@@ -307,7 +310,7 @@ function DropdownSearch(props) {
                             </div>
                         )}
                     </Popover.Pane>
-                    <Popover.Pane height="300px" onScrolledToBottom={() => updateText(inputValue || '', true)}>
+                    <Popover.Pane height="300px" onScrolledToBottom={() => updateText(searchRef.current || '', true)}>
                         <Listbox
                             accessibilityLabel={placeholder}
                             onSelect={(val) => {
