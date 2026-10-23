@@ -1265,51 +1265,6 @@ public class MaliciousEventService {
     return updated;
   }
 
-  // Gives events stored before these fields existed their Type, endpoint kind and behaviour. Only Endpoint,
-  // Agentic and MCP events without agenticType are touched, so running it again is safe.
-  public int backfillFilterFields(String accountId) {
-    createIndexIfAbsent(accountId);
-    MongoCollection<Document> events = maliciousEventDao.getCollection(accountId).withDocumentClass(Document.class);
-    Bson missing = Filters.and(
-        Filters.in("contextSource", FilterFields.AGENTIC_CONTEXTS),
-        Filters.exists("agenticType", false));
-    int updated = 0;
-    List<WriteModel<Document>> batch = new ArrayList<>();
-    try (MongoCursor<Document> cursor = events.find(missing)
-        .projection(Projections.include("_id", "contextSource", "latestApiEndpoint", "latestApiMethod", "metadata"))
-        .batchSize(500).cursor()) {
-      while (cursor.hasNext()) {
-        Document event = cursor.next();
-        FilterFields.Derived d = FilterFields.derive(
-            event.getString("contextSource"),
-            event.getString("latestApiEndpoint"),
-            event.getString("latestApiMethod"),
-            event.getString("metadata"));
-        if (d == null) {
-          continue;
-        }
-        List<Bson> sets = new ArrayList<>();
-        sets.add(Updates.set("agenticType", d.agenticType));
-        if (d.endpointKind != null) {
-          sets.add(Updates.set("endpointKind", d.endpointKind));
-        }
-        if (d.behaviour != null) {
-          sets.add(Updates.set("behaviour", d.behaviour));
-        }
-        batch.add(new UpdateOneModel<>(Filters.eq("_id", event.get("_id")), Updates.combine(sets)));
-        if (batch.size() >= 500) {
-          updated += events.bulkWrite(batch).getModifiedCount();
-          batch.clear();
-        }
-      }
-    }
-    if (!batch.isEmpty()) {
-      updated += events.bulkWrite(batch).getModifiedCount();
-    }
-    logger.info("backfillFilterFields accountId=" + accountId + " updated=" + updated);
-    return updated;
-  }
-
   public void createIndexIfAbsent(String accountId) {
     ThreatUtils.createIndexIfAbsent(accountId, maliciousEventDao);
     shouldNotCreateIndexes.put(accountId, true);

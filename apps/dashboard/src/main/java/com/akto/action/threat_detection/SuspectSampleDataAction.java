@@ -89,7 +89,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
   @Getter @Setter int backfilledGroupKeys;
-  @Getter @Setter int backfilledFilterFields;
   @Getter @Setter Boolean ungroupActivities; // one event per row, as before grouping
   @Getter @Setter String humanResponse;
   // ---- Agentic Assets flyout Violations tab server-side pagination/search ----
@@ -334,30 +333,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       this.backfilledGroupKeys = objectMapper.readTree(responseBody).path("updated").asInt(0);
     } catch (Exception e) {
       addActionError("Failed to group existing activities");
-      return ERROR.toUpperCase();
-    }
-    return SUCCESS.toUpperCase();
-  }
-
-  // Gives events stored before the Type and Action filter fields existed their values. Safe to run again.
-  public String backfillFilterFields() {
-    if (RBACDao.getCurrentRoleForUser(getSUser().getId(), Context.accountId.get()) != Role.ADMIN) {
-      addActionError("Only admins can backfill filter fields");
-      return ERROR.toUpperCase();
-    }
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/backfill_filter_fields", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
-    post.setEntity(new StringEntity("{}", ContentType.APPLICATION_JSON));
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
-      if (resp.getStatusLine().getStatusCode() != 200) {
-        addActionError("Failed to backfill filter fields");
-        return ERROR.toUpperCase();
-      }
-      this.backfilledFilterFields = objectMapper.readTree(responseBody).path("updated").asInt(0);
-    } catch (Exception e) {
-      addActionError("Failed to backfill filter fields");
       return ERROR.toUpperCase();
     }
     return SUCCESS.toUpperCase();
