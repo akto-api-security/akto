@@ -21,6 +21,7 @@ function AWSWaf() {
     const wafCard = (
         <LegacyCard
             primaryFooterAction={{content: 'Save', onAction: () => addAwsWafIntegration(), ...whenAllowed(canCall('api/addAwsWafIntegration'))}}
+            secondaryFooterActions={[{content: 'Delete', onAction: () => deleteAwsWafIntegration(), ...whenAllowed(canCall('api/deleteCloudflareWafIntegration'))}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate AWS-WAF</Text>
@@ -28,14 +29,20 @@ function AWSWaf() {
 
           <LegacyCard.Section>
             <VerticalStack gap={"2"}>
-                <TextField value={accessKey} onChange={setAccessKey} label="AWS Access Key Id" placeholder="AWS-Key"/>
+                <TextField value={accessKey} onChange={setAccessKey} label="AWS access key ID" placeholder="Access key ID"/>
                 <PasswordTextField text={secretKey}
-                                    setField={setSecretKey} onFunc={true} field={secretKey} 
-                                    label="AWS secret Access Key"
+                                    setField={setSecretKey} onFunc={true} field={secretKey}
+                                    label="AWS secret access key"
                 />
-                <TextField value={region} onChange={setRegion} label="Region" placeholder="Region"/>
-                <TextField value={ruleSetId} onChange={setRuleSetId} label="Waf Rule Set Id" placeholder="Rule-Set=Id"/>
-                <TextField value={ruleSetName} onChange={setRuleSetName} label="Waf Rule Set Name" placeholder="Waf-Rule-Set-Name"/>
+                <TextField value={region} onChange={setRegion} label="AWS region" placeholder="us-east-1" helpText="Region of the IP set. It must be the same region as the Web ACL protecting your ALB or API Gateway."/>
+                {ruleSetId ?
+                  <Text variant="bodyMd" color="subdued">
+                    {`Blocked IPs are added to IP set ${ruleSetName} (${ruleSetId}). Add a rule with action Block referencing this IP set to the Web ACL protecting your ALB or API Gateway.`}
+                  </Text> :
+                  <Text variant="bodyMd" color="subdued">
+                    On save, Akto uses the IP set akto-blocked-ips in this region and creates it if it doesn't exist.
+                  </Text>
+                }
                 <SeverityLevelDropdown
                   severityLevels={severityLevels}
                   setSeverityLevels={setSeverityLevels}
@@ -50,8 +57,17 @@ function AWSWaf() {
     )
 
     async function addAwsWafIntegration(){
-      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies)
+      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, severityLevels, threatPolicies)
+      window.IS_AWS_WAF_INTEGRATED = 'true'
       func.setToast(true, false, "Successfully added Aws Waf Integration")
+      fetchIntegration()
+    }
+
+    async function deleteAwsWafIntegration() {
+      await settingRequests.deleteCloudflareWafIntegration('AWS_WAF')
+      window.IS_AWS_WAF_INTEGRATED = 'false'
+      func.setToast(true, false, "Successfully deleted Aws Waf Integration")
+      fetchIntegration()
     }
 
     async function fetchIntegration() {
