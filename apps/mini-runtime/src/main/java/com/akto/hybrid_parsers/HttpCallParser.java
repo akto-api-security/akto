@@ -135,8 +135,9 @@ public class HttpCallParser {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
+        // the constructor already builds from the DB; building again here only re-downloaded every STI and ApiInfo
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
-        apiCatalogSync.buildFromDB(false, fetchAllSTI);
+        // apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = new HashMap<>();
         apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
         serviceTagCollectionHostNamesCache = new HashMap<>();

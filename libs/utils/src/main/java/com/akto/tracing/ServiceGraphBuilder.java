@@ -71,16 +71,10 @@ public class ServiceGraphBuilder {
             }
 
             // Merge new edges with existing
-            for (Map.Entry<String, ServiceGraphEdgeInfo> entry : edges.entrySet()) {
-                String targetService = entry.getKey();
-                ServiceGraphEdgeInfo newEdge = entry.getValue();
-
-                ServiceGraphEdgeInfo edgeInfo = existingEdges.get(targetService);
-                if (edgeInfo == null) {
-                    edgeInfo = newEdge;
-                }
-
-                existingEdges.put(targetService, edgeInfo);
+            boolean edgeAdded = mergeNewEdges(existingEdges, edges);
+            if (!edgeAdded) {
+                // every edge is already stored, so writing the map back would not change anything
+                return true;
             }
 
             boolean success = dataActor.updateServiceGraphEdges(apiCollectionId, existingEdges);
@@ -117,6 +111,21 @@ public class ServiceGraphBuilder {
             logger.error("Failed to prune and update service graph: {}", e.getMessage(), e);
             return false;
         }
+    }
+
+    /**
+     * Adds the incoming edges the collection doesn't have yet; an existing edge is never replaced.
+     * Returns whether anything was added. Pure, so it's testable without a DB.
+     */
+    static boolean mergeNewEdges(Map<String, ServiceGraphEdgeInfo> existingEdges, Map<String, ServiceGraphEdgeInfo> incomingEdges) {
+        boolean edgeAdded = false;
+        for (Map.Entry<String, ServiceGraphEdgeInfo> entry : incomingEdges.entrySet()) {
+            if (existingEdges.get(entry.getKey()) == null) {
+                existingEdges.put(entry.getKey(), entry.getValue());
+                edgeAdded = true;
+            }
+        }
+        return edgeAdded;
     }
 
     /** Pure prune-then-merge, split out from {@link #pruneAndUpdateServiceGraph} so it's testable without a DB. */
