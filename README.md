@@ -152,7 +152,7 @@ Akto is really powerful in Cloud deployment if you can provide your application'
   <summary><h3> Manual Setup Instructions</h3> </summary>
 
 ### Prerequisites
-OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://dlcdn.apache.org/maven/maven-3/3.6.3/binaries/)), MongoDB (v5.0.3+ [link](https://www.mongodb.com/docs/manual/administration/install-community/))
+OpenJDK 8, node(v18.7.0+ [link](https://nodejs.org/download/release/v18.7.0/)), npm(v8.15.0+), maven (v3.6.3 [link](https://archive.apache.org/dist/maven/maven-3/3.6.3/binaries/)), MongoDB (v5.0.3+ [link](https://www.mongodb.com/docs/manual/administration/install-community/))
 
 
 #### Clone repo
@@ -216,7 +216,7 @@ docker run -v ./:/out  \ # needed to generate test report on host machine
 
 <details>  
   <summary><h3>Debug</h3></summary>
-1. To debug front end, install Vue.js Chrome extension from [here](https://devtools.vuejs.org/guide/installation.html).
+1. To debug front end, install the Vue.js devtools browser extension from [here](https://devtools.vuejs.org/getting-started/installation).
 2. To debug backend, run the following before running web server - 
   a. Set MAVEN_OPTS variable to enable debugging on your Java process
         
