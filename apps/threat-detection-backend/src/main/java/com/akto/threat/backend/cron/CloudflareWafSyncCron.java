@@ -46,9 +46,9 @@ public class CloudflareWafSyncCron {
                     }
                 }, "cloudflare-waf-sync-cron");
             }
-        }, 0, 2, TimeUnit.DAYS);
+        }, 0, 15, TimeUnit.MINUTES);
 
-        loggerMaker.infoAndAddToDb("Cloudflare WAF Sync Cron scheduled to run every 2 days");
+        loggerMaker.infoAndAddToDb("WAF Sync Cron scheduled to run every 15 minutes");
     }
 
     private void syncCloudflareWafForAccount(int accountId) {
