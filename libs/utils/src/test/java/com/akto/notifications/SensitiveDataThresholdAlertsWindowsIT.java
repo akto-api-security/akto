@@ -285,6 +285,38 @@ public class SensitiveDataThresholdAlertsWindowsIT {
         assertEquals(Collections.singleton("T|2|500"), alertedPairs(received().get(0)));
     }
 
+
+    /**
+     * The day passing is necessary but not sufficient. Each run recomputes the trailing window
+     * from the current moment, so a pair only alerts again if it is STILL over the threshold
+     * across the last {@code windowDays} as measured now - not merely because a day has gone by.
+     */
+    @Test
+    public void reArmAloneDoesNotAlertWhenTheWindowNoLongerBreaches() throws Exception {
+        collection(1, "c1");
+        counts(1, "T", 5 * 24 + 2, 500);             // the spike has aged out of a 5 day window
+        int id = webhook(353, rule("T", 100, 5));
+        markAlerted(id, "T|1", now() - 25 * HOUR);   // and a day has passed since the last alert
+        SensitiveDataThresholdAlerts.run();
+        assertEquals("a day passing does not alert on its own", 0, received().size());
+
+        counts(1, "T", 2, 500);                      // fresh traffic inside the window
+        SensitiveDataThresholdAlerts.run();
+        assertEquals("it alerts once the trailing window breaches again", 1, received().size());
+        assertTrue(alertedPairs(received().get(0)).contains("T|1|500"));
+    }
+
+    /** Falling back under the threshold inside the window silences it, day or no day. */
+    @Test
+    public void droppingBelowTheThresholdSilencesItEvenAfterADay() throws Exception {
+        collection(1, "c1");
+        counts(1, "T", 2, 60);                       // inside the window but under 100
+        int id = webhook(354, rule("T", 100, 5));
+        markAlerted(id, "T|1", now() - 25 * HOUR);
+        SensitiveDataThresholdAlerts.run();
+        assertEquals(0, received().size());
+    }
+
     // ---- several rules at once ----------------------------------------------
 
     /** One type with two windows: only the window that reaches its threshold alerts. */
