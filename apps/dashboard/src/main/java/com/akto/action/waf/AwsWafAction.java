@@ -3,11 +3,11 @@ package com.akto.action.waf;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
-import com.akto.action.threat_detection.ThreatActorAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.ConfigType;
+import com.akto.threat_utils.AwsWafUtils;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
@@ -43,9 +43,8 @@ public class AwsWafAction extends UserAction {
 
         int accId = Context.accountId.get();
 
-        try {
-            Wafv2Client client = ThreatActorAction.fetchAwsWafClient(awsAccessKey, awsSecretKey, region);
-            IPSetSummary ipSet = ThreatActorAction.getOrCreateIpSet(client, AKTO_BLOCKED_IP_SET_NAME);
+        try (Wafv2Client client = AwsWafUtils.fetchAwsWafClient(awsAccessKey, awsSecretKey, region)) {
+            IPSetSummary ipSet = AwsWafUtils.getOrCreateIpSet(client, AKTO_BLOCKED_IP_SET_NAME);
             ruleSetId = ipSet.id();
             ruleSetName = ipSet.name();
         } catch (Exception e) {
