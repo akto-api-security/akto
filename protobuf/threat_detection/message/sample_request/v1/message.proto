@@ -16,6 +16,11 @@ message Metadata {
   string behaviour = 8;
   string remediation = 9; 
   string overview = 10;
+  map<string, ComplianceClauses> compliance = 11;
+}
+
+message ComplianceClauses {
+  repeated string clauses = 1;
 }
 
 message SchemaConformanceError {

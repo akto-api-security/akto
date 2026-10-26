@@ -161,12 +161,22 @@ export const mergePolicyComplianceMap = (capabilityMap, guardrailPolicies = []) 
   return capabilityMap;
 };
 
+// Compliance captured on the event at detection time; proto JSON shape is {framework: {clauses: [...]}}.
+export const extractStoredCompliance = (metadata) => {
+  const compliance = parseMetadataObj(metadata).compliance;
+  if (!compliance || Object.keys(compliance).length === 0) return null;
+  return Object.fromEntries(Object.entries(compliance).map(([framework, value]) => [framework, value?.clauses || []]));
+};
+
 export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap = {}, guardrailComplianceMap = {}) => {
   let base = {};
   if (isGuardrail) {
     const ruleViolated = extractRuleViolated(event?.metadata);
     const dbCapability = getDbComplianceCapability(ruleViolated);
-    if (dbCapability) {
+    const storedCompliance = extractStoredCompliance(event?.metadata);
+    if (storedCompliance) {
+      base = storedCompliance;
+    } else if (dbCapability) {
       base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || guardrailComplianceMap[dbCapability] || {};
     } else {
       const capability = getGuardrailCapabilityForRule(ruleViolated);
