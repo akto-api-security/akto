@@ -642,6 +642,7 @@ var orgEmailDomainsByAccount = map[string][]string{
 	"1726615470": {"akto.io"},
 	"1791484402": {"cookunity.com"},
 	"1786100206": {"chargepoint.com"},
+	"1768362636": {"uscca.com"},
 }
 
 // requestAccountType resolves browser requests via browser-user-email and everything else via the proxy token email.
