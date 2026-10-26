@@ -6,7 +6,6 @@ import settingRequests from '../api';
 import func from '@/util/func'
 import { usePermissions, whenAllowed } from '@/util/permissions'
 import DropdownSearch from '../../../components/shared/DropdownSearch';
-import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function CloudflareWaf() {
@@ -16,7 +15,7 @@ function CloudflareWaf() {
     const [integrationType, setIntegrationType] = useState('zones');
     const [email, setEmail] = useState('');
     const [zoneId, setZoneId] = useState('');
-    const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
+    const [severityLevels, setSeverityLevels] = useState([]);
     const [threatPolicies, setThreatPolicies] = useState([]);
 
     const isZoneLevel = integrationType === "zones";
@@ -49,10 +48,6 @@ function CloudflareWaf() {
                 {isZoneLevel && (
                     <TextField value={zoneId} onChange={setZoneId} label="Cloudflare Zone ID" placeholder="Zone ID (required for WAF rule)"/>
                 )}
-                <SeverityLevelDropdown
-                  severityLevels={severityLevels}
-                  setSeverityLevels={setSeverityLevels}
-                />
                 <ThreatPoliciesDropdown
                   threatPolicies={threatPolicies}
                   setThreatPolicies={setThreatPolicies}
@@ -87,7 +82,7 @@ function CloudflareWaf() {
       setAccountOrZoneId(resp?.cloudflareWafConfig?.accountOrZoneId || "")
       setIntegrationType(resp?.cloudflareWafConfig?.integrationType || "zones")
       setZoneId(resp?.cloudflareWafConfig?.zoneId || "")
-      setSeverityLevels(resp?.cloudflareWafConfig?.severityLevels || ['CRITICAL'])
+      setSeverityLevels(resp?.cloudflareWafConfig?.severityLevels || [])
       setThreatPolicies(resp?.cloudflareWafConfig?.threatPolicies || [])
     }
 

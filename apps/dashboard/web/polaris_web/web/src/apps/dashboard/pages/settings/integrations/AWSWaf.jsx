@@ -5,7 +5,6 @@ import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
 import { usePermissions, whenAllowed } from '@/util/permissions'
-import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function AWSWaf() {
@@ -16,7 +15,7 @@ function AWSWaf() {
     const [ruleSetId, setRuleSetId] = useState('');
     const [ruleSetName, setRuleSetName] = useState('');
     const [isPresent, setIsPresent] = useState(false);
-    const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
+    const [severityLevels, setSeverityLevels] = useState([]);
     const [threatPolicies, setThreatPolicies] = useState([]);
     const wafCard = (
         <LegacyCard
@@ -36,17 +35,14 @@ function AWSWaf() {
                 />
                 <TextField value={region} onChange={setRegion} label="AWS region" placeholder="us-east-1" helpText="Region of the IP set. It must be the same region as the Web ACL protecting your ALB or API Gateway."/>
                 {ruleSetId ?
-                  <Text variant="bodyMd" color="subdued">
-                    {`Blocked IPs are added to IP set ${ruleSetName} (${ruleSetId}). Add a rule with action Block referencing this IP set to the Web ACL protecting your ALB or API Gateway.`}
-                  </Text> :
+                  <VerticalStack gap={"1"}>
+                    <Text variant="bodyMd" color="subdued">{`Blocked IPs are added to the AWS IP set ${ruleSetName}.`}</Text>
+                    <Text variant="bodyMd" color="subdued">Add a rule with action Block referencing this IP set to the Web ACL protecting your ALB or API Gateway.</Text>
+                  </VerticalStack> :
                   <Text variant="bodyMd" color="subdued">
                     On save, Akto uses the IP set akto-blocked-ips in this region and creates it if it doesn't exist.
                   </Text>
                 }
-                <SeverityLevelDropdown
-                  severityLevels={severityLevels}
-                  setSeverityLevels={setSeverityLevels}
-                />
                 <ThreatPoliciesDropdown
                   threatPolicies={threatPolicies}
                   setThreatPolicies={setThreatPolicies}
@@ -78,7 +74,7 @@ function AWSWaf() {
       setRegion(resp?.wafConfig?.region)
       setRuleSetId(resp?.wafConfig?.ruleSetId)
       setRuleSetName(resp?.wafConfig?.ruleSetName)
-      setSeverityLevels(resp?.wafConfig?.severityLevels || ['CRITICAL'])
+      setSeverityLevels(resp?.wafConfig?.severityLevels || [])
       setThreatPolicies(resp?.wafConfig?.threatPolicies || [])
     }
 
