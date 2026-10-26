@@ -173,15 +173,14 @@ export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap 
   if (isGuardrail) {
     const ruleViolated = extractRuleViolated(event?.metadata);
     const dbCapability = getDbComplianceCapability(ruleViolated);
-    const storedCompliance = extractStoredCompliance(event?.metadata);
-    if (storedCompliance) {
-      base = storedCompliance;
-    } else if (dbCapability) {
+    if (dbCapability) {
       base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || guardrailComplianceMap[dbCapability] || {};
     } else {
       const capability = getGuardrailCapabilityForRule(ruleViolated);
       base = guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
     }
+    // Compliance captured on the event at detection time wins over the live policy / conf.
+    base = extractStoredCompliance(event?.metadata) || base;
   } else {
     base = threatFiltersMap[event?.filterId]?.compliance?.mapComplianceToListClauses || {};
   }
