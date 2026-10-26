@@ -578,8 +578,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        sendBulkModifyThreatActorStatusToBackend(actorIps);
-        return SUCCESS.toUpperCase();
+        return sendBulkModifyThreatActorStatusToBackend(actorIps) ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
     }
 
 

@@ -121,7 +121,7 @@ function ThreatActorPage() {
       refreshCount={actorsRefreshCount}
       onStatusChange={onActorStatusChange}
     />,
-    ...(showActorDetails ? [<ActorDetails actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} onStatusChange={onActorStatusChange} />] : [])
+    ...(showActorDetails ? [<ActorDetails key={actorDetails?.id} actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} onStatusChange={onActorStatusChange} />] : [])
   ];
 
   return (
