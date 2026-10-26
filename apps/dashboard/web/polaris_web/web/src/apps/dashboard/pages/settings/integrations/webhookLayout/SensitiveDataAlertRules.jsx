@@ -110,10 +110,6 @@ function SensitiveDataAlertRules({ rules, setRules }) {
             {loadFailed ?
                 <Text variant="bodySm" color="critical">Could not load data types. Saved rules are kept; reload the page to pick new ones.</Text>
                 : null}
-            <Text variant="bodySm" color="subdued">
-                Custom sensitive data types only. Every API collection is checked hourly; an event is one request or response carrying the type.
-                Each data type and collection pair alerts at most once a day for as long as it keeps breaching.
-            </Text>
         </VerticalStack>
     )
 }
