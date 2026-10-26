@@ -55,6 +55,11 @@ if MODE == "atlas":
 else:
     AI_AGENT_API_URL = os.getenv("AKTO_API_URL", "")
 
+
+def invoked_by_claude_code() -> bool:
+    """True only when Claude Code launched the hook (it sets CLAUDECODE=1); other agents like Cursor can run Claude hooks too."""
+    return os.getenv("CLAUDECODE") == "1"
+
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
 _CONNECTOR_LOG_DIR: Dict[str, str] = {
