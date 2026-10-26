@@ -7,8 +7,8 @@ with `contextSource=ENDPOINT`:
 `Default-Customer PII`, `Default-Source code detection`, `Default-Credentials Alert`, `Default-Financial Advice`.
 
 ## Data flow
-`InitializerListener` (`runJobFunctions == 2` block) -> `EndpointDefaultGuardrailsCron` (30 min, `callDibs`
-`Cluster.ENDPOINT_DEFAULT_GUARDRAILS_CRON_INFO`, expiry 25 min) -> `AccountTask.executeTask`
+`InitializerListener` (`runJobFunctions == 2` block) -> `EndpointDefaultGuardrailsCron` (30 min, no dibs lock)
+-> `AccountTask.executeTask`
 -> `DefaultEndpointGuardrailsService.seedCurrentAccount()`
 -> `ApiCollectionsDao.hasEndpointCollection()`
 -> `GuardrailPoliciesDao.existsByCreatedByOrName()` (skip rule) -> `insertOne` x4.
@@ -31,8 +31,9 @@ in another dashboard context does not block seeding.
 - The policy definitions are Java objects (`DefaultEndpointGuardrailPolicies.build`), not a resource file.
 
 ## Gotchas
-- No uniqueness is enforced by the database. Two nodes seeding the same account at once could both pass the skip check.
-  `callDibs` keeps the cron to one node at a time; no other code path calls the service.
+- No uniqueness is enforced by the database, and the cron takes no dibs lock, so every dashboard node running the
+  `runJobFunctions == 2` block seeds on its own schedule. Two nodes seeding the same account at once can both pass the
+  skip check and insert the 4 policies twice. `Cluster.ENDPOINT_DEFAULT_GUARDRAILS_CRON_INFO` is defined but unused.
 - The skip query ORs `createdBy` (unindexed) with `name`. It is fine because it is filtered by `contextSource` first
   and a single account has few policies. Revisit if that stops being true.
 - `hasEndpointCollection()` relies on `AccountsContextDaoWithRbac.modifyFilters`: it scopes `findAll` by
