@@ -56,6 +56,8 @@ function ThreatActorPage() {
   const { canCall } = usePermissions();
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
+  const [actorsRefreshCount, setActorsRefreshCount] = useState(0);
+  const onActorStatusChange = () => setActorsRefreshCount(count => count + 1);
 
   const [searchParams] = useSearchParams();
   const getInitialDateRange = () => {
@@ -116,8 +118,10 @@ function ThreatActorPage() {
       key={"threat-actor-data-table"}
       currDateRange={currDateRange}
       handleRowClick={onRowClick}
+      refreshCount={actorsRefreshCount}
+      onStatusChange={onActorStatusChange}
     />,
-    ...(showActorDetails ? [<ActorDetails actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} />] : [])
+    ...(showActorDetails ? [<ActorDetails key={actorDetails?.id} actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} onStatusChange={onActorStatusChange} />] : [])
   ];
 
   return (

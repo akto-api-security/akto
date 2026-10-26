@@ -3,21 +3,23 @@ package com.akto.action.waf;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
-import com.akto.action.threat_detection.ThreatActorAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.ConfigType;
+import com.akto.threat_utils.AwsWafUtils;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
 import software.amazon.awssdk.services.wafv2.Wafv2Client;
-import software.amazon.awssdk.services.wafv2.model.GetIpSetResponse;
+import software.amazon.awssdk.services.wafv2.model.IPSetSummary;
 
 import java.util.List;
 
 public class AwsWafAction extends UserAction {
-    
+
+    private static final String AKTO_BLOCKED_IP_SET_NAME = "akto-blocked-ips";
+
     private String awsAccessKey;
     private String awsSecretKey;
     private String region;
@@ -39,22 +41,15 @@ public class AwsWafAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        if(ruleSetId == null){
-            addActionError("Specify appropriate Rule Set Id, cannot be null");
-            return ERROR.toUpperCase();
-        }
-
-        if(ruleSetName == null){
-            addActionError("Specify appropriate Rule Set name, cannot be null");
-            return ERROR.toUpperCase();
-        }
-
         int accId = Context.accountId.get();
 
-        Wafv2Client client = ThreatActorAction.fetchAwsWafClient(awsAccessKey, awsSecretKey, region);
-        GetIpSetResponse resp = ThreatActorAction.fetchIpSet(client, ruleSetName, ruleSetId);
-        if (resp == null) {
-            addActionError("Error trying to fetch information of your rule set");
+        try (Wafv2Client client = AwsWafUtils.fetchAwsWafClient(awsAccessKey, awsSecretKey, region)) {
+            IPSetSummary ipSet = AwsWafUtils.getOrCreateIpSet(client, AKTO_BLOCKED_IP_SET_NAME);
+            ruleSetId = ipSet.id();
+            ruleSetName = ipSet.name();
+        } catch (Exception e) {
+            addActionError("Unable to get or create the AWS WAF IP set " + AKTO_BLOCKED_IP_SET_NAME + ": " + e.getMessage());
+            return ERROR.toUpperCase();
         }
 
         Bson filters = Filters.and(

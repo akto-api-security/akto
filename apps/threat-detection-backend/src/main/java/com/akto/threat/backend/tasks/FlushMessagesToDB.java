@@ -13,6 +13,7 @@ import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.utils.SplunkEvent;
+import com.akto.util.ThreatDetectionConstants;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -254,7 +255,7 @@ public class FlushMessagesToDB {
       updatesList.add(Updates.set("updatedAt", Context.now()));
       updatesList.add(Updates.setOnInsert("actorId", actor));
       updatesList.add(Updates.setOnInsert("contextSource", contextSource));  // Set on insert
-      updatesList.add(Updates.setOnInsert("status", "ACTIVE"));
+      updatesList.add(Updates.setOnInsert("status", ThreatDetectionConstants.ACTIVE));
       updatesList.add(Updates.inc("totalAttacks", 1));
 
       // Only set isCritical to true if this event is HIGH/CRITICAL

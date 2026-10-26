@@ -10,8 +10,8 @@ import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
 import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.Config;
+import com.akto.threat_utils.AwsWafUtils;
 import com.akto.threat_utils.CloudflareWafUtils;
-import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLMethods;
@@ -24,20 +24,13 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.ThreatDetectionConstants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.wafv2.Wafv2Client;
-import software.amazon.awssdk.services.wafv2.model.GetIpSetRequest;
-import software.amazon.awssdk.services.wafv2.model.GetIpSetResponse;
-import software.amazon.awssdk.services.wafv2.model.UpdateIpSetRequest;
-import software.amazon.awssdk.services.wafv2.model.Wafv2Exception;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -89,7 +82,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorAction.class, LogDb.DASHBOARD);
-  private static final String SCOPE = "REGIONAL";
 
   public ThreatActorAction() {
     super();
@@ -263,7 +255,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                                     smr.getCountry(),
                                     smr.getLatestSubcategory(),
                                     smr.getLatestApiHost(),
-                                    smr.getLatestMetadata()))
+                                    smr.getLatestMetadata(),
+                                    smr.getStatus()))
                         .collect(Collectors.toList());
 
                 this.total = m.getTotal();
@@ -454,32 +447,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
   }
 
-    public static Wafv2Client fetchAwsWafClient(String accessKey, String secretKey, String region) {
-      return Wafv2Client.builder()
-          .region(Region.of(region))
-          .credentialsProvider(StaticCredentialsProvider.create(
-              AwsBasicCredentials.create(accessKey, secretKey)
-          ))
-          .build();
-    }
-
-    public static GetIpSetResponse fetchIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
-        GetIpSetRequest getRequest = GetIpSetRequest.builder()
-                    .name(ruleSetName)
-                    .scope(SCOPE)
-                    .id(ruleSetId)
-                    .build();
-
-        GetIpSetResponse getResponse = null;
-        try {
-            getResponse = wafv2Client.getIPSet(getRequest);
-        } catch (Exception e) {
-            e.printStackTrace();
-            loggerMaker.errorAndAddToDb("unable to fetch ipSet " + e.getStackTrace());
-        }
-        return getResponse;
-    }
-
     private static Config.CloudflareWafConfig fetchCloudflareConfig() {
         int accId = Context.accountId.get();
         Bson filters = Filters.and(
@@ -503,7 +470,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
 
         boolean result;
-        if (status.equalsIgnoreCase("blocked")) {
+        if (ThreatDetectionConstants.BLOCKED.equals(status)) {
             result = CloudflareWafUtils.blockActorIps(cloudflareWafConfig, Collections.singletonList(actorIp));
         } else {
             result = CloudflareWafUtils.unblockActorIps(cloudflareWafConfig, Collections.singletonList(actorIp));
@@ -524,26 +491,32 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
-
-        if (!hasValidListConfig(cloudflareWafConfig)) {
-            addActionError("Cloudflare WAF integration not configured properly.");
-            return ERROR.toUpperCase();
-        }
-
         boolean result;
-        if ("blocked".equalsIgnoreCase(status)) {
-            result = CloudflareWafUtils.blockActorIps(cloudflareWafConfig, actorIps);
+        List<String> updatedIps = actorIps;
+        Config.AwsWafConfig awsWafConfig = fetchAwsWafConfig();
+        if (awsWafConfig != null) {
+            updatedIps = updateAwsWafIpSet(awsWafConfig, actorIps);
+            result = updatedIps != null;
         } else {
-            result = CloudflareWafUtils.unblockActorIps(cloudflareWafConfig, actorIps);
+            Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
+
+            if (!hasValidListConfig(cloudflareWafConfig)) {
+                addActionError("Cloudflare WAF integration not configured properly.");
+                return ERROR.toUpperCase();
+            }
+
+            if (ThreatDetectionConstants.BLOCKED.equals(status)) {
+                result = CloudflareWafUtils.blockActorIps(cloudflareWafConfig, actorIps);
+            } else {
+                result = CloudflareWafUtils.unblockActorIps(cloudflareWafConfig, actorIps);
+            }
         }
 
         if (!result) {
             return ERROR.toUpperCase();
         }
 
-        sendBulkModifyThreatActorStatusToBackend(actorIps);
-        return SUCCESS.toUpperCase();
+        return sendBulkModifyThreatActorStatusToBackend(updatedIps) ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
     }
 
 
@@ -555,69 +528,47 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         this.actorIps = actorIps;
     }
 
-    public String modifyThreatActorStatus() {
-        Wafv2Client wafClient = null;
+    private static Config.AwsWafConfig fetchAwsWafConfig() {
         int accId = Context.accountId.get();
         Bson filters = Filters.and(
             Filters.eq("_id", accId+ "_" + "AWS_WAF"),
             Filters.eq("accountId", accId)
         );
-        Config.AwsWafConfig awsWafConfig = (Config.AwsWafConfig) ConfigsDao.instance.findOne(filters);
+        return (Config.AwsWafConfig) ConfigsDao.instance.findOne(filters);
+    }
+
+    public String modifyThreatActorStatus() {
+        Config.AwsWafConfig awsWafConfig = fetchAwsWafConfig();
 
         if(awsWafConfig == null) {
             loggerMaker.debugAndAddToDb("Trying Cloudflare Waf.");
             return modifyThreatActorStatusCloudflare();
         }
 
-        try {
-            wafClient = fetchAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
-            //ListWebAcLsResponse webAclsResponse = wafClient.listWebACLs(ListWebAcLsRequest.builder().scope(SCOPE).build());
-            loggerMaker.debugAndAddToDb("init aws client, for threat actor block");
-        } catch (Exception e) {
-            e.printStackTrace();
-            loggerMaker.errorAndAddToDb("error initialising aws client " + e.getMessage());
-        }
-
-        try {
-            GetIpSetRequest getRequest = GetIpSetRequest.builder()
-                    .name(awsWafConfig.getRuleSetName())
-                    .scope(SCOPE)
-                    .id(awsWafConfig.getRuleSetId())
-                    .build();
-
-            GetIpSetResponse getResponse = null;
-            try {
-                getResponse = wafClient.getIPSet(getRequest);
-            } catch (Exception e) {
-                e.printStackTrace();
-                System.out.print("getResponse error " + e.getMessage());
-                return ERROR.toUpperCase();
-            }
-            
-            List<String> ipAddresses = new ArrayList<>(getResponse.ipSet().addresses());
-
-            String ipWithCidr = actorIp + "/32";
-            boolean resp;
-            if (status.equalsIgnoreCase("blocked")) {
-              resp = blockActorIp(ipAddresses, ipWithCidr, wafClient, awsWafConfig, getResponse);
-            } else {
-              resp = unblockActorIp(ipAddresses, ipWithCidr, wafClient, awsWafConfig, getResponse);
-            }
-
-            if (resp) {
-                boolean res = sendModifyThreatActorStatusToBackend(ipWithCidr);
-                if(!res) {
-                    return ERROR.toUpperCase();
-                } else {
-                    return SUCCESS.toUpperCase();
-                }
-            }
-            return SUCCESS.toUpperCase();
-            
-        } catch (Wafv2Exception e) {
-            loggerMaker.debugAndAddToDb("Error modiftying threat actor status: " + e.getMessage());
+        if (updateAwsWafIpSet(awsWafConfig, Collections.singletonList(actorIp)) == null) {
             return ERROR.toUpperCase();
         }
+
+        return sendModifyThreatActorStatusToBackend(actorIp) ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
+    }
+
+    // Returns the ips whose status should change in the backend, or null on failure
+    private List<String> updateAwsWafIpSet(Config.AwsWafConfig awsWafConfig, List<String> ips) {
+        if (!ThreatDetectionConstants.BLOCKED.equals(status)) {
+            return AwsWafUtils.unblockActorIps(awsWafConfig, ips) ? ips : null;
+        }
+
+        List<String> ipv4 = AwsWafUtils.ipv4Only(ips);
+        if (ipv4.isEmpty()) {
+            addActionError("AWS WAF supports only IPv4 addresses.");
+            return null;
+        }
+        List<String> blocked = AwsWafUtils.blockActorIps(awsWafConfig, ipv4);
+        if (blocked != null && blocked.isEmpty()) {
+            addActionError("AWS WAF IP set is full.");
+            return null;
+        }
+        return blocked;
     }
 
     public boolean sendModifyThreatActorStatusToBackend(String ip) {
@@ -679,48 +630,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
         return true;
     }
-
-    public boolean blockActorIp(List<String> ipAddresses, String ipWithCidr, Wafv2Client wafClient, AwsWafConfig awsWafConfig, GetIpSetResponse getResponse) {
-        if (!ipAddresses.contains(ipWithCidr)) {
-            ipAddresses.add(ipWithCidr);
-
-            UpdateIpSetRequest updateRequest = UpdateIpSetRequest.builder()
-                    .name(awsWafConfig.getRuleSetName())
-                    .scope(SCOPE)
-                    .id(awsWafConfig.getRuleSetId())
-                    .addresses(ipAddresses) 
-                    .lockToken(getResponse.lockToken())
-                    .build();
-
-            wafClient.updateIPSet(updateRequest);
-            loggerMaker.debugAndAddToDb("Blocked Threat Actor: " + actorIp);
-            return true;
-        } else {
-            loggerMaker.debugAndAddToDb("Threat Actor " + actorIp + " is already blocked.");
-            return false;
-        }
-    }
-
-    public boolean unblockActorIp(List<String> ipAddresses, String ipWithCidr, Wafv2Client wafClient, AwsWafConfig awsWafConfig, GetIpSetResponse getResponse) {
-      if (ipAddresses.contains(ipWithCidr)) {
-          ipAddresses.remove(ipWithCidr);
-
-          UpdateIpSetRequest updateRequest = UpdateIpSetRequest.builder()
-                  .name(awsWafConfig.getRuleSetName())
-                  .scope(SCOPE)
-                  .id(awsWafConfig.getRuleSetId())
-                  .addresses(ipAddresses) 
-                  .lockToken(getResponse.lockToken())
-                  .build();
-
-          wafClient.updateIPSet(updateRequest);
-          loggerMaker.debugAndAddToDb("Unblocked Threat Actor: " + actorIp);
-          return true;
-      } else {
-          loggerMaker.debugAndAddToDb("Threat Actor " + actorIp + " is currently active");
-          return false;
-      }
-  }
 
     public String sendIntegrationDataToThreatBackend() {
       HttpPost post =

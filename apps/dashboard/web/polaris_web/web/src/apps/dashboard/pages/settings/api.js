@@ -699,11 +699,11 @@ const settingRequests = {
             data: {roleName}
         })
     },
-    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies) {
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, severityLevels, threatPolicies) {
         return request({
             url: '/api/addAwsWafIntegration',
             method: 'post',
-            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies}
+            data: {awsAccessKey, awsSecretKey, region, severityLevels, threatPolicies}
         })
     },
     fetchAwsWafIntegration() {
@@ -965,11 +965,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async deleteCloudflareWafIntegration() {
+    async deleteCloudflareWafIntegration(wafType) {
         return await request({
             url: '/api/deleteCloudflareWafIntegration',
             method: 'post',
-            data: {}
+            data: {wafType}
         })
     },
     async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType, zoneId, severityLevels, threatPolicies) {

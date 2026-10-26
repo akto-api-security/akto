@@ -95,7 +95,7 @@ const getBaseHeaders = () => {
     {
       text: "Status",
       title: "Status",
-      value: "status",
+      value: "statusLabel",
     },
     {
       text: "Detected at",
@@ -126,7 +126,7 @@ const sortOptions = [
   },
 ];
 
-function ThreatActorTable({ data, currDateRange, handleRowClick }) {
+function ThreatActorTable({ data, currDateRange, handleRowClick, refreshCount, onStatusChange }) {
   const [loading, setLoading] = useState(false);
   const [lastCursor, setLastCursor] = useState(null);  // Track last ObjectId for cursor pagination
   const [usernameMap, setUsernameMap] = useState({});
@@ -260,7 +260,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
             ruleViolated: extractRuleViolated(x.latestMetadata)
           }),
           accessType: accessTypes.length > 0 ? getAccessType(accessTypes) : "-",
-          status: "Active",
+          statusLabel: x.status === "BLOCKED" ? "Blocked" : "Active",
           country: (
             <Tooltip
               content={x.country || "Unknown"}
@@ -411,19 +411,24 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       return [];
     }
 
-    return [
-      {
-        content: `Block ${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`,
-        requires: 'api/bulkModifyThreatActorStatusCloudflare',
-        onAction: async () => {
-          try {
-            await api.bulkModifyThreatActorStatusCloudflare(selectedIps, "blocked");
-            func.setToast(true, false, `Successfully blocked ${selectedIps.length} IP(s)`);
-          } catch (e) {
-            func.setToast(true, true, "Failed to block IPs");
-          }
-        },
+    const ipLabel = `${selectedIps.length} IP${selectedIps.length > 1 ? 's' : ''}`;
+    const bulkStatusAction = (action, status) => ({
+      content: `${action} ${ipLabel}`,
+      requires: 'api/bulkModifyThreatActorStatusCloudflare',
+      onAction: async () => {
+        try {
+          await api.bulkModifyThreatActorStatusCloudflare(selectedIps, status);
+          func.setToast(true, false, `Successfully ${action.toLowerCase()}ed ${ipLabel}`);
+          onStatusChange();
+        } catch (e) {
+          func.setToast(true, true, `Failed to ${action.toLowerCase()} IPs`);
+        }
       },
+    });
+
+    return [
+      bulkStatusAction("Block", "BLOCKED"),
+      bulkStatusAction("Unblock", "ACTIVE"),
     ];
   };
 
@@ -431,6 +436,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     <GithubServerTable
       onRowClick={(data) => onRowClick(data)}
       key={key}
+      callFromOutside={refreshCount}
       pageLimit={50}
       headers={getHeaders()}
       resourceName={resourceName}
