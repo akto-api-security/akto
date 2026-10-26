@@ -109,9 +109,11 @@ public class SensitiveDataThresholdAlerts {
     }
 
     /**
-     * Cyborg writes the counts but does not index them; that happens here, for every account, whether
-     * or not it has a webhook: without the unique index each increment scans the whole collection and
-     * concurrent runtimes can create the same bucket twice, and without the TTL indexes nothing expires.
+     * The services that write the counts - mini-runtime and the database abstractor - never call
+     * DaoInit.createIndices, so the collection can be created by the first increment with neither
+     * index. Without the unique one each upsert scans the collection and concurrent runtimes can
+     * create the same bucket twice; without the TTL nothing ever expires. Creating them here means
+     * the feature does not depend on who started first.
      */
     static void ensureCountIndexes() {
         int accountId = Context.accountId.get();
