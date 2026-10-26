@@ -4142,6 +4142,23 @@ public class DbLayer {
         }
     }
 
+    // Distinct email domains of this account's users; throws on DB errors so callers keep their last list rather than get an empty one.
+    public static List<String> fetchOrgEmailDomains() {
+        Set<String> domains = new HashSet<>();
+        List<User> users = UsersDao.instance.findAll(Filters.exists("accounts." + Context.accountId.get()), Projections.include(User.LOGIN));
+        for (User user : users) {
+            String login = user.getLogin();
+            if (login == null || !login.contains("@")) {
+                continue;
+            }
+            String domain = login.substring(login.lastIndexOf('@') + 1).trim().toLowerCase();
+            if (!domain.isEmpty()) {
+                domains.add(domain);
+            }
+        }
+        return new ArrayList<>(domains);
+    }
+
     public static List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
                                                     List<String> deviceIds, boolean negatedDeviceIds) {
         try {
