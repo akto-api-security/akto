@@ -24,6 +24,7 @@ import com.akto.testing_utils.TestingUtils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
@@ -123,17 +124,14 @@ public class AiVerificationAction extends UserAction {
             return ERROR.toUpperCase();
         }
         // Built here, with the user's context, so only issues the user can access are verified.
-        Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(
-            Filters.in(Constants.ID, issueIdArray));
+        Bson openIssuesFilter = Filters.and(
+            TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.in(Constants.ID, issueIdArray)),
+            Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN));
 
         int accountId = Context.accountId.get();
         return startJob(accountId + ":issues",
             "Verification already running for selected issues",
-            summaries -> verifyTargets(issueIdArray.size() + " selected issues", targetsForIssues(openOnly(accessFilter), summaries)));
-    }
-
-    private static Bson openOnly(Bson accessFilter) {
-        return Filters.and(accessFilter, Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN));
+            summaries -> verifyTargets(issueIdArray.size() + " selected issues", targetsForIssues(openIssuesFilter, summaries)));
     }
 
     /** Checks the feature and the per-scope guard, then runs the job in the background. */
@@ -255,7 +253,7 @@ public class AiVerificationAction extends UserAction {
         return targets;
     }
 
-    private static com.mongodb.client.MongoCollection<TestingRunResult> resultCollection(boolean inVulnerableCollection) {
+    private static MongoCollection<TestingRunResult> resultCollection(boolean inVulnerableCollection) {
         return inVulnerableCollection
             ? VulnerableTestingRunResultDao.instance.getMCollection()
             : TestingRunResultDao.instance.getMCollection();
@@ -391,7 +389,7 @@ public class AiVerificationAction extends UserAction {
      * The attempts the scanner flagged vulnerable (up to MAX_ATTEMPTS_PER_RESULT), since those are what
      * the verdict is about. Falls back to the last attempt if none carries the vulnerable flag.
      */
-    static List<TestResult> attemptsToJudge(TestingRunResult result) {
+    private static List<TestResult> attemptsToJudge(TestingRunResult result) {
         List<GenericTestResult> testResults = result.getTestResults();
         List<TestResult> picked = new ArrayList<>();
         if (testResults == null || testResults.isEmpty()) return picked;
@@ -410,24 +408,12 @@ public class AiVerificationAction extends UserAction {
         return picked;
     }
 
-    public String getTestingRunResultSummaryHexId() {
-        return testingRunResultSummaryHexId;
-    }
-
     public void setTestingRunResultSummaryHexId(String testingRunResultSummaryHexId) {
         this.testingRunResultSummaryHexId = testingRunResultSummaryHexId;
     }
 
-    public List<String> getTestingRunResultHexIds() {
-        return testingRunResultHexIds;
-    }
-
     public void setTestingRunResultHexIds(List<String> testingRunResultHexIds) {
         this.testingRunResultHexIds = testingRunResultHexIds;
-    }
-
-    public List<TestingIssuesId> getIssueIdArray() {
-        return issueIdArray;
     }
 
     public void setIssueIdArray(List<TestingIssuesId> issueIdArray) {
