@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.dto.notifications.SensitiveDataAlertRule;
 import com.akto.dto.traffic.SensitiveDataCount;
 import com.mongodb.ErrorCategory;
 import com.mongodb.MongoWriteException;
@@ -31,8 +32,14 @@ public class SensitiveDataCountDao extends AccountsContextDao<SensitiveDataCount
     public static final String COLLECTION_NAME = "sensitive_data_counts";
     public static final SensitiveDataCountDao instance = new SensitiveDataCountDao();
 
-    /** Longest alert window we expect (a month), plus margin. */
-    public static final int RETENTION_DAYS = 40;
+    /**
+     * Margin over the longest allowed window. Covers a late flush for an old hour and the fact
+     * that Mongo's TTL monitor sweeps periodically rather than deleting exactly on expiry.
+     */
+    public static final int RETENTION_SAFETY_DAYS = 10;
+
+    /** Buckets are kept for the longest window a rule may use, plus margin. */
+    public static final int RETENTION_DAYS = SensitiveDataAlertRule.MAX_WINDOW_DAYS + RETENTION_SAFETY_DAYS;
 
     /** Keys of requests already applied, so a retried request is not counted twice. */
     public static final String APPLIED_REQUESTS_COLLECTION = "sensitive_data_count_requests";

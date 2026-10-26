@@ -9,7 +9,13 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 public class SensitiveDataAlertRule {
 
     /** Counts are kept for 40 days, so a window must fit inside that with margin. */
-    public static final int MAX_WINDOW_DAYS = 30;
+    /**
+     * Longest window a rule may ask for. A window longer than what
+     * {@code SensitiveDataCountDao.RETENTION_DAYS} keeps would silently sum only the buckets that
+     * survived the TTL and report a total below the real one, so the threshold would never trip -
+     * a wrong answer with no error. Retention is derived from this, which keeps the two in step.
+     */
+    public static final int MAX_WINDOW_DAYS = 90;
 
     public static final String SUB_TYPE = "subType";
     private String subType;

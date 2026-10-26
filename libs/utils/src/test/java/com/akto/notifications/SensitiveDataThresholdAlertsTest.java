@@ -68,13 +68,13 @@ public class SensitiveDataThresholdAlertsTest {
     }
 
     @Test
-    public void alertsOncePerWindowPerTypeAndCollection() {
+    public void alertsAtMostOncePerDayPerTypeAndCollection() {
         FakeCounts counts = new FakeCounts().put("EMAIL_X", 1, 42).put("EMAIL_X", 2, 50);
         List<SensitiveDataAlertRule> rules = Collections.singletonList(new SensitiveDataAlertRule("EMAIL_X", 30, 7));
 
         Map<String, Integer> alertedAt = new HashMap<>();
-        alertedAt.put("EMAIL_X|1", NOW - 3 * DAY);   // within the window: stays quiet
-        alertedAt.put("EMAIL_X|2", NOW - 8 * DAY);   // window passed: alerts again
+        alertedAt.put("EMAIL_X|1", NOW - 3600);      // alerted within the day: stays quiet
+        alertedAt.put("EMAIL_X|2", NOW - 2 * DAY);   // a day has passed: alerts again
 
         List<SensitiveDataThresholdAlerts.Breach> breaches =
                 SensitiveDataThresholdAlerts.findBreaches(rules, alertedAt, NOW, counts);
