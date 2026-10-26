@@ -1210,6 +1210,11 @@ public class DbLayer {
 //    }
 
     public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId) {
+        return fetchStiBasedOnHostHeaders(objectId, 0);
+    }
+
+    /** lastSeenGte > 0 limits the result to host-header STIs seen at or after that timestamp; 0 means all of them. */
+    public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId, int lastSeenGte) {
         List<SingleTypeInfo> results = new ArrayList<>();
         ObjectId currentObjectId = objectId;
         Set<Integer> routingCollectionIds = null;
@@ -1227,6 +1232,9 @@ public class DbLayer {
         // Keep fetching until we get a non-empty list or exhaust documents
         while (results.isEmpty()) {
             Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1, false);
+            if (lastSeenGte > 0) {
+                filterForHostHeader = Filters.and(filterForHostHeader, Filters.gte(SingleTypeInfo.LAST_SEEN, lastSeenGte));
+            }
             Bson filterForSkip = currentObjectId == null ? null : Filters.gt("_id", currentObjectId);
             Bson finalFilter = filterForSkip == null ? filterForHostHeader : Filters.and(filterForHostHeader, filterForSkip);
 
@@ -1281,6 +1289,18 @@ public class DbLayer {
         }
 
         return results;
+    }
+
+    /**
+     * How many STIs a full walk of fetchStiBasedOnHostHeaders returns, or -1 if that can't be known cheaply.
+     * For the accounts whose results are filtered in Java after the query the DB count would overstate it.
+     */
+    public static long countStiBasedOnHostHeaders() {
+        Integer accountId = Context.accountId.get();
+        if (accountId != null && (accountId == Constants.ROUTING_SKIP_ACCOUNT_ID || accountId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID)) {
+            return -1;
+        }
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(SingleTypeInfoDao.filterForHostHeader(-1, false));
     }
 
     private static Set<Integer> getRoutingCollectionIds() {
