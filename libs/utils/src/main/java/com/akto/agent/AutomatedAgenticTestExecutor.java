@@ -12,6 +12,7 @@ import com.akto.util.Constants;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import okhttp3.*;
@@ -35,12 +36,19 @@ public class AutomatedAgenticTestExecutor {
 
     private static final String BASE_URL = Constants.AUTOMATED_AGENT_BASE_URL;
     private static final String EXECUTE_ENDPOINT = "/pentest";
+    private static final String VERIFY_ENDPOINT = "/verify";
 
     private static final OkHttpClient httpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.MINUTES)
             .writeTimeout(30, TimeUnit.SECONDS)
             .callTimeout(10, TimeUnit.MINUTES)
+            .build();
+
+    // verifying one finding is a few requests and one validator call; must finish inside the 5 min per-test timeout
+    private static final OkHttpClient verifyHttpClient = httpClient.newBuilder()
+            .readTimeout(2, TimeUnit.MINUTES)
+            .callTimeout(2, TimeUnit.MINUTES)
             .build();
 
     public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType) {
@@ -96,6 +104,53 @@ public class AutomatedAgenticTestExecutor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: error executing agentic test: " + e.getMessage());
+            return new PentestExecutionResult(Collections.emptyList(), null);
+        }
+    }
+
+    /**
+     * POST /verify: the service runs its proof gate and validator on one attempt a YAML template reported
+     * vulnerable. Empty results mean it couldn't judge it (skipped, error, timeout), so the template's verdict stands.
+     */
+    public PentestExecutionResult verifyFinding(RawApi original, RawApi finding, String testSubType) {
+        try {
+            JsonNode payload = objectMapper.readTree(buildRequestBody(original, testSubType));
+            JsonNode findingNode = objectMapper.readTree(buildRequestBody(finding, testSubType));
+            ((ObjectNode) findingNode).remove("testSubType");
+            ((ObjectNode) payload).set("finding", findingNode);
+            RequestBody requestBody = RequestBody.create(objectMapper.writeValueAsString(payload), MediaType.parse("application/json"));
+
+            Request.Builder requestBuilder = new Request.Builder()
+                    .url(BASE_URL + VERIFY_ENDPOINT)
+                    .post(requestBody)
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json");
+            String authToken = ClientActor.getAuthToken();
+            if (authToken != null && !authToken.isEmpty()) {
+                requestBuilder.addHeader(ClientActor.AUTHORIZATION, authToken);
+            }
+
+            try (Response response = verifyHttpClient.newCall(requestBuilder.build()).execute()) {
+                String responseBody = response.body() != null ? response.body().string() : "";
+                if (!response.isSuccessful()) {
+                    loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: verify failed with status " + response.code() + ", body: " + responseBody);
+                    return new PentestExecutionResult(Collections.emptyList(), null);
+                }
+                JsonNode root = objectMapper.readTree(responseBody);
+                if (root == null || !root.has("attempts")) {
+                    return new PentestExecutionResult(Collections.emptyList(), null);
+                }
+                List<TestResult> results = new ArrayList<>();
+                for (JsonNode node : root.get("attempts")) {
+                    TestResult result = new TestResult();
+                    result.setMessage(buildAttemptMessageFromPentestEvidence(node));
+                    result.setVulnerable(node.has("vulnerable") && node.get("vulnerable").asBoolean());
+                    results.add(result);
+                }
+                return new PentestExecutionResult(results, extractRootAiSummaryTraces(root));
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: error verifying finding: " + e.getMessage());
             return new PentestExecutionResult(Collections.emptyList(), null);
         }
     }
