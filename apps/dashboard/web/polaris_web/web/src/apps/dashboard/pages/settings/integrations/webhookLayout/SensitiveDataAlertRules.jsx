@@ -3,7 +3,9 @@ import { DeleteMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react"
 import observeApi from "../../../observe/api"
 
-export const MAX_WINDOW_DAYS = 30
+// Mirrors SensitiveDataAlertRule.MAX_WINDOW_DAYS. The server rejects anything above it
+// in WebhookAction, so this only saves a round trip - but the two must be changed together.
+export const MAX_WINDOW_DAYS = 90
 
 // Same validation the server applies, so a bad rule is caught before saving.
 export function invalidRuleMessage(rules, selectedOptions) {
@@ -110,7 +112,7 @@ function SensitiveDataAlertRules({ rules, setRules }) {
                 : null}
             <Text variant="bodySm" color="subdued">
                 Custom sensitive data types only. Every API collection is checked hourly; an event is one request or response carrying the type.
-                Each data type and collection pair alerts once when it crosses its threshold, and again only after its window has passed.
+                Each data type and collection pair alerts at most once a day for as long as it keeps breaching.
             </Text>
         </VerticalStack>
     )

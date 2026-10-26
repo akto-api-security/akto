@@ -29,9 +29,9 @@ import java.util.Map;
  *
  * Runs hourly, independent of the webhook's own frequency. For each rule it sums the hourly event
  * counts the runtime stores in sensitive_data_counts over the rule's window, per API collection,
- * and alerts on every collection above the threshold. A (data type, collection) pair alerts once
- * when it crosses, and again only after its window has passed, so a collection that stays above
- * the threshold does not alert every hour.
+ * and alerts on every collection above the threshold. A (data type, collection) pair alerts at
+ * most once a day for as long as it keeps breaching, so a collection that stays above the
+ * threshold does not alert every hour.
  */
 public class SensitiveDataThresholdAlerts {
 
@@ -39,6 +39,17 @@ public class SensitiveDataThresholdAlerts {
     private static final Gson gson = new Gson();
 
     public static final int RUN_INTERVAL_SECONDS = 3600;
+
+    /**
+     * How long a (data type, collection) pair stays quiet after it alerts.
+     *
+     * The window is rolling, so once a spike lands the total stays above the threshold for the
+     * whole window - without suppression a single incident on a 14 day rule would alert every
+     * hour, 336 times. Suppressing for the window instead goes too far the other way: a second
+     * spike, or the count growing tenfold, would pass unnoticed until the window elapsed. A day
+     * is the compromise: at most one alert per pair per day for as long as it keeps breaching.
+     */
+    public static final int RESEND_AFTER_SECONDS = 86400;
 
     /** Totals per collection for one type from an hour on, above a count. Abstracted for tests. */
     public interface CountSource {
@@ -116,8 +127,8 @@ public class SensitiveDataThresholdAlerts {
     }
 
     /**
-     * The (type, collection) pairs above their rule's threshold that have not alerted within the
-     * rule's window.
+     * The (type, collection) pairs above their rule's threshold that have not alerted in the last
+     * {@link #RESEND_AFTER_SECONDS}.
      */
     static List<Breach> findBreaches(List<SensitiveDataAlertRule> rules, Map<String, Integer> alertedAt,
                                      int now, CountSource counts) {
@@ -134,7 +145,7 @@ public class SensitiveDataThresholdAlerts {
 
             for (Map.Entry<Integer, Long> e : above.entrySet()) {
                 Integer last = lastAlerted.get(keyFor(rule.getSubType(), e.getKey()));
-                if (last != null && now - last < windowSeconds) continue;
+                if (last != null && now - last < RESEND_AFTER_SECONDS) continue;
                 breaches.add(new Breach(rule.getSubType(), e.getKey(), e.getValue(), rule.getThreshold(), rule.getWindowDays()));
             }
         }

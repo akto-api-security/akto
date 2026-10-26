@@ -164,15 +164,15 @@ public class SensitiveDataThresholdAlertsIT {
     }
 
     @Test
-    public void alertsOncePerWindowAndAgainAfterItPasses() throws Exception {
+    public void alertsOncePerDayAndAgainTheNextDay() throws Exception {
         counts(1, "T", 1, 50);
         webhook(14, "", true, rule("T", 10, 7));
         SensitiveDataThresholdAlerts.run();
         SensitiveDataThresholdAlerts.run();
         assertEquals(1, received().size());
 
-        // the window since the last alert has passed
-        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", 14), Updates.set("sensitiveDataAlertedAt.T|1", now() - 8 * DAY));
+        // a day has passed since the last alert, and it is still breaching
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", 14), Updates.set("sensitiveDataAlertedAt.T|1", now() - 2 * DAY));
         SensitiveDataThresholdAlerts.run();
         assertEquals(2, received().size());
         assertTrue(alertedAt(14).get("T|1") >= now() - 60);
@@ -195,7 +195,8 @@ public class SensitiveDataThresholdAlertsIT {
         counts(1, "T", 1, 50);
         webhook(16, "", false, rule("T", 10, 7));
         webhook(17, "", true);                                // no rules
-        webhook(18, "", true, rule("T", 0, 7), rule("", 10, 7), rule("T", 10, 0), rule("T", 10, 31));
+        webhook(18, "", true, rule("T", 0, 7), rule("", 10, 7), rule("T", 10, 0),
+                rule("T", 10, SensitiveDataAlertRule.MAX_WINDOW_DAYS + 1));
         CustomWebhooksDao.instance.updateOne(Filters.eq("_id", 17), Updates.unset(CustomWebhook.SENSITIVE_DATA_ALERT_RULES));
         SensitiveDataThresholdAlerts.run();
         assertTrue(received().isEmpty());
