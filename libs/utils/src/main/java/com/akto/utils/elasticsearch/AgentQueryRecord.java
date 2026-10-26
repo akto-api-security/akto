@@ -59,6 +59,7 @@ public class AgentQueryRecord {
     private static final String HEADER_USER_EMAIL = "user_email";
     private static final String HEADER_SESSION_ID = "akto_session_id";
     private static final String HEADER_TRACE_ID   = "akto_message_id";
+    private static final String TAG_BROWSER_USER_EMAIL = "browser-user-email";
 
     private static final String SESSIONS_PATH_SEGMENT = "sessions";
     private static final String EVENTS_PATH_SEGMENT   = "events";
@@ -262,7 +263,11 @@ public class AgentQueryRecord {
             serviceId = host;
             deviceId  = null;
             String moduleName = host != null ? host.split("\\.", 2)[0] : null;
-            userName = (deviceUserMap != null && moduleName != null) ? deviceUserMap.get(moduleName) : null;
+            // The site login the extension intercepted wins; otherwise fall back to the profile identity.
+            userName = tagsMap.get(TAG_BROWSER_USER_EMAIL);
+            if ((userName == null || !userName.contains("@")) && deviceUserMap != null && moduleName != null) {
+                userName = deviceUserMap.get(moduleName);
+            }
             // The extension can register before its profile email resolves, naming the module by
             // device id while the host id already says the email — so match on the email itself.
             if (userName == null || !userName.contains("@")) {
