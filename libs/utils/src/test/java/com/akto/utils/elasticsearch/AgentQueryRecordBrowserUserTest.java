@@ -13,11 +13,11 @@ import org.junit.jupiter.api.Test;
 public class AgentQueryRecordBrowserUserTest {
 
     private static final Map<String, String> DEVICE_USERS =
-            Collections.singletonMap("rohan", "rohan@akto.io");
+            Collections.singletonMap("jdoe", "jdoe@example.com");
 
     private static HttpResponseParams browserRequest() {
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("host", Collections.singletonList("rohan.chrome.claude.ai"));
+        headers.put("host", Collections.singletonList("jdoe.chrome.claude.ai"));
         HttpRequestParams req = new HttpRequestParams();
         req.setUrl("/api/chat");
         req.setHeaders(headers);
@@ -37,13 +37,13 @@ public class AgentQueryRecordBrowserUserTest {
 
     @Test
     public void browserUserEmailTagWins() {
-        assertEquals("richie.nprieto@gmail.com", userFor("richie.nprieto@gmail.com"));
+        assertEquals("personal.user@example.com", userFor("personal.user@example.com"));
     }
 
     @Test
     public void missingOrInvalidTagFallsBackToProfileIdentity() {
-        assertEquals("rohan@akto.io", userFor(null));
-        assertEquals("rohan@akto.io", userFor("null"));
-        assertEquals("rohan@akto.io", userFor(""));
+        assertEquals("jdoe@example.com", userFor(null));
+        assertEquals("jdoe@example.com", userFor("null"));
+        assertEquals("jdoe@example.com", userFor(""));
     }
 }
