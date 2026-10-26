@@ -260,6 +260,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Custom Regex ──────────────────────────────────────────────────────────
     {
         prefixes: ["UserDefinedRegex", "regex"],
+        capability: "regexPatterns",
         heading: "Custom Regex Pattern Match",
         overview: [
             {
@@ -475,6 +476,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── LLM Rule / Custom URL Rule ────────────────────────────────────────────
     {
         prefixes: ["UserDefinedLLMRule", "CustomURLRule", "LLMRule"],
+        capability: "llmRule",
         heading: "Custom Business Rule Violation",
         overview: [
             {
