@@ -1474,24 +1474,14 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         webhookSender();
+                        // Same hourly cadence and the same set of accounts, so this rides along
+                        // rather than scanning every account a second time. webhookSender swallows
+                        // its own exceptions, so a webhook failure cannot stop the alerts running.
+                        SensitiveDataThresholdAlerts.run();
                     }
                 }, "webhook-sender");
             }
         }, 0, 1, TimeUnit.HOURS);
-    }
-
-    /** Hourly: custom webhooks alerting on sensitive data event counts per collection. */
-    public void setUpSensitiveDataAlertScheduler() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account t) {
-                        SensitiveDataThresholdAlerts.run();
-                    }
-                }, "sensitive-data-threshold-alerts");
-            }
-        }, 0, SensitiveDataThresholdAlerts.RUN_INTERVAL_SECONDS, TimeUnit.SECONDS);
     }
 
     /**
@@ -2613,7 +2603,6 @@ public class InitializerListener implements ServletContextListener {
                         logger.warn("Starting CATEGORY 1 job schedulers", LogDb.DASHBOARD);
                         logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
                         setUpWebhookScheduler();
-                        setUpSensitiveDataAlertScheduler();
                         setUpThreatActivityWebhookSyncScheduler();
                         logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
                         setUpTrafficAlertScheduler();

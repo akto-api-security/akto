@@ -27,7 +27,7 @@ import java.util.Map;
 /**
  * Sends custom webhooks configured with {@link CustomWebhook.WebhookOptions#SENSITIVE_DATA_THRESHOLD_ALERTS}.
  *
- * Runs hourly, independent of the webhook's own frequency. For each rule it sums the hourly event
+ * Runs from the hourly custom-webhook pass, independent of each webhook's own frequency. For each rule it sums the hourly event
  * counts the runtime stores in sensitive_data_counts over the rule's window, per API collection,
  * and alerts on every collection above the threshold. A (data type, collection) pair alerts at
  * most once a day for as long as it keeps breaching, so a collection that stays above the
@@ -37,8 +37,6 @@ public class SensitiveDataThresholdAlerts {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(SensitiveDataThresholdAlerts.class, LogDb.DASHBOARD);
     private static final Gson gson = new Gson();
-
-    public static final int RUN_INTERVAL_SECONDS = 3600;
 
     /**
      * How long a (data type, collection) pair stays quiet after it alerts.
