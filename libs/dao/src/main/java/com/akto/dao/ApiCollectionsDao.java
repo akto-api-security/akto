@@ -39,6 +39,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
     public static final ApiCollectionsDao instance = new ApiCollectionsDao();
     private static Bson projectionForApis = Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD);
 
+    // Placeholder identity for system reads; matches no RBAC row.
+    private static final int SYSTEM_USER_ID = 0;
+
     private ApiCollectionsDao() {}
 
     @Override
@@ -203,6 +206,34 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         }
 
         return apiCollectionMap;
+    }
+
+    /**
+     * True if the current account has at least one endpoint collection. For system callers (crons) with no
+     * request user: findAll scopes itself to ENDPOINT collections from Context.contextSource, and a null
+     * Context.userId makes that scoping silently skipped (modifyFilters swallows the NPE), so a placeholder
+     * user is set. The user has no RBAC row, so it sees every collection in the ENDPOINT scope.
+     * The isEndpointCollection() check keeps a skipped scoping from reading as "has an endpoint collection".
+     */
+    public boolean hasEndpointCollection() {
+        CONTEXT_SOURCE prevContextSource = Context.contextSource.get();
+        try {
+            Context.userId.set(SYSTEM_USER_ID);
+            Context.contextSource.set(CONTEXT_SOURCE.ENDPOINT);
+            List<ApiCollection> scoped = findAll(new BasicDBObject(), 0, 1, null,
+                    Projections.include(ApiCollection.TAGS_STRING));
+            return scoped.stream().anyMatch(ApiCollection::isEndpointCollection);
+        } finally {
+            restore(Context.contextSource, prevContextSource);
+        }
+    }
+
+    private static <V> void restore(ThreadLocal<V> threadLocal, V previous) {
+        if (previous == null) {
+            threadLocal.remove();
+        } else {
+            threadLocal.set(previous);
+        }
     }
 
     public List<ApiCollection> fetchApiGroups() {

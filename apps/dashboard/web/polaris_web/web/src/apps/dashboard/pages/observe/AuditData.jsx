@@ -520,9 +520,7 @@ function AuditData() {
 
     const isEndpointSecurity = isEndpointSecurityCategory();
     const activeAccount = window?.ACTIVE_ACCOUNT
-    const definedTableTabs = isEndpointSecurity
-        ? (func.hasAccessToNewPosture() ? TABS_ENDPOINT_SECURITY : TABS_ENDPOINT_SECURITY_BASE)
-        : TABS_DEFAULT;
+    const definedTableTabs = isEndpointSecurity ? TABS_ENDPOINT_SECURITY : TABS_DEFAULT;
 
     const tableSelectedTab = PersistStore((state) => state.tableSelectedTab);
     const setTableSelectedTab = PersistStore((state) => state.setTableSelectedTab);
@@ -1434,7 +1432,7 @@ function AuditData() {
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.SKILLS]: skillsTotal }));
             }
-            if (isEndpointSecurity && func.hasAccessToNewPosture() && selectedTab !== TAB_IDS.VENDORS) {
+            if (isEndpointSecurity && selectedTab !== TAB_IDS.VENDORS) {
                 const vendorsTotal = await countVendors();
                 if (cancelled) return;
                 setTabCounts((prev) => ({ ...prev, [TAB_IDS.VENDORS]: vendorsTotal }));

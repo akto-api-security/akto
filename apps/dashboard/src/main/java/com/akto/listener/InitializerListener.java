@@ -187,6 +187,7 @@ public class InitializerListener implements ServletContextListener {
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
     ToolClassificationCron toolClassificationCron = new ToolClassificationCron();
     AgenticPostureScoreCron agenticPostureScoreCron = new AgenticPostureScoreCron();
+    EndpointDefaultGuardrailsCron endpointDefaultGuardrailsCron = new EndpointDefaultGuardrailsCron();
     UserAnalysisCron userAnalysisCron = new UserAnalysisCron();
     AgentGuardCorpusLabelingCron agentGuardCorpusLabelingCron = new AgentGuardCorpusLabelingCron();
 
@@ -2578,6 +2579,7 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
 
                 endpointStatViewCron.setUpEndpointInfoViewCronScheduler();
+                endpointDefaultGuardrailsCron.setUpEndpointDefaultGuardrailsCronScheduler();
 
                 if (runJobFunctions > 0 || runJobFunctionsAnyway) {
 
