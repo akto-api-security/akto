@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Sends custom webhooks configured with {@link CustomWebhook.WebhookOptions#SENSITIVE_DATA_THRESHOLD_ALERTS}.
@@ -37,6 +39,9 @@ public class SensitiveDataThresholdAlerts {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(SensitiveDataThresholdAlerts.class, LogDb.DASHBOARD);
     private static final Gson gson = new Gson();
+
+    /** Accounts whose count indexes this process has already made sure of. */
+    private static final Set<Integer> indexedAccounts = ConcurrentHashMap.newKeySet();
 
     /**
      * How long a (data type, collection) pair stays quiet after it alerts.
@@ -84,6 +89,8 @@ public class SensitiveDataThresholdAlerts {
 
     /** Checks every active webhook with this option in the current account. */
     public static void run() {
+        ensureCountIndexes();
+
         List<CustomWebhook> webhooks = CustomWebhooksDao.instance.findAll(Filters.and(
                 Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS,
                         CustomWebhook.WebhookOptions.SENSITIVE_DATA_THRESHOLD_ALERTS.name()),
@@ -98,6 +105,24 @@ public class SensitiveDataThresholdAlerts {
                 loggerMaker.errorAndAddToDb(e, "sensitive data threshold alert failed for webhook "
                         + webhook.getId() + ": " + e.getMessage());
             }
+        }
+    }
+
+    /**
+     * The services that write the counts - mini-runtime and the database abstractor - never call
+     * DaoInit.createIndices, so the collection can be created by the first increment with neither
+     * index. Without the unique one each upsert scans the collection and concurrent runtimes can
+     * create the same bucket twice; without the TTL nothing ever expires. Creating them here means
+     * the feature does not depend on who started first.
+     */
+    static void ensureCountIndexes() {
+        int accountId = Context.accountId.get();
+        if (!indexedAccounts.add(accountId)) return;
+        try {
+            SensitiveDataCountDao.instance.createIndicesIfAbsent();
+        } catch (Exception e) {
+            indexedAccounts.remove(accountId);
+            loggerMaker.errorAndAddToDb(e, "could not create sensitive data count indexes: " + e.getMessage());
         }
     }
 

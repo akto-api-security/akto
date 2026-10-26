@@ -1,4 +1,4 @@
-import { Button, Select, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { Button, HorizontalGrid, HorizontalStack, Select, Text, TextField, VerticalStack } from "@shopify/polaris"
 import { DeleteMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react"
 import observeApi from "../../../observe/api"
@@ -73,7 +73,7 @@ function SensitiveDataAlertRules({ rules, setRules }) {
                 Alert when one API collection has more than N events of a data type within the window
             </Text>
             {currentRules.map((rule, index) => (
-                <div key={index} style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto", gap: "12px", alignItems: "end" }}>
+                <HorizontalGrid key={index} columns="minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto" gap="3" alignItems="end">
                     <Select
                         label="Data type"
                         labelHidden={index > 0}
@@ -102,11 +102,11 @@ function SensitiveDataAlertRules({ rules, setRules }) {
                         onChange={(value) => updateRule(index, "windowDays", value === "" ? "" : parseInt(value))}
                     />
                     <Button icon={DeleteMinor} accessibilityLabel="Remove data type" onClick={() => removeRule(index)} />
-                </div>
+                </HorizontalGrid>
             ))}
-            <div>
+            <HorizontalStack align="start">
                 <Button onClick={addRule}>Add data type</Button>
-            </div>
+            </HorizontalStack>
             {loadFailed ?
                 <Text variant="bodySm" color="critical">Could not load data types. Saved rules are kept; reload the page to pick new ones.</Text>
                 : null}
