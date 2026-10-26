@@ -495,14 +495,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         List<String> updatedIps = actorIps;
         Config.AwsWafConfig awsWafConfig = fetchAwsWafConfig();
         if (awsWafConfig != null) {
-            updatedIps = AwsWafUtils.ipv4Only(actorIps);
-            if (updatedIps.isEmpty()) {
-                addActionError("AWS WAF supports only IPv4 addresses.");
-                return ERROR.toUpperCase();
-            }
-            result = ThreatDetectionConstants.BLOCKED.equals(status)
-                ? AwsWafUtils.blockActorIps(awsWafConfig, updatedIps)
-                : AwsWafUtils.unblockActorIps(awsWafConfig, updatedIps);
+            updatedIps = updateAwsWafIpSet(awsWafConfig, actorIps);
+            result = updatedIps != null;
         } else {
             Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
@@ -551,19 +545,30 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return modifyThreatActorStatusCloudflare();
         }
 
-        List<String> ips = AwsWafUtils.ipv4Only(Collections.singletonList(actorIp));
-        if (ips.isEmpty()) {
-            addActionError("AWS WAF supports only IPv4 addresses.");
-            return ERROR.toUpperCase();
-        }
-        boolean result = ThreatDetectionConstants.BLOCKED.equals(status)
-            ? AwsWafUtils.blockActorIps(awsWafConfig, ips)
-            : AwsWafUtils.unblockActorIps(awsWafConfig, ips);
-        if (!result) {
+        if (updateAwsWafIpSet(awsWafConfig, Collections.singletonList(actorIp)) == null) {
             return ERROR.toUpperCase();
         }
 
         return sendModifyThreatActorStatusToBackend(actorIp) ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
+    }
+
+    // Returns the ips whose status should change in the backend, or null on failure
+    private List<String> updateAwsWafIpSet(Config.AwsWafConfig awsWafConfig, List<String> ips) {
+        if (!ThreatDetectionConstants.BLOCKED.equals(status)) {
+            return AwsWafUtils.unblockActorIps(awsWafConfig, ips) ? ips : null;
+        }
+
+        List<String> ipv4 = AwsWafUtils.ipv4Only(ips);
+        if (ipv4.isEmpty()) {
+            addActionError("AWS WAF supports only IPv4 addresses.");
+            return null;
+        }
+        List<String> blocked = AwsWafUtils.blockActorIps(awsWafConfig, ipv4);
+        if (blocked != null && blocked.isEmpty()) {
+            addActionError("AWS WAF IP set is full.");
+            return null;
+        }
+        return blocked;
     }
 
     public boolean sendModifyThreatActorStatusToBackend(String ip) {

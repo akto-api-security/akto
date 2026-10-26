@@ -63,21 +63,25 @@ public class CloudflareWafSyncCron {
         int sevenDaysAgo = Context.now() - SEVEN_DAYS_SECONDS;
 
         // One WAF per account, same as manual block: AWS if configured, else Cloudflare
-        List<String> actors;
-        boolean blocked;
+        List<String> blockedActors = Collections.emptyList();
         if (awsWafConfig != null) {
-            actors = AwsWafUtils.ipv4Only(actorsToBlock(accountId, awsWafConfig.getThreatPolicies(), sevenDaysAgo));
-            blocked = !actors.isEmpty() && AwsWafUtils.blockActorIps(awsWafConfig, actors);
+            List<String> actors = AwsWafUtils.ipv4Only(actorsToBlock(accountId, awsWafConfig.getThreatPolicies(), sevenDaysAgo));
+            if (!actors.isEmpty()) {
+                List<String> inIpSet = AwsWafUtils.blockActorIps(awsWafConfig, actors);
+                blockedActors = inIpSet != null ? inIpSet : Collections.emptyList();
+            }
         } else {
-            actors = actorsToBlock(accountId, cloudflareConfig.getThreatPolicies(), sevenDaysAgo);
-            blocked = !actors.isEmpty() && CloudflareWafUtils.blockActorIps(cloudflareConfig, actors);
+            List<String> actors = actorsToBlock(accountId, cloudflareConfig.getThreatPolicies(), sevenDaysAgo);
+            if (!actors.isEmpty() && CloudflareWafUtils.blockActorIps(cloudflareConfig, actors)) {
+                blockedActors = actors;
+            }
         }
 
-        if (blocked) {
-            ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), actors, ThreatDetectionConstants.BLOCKED, Context.now());
+        if (!blockedActors.isEmpty()) {
+            ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), blockedActors, ThreatDetectionConstants.BLOCKED, Context.now());
         }
 
-        loggerMaker.infoAndAddToDb("Completed WAF sync for account " + accountId + ", blocked " + (blocked ? actors.size() : 0) + " actors");
+        loggerMaker.infoAndAddToDb("Completed WAF sync for account " + accountId + ", blocked " + blockedActors.size() + " actors");
     }
 
     private List<String> actorsToBlock(int accountId, List<String> threatPolicies, int startTime) {

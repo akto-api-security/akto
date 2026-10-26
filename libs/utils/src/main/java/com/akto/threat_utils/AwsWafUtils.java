@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 public class AwsWafUtils {
 
     private static final String SCOPE = "REGIONAL";
+    private static final int MAX_IP_SET_ADDRESSES = 10000;
     private static final LoggerMaker loggerMaker = new LoggerMaker(AwsWafUtils.class, LogDb.THREAT_DETECTION);
     private static final Pattern IPV4 = Pattern.compile("^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$");
 
@@ -74,18 +75,19 @@ public class AwsWafUtils {
         return wafv2Client.createIPSet(createRequest).summary();
     }
 
-    public static boolean blockActorIps(Config.AwsWafConfig config, List<String> ips) {
+    // Returns the ips that are in the ip set after the update, or null on failure
+    public static List<String> blockActorIps(Config.AwsWafConfig config, List<String> ips) {
         return updateIpSet(config, ips, true);
     }
 
     public static boolean unblockActorIps(Config.AwsWafConfig config, List<String> ips) {
-        return updateIpSet(config, ips, false);
+        return updateIpSet(config, ips, false) != null;
     }
 
-    private static boolean updateIpSet(Config.AwsWafConfig config, List<String> ips, boolean block) {
+    private static List<String> updateIpSet(Config.AwsWafConfig config, List<String> ips, boolean block) {
         if (config == null || ips == null || ips.isEmpty()) {
             loggerMaker.debugAndAddToDb("Invalid parameters for updating AWS WAF ip set");
-            return false;
+            return null;
         }
 
         try (Wafv2Client wafClient = fetchAwsWafClient(config.getAwsAccessKey(), config.getAwsSecretKey(), config.getRegion())) {
@@ -96,10 +98,27 @@ public class AwsWafUtils {
                     .build());
 
             Set<String> addresses = new LinkedHashSet<>(getResponse.ipSet().addresses());
+            List<String> updatedIps = new ArrayList<>();
+            int skipped = 0;
             boolean changed = false;
             for (String ip : ips) {
                 String ipWithCidr = ip + "/32";
-                changed |= block ? addresses.add(ipWithCidr) : addresses.remove(ipWithCidr);
+                if (!block) {
+                    changed |= addresses.remove(ipWithCidr);
+                    updatedIps.add(ip);
+                } else if (addresses.contains(ipWithCidr)) {
+                    updatedIps.add(ip);
+                } else if (addresses.size() < MAX_IP_SET_ADDRESSES) {
+                    addresses.add(ipWithCidr);
+                    updatedIps.add(ip);
+                    changed = true;
+                } else {
+                    skipped++;
+                }
+            }
+
+            if (skipped > 0) {
+                loggerMaker.errorAndAddToDb("AWS WAF ip set " + config.getRuleSetName() + " is full (" + MAX_IP_SET_ADDRESSES + " addresses), skipped " + skipped + " ips");
             }
 
             if (changed) {
@@ -111,11 +130,11 @@ public class AwsWafUtils {
                         .lockToken(getResponse.lockToken())
                         .build());
             }
-            loggerMaker.debugAndAddToDb("AWS WAF ip set updated, block " + block + " for " + ips.size() + " ips");
-            return true;
+            loggerMaker.debugAndAddToDb("AWS WAF ip set updated, block " + block + " for " + updatedIps.size() + " ips");
+            return updatedIps;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error updating AWS WAF ip set: " + e.getMessage());
-            return false;
+            return null;
         }
     }
 }
