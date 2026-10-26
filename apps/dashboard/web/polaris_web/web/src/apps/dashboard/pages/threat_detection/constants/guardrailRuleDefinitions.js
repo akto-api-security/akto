@@ -912,8 +912,14 @@ export function getGuardrailRuleInfo(ruleViolated, templateId) {
 // Capabilities without a detail-dialog entry above. capability === guardrails/<capability>.conf filename.
 const EXTRA_CAPABILITY_PREFIXES = [
     { prefixes: ["ContextPoisoning", "context_poisoning"], capability: "contextPoisoning" },
-    { prefixes: ["BlockedHosts", "blocked_host", "EndpointNotWhitelisted"], capability: "blockedHosts" },
-    { prefixes: ["Password"], capability: "piiTypes" },
+    { prefixes: ["BlockedHosts", "blocked_host"], capability: "blockedHosts" },
+    // Credential types detected by the PII filter (and the Password scanner) are secrets, not personal data.
+    {
+        prefixes: ["Password", "PII-password", "PII-secret", "PII-token", "PII-otp", "PII-aws_access_key_id", "PII-ssh_private_key",
+            "PII-gcp_credential", "PII-azure_credential", "PII-database", "PII-aws_rds_url", "PII-aws_docdb_url",
+            "PII-aws_dynamodb_url", "PII-aws_arn_connect_instance", "PII-webhook_url"],
+        capability: "secretsDetection",
+    },
 ];
 
 // Maps an event's rule_violated to its compliance capability (e.g. "PII_EMAIL" -> "piiTypes").
