@@ -569,6 +569,21 @@ function IssuesPage() {
             })
         }
 
+        function verifyWithAiAction() {
+            func.showConfirmationModal(
+                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"}. Issues it judges as false positives will be moved to Ignored. You can reopen them anytime.`,
+                "Verify",
+                async () => {
+                    await api.verifyIssuesWithAi(items).then(() => {
+                        setToast(true, false, "AI verification started. False positives will move to Ignored - refresh in a few minutes to see the results.")
+                        resetResourcesSelected()
+                    }).catch(() => {
+                        // request() already shows the server's error as a toast
+                    })
+                }
+            )
+        }
+
         function createJiraTicketBulk() {
             setSelectedIssuesItems(items)
             settingFunctions.fetchJiraIntegration().then((jirIntegration) => {
@@ -666,6 +681,11 @@ function IssuesPage() {
                 onAction: () => { ignoreAction('noTimeToFix') },
                 requires: ignoreRequires('noTimeToFix')
             },
+            ...(func.checkForFeatureSaas('AKTO_GPT_AI') ? [{
+                content: 'Verify with AI',
+                onAction: () => { verifyWithAiAction() },
+                requires: 'api/verifyIssuesWithAi'
+            }] : []),
             {
                 content: 'Export selected Issues',
                 onAction: () => { openVulnerabilityReport(items, false) },
