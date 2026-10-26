@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat_utils.AwsWafUtils;
 import com.akto.threat_utils.CloudflareWafUtils;
 import com.akto.util.AccountTask;
 import com.akto.util.ThreatDetectionConstants;
@@ -51,35 +52,42 @@ public class CloudflareWafSyncCron {
     }
 
     private void syncCloudflareWafForAccount(int accountId) {
-        // 1. Fetch CloudflareWafConfig
-        Config.CloudflareWafConfig config = fetchCloudflareConfig(accountId);
+        Config.CloudflareWafConfig cloudflareConfig = fetchCloudflareConfig(accountId);
+        Config.AwsWafConfig awsWafConfig = fetchAwsWafConfig(accountId);
 
-        if (config == null) {
-            loggerMaker.debugAndAddToDb("No Cloudflare WAF config found for account " + accountId);
+        if (cloudflareConfig == null && awsWafConfig == null) {
+            loggerMaker.debugAndAddToDb("No WAF config found for account " + accountId);
             return;
         }
 
-        List<String> threatPolicies = config.getThreatPolicies();
+        int sevenDaysAgo = Context.now() - SEVEN_DAYS_SECONDS;
+
+        // Compute both lists before marking any actor BLOCKED, so an account with both WAFs blocks in both
+        List<String> cloudflareActors = cloudflareConfig == null ? Collections.emptyList()
+            : actorsToBlock(accountId, cloudflareConfig.getThreatPolicies(), sevenDaysAgo);
+        List<String> awsActors = awsWafConfig == null ? Collections.emptyList()
+            : actorsToBlock(accountId, awsWafConfig.getThreatPolicies(), sevenDaysAgo);
+
+        Set<String> blockedActors = new HashSet<>();
+        if (!cloudflareActors.isEmpty() && CloudflareWafUtils.blockActorIps(cloudflareConfig, cloudflareActors)) {
+            blockedActors.addAll(cloudflareActors);
+        }
+        if (!awsActors.isEmpty() && AwsWafUtils.blockActorIps(awsWafConfig, awsActors)) {
+            blockedActors.addAll(awsActors);
+        }
+
+        if (!blockedActors.isEmpty()) {
+            ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), new ArrayList<>(blockedActors), ThreatDetectionConstants.BLOCKED, Context.now());
+        }
+
+        loggerMaker.infoAndAddToDb("Completed WAF sync for account " + accountId + ", blocked " + blockedActors.size() + " actors");
+    }
+
+    private List<String> actorsToBlock(int accountId, List<String> threatPolicies, int startTime) {
         if (threatPolicies == null || threatPolicies.isEmpty()) {
-            loggerMaker.debugAndAddToDb("No threat policies configured for account " + accountId);
-            return;
+            return Collections.emptyList();
         }
-
-        // 2. Calculate 7-day time window
-        int currentTime = Context.now();
-        int sevenDaysAgo = currentTime - SEVEN_DAYS_SECONDS;
-
-        // 3. Fetch unique threat actors (excluding already blocked)
-        Set<String> actorsToBlock = fetchUniqueThreatActors(accountId, threatPolicies, sevenDaysAgo);
-
-        loggerMaker.infoAndAddToDb("Found " + actorsToBlock.size() + " actors to block for account " + accountId);
-
-        // 4. Block actors and mark status as BLOCKED
-        if (!actorsToBlock.isEmpty()) {
-            bulkModifyActorCloudflare(accountId, config, new ArrayList<>(actorsToBlock));
-        }
-
-        loggerMaker.infoAndAddToDb("Completed Cloudflare WAF sync for account " + accountId);
+        return new ArrayList<>(fetchUniqueThreatActors(accountId, threatPolicies, startTime));
     }
 
     private Config.CloudflareWafConfig fetchCloudflareConfig(int accountId) {
@@ -88,6 +96,14 @@ public class CloudflareWafSyncCron {
             Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
         );
         return (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filter);
+    }
+
+    private Config.AwsWafConfig fetchAwsWafConfig(int accountId) {
+        Bson filter = Filters.and(
+            Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accountId),
+            Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.AWS_WAF.name())
+        );
+        return (Config.AwsWafConfig) ConfigsDao.instance.findOne(filter);
     }
 
     private Set<String> fetchUniqueThreatActors(int accountId, List<String> policyIds, int startTime) {
@@ -139,25 +155,5 @@ public class CloudflareWafSyncCron {
 
         loggerMaker.infoAndAddToDb("After filtering blocked actors: " + actorsToBlock.size() + " actors to block for account " + accountId);
         return actorsToBlock;
-    }
-
-    /**
-     * Blocks actors by adding them to Cloudflare WAF lists and marks them as BLOCKED in ActorInfoDao
-     */
-    private void bulkModifyActorCloudflare(int accountId, Config.CloudflareWafConfig config, List<String> actorIds) {
-        try {
-            boolean success = CloudflareWafUtils.blockActorIps(config, actorIds);
-            if (success) {
-                loggerMaker.infoAndAddToDb("Successfully blocked " + actorIds.size() + " actors in Cloudflare WAF");
-
-                // Mark actors as BLOCKED in ActorInfoDao to prevent re-blocking on next run
-                ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), actorIds, ThreatDetectionConstants.BLOCKED, Context.now());
-                loggerMaker.debugAndAddToDb("Marked " + actorIds.size() + " actors as BLOCKED for account " + accountId);
-            } else {
-                loggerMaker.errorAndAddToDb("Failed to block " + actorIds.size() + " actors in Cloudflare WAF");
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error blocking actors in Cloudflare WAF: " + e.getMessage());
-        }
     }
 }

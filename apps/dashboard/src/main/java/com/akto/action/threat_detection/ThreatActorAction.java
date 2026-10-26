@@ -10,8 +10,8 @@ import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.threat_detection.GuardrailComplianceInfosDao;
 import com.akto.dto.threat_detection.GuardrailComplianceInfo;
 import com.akto.dto.Config;
+import com.akto.threat_utils.AwsWafUtils;
 import com.akto.threat_utils.CloudflareWafUtils;
-import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLMethods;
@@ -31,18 +31,6 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.wafv2.Wafv2Client;
-import software.amazon.awssdk.services.wafv2.model.CreateIpSetRequest;
-import software.amazon.awssdk.services.wafv2.model.GetIpSetRequest;
-import software.amazon.awssdk.services.wafv2.model.IPAddressVersion;
-import software.amazon.awssdk.services.wafv2.model.IPSetSummary;
-import software.amazon.awssdk.services.wafv2.model.ListIpSetsRequest;
-import software.amazon.awssdk.services.wafv2.model.ListIpSetsResponse;
-import software.amazon.awssdk.services.wafv2.model.GetIpSetResponse;
-import software.amazon.awssdk.services.wafv2.model.UpdateIpSetRequest;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -94,7 +82,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorAction.class, LogDb.DASHBOARD);
-  private static final String SCOPE = "REGIONAL";
 
   public ThreatActorAction() {
     super();
@@ -460,57 +447,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
   }
 
-    public static Wafv2Client fetchAwsWafClient(String accessKey, String secretKey, String region) {
-      return Wafv2Client.builder()
-          .region(Region.of(region))
-          .credentialsProvider(StaticCredentialsProvider.create(
-              AwsBasicCredentials.create(accessKey, secretKey)
-          ))
-          .build();
-    }
-
-    public static GetIpSetResponse fetchIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
-        GetIpSetRequest getRequest = GetIpSetRequest.builder()
-                    .name(ruleSetName)
-                    .scope(SCOPE)
-                    .id(ruleSetId)
-                    .build();
-
-        GetIpSetResponse getResponse = null;
-        try {
-            getResponse = wafv2Client.getIPSet(getRequest);
-        } catch (Exception e) {
-            e.printStackTrace();
-            loggerMaker.errorAndAddToDb("unable to fetch ipSet " + e.getStackTrace());
-        }
-        return getResponse;
-    }
-
-    public static IPSetSummary getOrCreateIpSet(Wafv2Client wafv2Client, String ipSetName) {
-        String nextMarker = null;
-        do {
-            ListIpSetsResponse listResponse = wafv2Client.listIPSets(ListIpSetsRequest.builder()
-                    .scope(SCOPE)
-                    .limit(100)
-                    .nextMarker(nextMarker)
-                    .build());
-            for (IPSetSummary ipSet : listResponse.ipSets()) {
-                if (ipSetName.equals(ipSet.name())) {
-                    return ipSet;
-                }
-            }
-            nextMarker = listResponse.ipSets().isEmpty() ? null : listResponse.nextMarker();
-        } while (nextMarker != null);
-
-        CreateIpSetRequest createRequest = CreateIpSetRequest.builder()
-                .name(ipSetName)
-                .scope(SCOPE)
-                .ipAddressVersion(IPAddressVersion.IPV4)
-                .addresses(Collections.emptyList())
-                .build();
-        return wafv2Client.createIPSet(createRequest).summary();
-    }
-
     private static Config.CloudflareWafConfig fetchCloudflareConfig() {
         int accId = Context.accountId.get();
         Bson filters = Filters.and(
@@ -558,7 +494,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         boolean result;
         Config.AwsWafConfig awsWafConfig = fetchAwsWafConfig();
         if (awsWafConfig != null) {
-            result = updateAwsWafIpSet(awsWafConfig, actorIps);
+            result = ThreatDetectionConstants.BLOCKED.equals(status)
+                ? AwsWafUtils.blockActorIps(awsWafConfig, actorIps)
+                : AwsWafUtils.unblockActorIps(awsWafConfig, actorIps);
         } else {
             Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
@@ -608,7 +546,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return modifyThreatActorStatusCloudflare();
         }
 
-        if (!updateAwsWafIpSet(awsWafConfig, Collections.singletonList(actorIp))) {
+        List<String> ips = Collections.singletonList(actorIp);
+        boolean result = ThreatDetectionConstants.BLOCKED.equals(status)
+            ? AwsWafUtils.blockActorIps(awsWafConfig, ips)
+            : AwsWafUtils.unblockActorIps(awsWafConfig, ips);
+        if (!result) {
             return ERROR.toUpperCase();
         }
 
@@ -673,39 +615,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
 
         return true;
-    }
-
-    private boolean updateAwsWafIpSet(AwsWafConfig awsWafConfig, List<String> ips) {
-        try {
-            Wafv2Client wafClient = fetchAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
-            GetIpSetResponse getResponse = fetchIpSet(wafClient, awsWafConfig.getRuleSetName(), awsWafConfig.getRuleSetId());
-            if (getResponse == null) {
-                return false;
-            }
-
-            Set<String> addresses = new LinkedHashSet<>(getResponse.ipSet().addresses());
-            boolean changed = false;
-            for (String ip : ips) {
-                String ipWithCidr = ip + "/32";
-                changed |= ThreatDetectionConstants.BLOCKED.equals(status) ? addresses.add(ipWithCidr) : addresses.remove(ipWithCidr);
-            }
-
-            if (changed) {
-                UpdateIpSetRequest updateRequest = UpdateIpSetRequest.builder()
-                        .name(awsWafConfig.getRuleSetName())
-                        .scope(SCOPE)
-                        .id(awsWafConfig.getRuleSetId())
-                        .addresses(new ArrayList<>(addresses))
-                        .lockToken(getResponse.lockToken())
-                        .build();
-                wafClient.updateIPSet(updateRequest);
-            }
-            loggerMaker.debugAndAddToDb("AWS WAF ip set updated, status " + status + " for " + ips.size() + " ips");
-            return true;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error updating AWS WAF ip set: " + e.getMessage());
-            return false;
-        }
     }
 
     public String sendIntegrationDataToThreatBackend() {
