@@ -33,12 +33,9 @@ function AWSWaf() {
                                     setField={setSecretKey} onFunc={true} field={secretKey}
                                     label="AWS secret access key"
                 />
-                <TextField value={region} onChange={setRegion} label="AWS region" placeholder="us-east-1" helpText="Region of the IP set. It must be the same region as the Web ACL protecting your ALB or API Gateway."/>
+                <TextField value={region} onChange={setRegion} label="AWS region" placeholder="us-east-1" helpText="Region of your Web ACL."/>
                 {ruleSetId ?
-                  <VerticalStack gap={"1"}>
-                    <Text variant="bodyMd" color="subdued">{`Blocked IPs are added to the AWS IP set ${ruleSetName}.`}</Text>
-                    <Text variant="bodyMd" color="subdued">Add a rule with action Block referencing this IP set to the Web ACL protecting your ALB or API Gateway.</Text>
-                  </VerticalStack> :
+                  <Text variant="bodyMd" color="subdued">{`Blocked IPs go to IP set ${ruleSetName}. Add it as a Block rule in your Web ACL.`}</Text> :
                   <Text variant="bodyMd" color="subdued">
                     On save, Akto uses the IP set akto-blocked-ips in this region and creates it if it doesn't exist.
                   </Text>
