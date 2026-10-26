@@ -62,25 +62,22 @@ public class CloudflareWafSyncCron {
 
         int sevenDaysAgo = Context.now() - SEVEN_DAYS_SECONDS;
 
-        // Compute both lists before marking any actor BLOCKED, so an account with both WAFs blocks in both
-        List<String> cloudflareActors = cloudflareConfig == null ? Collections.emptyList()
-            : actorsToBlock(accountId, cloudflareConfig.getThreatPolicies(), sevenDaysAgo);
-        List<String> awsActors = awsWafConfig == null ? Collections.emptyList()
-            : actorsToBlock(accountId, awsWafConfig.getThreatPolicies(), sevenDaysAgo);
-
-        Set<String> blockedActors = new HashSet<>();
-        if (!cloudflareActors.isEmpty() && CloudflareWafUtils.blockActorIps(cloudflareConfig, cloudflareActors)) {
-            blockedActors.addAll(cloudflareActors);
-        }
-        if (!awsActors.isEmpty() && AwsWafUtils.blockActorIps(awsWafConfig, awsActors)) {
-            blockedActors.addAll(awsActors);
+        // One WAF per account, same as manual block: AWS if configured, else Cloudflare
+        List<String> actors;
+        boolean blocked;
+        if (awsWafConfig != null) {
+            actors = AwsWafUtils.ipv4Only(actorsToBlock(accountId, awsWafConfig.getThreatPolicies(), sevenDaysAgo));
+            blocked = !actors.isEmpty() && AwsWafUtils.blockActorIps(awsWafConfig, actors);
+        } else {
+            actors = actorsToBlock(accountId, cloudflareConfig.getThreatPolicies(), sevenDaysAgo);
+            blocked = !actors.isEmpty() && CloudflareWafUtils.blockActorIps(cloudflareConfig, actors);
         }
 
-        if (!blockedActors.isEmpty()) {
-            ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), new ArrayList<>(blockedActors), ThreatDetectionConstants.BLOCKED, Context.now());
+        if (blocked) {
+            ActorInfoDao.instance.bulkUpdateActorStatus(String.valueOf(accountId), actors, ThreatDetectionConstants.BLOCKED, Context.now());
         }
 
-        loggerMaker.infoAndAddToDb("Completed WAF sync for account " + accountId + ", blocked " + blockedActors.size() + " actors");
+        loggerMaker.infoAndAddToDb("Completed WAF sync for account " + accountId + ", blocked " + (blocked ? actors.size() : 0) + " actors");
     }
 
     private List<String> actorsToBlock(int accountId, List<String> threatPolicies, int startTime) {

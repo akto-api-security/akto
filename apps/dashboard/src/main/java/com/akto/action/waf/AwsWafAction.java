@@ -43,8 +43,7 @@ public class AwsWafAction extends UserAction {
 
         int accId = Context.accountId.get();
 
-        try {
-            Wafv2Client client = AwsWafUtils.fetchAwsWafClient(awsAccessKey, awsSecretKey, region);
+        try (Wafv2Client client = AwsWafUtils.fetchAwsWafClient(awsAccessKey, awsSecretKey, region)) {
             IPSetSummary ipSet = AwsWafUtils.getOrCreateIpSet(client, AKTO_BLOCKED_IP_SET_NAME);
             ruleSetId = ipSet.id();
             ruleSetName = ipSet.name();

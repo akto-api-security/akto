@@ -492,11 +492,17 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
 
         boolean result;
+        List<String> updatedIps = actorIps;
         Config.AwsWafConfig awsWafConfig = fetchAwsWafConfig();
         if (awsWafConfig != null) {
+            updatedIps = AwsWafUtils.ipv4Only(actorIps);
+            if (updatedIps.isEmpty()) {
+                addActionError("AWS WAF supports only IPv4 addresses.");
+                return ERROR.toUpperCase();
+            }
             result = ThreatDetectionConstants.BLOCKED.equals(status)
-                ? AwsWafUtils.blockActorIps(awsWafConfig, actorIps)
-                : AwsWafUtils.unblockActorIps(awsWafConfig, actorIps);
+                ? AwsWafUtils.blockActorIps(awsWafConfig, updatedIps)
+                : AwsWafUtils.unblockActorIps(awsWafConfig, updatedIps);
         } else {
             Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
@@ -516,7 +522,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        return sendBulkModifyThreatActorStatusToBackend(actorIps) ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
+        return sendBulkModifyThreatActorStatusToBackend(updatedIps) ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
     }
 
 
@@ -545,7 +551,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return modifyThreatActorStatusCloudflare();
         }
 
-        List<String> ips = Collections.singletonList(actorIp);
+        List<String> ips = AwsWafUtils.ipv4Only(Collections.singletonList(actorIp));
+        if (ips.isEmpty()) {
+            addActionError("AWS WAF supports only IPv4 addresses.");
+            return ERROR.toUpperCase();
+        }
         boolean result = ThreatDetectionConstants.BLOCKED.equals(status)
             ? AwsWafUtils.blockActorIps(awsWafConfig, ips)
             : AwsWafUtils.unblockActorIps(awsWafConfig, ips);

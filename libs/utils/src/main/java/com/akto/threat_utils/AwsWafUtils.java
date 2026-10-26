@@ -22,11 +22,23 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class AwsWafUtils {
 
     private static final String SCOPE = "REGIONAL";
     private static final LoggerMaker loggerMaker = new LoggerMaker(AwsWafUtils.class, LogDb.THREAT_DETECTION);
+    private static final Pattern IPV4 = Pattern.compile("^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$");
+
+    // The akto-blocked-ips set is IPv4, and one non-IPv4 entry makes AWS reject the whole update
+    public static List<String> ipv4Only(List<String> ips) {
+        List<String> ipv4 = ips.stream().filter(ip -> ip != null && IPV4.matcher(ip).matches()).collect(Collectors.toList());
+        if (ipv4.size() < ips.size()) {
+            loggerMaker.infoAndAddToDb("Skipping " + (ips.size() - ipv4.size()) + " non-IPv4 actors for AWS WAF");
+        }
+        return ipv4;
+    }
 
     public static Wafv2Client fetchAwsWafClient(String accessKey, String secretKey, String region) {
         return Wafv2Client.builder()
@@ -76,8 +88,7 @@ public class AwsWafUtils {
             return false;
         }
 
-        try {
-            Wafv2Client wafClient = fetchAwsWafClient(config.getAwsAccessKey(), config.getAwsSecretKey(), config.getRegion());
+        try (Wafv2Client wafClient = fetchAwsWafClient(config.getAwsAccessKey(), config.getAwsSecretKey(), config.getRegion())) {
             GetIpSetResponse getResponse = wafClient.getIPSet(GetIpSetRequest.builder()
                     .name(config.getRuleSetName())
                     .scope(SCOPE)
