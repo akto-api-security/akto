@@ -12,7 +12,9 @@ import (
 
 // newAccountTestService returns a Service with the given org email domains.
 func newAccountTestService(domains []string) *Service {
-	return &Service{logger: zap.NewNop(), orgEmailDomains: domains}
+	s := &Service{logger: zap.NewNop()}
+	s.orgEmailDomains.Store(&domains)
+	return s
 }
 
 // openAIToken builds an unsigned ChatGPT-style bearer token.
@@ -142,6 +144,24 @@ func TestSeverityForPolicy(t *testing.T) {
 	for name, want := range map[string]string{"high": "HIGH", "unset": "MEDIUM", "missing": "MEDIUM"} {
 		if got := severityForPolicy(policies, name); got != want {
 			t.Errorf("%s: got %s, want %s", name, got, want)
+		}
+	}
+}
+
+// Org email domains load once at startup, then refresh only while a policy classifies accounts by email.
+func TestNeedsOrgEmailDomains(t *testing.T) {
+	s := &Service{cache: &policyCache{}}
+	if !s.needsOrgEmailDomains() {
+		t.Error("not loaded yet: want true")
+	}
+	s.orgEmailDomains.Store(&[]string{"acme.com"})
+	if s.needsOrgEmailDomains() {
+		t.Error("loaded, no account-type policy: want false")
+	}
+	for _, p := range []types.Policy{{BlockPersonalAccounts: true}, {SkipEnterpriseAccounts: true}} {
+		s.cache.policies = []types.Policy{{}, p}
+		if !s.needsOrgEmailDomains() {
+			t.Errorf("policy %+v: want true", p)
 		}
 	}
 }
