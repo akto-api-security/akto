@@ -29,7 +29,8 @@ import {
   SettingsMinor,
   ViewMajor,
   CircleAlertMajor,
-  FileMinor
+  FileMinor,
+  MagicMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -56,6 +57,7 @@ import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import issuesApi from '../../issues/api';
 import TestingRunEndpointsModal from './TestingRunEndpointsModal';
 import { getDashboardCategory, mapLabel, categoryToShortName } from '../../../../main/labelHelper';
 import MarkdownReportGenerator from "../../../components/shared/MarkdownReportGenerator";
@@ -181,6 +183,12 @@ function SingleTestRunPage() {
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
   const [confirmationModal, setConfirmationModal] = useState(false);
+  const [aiVerifyModalActive, setAiVerifyModalActive] = useState(false);
+  // Summary already sent for AI verification from this page, so the button can't be clicked twice.
+  const [aiVerifyStartedFor, setAiVerifyStartedFor] = useState(null);
+  // Result hexIds to verify; empty = every vulnerable result of the run.
+  const [aiVerifyTargets, setAiVerifyTargets] = useState([]);
+  const [reopenInProgress, setReopenInProgress] = useState(false);
   const [severityModalActive, setSeverityModalActive] = useState(false);
   const [selectedTestResultItems, setSelectedTestResultItems] = useState([]);
   const [severityUpdateInProgress, setSeverityUpdateInProgress] = useState(false);
@@ -606,10 +614,73 @@ function SingleTestRunPage() {
     setSeverityModalActive(true);
   };
 
+  const showVerifyWithAi = !workflowTest && func.checkForFeatureSaas('AKTO_GPT_AI') && (testRunCountMap?.VULNERABLE || 0) > 0
+
+  // Reopens the issues behind the selected results in the Ignored Issues tab, the same as "Reopen"
+  // in the result flyout, then recounts this run so the results move back to Vulnerable.
+  const handleBulkReopen = async (resultHexIds) => {
+    if (reopenInProgress) return;
+    setReopenInProgress(true);
+    try {
+      const responses = await Promise.all(resultHexIds.map((hexId) =>
+        api.fetchIssueFromTestRunResultDetails(hexId).catch(() => null)
+      ));
+      const issueIds = [];
+      const seen = new Set();
+      responses.forEach((res) => {
+        const issue = res?.runIssues;
+        if (issue?.id && issue.testRunIssueStatus === "IGNORED") {
+          const key = JSON.stringify(issue.id);
+          if (!seen.has(key)) {
+            seen.add(key);
+            issueIds.push(issue.id);
+          }
+        }
+      });
+      if (issueIds.length === 0) {
+        func.setToast(true, true, "No ignored issues found for the selected results");
+        return;
+      }
+      await issuesApi.bulkUpdateIssueStatus(issueIds, "OPEN", "");
+      // The status update recounts each issue's latest run; recount this run too in case it's an older one.
+      await api.handleRefreshTableCount(currentSummary.hexId);
+      func.setToast(true, false, `${issueIds.length} issue${issueIds.length === 1 ? "" : "s"} re-opened`);
+      setTimeout(async () => {
+        await fetchTestingRunResultSummaries();
+        setUpdateTable(Date.now().toString());
+        setChartRefreshCounter(prev => prev + 1);
+      }, 1500);
+    } catch (e) {
+      // request() already shows the server's error as a toast
+    } finally {
+      setReopenInProgress(false);
+    }
+  };
+
   const promotedBulkActions = () => {
     let totalSelectedItemsSet = new Set(TableStore.getState().selectedItems.flat())
 
     return [
+      ...(selectedTab === 'ignored_issues' ? [{
+        content: `Reopen ${totalSelectedItemsSet.size} issue${totalSelectedItemsSet.size === 1 ? '' : 's'}`,
+        disabled: reopenInProgress,
+        onAction: () => {
+          if (totalSelectedItemsSet.size > 0) {
+            handleBulkReopen([...totalSelectedItemsSet])
+          }
+        },
+        requires: 'api/bulkUpdateIssueStatus',
+      }] : []),
+      ...(showVerifyWithAi && selectedTab === 'vulnerable' ? [{
+        content: `Verify ${totalSelectedItemsSet.size} with AI`,
+        disabled: aiVerifyStartedFor === currentSummary?.hexId,
+        onAction: () => {
+          if (totalSelectedItemsSet.size > 0) {
+            openAiVerifyModal([...totalSelectedItemsSet])
+          }
+        },
+        requires: 'api/verifyTestRunWithAi',
+      }] : []),
       {
         content: 'Update severity',
         onAction: () => {
@@ -897,6 +968,25 @@ function SingleTestRunPage() {
           <Text>{"Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest" + mapLabel('test results', getDashboardCategory()) + " and may affect the FIXED or IGNORED issues in the current testing run"}</Text>
         </Modal.Section>
       </Modal>
+      <Modal
+        open={aiVerifyModalActive}
+        onClose={() => setAiVerifyModalActive(false)}
+        title="Verify with AI"
+        primaryAction={{
+          content: 'Verify',
+          onAction: () => handleVerifyWithAi(currentSummary.hexId, aiVerifyTargets),
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setAiVerifyModalActive(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'}. Results it judges as false positives will be moved to Ignored Issues. You can reopen them anytime.`}</Text>
+        </Modal.Section>
+      </Modal>
     </>
   )
 
@@ -997,6 +1087,23 @@ function SingleTestRunPage() {
       setSecondaryPopover(false)
       setConfirmationModal(false)
     })
+  }
+
+  const handleVerifyWithAi = async (summaryHexId, resultHexIds) => {
+    setAiVerifyModalActive(false)
+    try {
+      await api.verifyTestRunWithAi(summaryHexId, resultHexIds)
+      setAiVerifyStartedFor(summaryHexId)
+      func.setToast(true, false, "AI verification started. False positives will move to Ignored Issues - refresh in a few minutes to see the results.")
+    } catch (e) {
+      // request() already shows the server's error (e.g. "Verification already running") as a toast
+    }
+  }
+
+  const openAiVerifyModal = (resultHexIds) => {
+    setSecondaryPopover(false)
+    setAiVerifyTargets(resultHexIds)
+    setAiVerifyModalActive(true)
   }
 
   const EmptyData = () => {
@@ -1295,6 +1402,13 @@ function SingleTestRunPage() {
         onAction: () => { setConfirmationModal(true) },
         requires: 'api/handleRefreshTableCount'
       },
+      ...(showVerifyWithAi ? [{
+        content: aiVerifyStartedFor === currentSummary?.hexId ? 'AI verification running' : 'Verify all with AI',
+        icon: MagicMinor,
+        disabled: aiVerifyStartedFor === currentSummary?.hexId,
+        onAction: () => openAiVerifyModal([]),
+        requires: 'api/verifyTestRunWithAi'
+      }] : []),
       ...(currentSummary?.hexId ? [{
         content: 'View logs',
         icon: FileMinor,
