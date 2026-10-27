@@ -1,0 +1,218 @@
+{
+ "cases": [
+  {
+   "url": "/claude/guardrail",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/claude/guardrail/tool-call",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "TOOL"
+  },
+  {
+   "url": "/copilot/conversation/a1b2/message/0",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/v1/chat/completions",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/mcp/server/ab12",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "SERVER"
+  },
+  {
+   "url": "/mcp/resource/read/x",
+   "method": "POST",
+   "agenticType": "Resource",
+   "endpointKind": "RESOURCE"
+  },
+  {
+   "url": "/skills/pdf",
+   "method": "POST",
+   "agenticType": "Skill",
+   "endpointKind": "SKILL"
+  },
+  {
+   "url": "/claude/config/settings.json",
+   "method": "POST",
+   "agenticType": "Config",
+   "endpointKind": "CONFIG"
+  },
+  {
+   "url": "/claude/plugin/x/tool",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "PLUGIN"
+  },
+  {
+   "url": "/a/tool/prompt",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "TOOL"
+  },
+  {
+   "url": "/a/skill/resource",
+   "method": "POST",
+   "agenticType": "Skill",
+   "endpointKind": "SKILL"
+  },
+  {
+   "url": "/Resource/TOOL",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/x/prompt/config",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "PROMPT"
+  },
+  {
+   "url": "/a/settings",
+   "method": "POST",
+   "agenticType": "Config",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/a/mcp/prompt",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "PROMPT"
+  },
+  {
+   "url": "/a/server/chat",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "SERVER"
+  },
+  {
+   "url": "/a/chat/server",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "SERVER"
+  },
+  {
+   "url": "/a/completion",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/a/message/skill",
+   "method": "POST",
+   "agenticType": "Skill",
+   "endpointKind": "SKILL"
+  },
+  {
+   "url": "/plain",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/x?bl=server_y",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/a/Config",
+   "method": "POST",
+   "agenticType": "Config",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/mcp",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/tool-call/chat",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "TOOL"
+  },
+  {
+   "url": "/resourceful",
+   "method": "POST",
+   "agenticType": "Resource",
+   "endpointKind": "RESOURCE"
+  },
+  {
+   "url": "/x/y?tool=1",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/v1/hooks/pre",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/api/users/123",
+   "method": "POST",
+   "agenticType": "Prompt",
+   "endpointKind": "POST"
+  },
+  {
+   "url": "/a/Tool/Plugin/",
+   "method": "POST",
+   "agenticType": "Tool",
+   "endpointKind": "POST"
+  }
+ ],
+ "behaviour": [
+  {
+   "metadata": "policy_name: \"P\"\nbehaviour: \"block\"\n",
+   "behaviour": "block"
+  },
+  {
+   "metadata": "policy_name: \"P\"\nbehaviour: \"alert\"\nrisk_score: \"0.9\"\n",
+   "behaviour": "alert"
+  },
+  {
+   "metadata": "behaviour: \"warn\"\n",
+   "behaviour": "warn"
+  },
+  {
+   "metadata": "policy_name: \"P\"\nrisk_score: \"0.9\"\n",
+   "behaviour": null
+  },
+  {
+   "metadata": "{\"behaviour\":\"flag\",\"x\":1}",
+   "behaviour": "flag"
+  },
+  {
+   "metadata": "nbehaviour: \"alert\"\n",
+   "behaviour": "alert"
+  },
+  {
+   "metadata": "",
+   "behaviour": null
+  },
+  {
+   "metadata": "behaviour: \"BLOCK\"\n",
+   "behaviour": "BLOCK"
+  }
+ ]
+}
