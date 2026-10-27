@@ -181,6 +181,10 @@ export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap 
   return base;
 };
 
+// Events written by the guardrail backfill replay carry refId "backfill|<policy>|<id>"
+// (GuardrailBackfillReplayRunner), which is the only marker separating them from live detections.
+export const isBackfillRefId = (refId) => typeof refId === "string" && refId.toLowerCase().startsWith("backfill|");
+
 export const extractBehaviour = (metadata) => {
   if (!metadata) return null;
 

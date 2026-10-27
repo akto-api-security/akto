@@ -22,6 +22,7 @@ import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFl
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
 import { buildAgenticObserveChatMetadata } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
+import { isBackfillRefId } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
 import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
@@ -370,6 +371,7 @@ function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
                                 {row.action}
                             </Badge>
                         )}
+                        {isBackfillRefId(row.refId) && <Badge size="small" status="info">Backfill</Badge>}
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         {!isHumanApprovalEvent && (

@@ -38,7 +38,7 @@ import SessionStore from "@/apps/main/SessionStore";
 import LocalStore from "@/apps/main/LocalStorageStore";
 import guardrailApi from "@/apps/dashboard/pages/guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "@/apps/dashboard/pages/guardrails/utils";
-import { resolveComplianceClauseMap, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { resolveComplianceClauseMap, isBackfillRefId, loadGuardrailComplianceMap, formatActorId, actorIdDisplayText } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import { downloadMaliciousEventsAsJson, downloadMaliciousEventsAsCsv } from "@/apps/dashboard/pages/threat_detection/utils/exportEvents";
 import NewLayoutTooltip from "@/apps/dashboard/pages/observe/agentic/NewLayoutTooltip";
 import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/main/labelHelper";
@@ -169,10 +169,16 @@ function ComplianceCellRenderer({ data }) {
     );
 }
 
-function ActionCellRenderer({ value }) {
-    if (!value) return null;
+function ActionCellRenderer({ value, data }) {
+    const isBackfill = isBackfillRefId(data?.refId);
+    if (!value && !isBackfill) return null;
     const status = value === "Blocked" ? "critical" : "warning";
-    return <Badge size="small" status={status}>{value}</Badge>;
+    return (
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+            {value && <Badge size="small" status={status}>{value}</Badge>}
+            {isBackfill && <Badge size="small" status="info">Backfill</Badge>}
+        </HorizontalStack>
+    );
 }
 
 function RiskScoreCellRenderer({ value }) {
