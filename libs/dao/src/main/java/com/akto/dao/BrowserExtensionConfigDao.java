@@ -18,7 +18,7 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
 
     public static final String COLLECTION_NAME = "browser_extension_configs";
     public static final int FULL_SYNC_PAGE_SIZE = 50;         // default when the client sends no limit
-    public static final int MAX_FULL_SYNC_PAGE_SIZE = 1000;   // cap on a client-sent limit
+    public static final int MAX_FULL_SYNC_PAGE_SIZE = 500;    // cap on a client-sent limit
     public static final BrowserExtensionConfigDao instance = new BrowserExtensionConfigDao();
 
     @Override
