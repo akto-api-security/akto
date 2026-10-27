@@ -80,6 +80,15 @@ public class UserDetailsFilter implements Filter {
         filterChain.doFilter(httpServletRequest, httpServletResponse);
     }
 
+    private void rejectNoAccount(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        logger.errorAndAddToDb("Signed-in user has no account: " + request.getRequestURI());
+        if (request.getRequestURI().contains(API_URI)) {
+            response.sendError(403);
+            return;
+        }
+        response.sendRedirect(LOGIN_URI + "?error=no_account");
+    }
+
     public static final String ACCOUNT_ID = "accountId";
     
     //TODO: logout if user in access-token is not the same as the user in cookie
@@ -342,7 +351,7 @@ public class UserDetailsFilter implements Filter {
                 session.setAttribute("username", user.getLogin());
                 String accountId = Context.accountId.get() == null ? user.findAnyAccountId() : (""+Context.accountId.get());
                 if (accountId == null) {
-                    redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                    rejectNoAccount(httpServletRequest, httpServletResponse);
                     return ;
                 }
                 session.setAttribute(ACCOUNT_ID, accountId);
@@ -363,7 +372,7 @@ public class UserDetailsFilter implements Filter {
 
                         accountIdStr = user.findAnyAccountId();
                         if (accountIdStr == null) {
-                            redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
+                            rejectNoAccount(httpServletRequest, httpServletResponse);
                             return ;
                         }
 
@@ -375,8 +384,9 @@ public class UserDetailsFilter implements Filter {
                     }
                 }
             }
-            if (accessTokenFromRequest == null) {
-                ProfileAction.executeMeta1(utility, user, httpServletRequest, httpServletResponse);
+            if (accessTokenFromRequest == null && !ProfileAction.executeMeta1(utility, user, httpServletRequest, httpServletResponse)) {
+                rejectNoAccount(httpServletRequest, httpServletResponse);
+                return;
             }
         } else {
             redirectIfNotLoginURI(filterChain, httpServletRequest, httpServletResponse);
