@@ -2,6 +2,7 @@ package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.RBACDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.RBAC.Role;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -100,6 +101,12 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter Double riskScoreFilterValue;
   @Getter @Setter List<String> agenticTypes;
   @Getter @Setter List<String> behaviours;
+  // Guardrail case management. Update: the new owner / notes ("" clears, null leaves as is).
+  @Getter @Setter String caseOwner;
+  @Getter @Setter String caseNotes;
+  // Filter: owner logins ("__unassigned__" = no owner) and whether the event has notes.
+  @Getter @Setter List<String> caseOwners;
+  @Getter @Setter Boolean hasCaseNotes;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -228,6 +235,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("behaviours", this.behaviours);
     }
 
+    if (this.caseOwners != null && !this.caseOwners.isEmpty()) {
+      filter.put("caseOwners", this.caseOwners);
+    }
+
+    if (this.hasCaseNotes != null) {
+      filter.put("hasCaseNotes", this.hasCaseNotes);
+    }
+
     Map<String, Integer> time_range = new HashMap<>();
     if (this.startTimestamp > 0) {
       time_range.put("start", this.startTimestamp);
@@ -290,6 +305,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             event.setRemediation(smr.getRemediation());
                             event.setEvidenceLine(smr.getEvidenceLine());
                             event.setHumanResponse(smr.getHumanResponse());
+                            event.setCaseOwner(smr.getCaseOwner());
+                            event.setCaseNotes(smr.getCaseNotes());
+                            event.setCaseTimeline(smr.getCaseTimelineList().stream()
+                                .map(c -> new DashboardMaliciousEvent.CaseActivity(c.getTimestamp(), c.getUpdatedBy(), c.getActivityType(), c.getStatus(), c.getOwner(), c.getNotes()))
+                                .collect(Collectors.toList()));
                             event.setGroupCount(smr.getGroupCount());
                             event.setGroupFirstDetectedAt(smr.getGroupFirstDetectedAt());
                             event.setGroupEventIds(smr.getGroupEventIdsList());
@@ -470,6 +490,12 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     if (this.statusFilter != null) {
       filterBuilder.setStatusFilter(this.statusFilter);
     }
+    if (this.caseOwners != null && !this.caseOwners.isEmpty()) {
+      filterBuilder.addAllCaseOwners(this.caseOwners);
+    }
+    if (this.hasCaseNotes != null) {
+      filterBuilder.setHasCaseNotes(this.hasCaseNotes);
+    }
     if (this.label != null && !this.label.isEmpty()) {
       filterBuilder.setLabel(this.label);
     }
@@ -500,6 +526,15 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       this.updatedCount = 0;
       return ERROR.toUpperCase();
     }
+    // A case is only assigned to someone who can open it; "" unassigns.
+    if (!StringUtils.isBlank(this.caseOwner) && !isAccountMember(this.caseOwner.trim())) {
+      this.updateSuccess = false;
+      this.updateMessage = "The owner must be a member of this account";
+      this.updatedCount = 0;
+      addActionError(this.updateMessage);
+      return ERROR.toUpperCase();
+    }
+
     // Build filter if needed for filter-based updates
     Filter.Builder filterBuilder = null;
     if ((this.eventId == null || this.eventId.isEmpty()) &&
@@ -518,7 +553,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
             filterBuilder,
             this.status,
             null,  // No Jira URL in this method
-            this.humanResponse
+            this.humanResponse,
+            this.caseOwner,
+            this.caseNotes,
+            getSUser() != null ? getSUser().getLogin() : null
         );
 
     // Set response fields from result
@@ -537,6 +575,17 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     }
 
     return this.updateSuccess ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
+  }
+
+  // A case can only be assigned to a member of the account. (The UI lists the choices from the existing
+  // getTeamData; this is the server-side check behind it.)
+  private boolean isAccountMember(String login) {
+    for (Object member : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
+      if (login.equalsIgnoreCase(((BasicDBObject) member).getString("login"))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

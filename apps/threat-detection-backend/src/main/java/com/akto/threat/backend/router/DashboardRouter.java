@@ -104,6 +104,12 @@ public class DashboardRouter implements ARouter {
         if (protoFilter.hasLatestApiOrigRegex() && !protoFilter.getLatestApiOrigRegex().isEmpty()) {
             filterMap.put("latestApiOrigRegex", protoFilter.getLatestApiOrigRegex());
         }
+        if (!protoFilter.getCaseOwnersList().isEmpty()) {
+            filterMap.put("caseOwners", new ArrayList<>(protoFilter.getCaseOwnersList()));
+        }
+        if (protoFilter.hasHasCaseNotes()) {
+            filterMap.put("hasCaseNotes", protoFilter.getHasCaseNotes());
+        }
 
         return filterMap;
     }
@@ -609,7 +615,10 @@ public class DashboardRouter implements ARouter {
                     req.getStatus(),
                     req.getJiraTicketUrl(),
                     contextSource,
-                    req.hasHumanResponse() ? req.getHumanResponse() : null
+                    req.hasHumanResponse() ? req.getHumanResponse() : null,
+                    req.hasCaseOwner() ? req.getCaseOwner() : null,
+                    req.hasCaseNotes() ? req.getCaseNotes() : null,
+                    req.hasUpdatedBy() ? req.getUpdatedBy() : null
                 );
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
