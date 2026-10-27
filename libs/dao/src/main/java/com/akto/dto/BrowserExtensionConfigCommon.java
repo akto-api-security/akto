@@ -104,6 +104,11 @@ public class BrowserExtensionConfigCommon {
     public static final String ENFORCE_AT = "enforceAt";
     private String enforceAt;
 
+    // epoch seconds of the last change; drives incremental sync (v3). 0 when the document has none,
+    // so such a config is only delivered by a full sync.
+    public static final String UPDATED_AT = "updatedAt";
+    private long updatedAt;
+
     // getter name is get_id() on purpose: the struts json serializer keys output off the bean
     // property, so this surfaces as `_id` (matching the db) with the same 24-char hex value as the
     // stored ObjectId. json has no native ObjectId, so the hex string is the faithful form.
@@ -156,8 +161,28 @@ public class BrowserExtensionConfigCommon {
         config.blockResponseFrames = asObjectList(doc.get(BLOCK_RESPONSE_FRAMES));
         config.fileUpload = asObjectList(doc.get(FILE_UPLOAD));
         config.enforceAt = asString(doc.get(ENFORCE_AT));
+        config.updatedAt = asEpochSeconds(doc.get(UPDATED_AT), doc.get("updatedTimestamp"));
 
         return config;
+    }
+
+    /**
+     * The v3 read: configs with updatedAt strictly greater than updatedAfter, all in one list (no
+     * paging; a few thousand small configs is a single response, and if every config shares one
+     * updatedAt they are all sent). updatedAfter &lt;= 0 returns everything, which is a full sync.
+     * Ordered by _id so the response is deterministic.
+     */
+    public static List<BrowserExtensionConfigCommon> updatedAfter(List<BrowserExtensionConfigCommon> merged, long updatedAfter) {
+        List<BrowserExtensionConfigCommon> result = new ArrayList<>();
+        if (merged != null) {
+            for (BrowserExtensionConfigCommon c : merged) {
+                if (hostKey(c) != null && (updatedAfter <= 0 || c.getUpdatedAt() > updatedAfter)) {
+                    result.add(c);
+                }
+            }
+        }
+        result.sort((x, y) -> sortKey(x).compareTo(sortKey(y)));
+        return result;
     }
 
     /**
@@ -197,11 +222,31 @@ public class BrowserExtensionConfigCommon {
         return new ArrayList<>(byHost.values());
     }
 
+    // the hex _id; a doc without an ObjectId (not expected) sorts last, by host
+    private static String sortKey(BrowserExtensionConfigCommon config) {
+        String id = config.get_id();
+        return id != null ? id : "~" + hostKey(config);
+    }
+
     private static String hostKey(BrowserExtensionConfigCommon config) {
         if (config == null || config.host == null || config.host.trim().isEmpty()) {
             return null;
         }
         return config.host.trim().toLowerCase();
+    }
+
+    // accepts a number (seconds, or millis if clearly too large) or a Date; first usable value wins
+    private static long asEpochSeconds(Object... candidates) {
+        for (Object value : candidates) {
+            if (value instanceof java.util.Date) {
+                return ((java.util.Date) value).getTime() / 1000;
+            }
+            if (value instanceof Number) {
+                long n = ((Number) value).longValue();
+                return n > 100_000_000_000L ? n / 1000 : n;
+            }
+        }
+        return 0;
     }
 
     private static String asString(Object value) {

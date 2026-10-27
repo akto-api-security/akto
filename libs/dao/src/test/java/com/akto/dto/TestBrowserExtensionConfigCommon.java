@@ -260,4 +260,50 @@ public class TestBrowserExtensionConfigCommon {
         List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
         assertEquals(Arrays.asList("chatgpt.com"), hosts(merged));
     }
+
+    private static BrowserExtensionConfigCommon cfg(String host, long updatedAt, int id) {
+        BrowserExtensionConfigCommon c = new BrowserExtensionConfigCommon();
+        c.setHost(host);
+        c.setId(new ObjectId(String.format("%024x", id)));
+        c.setUpdatedAt(updatedAt);
+        return c;
+    }
+
+    @Test
+    public void testUpdatedAtParsing() {
+        assertEquals(100, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com','updatedAt':100}")).getUpdatedAt());
+        assertEquals(1761500000L, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com','updatedAt':1761500000000}")).getUpdatedAt());
+        assertEquals(0, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com'}")).getUpdatedAt());
+        assertEquals(50, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com','updatedTimestamp':50}")).getUpdatedAt());
+    }
+
+    @Test
+    public void testFullSyncReturnsEverythingOrderedById() {
+        List<BrowserExtensionConfigCommon> all = Arrays.asList(cfg("b.com", 3, 2), cfg("c.com", 1, 3), cfg("a.com", 2, 1), cfg("z.com", 0, 4));
+        assertEquals(Arrays.asList("a.com", "b.com", "c.com", "z.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 0)));
+    }
+
+    @Test
+    public void testIncrementalIsStrictlyAfterTheClientsTime() {
+        List<BrowserExtensionConfigCommon> all = Arrays.asList(cfg("a.com", 10, 1), cfg("b.com", 15, 2), cfg("c.com", 20, 3));
+        assertEquals(Arrays.asList("c.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 15)));
+        assertEquals(Arrays.asList("b.com", "c.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 14)));
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(all, 20).isEmpty());
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(all, 21).isEmpty());
+    }
+
+    @Test
+    public void testEveryConfigSharingOneTimestampIsSentTogether() {
+        List<BrowserExtensionConfigCommon> all = new java.util.ArrayList<>();
+        for (int i = 1; i <= 1800; i++) {
+            all.add(cfg("h" + i + ".com", 16, i));
+        }
+        assertEquals(1800, BrowserExtensionConfigCommon.updatedAfter(all, 15).size());
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(all, 16).isEmpty());
+    }
+
+    @Test
+    public void testConfigWithoutHostIsSkipped() {
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(Arrays.asList(new BrowserExtensionConfigCommon()), 0).isEmpty());
+    }
 }

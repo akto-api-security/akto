@@ -40,6 +40,14 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
     }
 
     /**
+     * Read backing the v3 API: the same merged catalogue as v2, narrowed to configs with updatedAt
+     * strictly after {@code updatedAfter} (0 = all). See {@link BrowserExtensionConfigCommon#updatedAfter}.
+     */
+    public List<BrowserExtensionConfigCommon> findConfigsV3(long updatedAfter) {
+        return BrowserExtensionConfigCommon.updatedAfter(findActiveConfigsV2(), updatedAfter);
+    }
+
+    /**
      * All account-level configs - active AND inactive - because an opt-out is an inactive doc whose
      * host {@link BrowserExtensionConfigCommon#merge} must remove from the catalogue. Read raw and
      * mapped via {@link BrowserExtensionConfigCommon#fromDocument} (polymorphic path fields the pojo

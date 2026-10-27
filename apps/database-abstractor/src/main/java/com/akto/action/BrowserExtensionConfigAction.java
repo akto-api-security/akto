@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.opensymphony.xwork2.ActionSupport;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.List;
 
@@ -25,6 +26,14 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     // (transport/format/path/response*/model*/frameMatch/...), typed via the shared mapper.
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsV2;
+
+    // v3 request: updatedAfter = the newest updatedAt the client holds; omit it for a full sync
+    @Setter
+    private long updatedAfter;
+
+    // v3 response: configs with updatedAt > updatedAfter, in one list
+    @Getter
+    private List<BrowserExtensionConfigCommon> browserExtensionConfigsV3;
 
     public String fetchBrowserExtensionConfigs() {
         try {
@@ -46,6 +55,17 @@ public class BrowserExtensionConfigAction extends ActionSupport {
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs v2: " + e.getMessage(), LogDb.DB_ABS);
+            addActionError("Failed to fetch browser extension configs");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchBrowserExtensionConfigsV3() {
+        try {
+            this.browserExtensionConfigsV3 = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching browser extension configs v3: " + e.getMessage(), LogDb.DB_ABS);
             addActionError("Failed to fetch browser extension configs");
             return ERROR.toUpperCase();
         }
