@@ -1504,7 +1504,7 @@ const claudeInferenceHookObj = {
 }
 
 const grokBotInferenceHookObj = {
-    icon: '/public/grok.svg',
+    icon: '/public/grok_bot.svg',
     label: "Grok Bot Inference Hooks",
     text: "Route every governed Grok Bot prompt through Akto for an allow/deny verdict before inference runs.",
     docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/grok-bot-inference-hooks',
