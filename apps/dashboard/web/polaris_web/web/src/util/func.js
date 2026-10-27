@@ -745,6 +745,19 @@ prettifyEpoch(epoch) {
     }
     return result
   },
+  // Brotli bodies arrive as a broken string. A valid JSON body is left alone, so a sample that was already inflated still renders.
+  undecodedBrotliPayload: function (responseHeaders, responsePayloadString) {
+    const raw = responseHeaders && responseHeaders["content-encoding"]
+    const encoding = (Array.isArray(raw) ? raw.join(",") : (raw == null ? "" : String(raw))).toLowerCase()
+    const isBrotli = encoding.split(",").some((part) => part.trim() === "br")
+    if (!isBrotli || typeof responsePayloadString !== "string") return null
+    try {
+      JSON.parse(responsePayloadString)
+      return null
+    } catch (e) {
+      return "Response body is brotli-compressed and was not decoded."
+    }
+  },
   responseJson: function (message, highlightPaths, metadata = []) {
 
     if(!message || typeof message !== "object" || Object.keys(message).length === 0 || !func.isSampleEnvelope(message)){
@@ -769,11 +782,16 @@ prettifyEpoch(epoch) {
     } catch (e) {
       // eat it
     }
+    const brotliNotice = func.undecodedBrotliPayload(responseHeaders, responsePayloadString)
     let responsePayload = {}
-    try {
-      responsePayload = JSON.parse(responsePayloadString)
-    } catch (e) {
-      responsePayload = responsePayloadString
+    if (brotliNotice) {
+      responsePayload = brotliNotice
+    } else {
+      try {
+        responsePayload = JSON.parse(responsePayloadString)
+      } catch (e) {
+        responsePayload = responsePayloadString
+      }
     }    
 
     Object.keys(responseHeaders).forEach((key) => {
