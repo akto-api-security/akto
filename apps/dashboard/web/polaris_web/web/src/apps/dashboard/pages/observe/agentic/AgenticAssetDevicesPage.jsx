@@ -48,7 +48,8 @@ const PLUGIN_SCOPE_HEADER = {
 };
 
 const PLUGIN_LAST_SEEN_HEADER = {
-    title: "Last seen", text: "Last seen", value: "lastTraffic", numericValue: "lastSeenEpoch", sortActive: true, boxWidth: "80px",
+    title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time this plugin was seen on the device</Text>} title="Last seen" />,
+    text: "Last seen", value: "lastTraffic", numericValue: "lastSeenEpoch", sortActive: true, boxWidth: "80px",
 };
 
 const getParentHeaders = (rowType) => [
