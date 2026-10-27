@@ -3,6 +3,7 @@ package com.akto.dao;
 import com.akto.dto.BrowserExtensionConfigCommon;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -43,16 +44,20 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
     }
 
     /**
-     * Active configs changed after {@code updatedAfter} (epoch seconds), served by the updatedAt index.
-     * Also returns the active configs for {@code alwaysIncludeHosts} (any age), so the caller's merge
-     * still lets the catalogue entry win over a same-host account row.
+     * Active configs changed after {@code updatedAfter} (epoch seconds, served by the updatedAt index),
+     * sorted by _id; {@code updatedAfter <= 0} means all of them. Also returns the active configs for
+     * {@code alwaysIncludeHosts} (any age), so the caller's merge still lets the catalogue entry win
+     * over a same-host account row.
      */
     public List<BrowserExtensionConfigCommon> findActiveConfigsUpdatedAfter(long updatedAfter, List<String> alwaysIncludeHosts) {
-        Bson changed = Filters.gt(BrowserExtensionConfigCommon.UPDATED_AT, updatedAfter);
-        Bson filter = alwaysIncludeHosts.isEmpty()
-                ? changed
-                : Filters.or(changed, Filters.in(BrowserExtensionConfigCommon.HOST, alwaysIncludeHosts));
-        return toConfigs(instance.findAll(Filters.and(Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false), filter)));
+        Bson filter = Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false);
+        if (updatedAfter > 0) {
+            Bson changed = Filters.gt(BrowserExtensionConfigCommon.UPDATED_AT, updatedAfter);
+            filter = Filters.and(filter, alwaysIncludeHosts.isEmpty()
+                    ? changed
+                    : Filters.or(changed, Filters.in(BrowserExtensionConfigCommon.HOST, alwaysIncludeHosts)));
+        }
+        return toConfigs(instance.findAll(filter, 0, 1_000_000, Sorts.ascending("_id")));
     }
 
     public void createIndicesIfAbsent() {

@@ -46,9 +46,6 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
      * {@link BrowserExtensionConfigCommon#updatedAfter}.
      */
     public List<BrowserExtensionConfigCommon> findConfigsV3(long updatedAfter) {
-        if (updatedAfter <= 0) {
-            return BrowserExtensionConfigCommon.updatedAfter(findActiveConfigsV2(), 0);
-        }
         List<BrowserExtensionConfigCommon> account = findAllAccountConfigs();
         List<String> accountHosts = new ArrayList<>();
         for (BrowserExtensionConfigCommon a : account) {

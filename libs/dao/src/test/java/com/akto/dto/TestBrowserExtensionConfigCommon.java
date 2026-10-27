@@ -276,9 +276,9 @@ public class TestBrowserExtensionConfigCommon {
     }
 
     @Test
-    public void testFullSyncReturnsEverythingOrderedById() {
+    public void testFullSyncReturnsEverything() {
         List<BrowserExtensionConfigCommon> all = Arrays.asList(cfg("b.com", 3, 2), cfg("c.com", 1, 3), cfg("a.com", 2, 1), cfg("z.com", 0, 4));
-        assertEquals(Arrays.asList("a.com", "b.com", "c.com", "z.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 0)));
+        assertEquals(Arrays.asList("b.com", "c.com", "a.com", "z.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 0)));
     }
 
     @Test

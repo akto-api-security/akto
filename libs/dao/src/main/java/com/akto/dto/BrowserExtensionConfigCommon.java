@@ -171,7 +171,6 @@ public class BrowserExtensionConfigCommon {
      * The v3 read: configs with updatedAt strictly greater than updatedAfter, all in one list (no
      * paging; a few thousand small configs is a single response, and if every config shares one
      * updatedAt they are all sent). updatedAfter &lt;= 0 returns everything, which is a full sync.
-     * Ordered by _id so the response is deterministic.
      */
     public static List<BrowserExtensionConfigCommon> updatedAfter(List<BrowserExtensionConfigCommon> merged, long updatedAfter) {
         List<BrowserExtensionConfigCommon> result = new ArrayList<>();
@@ -182,7 +181,6 @@ public class BrowserExtensionConfigCommon {
                 }
             }
         }
-        result.sort((x, y) -> sortKey(x).compareTo(sortKey(y)));
         return result;
     }
 
@@ -221,12 +219,6 @@ public class BrowserExtensionConfigCommon {
             }
         }
         return new ArrayList<>(byHost.values());
-    }
-
-    // the hex _id; a doc without an ObjectId (not expected) sorts last, by host
-    private static String sortKey(BrowserExtensionConfigCommon config) {
-        String id = config.get_id();
-        return id != null ? id : "~" + hostKey(config);
     }
 
     private static String hostKey(BrowserExtensionConfigCommon config) {
