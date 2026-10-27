@@ -1600,6 +1600,21 @@ const transform = {
     }));
     return testingEndpointsApisList;
   },
+  normalizeRemediationText(value) {
+    if (value && typeof value === 'object' && typeof value.message === 'string') {
+      return value.message;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        if (parsed && typeof parsed === 'object' && typeof parsed.message === 'string') {
+          return parsed.message;
+        }
+      } catch (_) {}
+      return value;
+    }
+    return '';
+  },
   prepareConversationsList(agentConversationResults, isGeneric = false) {
     let conversationsListCopy = []
     let extractedRemediationText = ''
