@@ -47,6 +47,11 @@ const PLUGIN_SCOPE_HEADER = {
     title: "Scope", text: "Scope", value: "pluginScopeComp", textValue: "pluginScope", boxWidth: "90px",
 };
 
+const PLUGIN_LAST_SEEN_HEADER = {
+    title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time this plugin was seen on the device</Text>} title="Last seen" />,
+    text: "Last seen", value: "lastTraffic", numericValue: "lastSeenEpoch", sortActive: true, boxWidth: "80px",
+};
+
 const getParentHeaders = (rowType) => [
     { title: "", text: "", value: "collapsibleIcon", type: CellType.COLLAPSIBLE, boxWidth: "32px" },
     { title: "Endpoint ID", text: "Endpoint ID", value: "displayNameComp", textValue: "endpointId" },
@@ -62,7 +67,7 @@ const getParentHeaders = (rowType) => [
         tooltipContent: <Text variant="bodySm">Types of sensitive data seen across this device's own collections</Text>,
         boxWidth: "160px",
     },
-    {
+    rowType === "plugin" ? PLUGIN_LAST_SEEN_HEADER : {
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time this device's traffic was seen</Text>} title="Last traffic seen" />,
         text: "Last traffic seen", value: "lastTraffic", numericValue: "lastSeenEpoch", sortActive: true, boxWidth: "80px",
     },
@@ -85,6 +90,10 @@ const SORT_OPTIONS = [
     { label: "Discovered", value: "startTs desc", directionLabel: "Newest", sortKey: "startTs", columnIndex: 7 },
     { label: "Discovered", value: "startTs asc", directionLabel: "Oldest", sortKey: "startTs", columnIndex: 7 },
 ];
+
+const getSortOptions = (rowType) => rowType === "plugin"
+    ? SORT_OPTIONS.map(o => o.sortKey === "lastSeenEpoch" ? { ...o, label: "Last seen" } : o)
+    : SORT_OPTIONS;
 
 const ENDPOINT_TAGS_FILTER_DEF = { key: "endpointTags", label: "Endpoint tags", choices: [
     { label: "Contains personal account", value: "Contains personal account" },
@@ -567,6 +576,7 @@ export default function AgenticAssetDevicesPage() {
 
     const disambiguateLabel = useCallback((key, value) => func.convertToDisambiguateLabelObj(value, null, 2), []);
     const parentHeaders = useMemo(() => getParentHeaders(rowType), [rowType]);
+    const sortOptions = useMemo(() => getSortOptions(rowType), [rowType]);
 
     if (loading) {
         return (
@@ -596,7 +606,7 @@ export default function AgenticAssetDevicesPage() {
                         key={`asset-endpoints-${groupKey}-${rowType}-${refreshKey}`}
                         fetchData={fetchTableData}
                         pageLimit={20}
-                        sortOptions={SORT_OPTIONS}
+                        sortOptions={sortOptions}
                         resourceName={resourceName}
                         filters={filtersDef}
                         headers={parentHeaders}
