@@ -45,7 +45,7 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
 
     /**
      * Active configs changed after {@code updatedAfter} (epoch seconds, served by the updatedAt index),
-     * sorted by _id; {@code updatedAfter <= 0} means all of them. Also returns the active configs for
+     * oldest change first, {@code updatedAfter <= 0} means all of them. Also returns the active configs for
      * {@code alwaysIncludeHosts} (any age), so the caller's merge still lets the catalogue entry win
      * over a same-host account row.
      */
@@ -57,7 +57,7 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
                     ? changed
                     : Filters.or(changed, Filters.in(BrowserExtensionConfigCommon.HOST, alwaysIncludeHosts)));
         }
-        return toConfigs(instance.findAll(filter, 0, 1_000_000, Sorts.ascending("_id")));
+        return toConfigs(instance.findAll(filter, 0, 1_000_000, Sorts.ascending(BrowserExtensionConfigCommon.UPDATED_AT)));
     }
 
     public void createIndicesIfAbsent() {
