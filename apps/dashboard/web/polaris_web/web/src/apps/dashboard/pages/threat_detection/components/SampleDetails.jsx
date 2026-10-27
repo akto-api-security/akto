@@ -21,7 +21,7 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation, extractBehaviour, extractRuleViolated, resolveComplianceClauseMap, storedRemediationMarkdown } from "../utils/formatUtils";
+import { extractOverviewAndRemediation, extractBehaviour, isBackfillRefId, extractRuleViolated, resolveComplianceClauseMap, storedRemediationMarkdown } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -183,6 +183,7 @@ function SampleDetails(props) {
         return {
             ...rowInfo,
             templateId: attempt.filterId,
+            refId: attempt.refId || rowInfo?.refId,
             severity: attempt.severity || rowInfo?.severity,
             url: attempt.endpoint || rowInfo?.url,
             method: attempt.method || rowInfo?.method,
@@ -1238,6 +1239,7 @@ Reference URL: ${window.location.href}`.trim();
                             <div className={`badge-wrapper-${severity}`}>
                                 <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                             </div>
+                            {isBackfillRefId(moreInfoData?.refId) && <Badge size="small" status="info">Backfill</Badge>}
                         </HorizontalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>

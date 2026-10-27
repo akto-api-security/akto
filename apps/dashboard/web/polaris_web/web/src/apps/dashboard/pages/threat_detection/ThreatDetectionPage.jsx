@@ -489,6 +489,7 @@ function ThreatDetectionPage() {
                 complianceMap: data.complianceMapData || {},
                 metadata: data.metadata || '',
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata) || '',
+                refId: data.refId || '',
                 host: data.host || '',
                 remediation: data.remediation || '',
                 evidenceLine: data.evidenceLineFull || ''
@@ -685,6 +686,7 @@ function ThreatDetectionPage() {
               ruleViolated: rowContext?.ruleViolated || queryParams.ruleViolated || '-',
               metadata: rowContext?.metadata || '',
               behaviour: rowContext?.behaviourRaw || extractBehaviour(rowContext?.metadata) || '',
+              refId: queryParams.refId || '',
               host: rowContext?.host || '',
               remediation: rowContext?.remediation || '',
               evidenceLine: rowContext?.evidenceLineFull || '',
