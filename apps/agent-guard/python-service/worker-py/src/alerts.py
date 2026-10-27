@@ -140,9 +140,11 @@ def _fallback_webhook() -> str:
 
 
 def fallback_reason(exc: BaseException) -> str:
-    """Short, groupable cause of a fallback: 'timeout' or the exception type."""
+    """Short, groupable cause of a fallback: 'timeout', 'HTTP <status>', or the exception type."""
     if isinstance(exc, (TimeoutError, httpx.TimeoutException)):
         return "timeout"
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"  # 400 (too long) and 503 (down) need different fixes
     return type(exc).__name__
 
 

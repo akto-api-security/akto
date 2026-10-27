@@ -108,6 +108,14 @@ def test_reason_groups_timeouts():
     assert alerts.fallback_reason(providers.httpx.ConnectError("refused")) == "ConnectError"
 
 
+@pytest.mark.parametrize("status", [400, 429, 503])
+def test_reason_names_the_http_status(status):
+    httpx = providers.httpx
+    request = httpx.Request("POST", "http://vllm:80/v1/chat/completions")
+    exc = httpx.HTTPStatusError("failed", request=request, response=httpx.Response(status, request=request))
+    assert alerts.fallback_reason(exc) == f"HTTP {status}"
+
+
 # ── provider hooks ────────────────────────────────────────────────────────────
 
 
