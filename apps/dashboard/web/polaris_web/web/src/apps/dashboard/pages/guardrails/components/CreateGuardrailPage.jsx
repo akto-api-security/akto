@@ -15,6 +15,7 @@ import {
     SettingsMajor
 } from "@shopify/polaris-icons";
 import PersistStore from '../../../../main/PersistStore';
+import homeFunctions from '../../home/module';
 import AgenticSearchInput from '../../agentic/components/AgenticSearchInput';
 import ViolationReplayPanel from './ViolationReplayPanel';
 import guardrailApi from '../api';
@@ -288,6 +289,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
     // Get collections from PersistStore
     const allCollections = PersistStore(state => state.allCollections);
+    const setAllCollections = PersistStore(state => state.setAllCollections);
 
     const { usersLoading, availableTagKeyValues, availableUsers, availableDevices, deviceValueToIdentity, matchingDeviceRows } = useAgenticUserOptions({
         applyToAllUsers, targetTags, negatedTargetTags, targetDeviceIds, negatedTargetDeviceIds,
@@ -510,11 +512,18 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
             filterCollections();
-        } else {
-            setMcpServers([]);
-            setAgentServers([]);
-            setCollectionsLoading(false);
+            return;
         }
+        setMcpServers([]);
+        setAgentServers([]);
+        setBrowserLlmServers([]);
+        let isActive = true;
+        setCollectionsLoading(true);
+        homeFunctions.getAllCollections()
+            .then(collections => { if (isActive && collections?.length > 0) setAllCollections(collections); })
+            .catch(() => func.setToast(true, true, "Failed to load agentic assets"))
+            .finally(() => { if (isActive) setCollectionsLoading(false); });
+        return () => { isActive = false; };
     }, [allCollections]);
 
     // Load browser extension configs - these supply host + path autosuggestions
