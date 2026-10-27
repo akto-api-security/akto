@@ -295,6 +295,7 @@ class ModelMapScanner:
     # "categories" and "safety" fields are silently dropped and _extract_task_category
     # always falls back to the reason-keyword scan.
     _ENRICHMENT_FIELDS = (
+        "fallback_provider",
         "safety",
         "categories",
         "matchedTopic",
