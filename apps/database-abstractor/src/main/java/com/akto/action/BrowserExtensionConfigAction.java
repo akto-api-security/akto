@@ -33,6 +33,8 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     private long updatedAfter;
     @Setter
     private String afterId;
+    @Setter
+    private int limit;   // optional page size for a full sync; capped server side
 
     // v3 response: the configs, and for a full sync the afterId of the next page (null on the last)
     @Getter
@@ -67,7 +69,7 @@ public class BrowserExtensionConfigAction extends ActionSupport {
 
     public String fetchBrowserExtensionConfigsV3() {
         try {
-            BrowserExtensionConfigDao.ConfigsV3 result = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter, afterId);
+            BrowserExtensionConfigDao.ConfigsV3 result = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter, afterId, limit);
             this.browserExtensionConfigsV3 = result.getConfigs();
             this.nextAfterId = result.getNextAfterId();
             return SUCCESS.toUpperCase();

@@ -17,7 +17,8 @@ import java.util.List;
 public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensionConfig> {
 
     public static final String COLLECTION_NAME = "browser_extension_configs";
-    public static final int FULL_SYNC_PAGE_SIZE = 500;
+    public static final int FULL_SYNC_PAGE_SIZE = 500;        // default when the client sends no limit
+    public static final int MAX_FULL_SYNC_PAGE_SIZE = 1000;   // cap on a client-sent limit
     public static final BrowserExtensionConfigDao instance = new BrowserExtensionConfigDao();
 
     @Override
@@ -57,11 +58,12 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
      * catalogue is read in Mongo.
      *  - delta ({@code updatedAfter > 0}): the same merged catalogue as v2, narrowed to configs with
      *    updatedAt strictly after it (indexed on updatedAt), in one response.
-     *  - full sync: the catalogue in pages of {@link #FULL_SYNC_PAGE_SIZE} by _id. The client sends the
+     *  - full sync: the catalogue in pages by _id, {@code limit} per page (default
+     *    {@link #FULL_SYNC_PAGE_SIZE}, at most {@link #MAX_FULL_SYNC_PAGE_SIZE}). The client sends the
      *    last _id it got as {@code afterId} until {@code nextAfterId} comes back null. Opt-outs are
      *    applied to every page, the account's custom hosts ride on the last page.
      */
-    public ConfigsV3 findConfigsV3(long updatedAfter, String afterId) {
+    public ConfigsV3 findConfigsV3(long updatedAfter, String afterId, int limit) {
         List<BrowserExtensionConfigCommon> account = findAllAccountConfigs();
         List<String> accountHosts = new ArrayList<>();
         for (BrowserExtensionConfigCommon a : account) {
@@ -75,11 +77,12 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
                     BrowserExtensionConfigCommon.merge(common, account), updatedAfter), null);
         }
 
+        int pageSize = limit <= 0 ? FULL_SYNC_PAGE_SIZE : Math.min(limit, MAX_FULL_SYNC_PAGE_SIZE);
         ObjectId cursor = afterId == null || afterId.isEmpty() ? null : new ObjectId(afterId);
         List<BrowserExtensionConfigCommon> fetched =
-                BrowserExtensionConfigCommonDao.instance.findActiveConfigsAfterId(cursor, FULL_SYNC_PAGE_SIZE + 1);
-        boolean hasMore = fetched.size() > FULL_SYNC_PAGE_SIZE;
-        List<BrowserExtensionConfigCommon> page = hasMore ? fetched.subList(0, FULL_SYNC_PAGE_SIZE) : fetched;
+                BrowserExtensionConfigCommonDao.instance.findActiveConfigsAfterId(cursor, pageSize + 1);
+        boolean hasMore = fetched.size() > pageSize;
+        List<BrowserExtensionConfigCommon> page = hasMore ? fetched.subList(0, pageSize) : fetched;
 
         List<BrowserExtensionConfigCommon> configs = BrowserExtensionConfigCommon.withoutOptOuts(page, account);
         if (hasMore) {
