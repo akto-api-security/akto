@@ -1071,6 +1071,9 @@ public class ThreatActorService {
             setMethod(event.getLatestApiMethod() != null ? event.getLatestApiMethod().name() : "").
             setEvidenceLine(nullToEmpty(event.getEvidenceLine())).
             setRemediation(nullToEmpty(event.getRemediation())).
+            setCaseOwner(nullToEmpty(event.getCaseOwner())).
+            setCaseNotes(nullToEmpty(event.getCaseNotes())).
+            addAllCaseTimeline(ThreatUtils.caseActivities(event)).
             setStatus(event.getStatus() != null ? event.getStatus().name() : "").build());
     }
     return maliciousPayloadsResponse;

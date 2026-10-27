@@ -36,6 +36,13 @@ public class MaliciousEventDto {
   private List<OwaspCategory> owaspCategories;
   private String remediation;
   private String evidenceLine;
+  // Case management for events marked for review. Field names are the Mongo field names.
+  public static final String CASE_OWNER = "caseOwner";
+  public static final String CASE_NOTES = "caseNotes";
+  public static final String CASE_TIMELINE = "caseTimeline";
+  private String caseOwner;
+  private String caseNotes;
+  private List<CaseActivity> caseTimeline;
   // Bedrock caller ARN + prompt hash: events with the same key close together in time are one activity.
   private String groupKey;
   // Set only by the grouped activity list (never stored): how many events are behind this row, the first
@@ -95,6 +102,54 @@ public class MaliciousEventDto {
     public void setSeverity(String severity) { this.severity = severity; }
     public String getConfidence() { return confidence; }
     public void setConfidence(String confidence) { this.confidence = confidence; }
+  }
+
+  // One entry of the case history: who changed what, when. Appended by MaliciousEventService, never edited.
+  public static class CaseActivity {
+    // activityType says which of status, owner and notes the entry is about; the others are empty.
+    // STATUS: status = the new status. OWNER: owner = the new owner (empty when unassigned).
+    // NOTES: notes = the notes as saved (empty when cleared).
+    public static final String ACTIVITY_TYPE_STATUS = "STATUS";
+    public static final String ACTIVITY_TYPE_OWNER = "OWNER";
+    public static final String ACTIVITY_TYPE_NOTES = "NOTES";
+    // Mongo field names of an entry, which the service writes by name in its pipeline update.
+    public static final String TIMESTAMP = "timestamp";
+    public static final String UPDATED_BY = "updatedBy";
+    public static final String ACTIVITY_TYPE = "activityType";
+    public static final String STATUS = "status";
+    public static final String OWNER = "owner";
+    public static final String NOTES = "notes";
+
+    private long timestamp;
+    private String updatedBy;
+    private String activityType;
+    private String status;
+    private String owner;
+    private String notes;
+
+    public CaseActivity() {}
+
+    public CaseActivity(long timestamp, String updatedBy, String activityType, String status, String owner, String notes) {
+      this.timestamp = timestamp;
+      this.updatedBy = updatedBy;
+      this.activityType = activityType;
+      this.status = status;
+      this.owner = owner;
+      this.notes = notes;
+    }
+
+    public long getTimestamp() { return timestamp; }
+    public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+    public String getUpdatedBy() { return updatedBy; }
+    public void setUpdatedBy(String updatedBy) { this.updatedBy = updatedBy; }
+    public String getActivityType() { return activityType; }
+    public void setActivityType(String activityType) { this.activityType = activityType; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getOwner() { return owner; }
+    public void setOwner(String owner) { this.owner = owner; }
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
   }
 
   public MaliciousEventDto() {}
@@ -531,6 +586,30 @@ public class MaliciousEventDto {
 
   public void setEvidenceLine(String evidenceLine) {
     this.evidenceLine = evidenceLine;
+  }
+
+  public String getCaseOwner() {
+    return caseOwner;
+  }
+
+  public void setCaseOwner(String caseOwner) {
+    this.caseOwner = caseOwner;
+  }
+
+  public String getCaseNotes() {
+    return caseNotes;
+  }
+
+  public void setCaseNotes(String caseNotes) {
+    this.caseNotes = caseNotes;
+  }
+
+  public List<CaseActivity> getCaseTimeline() {
+    return caseTimeline;
+  }
+
+  public void setCaseTimeline(List<CaseActivity> caseTimeline) {
+    this.caseTimeline = caseTimeline;
   }
 
   public List<OwaspCategory> getOwaspCategories() {

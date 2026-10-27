@@ -387,6 +387,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                               payload.setEvidenceLine(smr.getEvidenceLine());
                               payload.setRemediation(smr.getRemediation());
                               payload.setStatus(smr.getStatus());
+                              payload.setCaseOwner(smr.getCaseOwner());
+                              payload.setCaseNotes(smr.getCaseNotes());
+                              payload.setCaseTimeline(smr.getCaseTimelineList().stream()
+                                  .map(c -> new DashboardMaliciousEvent.CaseActivity(c.getTimestamp(), c.getUpdatedBy(), c.getActivityType(), c.getStatus(), c.getOwner(), c.getNotes()))
+                                  .collect(Collectors.toList()));
                               return payload;
                             })
                         .collect(Collectors.toList());

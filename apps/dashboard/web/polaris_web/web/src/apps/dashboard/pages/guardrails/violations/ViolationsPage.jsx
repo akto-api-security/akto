@@ -64,6 +64,9 @@ import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insigh
 import { INSIGHT_GROUP } from "@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers";
 import { usePermissions } from "@/util/permissions";
 import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
+import ReviewCaseModal from "@/apps/dashboard/pages/guardrails/components/ReviewCaseModal";
+import useCaseOwners from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
+import { UNASSIGNED_OWNER, CASE_NOTES_FILTER_CHOICES, applyCaseUpdate, caseFilterRequestParams, ownerLabel, ownerOptionLabel, truncateText } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
 
 // ─── Method → display type mapping ──────────────────────────────────────────────
 
@@ -287,7 +290,40 @@ const typeFilterEnabled = () => isEndpointSecurityCategory() && Number(window.AC
 const AGENTIC_TYPE_FILTER_VALUES = ["Prompt", "Tool", "Resource"];
 const ACTION_FILTER_LABELS = { block: "Blocked", alert: "Alert", flag: "Flagged" };
 
-function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval, hideTypeFilter) {
+// The Owner and Notes columns of the Under Review tab, each with its filter. caseOwners are the account's members.
+function buildCaseColDefs(caseOwners) {
+    return [
+        {
+            field: "caseOwner",
+            headerName: "Owner",
+            minWidth: 160,
+            sortable: false,
+            // Owners with cases on this page may not be members any more; the filter offers members and Unassigned.
+            valueFormatter: (p) => (p.value ? ownerLabel(p.value, caseOwners) : "Unassigned"),
+            filter: "agSetColumnFilter",
+            filterParams: {
+                values: [UNASSIGNED_OWNER, ...caseOwners.map((o) => o.login)],
+                valueFormatter: (p) => (p.value === UNASSIGNED_OWNER ? "Unassigned" : ownerOptionLabel(caseOwners.find((o) => o.login === p.value) || { login: p.value })),
+            },
+        },
+        {
+            field: "caseNotes",
+            headerName: "Notes",
+            minWidth: 220,
+            sortable: false,
+            valueFormatter: (p) => truncateText(p.value, 100),
+            tooltipValueGetter: (p) => p.value || undefined,
+            filter: "agSetColumnFilter",
+            filterParams: {
+                values: CASE_NOTES_FILTER_CHOICES.map((c) => c.value),
+                valueFormatter: (p) => CASE_NOTES_FILTER_CHOICES.find((c) => c.value === p.value)?.label || p.value,
+            },
+        },
+    ];
+}
+
+// caseColumnOwners: the account's members when the Under Review tab (which has the case columns) is open, else null.
+function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, onHumanApproval, hideTypeFilter, caseColumnOwners) {
     const humanStatusCol = {
         field: "humanResponse",
         headerName: "Status",
@@ -333,6 +369,8 @@ function buildColDefs(filterValues, showApprove, onApprove, isHumanApprovalTab, 
             // Not sorted by default (detected is) — asc here would mean ascending severityRank,
             // and the backend ranks CRITICAL as 1, so clicking this header still ranks Critical first.
         },
+        // Under Review: the case's owner and notes, each with a filter.
+        ...(caseColumnOwners ? buildCaseColDefs(caseColumnOwners) : []),
         // Atlas: username from Endpoint Shield metadata. Argus: identity actor (IAM ARN, etc.),
         // distinct from the Agentic Asset column.
         ...(isEndpointSecurityCategory() ? [{
@@ -635,6 +673,10 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
         // explanation), which would show up as if it were the captured request content.
         evidenceText: primaryValue || "-",
         evidenceLine: event.evidenceLine || "",
+        // Case management (events marked for review): owner login, notes, and the status/owner/notes history.
+        caseOwner: event.caseOwner || "",
+        caseNotes: event.caseNotes || "",
+        caseTimeline: event.caseTimeline || [],
         riskScore: parseStoredRiskScore(meta),
         reason: normalizeReasonPunctuation(meta.reason || meta.nreason) || "",
         actor: event.actor || "",
@@ -930,6 +972,7 @@ function Violations() {
     const [bulkSelectedCount, setBulkSelectedCount] = useState(0);
     const [bulkPendingCount, setBulkPendingCount] = useState(0);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [reviewModalOpen, setReviewModalOpen] = useState(false);
     const [moreActionsOpen, setMoreActionsOpen] = useState(false);
     const [filterValues, setFilterValues] = useState({ hosts: [], subCategory: [], actors: [] });
     const [latencyData, setLatencyData] = useState(null);
@@ -949,6 +992,9 @@ function Violations() {
     const isNeedsApprovalTab = currentTab === "needs_approval";
     const isMisconfiguredTab = currentTab === "misconfigured_settings";
     const isHumanApprovalTab = currentTab === "human_approval";
+    // Under Review is where cases live: it has the Owner and Notes columns and their filters.
+    const isUnderReviewTab = currentTab === "under_review";
+    const { owners: caseOwners } = useCaseOwners();
     // Needs Approval / Skills Evaluations / Misconfigured Settings are views over ACTIVE events
     // narrowed by other means. Human Approval is its own status (HUMAN_APPROVAL) so Active's
     // existing status index already excludes those rows — same isolation as Training Data.
@@ -987,6 +1033,11 @@ function Violations() {
         groupEventIds: row.groupEventIds,
         groupFilterIds: row.groupFilterIds,
         groupFirstDetectedAt: row.groupFirstDetectedAt,
+        // The case belongs to the whole activity, not to the attempt being looked at.
+        _status: row._status,
+        caseOwner: row.caseOwner,
+        caseNotes: row.caseNotes,
+        caseTimeline: row.caseTimeline,
     }), [collectionsMap]);
     const [usernameMap, setUsernameMap] = useState({});
 
@@ -1281,6 +1332,21 @@ function Violations() {
         }
     }, [expandToGroupEvents, triggerTableRefresh]);
 
+    // The flyout saved a status and/or case change ({ status?, caseOwner?, caseNotes? }): show it in the open
+    // flyout at once — with the timeline entries the server adds for it — and refresh the table.
+    const handleCaseUpdate = useCallback((update) => {
+        setSelectedViolation(prev => {
+            if (!prev) return prev;
+            const next = applyCaseUpdate(
+                { status: prev._status, caseOwner: prev.caseOwner, caseNotes: prev.caseNotes, caseTimeline: prev.caseTimeline },
+                update,
+                window.USER_NAME,
+            );
+            return { ...prev, _status: next.status, caseOwner: next.caseOwner, caseNotes: next.caseNotes, caseTimeline: next.caseTimeline };
+        });
+        triggerTableRefresh();
+    }, [triggerTableRefresh]);
+
     // Same label the Agentic Asset column renders, so each filter option maps to the hosts behind it.
     const assetHostsByLabel = useMemo(() => {
         const byLabel = {};
@@ -1297,8 +1363,8 @@ function Violations() {
     }), [filterValues, assetHostsByLabel]);
 
     const colDefs = useMemo(
-        () => buildColDefs(extendedFilterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab || isMisconfiguredTab),
-        [extendedFilterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab, isMisconfiguredTab],
+        () => buildColDefs(extendedFilterValues, isNeedsApprovalTab && func.canManageGuardrailPolicies(), openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab || isMisconfiguredTab, isUnderReviewTab ? caseOwners : null),
+        [extendedFilterValues, isNeedsApprovalTab, openInlineApprove, isHumanApprovalTab, handleHumanApproval, isSkillsEvaluationsTab, isMisconfiguredTab, isUnderReviewTab, caseOwners],
     );
 
     // ─── Fetch summary stats from existing backend APIs ─────────────────────
@@ -1505,6 +1571,7 @@ function Violations() {
             {
                 agenticTypes: typeFilterEnabled() && !isSkillsEvaluationsTab && !isMisconfiguredTab ? filters?.type : undefined,
                 behaviours: atlasFilters ? filters?.action : undefined,
+                ...caseFilterRequestParams(currentTab, filters),
             },
         ).then(result => {
             const rawEvents = result?.maliciousEvents || [];
@@ -1525,7 +1592,7 @@ function Violations() {
             }
             return { value: transformed, total, rawEvents };
         });
-    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, assetHostsByLabel, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, guardrailApprovedByPolicy, advancedFilters, groupActivities]);
+    }, [startTimestamp, endTimestamp, collectionsMap, activeStatusValue, activeTypeSubCategories, activePolicyFilter, activeAssetFilter, assetHostsByLabel, currentTab, isSkillsEvaluationsTab, isMisconfiguredTab, isNeedsApprovalTab, isUnderReviewTab, guardrailApprovedByPolicy, advancedFilters, groupActivities]);
 
     const onServerFetch = useCallback((args) => {
         lastServerFetchArgsRef.current = args;
@@ -1593,11 +1660,12 @@ function Violations() {
         setBulkPendingCount(0);
     }, []);
 
-    const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel) => {
+    // caseFields: { caseOwner?, caseNotes? } from the review dialog, applied together with the status.
+    const handleBulkStatusUpdate = useCallback(async (status, pastTenseLabel, caseFields = {}) => {
         const ids = expandToGroupEvents(getSelectedIds());
         if (!ids.length) return;
         try {
-            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: ids, status });
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventIds: ids, status, ...caseFields });
             if (response?.updateSuccess) {
                 func.setToast(true, false, `${ids.length} event${ids.length === 1 ? "" : "s"} ${pastTenseLabel} successfully`);
                 clearBulkSelection();
@@ -1661,7 +1729,7 @@ function Violations() {
             return actions;
         }
         return [
-            { label: "Mark for Review", requires: "api/updateMaliciousEventStatus", onAction: () => handleBulkStatusUpdate("UNDER_REVIEW", "marked for review") },
+            { label: "Mark for Review", requires: "api/updateMaliciousEventStatus", onAction: () => setReviewModalOpen(true) },
             { label: "Ignore", requires: "api/updateMaliciousEventStatus", onAction: () => handleBulkStatusUpdate("IGNORED", "ignored") },
             { label: "Delete", requires: "api/deleteMaliciousEvents", destructive: true, onAction: () => setDeleteConfirmOpen(true) },
         ];
@@ -1857,7 +1925,15 @@ function Violations() {
             show={selectedViolation !== null}
             onClose={() => setSelectedViolation(null)}
             onAddAsSearchFilter={handleAddSearchFilter}
+            onStatusUpdate={handleCaseUpdate}
             onHumanApproval={(response) => selectedViolation && handleHumanApproval(selectedViolation, response)}
+        />,
+        <ReviewCaseModal
+            key="review-case"
+            open={reviewModalOpen}
+            onClose={() => setReviewModalOpen(false)}
+            onConfirm={(caseFields) => { setReviewModalOpen(false); handleBulkStatusUpdate("UNDER_REVIEW", "marked for review", caseFields); }}
+            summary={`${bulkSelectedCount} selected event${bulkSelectedCount === 1 ? "" : "s"} will be marked for review.`}
         />,
         <Modal
             key="delete-confirm"
