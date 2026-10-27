@@ -14,7 +14,7 @@ import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone,
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
-import { fetchEndpointShieldUsernameMap, getUsernameForCollection } from "../../observe/api_collections/endpointShieldHelper";
+import { fetchEndpointShieldUsernameMap, getUsernameForCollection, getBrowserExtensionActorEmail } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 import guardrailApi from "../../guardrails/api";
 import { buildApprovedByPolicy, isServerApproved } from "../../guardrails/utils";
@@ -1106,7 +1106,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ...x,
         id: x.id,
         actorComp: isEndpointSecurityCategory()
-          ? getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap, x.actor)
+          ? (getBrowserExtensionActorEmail(x.host, x.actor)
+              || getUsernameForCollection({ displayName: x.host || collectionsMap[x.apiCollectionId] }, usernameMap, x.actor))
           : formatActorId(x.actor),
         host: x.host || "-",
         endpointComp: String(x?.url || "").includes('/skills/') ? (
