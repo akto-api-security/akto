@@ -144,12 +144,14 @@ class _Primary:
 
 async def test_arbiter_fallback_is_recorded_and_flip_reported(slack, monkeypatch):
     fb = _arbiter(monkeypatch, _Primary())
-    assert await fb.complete("hi") == "from backup"
-    assert alerts._fallbacks[("primary", "backup")]["reasons"] == {"ConnectError": 1}
-    assert any("`vllm:80` is DOWN" in t for t in alerts._transitions)  # ConnectError marks it down
+    with pytest.raises(providers.httpx.ConnectError):  # a failed request neither falls back nor marks it down
+        await fb.complete("hi")
+    assert not alerts._fallbacks and not alerts._transitions
 
-    await fb.complete("hi")  # now skipped by the down flag: recorded as "marked down"
-    assert alerts._fallbacks[("primary", "backup")]["reasons"] == {"ConnectError": 1, "marked down": 1}
+    providers._set_availability(fb.health_url, False)  # what a failed /health probe does
+    assert any("`vllm:80` is DOWN" in t for t in alerts._transitions)
+    assert await fb.complete("hi") == "from backup"  # skipped by the down flag: recorded as "marked down"
+    assert alerts._fallbacks[("primary", "backup")]["reasons"] == {"marked down": 1}
 
 
 async def test_gemma_fast_fallback_is_recorded(slack, monkeypatch):

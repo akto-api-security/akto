@@ -1091,12 +1091,17 @@ def _dispatch(provider_name: str, model: str, base_url: str, deployment: str = "
 
 # ── Primary availability flag (FINAL_ARBITER_BACKUP only) ────────────────────
 # A background task GETs the primary's /health once per interval (default 60s) and records the
-# result here. FallbackProvider reads the flag, so a down primary is skipped with a dict lookup
-# and no waiting. Only primaries that have a FINAL_ARBITER_BACKUP and declare a health_path are
-# probed; with no backup configured nothing runs. Unknown (not probed yet) counts as available.
+# result here; only the probe sets it, never an individual request's failure. FallbackProvider
+# reads the flag, so a down primary is skipped with a dict lookup and no waiting, and a request
+# that fails while the primary is up is not retried on the backup. Only primaries that have a
+# FINAL_ARBITER_BACKUP and declare a health_path are probed; with no backup configured nothing
+# runs. Unknown (not probed yet) counts as available.
 _HEALTH_INTERVAL_S = float(os.getenv("AGW_ARBITER_HEALTH_INTERVAL_S", "60"))
 _HEALTH_PROBE_TIMEOUT_S = 3.0
+# Consecutive failed probes before the primary is marked down; one good probe marks it available again.
+_HEALTH_FAILURES_TO_DOWN = int(os.getenv("AGW_ARBITER_HEALTH_FAILURES_TO_DOWN", "3"))
 _PRIMARY_AVAILABLE: dict[str, bool] = {}
+_HEALTH_FAILURES: dict[str, int] = {}
 _HEALTH_TASKS: dict[str, "asyncio.Task[None]"] = {}
 
 
@@ -1111,9 +1116,12 @@ async def _health_loop(health_url: str) -> None:
     while True:
         try:
             resp = await http_client.get_client().get(health_url, timeout=_HEALTH_PROBE_TIMEOUT_S)
-            _set_availability(health_url, resp.status_code == 200)
+            healthy = resp.status_code == 200
         except Exception:
-            _set_availability(health_url, False)
+            healthy = False
+        _HEALTH_FAILURES[health_url] = 0 if healthy else _HEALTH_FAILURES.get(health_url, 0) + 1
+        if healthy or _HEALTH_FAILURES[health_url] >= _HEALTH_FAILURES_TO_DOWN:
+            _set_availability(health_url, healthy)
         await asyncio.sleep(_HEALTH_INTERVAL_S)
 
 
@@ -1155,8 +1163,8 @@ class FallbackProvider(LLMProvider):
         try:
             return await asyncio.wait_for(self.primary.complete(prompt), self.primary_timeout_s)
         except Exception as exc:
-            if self.health_url and isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, TimeoutError)):
-                _set_availability(self.health_url, False)  # refused/unreachable/hung: skip until the next probe
+            if self.health_url:
+                raise  # only the probe sends a health-checked primary's traffic to the backup, not one failed request
             return await self._complete_on_backup(prompt, repr(exc), exc)
 
     async def _complete_on_backup(self, prompt: str, why: str, exc: Exception | None = None) -> str:
