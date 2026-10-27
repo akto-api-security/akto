@@ -2,6 +2,7 @@ import { isEndpointSecurityCategory, isAgenticSecurityCategory } from "@/apps/ma
 import { getGuardrailRuleInfo } from "@/apps/dashboard/pages/threat_detection/constants/guardrailRuleDefinitions";
 import { GUARDRAIL_REMEDIATION_MARKDOWN } from "@/apps/dashboard/pages/threat_detection/constants/guardrailDescriptions";
 import { storedRemediationMarkdown } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
+import { buildEvidenceVulnerabilitySegments } from "@/apps/dashboard/pages/threat_detection/utils/evidenceHighlight";
 import { getOwaspThreatsForRule } from "@/apps/dashboard/pages/guardrails/components/owaspConfig";
 import func from "@/util/func";
 // ─── Flyout detail helpers ───────────────────────────────────────────────────────
@@ -407,8 +408,20 @@ export function buildFallbackDetail(row) {
     const primaryValue = sanitizeDisplayText(prettyPrimaryValue, 1500);
     // untruncated, for Values tab
     const primaryValueFull = sanitizeDisplayText(prettyPrimaryValue, Infinity);
-    const evidenceText = primaryValue || row.evidenceText || row.violation;
+    const evidenceText = primaryValue || (row.evidenceText !== "-" ? row.evidenceText : "") || row.evidenceLine || row.violation;
     const evidenceIsMono = isJson && !!primaryValue && evidenceText === primaryValue;
+
+    // Atlas and Argus: highlight the backend evidenceLine inside the text shown, as the old side window does. Config keeps its own field highlight.
+    const evidenceHighlights = (text) => {
+        if (!(isEndpointSecurityCategory() || isAgenticSecurityCategory()) || row.type === "Config") return undefined;
+        const phrases = buildEvidenceVulnerabilitySegments(row.evidenceLine, text, "").map((segment) => segment.phrase);
+        return phrases.length > 0 ? phrases : undefined;
+    };
+    // The evidence can sit in the response instead (e.g. a tool whose output carried the PII): then show that side too.
+    const responseText = typeof outer.responsePayload === "string" ? outer.responsePayload : "";
+    const responseEvidence = responseText && (isEndpointSecurityCategory() || isAgenticSecurityCategory()) && row.type !== "Config"
+        ? buildEvidenceVulnerabilitySegments(row.evidenceLine, "", responseText).map((segment) => segment.phrase)
+        : [];
 
     // Don't repeat `reason` in the trigger line when it's already the exact text shown
     // above in the evidence box (happens when there's no body/evidence field, so evidenceText
@@ -421,7 +434,7 @@ export function buildFallbackDetail(row) {
         evidence: {
             title: "Guardrail Violation",
             text: evidenceText,
-            highlights: undefined,
+            highlights: primaryValue ? evidenceHighlights(evidenceText) : undefined,
             mono: evidenceIsMono,
             // Atlas only: row.user is a real device user there. On Argus it's a host fragment
             // (e.g. "slash2-api" from slash2-api.concierge.razorpay.com), which reads as a
@@ -457,7 +470,9 @@ export function buildFallbackDetail(row) {
             return {
                 valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
                 promptBody,
-                highlights: row.type === "Config" ? (fileHighlights || undefined) : undefined,
+                highlights: row.type === "Config" ? (fileHighlights || undefined) : evidenceHighlights(promptBody),
+                responseBody: responseEvidence.length > 0 ? responseText : undefined,
+                responseHighlights: responseEvidence.length > 0 ? responseEvidence : undefined,
                 behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || row.action || undefined,
                 blockedAt: resp?.error?.data?.blocked_at || row.detected || undefined,
                 blockedBy: resp?.error?.data?.blocked_by || policyName || undefined,
