@@ -106,6 +106,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.TrafficUpdates;
+import com.akto.notifications.SensitiveDataThresholdAlerts;
 import com.akto.notifications.TrafficUpdates.AlertResult;
 import com.akto.notifications.TrafficUpdates.AlertType;
 import com.akto.notifications.slack.DailyUpdate;
@@ -1010,6 +1011,7 @@ public class InitializerListener implements ServletContextListener {
          *
          * TRAFFIC_ALERTS type webhooks have a separate cron.
          * PENDING_TESTS_ALERTS type webhooks have a separate job
+         * SENSITIVE_DATA_THRESHOLD_ALERTS type webhooks have a separate cron.
          */
 
 
@@ -1020,7 +1022,9 @@ public class InitializerListener implements ServletContextListener {
                         || webhook.getSelectedWebhookOptions()
                                 .contains(CustomWebhook.WebhookOptions.TRAFFIC_ALERTS)
             || webhook.getSelectedWebhookOptions()
-                .contains(WebhookOptions.PENDING_TESTS_ALERTS))) {
+                .contains(WebhookOptions.PENDING_TESTS_ALERTS)
+            || webhook.getSelectedWebhookOptions()
+                .contains(WebhookOptions.SENSITIVE_DATA_THRESHOLD_ALERTS))) {
             return;
         }
 
@@ -1471,6 +1475,10 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         webhookSender();
+                        // Same hourly cadence and the same set of accounts, so this rides along
+                        // rather than scanning every account a second time. webhookSender swallows
+                        // its own exceptions, so a webhook failure cannot stop the alerts running.
+                        SensitiveDataThresholdAlerts.run();
                     }
                 }, "webhook-sender");
             }

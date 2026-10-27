@@ -236,6 +236,14 @@ const getUsernameForCollection = (collection, usernameMap, actor) => {
     return coworkActorFallback(collection, actor) || DEFAULT_VALUE;
 };
 
+const BROWSER_EXTENSION_HOST = /^[^.]+\.(chrome|edge|opera|firefox|safari|unknown)\./i;
+
+const getBrowserExtensionActorEmail = (host, actor) => {
+    if (typeof host !== 'string' || !BROWSER_EXTENSION_HOST.test(host)) return null;
+    const a = typeof actor === 'string' ? actor.trim() : '';
+    return a.includes('@') ? a : null;
+};
+
 /**
  * Username from Endpoint Shield map, else from envType tags (e.g. username=) for local / mixed setups.
  */
@@ -310,6 +318,7 @@ export {
     fetchEndpointShieldUserMetadata,
     buildUserAnalysisKeysByDeviceId,
     getUsernameForCollection,
+    getBrowserExtensionActorEmail,
     getResolvedUsernameForCollection,
     MODULE_TYPE,
     DEFAULT_VALUE,

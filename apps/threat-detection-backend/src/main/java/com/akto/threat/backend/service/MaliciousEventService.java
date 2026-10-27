@@ -625,6 +625,8 @@ public class MaliciousEventService {
     applyRiskScoreFilter(query, filter);
     andDocument(query, agenticTypeCondition(filter.getAgenticTypesList()));
     andDocument(query, behaviourCondition(filter.getBehavioursList()));
+    andDocument(query, caseOwnerCondition(filter.getCaseOwnersList()));
+    andDocument(query, caseNotesCondition(filter.hasHasCaseNotes() ? filter.getHasCaseNotes() : null));
 
     // if (filter.hasLabel()) {
     //   String labelString = filter.getLabel();
@@ -814,6 +816,9 @@ public class MaliciousEventService {
           builder.setRemediation(evt.getRemediation() != null ? evt.getRemediation() : "")
               .setEvidenceLine(evt.getEvidenceLine() != null ? evt.getEvidenceLine() : "")
               .setHumanResponse(evt.getHumanResponse() != null ? evt.getHumanResponse() : "")
+              .setCaseOwner(evt.getCaseOwner() != null ? evt.getCaseOwner() : "")
+              .setCaseNotes(evt.getCaseNotes() != null ? evt.getCaseNotes() : "")
+              .addAllCaseTimeline(ThreatUtils.caseActivities(evt))
               .addAllOwaspCategories(evt.getOwaspCategories() != null
                   ? evt.getOwaspCategories().stream()
                       .map(o -> OwaspCategory.newBuilder()
@@ -1121,6 +1126,32 @@ public class MaliciousEventService {
     return new Document("$or", anyOf);
   }
 
+  // Owners to match; UNASSIGNED_OWNER stands for "no owner" (field missing, null or empty).
+  private Document caseOwnerCondition(List<String> owners) {
+    if (owners == null || owners.isEmpty()) {
+      return null;
+    }
+    List<Object> match = new ArrayList<>();
+    for (String owner : owners) {
+      if (UNASSIGNED_OWNER.equals(owner)) {
+        match.add(null);
+        match.add("");
+      } else if (owner != null && !owner.isEmpty()) {
+        match.add(owner);
+      }
+    }
+    return match.isEmpty() ? null : new Document(MaliciousEventDto.CASE_OWNER, new Document("$in", match));
+  }
+
+  // true: events with notes; false: events without (field missing, null or empty).
+  private Document caseNotesCondition(Boolean hasNotes) {
+    if (hasNotes == null) {
+      return null;
+    }
+    List<Object> none = Arrays.asList(null, "");
+    return new Document(MaliciousEventDto.CASE_NOTES, new Document(hasNotes ? "$nin" : "$in", none));
+  }
+
   private void applyRiskScoreFilter(Document query, ListMaliciousRequestsRequest.Filter filter) {
     if (!filter.hasRiskScoreFilterType() || filter.getRiskScoreFilterType().isEmpty()) {
       return;
@@ -1236,7 +1267,21 @@ public class MaliciousEventService {
   }
 
   public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource, String humanResponse) {
+    return updateMaliciousEventStatus(accountId, eventIds, filterMap, status, jiraTicketUrl, contextSource, humanResponse, null, null, null);
+  }
+
+  /**
+   * caseOwner / caseNotes: null = leave as is, "" = clear. A change to status, owner or notes that actually
+   * takes effect on an event is added to its caseTimeline under updatedBy, so the history is complete whichever
+   * screen made the change. Jira and human-response updates are not part of the case history.
+   */
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource, String humanResponse, String caseOwner, String caseNotes, String updatedBy) {
     try {
+      boolean statusGiven = status != null && !status.isEmpty();
+      if (statusGiven || caseOwner != null || caseNotes != null) {
+        return updateWithCaseHistory(accountId, eventIds, filterMap, status, jiraTicketUrl, contextSource, humanResponse, caseOwner, caseNotes, updatedBy);
+      }
+
       List<Bson> updateOps = new ArrayList<>();
 
       if(status != null && !status.isEmpty()) {
@@ -1276,6 +1321,87 @@ public class MaliciousEventService {
       logger.error("Error updating malicious event status", e);
       return 0;
     }
+  }
+
+  // The owner an event filter uses for "no owner".
+  public static final String UNASSIGNED_OWNER = "__unassigned__";
+  private static final int CASE_TIMELINE_MAX_ENTRIES = 10;
+  private static final int CASE_NOTES_MAX_LENGTH = 5000;
+
+  // Wraps a user-supplied value so a pipeline stage never reads it as an expression or field path ("$100 refund").
+  private static Document literal(Object value) {
+    return new Document("$literal", value);
+  }
+
+  // [entry] when `changed`, else [] — the term for one kind of change in the timeline concatenation.
+  private static Document timelineEntryIf(Document changed, long timestamp, String updatedBy, String activityType, String status, String owner, String notes) {
+    Document entry = new Document(MaliciousEventDto.CaseActivity.TIMESTAMP, timestamp)
+        .append(MaliciousEventDto.CaseActivity.UPDATED_BY, updatedBy)
+        .append(MaliciousEventDto.CaseActivity.ACTIVITY_TYPE, activityType)
+        .append(MaliciousEventDto.CaseActivity.STATUS, status)
+        .append(MaliciousEventDto.CaseActivity.OWNER, owner)
+        .append(MaliciousEventDto.CaseActivity.NOTES, notes);
+    return new Document("$cond", Arrays.asList(changed, Arrays.asList(literal(entry)), Collections.emptyList()));
+  }
+
+  private int updateWithCaseHistory(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status, String jiraTicketUrl, String contextSource, String humanResponse, String caseOwner, String caseNotes, String updatedBy) {
+    Document query = buildQuery(eventIds, filterMap, "update", contextSource, accountId);
+    if (query == null) {
+      return 0;
+    }
+    if (humanResponse != null && !humanResponse.isEmpty()) {
+      query.append("status", ThreatDetectionConstants.HUMAN_APPROVAL);
+      applyHumanResponseFilter(query, MaliciousEventDto.HumanResponse.PENDING.name());
+    }
+
+    long now = com.akto.dao.context.Context.now();
+    String by = updatedBy == null ? "" : updatedBy.trim();   // who the entries are recorded under
+    Document set = new Document();
+    List<Object> changes = new ArrayList<>();
+
+    if (status != null && !status.isEmpty()) {
+      String newStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase()).toString();
+      set.append("status", literal(newStatus));
+      Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$status", ThreatDetectionConstants.ACTIVE)), literal(newStatus)));
+      changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_STATUS, newStatus, "", ""));
+    }
+    if (caseOwner != null) {
+      String newOwner = caseOwner.trim();
+      set.append(MaliciousEventDto.CASE_OWNER, literal(newOwner));
+      Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_OWNER, "")), literal(newOwner)));
+      changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_OWNER, "", newOwner, ""));
+    }
+    if (caseNotes != null) {
+      String newNotes = caseNotes.length() > CASE_NOTES_MAX_LENGTH ? caseNotes.substring(0, CASE_NOTES_MAX_LENGTH) : caseNotes;
+      set.append(MaliciousEventDto.CASE_NOTES, literal(newNotes));
+      Document changed = new Document("$ne", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_NOTES, "")), literal(newNotes)));
+      changes.add(timelineEntryIf(changed, now, by, MaliciousEventDto.CaseActivity.ACTIVITY_TYPE_NOTES, "", "", newNotes));
+    }
+    if (jiraTicketUrl != null && !jiraTicketUrl.isEmpty()) {
+      set.append("jiraTicketUrl", literal(jiraTicketUrl));
+    }
+    if (humanResponse != null && !humanResponse.isEmpty()) {
+      set.append(MaliciousEventDto.HUMAN_RESPONSE, literal(MaliciousEventDto.HumanResponse.valueOf(humanResponse.toUpperCase()).name()));
+    }
+
+    // Stage 1 reads the old values to decide which changes are real and appends them (keeping the newest
+    // entries); stage 2 writes the new values. The timeline is left alone, even absent, when nothing changed.
+    Document newEntries = new Document("$concatArrays", changes);
+    Document timeline = new Document("$cond", Arrays.asList(
+        new Document("$eq", Arrays.asList(new Document("$size", newEntries), 0)),
+        "$" + MaliciousEventDto.CASE_TIMELINE,
+        new Document("$slice", Arrays.asList(
+            new Document("$concatArrays", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + MaliciousEventDto.CASE_TIMELINE, Collections.emptyList())), newEntries)),
+            -CASE_TIMELINE_MAX_ENTRIES))));
+    List<Document> pipeline = Arrays.asList(
+        new Document("$set", new Document(MaliciousEventDto.CASE_TIMELINE, timeline)),
+        new Document("$set", set));
+
+    logger.info(String.format("Updating events %s to status: %s caseOwner: %s caseNotes: %s by: %s",
+        getQueryDescription(eventIds, filterMap, accountId), status,
+        caseOwner == null ? "unchanged" : "'" + caseOwner + "'", caseNotes == null ? "unchanged" : "(" + caseNotes.length() + " chars)", by));
+
+    return (int) maliciousEventDao.getCollection(accountId).updateMany(query, pipeline).getModifiedCount();
   }
 
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap, String contextSource) {
@@ -1441,6 +1567,10 @@ public class MaliciousEventService {
     if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
       query.append("latestApiOrig", new Document("$regex", latestApiOrigRegex));
     }
+
+    // A bulk action on a filtered view must reach exactly the rows the view shows.
+    andDocument(query, caseOwnerCondition((List<String>) filter.get("caseOwners")));
+    andDocument(query, caseNotesCondition((Boolean) filter.get("hasCaseNotes")));
 
     // Apply simple context filter (only for ENDPOINT and AGENTIC)
     Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
