@@ -44,20 +44,22 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
     }
 
     /**
-     * Active configs changed after {@code updatedAfter} (epoch seconds, served by the updatedAt index),
-     * oldest change first, {@code updatedAfter <= 0} means all of them. Also returns the active configs for
-     * {@code alwaysIncludeHosts} (any age), so the caller's merge still lets the catalogue entry win
-     * over a same-host account row.
+     * Full sync ({@code updatedAfter <= 0}): every active config, sorted by _id. Delta: active configs
+     * changed after {@code updatedAfter} (epoch seconds), oldest change first, served by the updatedAt
+     * index. A delta also returns the active configs for {@code alwaysIncludeHosts} (any age), so the
+     * caller's merge still lets the catalogue entry win over a same-host account row.
      */
     public List<BrowserExtensionConfigCommon> findActiveConfigsUpdatedAfter(long updatedAfter, List<String> alwaysIncludeHosts) {
         Bson filter = Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false);
-        if (updatedAfter > 0) {
-            Bson changed = Filters.gt(BrowserExtensionConfigCommon.UPDATED_AT, updatedAfter);
-            filter = Filters.and(filter, alwaysIncludeHosts.isEmpty()
-                    ? changed
-                    : Filters.or(changed, Filters.in(BrowserExtensionConfigCommon.HOST, alwaysIncludeHosts)));
+        if (updatedAfter <= 0) {
+            return toConfigs(instance.findAll(filter, 0, 1_000_000, Sorts.ascending("_id")));
         }
-        return toConfigs(instance.findAll(filter, 0, 1_000_000, Sorts.ascending(BrowserExtensionConfigCommon.UPDATED_AT)));
+        Bson changed = Filters.gt(BrowserExtensionConfigCommon.UPDATED_AT, updatedAfter);
+        Bson changedOrOverridden = alwaysIncludeHosts.isEmpty()
+                ? changed
+                : Filters.or(changed, Filters.in(BrowserExtensionConfigCommon.HOST, alwaysIncludeHosts));
+        return toConfigs(instance.findAll(Filters.and(filter, changedOrOverridden), 0, 1_000_000,
+                Sorts.ascending(BrowserExtensionConfigCommon.UPDATED_AT)));
     }
 
     public void createIndicesIfAbsent() {
