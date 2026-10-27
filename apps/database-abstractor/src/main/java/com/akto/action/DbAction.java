@@ -4142,6 +4142,9 @@ public class DbAction extends ActionSupport {
 
     public String insertMCPAuditDataLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             DbLayer.insertMCPAuditDataLog(auditInfo);
         } catch (Exception e) {
             e.printStackTrace();
