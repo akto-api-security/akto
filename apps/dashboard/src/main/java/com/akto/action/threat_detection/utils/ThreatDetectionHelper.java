@@ -90,6 +90,26 @@ public class ThreatDetectionHelper {
             String status,
             String jiraTicketUrl,
             String humanResponse) {
+        return updateMaliciousEvent(httpClient, backendUrl, apiToken, eventId, eventIds, filter, status, jiraTicketUrl, humanResponse, null, null, null);
+    }
+
+    /**
+     * caseOwner / caseNotes: null leaves the value as is, "" clears it. updatedBy is the login the change is
+     * recorded under in the event's case timeline.
+     */
+    public static UpdateResult updateMaliciousEvent(
+            CloseableHttpClient httpClient,
+            String backendUrl,
+            String apiToken,
+            String eventId,
+            List<String> eventIds,
+            Filter.Builder filter,
+            String status,
+            String jiraTicketUrl,
+            String humanResponse,
+            String caseOwner,
+            String caseNotes,
+            String updatedBy) {
 
         try {
             HttpPost post = new HttpPost(
@@ -125,6 +145,16 @@ public class ThreatDetectionHelper {
 
             if (!StringUtils.isEmpty(humanResponse)) {
                 requestBuilder.setHumanResponse(humanResponse);
+            }
+
+            if (caseOwner != null) {
+                requestBuilder.setCaseOwner(caseOwner);
+            }
+            if (caseNotes != null) {
+                requestBuilder.setCaseNotes(caseNotes);
+            }
+            if (!StringUtils.isEmpty(updatedBy)) {
+                requestBuilder.setUpdatedBy(updatedBy);
             }
 
             UpdateMaliciousEventStatusRequest request = requestBuilder.build();

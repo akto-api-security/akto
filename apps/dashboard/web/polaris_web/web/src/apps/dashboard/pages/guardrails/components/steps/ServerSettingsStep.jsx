@@ -278,6 +278,7 @@ const ServerSettingsStep = ({
                                                 mcpCountItems.length > 0 && { count: mcpCountItems.length, label: "MCP Servers", items: mcpCountItems },
                                                 llmCountItems.length > 0 && { count: llmCountItems.length, label: "LLMs", items: llmCountItems },
                                             ].filter(Boolean);
+                                            if (nonZeroItems.length === 0) return collectionsLoading ? "Loading agentic assets…" : "No agentic assets found.";
                                             return (
                                                 <HorizontalStack gap="1" blockAlign="center" wrap>
                                                     <Text variant="bodyMd" tone="subdued">This includes</Text>
@@ -403,6 +404,7 @@ const ServerSettingsStep = ({
                                                 mcpCountItems.length > 0 && { count: mcpCountItems.length, label: "MCP Servers", items: mcpCountItems },
                                                 llmCountItems.length > 0 && { count: llmCountItems.length, label: "LLMs", items: llmCountItems },
                                             ].filter(Boolean);
+                                            if (nonZeroItems.length === 0) return collectionsLoading ? "Loading agentic assets…" : "No agentic assets found.";
                                             return (
                                                 <HorizontalStack gap="1" blockAlign="center" wrap>
                                                     <Text variant="bodyMd" tone="subdued">This includes</Text>

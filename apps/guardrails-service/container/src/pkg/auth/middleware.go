@@ -33,16 +33,32 @@ func AccountIDFromContext(c *gin.Context) (int, bool) {
 	return id, true
 }
 
+// deploymentAccountID is the account this deployment serves: the accountId claim of its own
+// DATABASE_ABSTRACTOR_SERVICE_TOKEN, or "" when that token is absent. A var so tests can pin it.
+var deploymentAccountID = AccountIDFromServiceToken
+
 func NewMiddleware(rsaPublicKey string, logger *zap.Logger) (gin.HandlerFunc, error) {
 	publicKey, err := parseRSAPublicKey(rsaPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSA_PUBLIC_KEY: %w", err)
+	}
+	if deploymentAccountID() == "" {
+		logger.Warn("Deployment account unknown (no DATABASE_ABSTRACTOR_SERVICE_TOKEN): " +
+			"valid tokens of any account are accepted")
 	}
 
 	return func(c *gin.Context) {
 		accountID, err := verifyToken(c.GetHeader("Authorization"), publicKey)
 		if err != nil {
 			logger.Warn("Authentication failed", zap.Error(err))
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		// Every account's tokens are signed with the same key, so a valid signature alone would let
+		// one account's token in to another account's deployment: the token must be for this one.
+		if own := deploymentAccountID(); own != "" && own != strconv.Itoa(accountID) {
+			logger.Warn("Rejected a token issued for another account",
+				zap.Int("tokenAccountId", accountID), zap.String("deploymentAccountId", own))
 			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}

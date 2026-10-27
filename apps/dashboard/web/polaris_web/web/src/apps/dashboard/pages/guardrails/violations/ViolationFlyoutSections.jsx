@@ -412,7 +412,7 @@ function NearbyMessagesSection({ host, anchorTimestamp }) {
 export function PromptResponseSection({ detail, host, anchorTimestamp }) {
     const pr = detail?.promptResponse;
     const hasPrompt = !!pr?.promptBody;
-    const hasResponse = !!(pr && (pr.behaviour || pr.blockedBy || pr.blockedAt || pr.reason || pr.message));
+    const hasResponse = !!(pr && (pr.behaviour || pr.blockedBy || pr.blockedAt || pr.reason || pr.message || pr.responseBody));
     const nearbyMessages = <NearbyMessagesSection host={host} anchorTimestamp={anchorTimestamp} />;
 
     if (!hasPrompt && !hasResponse) {
@@ -451,7 +451,7 @@ export function PromptResponseSection({ detail, host, anchorTimestamp }) {
                     {!hasPrompt
                         ? <Text variant="bodySm" color="subdued">No content captured for this violation.</Text>
                         : pr.valueLabel === "Prompt"
-                            ? <HighlightedText text={pr.promptBody} mono />
+                            ? <HighlightedText text={pr.promptBody} highlights={pr.highlights} mono />
                             : (
                                 <SampleData
                                     data={{
@@ -468,6 +468,21 @@ export function PromptResponseSection({ detail, host, anchorTimestamp }) {
                                     wordWrap
                                 />
                             )}
+                    {pr.responseBody && (
+                        <VerticalStack gap="3">
+                            <Text variant="headingMd" color="subdued">Response Body</Text>
+                            <SampleData
+                                data={{
+                                    message: pr.responseBody,
+                                    vulnerabilitySegments: (pr.responseHighlights || []).map((phrase) => ({ phrase })),
+                                }}
+                                editorLanguage="plaintext"
+                                minHeight="200px"
+                                readOnly
+                                wordWrap
+                            />
+                        </VerticalStack>
+                    )}
                 </VerticalStack>
             </Box>
 

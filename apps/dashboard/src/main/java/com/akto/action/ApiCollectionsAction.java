@@ -429,7 +429,8 @@ public class ApiCollectionsAction extends UserAction {
                 httpResponse.setCharacterEncoding("UTF-8");
                 httpResponse.getOutputStream().write(cached);
                 loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] served from cache in " + (System.currentTimeMillis() - start) + "ms, bytes=" + cached.length+ ", loggedInUser=" + loggedInUser);
-                return Action.SUCCESS.toUpperCase();
+                // The body is already written to the output stream; NONE stops the json result from writing it again.
+                return Action.NONE;
             }
         }
 
@@ -488,7 +489,7 @@ public class ApiCollectionsAction extends UserAction {
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] Jackson serialization took " + (System.currentTimeMillis() - stepStart) + "ms");
 
         loggerMaker.infoAndAddToDb("[fetchAllCollectionsBasic] TOTAL took " + (System.currentTimeMillis() - start) + "ms");
-        return Action.SUCCESS.toUpperCase();
+        return Action.NONE;
     }
 
     // Deliberately NOT named "hostNames"/"hostnames" — this class already has an unrelated
@@ -510,7 +511,7 @@ public class ApiCollectionsAction extends UserAction {
             httpResponse.setContentType("application/json");
             httpResponse.setCharacterEncoding("UTF-8");
             new ObjectMapper().writeValue(httpResponse.getOutputStream(), Collections.singletonMap("apiCollections", Collections.emptyList()));
-            return Action.SUCCESS.toUpperCase();
+            return Action.NONE;
         }
 
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(ApiCollection.HOST_NAME, deviceHostNames), ApiCollectionsDao.LIST_PROJECTION);
@@ -539,7 +540,7 @@ public class ApiCollectionsAction extends UserAction {
         mapper.writeValue(httpResponse.getOutputStream(), responseBody);
 
         loggerMaker.infoAndAddToDb("[fetchCollectionsBasicForHostNames] TOTAL took " + (System.currentTimeMillis() - start) + "ms, hostNames=" + deviceHostNames.size() + ", found=" + this.apiCollections.size());
-        return  Action.SUCCESS.toUpperCase();
+        return Action.NONE;
     }
 
     public String fetchCollection() {

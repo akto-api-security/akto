@@ -461,6 +461,14 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     // Java port of transform.js's splitCollectionNameForEndpointSecurity's "sourceId" segment
     // (parts[1]) — used by fetchAgenticAssetEndpointsPage's child rows for MCP Server/LLM assets,
     // whose "source" column shows which agent/client called into them, not their own service name.
+    // <endpointId>.<agent>.<name> -> "<agent>.<name>", lowercased: one agentic entity regardless of
+    // which device it was seen on (AgenticCountBadges' counts; AgentEndpointTreeTable keys the same way).
+    private static String entityKeyWithoutDevice(String hostName) {
+        if (StringUtils.isBlank(hostName)) return "";
+        int dot = hostName.indexOf('.');
+        return (dot >= 0 ? hostName.substring(dot + 1) : hostName).toLowerCase(Locale.ROOT);
+    }
+
     private static String extractSourceIdForGrouping(String hostName) {
         if (StringUtils.isBlank(hostName)) return "";
         String[] parts = DOT_SPLIT.split(hostName);
@@ -1003,6 +1011,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             child.put("skillCount", skillCount);
             child.put("baseRiskScore", c.getBaseRiskScore());
             child.put("baseRiskScoreReason", c.getBaseRiskScoreReason());
+            // Lets the devices page's bulk actions offer only the toggles that apply to the selection.
+            child.put("deactivated", c.isDeactivated());
+            child.put("isOutOfTestingScope", c.getIsOutOfTestingScope());
+            List<BasicDBObject> childTags = new ArrayList<>();
+            if (c.getEnvType() != null) {
+                for (CollectionTags tag : c.getEnvType()) {
+                    childTags.add(new BasicDBObject("keyName", tag.getKeyName()).append("value", tag.getValue()));
+                }
+            }
+            child.put("envType", childTags);
 
             // Plugin collections carry the agent's mcp-client/ai-agent tags (naming where the plugin is
             // installed), so label the child by its own type rather than letting those tags speak.
@@ -1098,7 +1116,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Filters.in(Constants.ID, ids),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING,
                             ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
-                            ApiCollection.BASE_RISK_SCORE_REASON)
+                            ApiCollection.BASE_RISK_SCORE_REASON, "deactivated", ApiCollection.IS_OUT_OF_TESTING_SCOPE)
             );
 
             // Computed here, scoped to just this asset's own `ids` — unlike every other agentic
@@ -3054,6 +3072,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // Generic device tags (AgenticUsers.deviceTags), resolved via this group's owner username.
         List<Map<String, String>> tags = Collections.emptyList();
         int nonSkillCollectionsCount = 0;
+        // For the per-entity count badges. An entity is the hostname without its device prefix
+        // (<agent>.<name>): the same MCP server under two agents is two, the same agent+server on two
+        // devices is one. Keyed by type (getTypeFromCollection). Skills are counted by name alone
+        // (uniqueSkillNames): agents that share a skills folder all report the same skills.
+        final Map<String, Set<String>> entityKeysByType = new HashMap<>();
         final Set<String> uniqueSkillNames = new HashSet<>();
         final Set<String> uniquePluginNames = new HashSet<>();
         // Device-row extras (DeviceEndpoints only — null/zero when not populated, e.g. Users-and-Devices).
@@ -3071,12 +3094,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             hostNames.add(hostName);
             String category = AgenticObserveUtil.getTypeFromCollection(c);
             clientTypes.add(category);
+            String entityKey = entityKeyWithoutDevice(hostName);
+            entityKeysByType.computeIfAbsent(category, k -> new HashSet<>()).add(entityKey);
             if (!AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(category)) nonSkillCollectionsCount++;
             if (c.getSkills() != null && !c.getSkills().isEmpty()) {
                 clientTypes.add(AgenticObserveUtil.CLIENT_TYPE_SKILL);
                 for (String s : c.getSkills()) {
                     if (StringUtils.isNotBlank(s)) uniqueSkillNames.add(s.toLowerCase(Locale.ROOT));
                 }
+            } else if (AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(category)) {
+                // A standalone skill collection is the skill itself
+                String skillName = extractServiceNameForGrouping(hostName);
+                if (StringUtils.isNotBlank(skillName)) uniqueSkillNames.add(skillName.toLowerCase(Locale.ROOT));
             }
             // Plugins have their own collection, so nonSkillCollectionsCount above already counted it —
             // this set is for the "N plugins" badge only, never added to the asset total.
@@ -3137,6 +3166,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.put("hasMisconfiguredConfig", hasMisconfiguredConfig);
             row.put("uniqueSkillNames", new ArrayList<>(uniqueSkillNames));
             row.put("uniquePluginNames", new ArrayList<>(uniquePluginNames));
+            BasicDBObject countsByType = new BasicDBObject();
+            entityKeysByType.forEach((type, keys) -> countsByType.put(type, keys.size()));
+            row.put("countsByType", countsByType);
             row.put("os", os);
             row.put("username", username);
             BasicDBObject violationsObj = new BasicDBObject();

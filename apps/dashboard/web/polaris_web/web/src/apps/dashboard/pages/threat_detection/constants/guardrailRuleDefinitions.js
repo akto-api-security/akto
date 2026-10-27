@@ -144,6 +144,7 @@ const GUARDRAIL_RULE_DEFINITIONS = [
     // ─── Enterprise License Compliance ─────────────────────────────────────────
     {
         prefixes: ["EnterpriseLicenseCompliance", "enterprise_license_compliance"],
+        capability: "enterpriseLicenseCompliance",
         heading: "Enterprise License Compliance Violation",
         overview: [
             {
@@ -344,6 +345,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Intent Analysis / Base Prompt ─────────────────────────────────────────
     {
         prefixes: ["IntentAnalysis", "BasePrompt", "base_prompt", "intent"],
+        capability: "basePromptRule",
         heading: "Intent Mismatch - Agent Purpose Violated",
         overview: [
             {
@@ -445,6 +447,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Code Detection ────────────────────────────────────────────────────────
     {
         prefixes: ["BanCode", "Code", "ban_code", "code_detection"],
+        capability: "banCodeDetection",
         heading: "Code Detected in Payload",
         overview: [
             {
@@ -500,6 +503,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── Token Limit ───────────────────────────────────────────────────────────
     {
         prefixes: ["tokenLimit", "TokenLimit", "token_limit"],
+        capability: "tokenLimitDetection",
         heading: "Token Limit Exceeded",
         overview: [
             {
@@ -527,7 +531,8 @@ This event means the guardrail **successfully protected** the data - the sensiti
 
     // ─── Anomaly Detection ─────────────────────────────────────────────────────
     {
-        prefixes: ["Anomaly", "anomaly"],
+        prefixes: ["Anomaly", "anomaly", "ToolCallRateExceeded", "ErrorRateExceeded"],
+        capability: "anomalyDetection",
         heading: "Anomalous Behaviour Detected",
         overview: [
             {
@@ -671,6 +676,7 @@ This event means the guardrail **successfully protected** the data - the sensiti
     // ─── MCP Server Not in Allowed List ────────────────────────────────────────
     {
         prefixes: ["McpServerNotInAllowedList", "McpServer", "mcp_server"],
+        capability: "mcpServerAllowList",
         heading: "MCP Server Not Allowed",
         overview: [
             {
@@ -730,6 +736,7 @@ This is **working as intended**. The host was blocked on purpose by your organis
     // ─── Blocked LLM (Audit Data → LLMs) ───────────────────────────────────────
     {
         prefixes: ["LLMAccessRejected"],
+        capability: "blockedLlms",
         heading: "Blocked LLM",
         overview: [
             {
@@ -759,6 +766,7 @@ Review the LLMs tab in Audit Data regularly and allow or block newly discovered 
     // ─── Blocked AI Agent (Audit Data → AI Agents) ─────────────────────────────
     {
         prefixes: ["AIAgentAccessRejected"],
+        capability: "blockedAgents",
         heading: "Blocked AI Agent",
         overview: [
             {
@@ -788,6 +796,7 @@ Review the AI Agents tab in Audit Data regularly and allow or block newly discov
     // ─── Audit Controls (ComponentAccess, Approval, IP, Endpoint) ──────────────
     {
         prefixes: ["ComponentAccessRejected", "ApprovalConditionsNotDefined", "ApprovalExpired", "IPNotInAllowedList", "EndpointNotWhitelisted"],
+        capability: "componentAccess",
         heading: "Access Control Violation",
         overview: [
             {
@@ -821,6 +830,7 @@ Identify the specific rule from the \`ruleViolated\` field:
     // ─── Personal Account ──────────────────────────────────────────────────────
     {
         prefixes: ["BlockPersonalAccounts", "block_personal_account", "personal_account", "personalaccount"],
+        capability: "blockPersonalAccounts",
         templateIdPrefixes: ["block-personal-account"],
         heading: "Personal Account Usage Blocked",
         overview: [
@@ -847,6 +857,7 @@ Identify the specific rule from the \`ruleViolated\` field:
     // ─── Public Share ───────────────────────────────────────────────────────────
     {
         prefixes: ["BlockPublicShare", "block_public_share", "public_share"],
+        capability: "blockPublicShare",
         heading: "Public Sharing Blocked",
         overview: [
             {
@@ -901,7 +912,14 @@ export function getGuardrailRuleInfo(ruleViolated, templateId) {
 // Capabilities without a detail-dialog entry above. capability === guardrails/<capability>.conf filename.
 const EXTRA_CAPABILITY_PREFIXES = [
     { prefixes: ["ContextPoisoning", "context_poisoning"], capability: "contextPoisoning" },
-    { prefixes: ["BlockedHosts", "blocked_host", "EndpointNotWhitelisted"], capability: "blockedHosts" },
+    { prefixes: ["BlockedHosts", "blocked_host"], capability: "blockedHosts" },
+    // Credential types detected by the PII filter (and the Password scanner) are secrets, not personal data.
+    {
+        prefixes: ["Password", "PII-password", "PII-secret", "PII-token", "PII-otp", "PII-aws_access_key_id", "PII-ssh_private_key",
+            "PII-gcp_credential", "PII-azure_credential", "PII-database", "PII-aws_rds_url", "PII-aws_docdb_url",
+            "PII-aws_dynamodb_url", "PII-aws_arn_connect_instance", "PII-webhook_url"],
+        capability: "secretsDetection",
+    },
 ];
 
 // Maps an event's rule_violated to its compliance capability (e.g. "PII_EMAIL" -> "piiTypes").
@@ -910,7 +928,7 @@ export function getGuardrailCapabilityForRule(ruleViolated) {
     const v = ruleViolated.trim().toLowerCase();
     const matches = (prefixes) => prefixes.some(p => v.startsWith(p.toLowerCase()) || v.includes(p.toLowerCase()));
 
-    for (const def of [...GUARDRAIL_RULE_DEFINITIONS, ...EXTRA_CAPABILITY_PREFIXES]) {
+    for (const def of [...EXTRA_CAPABILITY_PREFIXES, ...GUARDRAIL_RULE_DEFINITIONS]) {
         if (def.capability && matches(def.prefixes)) return def.capability;
     }
     return null;

@@ -198,14 +198,12 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_endpoint_security_dashboard" || currPathString === "dashboard_endpoint_dashboard",
                 key: "1",
             }] : []),
-            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY && (func.hasAccessToNewPosture() || (window.USER_NAME.indexOf("@akto.io") !== -1)) ? [{
+            ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [{
                 label: "AI Security Posture",
                 icon: ReportFilledMinor,
                 onClick: () => {
                     handleSelect("dashboard_endpoint_posture");
-                    // The new posture page is still only for the internal test account; every
-                    // other @akto.io account keeps landing on the older EndpointPosture page.
-                    navigate(func.hasAccessToNewPosture() ? "/dashboard/security-posture" : "/dashboard/endpoint-dashboard");
+                    navigate("/dashboard/security-posture");
                     setActive("normal");
                 },
                 selected: leftNavSelected === "dashboard_endpoint_posture",

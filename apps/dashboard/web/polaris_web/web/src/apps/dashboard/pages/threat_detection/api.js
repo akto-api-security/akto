@@ -58,6 +58,9 @@ const threatDetectionRequests = {
                 ...(ungroupActivities ? { ungroupActivities: true } : {}),
                 ...(extraFilters.agenticTypes?.length ? { agenticTypes: extraFilters.agenticTypes } : {}),
                 ...(extraFilters.behaviours?.length ? { behaviours: extraFilters.behaviours } : {}),
+                // Guardrail case management: owner logins (UNASSIGNED_OWNER = no owner) and whether the event has notes.
+                ...(extraFilters.caseOwners?.length ? { caseOwners: extraFilters.caseOwners } : {}),
+                ...(typeof extraFilters.hasCaseNotes === 'boolean' ? { hasCaseNotes: extraFilters.hasCaseNotes } : {}),
             },
             suppress403Toast: true
         })

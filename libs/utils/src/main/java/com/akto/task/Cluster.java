@@ -25,6 +25,7 @@ public class Cluster {
     public static final String USER_ANALYSIS_CRON_INFO = "user-analysis-cron-info";
     public static final String TOOL_CLASSIFICATION_CRON_INFO = "tool-classification-cron-info";
     public static final String AGENTIC_POSTURE_SCORE_CRON_INFO = "agentic-posture-score-cron-info";
+    public static final String ENDPOINT_DEFAULT_GUARDRAILS_CRON_INFO = "endpoint-default-guardrails-cron-info";
     public static final String TOKEN_GENERATOR_CRON = "token-generator-cron";
     public static final String AUTOMATED_API_GROUPS_CRON = "automated-api-groups-cron";
     public static final String DEPENDENCY_FLOW_CRON= "dependency-flow-cron";

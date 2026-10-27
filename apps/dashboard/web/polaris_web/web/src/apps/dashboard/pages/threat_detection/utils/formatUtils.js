@@ -167,7 +167,7 @@ export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap 
     const ruleViolated = extractRuleViolated(event?.metadata);
     const dbCapability = getDbComplianceCapability(ruleViolated);
     if (dbCapability) {
-      base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || {};
+      base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || {}; // user-defined: only the policy's own tags
     } else {
       const capability = getGuardrailCapabilityForRule(ruleViolated);
       base = guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};
@@ -180,6 +180,10 @@ export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap 
   }
   return base;
 };
+
+// Events written by the guardrail backfill replay carry refId "backfill|<policy>|<id>"
+// (GuardrailBackfillReplayRunner), which is the only marker separating them from live detections.
+export const isBackfillRefId = (refId) => typeof refId === "string" && refId.toLowerCase().startsWith("backfill|");
 
 export const extractBehaviour = (metadata) => {
   if (!metadata) return null;

@@ -22,6 +22,7 @@ from urllib.parse import quote, urlparse
 
 import httpx
 
+import alerts
 import aws_auth
 import gcp_auth
 import http_client
@@ -921,6 +922,7 @@ class Qwen3GuardFastProvider(Qwen3GuardOutput, OpenAIProvider):
             fallback = _build_qwen3guard()
             if not isinstance(fallback, Qwen3GuardOutput):
                 raise
+            alerts.note_fallback(self.name, fallback.name, alerts.fallback_reason(exc))
             return await fallback.complete_with_logprobs(text, top_logprobs, temperature)
 
 
@@ -941,6 +943,7 @@ class GemmaFastProvider(OpenAIProvider):
             fallback = _build_foundry("gemma_foundry", "", "", "")
             if fallback is None:
                 raise
+            alerts.note_fallback(self.name, fallback.name, alerts.fallback_reason(exc))
             return await fallback.complete(prompt)
 
 
@@ -1100,6 +1103,7 @@ _HEALTH_TASKS: dict[str, "asyncio.Task[None]"] = {}
 def _set_availability(health_url: str, available: bool) -> None:
     if _PRIMARY_AVAILABLE.get(health_url, True) != available:
         logger.warning(f"[FinalArbiter] primary {health_url} is now {'AVAILABLE' if available else 'DOWN'}")
+        alerts.note_availability(urlparse(health_url).netloc or health_url, available)
     _PRIMARY_AVAILABLE[health_url] = available
 
 
@@ -1162,6 +1166,7 @@ class FallbackProvider(LLMProvider):
                 raise exc
             return await self.primary.complete(prompt)  # no usable backup: behave as without one
         logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({why}), falling back to {backup.name}")
+        alerts.note_fallback(self.primary.name, backup.name, alerts.fallback_reason(exc) if exc else "marked down")
         return await backup.complete(prompt)
 
 

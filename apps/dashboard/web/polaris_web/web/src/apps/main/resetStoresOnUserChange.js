@@ -2,6 +2,7 @@ import PersistStore from "./PersistStore";
 import LocalStore from "./LocalStorageStore";
 import SessionStore from "./SessionStore";
 import IssuesStore from "../dashboard/pages/issues/issuesStore";
+import { getReportCategoryShortName, shortNameToCategory } from "./labelHelper";
 
 // Saved dashboard data (collections, filters, ...) belongs to the user and account that loaded it.
 // If the dashboard opens for a different user or account without a logout in between (for example
@@ -19,6 +20,11 @@ export default function resetStoresOnUserChange() {
             return;
         }
         PersistStore.getState().resetAll();
+        // resetAll restores the default category; keep the one a ?category= page (report PDFs, new tabs) set
+        const categoryOverride = shortNameToCategory[getReportCategoryShortName()];
+        if (categoryOverride) {
+            PersistStore.getState().setDashboardCategory(categoryOverride);
+        }
         LocalStore.getState().resetStore();
         SessionStore.getState().resetStore();
         IssuesStore.getState().resetStore();

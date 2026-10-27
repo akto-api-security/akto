@@ -1,5 +1,10 @@
 FROM eclipse-temurin:17-jre-noble
 
+# CVE-2026-91403: drop the eMudhra roots Temurin 17.0.21 removed; fail build if any remain. Remove once on 17.0.21+.
+RUN for a in cn_emsign_ecc_root_ca__g3,o_emudhra_technologies_limited,ou_emsign_pki,c_in cn_emsign_ecc_root_ca__c3,o_emudhra_inc,ou_emsign_pki,c_us cn_emsign_root_ca__c1,o_emudhra_inc,ou_emsign_pki,c_us; do \
+      keytool -delete -cacerts -storepass changeit -alias "$a [jdk]" || true; done; \
+    ! keytool -list -v -cacerts -storepass changeit | grep -E "Owner: CN=(emSign ECC Root CA - (G3|C3)|emSign Root CA - C1|AAA Certificate Services),"
+
 # NOTE: Not yet tested on Red Hat (RHEL/Podman/OpenShift). Verified only under Docker on a
 # cgroup-v2 host (a faithful proxy for RHEL 9's runtime constraints), not on an actual Red Hat
 # host. The image ships its own Ubuntu userspace so host distro shouldn't matter, but a real

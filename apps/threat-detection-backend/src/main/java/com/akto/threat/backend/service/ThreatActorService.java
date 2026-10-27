@@ -493,6 +493,7 @@ public class ThreatActorService {
             .setCountry(actorInfo.getCountry() != null ? actorInfo.getCountry() : "")
             .setLatestSubcategory(actorInfo.getFilterId() != null ? actorInfo.getFilterId() : "")
             .setLatestMetadata(actorInfo.getLatestMetadata() != null ? actorInfo.getLatestMetadata() : "")
+            .setStatus(actorInfo.getStatus() != null ? actorInfo.getStatus() : ThreatDetectionConstants.ACTIVE)
             .build();
     }
 
@@ -571,11 +572,14 @@ public class ThreatActorService {
         List<Document> countList = result.getList("count", Document.class, Collections.emptyList());
         long total = countList.isEmpty() ? 0 : countList.get(0).getInteger("total");
 
+        Map<String, String> actorStatuses = fetchActorStatuses(accountId, paginated);
+
         List<ListThreatActorResponse.ThreatActor> actors = new ArrayList<>();
         for (Document doc : paginated) {
             String actorId = doc.getString("_id");
 
             ListThreatActorResponse.ThreatActor.Builder actorBuilder = ListThreatActorResponse.ThreatActor.newBuilder()
+                .setStatus(actorStatuses.getOrDefault(actorId, ThreatDetectionConstants.ACTIVE))
                 .setId(actorId)
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
@@ -594,6 +598,25 @@ public class ThreatActorService {
         }
 
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
+    }
+
+    private Map<String, String> fetchActorStatuses(String accountId, List<Document> actorDocs) {
+        List<String> actorIds = new ArrayList<>();
+        for (Document doc : actorDocs) {
+            actorIds.add(doc.getString("_id"));
+        }
+
+        Map<String, String> statuses = new HashMap<>();
+        if (actorIds.isEmpty()) {
+            return statuses;
+        }
+
+        for (ActorInfoModel actorInfo : actorInfoDao.getCollection(accountId).find(Filters.in("actorId", actorIds))) {
+            if (actorInfo.getStatus() != null) {
+                statuses.put(actorInfo.getActorId(), actorInfo.getStatus());
+            }
+        }
+        return statuses;
     }
 
   // hostScopeMatch: only some agents' events (users limited to specific collections); null for the whole account
@@ -1048,6 +1071,9 @@ public class ThreatActorService {
             setMethod(event.getLatestApiMethod() != null ? event.getLatestApiMethod().name() : "").
             setEvidenceLine(nullToEmpty(event.getEvidenceLine())).
             setRemediation(nullToEmpty(event.getRemediation())).
+            setCaseOwner(nullToEmpty(event.getCaseOwner())).
+            setCaseNotes(nullToEmpty(event.getCaseNotes())).
+            addAllCaseTimeline(ThreatUtils.caseActivities(event)).
             setStatus(event.getStatus() != null ? event.getStatus().name() : "").build());
     }
     return maliciousPayloadsResponse;

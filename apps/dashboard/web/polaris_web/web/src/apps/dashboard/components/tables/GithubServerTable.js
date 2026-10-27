@@ -594,7 +594,7 @@ function GithubServerTable(props) {
     });
 
   useEffect(() => {
-    if(!window.location.pathname.includes("testing")){
+    if(!window.location.pathname.includes("testing") && !props.selectAllAddsRowIds){
       return
     }
     if (!allResourcesSelected || (data && data.length >= total) || (fullDataIds && fullDataIds.length >= total) || (rawSelectedResources && rawSelectedResources.length >= total)) {
@@ -658,6 +658,8 @@ function GithubServerTable(props) {
               for (let row of data) {
                   if (row?.id instanceof Array) {
                     row?.id.forEach(item => allItemsSet.add(item));
+                  } else if (props?.selectAllAddsRowIds && row?.id !== undefined) {
+                    allItemsSet.add(row.id);
                   }
               }
               selectItems([...allItemsSet])
@@ -751,7 +753,10 @@ function GithubServerTable(props) {
 
   let tableHeightClass = props.increasedHeight ? "control-row" : (props.condensedHeight ? "condensed-row" : '') 
   let tableClass = props.useNewRow ? "new-table" : (props.selectable ? "removeHeaderColor" : "hideTableHead")
-  const bulkActionResources = selectedItems.length > 0 ? selectedItems : selectedResources
+  // Grouped tables keep their selection in selectedItems; "Select all" across pages still means every row
+  const bulkActionResources = (props.selectAllAddsRowIds && allResourcesSelected && allDataIds.length > 0)
+    ? allDataIds
+    : (selectedItems.length > 0 ? selectedItems : selectedResources)
   
   // Move setState out of render to avoid "Cannot update a component while rendering" warning
   useEffect(() => {
