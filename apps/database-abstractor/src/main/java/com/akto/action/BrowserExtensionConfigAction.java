@@ -28,19 +28,19 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsV2;
 
     // v3 request: updatedAfter = the newest updatedAt the client holds (delta, one response). Omit it
-    // for a full sync, which is paged: afterId = the nextAfterId of the previous page (none on the first)
+    // for a full sync, which is paged: cursor = the nextCursor of the previous page (none on the first); treat it as opaque
     @Setter
     private long updatedAfter;
     @Setter
-    private String afterId;
+    private String cursor;
     @Setter
     private int limit;   // optional page size for a full sync; capped server side
 
-    // v3 response: the configs, and for a full sync the afterId of the next page (null on the last)
+    // v3 response: the configs, and for a full sync the cursor of the next page (null on the last)
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsV3;
     @Getter
-    private String nextAfterId;
+    private String nextCursor;
 
     public String fetchBrowserExtensionConfigs() {
         try {
@@ -69,9 +69,9 @@ public class BrowserExtensionConfigAction extends ActionSupport {
 
     public String fetchBrowserExtensionConfigsV3() {
         try {
-            BrowserExtensionConfigDao.ConfigsV3 result = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter, afterId, limit);
+            BrowserExtensionConfigDao.ConfigsV3 result = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter, cursor, limit);
             this.browserExtensionConfigsV3 = result.getConfigs();
-            this.nextAfterId = result.getNextAfterId();
+            this.nextCursor = result.getNextCursor();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs v3: " + e.getMessage(), LogDb.DB_ABS);

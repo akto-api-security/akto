@@ -50,7 +50,7 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
     @AllArgsConstructor
     public static class ConfigsV3 {
         private final List<BrowserExtensionConfigCommon> configs;
-        private final String nextAfterId;
+        private final String nextCursor;
     }
 
     /**
@@ -60,10 +60,10 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
      *    updatedAt strictly after it (indexed on updatedAt), in one response.
      *  - full sync: the catalogue in pages by _id, {@code limit} per page (default
      *    {@link #FULL_SYNC_PAGE_SIZE}, at most {@link #MAX_FULL_SYNC_PAGE_SIZE}). The client sends the
-     *    last _id it got as {@code afterId} until {@code nextAfterId} comes back null. Opt-outs are
+     *    {@code nextCursor} of the previous page as {@code cursor} until {@code nextCursor} comes back null. Opt-outs are
      *    applied to every page, the account's custom hosts ride on the last page.
      */
-    public ConfigsV3 findConfigsV3(long updatedAfter, String afterId, int limit) {
+    public ConfigsV3 findConfigsV3(long updatedAfter, String cursor, int limit) {
         List<BrowserExtensionConfigCommon> account = findAllAccountConfigs();
         List<String> accountHosts = new ArrayList<>();
         for (BrowserExtensionConfigCommon a : account) {
@@ -78,9 +78,9 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
         }
 
         int pageSize = limit <= 0 ? FULL_SYNC_PAGE_SIZE : Math.min(limit, MAX_FULL_SYNC_PAGE_SIZE);
-        ObjectId cursor = afterId == null || afterId.isEmpty() ? null : new ObjectId(afterId);
+        ObjectId afterId = cursor == null || cursor.isEmpty() ? null : new ObjectId(cursor);   // the cursor is the last _id
         List<BrowserExtensionConfigCommon> fetched =
-                BrowserExtensionConfigCommonDao.instance.findActiveConfigsAfterId(cursor, pageSize + 1);
+                BrowserExtensionConfigCommonDao.instance.findActiveConfigsAfterId(afterId, pageSize + 1);
         boolean hasMore = fetched.size() > pageSize;
         List<BrowserExtensionConfigCommon> page = hasMore ? fetched.subList(0, pageSize) : fetched;
 
