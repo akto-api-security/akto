@@ -420,15 +420,38 @@ async def test_health_probe_sets_the_flag_back_to_available(monkeypatch):
     assert providers._PRIMARY_AVAILABLE["u"] is True
 
 
-async def test_other_errors_fall_back_without_flagging_down(monkeypatch):
+def _http_error(status):
+    import httpx
+
+    request = httpx.Request("POST", "http://vllm:80/v1/chat/completions")
+    return httpx.HTTPStatusError(f"HTTP {status}", request=request, response=httpx.Response(status, request=request))
+
+
+def _raising(exc):
+    class Failing(_Primary):
+        async def complete(self, prompt):
+            raise exc
+
+    return Failing()
+
+
+@pytest.mark.parametrize("status", [500, 502, 503, 429, 401, 403, 404])
+async def test_unavailable_primary_falls_back_without_flagging_down(monkeypatch, status):
     import providers
 
-    class Boom(_Primary):
-        async def complete(self, prompt):
-            raise ValueError("bad reply")
-
-    fb = _fallback(monkeypatch, Boom())
+    fb = _fallback(monkeypatch, _raising(_http_error(status)))
     assert await fb.complete("hi") == "from backup"
+    assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
+
+
+@pytest.mark.parametrize("exc", [_http_error(400), _http_error(413), _http_error(422), ValueError("bad reply")])
+async def test_request_rejected_by_primary_does_not_fall_back(monkeypatch, exc):
+    """A prompt too long for the primary's context (400) fails the same way every time: no backup, no down flag."""
+    import providers
+
+    fb = _fallback(monkeypatch, _raising(exc))
+    with pytest.raises(type(exc)):
+        await fb.complete("hi")
     assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
 
 

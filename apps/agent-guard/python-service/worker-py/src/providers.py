@@ -1127,6 +1127,19 @@ def _health_url_of(primary: LLMProvider) -> str:
     return base_url.removesuffix("/v1") + path
 
 
+# Statuses where the primary can't serve any request (misconfigured key/model, or rate limited), so the backup
+# is worth its cost. Other 4xx (400, 413, 422 — e.g. a prompt longer than the model's context) are about this
+# request: the primary rejects it every time, and falling back only bills the backup for it.
+_PRIMARY_UNAVAILABLE_STATUSES = frozenset({401, 403, 404, 429})
+
+
+def _primary_unavailable(exc: Exception) -> bool:
+    if isinstance(exc, httpx.HTTPStatusError):
+        status = exc.response.status_code
+        return status >= 500 or status in _PRIMARY_UNAVAILABLE_STATUSES
+    return isinstance(exc, (httpx.TransportError, TimeoutError))  # unreachable, dropped connection, hung
+
+
 class FallbackProvider(LLMProvider):
     def __init__(
         self,
@@ -1151,6 +1164,8 @@ class FallbackProvider(LLMProvider):
         try:
             return await asyncio.wait_for(self.primary.complete(prompt), self.primary_timeout_s)
         except Exception as exc:
+            if not _primary_unavailable(exc):
+                raise
             if self.health_url and isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout, TimeoutError)):
                 _set_availability(self.health_url, False)  # refused/unreachable/hung: skip until the next probe
             return await self._complete_on_backup(prompt, repr(exc), exc)

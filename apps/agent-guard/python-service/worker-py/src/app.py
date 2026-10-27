@@ -161,7 +161,8 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
     """Single-provider prompt-in/text-out passthrough for the gateway's PII/custom-guardrail
     block+redact decisions — bypasses ModelMapScanner's cascade entirely, one provider call.
     Primary = the FINAL_ARBITER entry of the model config (DEFAULT_MODEL_CONFIG_JSON, else the built-in default).
-    Backup = its FINAL_ARBITER_BACKUP entry, tried when the primary fails; no such entry = no backup.
+    Backup = its FINAL_ARBITER_BACKUP entry, tried when the primary is unavailable (unreachable, hung, 5xx, 429,
+    401/403/404) but not when it rejects this request (400/413/422); no such entry = no backup.
     """
     return await _run_guardrails_llm(body, relaxed=False)
 
