@@ -366,12 +366,13 @@ function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
                     <HorizontalStack gap="2" blockAlign="center">
                         <Text variant="headingMd" fontWeight="semibold">{row.violation}</Text>
                         <SeverityBadge severity={row.severity} />
-                        {row.action && (
+                        {isBackfillRefId(row.refId) ? (
+                            <Badge size="small" status="info">Backfill</Badge>
+                        ) : row.action && (
                             <Badge size="small" status={row.action === "Blocked" ? "critical" : "warning"}>
                                 {row.action}
                             </Badge>
                         )}
-                        {isBackfillRefId(row.refId) && <Badge size="small" status="info">Backfill</Badge>}
                     </HorizontalStack>
                     <HorizontalStack gap="2" blockAlign="center" wrap={false}>
                         {!isHumanApprovalEvent && (

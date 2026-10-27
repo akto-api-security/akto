@@ -174,10 +174,10 @@ function ActionCellRenderer({ value, data }) {
     if (!value && !isBackfill) return null;
     const status = value === "Blocked" ? "critical" : "warning";
     return (
-        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-            {value && <Badge size="small" status={status}>{value}</Badge>}
-            {isBackfill && <Badge size="small" status="info">Backfill</Badge>}
-        </HorizontalStack>
+        // One tag only: Backfill replaces the action badge.
+        isBackfill
+            ? <Badge size="small" status="info">Backfill</Badge>
+            : <Badge size="small" status={status}>{value}</Badge>
     );
 }
 

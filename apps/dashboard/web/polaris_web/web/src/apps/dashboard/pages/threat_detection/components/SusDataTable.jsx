@@ -10,7 +10,7 @@ import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalSta
 import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents, showsActivityGrouping } from "../utils/activityGroups";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
-import { formatActorId, extractRuleViolated, extractBehaviour, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
+import { formatActorId, extractRuleViolated, extractBehaviour, isBackfillRefId, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
@@ -1178,6 +1178,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           // "Approve server" action for "approval" behaviour policies.
           behaviourRaw: extractBehaviour(x?.metadata),
           behaviour: (() => {
+            // Backfill-replayed events show a single "Backfill" tag instead of the behaviour tag.
+            if (isBackfillRefId(x?.refId)) return <Badge tone="info">Backfill</Badge>;
             const b = extractBehaviour(x?.metadata);
             if (!b) return '-';
             // Display "Human Approval" for the "approval" behaviour (value stays "approval").
