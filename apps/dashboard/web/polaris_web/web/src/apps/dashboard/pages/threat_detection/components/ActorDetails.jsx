@@ -7,10 +7,11 @@ import api from "../api";
 import { getDashboardCategory, mapLabel, isEndpointSecurityCategory } from "../../../../main/labelHelper";
 import { usePermissions } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
-export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
+export const ActorDetails = ({ actorDetails, setShowActorDetails, onStatusChange }) => {
     const { canCall } = usePermissions();
-    const [ipStatus, setIpStatus] = useState(actorDetails.status || "active")
+    const [ipStatus, setIpStatus] = useState(actorDetails.status || "ACTIVE")
     const [showModal, setShowModal] = useState(false)
+    const isBlocked = ipStatus === "BLOCKED"
     const [activityLog, setActivityLog] = useState([])
     const [loadingActivity, setLoadingActivity] = useState(true)
 
@@ -44,6 +45,7 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
         try {
             const res = await api.modifyThreatActorStatus(actorDetails.latestApiIp, status)
             setIpStatus(status)
+            onStatusChange()
             setToast(true, false, "Successfully updated IP status")
             setShowModal(false)
         } catch (error) {
@@ -59,30 +61,30 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
                 <VerticalStack gap={"2"}>
                         <Text variant="bodyMd" fontWeight="medium">{actorDetails.id}</Text>
                         <HorizontalStack gap={"2"}>
-                            <Text variant="bodySm" color="subdued">Status: {ipStatus.charAt(0).toUpperCase() + ipStatus.slice(1)}</Text>
+                            <Text variant="bodySm" color="subdued">Status: {isBlocked ? "Blocked" : "Active"}</Text>
                             <Text variant="bodySm" color="subdued">|</Text>
                             <Text variant="bodySm" color="subdued">Discovered: {actorDetails.discoveredAt}</Text>
                         </HorizontalStack>
                 </VerticalStack>
                 {!isEndpointSecurityCategory() && (
                     <Modal
-                        activator={<AllowedAction allowed={canCall('api/modifyThreatActorStatus')}><Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button></AllowedAction>}
+                        activator={<AllowedAction allowed={canCall('api/modifyThreatActorStatus')}><Button destructive={!isBlocked} size="slim" onClick={() => setShowModal(!showModal)}>{isBlocked ? "Unblock IP" : "Block IP"}</Button></AllowedAction>}
                         open={showModal}
                         onClose={() => setShowModal(false)}
                         primaryAction={
                             {
-                                content: ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP",
-                                onAction: () => handleBlockUnblockIp(ipStatus.toLowerCase() === "active" ? "blocked" : "active"),
+                                content: isBlocked ? "Unblock IP" : "Block IP",
+                                onAction: () => handleBlockUnblockIp(isBlocked ? "ACTIVE" : "BLOCKED"),
                                 disabled: window.IS_AWS_WAF_INTEGRATED === 'false' && window.IS_CLOUDFLARE_WAF_INTEGRATED === 'false',
                             }
                         }
-                        title={ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}
+                        title={isBlocked ? "Unblock IP" : "Block IP"}
                     >
                         <Modal.Section>
                             <Text variant="bodyMd" color="subdued">
-                                {ipStatus.toLowerCase() === "active" ?
-                                `Are you sure you want to block this IP - ${actorDetails.latestApiIp}?` :
-                                `Are you sure you want to unblock this IP - ${actorDetails.latestApiIp}?`}
+                                {isBlocked ?
+                                `Are you sure you want to unblock this IP - ${actorDetails.latestApiIp}?` :
+                                `Are you sure you want to block this IP - ${actorDetails.latestApiIp}?`}
                             </Text>
                         </Modal.Section>
                     </Modal>

@@ -10,6 +10,7 @@ import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookType;
 import com.akto.dto.notifications.CustomWebhookResult;
+import com.akto.dto.notifications.SensitiveDataAlertRule;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
@@ -25,7 +26,9 @@ import org.bson.conversions.Bson;
 
 import static com.akto.utils.Utils.createDashboardUrlFromRequest;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -54,6 +57,7 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
     private boolean webhookPresent;
     private String webhookOption;
     private String dashboardUrl;
+    private List<SensitiveDataAlertRule> sensitiveDataAlertRules;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -103,6 +107,8 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
         } else if (frequencyInSeconds<=0){
             addActionError("Please enter a valid frequency");
             return ERROR.toUpperCase();
+        } else if (!validateSensitiveDataAlertRules()) {
+            return ERROR.toUpperCase();
         } else {
             int now = Context.now();
             String userEmail = getSUser().getLogin();
@@ -115,6 +121,7 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             customWebhook.setWebhookType(type);
             customWebhook.setDashboardUrl(this.dashboardUrl);
             customWebhook.setUrl(this.url);
+            customWebhook.setSensitiveDataAlertRules(rulesToStore());
             CustomWebhooksDao.instance.insertOne(customWebhook);
 
             if(customWebhook.getSelectedWebhookOptions().get(0).equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
@@ -190,6 +197,8 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
         } else if (selectedWebhookOptions == null && body == null) {
             addActionError("Please select at least one option");
             return ERROR.toUpperCase();
+        } else if (!validateSensitiveDataAlertRules()) {
+            return ERROR.toUpperCase();
         } else {
             int now = Context.now();
 
@@ -207,7 +216,8 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
                 Updates.set(CustomWebhook.NEW_ENDPOINT_COLLECTIONS, newEndpointCollections),
                 Updates.set(CustomWebhook.NEW_SENSITIVE_ENDPOINT_COLLECTIONS, newSensitiveEndpointCollections),
                 Updates.set(CustomWebhook.SEND_INSTANTLY, sendInstantly),
-                Updates.set(CustomWebhook.DASHBOARD_URL, this.dashboardUrl)
+                Updates.set(CustomWebhook.DASHBOARD_URL, this.dashboardUrl),
+                Updates.set(CustomWebhook.SENSITIVE_DATA_ALERT_RULES, rulesToStore())
             );
 
             if (batchSize > 0) {
@@ -219,6 +229,43 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private boolean sensitiveDataAlertsSelected() {
+        return selectedWebhookOptions != null
+                && selectedWebhookOptions.contains(CustomWebhook.WebhookOptions.SENSITIVE_DATA_THRESHOLD_ALERTS);
+    }
+
+    /** Rules are kept only while the option is selected. */
+    private List<SensitiveDataAlertRule> rulesToStore() {
+        return sensitiveDataAlertsSelected() ? sensitiveDataAlertRules : null;
+    }
+
+    private boolean validateSensitiveDataAlertRules() {
+        if (!sensitiveDataAlertsSelected()) return true;
+        if (selectedWebhookOptions.size() > 1) {
+            // The periodic sender skips webhooks with this option, so any other option on the same
+            // webhook would silently never send.
+            addActionError("Sensitive data threshold alerts can't be combined with other options in one webhook");
+            return false;
+        }
+        if (sensitiveDataAlertRules == null || sensitiveDataAlertRules.isEmpty()) {
+            addActionError("Add at least one data type for sensitive data threshold alerts");
+            return false;
+        }
+        Set<String> seen = new HashSet<>();
+        for (SensitiveDataAlertRule rule : sensitiveDataAlertRules) {
+            if (rule == null || !rule.isValid()) {
+                addActionError("Each sensitive data alert needs a data type, a threshold above 0 and a window of 1 to "
+                        + SensitiveDataAlertRule.MAX_WINDOW_DAYS + " days");
+                return false;
+            }
+            if (!seen.add(rule.getSubType())) {
+                addActionError("Data type " + rule.getSubType() + " is added more than once");
+                return false;
+            }
+        }
+        return true;
     }
 
     public String changeStatus(){
@@ -512,5 +559,13 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
 
     public boolean getWebhookPresent() {
         return webhookPresent;
+    }
+
+    public List<SensitiveDataAlertRule> getSensitiveDataAlertRules() {
+        return sensitiveDataAlertRules;
+    }
+
+    public void setSensitiveDataAlertRules(List<SensitiveDataAlertRule> sensitiveDataAlertRules) {
+        this.sensitiveDataAlertRules = sensitiveDataAlertRules;
     }
 }

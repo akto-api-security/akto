@@ -167,7 +167,7 @@ export const resolveComplianceClauseMap = (event, isGuardrail, threatFiltersMap 
     const ruleViolated = extractRuleViolated(event?.metadata);
     const dbCapability = getDbComplianceCapability(ruleViolated);
     if (dbCapability) {
-      base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || {};
+      base = guardrailComplianceMap[dbComplianceKey(event?.filterId, dbCapability)] || {}; // user-defined: only the policy's own tags
     } else {
       const capability = getGuardrailCapabilityForRule(ruleViolated);
       base = guardrailComplianceMap[capability] || guardrailComplianceMap[event?.filterId] || {};

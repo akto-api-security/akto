@@ -5,7 +5,6 @@ import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
 import { usePermissions, whenAllowed } from '@/util/permissions'
-import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 import ThreatPoliciesDropdown from '../../../components/shared/ThreatPoliciesDropdown';
 
 function AWSWaf() {
@@ -16,11 +15,12 @@ function AWSWaf() {
     const [ruleSetId, setRuleSetId] = useState('');
     const [ruleSetName, setRuleSetName] = useState('');
     const [isPresent, setIsPresent] = useState(false);
-    const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
+    const [severityLevels, setSeverityLevels] = useState([]);
     const [threatPolicies, setThreatPolicies] = useState([]);
     const wafCard = (
         <LegacyCard
             primaryFooterAction={{content: 'Save', onAction: () => addAwsWafIntegration(), ...whenAllowed(canCall('api/addAwsWafIntegration'))}}
+            secondaryFooterActions={[{content: 'Delete', onAction: () => deleteAwsWafIntegration(), ...whenAllowed(canCall('api/deleteCloudflareWafIntegration'))}]}
         >
           <LegacyCard.Section>
             <Text variant="headingMd">Integrate AWS-WAF</Text>
@@ -28,18 +28,18 @@ function AWSWaf() {
 
           <LegacyCard.Section>
             <VerticalStack gap={"2"}>
-                <TextField value={accessKey} onChange={setAccessKey} label="AWS Access Key Id" placeholder="AWS-Key"/>
+                <TextField value={accessKey} onChange={setAccessKey} label="AWS access key ID" placeholder="Access key ID"/>
                 <PasswordTextField text={secretKey}
-                                    setField={setSecretKey} onFunc={true} field={secretKey} 
-                                    label="AWS secret Access Key"
+                                    setField={setSecretKey} onFunc={true} field={secretKey}
+                                    label="AWS secret access key"
                 />
-                <TextField value={region} onChange={setRegion} label="Region" placeholder="Region"/>
-                <TextField value={ruleSetId} onChange={setRuleSetId} label="Waf Rule Set Id" placeholder="Rule-Set=Id"/>
-                <TextField value={ruleSetName} onChange={setRuleSetName} label="Waf Rule Set Name" placeholder="Waf-Rule-Set-Name"/>
-                <SeverityLevelDropdown
-                  severityLevels={severityLevels}
-                  setSeverityLevels={setSeverityLevels}
-                />
+                <TextField value={region} onChange={setRegion} label="AWS region" placeholder="us-east-1" helpText="Region of your Web ACL."/>
+                {ruleSetId ?
+                  <Text variant="bodyMd" color="subdued">{`Blocked IPs go to IP set ${ruleSetName}. Add it as a Block rule in your Web ACL.`}</Text> :
+                  <Text variant="bodyMd" color="subdued">
+                    On save, Akto uses the IP set akto-blocked-ips in this region and creates it if it doesn't exist.
+                  </Text>
+                }
                 <ThreatPoliciesDropdown
                   threatPolicies={threatPolicies}
                   setThreatPolicies={setThreatPolicies}
@@ -50,8 +50,17 @@ function AWSWaf() {
     )
 
     async function addAwsWafIntegration(){
-      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, ruleSetId, ruleSetName, severityLevels, threatPolicies)
+      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, severityLevels, threatPolicies)
+      window.IS_AWS_WAF_INTEGRATED = 'true'
       func.setToast(true, false, "Successfully added Aws Waf Integration")
+      fetchIntegration()
+    }
+
+    async function deleteAwsWafIntegration() {
+      await settingRequests.deleteCloudflareWafIntegration('AWS_WAF')
+      window.IS_AWS_WAF_INTEGRATED = 'false'
+      func.setToast(true, false, "Successfully deleted Aws Waf Integration")
+      fetchIntegration()
     }
 
     async function fetchIntegration() {
@@ -62,7 +71,7 @@ function AWSWaf() {
       setRegion(resp?.wafConfig?.region)
       setRuleSetId(resp?.wafConfig?.ruleSetId)
       setRuleSetName(resp?.wafConfig?.ruleSetName)
-      setSeverityLevels(resp?.wafConfig?.severityLevels || ['CRITICAL'])
+      setSeverityLevels(resp?.wafConfig?.severityLevels || [])
       setThreatPolicies(resp?.wafConfig?.threatPolicies || [])
     }
 

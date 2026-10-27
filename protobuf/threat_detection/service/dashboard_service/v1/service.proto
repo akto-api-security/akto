@@ -183,6 +183,7 @@ message ListThreatActorResponse {
     string latest_api_host = 9;
     string latest_metadata = 10;
     optional string object_id = 11;  // MongoDB ObjectId hex string for cursor-based pagination
+    string status = 12;
   }
   repeated ThreatActor actors = 1;
   uint64 total = 2;

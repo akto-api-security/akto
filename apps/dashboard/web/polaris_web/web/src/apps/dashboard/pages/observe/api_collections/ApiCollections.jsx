@@ -1,10 +1,9 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, Modal, VerticalStack, Tooltip, Filters, ChoiceList} from "@shopify/polaris"
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, HorizontalStack, Icon, Modal, VerticalStack, Tooltip, Filters, ChoiceList} from "@shopify/polaris"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import RunTest from "./RunTest";
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
-import settingRequests from "../../settings/api"
 import React, { useEffect, useState, useRef, useMemo } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
@@ -22,8 +21,6 @@ import CollectionsPageBanner from "./component/CollectionsPageBanner"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
-import SearchableResourceList from "../../../components/shared/SearchableResourceList"
-import ResourceListModal from "../../../components/shared/ResourceListModal"
 import { saveAs } from 'file-saver'
 import TreeViewTable from "../../../components/shared/treeView/TreeViewTable"
 import TableStore from "../../../components/tables/TableStore";
@@ -33,7 +30,7 @@ import ReactFlow, {
     useEdgesState,
 
   } from 'react-flow-renderer';
-import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
+import useCollectionBulkActions from "./useCollectionBulkActions";
 import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../../main/labelHelper";
 import useAgenticFilter, { FILTER_TYPES, parseFilterFromUrl } from "./useAgenticFilter";
 import { AGENTIC_OBSERVE_BACK_PATHS, INVENTORY_FILTER_KEY, fetchAndCacheSkillApiData, fetchAndCacheAgenticTrafficRiskBundle, fetchAndCacheAgenticSensitiveInfo } from "../agentic/constants";
@@ -485,7 +482,6 @@ const categorizeCollections = (prettifyArray) => {
 function ApiCollections(props) {
     const {customCollectionDataFilter, onlyShowCollectionsTable, sendData} = props;
 
-    const userRole = window.USER_ROLE
     const { canCall } = usePermissions()
 
     const navigate = useNavigate();
@@ -552,9 +548,6 @@ function ApiCollections(props) {
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [usernameMap, setUsernameMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
-    const [popover,setPopover] = useState(false)
-    const [teamData, setTeamData] = useState([])
-    const [usersCollection, setUsersCollection] = useState([])
 
     // Get filtersMap from PersistStore first (needed for tag filter initialization)
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -564,7 +557,6 @@ function ApiCollections(props) {
     // Tag filter state - initialize from persisted state
     const pageFiltersMap = filtersMap[pageKey];
     const [tagFiltersApplied, setTagFiltersApplied] = useState(pageFiltersMap?.tagFilters || {})
-    const [selectedItems, setSelectedItems] = useState([])
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
     const [moreActions, setMoreActions] = useState(false);
@@ -932,16 +924,6 @@ function ApiCollections(props) {
         setTimeout(() => fetchPageMeta(), 1500)
     }
 
-    // Admin only: the member list and which collections each can see, for the Share action.
-    async function fetchShareData() {
-        if (!(userRole === 'ADMIN' && func.checkForRbacFeature())) return
-        const [usersCollectionResp, teamResp] = await Promise.allSettled([api.getAllUsersCollections(), settingRequests.getTeamData()])
-        if (usersCollectionResp.status === 'fulfilled') setUsersCollection(usersCollectionResp.value)
-        if (teamResp.status === 'fulfilled' && teamResp.value) {
-            setTeamData(teamResp.value.filter(x => x?.role !== "ADMIN"))
-        }
-    }
-
     function disambiguateLabel(key, value) {
         return func.convertToDisambiguateLabelObj(value, null, 2)
     }
@@ -1006,7 +988,6 @@ function ApiCollections(props) {
             func.refreshCollectionMapsAsync();
         }
         fetchTotalApis(isMountedRef);
-        fetchShareData();
         resetFunc();
 
         // Cleanup function to prevent state updates after unmount
@@ -1025,19 +1006,6 @@ function ApiCollections(props) {
         TableStore.getState().setSelectedItems([])
         selectItems([])
     }
-    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent, currentIsOutOfTestingScopeVal=null){
-        const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        await (currentIsOutOfTestingScopeVal !== null
-                ? apiFunction(collectionIdList, currentIsOutOfTestingScopeVal)
-                : apiFunction(collectionIdListObj)).then(() => {
-            func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
-        }).catch((error) => {
-            func.setToast(true, true, error.message || 'Something went wrong!')
-        })
-        resetResourcesSelected();
-        refreshAll() // reload after mutations
-    }
-
     const getActiveSkillName = () => {
         const filterValue = filtersMap[INVENTORY_FILTER_KEY]?.filters?.find(f => f.key === 'envType')?.value?.values?.[0] || '';
         const eq = filterValue.indexOf('=');
@@ -1071,19 +1039,6 @@ function ApiCollections(props) {
         resetResourcesSelected();
         refreshAll()
     }
-    async function handleShareCollectionsAction(collectionIdList, userIdList, apiFunction){
-        const userCollectionMap = {};
-
-        for(const userId of userIdList) {
-            const intUserId = parseInt(userId, 10);
-            const userCollections = usersCollection[intUserId] || [];
-            userCollectionMap[intUserId] = [...new Set([...userCollections, ...collectionIdList])];
-        }
-
-        await apiFunction(userCollectionMap);
-        func.setToast(true, false, `${userIdList.length} Member${func.addPlurality(userIdList.length)}'s collections have been updated successfully`);
-    }
-
     const exportCsv = async (selectedResources = []) =>{
         const csvFileName = definedTableTabs[selected] + " Collections.csv"
         if (loading) return
@@ -1193,178 +1148,7 @@ function ApiCollections(props) {
             return actions;
         }
 
-        const isDefaultApiGroup = (id) => rowOf(id)?.type === "API_GROUP" && rowOf(id)?.automated;
-        const isActivated = (id) => rowOf(id) && !rowOf(id).deactivated;
-        const isDeactivated = (id) => rowOf(id)?.deactivated;
-        if (selectedResources.every(isActivated)) {
-            actions.push(
-                {
-                    content: `Deactivate collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () => {
-                        const message = "Deactivating a collection will stop traffic ingestion and testing for this collection. Please sync the usage data via Settings > billing after deactivating a collection to reflect your updated usage. Are you sure, you want to deactivate this collection ?"
-                        func.showConfirmationModal(message, "Deactivate collection", () => handleCollectionsAction(selectedResources, collectionApi.deactivateCollections, "deactivated") )
-                    },
-                    requires: 'api/deactivateCollections'
-                }
-            )
-        } else if (selectedResources.every(isDeactivated)) {
-            actions.push(
-                {
-                    content: `Reactivate collection${func.addPlurality(selectedResources.length)}`,
-                    onAction: () =>  {
-                        const message = "Please sync the usage data via Settings > billing after reactivating a collection to resume data ingestion and testing."
-                        func.showConfirmationModal(message, "Activate collection", () => handleCollectionsAction(selectedResources, collectionApi.activateCollections, "activated"))
-                    },
-                    requires: 'api/activateCollections'
-                }
-            )
-        }
-        actions.push(
-            {
-                content: `Delete collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => {
-                    const deleteConfirmationMessage = `Are you sure, you want to delete collection${func.addPlurality(selectedResources.length)}?`
-                    func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleCollectionsAction(selectedResources.filter(v => !isDefaultApiGroup(v)), api.deleteMultipleCollections, "deleted"))
-                },
-                requires: 'api/deleteMultipleCollections'
-            }
-        )
-
-        const apiCollectionShareRenderItem = (item) => {
-            const { id, name, login, role } = item;
-            const initials = func.initials(login)
-            const media = <Avatar user size="medium" name={login} initials={initials} />
-            const shortcutActions = [
-                {
-                    content: <Text color="subdued">{role}</Text>,
-                    url: '#',
-                    onAction: ((event) => event.preventDefault())
-                }
-            ]
-
-            return (
-                <ResourceItem
-                    id={id}
-                    key={id}
-                    media={media}
-                    shortcutActions={shortcutActions}
-                    persistActions
-                >
-                    <Text variant="bodyMd" fontWeight="bold" as="h3">
-                        {name}
-                    </Text>
-                    <Text variant="bodyMd">
-                        {login}
-                    </Text>
-                </ResourceItem>
-            );
-        }
-
-        const shareCollectionHandler = () => {
-            if (selectedItems.length > 0) {
-                handleShareCollectionsAction(selectedResources, selectedItems, api.updateUserCollections);
-                return true
-            } else {
-                func.setToast(true, true, "No member is selected!");
-                return false
-            }
-        };
-
-        const handleSelectedItemsChange = (items) => {
-            setSelectedItems(items);
-        };
-
-        const shareComponentChildrens = (
-            <Box>
-                <Box padding={5} background="bg-subdued-hover">
-                    <Text fontWeight="medium">{`${selectedResources.length} collection${func.addPlurality(selectedResources.length)} selected`}</Text>
-                </Box>
-                    <SearchableResourceList
-                        resourceName={'user'}
-                        items={teamData}
-                        renderItem={apiCollectionShareRenderItem}
-                        isFilterControlEnabale={true}
-                        selectable={true}
-                        onSelectedItemsChange={handleSelectedItemsChange}
-                    />
-            </Box>
-        )
-
-        const shareContent = (
-            <ResourceListModal
-                isLarge={true}
-                activatorPlaceaholder={"Share"}
-                title={"Share collections"}
-                primaryAction={shareCollectionHandler}
-                component={shareComponentChildrens}
-            />
-        )
-
-    let rbacAccess = func.checkForRbacFeature();
-    if(userRole === 'ADMIN' && rbacAccess) {
-        actions.push(
-            {
-                content: shareContent,
-                requires: 'api/updateUserCollections'
-            }
-        )
-    }
-
-        const toggleTypeContent = (
-            <Popover
-                activator={<div onClick={() => setPopover(!popover)}>Set tags</div>}
-                onClose={() => {
-                    setPopover(false)
-                }}
-                active={popover}
-                autofocusTarget="first-node"
-            >
-                <Popover.Pane>
-                    <SetUserEnvPopupComponent
-                        popover={popover}
-                        setPopover={setPopover}
-                        tags={scopedMode ? envTypeMap : tagsOfKnownRows()}
-                        updateTags={updateTags}
-                        apiCollectionIds={selectedResources}
-                    />
-                </Popover.Pane>
-            </Popover>
-        )
-
-        const toggleEnvType = {
-            content: toggleTypeContent,
-            requires: 'api/updateEnvType'
-        }
-
-        const allOutOfTestScopeFalse = selectedResources.every(id => {
-            const collection = normalDataById.get(id);
-            return collection && !collection.isOutOfTestingScope;
-        })
-
-        const allOutOfTestScopeTrue = selectedResources.every(id => {
-            const collection = normalDataById.get(id);
-            return collection && collection.isOutOfTestingScope;
-        })
-
-        let content = "";
-        let toastContent = "";
-        if(allOutOfTestScopeFalse){
-            content = `Mark collection${func.addPlurality(selectedResources.length)} as out of testing scope`
-            toastContent = "marked out of testing scope"
-        }else if(allOutOfTestScopeTrue){
-            content = `Mark collection${func.addPlurality(selectedResources.length)} as in testing scope`
-            toastContent = "marked in testing scope"
-        }
-
-        if(content.length > 0 && toastContent.length > 0){
-            actions.push(
-                {
-                    content: content,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, toastContent, allOutOfTestScopeTrue),
-                    requires: 'api/toggleCollectionsOutOfTestScope'
-                }
-            )
-        }
+        actions.push(...collectionActions(selectedResources))
 
         // Add Run Test button for multi-collection testing (hidden for Atlas / Endpoint Security)
         if (selectedResources.length > 1 && !isEndpointSecurityCategory()) {
@@ -1378,9 +1162,8 @@ function ApiCollections(props) {
             })
         }
 
-        const bulkActionsOptions = [...actions];
-        bulkActionsOptions.push(toggleEnvType)
-        return bulkActionsOptions
+        actions.push(setTagsAction(selectedResources))
+        return actions
     }
     const updateData = (dataMap) => {
         let copyObj = data;
@@ -1395,8 +1178,9 @@ function ApiCollections(props) {
         setRefreshData(!refreshData)
     }
 
-    const updateTags = async (apiCollectionIds, tagObj) => {
-        let copyObj = await JSON.parse(JSON.stringify(envTypeMap))
+    // After the tags API call: the scoped view patches its rows in place, the paginated view reloads
+    const applyUpdatedTags = (apiCollectionIds, tagObj) => {
+        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
         apiCollectionIds.forEach(id => {
             if(!copyObj[id]) {
                 copyObj[id] = []
@@ -1436,19 +1220,21 @@ function ApiCollections(props) {
         })
 
 
-        await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then(() => {
-            func.setToast(true, false, "Tags updated successfully")
-            if (scopedMode) {
-                setEnvTypeMap(copyObj)
-                updateData(copyObj)
-            } else {
-                refreshAll()
-            }
-        })
-
+        if (scopedMode) {
+            setEnvTypeMap(copyObj)
+            updateData(copyObj)
+        } else {
+            refreshAll()
+        }
         resetResourcesSelected();
-        setPopover(false)
     }
+
+    const { collectionActions, setTagsAction } = useCollectionBulkActions({
+        rowOf,
+        getTags: () => scopedMode ? envTypeMap : tagsOfKnownRows(),
+        onDone: () => { resetResourcesSelected(); refreshAll() },
+        onTagsUpdated: applyUpdatedTags,
+    })
 
     const modalComponent = <CreateNewCollectionModal
         key="modal"

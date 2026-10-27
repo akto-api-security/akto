@@ -645,6 +645,13 @@ export default {
             data: {testingRunResultSummaryHexId}
         })
     },
+    verifyTestRunWithAi(testingRunResultSummaryHexId, testingRunResultHexIds = []) {
+        return request({
+            url: '/api/verifyTestRunWithAi',
+            method: 'post',
+            data: {testingRunResultSummaryHexId, testingRunResultHexIds}
+        })
+    },
     createNewTestSuite(testSuiteName,subCategoryList) {
         return request({
             url: '/api/createTestSuite',
