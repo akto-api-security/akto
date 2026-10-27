@@ -1503,6 +1503,19 @@ const claudeInferenceHookObj = {
     />
 }
 
+const grokBotInferenceHookObj = {
+    icon: '/public/grok.svg',
+    label: "Grok Bot Inference Hooks",
+    text: "Route every governed Grok Bot prompt through Akto for an allow/deny verdict before inference runs.",
+    docsUrl: 'https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/grok-bot-inference-hooks',
+    key: "GROK_BOT_INFERENCE_HOOK",
+    badge: "Beta",
+    component: <BannerComponent
+        content="Route every governed Grok Bot prompt through Akto for an allow/deny verdict before inference runs."
+        docsUrl='https://ai-security-docs.akto.io/akto-atlas-agentic-ai-security-for-employee-endpoints/endpoints-discovery-agents/grok-bot-inference-hooks'
+    />
+}
+
 const claudeCoworkObj = {
     icon: '/public/claude.svg',
     label: "Claude Cowork",
@@ -2441,7 +2454,7 @@ const quickStartFunc = {
         // CLI-only agents. IDE/editor integrations live in agenticIdes below.
         const agenticClis = [
             claudeCodeCliHookObj, geminiCliHookObj, githubCopilotHookObj, codexHookObj, hermesHookObj,
-            kiroCliObj, claudeInferenceHookObj, ampHookObj, antigravityCliObj,
+            kiroCliObj, claudeInferenceHookObj, grokBotInferenceHookObj, ampHookObj, antigravityCliObj,
         ]
 
         const agenticIdes = [
