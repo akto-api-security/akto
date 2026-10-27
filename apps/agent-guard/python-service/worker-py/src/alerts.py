@@ -121,3 +121,76 @@ async def store_results(completed: list[dict[str, Any]], scanner_name: str) -> N
     except Exception as exc:
         metrics_push.COUNTS["alert_errors"].increment(f"store_results:{type(exc).__name__}")
         logger.warning(f"[Store] failed for scanner={scanner_name}: {exc}")
+
+
+# ── Model-fallback alerts (FALLBACK_SLACK_WEBHOOK_URL) ────────────────────────
+# Providers only *record* a fallback (synchronous, no I/O on the scan path);
+# scan_handler flushes the records through the runtime's fire-and-forget hook.
+# The first fallback of a (primary, backup) pair posts at once, then at most one
+# summary per window, so a dead or slow primary can't flood the channel.
+# Health-check flips (primary DOWN / AVAILABLE again) post at once. State is
+# per process (per isolate on Cloudflare).
+_FALLBACK_WINDOW_S = 600.0
+_fallbacks: dict[tuple[str, str], dict[str, Any]] = {}
+_transitions: list[str] = []
+
+
+def _fallback_webhook() -> str:
+    return (settings.FALLBACK_SLACK_WEBHOOK_URL or "").strip()
+
+
+def fallback_reason(exc: BaseException) -> str:
+    """Short, groupable cause of a fallback: 'timeout' or the exception type."""
+    if isinstance(exc, (TimeoutError, httpx.TimeoutException)):
+        return "timeout"
+    return type(exc).__name__
+
+
+def note_fallback(primary: str, backup: str, reason: str) -> None:
+    """A request meant for `primary` was answered by `backup`. Never raises."""
+    if not _fallback_webhook():
+        return
+    new = {"count": 0, "reasons": {}, "since": time.time(), "last_sent": 0.0}
+    entry = _fallbacks.setdefault((primary, backup), new)
+    entry["count"] += 1
+    entry["reasons"][reason] = entry["reasons"].get(reason, 0) + 1
+
+
+def note_availability(target: str, available: bool) -> None:
+    """The health check changed a primary's state (called only on a change)."""
+    if _fallback_webhook():
+        _transitions.append(
+            f"✅ primary `{target}` is AVAILABLE again"
+            if available
+            else f"🔴 primary `{target}` is DOWN, requests go to its backup"
+        )
+
+
+def has_pending_fallback_alerts() -> bool:
+    now = time.time()
+    return bool(_transitions) or any(
+        e["count"] and now - e["last_sent"] >= _FALLBACK_WINDOW_S for e in _fallbacks.values()
+    )
+
+
+async def flush_fallback_alerts() -> None:
+    """Post what is due. State is taken and reset before the first await: concurrent flushes can't double-post."""
+    now = time.time()
+    lines, _transitions[:] = list(_transitions), []
+    for (primary, backup), e in _fallbacks.items():
+        if e["count"] and now - e["last_sent"] >= _FALLBACK_WINDOW_S:
+            reasons = ", ".join(f"{r} x{n}" for r, n in sorted(e["reasons"].items(), key=lambda kv: -kv[1]))
+            minutes = max(1, round((now - e["since"]) / 60))
+            lines.append(f"⚠️ `{primary}` fell back to `{backup}` {e['count']}x in the last {minutes} min ({reasons})")
+            e.update(count=0, reasons={}, since=now, last_sent=now)
+    webhook = _fallback_webhook()
+    if not webhook or not lines:
+        return
+    try:
+        payload = {"text": "*agent-guard model fallback*\n" + "\n".join(lines)}
+        async with httpx.AsyncClient(timeout=_SLACK_TIMEOUT_S) as client:
+            resp = await client.post(webhook, headers=_IDENTITY, json=payload)
+        if resp.status_code >= 400:
+            logger.warning(f"[Slack] fallback webhook returned {resp.status_code}")
+    except Exception as exc:
+        logger.warning(f"[Slack] fallback post failed: {exc}")
