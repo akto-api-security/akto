@@ -12,7 +12,13 @@ import time
 from typing import Any
 
 from prompts import build_scan_prompt, resolve_response_format
-from providers import LLMProvider, Qwen3GuardOutput, parse_qwen3guard_result
+from providers import (
+    LLMProvider,
+    Qwen3GuardOutput,
+    fallback_provider_used,
+    parse_qwen3guard_result,
+    reset_fallback_provider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +205,7 @@ class LLMScanner:
             if prompt is None:
                 raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
             logger.debug(f"[LLMScanner] {scanner_name} prompt: {prompt!r}")
+            reset_fallback_provider()
             raw = await self.provider.complete(prompt)
             logger.debug(f"[LLMScanner] {scanner_name} raw response: {raw!r}")
             effective = resolve_response_format(scanner_name, scanner_type, self.response_format)
@@ -206,6 +213,8 @@ class LLMScanner:
 
         elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name
+        if fallback_provider_used():
+            result["details"]["fallback_provider"] = fallback_provider_used()
         result["details"]["scanner_type"] = scanner_type
         result["execution_time_ms"] = round(elapsed_ms, 2)
         logger.info(

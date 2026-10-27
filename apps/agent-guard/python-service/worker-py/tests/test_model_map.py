@@ -383,6 +383,18 @@ async def test_fallback_uses_primary_when_available_or_unknown(monkeypatch):
     assert await fb.complete("hi") == "from primary"
 
 
+async def test_backup_answer_records_fallback_provider(monkeypatch):
+    import providers
+
+    fb = _fallback(monkeypatch, _Primary())
+    providers.reset_fallback_provider()
+    assert await fb.complete("hi") == "from primary"
+    assert providers.fallback_provider_used() == ""
+    providers._PRIMARY_AVAILABLE[fb.health_url] = False
+    assert await fb.complete("hi") == "from backup"
+    assert providers.fallback_provider_used() == "backup"
+
+
 async def test_connect_error_marks_primary_down_and_falls_back(monkeypatch):
     import httpx
 

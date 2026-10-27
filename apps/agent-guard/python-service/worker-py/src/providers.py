@@ -34,6 +34,15 @@ DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 _DEFAULT_MAX_TOKENS = 256
 _ASYNC_MAX_TOKENS = 4096
 _relaxed_limits: ContextVar[bool] = ContextVar("relaxed_limits", default=False)
+_fallback_provider: ContextVar[str] = ContextVar("fallback_provider", default="")
+
+
+def reset_fallback_provider() -> None:
+    _fallback_provider.set("")
+
+
+def fallback_provider_used() -> str:
+    return _fallback_provider.get()
 
 
 @contextmanager
@@ -1167,6 +1176,7 @@ class FallbackProvider(LLMProvider):
             return await self.primary.complete(prompt)  # no usable backup: behave as without one
         logger.warning(f"[FinalArbiter] primary {self.primary.name} failed ({why}), falling back to {backup.name}")
         alerts.note_fallback(self.primary.name, backup.name, alerts.fallback_reason(exc) if exc else "marked down")
+        _fallback_provider.set(backup.name)
         return await backup.complete(prompt)
 
 
