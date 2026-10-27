@@ -2,9 +2,11 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -104,6 +106,11 @@ public class BrowserExtensionConfigCommon {
     public static final String ENFORCE_AT = "enforceAt";
     private String enforceAt;
 
+    // epoch seconds of the last change; drives incremental sync (v3). 0 when the document has none,
+    // so such a config is only delivered by a full sync.
+    public static final String UPDATED_AT = "updatedAt";
+    private long updatedAt;
+
     // getter name is get_id() on purpose: the struts json serializer keys output off the bean
     // property, so this surfaces as `_id` (matching the db) with the same 24-char hex value as the
     // stored ObjectId. json has no native ObjectId, so the hex string is the faithful form.
@@ -156,8 +163,26 @@ public class BrowserExtensionConfigCommon {
         config.blockResponseFrames = asObjectList(doc.get(BLOCK_RESPONSE_FRAMES));
         config.fileUpload = asObjectList(doc.get(FILE_UPLOAD));
         config.enforceAt = asString(doc.get(ENFORCE_AT));
+        Object updatedAt = doc.get(UPDATED_AT);
+        config.updatedAt = updatedAt instanceof Number ? ((Number) updatedAt).longValue() : 0;
 
         return config;
+    }
+
+    /**
+     * The v3 delta read: configs with updatedAt strictly greater than updatedAfter, all in one list
+     * (if every config shares one updatedAt they are all sent). A full sync is paged instead.
+     */
+    public static List<BrowserExtensionConfigCommon> updatedAfter(List<BrowserExtensionConfigCommon> merged, long updatedAfter) {
+        List<BrowserExtensionConfigCommon> result = new ArrayList<>();
+        if (merged != null) {
+            for (BrowserExtensionConfigCommon c : merged) {
+                if (hostKey(c) != null && (updatedAfter <= 0 || c.getUpdatedAt() > updatedAfter)) {
+                    result.add(c);
+                }
+            }
+        }
+        return result;
     }
 
     /**
@@ -195,6 +220,49 @@ public class BrowserExtensionConfigCommon {
             }
         }
         return new ArrayList<>(byHost.values());
+    }
+
+    /**
+     * One page of a full sync: the catalogue page minus the hosts this account opted out of. Account
+     * custom hosts are not added here, see {@link #customHosts}.
+     */
+    public static List<BrowserExtensionConfigCommon> withoutOptOuts(
+            List<BrowserExtensionConfigCommon> commonPage,
+            List<BrowserExtensionConfigCommon> accountConfigs) {
+        List<BrowserExtensionConfigCommon> optOuts = new ArrayList<>();
+        for (BrowserExtensionConfigCommon a : accountConfigs) {
+            if (!a.isActive()) {
+                optOuts.add(a);
+            }
+        }
+        return merge(commonPage, optOuts);
+    }
+
+    /**
+     * The account's own active hosts that the catalogue does not already cover (common wins) and the
+     * account did not opt out of. {@code commonOfAccountHosts} = the active catalogue entries for the
+     * account's hosts, whatever page they sit on. Sent once, with the last page of a full sync.
+     */
+    public static List<BrowserExtensionConfigCommon> customHosts(
+            List<BrowserExtensionConfigCommon> commonOfAccountHosts,
+            List<BrowserExtensionConfigCommon> accountConfigs) {
+        Set<String> taken = new HashSet<>();
+        for (BrowserExtensionConfigCommon c : commonOfAccountHosts) {
+            taken.add(hostKey(c));
+        }
+        for (BrowserExtensionConfigCommon a : accountConfigs) {
+            if (!a.isActive()) {
+                taken.add(hostKey(a));
+            }
+        }
+        Map<String, BrowserExtensionConfigCommon> custom = new LinkedHashMap<>();
+        for (BrowserExtensionConfigCommon a : accountConfigs) {
+            String key = hostKey(a);
+            if (a.isActive() && key != null && !taken.contains(key)) {
+                custom.putIfAbsent(key, a);
+            }
+        }
+        return new ArrayList<>(custom.values());
     }
 
     private static String hostKey(BrowserExtensionConfigCommon config) {
