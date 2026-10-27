@@ -5,6 +5,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 import org.bson.Document;
+import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +40,24 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
      */
     public List<BrowserExtensionConfigCommon> findActiveConfigs() {
         return toConfigs(instance.findAll(Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false)));
+    }
+
+    /**
+     * Active configs changed after {@code updatedAfter} (epoch seconds), served by the updatedAt index.
+     * Also returns the active configs for {@code alwaysIncludeHosts} (any age), so the caller's merge
+     * still lets the catalogue entry win over a same-host account row.
+     */
+    public List<BrowserExtensionConfigCommon> findActiveConfigsUpdatedAfter(long updatedAfter, List<String> alwaysIncludeHosts) {
+        Bson changed = Filters.gt(BrowserExtensionConfigCommon.UPDATED_AT, updatedAfter);
+        Bson filter = alwaysIncludeHosts.isEmpty()
+                ? changed
+                : Filters.or(changed, Filters.in(BrowserExtensionConfigCommon.HOST, alwaysIncludeHosts));
+        return toConfigs(instance.findAll(Filters.and(Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false), filter)));
+    }
+
+    public void createIndicesIfAbsent() {
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[]{BrowserExtensionConfigCommon.UPDATED_AT}, true);
     }
 
     private List<BrowserExtensionConfigCommon> toConfigs(List<Document> docs) {

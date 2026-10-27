@@ -41,10 +41,22 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
 
     /**
      * Read backing the v3 API: the same merged catalogue as v2, narrowed to configs with updatedAt
-     * strictly after {@code updatedAfter} (0 = all). See {@link BrowserExtensionConfigCommon#updatedAfter}.
+     * strictly after {@code updatedAfter} (0 = all). The common catalogue is filtered in Mongo (indexed
+     * on updatedAt); the account's own configs are few, so they are read whole for the merge. See
+     * {@link BrowserExtensionConfigCommon#updatedAfter}.
      */
     public List<BrowserExtensionConfigCommon> findConfigsV3(long updatedAfter) {
-        return BrowserExtensionConfigCommon.updatedAfter(findActiveConfigsV2(), updatedAfter);
+        if (updatedAfter <= 0) {
+            return BrowserExtensionConfigCommon.updatedAfter(findActiveConfigsV2(), 0);
+        }
+        List<BrowserExtensionConfigCommon> account = findAllAccountConfigs();
+        List<String> accountHosts = new ArrayList<>();
+        for (BrowserExtensionConfigCommon a : account) {
+            accountHosts.add(a.getHost());
+        }
+        List<BrowserExtensionConfigCommon> common =
+                BrowserExtensionConfigCommonDao.instance.findActiveConfigsUpdatedAfter(updatedAfter, accountHosts);
+        return BrowserExtensionConfigCommon.updatedAfter(BrowserExtensionConfigCommon.merge(common, account), updatedAfter);
     }
 
     /**

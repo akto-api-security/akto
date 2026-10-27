@@ -161,7 +161,8 @@ public class BrowserExtensionConfigCommon {
         config.blockResponseFrames = asObjectList(doc.get(BLOCK_RESPONSE_FRAMES));
         config.fileUpload = asObjectList(doc.get(FILE_UPLOAD));
         config.enforceAt = asString(doc.get(ENFORCE_AT));
-        config.updatedAt = asEpochSeconds(doc.get(UPDATED_AT), doc.get("updatedTimestamp"));
+        Object updatedAt = doc.get(UPDATED_AT);
+        config.updatedAt = updatedAt instanceof Number ? ((Number) updatedAt).longValue() : 0;
 
         return config;
     }
@@ -233,20 +234,6 @@ public class BrowserExtensionConfigCommon {
             return null;
         }
         return config.host.trim().toLowerCase();
-    }
-
-    // accepts a number (seconds, or millis if clearly too large) or a Date; first usable value wins
-    private static long asEpochSeconds(Object... candidates) {
-        for (Object value : candidates) {
-            if (value instanceof java.util.Date) {
-                return ((java.util.Date) value).getTime() / 1000;
-            }
-            if (value instanceof Number) {
-                long n = ((Number) value).longValue();
-                return n > 100_000_000_000L ? n / 1000 : n;
-            }
-        }
-        return 0;
     }
 
     private static String asString(Object value) {

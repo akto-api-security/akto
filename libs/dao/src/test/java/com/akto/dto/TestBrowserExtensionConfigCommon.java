@@ -272,9 +272,7 @@ public class TestBrowserExtensionConfigCommon {
     @Test
     public void testUpdatedAtParsing() {
         assertEquals(100, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com','updatedAt':100}")).getUpdatedAt());
-        assertEquals(1761500000L, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com','updatedAt':1761500000000}")).getUpdatedAt());
         assertEquals(0, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com'}")).getUpdatedAt());
-        assertEquals(50, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com','updatedTimestamp':50}")).getUpdatedAt());
     }
 
     @Test
