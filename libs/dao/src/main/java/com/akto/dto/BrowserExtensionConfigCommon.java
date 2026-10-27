@@ -2,9 +2,11 @@ package com.akto.dto;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -168,9 +170,8 @@ public class BrowserExtensionConfigCommon {
     }
 
     /**
-     * The v3 read: configs with updatedAt strictly greater than updatedAfter, all in one list (no
-     * paging; a few thousand small configs is a single response, and if every config shares one
-     * updatedAt they are all sent). updatedAfter &lt;= 0 returns everything, which is a full sync.
+     * The v3 delta read: configs with updatedAt strictly greater than updatedAfter, all in one list
+     * (if every config shares one updatedAt they are all sent). A full sync is paged instead.
      */
     public static List<BrowserExtensionConfigCommon> updatedAfter(List<BrowserExtensionConfigCommon> merged, long updatedAfter) {
         List<BrowserExtensionConfigCommon> result = new ArrayList<>();
@@ -219,6 +220,49 @@ public class BrowserExtensionConfigCommon {
             }
         }
         return new ArrayList<>(byHost.values());
+    }
+
+    /**
+     * One page of a full sync: the catalogue page minus the hosts this account opted out of. Account
+     * custom hosts are not added here, see {@link #customHosts}.
+     */
+    public static List<BrowserExtensionConfigCommon> withoutOptOuts(
+            List<BrowserExtensionConfigCommon> commonPage,
+            List<BrowserExtensionConfigCommon> accountConfigs) {
+        List<BrowserExtensionConfigCommon> optOuts = new ArrayList<>();
+        for (BrowserExtensionConfigCommon a : accountConfigs) {
+            if (!a.isActive()) {
+                optOuts.add(a);
+            }
+        }
+        return merge(commonPage, optOuts);
+    }
+
+    /**
+     * The account's own active hosts that the catalogue does not already cover (common wins) and the
+     * account did not opt out of. {@code commonOfAccountHosts} = the active catalogue entries for the
+     * account's hosts, whatever page they sit on. Sent once, with the last page of a full sync.
+     */
+    public static List<BrowserExtensionConfigCommon> customHosts(
+            List<BrowserExtensionConfigCommon> commonOfAccountHosts,
+            List<BrowserExtensionConfigCommon> accountConfigs) {
+        Set<String> taken = new HashSet<>();
+        for (BrowserExtensionConfigCommon c : commonOfAccountHosts) {
+            taken.add(hostKey(c));
+        }
+        for (BrowserExtensionConfigCommon a : accountConfigs) {
+            if (!a.isActive()) {
+                taken.add(hostKey(a));
+            }
+        }
+        Map<String, BrowserExtensionConfigCommon> custom = new LinkedHashMap<>();
+        for (BrowserExtensionConfigCommon a : accountConfigs) {
+            String key = hostKey(a);
+            if (a.isActive() && key != null && !taken.contains(key)) {
+                custom.putIfAbsent(key, a);
+            }
+        }
+        return new ArrayList<>(custom.values());
     }
 
     private static String hostKey(BrowserExtensionConfigCommon config) {

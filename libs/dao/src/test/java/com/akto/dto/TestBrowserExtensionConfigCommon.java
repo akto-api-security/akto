@@ -304,4 +304,22 @@ public class TestBrowserExtensionConfigCommon {
     public void testConfigWithoutHostIsSkipped() {
         assertTrue(BrowserExtensionConfigCommon.updatedAfter(Arrays.asList(new BrowserExtensionConfigCommon()), 0).isEmpty());
     }
+
+    @Test
+    public void testFullSyncPageDropsOptedOutHostsButAddsNoCustomHosts() {
+        List<BrowserExtensionConfigCommon> page = Arrays.asList(cfg("chatgpt.com", true), cfg("claude.ai", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("claude.ai", false), cfg("my-internal.ai", true));
+        assertEquals(Arrays.asList("chatgpt.com"), hosts(BrowserExtensionConfigCommon.withoutOptOuts(page, account)));
+    }
+
+    @Test
+    public void testCustomHostsSkipCatalogueHostsAndOptOuts() {
+        List<BrowserExtensionConfigCommon> commonOfAccountHosts = Arrays.asList(cfg("chatgpt.com", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(
+                cfg("ChatGPT.com", true),     // catalogue wins (any case)
+                cfg("claude.ai", false),      // opt-out, not a custom host
+                cfg("my-internal.ai", true),
+                cfg("my-internal.ai", true)); // repeated host is sent once
+        assertEquals(Arrays.asList("my-internal.ai"), hosts(BrowserExtensionConfigCommon.customHosts(commonOfAccountHosts, account)));
+    }
 }

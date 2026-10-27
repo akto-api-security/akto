@@ -7,6 +7,7 @@ import com.mongodb.client.model.Sorts;
 
 import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,22 +45,36 @@ public class BrowserExtensionConfigCommonDao extends CommonContextDao<Document> 
     }
 
     /**
-     * Full sync ({@code updatedAfter <= 0}): every active config, sorted by _id. Delta: active configs
-     * changed after {@code updatedAfter} (epoch seconds), oldest change first, served by the updatedAt
-     * index. A delta also returns the active configs for {@code alwaysIncludeHosts} (any age), so the
-     * caller's merge still lets the catalogue entry win over a same-host account row.
+     * Delta: active configs changed after {@code updatedAfter} (epoch seconds), oldest change first,
+     * served by the updatedAt index. Also returns the active configs for {@code alwaysIncludeHosts}
+     * (any age), so the caller's merge still lets the catalogue entry win over a same-host account row.
      */
     public List<BrowserExtensionConfigCommon> findActiveConfigsUpdatedAfter(long updatedAfter, List<String> alwaysIncludeHosts) {
-        Bson filter = Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false);
-        if (updatedAfter <= 0) {
-            return toConfigs(instance.findAll(filter, 0, 1_000_000, Sorts.ascending("_id")));
-        }
         Bson changed = Filters.gt(BrowserExtensionConfigCommon.UPDATED_AT, updatedAfter);
         Bson changedOrOverridden = alwaysIncludeHosts.isEmpty()
                 ? changed
                 : Filters.or(changed, Filters.in(BrowserExtensionConfigCommon.HOST, alwaysIncludeHosts));
-        return toConfigs(instance.findAll(Filters.and(filter, changedOrOverridden), 0, 1_000_000,
-                Sorts.ascending(BrowserExtensionConfigCommon.UPDATED_AT)));
+        return toConfigs(instance.findAll(Filters.and(Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false), changedOrOverridden),
+                0, 1_000_000, Sorts.ascending(BrowserExtensionConfigCommon.UPDATED_AT)));
+    }
+
+    /**
+     * Full sync page: up to {@code limit} active configs with _id after {@code afterId} (null = from
+     * the start), in _id order.
+     */
+    public List<BrowserExtensionConfigCommon> findActiveConfigsAfterId(ObjectId afterId, int limit) {
+        Bson active = Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false);
+        Bson filter = afterId == null ? active : Filters.and(active, Filters.gt("_id", afterId));
+        return toConfigs(instance.findAll(filter, 0, limit, Sorts.ascending("_id")));
+    }
+
+    public List<BrowserExtensionConfigCommon> findActiveConfigsByHosts(List<String> hosts) {
+        if (hosts.isEmpty()) {
+            return new ArrayList<>();
+        }
+        return toConfigs(instance.findAll(Filters.and(
+                Filters.ne(BrowserExtensionConfigCommon.ACTIVE, false),
+                Filters.in(BrowserExtensionConfigCommon.HOST, hosts))));
     }
 
     public void createIndicesIfAbsent() {

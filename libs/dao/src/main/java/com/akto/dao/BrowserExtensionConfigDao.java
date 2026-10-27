@@ -5,7 +5,11 @@ import com.akto.dto.BrowserExtensionConfigCommon;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 import org.bson.Document;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +17,7 @@ import java.util.List;
 public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensionConfig> {
 
     public static final String COLLECTION_NAME = "browser_extension_configs";
+    public static final int FULL_SYNC_PAGE_SIZE = 500;
     public static final BrowserExtensionConfigDao instance = new BrowserExtensionConfigDao();
 
     @Override
@@ -39,21 +44,50 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
         return BrowserExtensionConfigCommon.merge(common, findAllAccountConfigs());
     }
 
+    /** A v3 response: the configs, and the _id to send back for the next page (null = no more). */
+    @Getter
+    @AllArgsConstructor
+    public static class ConfigsV3 {
+        private final List<BrowserExtensionConfigCommon> configs;
+        private final String nextAfterId;
+    }
+
     /**
-     * Read backing the v3 API: the same merged catalogue as v2, narrowed to configs with updatedAt
-     * strictly after {@code updatedAfter} (0 = all). The common catalogue is filtered in Mongo (indexed
-     * on updatedAt); the account's own configs are few, so they are read whole for the merge. See
-     * {@link BrowserExtensionConfigCommon#updatedAfter}.
+     * Read backing the v3 API. The account's own configs are few, so they are read whole; the common
+     * catalogue is read in Mongo.
+     *  - delta ({@code updatedAfter > 0}): the same merged catalogue as v2, narrowed to configs with
+     *    updatedAt strictly after it (indexed on updatedAt), in one response.
+     *  - full sync: the catalogue in pages of {@link #FULL_SYNC_PAGE_SIZE} by _id. The client sends the
+     *    last _id it got as {@code afterId} until {@code nextAfterId} comes back null. Opt-outs are
+     *    applied to every page, the account's custom hosts ride on the last page.
      */
-    public List<BrowserExtensionConfigCommon> findConfigsV3(long updatedAfter) {
+    public ConfigsV3 findConfigsV3(long updatedAfter, String afterId) {
         List<BrowserExtensionConfigCommon> account = findAllAccountConfigs();
         List<String> accountHosts = new ArrayList<>();
         for (BrowserExtensionConfigCommon a : account) {
             accountHosts.add(a.getHost());
         }
-        List<BrowserExtensionConfigCommon> common =
-                BrowserExtensionConfigCommonDao.instance.findActiveConfigsUpdatedAfter(updatedAfter, accountHosts);
-        return BrowserExtensionConfigCommon.updatedAfter(BrowserExtensionConfigCommon.merge(common, account), updatedAfter);
+
+        if (updatedAfter > 0) {
+            List<BrowserExtensionConfigCommon> common =
+                    BrowserExtensionConfigCommonDao.instance.findActiveConfigsUpdatedAfter(updatedAfter, accountHosts);
+            return new ConfigsV3(BrowserExtensionConfigCommon.updatedAfter(
+                    BrowserExtensionConfigCommon.merge(common, account), updatedAfter), null);
+        }
+
+        ObjectId cursor = afterId == null || afterId.isEmpty() ? null : new ObjectId(afterId);
+        List<BrowserExtensionConfigCommon> fetched =
+                BrowserExtensionConfigCommonDao.instance.findActiveConfigsAfterId(cursor, FULL_SYNC_PAGE_SIZE + 1);
+        boolean hasMore = fetched.size() > FULL_SYNC_PAGE_SIZE;
+        List<BrowserExtensionConfigCommon> page = hasMore ? fetched.subList(0, FULL_SYNC_PAGE_SIZE) : fetched;
+
+        List<BrowserExtensionConfigCommon> configs = BrowserExtensionConfigCommon.withoutOptOuts(page, account);
+        if (hasMore) {
+            return new ConfigsV3(configs, page.get(page.size() - 1).get_id());
+        }
+        configs.addAll(BrowserExtensionConfigCommon.customHosts(
+                BrowserExtensionConfigCommonDao.instance.findActiveConfigsByHosts(accountHosts), account));
+        return new ConfigsV3(configs, null);
     }
 
     /**

@@ -27,13 +27,18 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsV2;
 
-    // v3 request: updatedAfter = the newest updatedAt the client holds; omit it for a full sync
+    // v3 request: updatedAfter = the newest updatedAt the client holds (delta, one response). Omit it
+    // for a full sync, which is paged: afterId = the nextAfterId of the previous page (none on the first)
     @Setter
     private long updatedAfter;
+    @Setter
+    private String afterId;
 
-    // v3 response: configs with updatedAt > updatedAfter, in one list
+    // v3 response: the configs, and for a full sync the afterId of the next page (null on the last)
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsV3;
+    @Getter
+    private String nextAfterId;
 
     public String fetchBrowserExtensionConfigs() {
         try {
@@ -62,7 +67,9 @@ public class BrowserExtensionConfigAction extends ActionSupport {
 
     public String fetchBrowserExtensionConfigsV3() {
         try {
-            this.browserExtensionConfigsV3 = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter);
+            BrowserExtensionConfigDao.ConfigsV3 result = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter, afterId);
+            this.browserExtensionConfigsV3 = result.getConfigs();
+            this.nextAfterId = result.getNextAfterId();
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs v3: " + e.getMessage(), LogDb.DB_ABS);
