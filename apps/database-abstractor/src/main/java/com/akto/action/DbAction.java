@@ -3340,6 +3340,9 @@ public class DbAction extends ActionSupport {
 
     public String insertProtectionLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertProtectionLog(dbLog);
         } catch (Exception e) {
