@@ -45,7 +45,7 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
         return BrowserExtensionConfigCommon.merge(common, findAllAccountConfigs());
     }
 
-    /** A v3 response: the configs, and the _id to send back for the next page (null = no more). */
+    /** A v3 response: the configs, and the cursor to send back for the next page (null = no more). */
     @Getter
     @AllArgsConstructor
     public static class ConfigsV3 {
@@ -53,32 +53,68 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
         private final String nextCursor;
     }
 
+    public enum SyncMode {
+        FULL,    // the whole catalogue, paged by cursor
+        DELTA;   // everything newer than updatedAfter, in one response
+
+        /** No mode = a client that predates it: updatedAfter &gt; 0 meant delta, otherwise full. */
+        public static SyncMode resolve(String mode, long updatedAfter) {
+            if (mode == null || mode.trim().isEmpty()) {
+                return updatedAfter > 0 ? DELTA : FULL;
+            }
+            return valueOf(mode.trim().toUpperCase());
+        }
+
+        /**
+         * @return why the request is invalid, or null. Checked only when the client names a mode, so
+         *         a request without one stays as lenient as before.
+         */
+        public static String validate(String mode, long updatedAfter, String cursor, int limit) {
+            if (mode == null || mode.trim().isEmpty()) {
+                return null;
+            }
+            SyncMode resolved;
+            try {
+                resolved = resolve(mode, updatedAfter);
+            } catch (IllegalArgumentException e) {
+                return "mode must be FULL or DELTA";
+            }
+            boolean hasCursor = cursor != null && !cursor.isEmpty();
+            if (resolved == DELTA) {
+                if (updatedAfter <= 0) return "mode DELTA needs updatedAfter greater than 0";
+                if (hasCursor || limit != 0) return "mode DELTA does not take cursor or limit";
+            } else if (updatedAfter != 0) {
+                return "mode FULL does not take updatedAfter";
+            }
+            return null;
+        }
+    }
+
     /**
-     * Read backing the v3 API. The account's own configs are few, so they are read whole; the common
-     * catalogue is read in Mongo.
-     *  - delta ({@code updatedAfter > 0}): the same merged catalogue as v2, narrowed to configs with
-     *    updatedAt strictly after it (indexed on updatedAt), in one response.
-     *  - full sync: the catalogue in pages by _id, {@code limit} per page (default
-     *    {@link #FULL_SYNC_PAGE_SIZE}, at most {@link #MAX_FULL_SYNC_PAGE_SIZE}). The client sends the
-     *    {@code nextCursor} of the previous page as {@code cursor} until {@code nextCursor} comes back null. Opt-outs are
-     *    applied to every page, the account's custom hosts ride on the last page.
+     * v3 DELTA: the same merged catalogue as v2, narrowed to configs with updatedAt strictly after
+     * {@code updatedAfter}, in one response. The common catalogue is filtered in Mongo (indexed on
+     * updatedAt); the account's own configs are few, so they are read whole for the merge.
      */
-    public ConfigsV3 findConfigsV3(long updatedAfter, String cursor, int limit) {
+    public ConfigsV3 findDelta(long updatedAfter) {
         List<BrowserExtensionConfigCommon> account = findAllAccountConfigs();
-        List<String> accountHosts = new ArrayList<>();
-        for (BrowserExtensionConfigCommon a : account) {
-            accountHosts.add(a.getHost());
-        }
+        List<BrowserExtensionConfigCommon> common = BrowserExtensionConfigCommonDao.instance
+                .findActiveConfigsUpdatedAfter(updatedAfter, hostsOf(account));
+        return new ConfigsV3(BrowserExtensionConfigCommon.updatedAfter(
+                BrowserExtensionConfigCommon.merge(common, account), updatedAfter), null);
+    }
 
-        if (updatedAfter > 0) {
-            List<BrowserExtensionConfigCommon> common =
-                    BrowserExtensionConfigCommonDao.instance.findActiveConfigsUpdatedAfter(updatedAfter, accountHosts);
-            return new ConfigsV3(BrowserExtensionConfigCommon.updatedAfter(
-                    BrowserExtensionConfigCommon.merge(common, account), updatedAfter), null);
-        }
-
+    /**
+     * v3 FULL: the catalogue in pages by _id, {@code limit} per page (default {@link #FULL_SYNC_PAGE_SIZE},
+     * at most {@link #MAX_FULL_SYNC_PAGE_SIZE}). The client sends the {@code nextCursor} of the previous
+     * page as {@code cursor} until it comes back null. Opt-outs are applied to every page, the account's
+     * custom hosts ride on the last page.
+     *
+     * @throws IllegalArgumentException if the cursor is not one this API handed out
+     */
+    public ConfigsV3 findFullSyncPage(String cursor, int limit) {
         int pageSize = limit <= 0 ? FULL_SYNC_PAGE_SIZE : Math.min(limit, MAX_FULL_SYNC_PAGE_SIZE);
-        ObjectId afterId = cursor == null || cursor.isEmpty() ? null : new ObjectId(cursor);   // the cursor is the last _id
+        ObjectId afterId = cursor == null || cursor.isEmpty() ? null : parseCursor(cursor);   // the cursor is the last _id
+        List<BrowserExtensionConfigCommon> account = findAllAccountConfigs();
         List<BrowserExtensionConfigCommon> fetched =
                 BrowserExtensionConfigCommonDao.instance.findActiveConfigsAfterId(afterId, pageSize + 1);
         boolean hasMore = fetched.size() > pageSize;
@@ -89,8 +125,23 @@ public class BrowserExtensionConfigDao extends AccountsContextDao<BrowserExtensi
             return new ConfigsV3(configs, page.get(page.size() - 1).get_id());
         }
         configs.addAll(BrowserExtensionConfigCommon.customHosts(
-                BrowserExtensionConfigCommonDao.instance.findActiveConfigsByHosts(accountHosts), account));
+                BrowserExtensionConfigCommonDao.instance.findActiveConfigsByHosts(hostsOf(account)), account));
         return new ConfigsV3(configs, null);
+    }
+
+    private static ObjectId parseCursor(String cursor) {
+        if (!ObjectId.isValid(cursor)) {
+            throw new IllegalArgumentException("invalid cursor");
+        }
+        return new ObjectId(cursor);
+    }
+
+    private static List<String> hostsOf(List<BrowserExtensionConfigCommon> configs) {
+        List<String> hosts = new ArrayList<>();
+        for (BrowserExtensionConfigCommon c : configs) {
+            hosts.add(c.getHost());
+        }
+        return hosts;
     }
 
     /**

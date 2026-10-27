@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dao.BrowserExtensionConfigDao;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.Test;
@@ -321,5 +322,24 @@ public class TestBrowserExtensionConfigCommon {
                 cfg("my-internal.ai", true),
                 cfg("my-internal.ai", true)); // repeated host is sent once
         assertEquals(Arrays.asList("my-internal.ai"), hosts(BrowserExtensionConfigCommon.customHosts(commonOfAccountHosts, account)));
+    }
+
+    @Test
+    public void testSyncModeResolvesFromAnOldClientsParams() {
+        assertEquals(BrowserExtensionConfigDao.SyncMode.FULL, BrowserExtensionConfigDao.SyncMode.resolve(null, 0));
+        assertEquals(BrowserExtensionConfigDao.SyncMode.DELTA, BrowserExtensionConfigDao.SyncMode.resolve("", 5));
+        assertEquals(BrowserExtensionConfigDao.SyncMode.DELTA, BrowserExtensionConfigDao.SyncMode.resolve("delta", 0));
+    }
+
+    @Test
+    public void testSyncModeValidation() {
+        assertNull(BrowserExtensionConfigDao.SyncMode.validate(null, 5, "abc", 3));       // no mode: lenient, as before
+        assertNull(BrowserExtensionConfigDao.SyncMode.validate("FULL", 0, "abc", 50));
+        assertNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 5, null, 0));
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("BOGUS", 0, null, 0));
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 0, null, 0));   // needs updatedAfter
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 5, "abc", 0));  // no cursor
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 5, null, 10));  // no limit
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("FULL", 5, null, 0));    // no updatedAfter
     }
 }

@@ -27,16 +27,22 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsV2;
 
-    // v3 request: updatedAfter = the newest updatedAt the client holds (delta, one response). Omit it
-    // for a full sync, which is paged: cursor = the nextCursor of the previous page (none on the first); treat it as opaque
+    // v3 request:
+    //  mode=FULL   (cursor, limit optional): the whole catalogue, paged. cursor = the nextCursor of the
+    //              previous page (none on the first), opaque to the client.
+    //  mode=DELTA  (updatedAfter required): everything newer than updatedAfter, one response.
+    // No mode = an older client: updatedAfter > 0 is a delta, otherwise a full sync.
+    @Setter
+    @Getter   // echoed back as the mode actually served
+    private String mode;
     @Setter
     private long updatedAfter;
     @Setter
     private String cursor;
     @Setter
-    private int limit;   // optional page size for a full sync; capped server side
+    private int limit;   // page size for a full sync; capped server side
 
-    // v3 response: the configs, and for a full sync the cursor of the next page (null on the last)
+    // v3 response: mode (above), the configs, and for a full sync the cursor of the next page (null on the last)
     @Getter
     private List<BrowserExtensionConfigCommon> browserExtensionConfigsV3;
     @Getter
@@ -68,11 +74,23 @@ public class BrowserExtensionConfigAction extends ActionSupport {
     }
 
     public String fetchBrowserExtensionConfigsV3() {
+        String invalid = BrowserExtensionConfigDao.SyncMode.validate(mode, updatedAfter, cursor, limit);
+        if (invalid != null) {
+            addActionError(invalid);
+            return ERROR.toUpperCase();
+        }
         try {
-            BrowserExtensionConfigDao.ConfigsV3 result = BrowserExtensionConfigDao.instance.findConfigsV3(updatedAfter, cursor, limit);
+            BrowserExtensionConfigDao.SyncMode syncMode = BrowserExtensionConfigDao.SyncMode.resolve(mode, updatedAfter);
+            BrowserExtensionConfigDao.ConfigsV3 result = syncMode == BrowserExtensionConfigDao.SyncMode.DELTA
+                    ? BrowserExtensionConfigDao.instance.findDelta(updatedAfter)
+                    : BrowserExtensionConfigDao.instance.findFullSyncPage(cursor, limit);
+            this.mode = syncMode.name();
             this.browserExtensionConfigsV3 = result.getConfigs();
             this.nextCursor = result.getNextCursor();
             return SUCCESS.toUpperCase();
+        } catch (IllegalArgumentException e) {
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error fetching browser extension configs v3: " + e.getMessage(), LogDb.DB_ABS);
             addActionError("Failed to fetch browser extension configs");
