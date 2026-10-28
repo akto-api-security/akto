@@ -1076,7 +1076,7 @@ function SingleTestRunPage() {
         ]}
       >
         <Modal.Section>
-          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'}. Results it judges as false positives will be moved to Ignored Issues. You can reopen them anytime.`}</Text>
+          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'} and add its verdict and confidence to each issue's description. No issue is ignored automatically; select the false positives and ignore them yourself.`}</Text>
         </Modal.Section>
       </Modal>
     </>
@@ -1186,7 +1186,7 @@ function SingleTestRunPage() {
     try {
       await api.verifyTestRunWithAi(summaryHexId, resultHexIds)
       setAiVerifyStartedFor(summaryHexId)
-      func.setToast(true, false, "AI verification started. False positives will move to Ignored Issues - refresh in a few minutes to see the results.")
+      func.setToast(true, false, "AI verification started. Refresh in a few minutes to see the verdicts in the issue descriptions.")
     } catch (e) {
       // request() already shows the server's error (e.g. "Verification already running") as a toast
     }

@@ -43,9 +43,10 @@ import java.util.concurrent.Future;
 import java.util.regex.Pattern;
 
 /**
- * "Verify with AI" on the test run page: asks the LLM about every vulnerable result of a test run
- * and moves the ones it judges false positives to ignored issues (same as a manual "False positive"
- * ignore). Runs in the background; the page shows the outcome on refresh.
+ * "Verify with AI" on the test run and issues pages: asks the LLM about every vulnerable result and
+ * writes its verdict, confidence and reason into the issue's description. Issue status is never
+ * changed; users review the verdicts and ignore the false positives themselves. Runs in the
+ * background; the page shows the verdicts on refresh.
  */
 public class AiVerificationAction extends UserAction {
 
@@ -53,9 +54,7 @@ public class AiVerificationAction extends UserAction {
 
     private static final String FEATURE_LABEL = "AKTO_GPT_AI";
     private static final int MAX_RESULTS_PER_RUN = 500;
-    private static final int MIN_CONFIDENCE_TO_IGNORE = 85;
     private static final int MAX_ATTEMPTS_PER_RESULT = 3;
-    private static final String IGNORE_REASON = "False positive";
     // Descriptions Verify with AI writes start with this, e.g. "[AI verified: false positive, confidence 85%] <reason>".
     public static final String DESCRIPTION_PREFIX = "[AI verified";
     // Tests the AI cannot judge from the stored request/response, so they are never sent to it:
@@ -64,7 +63,6 @@ public class AiVerificationAction extends UserAction {
     // out-of-band callback (ssrf_url_hit) or response timing, which are not stored.
     private static final Pattern NOT_VERIFIABLE_TEST = Pattern.compile(
         "(?m)^\\s*type:\\s*(passive|multiple|graph)\\s*$|ssrf_url_hit|response_time|median_response|compare_greater|\\.stats\\.");
-    private static final String UPDATED_BY = "Akto AI";
 
     // One background job per test run at a time; jobs run here, LLM calls in a separate pool so a
     // job waiting on its calls cannot starve them.
@@ -89,9 +87,9 @@ public class AiVerificationAction extends UserAction {
         }
     }
 
-    /** Background work; adds every test run summary whose counts it may have changed. */
+    /** Background work. */
     private interface Job {
-        void run(Set<ObjectId> summariesToRecount) throws Exception;
+        void run() throws Exception;
     }
 
     /** Test run page: every vulnerable result of the run, or only the selected ones. */
@@ -113,10 +111,7 @@ public class AiVerificationAction extends UserAction {
         int accountId = Context.accountId.get();
         return startJob(accountId + ":run:" + testingRunResultSummaryHexId,
             "Verification already running for this test run",
-            summaries -> {
-                summaries.add(summaryId);
-                verifyTargets("test run " + summaryId, targetsForSummary(summaryId, resultIds));
-            });
+            () -> verifyTargets("test run " + summaryId, targetsForSummary(summaryId, resultIds)));
     }
 
     /** Issues page: the selected issues, each judged by its latest vulnerable result. */
@@ -137,7 +132,7 @@ public class AiVerificationAction extends UserAction {
         int accountId = Context.accountId.get();
         return startJob(accountId + ":issues",
             "Verification already running for selected issues",
-            summaries -> verifyTargets(issueIdArray.size() + " selected issues", targetsForIssues(openIssuesFilter, summaries)));
+            () -> verifyTargets(issueIdArray.size() + " selected issues", targetsForIssues(openIssuesFilter)));
     }
 
     /** Checks the feature and the per-scope guard, then runs the job in the background. */
@@ -158,19 +153,11 @@ public class AiVerificationAction extends UserAction {
 
         JOB_EXECUTOR.submit(() -> {
             Context.accountId.set(accountId);
-            Set<ObjectId> summariesToRecount = new HashSet<>();
             try {
-                job.run(summariesToRecount);
+                job.run();
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "AI verification failed for " + key + ": " + e.getMessage());
             } finally {
-                for (ObjectId summaryId : summariesToRecount) {
-                    try {
-                        TestingUtils.recountAndUpdateSummaryCount(summaryId);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Recount after AI verification failed for summary " + summaryId);
-                    }
-                }
                 IN_PROGRESS.remove(key);
             }
         });
@@ -214,7 +201,7 @@ public class AiVerificationAction extends UserAction {
     }
 
     /** For each OPEN issue, the vulnerable result from the latest test run that found it. */
-    private static List<Target> targetsForIssues(Bson openIssuesFilter, Set<ObjectId> summariesToRecount) {
+    private static List<Target> targetsForIssues(Bson openIssuesFilter) {
         List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(openIssuesFilter,
             Projections.include(TestingRunIssues.DESCRIPTION, TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID));
         Map<ObjectId, Boolean> inVulnerableCollection = new HashMap<>();
@@ -246,7 +233,6 @@ public class AiVerificationAction extends UserAction {
                     continue;
                 }
                 targets.add(new Target(issue, result));
-                summariesToRecount.add(summaryId);
             } catch (Exception e) {
                 skipped++;
                 loggerMaker.errorAndAddToDb(e, "AI verification could not load evidence for issue " + issue.getId() + ": " + e.getMessage());
@@ -266,9 +252,9 @@ public class AiVerificationAction extends UserAction {
     }
 
     /** Result of judging one target. */
-    private enum Outcome { IGNORED, KEPT, ERROR }
+    private enum Outcome { FALSE_POSITIVE, TRUE_POSITIVE, ERROR }
 
-    /** Asks the LLM about every target in parallel; false positives are moved to ignored. */
+    /** Asks the LLM about every target in parallel and records each verdict on its issue. */
     private void verifyTargets(String label, List<Target> targets) {
         if (targets.isEmpty()) {
             loggerMaker.infoAndAddToDb("AI verification for " + label + ": nothing to verify");
@@ -293,8 +279,8 @@ public class AiVerificationAction extends UserAction {
             }));
         }
 
-        int ignored = 0;
-        int kept = 0;
+        int falsePositives = 0;
+        int truePositives = 0;
         int errors = 0;
         for (Future<Outcome> call : calls) {
             Outcome outcome;
@@ -304,13 +290,13 @@ public class AiVerificationAction extends UserAction {
                 loggerMaker.errorAndAddToDb(e, "AI verification call failed: " + e.getMessage());
                 outcome = Outcome.ERROR;
             }
-            if (outcome == Outcome.IGNORED) ignored++;
-            else if (outcome == Outcome.KEPT) kept++;
+            if (outcome == Outcome.FALSE_POSITIVE) falsePositives++;
+            else if (outcome == Outcome.TRUE_POSITIVE) truePositives++;
             else errors++;
         }
 
-        String summary = "AI verification for " + label + ": checked " + calls.size() + ", moved " + ignored
-            + " false positives to ignored, kept " + kept + ", errors " + errors + ", skipped " + notVerifiable + " not verifiable by AI";
+        String summary = "AI verification for " + label + ": checked " + calls.size() + ", false positives "
+            + falsePositives + ", true positives " + truePositives + ", errors " + errors + ", skipped " + notVerifiable + " not verifiable by AI";
         if (!calls.isEmpty() && errors == calls.size()) {
             loggerMaker.errorAndAddToDb(summary + ". Every AI call failed; check the AI provider configuration and logs.");
         } else {
@@ -333,10 +319,10 @@ public class AiVerificationAction extends UserAction {
         return templates;
     }
 
-    /** Asks the LLM about one result, records its verdict on the issue and moves it to ignored if it is a false positive. */
+    /** Asks the LLM about one result and writes its verdict into the issue's description. */
     private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, String template) {
         List<TestResult> attempts = attemptsToJudge(result);
-        if (attempts.isEmpty()) return Outcome.KEPT;
+        if (attempts.isEmpty()) return Outcome.TRUE_POSITIVE;
 
         List<String> attemptMessages = new ArrayList<>();
         Set<String> reasons = new LinkedHashSet<>();
@@ -353,41 +339,29 @@ public class AiVerificationAction extends UserAction {
             loggerMaker.infoAndAddToDb("AI verification skipped result " + result.getHexId() + ": " + verdict.get("error"));
             return Outcome.ERROR;
         }
-        String verdictName = verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT);
-        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
-        boolean ignore = FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdictName)
-            && confidence >= MIN_CONFIDENCE_TO_IGNORE;
+        boolean falsePositive = FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(
+            verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT));
+        Outcome outcome = falsePositive ? Outcome.FALSE_POSITIVE : Outcome.TRUE_POSITIVE;
 
-        List<Bson> updates = new ArrayList<>();
-        if (ignore) {
-            updates.add(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED));
-            updates.add(Updates.set(TestingRunIssues.IGNORE_REASON, IGNORE_REASON));
-            updates.add(Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
-            updates.add(Updates.set(TestingRunIssues.LAST_UPDATED_BY, UPDATED_BY));
-        }
-        // The verdict is written on issues that stay open too, so users can review it and ignore them by hand.
         // A description the user wrote is kept; one written by an earlier verification is replaced.
         String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
         String description = issue.getDescription();
         boolean canWriteDescription = description == null || description.trim().isEmpty()
             || description.startsWith(DESCRIPTION_PREFIX);
-        if (canWriteDescription && reason != null && !reason.isEmpty()) {
-            String verdictLabel = FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdictName)
-                ? "false positive" : "true positive";
-            updates.add(Updates.set(TestingRunIssues.DESCRIPTION,
-                DESCRIPTION_PREFIX + ": " + verdictLabel + ", confidence " + confidence + "%] " + reason));
-        }
-        if (updates.isEmpty()) return Outcome.KEPT;
+        if (!canWriteDescription || reason == null || reason.isEmpty()) return outcome;
 
-        // Only while still OPEN, so a user's ignore/fix made in the meantime is never overridden.
-        boolean updated = TestingRunIssuesDao.instance.getMCollection().updateOne(
+        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
+        String newDescription = DESCRIPTION_PREFIX + ": " + (falsePositive ? "false positive" : "true positive")
+            + ", confidence " + confidence + "%] " + reason;
+        // Only while still OPEN, so an issue the user ignored or fixed in the meantime is left as it is.
+        TestingRunIssuesDao.instance.getMCollection().updateOne(
             Filters.and(
                 Filters.eq(Constants.ID, issue.getId()),
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN)
             ),
-            Updates.combine(updates)
-        ).getModifiedCount() > 0;
-        return updated && ignore ? Outcome.IGNORED : Outcome.KEPT;
+            Updates.set(TestingRunIssues.DESCRIPTION, newDescription)
+        );
+        return outcome;
     }
 
     /**

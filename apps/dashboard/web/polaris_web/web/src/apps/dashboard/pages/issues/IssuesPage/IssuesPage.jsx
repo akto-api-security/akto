@@ -571,11 +571,11 @@ function IssuesPage() {
 
         function verifyWithAiAction() {
             func.showConfirmationModal(
-                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"}. Issues it judges as false positives will be moved to Ignored. You can reopen them anytime.`,
+                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"} and add its verdict and confidence to each issue's description. No issue is ignored automatically; select the false positives and ignore them yourself.`,
                 "Verify",
                 async () => {
                     await api.verifyIssuesWithAi(items).then(() => {
-                        setToast(true, false, "AI verification started. False positives will move to Ignored - refresh in a few minutes to see the results.")
+                        setToast(true, false, "AI verification started. Refresh in a few minutes to see the verdicts in the issue descriptions.")
                         resetResourcesSelected()
                     }).catch(() => {
                         // request() already shows the server's error as a toast
