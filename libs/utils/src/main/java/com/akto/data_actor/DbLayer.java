@@ -4142,7 +4142,7 @@ public class DbLayer {
         }
     }
 
-    // Distinct email domains of this account's users; throws on DB errors so callers keep their last list rather than get an empty one.
+    // Distinct email domains of this account's users; throws on error so callers keep their old list.
     public static List<String> fetchOrgEmailDomains() {
         Set<String> domains = new HashSet<>();
         List<User> users = UsersDao.instance.findAll(Filters.exists("accounts." + Context.accountId.get()), Projections.include(User.LOGIN));
