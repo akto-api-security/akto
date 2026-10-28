@@ -322,6 +322,9 @@ class ModelMapScanner:
             details["error"] = winner_details["error"]
         if winner_details.get("values"):  # Password: exact secret substrings to redact
             details["values"] = winner_details["values"]
+        for key in ("chunks", "chunks_skipped"):  # text split to fit the context window (llm_scanner)
+            if key in winner_details:
+                details[key] = winner_details[key]
         # Also carry decision_confidence from the top-level winner result if not
         # already set by the details (Qwen3Guard puts it at the top level).
         if "decision_confidence" not in details and winner.get("decision_confidence") is not None:

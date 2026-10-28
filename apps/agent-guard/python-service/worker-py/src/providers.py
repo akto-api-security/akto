@@ -154,6 +154,36 @@ def _log_vllm_metrics(provider: str, model: str, base_url: str, body: Any, clien
     )
 
 
+# max_model_len an OpenAI-compatible (vLLM) endpoint reports on /models, per (base_url, model): (value,
+# expires_at). Re-read every 10 min so a server restarted with a longer context is picked up; a failed
+# read keeps the last known value and is retried after a minute.
+_MODEL_LEN_TTL_S = 600.0
+_MODEL_LEN_RETRY_S = 60.0
+_MODEL_LEN_TIMEOUT_S = 2.0
+_MODEL_LEN: dict[tuple[str, str], tuple[int | None, float]] = {}
+# Tokens the chat template wraps around the user message (BOS, turn markers), with room to spare.
+_CHAT_TEMPLATE_TOKENS = 64
+
+
+async def _max_model_len(base_url: str, model: str, api_key: str) -> int | None:
+    key = (base_url, model)
+    value, expires_at = _MODEL_LEN.get(key, (None, 0.0))
+    now = time.monotonic()
+    if now < expires_at:
+        return value
+    headers = dict(_IDENTITY, **({"Authorization": f"Bearer {api_key}"} if api_key else {}))
+    try:
+        resp = await http_client.get_client().get(f"{base_url}/models", headers=headers, timeout=_MODEL_LEN_TIMEOUT_S)
+        resp.raise_for_status()
+        value = next((m.get("max_model_len") for m in resp.json()["data"] if m.get("id") == model), None)
+        ttl = _MODEL_LEN_TTL_S
+    except Exception as exc:
+        logger.warning(f"[Providers] could not read max_model_len from {base_url}/models: {exc!r}")
+        ttl = _MODEL_LEN_RETRY_S
+    _MODEL_LEN[key] = (value, now + ttl)
+    return value
+
+
 class LLMProvider(ABC):
     name: str = ""
 
@@ -165,6 +195,10 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def complete(self, prompt: str) -> str: ...
+
+    async def prompt_budget_bytes(self) -> int | None:
+        """Longest prompt, in UTF-8 bytes, certain to fit the model's context window; None = no known limit."""
+        return None
 
 
 class OpenAIProvider(LLMProvider):
@@ -200,6 +234,14 @@ class OpenAIProvider(LLMProvider):
         if self.include_metrics:
             _log_vllm_metrics(self.name, self.model, self.base_url, body, client_ms)
         return body["choices"][0]["message"]["content"]
+
+    async def prompt_budget_bytes(self) -> int | None:
+        # A byte-fallback tokenizer (Gemma, Qwen, Llama) never makes more tokens than the text has UTF-8
+        # bytes, so a prompt of N bytes always fits in N tokens: no tokenizer or /tokenize round trip.
+        # ponytail: bytes over-count English ~5x, so long English splits more than it must; count with
+        # vLLM /tokenize if the extra chunk calls show up in cost.
+        limit = await _max_model_len(self.base_url, self.model, self.api_key)
+        return None if limit is None else limit - _max_tokens() - _CHAT_TEMPLATE_TOKENS
 
 
 class AnthropicProvider(LLMProvider):
@@ -1166,6 +1208,9 @@ class FallbackProvider(LLMProvider):
             if self.health_url:
                 raise  # only the probe sends a health-checked primary's traffic to the backup, not one failed request
             return await self._complete_on_backup(prompt, repr(exc), exc)
+
+    async def prompt_budget_bytes(self) -> int | None:
+        return await self.primary.prompt_budget_bytes()  # sized for the primary, which serves while it is up
 
     async def _complete_on_backup(self, prompt: str, why: str, exc: Exception | None = None) -> str:
         backup = build_provider_from_config(self.backup_entry)
