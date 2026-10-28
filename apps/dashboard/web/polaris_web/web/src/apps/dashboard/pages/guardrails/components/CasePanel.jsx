@@ -5,7 +5,7 @@ import { usePermissions } from "@/util/permissions";
 import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
-import useCaseOwners from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
+import useCaseOwners, { ASSIGN_ROLES_MESSAGE } from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
 import { CASE_NOTES_MAX_LENGTH, changedCaseFields } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
 import { ownerSelectOptions } from "./ReviewCaseModal";
 
@@ -15,7 +15,7 @@ import { ownerSelectOptions } from "./ReviewCaseModal";
 // saved ({ caseOwner?, caseNotes? }) so the screen can show them, and the timeline entries they add, at once.
 export default function CasePanel({ eventIds, caseOwner = "", caseNotes = "", activity, onSaved }) {
     const { canCall } = usePermissions();
-    const { owners } = useCaseOwners();
+    const { owners, canAssign } = useCaseOwners();
     const [owner, setOwner] = useState(caseOwner);
     const [notes, setNotes] = useState(caseNotes);
     const [saving, setSaving] = useState(false);
@@ -29,7 +29,7 @@ export default function CasePanel({ eventIds, caseOwner = "", caseNotes = "", ac
     const fields = changedCaseFields({ owner, notes }, { initialOwner: caseOwner, initialNotes: caseNotes });
     const dirty = Object.keys(fields).length > 0;
     const me = window.USER_NAME;
-    const canAssignToMe = !!me && owner !== me && owners.some((o) => o.login === me);
+    const canAssignToMe = canAssign && !!me && owner !== me && owners.some((o) => o.login === me);
 
     const save = async () => {
         setSaving(true);
@@ -58,7 +58,8 @@ export default function CasePanel({ eventIds, caseOwner = "", caseNotes = "", ac
                             options={ownerSelectOptions(owners, owner)}
                             value={owner}
                             onChange={setOwner}
-                            disabled={!canCall("api/updateMaliciousEventStatus")}
+                            disabled={!canCall("api/updateMaliciousEventStatus") || !canAssign}
+                            helpText={canAssign ? undefined : ASSIGN_ROLES_MESSAGE}
                         />
                         {canAssignToMe && <Button plain onClick={() => setOwner(me)}>Assign to me</Button>}
                     </VerticalStack>

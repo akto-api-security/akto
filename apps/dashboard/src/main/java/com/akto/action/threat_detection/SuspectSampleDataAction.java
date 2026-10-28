@@ -15,6 +15,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.De
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest.Filter;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.TimeRangeFilter;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
@@ -526,12 +528,12 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       this.updatedCount = 0;
       return ERROR.toUpperCase();
     }
-    // A case is only assigned to someone who can open it; "" unassigns.
-    if (!StringUtils.isBlank(this.caseOwner) && !isAccountMember(this.caseOwner.trim())) {
+    String ownerError = caseOwnerError();
+    if (ownerError != null) {
       this.updateSuccess = false;
-      this.updateMessage = "The owner must be a member of this account";
+      this.updateMessage = ownerError;
       this.updatedCount = 0;
-      addActionError(this.updateMessage);
+      addActionError(ownerError);
       return ERROR.toUpperCase();
     }
 
@@ -577,15 +579,42 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     return this.updateSuccess ? SUCCESS.toUpperCase() : ERROR.toUpperCase();
   }
 
-  // A case can only be assigned to a member of the account. (The UI lists the choices from the existing
-  // getTeamData; this is the server-side check behind it.)
-  private boolean isAccountMember(String login) {
-    for (Object member : UsersDao.instance.getAllUsersInfoForTheAccount(Context.accountId.get())) {
-      if (login.equalsIgnoreCase(((BasicDBObject) member).getString("login"))) {
-        return true;
+  // Only Admin and Threat Engineer base roles (custom roles resolve to theirs) assign a case, and only to
+  // someone with one of those roles, like guardrail policies. "" unassigns, null leaves the owner as it is.
+  // (The UI lists the choices from the existing getTeamData; this is the server-side check behind it.)
+  static boolean mayOwnCases(Role role) {
+    return role == Role.ADMIN || role == Role.THREAT_ENGINEER;
+  }
+
+  // Roles are only enforced where roleAccessInterceptor enforces them: metered dashboards with the RBAC feature.
+  private boolean caseRolesEnforced() {
+    Integer accountId = Context.accountId.get();
+    return accountId != null && getSUser() != null && DashboardMode.isMetered()
+        && UsageMetricCalculator.isRbacFeatureAvailable(accountId);
+  }
+
+  // Returns the reason the owner can't be set, or null if it can (or isn't being changed).
+  private String caseOwnerError() {
+    if (this.caseOwner == null) {
+      return null;
+    }
+    int accountId = Context.accountId.get();
+    boolean enforced = caseRolesEnforced();
+    if (enforced && !mayOwnCases(RBACDao.getCurrentRoleForUser(getSUser().getId(), accountId))) {
+      return "Only Admin and Threat Engineer roles can assign a case";
+    }
+    String owner = this.caseOwner.trim();
+    if (owner.isEmpty()) {
+      return null;
+    }
+    for (Object member : UsersDao.instance.getAllUsersInfoForTheAccount(accountId)) {
+      BasicDBObject user = (BasicDBObject) member;
+      if (owner.equalsIgnoreCase(user.getString("login"))) {
+        return enforced && !mayOwnCases(RBACDao.getCurrentRoleForUser(user.getInt("id"), accountId))
+            ? "The owner must have the Admin or Threat Engineer role" : null;
       }
     }
-    return false;
+    return "The owner must be a member of this account";
   }
 
   /**
