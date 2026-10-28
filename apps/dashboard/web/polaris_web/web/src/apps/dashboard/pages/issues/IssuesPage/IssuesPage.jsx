@@ -110,6 +110,16 @@ let filtersOptions = [
         label: 'Tags',
         title: 'Tags',
         choices: [],
+    },
+    {
+        key: 'aiVerdict',
+        label: 'AI verdict',
+        title: 'AI verdict',
+        choices: [
+            { label: 'False positive', value: 'FALSE_POSITIVE' },
+            { label: 'True positive', value: 'TRUE_POSITIVE' },
+            { label: 'Not verified', value: 'NOT_VERIFIED' }
+        ],
     }
 ]
 
@@ -681,11 +691,11 @@ function IssuesPage() {
                 onAction: () => { ignoreAction('noTimeToFix') },
                 requires: ignoreRequires('noTimeToFix')
             },
-            ...(func.checkForFeatureSaas('AKTO_GPT_AI') ? [{
+            {
                 content: 'Verify with AI',
                 onAction: () => { verifyWithAiAction() },
                 requires: 'api/verifyIssuesWithAi'
-            }] : []),
+            },
             {
                 content: 'Export selected Issues',
                 onAction: () => { openVulnerabilityReport(items, false) },
@@ -922,6 +932,7 @@ function IssuesPage() {
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
         let filterCompliance = filters.compliance
+        let filterAiVerdict = filters.aiVerdict
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const filterCollectionsId = mergeFilterCollectionsId(filters, pageScopeApiCollectionIds)
         let filterSubCategory = []
@@ -939,7 +950,8 @@ function IssuesPage() {
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()],
             endTimeStamp: [endTimestamp.toString()],
-            activeCollections: [activeCollections.toString()]
+            activeCollections: [activeCollections.toString()],
+            filterAiVerdict: filterAiVerdict
         }
         setIssuesFilters(obj)
 
@@ -948,7 +960,7 @@ function IssuesPage() {
 
         let issueItem = []
 
-        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance, filterAiVerdict).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory || ''}|${item?.severity || ''}|${item?.testRunIssueStatus || ''}`
@@ -1042,7 +1054,7 @@ function IssuesPage() {
         }
         let issueItems = []
 
-        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance, filters?.aiVerdict || []).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
                 if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
                 const issue = {
@@ -1099,7 +1111,7 @@ function IssuesPage() {
         }
         let issueItems = []
 
-        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance, filters?.aiVerdict || []).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
                 if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
                 const issue = {

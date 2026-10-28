@@ -1,7 +1,6 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -52,11 +51,15 @@ public class AiVerificationAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AiVerificationAction.class, LogDb.DASHBOARD);
 
-    private static final String FEATURE_LABEL = "AKTO_GPT_AI";
     private static final int MAX_RESULTS_PER_RUN = 500;
     private static final int MAX_ATTEMPTS_PER_RESULT = 3;
     // Descriptions Verify with AI writes start with this, e.g. "[AI verified: false positive, confidence 85%] <reason>".
     public static final String DESCRIPTION_PREFIX = "[AI verified";
+    // Values of the "AI verdict" filter on the issues and test run tables.
+    public static final String AI_VERDICT_FILTER = "aiVerdict";
+    private static final String VERDICT_FALSE_POSITIVE = "FALSE_POSITIVE";
+    private static final String VERDICT_TRUE_POSITIVE = "TRUE_POSITIVE";
+    private static final String VERDICT_NOT_VERIFIED = "NOT_VERIFIED";
     // Tests the AI cannot judge from the stored request/response, so they are never sent to it:
     // passive tests (e.g. sensitive data exposure) send no attack, multi-step tests are judged across
     // steps the stored attempts do not fully show, and some tests prove the finding through an
@@ -135,13 +138,9 @@ public class AiVerificationAction extends UserAction {
             () -> verifyTargets(issueIdArray.size() + " selected issues", targetsForIssues(openIssuesFilter)));
     }
 
-    /** Checks the feature and the per-scope guard, then runs the job in the background. */
+    /** Checks the AI provider and the per-scope guard, then runs the job in the background. */
     private String startJob(String key, String busyMessage, Job job) {
         int accountId = Context.accountId.get();
-        if (!UsageMetricUtils.getFeatureAccessSaas(accountId, FEATURE_LABEL).getIsGranted()) {
-            addActionError("AI features are not enabled for this account");
-            return ERROR.toUpperCase();
-        }
         if (!FalsePositiveVerifierPromptHandler.isConfigured()) {
             addActionError("AI provider is not configured. Set the AZURE_OPENAI_* environment variables or configure a model for 'false-positive-verification'.");
             return ERROR.toUpperCase();
@@ -243,6 +242,26 @@ public class AiVerificationAction extends UserAction {
                 + " issues with no vulnerable result in their latest test run");
         }
         return targets;
+    }
+
+    /**
+     * Issues filter for the verdict Verify with AI wrote into the description: any of FALSE_POSITIVE,
+     * TRUE_POSITIVE and NOT_VERIFIED. Unknown values match nothing.
+     */
+    public static Bson aiVerdictFilter(List<String> verdicts) {
+        String prefix = "^" + DESCRIPTION_PREFIX.replace("[", "\\[");
+        List<Bson> anyOf = new ArrayList<>();
+        for (String verdict : verdicts) {
+            if (VERDICT_FALSE_POSITIVE.equals(verdict)) {
+                // "[AI verified] <reason>" is the older format, written only for false positives.
+                anyOf.add(Filters.regex(TestingRunIssues.DESCRIPTION, prefix + "(: false positive|\\] )"));
+            } else if (VERDICT_TRUE_POSITIVE.equals(verdict)) {
+                anyOf.add(Filters.regex(TestingRunIssues.DESCRIPTION, prefix + ": true positive"));
+            } else if (VERDICT_NOT_VERIFIED.equals(verdict)) {
+                anyOf.add(Filters.not(Filters.regex(TestingRunIssues.DESCRIPTION, prefix)));
+            }
+        }
+        return anyOf.isEmpty() ? Filters.in(Constants.ID, new ArrayList<>()) : Filters.or(anyOf);
     }
 
     private static MongoCollection<TestingRunResult> resultCollection(boolean inVulnerableCollection) {

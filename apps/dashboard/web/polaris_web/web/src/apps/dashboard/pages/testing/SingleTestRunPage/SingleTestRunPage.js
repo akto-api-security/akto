@@ -133,6 +133,16 @@ let filterOptions = [
     title: mapLabel('API', getDashboardCategory()) + ' name',
     choices: [],
   },
+  {
+    key: 'aiVerdict',
+    label: 'AI verdict',
+    title: 'AI verdict',
+    choices: [
+      { label: 'False positive', value: 'FALSE_POSITIVE' },
+      { label: 'True positive', value: 'TRUE_POSITIVE' },
+      { label: 'Not verified', value: 'NOT_VERIFIED' }
+    ],
+  },
 ]
 
 // CSV export pages through fetchTestingRunResults in raw-result units (skip/limit count results, not
@@ -626,7 +636,7 @@ function SingleTestRunPage() {
     setSeverityModalActive(true);
   };
 
-  const showVerifyWithAi = !workflowTest && func.checkForFeatureSaas('AKTO_GPT_AI') && (testRunCountMap?.VULNERABLE || 0) > 0
+  const showVerifyWithAi = !workflowTest && (testRunCountMap?.VULNERABLE || 0) > 0
 
   // Reopens the issues behind the selected results in the Ignored Issues tab, the same as "Reopen"
   // in the result flyout, then recounts this run so the results move back to Vulnerable.
