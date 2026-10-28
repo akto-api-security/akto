@@ -14,21 +14,21 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-      - uses: actions/setup-java@v2
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
         with:
-          distribution: 'adopt'
+          distribution: 'temurin'
           java-version: '8'
           architecture: x64
 
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v6
         with:
-          node-version: '17'
+          node-version: '20'
       - name: Download dashboard static assets
         run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
 
@@ -36,7 +36,7 @@ jobs:
         working-directory: ./apps/dashboard/web/polaris_web
         run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{secrets.AWS_ACCESS_KEY_ID}}
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
@@ -47,3 +47,15 @@ jobs:
 
       - name: Invalidate CDN cache
         run: aws cloudfront create-invalidation --distribution-id ${{secrets.AWS_CDN_DISTRIBUTION_ID}} --paths "/polaris_web/${{github.event.inputs.release_version}}/*"
+
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Akto Dashboard v${{ github.event.inputs.release_version }} released Only UI!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

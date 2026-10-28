@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Modal, Select, Text, TextField, VerticalStack } from "@shopify/polaris";
-import useCaseOwners from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
-import { CASE_NOTES_MAX_LENGTH, changedCaseFields, ownerOptionLabel } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
+import useCaseOwners, { ASSIGN_ROLES_MESSAGE } from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
+import { CASE_NOTES_MAX_LENGTH, canAssignToMe, changedCaseFields, ownerOptionLabel } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
 
 // The owner choices of a case: unassigned, the account's members, and the current owner even if they have
 // since left the account, so the select always shows what is actually set.
@@ -15,7 +15,7 @@ export function ownerSelectOptions(owners, currentOwner) {
 // set ({ caseOwner?, caseNotes? }), so marking events that already have an owner or notes never clears them by
 // leaving the dialog blank.
 export default function ReviewCaseModal({ open, onClose, onConfirm, summary, initialOwner = "", initialNotes = "", loading = false }) {
-    const { owners } = useCaseOwners();
+    const { owners, canAssign } = useCaseOwners();
     const [owner, setOwner] = useState(initialOwner);
     const [notes, setNotes] = useState(initialNotes);
 
@@ -27,7 +27,6 @@ export default function ReviewCaseModal({ open, onClose, onConfirm, summary, ini
     }, [open, initialOwner, initialNotes]);
 
     const me = window.USER_NAME;
-    const canAssignToMe = !!me && owner !== me && owners.some((o) => o.login === me);
 
     return (
         <Modal
@@ -50,9 +49,10 @@ export default function ReviewCaseModal({ open, onClose, onConfirm, summary, ini
                             options={ownerSelectOptions(owners, owner)}
                             value={owner}
                             onChange={setOwner}
-                            helpText="Who is responsible for reviewing this. You can change it later."
+                            disabled={!canAssign}
+                            helpText={canAssign ? "Who is responsible for reviewing this. You can change it later." : ASSIGN_ROLES_MESSAGE}
                         />
-                        {canAssignToMe && <Button plain onClick={() => setOwner(me)}>Assign to me</Button>}
+                        {canAssignToMe({ canAssign, me, owner, owners }) && <Button plain onClick={() => setOwner(me)}>Assign to me</Button>}
                     </VerticalStack>
                     <TextField
                         label="Notes"

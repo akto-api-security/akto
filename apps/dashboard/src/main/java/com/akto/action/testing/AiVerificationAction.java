@@ -8,7 +8,6 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -17,7 +16,6 @@ import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.gpt.handlers.gpt_prompts.FalsePositiveVerifierPromptHandler;
-import com.akto.gpt.handlers.gpt_prompts.FalsePositiveVerifierPromptHandler.TestDefinition;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing_utils.TestingUtils;
@@ -42,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.regex.Pattern;
 
 /**
  * "Verify with AI" on the test run page: asks the LLM about every vulnerable result of a test run
@@ -57,7 +56,13 @@ public class AiVerificationAction extends UserAction {
     private static final int MIN_CONFIDENCE_TO_IGNORE = 70;
     private static final int MAX_ATTEMPTS_PER_RESULT = 3;
     private static final String IGNORE_REASON = "False positive";
-    private static final String DESCRIPTION_PREFIX = "[AI verified] ";
+    public static final String DESCRIPTION_PREFIX = "[AI verified] ";
+    // Tests the AI cannot judge from the stored request/response, so they are never sent to it:
+    // passive tests (e.g. sensitive data exposure) send no attack, multi-step tests are judged across
+    // steps the stored attempts do not fully show, and some tests prove the finding through an
+    // out-of-band callback (ssrf_url_hit) or response timing, which are not stored.
+    private static final Pattern NOT_VERIFIABLE_TEST = Pattern.compile(
+        "(?m)^\\s*type:\\s*(passive|multiple|graph)\\s*$|ssrf_url_hit|response_time|median_response|compare_greater|\\.stats\\.");
     private static final String UPDATED_BY = "Akto AI";
 
     // One background job per test run at a time; jobs run here, LLM calls in a separate pool so a
@@ -270,15 +275,20 @@ public class AiVerificationAction extends UserAction {
         }
         List<TestingRunResult> results = new ArrayList<>();
         for (Target target : targets) results.add(target.result);
-        Map<String, TestDefinition> testDefinitions = loadTestDefinitions(results);
+        Map<String, String> templates = loadTemplates(results);
 
         int accountId = Context.accountId.get();
         List<Future<Outcome>> calls = new ArrayList<>();
+        int notVerifiable = 0;
         for (Target target : targets) {
-            TestDefinition test = testDefinitions.get(target.result.getTestSubType());
+            String template = templates.get(target.result.getTestSubType());
+            if (template != null && NOT_VERIFIABLE_TEST.matcher(template).find()) {
+                notVerifiable++;
+                continue;
+            }
             calls.add(LLM_EXECUTOR.submit(() -> {
                 Context.accountId.set(accountId);
-                return verifyResult(target.issue, target.result, test);
+                return verifyResult(target.issue, target.result, template);
             }));
         }
 
@@ -299,48 +309,31 @@ public class AiVerificationAction extends UserAction {
         }
 
         String summary = "AI verification for " + label + ": checked " + calls.size() + ", moved " + ignored
-            + " false positives to ignored, kept " + kept + ", errors " + errors;
-        if (errors == calls.size()) {
+            + " false positives to ignored, kept " + kept + ", errors " + errors + ", skipped " + notVerifiable + " not verifiable by AI";
+        if (!calls.isEmpty() && errors == calls.size()) {
             loggerMaker.errorAndAddToDb(summary + ". Every AI call failed; check the AI provider configuration and logs.");
         } else {
             loggerMaker.infoAndAddToDb(summary);
         }
     }
 
-    /** The test template (YAML + name/description/category) for every test in the batch, in one query. */
-    private static Map<String, TestDefinition> loadTestDefinitions(List<TestingRunResult> results) {
+    /** The test template YAML of every test in the batch, by test id, in one query. */
+    private static Map<String, String> loadTemplates(List<TestingRunResult> results) {
         Set<String> testIds = new HashSet<>();
         for (TestingRunResult result : results) {
             if (result.getTestSubType() != null) testIds.add(result.getTestSubType());
         }
-        Map<String, TestDefinition> definitions = new HashMap<>();
-        if (testIds.isEmpty()) return definitions;
-        List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
-            Filters.in(Constants.ID, new ArrayList<>(testIds)),
-            Projections.include(YamlTemplate.CONTENT, YamlTemplate.INFO)
-        );
-        for (YamlTemplate template : templates) {
-            Info info = template.getInfo();
-            String category = null;
-            if (info != null && info.getCategory() != null) {
-                category = info.getCategory().getDisplayName() != null
-                    ? info.getCategory().getDisplayName() : info.getCategory().getName();
-            }
-            definitions.put(template.getId(), new TestDefinition(template.getId(),
-                info == null ? null : info.getName(),
-                info == null ? null : info.getDescription(),
-                category,
-                template.getContent()));
+        Map<String, String> templates = new HashMap<>();
+        if (testIds.isEmpty()) return templates;
+        for (YamlTemplate template : YamlTemplateDao.instance.findAll(
+                Filters.in(Constants.ID, new ArrayList<>(testIds)), Projections.include(YamlTemplate.CONTENT))) {
+            templates.put(template.getId(), template.getContent());
         }
-        // Tests whose template is gone still get verified, with just their id.
-        for (String testId : testIds) {
-            definitions.putIfAbsent(testId, new TestDefinition(testId, null, null, null, null));
-        }
-        return definitions;
+        return templates;
     }
 
     /** Asks the LLM about one result and moves its issue to ignored if it is a false positive. */
-    private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, TestDefinition test) {
+    private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, String template) {
         List<TestResult> attempts = attemptsToJudge(result);
         if (attempts.isEmpty()) return Outcome.KEPT;
 
@@ -352,7 +345,7 @@ public class AiVerificationAction extends UserAction {
                 reasons.add(attempt.getValidationReason().trim());
             }
         }
-        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(test, String.join("; ", reasons),
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(result.getTestSubType(), template, String.join("; ", reasons),
             attempts.get(0).getOriginalMessage(), attemptMessages);
         BasicDBObject verdict = new FalsePositiveVerifierPromptHandler().handle(new BasicDBObject("prompt", prompt));
         if (verdict.containsField("error")) {

@@ -40,6 +40,7 @@ const KNOWN_CLIENTS = {
     vscopilot: { displayName: 'Visual Studio Copilot', domain: 'visualstudio.microsoft.com', agentType: CLIENT_TYPES.AI_AGENT, variants: ['visual-studio-copilot'] },
     cursor: { displayName: 'Cursor', domain: 'cursor.com', agentType: CLIENT_TYPES.AI_AGENT },
     grok: { displayName: 'Grok', domain: 'x.ai', agentType: CLIENT_TYPES.AI_AGENT },
+    grokbot: { displayName: 'Grok Bot', domain: 'x.ai', agentType: CLIENT_TYPES.AI_AGENT, variants: ['grok-bot'] },
     cody: { displayName: 'Cody', domain: 'sourcegraph.com', agentType: CLIENT_TYPES.AI_AGENT },
     windsurf: { displayName: 'Windsurf', domain: 'codeium.com', agentType: CLIENT_TYPES.AI_AGENT },
     codeium: { displayName: 'Codeium', domain: 'codeium.com', agentType: CLIENT_TYPES.AI_AGENT },

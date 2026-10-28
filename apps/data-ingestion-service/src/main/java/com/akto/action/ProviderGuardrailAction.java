@@ -224,11 +224,20 @@ public class ProviderGuardrailAction extends ActionSupport {
 
     // Endpoint ID is the first host segment; the prefix keeps hook endpoints apart from real devices.
     private static String endpointId(ParsedRequest frame) {
-        return ENDPOINT_PREFIX + AgentHostUtils.identitySlug(AgentHostUtils.emailLocalPart(extractEmail(frame.actor)));
+        return ENDPOINT_PREFIX + AgentHostUtils.identitySlug(actorIdentity(frame.actor));
     }
 
     private static String actorSlug(ParsedRequest frame) {
-        return AgentHostUtils.slugify(AgentHostUtils.emailLocalPart(extractEmail(frame.actor)));
+        return AgentHostUtils.slugify(actorIdentity(frame.actor));
+    }
+
+    private static String actorIdentity(Map<String, Object> actor) {
+        String email = extractEmail(actor);
+        if (email != null && !email.trim().isEmpty()) {
+            return AgentHostUtils.emailLocalPart(email);
+        }
+        Object id = actor == null ? null : actor.get("id");
+        return id != null ? id.toString() : null;
     }
 
     // Registry-known ai-agent values keep each Claude surface in its own group instead of folding everything into Claude CLI.

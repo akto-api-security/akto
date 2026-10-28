@@ -73,6 +73,7 @@ public final class McpClientRegistry {
         register("vscopilot", "Visual Studio Copilot", AI_AGENT, "visual-studio-copilot");
         register("cursor", "Cursor", AI_AGENT);
         register("grok", "Grok", AI_AGENT);
+        register("grokbot", "Grok Bot", AI_AGENT, "grok-bot");
         register("cody", "Cody", AI_AGENT);
         register("windsurf", "Windsurf", AI_AGENT);
         register("codeium", "Codeium", AI_AGENT);
