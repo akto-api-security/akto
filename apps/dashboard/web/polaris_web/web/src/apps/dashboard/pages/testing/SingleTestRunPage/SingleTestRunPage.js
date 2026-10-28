@@ -1086,7 +1086,7 @@ function SingleTestRunPage() {
         ]}
       >
         <Modal.Section>
-          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'} and add its verdict and confidence to each issue's description. No issue is ignored automatically; select the false positives and ignore them yourself.`}</Text>
+          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'} and add its verdict and confidence to each issue's description. Issue statuses won't change, so you can review the verdicts and mark false positives.`}</Text>
         </Modal.Section>
       </Modal>
     </>

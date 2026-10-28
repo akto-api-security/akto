@@ -581,7 +581,7 @@ function IssuesPage() {
 
         function verifyWithAiAction() {
             func.showConfirmationModal(
-                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"} and add its verdict and confidence to each issue's description. No issue is ignored automatically; select the false positives and ignore them yourself.`,
+                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"} and add its verdict and confidence to each issue's description. Issue statuses won't change, so you can review the verdicts and mark false positives.`,
                 "Verify",
                 async () => {
                     await api.verifyIssuesWithAi(items).then(() => {
