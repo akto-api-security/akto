@@ -85,10 +85,8 @@ class FalsePositiveVerifierPromptHandlerTest {
         assertTrue(prompt.contains("validate:\n  response_code:"));
         assertTrue(prompt.contains("Why the scanner flagged it: status 200 with other user's id"));
         assertTrue(prompt.contains("<<<EVIDENCE") && prompt.contains("EVIDENCE>>>"));
-        assertTrue(prompt.contains("answer FALSE_POSITIVE, even with status 200"));
-        // tests that only inspect the response are judged by `validate`, not by an injected payload
-        assertTrue(prompt.contains("B. The test sends the request unchanged (`req: []`, or `type: passive`)"));
-        assertTrue(prompt.contains("are NOT a reason for FALSE_POSITIVE"));
+        assertTrue(prompt.contains("Answer FALSE_POSITIVE only\n  when the proof rules below clearly show"));
+        assertTrue(prompt.contains("`x-akto-ignore` header to every request it sends; it is not part of the attack"));
         assertTrue(prompt.contains("Baseline (original) request/response:\n(not available)"));
         // the template sits outside the untrusted evidence block
         assertTrue(prompt.indexOf("validate:") < prompt.indexOf("\n<<<EVIDENCE\n"));
@@ -164,5 +162,78 @@ class FalsePositiveVerifierPromptHandlerTest {
             java.util.Collections.singletonList(testResultMessage("", 200, body)));
         assertTrue(prompt.contains("validate:\n  response_payload:\n    regex: \"root:.*:0:0:\""));
         assertTrue(prompt.contains("end-of-body"));
+    }
+
+    // --- proof class, chosen from the template's category ---
+
+    private static String template(String id, String category, String execute) {
+        return "id: " + id + "\ninfo:\n  name: \"" + id + "\"\n  category:\n    name: " + category + "\n"
+            + "execute:\n" + execute + "\nvalidate:\n  response_code:\n    gte: 200\n";
+    }
+
+    private static final String UNCHANGED = "  type: single\n  requests:\n    - req: []\n";
+    private static final String CHANGED = "  type: single\n  requests:\n    - req:\n        - modify_url: /v1/\n";
+
+    @Test
+    void proofClassComesFromTheCategory() {
+        assertEquals(FalsePositiveProofRules.HEADERS, FalsePositiveProofRules.detectClass(template("MUST_CONTAIN_REQUEST_HEADERS", "MHH", UNCHANGED)));
+        assertEquals(FalsePositiveProofRules.ACCEPTANCE, FalsePositiveProofRules.detectClass(template("OLD_VERSION_API_TEST", "IIM", CHANGED)));
+        assertEquals(FalsePositiveProofRules.JWT, FalsePositiveProofRules.detectClass(template("ADD_JKU_TO_JWT", "NO_AUTH", CHANGED)));
+        assertEquals(FalsePositiveProofRules.AUTH_BOLA, FalsePositiveProofRules.detectClass(template("REMOVE_TOKENS", "NO_AUTH", CHANGED)));
+        assertEquals(FalsePositiveProofRules.AUTH_BOLA, FalsePositiveProofRules.detectClass(template("REPLACE_AUTH_TOKEN", "BOLA", CHANGED)));
+        assertEquals(FalsePositiveProofRules.INJECTION, FalsePositiveProofRules.detectClass(template("FILE_INCLUSION_NEW_PARAM", "LFI", CHANGED)));
+        assertEquals(FalsePositiveProofRules.HEADERS, FalsePositiveProofRules.detectClass(template("SM_HEADER", "SM", UNCHANGED)));
+        assertEquals(FalsePositiveProofRules.EXPOSURE, FalsePositiveProofRules.detectClass(template("AIRFLOW_CONFIGURATION_EXPOSURE", "SM", CHANGED)));
+        assertEquals(FalsePositiveProofRules.GENERAL, FalsePositiveProofRules.detectClass("not: [valid"));
+        assertEquals(FalsePositiveProofRules.GENERAL, FalsePositiveProofRules.detectClass(null));
+    }
+
+    @Test
+    void promptCarriesOnlyThatClassesRules() throws Exception {
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt("OLD_VERSION_API_TEST", template("OLD_VERSION_API_TEST", "IIM", CHANGED),
+            null, null, java.util.Collections.singletonList(testResultMessage("", 200, "{}")));
+        assertTrue(prompt.contains("Proof rules - acceptance"));
+        assertFalse(prompt.contains("Proof rules - injection"));
+        assertFalse(prompt.contains("Proof rules - JWT"));
+    }
+
+    // --- facts computed in code ---
+
+    private static String exchange(String url, String headers, int status, String responseHeaders, String body) throws Exception {
+        return new org.json.JSONObject()
+            .put("request", new org.json.JSONObject().put("method", "GET").put("url", url).put("headers", headers).put("body", ""))
+            .put("response", new org.json.JSONObject().put("statusCode", status).put("headers", responseHeaders).put("body", body))
+            .toString();
+    }
+
+    @Test
+    void factsIgnoreAktoHeadersAndReportIdenticalTokens() throws Exception {
+        String baseline = exchange("https://x.io/v2/a?q=1", "{\"authorization\":\"Bearer t1\"}", 200, "{\"content-type\":\"json\"}", "{\"id\":1}");
+        String attack = exchange("https://x.io/v2/a?q=1", "{\"authorization\":\"Bearer t1\",\"x-akto-ignore\":\"0\"}", 200, "{\"content-type\":\"json\"}", "{\"id\":1}");
+        String facts = ExchangeFacts.describe(baseline, attack);
+        assertTrue(facts.contains("- Request vs baseline: identical, apart from Akto's own headers; credential header authorization: identical to the baseline"), facts);
+        assertTrue(facts.contains("Response status: 200 (baseline 200, same)"), facts);
+        assertTrue(facts.contains("Response body vs baseline: same fields and values"), facts);
+    }
+
+    @Test
+    void factsShowPathChangesAndBodyDifferences() throws Exception {
+        String baseline = exchange("https://x.io/v2/a", "{}", 200, "{\"x-frame-options\":\"DENY\"}", "{\"balance\":20643982,\"at\":\"2026-09-16T09:16:44Z\"}");
+        String attack = exchange("https://x.io/v1/a", "{}", 200, "{}", "{\"balance\":0,\"at\":\"2026-09-16T09:25:07Z\"}");
+        String facts = ExchangeFacts.describe(baseline, attack);
+        assertTrue(facts.contains("path: https://x.io/v2/a -> https://x.io/v1/a"), facts);
+        assertTrue(facts.contains("x-frame-options removed"), facts);
+        assertTrue(facts.contains("Response body fields changed: balance (20643982 -> 0)"), facts);
+        assertFalse(facts.contains("at ("), facts);
+    }
+
+    @Test
+    void factsFlagEchoOnlyResponses() throws Exception {
+        String baseline = exchange("https://x.io/a?file=report", "{}", 200, "{}", "{\"file\":\"report\"}");
+        String attack = exchange("https://x.io/a?file=../../etc/passwd", "{}", 200, "{}", "{\"file\":\"../../etc/passwd\"}");
+        String facts = ExchangeFacts.describe(baseline, attack);
+        assertTrue(facts.contains("query param changed: file (report -> ../../etc/passwd)"), facts);
+        assertTrue(facts.contains("differs from the baseline only by echoing values the attack sent"), facts);
+        assertEquals("", ExchangeFacts.describe(null, attack));
     }
 }
