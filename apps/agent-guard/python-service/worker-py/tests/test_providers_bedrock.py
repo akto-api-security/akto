@@ -135,7 +135,7 @@ async def test_api_key_sends_bearer_and_converse_body():
     assert post["json"] is None
     assert json.loads(post["content"]) == {
         "messages": [{"role": "user", "content": [{"text": "hello"}]}],
-        "inferenceConfig": {"maxTokens": 512, "temperature": 0.1},
+        "inferenceConfig": {"maxTokens": 512, "temperature": 0.0},
     }
 
 
@@ -290,7 +290,7 @@ async def test_mantle_posts_chat_completions_signed_for_mantle(pod_role):
         "model": _GEMMA,
         "messages": [{"role": "user", "content": "hello"}],
         "max_tokens": 512,
-        "temperature": 0.1,
+        "temperature": 0.0,
     }
     auth = post["headers"]["Authorization"]
     assert auth.startswith("AWS4-HMAC-SHA256 Credential=ASIAROLE/")
