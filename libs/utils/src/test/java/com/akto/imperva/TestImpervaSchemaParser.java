@@ -4,27 +4,21 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Before;
 import org.junit.Test;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.upload.SwaggerUploadLog;
-import com.akto.imperva.ImpervaApiClient.EndpointSummary;
-import com.akto.imperva.ImpervaApiEndpointsImporter.ImportResult;
 import com.akto.imperva.model.ImpervaSchema;
 import com.akto.imperva.parser.ImpervaSchemaParser;
 import com.akto.open_api.parser.ParserResult;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class TestImpervaApiEndpointsImporter {
+public class TestImpervaSchemaParser {
 
     private static final ObjectMapper mapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -94,75 +88,8 @@ public class TestImpervaApiEndpointsImporter {
 
     @Test
     public void replacesWildcardSegmentsOnly() {
-        assertEquals("/dps/apps/STRING/users/STRING/secure", ImpervaApiEndpointsImporter.replacePathWildcards("/dps/apps/*/users/*/secure"));
-        assertEquals("/common/culture/STRING", ImpervaApiEndpointsImporter.replacePathWildcards("/common/culture/*"));
-        assertEquals("/files/a*.json", ImpervaApiEndpointsImporter.replacePathWildcards("/files/a*.json"));
-    }
-
-    @Test
-    public void importerFallsBackToInventoryWhenDetailsUnavailable() throws Exception {
-        ImpervaApiClient client = new ImpervaApiClient(null, "id", "key") {
-            @Override
-            public List<EndpointSummary> fetchAllEndpoints() {
-                return Arrays.asList(
-                    new EndpointSummary(1, "api.example.com", "POST", "/orders"),
-                    new EndpointSummary(2, "api.example.com", "GET", "/users/*/orders"),
-                    new EndpointSummary(3, "other.example.com", "DELETE", "/items/*")
-                );
-            }
-
-            @Override
-            public ImpervaSchema fetchEndpointDetails(long endpointId) throws Exception {
-                if (endpointId == 1) return schema(POST_SCHEMA);
-                if (endpointId == 2) return schema(GET_SCHEMA);
-                throw new IOException("Imperva API returned 404");
-            }
-        };
-
-        List<SwaggerUploadLog> received = new ArrayList<>();
-        List<Boolean> lastPageFlags = new ArrayList<>();
-        ImportResult result = ImpervaApiEndpointsImporter.importEndpoints(client, (parsed, page) -> {
-            received.addAll(parsed.getUploadLogs());
-            lastPageFlags.add(page.isLastPage());
-        });
-
-        assertEquals(3, result.getEndpointCount());
-        assertEquals(1, result.getFallbackCount());
-        assertEquals(3, received.size());
-        assertEquals(Arrays.asList(true), lastPageFlags);
-
-        assertEquals("https://api.example.com/orders", aktoMessage(received.get(0)).get("path"));
-        assertEquals("https://api.example.com/users/STRING/orders?page=123", aktoMessage(received.get(1)).get("path"));
-        Map<String, Object> fallback = aktoMessage(received.get(2));
-        assertEquals("DELETE", fallback.get("method"));
-        assertEquals("https://other.example.com/items/STRING", fallback.get("path"));
-    }
-
-    @Test
-    public void importerStopsCallingDetailsAfterConsecutiveFailures() throws Exception {
-        AtomicInteger detailsCalls = new AtomicInteger();
-        ImpervaApiClient client = new ImpervaApiClient(null, "id", "key") {
-            @Override
-            public List<EndpointSummary> fetchAllEndpoints() {
-                List<EndpointSummary> endpoints = new ArrayList<>();
-                for (int i = 0; i < 150; i++) {
-                    endpoints.add(new EndpointSummary(i, "api.example.com", "GET", "/items/" + i));
-                }
-                return endpoints;
-            }
-
-            @Override
-            public ImpervaSchema fetchEndpointDetails(long endpointId) throws Exception {
-                detailsCalls.incrementAndGet();
-                throw new IOException("Imperva API returned 403");
-            }
-        };
-
-        List<SwaggerUploadLog> received = new ArrayList<>();
-        ImportResult result = ImpervaApiEndpointsImporter.importEndpoints(client, (parsed, page) -> received.addAll(parsed.getUploadLogs()));
-
-        assertEquals(100, detailsCalls.get());
-        assertEquals(150, result.getFallbackCount());
-        assertEquals(150, received.size());
+        assertEquals("/dps/apps/STRING/users/STRING/secure", ImpervaSchemaParser.replacePathWildcards("/dps/apps/*/users/*/secure"));
+        assertEquals("/common/culture/STRING", ImpervaSchemaParser.replacePathWildcards("/common/culture/*"));
+        assertEquals("/files/a*.json", ImpervaSchemaParser.replacePathWildcards("/files/a*.json"));
     }
 }

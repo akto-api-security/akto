@@ -61,6 +61,20 @@ public class ImpervaSchemaParser {
     }
 
     /**
+     * Imperva marks path parameters as "*" segments, e.g. /users/{@literal *}/orders. Akto expects STRING
+     * tokens so the endpoint is stored as a templated URL.
+     */
+    public static String replacePathWildcards(String resource) {
+        String[] segments = resource.split("/", -1);
+        for (int i = 0; i < segments.length; i++) {
+            if ("*".equals(segments[i])) {
+                segments[i] = "STRING";
+            }
+        }
+        return String.join("/", segments);
+    }
+
+    /**
      * @param generateBodylessSample when true, endpoints without a usable request body (e.g. GET) still
      *                               produce one sample with an empty body instead of being skipped.
      */
