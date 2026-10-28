@@ -162,6 +162,8 @@ async def scan_payload(
             if isinstance(elapsed, (int, float)) and elapsed > 0:
                 cascade_backpressure.record_cascade_latency(float(elapsed))
             schedule(alerts.post_slack(scanner_name, scanner_type, text, result))
+            if alerts.has_pending_fallback_alerts():
+                schedule(alerts.flush_fallback_alerts())
             scan_diag.log_scan_outcome(
                 "cascade_run",
                 scanner_name,
@@ -208,6 +210,8 @@ async def scan_payload(
             # (bad config, unexpected bug, not just "arbiter timed out") shows
             # up in the same channel people actually watch, not just logs.
             schedule(alerts.post_slack(scanner_name, scanner_type, text, error_result))
+            if alerts.has_pending_fallback_alerts():
+                schedule(alerts.flush_fallback_alerts())
             return error_result
 
     if scanner_name in LOCAL_SCANNERS:

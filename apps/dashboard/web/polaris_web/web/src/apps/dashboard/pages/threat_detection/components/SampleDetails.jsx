@@ -21,7 +21,7 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import transform from "../../testing/transform";
 import issuesFunctions from "../../issues/module";
 import { GUARDRAIL_REMEDIATION_MARKDOWN, SETTINGS_RISK_CONFIGS } from "../constants/guardrailDescriptions";
-import { extractOverviewAndRemediation, extractBehaviour, extractRuleViolated, resolveComplianceClauseMap, storedRemediationMarkdown } from "../utils/formatUtils";
+import { extractOverviewAndRemediation, extractBehaviour, isBackfillRefId, extractRuleViolated, resolveComplianceClauseMap, storedRemediationMarkdown } from "../utils/formatUtils";
 import { getGuardrailRuleInfo } from "../constants/guardrailRuleDefinitions";
 import { getOwaspThreatsForRule } from "../../guardrails/components/owaspConfig";
 import { isAgenticSecurityCategory, isEndpointSecurityCategory } from "../../../../main/labelHelper";
@@ -32,6 +32,10 @@ import { buildEvidenceVulnerabilitySegments } from "../utils/evidenceHighlight";
 import sampleDataTransform from "../../../components/shared/customDiffEditor";
 import { usePermissions, withPermissions } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
+import ReviewCaseModal from "../../guardrails/components/ReviewCaseModal";
+import CasePanel from "../../guardrails/components/CasePanel";
+import useCaseOwners from "../utils/useCaseOwners";
+import { applyCaseUpdate, buildCaseTimeline } from "../utils/caseManagement";
 
 // For config-scan events: pull evidence/message/config_content out of the sample's raw orig.
 // requestPayload is normally valid JSON (repaired server-side if PII redaction corrupted it);
@@ -183,6 +187,7 @@ function SampleDetails(props) {
         return {
             ...rowInfo,
             templateId: attempt.filterId,
+            refId: attempt.refId || rowInfo?.refId,
             severity: attempt.severity || rowInfo?.severity,
             url: attempt.endpoint || rowInfo?.url,
             method: attempt.method || rowInfo?.method,
@@ -289,6 +294,34 @@ function SampleDetails(props) {
     useEffect(() => {
         setHumanResponse((humanResponseProp || "PENDING").toUpperCase());
     }, [eventId, humanResponseProp]);
+
+    // Case management (an event marked for review): owner, notes and the status/owner/notes history. Read from the
+    // event's fetched payload when it has one (so a flyout opened from a link or after a reload is complete), else
+    // from the table row. Changes made here are applied on top at once, until the event is opened again.
+    const { owners: caseOwners } = useCaseOwners();
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const [caseEdits, setCaseEdits] = useState(null);
+    const loadedCase = useMemo(() => {
+        const first = Array.isArray(data) ? data[0] : null;
+        const source = first && first.caseOwner !== undefined ? first : rowInfo;
+        return { caseOwner: source?.caseOwner || "", caseNotes: source?.caseNotes || "", caseTimeline: source?.caseTimeline || [] };
+    }, [data, rowInfo]);
+    useEffect(() => { setCaseEdits(null); }, [eventId, data]);
+    const caseData = caseEdits || loadedCase;
+    const hasCase = eventStatus === 'UNDER_REVIEW' || !!caseData.caseOwner || !!caseData.caseNotes;
+    // A grouped activity is one case: its owner and notes apply to every event in it.
+    const caseEventIds = (Array.isArray(data) ? data.map((d) => d?.eventId).filter(Boolean) : []).length > 0
+        ? data.map((d) => d?.eventId).filter(Boolean)
+        : [eventId];
+    const detectedAt = (Array.isArray(data) && data[0]?.ts) || rowInfo?.detectedAt;
+    // The change the server just saved ({ status?, caseOwner?, caseNotes? }), with the history entries it adds.
+    const applyCaseChange = (update) => {
+        setCaseEdits(applyCaseUpdate(
+            { status: eventStatus, caseOwner: caseData.caseOwner, caseNotes: caseData.caseNotes, caseTimeline: caseData.caseTimeline },
+            update,
+            window.USER_NAME,
+        ));
+    };
 
     // Approve-server: modal/mode/days state lives in the small ApproveServerButton component
     // (not here) so typing the duration re-renders only that button, not the whole flyout.
@@ -471,10 +504,32 @@ function SampleDetails(props) {
         setLatestActivity(activityEvents)
     }
 
-    const timelineTab = data.length > 0 && {
+    // The timeline. On Threat Activity the case history (status, owner and notes changes) shares it with the
+    // attack activity; the Guardrails page has no attack activity, so there it is the case history alone.
+    const isGuardrailsPage = window.location.href.indexOf("guardrails") > -1;
+    const timelineActivity = isGuardrailsPage
+        ? buildCaseTimeline(caseData.caseTimeline, detectedAt, caseOwners)
+        : [...latestActivity, ...buildCaseTimeline(caseData.caseTimeline, null, caseOwners)].sort((a, b) => a.timestamp - b.timestamp);
+
+    // A case is one tab: its owner and notes, with the timeline below them.
+    const caseTab = hasCase && {
+        id: "case",
+        content: "Review case",
+        component: (
+            <CasePanel
+                eventIds={caseEventIds}
+                caseOwner={caseData.caseOwner}
+                caseNotes={caseData.caseNotes}
+                activity={timelineActivity}
+                onSaved={(fields) => { applyCaseChange(fields); onStatusUpdate?.(eventStatus); }}
+            />
+        )
+    }
+    // Any other event keeps a plain Timeline tab (on the Guardrails page, once it has some history).
+    const timelineTab = !hasCase && (isGuardrailsPage ? caseData.caseTimeline.length > 0 : data.length > 0) && {
         id: "timeline",
         content: "Timeline",
-        component: <ActivityTracker latestActivity={latestActivity} />
+        component: <ActivityTracker latestActivity={timelineActivity} />
     }
 
     const configValues = data.length > 0 ? _configFromOrig(data[0]?.orig, moreInfoData?.ruleViolated) : null;
@@ -924,15 +979,17 @@ function SampleDetails(props) {
         window.open(navigateUrl, "_blank")
     }
 
-    const handleStatusChange = async (newStatus) => {
+    // caseFields: { caseOwner?, caseNotes? } from the "Mark for review" dialog, saved together with the status.
+    const handleStatusChange = async (newStatus, caseFields = {}) => {
         if (!eventId) return;
 
         setActionPopoverActive(false);
-        
+
         setTriageLoading(true);
         try {
-            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: eventId, status: newStatus });
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: eventId, status: newStatus, ...caseFields });
             if (response?.updateSuccess) {
+                applyCaseChange({ status: newStatus, ...caseFields });
                 // Update parent state instead of refreshing page
                 if (onStatusUpdate) {
                     onStatusUpdate(newStatus);
@@ -1238,6 +1295,7 @@ Reference URL: ${window.location.href}`.trim();
                             <div className={`badge-wrapper-${severity}`}>
                                 <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                             </div>
+                            {isBackfillRefId(moreInfoData?.refId) && <Badge size="small" status="info">Backfill</Badge>}
                         </HorizontalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
@@ -1265,7 +1323,7 @@ Reference URL: ${window.location.href}`.trim();
                                         requires: 'api/updateMaliciousEventStatus',
                                     } : {
                                         content: 'Mark for Review',
-                                        onAction: () => handleStatusChange('UNDER_REVIEW'),
+                                        onAction: () => { setActionPopoverActive(false); setReviewOpen(true); },
                                         requires: 'api/updateMaliciousEventStatus',
                                     },
                                     eventStatus === 'IGNORED' ? {
@@ -1409,9 +1467,9 @@ Reference URL: ${window.location.href}`.trim();
             key={`tabs-comp-${eventId || 'default'}`}
             tabs={ isHumanApprovalEvent
                 ? [overviewTab, ValuesTab].filter(Boolean)
-                : window.location.href.indexOf("guardrails") > -1
-                ? (showSessionContext ? [overviewTab, ValuesTab, sessionContextTab] : [overviewTab, ValuesTab]).filter(Boolean)
-                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]).filter(Boolean)}
+                : isGuardrailsPage
+                ? (showSessionContext ? [overviewTab, ValuesTab, timelineTab, sessionContextTab, caseTab] : [overviewTab, ValuesTab, timelineTab, caseTab]).filter(Boolean)
+                : (showSessionContext ? [overviewTab, timelineTab, ValuesTab, sessionContextTab, remediationTab, caseTab] : [overviewTab, timelineTab, ValuesTab, remediationTab, caseTab]).filter(Boolean)}
             currTab = {() => {}}
         />
     )
@@ -1420,12 +1478,24 @@ Reference URL: ${window.location.href}`.trim();
         <TitleComponent/>, tabsComponent
     ]
 
-    return <FlyLayout
-        title={title || ""}
-        show={showDetails}
-        setShow={setShowDetails}
-        components={currentComponents}
-    />
+    return (
+        <>
+            <FlyLayout
+                title={title || ""}
+                show={showDetails}
+                setShow={setShowDetails}
+                components={currentComponents}
+            />
+            {/* Outside the flyout's components, which are rebuilt on every render and would reset what is typed. */}
+            <ReviewCaseModal
+                open={reviewOpen}
+                onClose={() => setReviewOpen(false)}
+                onConfirm={(caseFields) => { setReviewOpen(false); handleStatusChange('UNDER_REVIEW', caseFields); }}
+                initialOwner={caseData.caseOwner}
+                initialNotes={caseData.caseNotes}
+            />
+        </>
+    )
 }
 
 export default SampleDetails;

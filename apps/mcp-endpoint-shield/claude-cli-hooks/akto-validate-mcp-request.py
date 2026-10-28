@@ -13,7 +13,7 @@ from urllib.parse import quote
 from typing import Any, Dict, Set, Tuple, Union
 
 from akto_machine_id import get_machine_id, get_username
-from akto_ingestion_utility import installer_headers, resolve_session_info
+from akto_ingestion_utility import installer_headers, invoked_by_claude_code, resolve_session_info
 
 # Configure logging
 LOG_DIR = os.path.expanduser(os.getenv("LOG_DIR", "~/.claude/akto/logs"))
@@ -506,6 +506,9 @@ def ingest_blocked_request(
 
 def main():
     logger.info(f"=== Hook execution started - Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
+    if not invoked_by_claude_code():
+        logger.info("Not launched by Claude Code (e.g. Cursor running Claude hooks), skipping")
+        sys.exit(0)
 
     try:
         input_data = json.load(sys.stdin)

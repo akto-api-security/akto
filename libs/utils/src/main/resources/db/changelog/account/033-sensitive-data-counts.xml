@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collections and indexes for SensitiveDataCountDao.createIndicesIfAbsent.
+
+        sensitive_data_counts holds one hourly bucket per (data type, API collection), written by
+        the runtime and summed by the sensitive data threshold alert job.
+
+        Both indexes matter for correctness, not only speed:
+
+        - subType_hour_apiCollectionId is what bulkInc's upsert matches on. It is UNIQUE because
+          two runtimes flushing the same hour would otherwise both miss and both insert, leaving
+          two documents for one bucket; the alert sums them and the count comes out inflated.
+        - expireAt_ttl is what actually expires a bucket. expireAt is a date written per document
+          by the producer, so the TTL is expireAfterSeconds 0 and the stored date decides.
+
+        sensitive_data_count_requests records applied idempotency keys so a retried batch is not
+        counted twice, expiring after APPLIED_REQUESTS_TTL_HOURS (24h).
+
+        Index names match MCollection.generateIndexName's explicit names above, so the DAO's
+        createIndexIfAbsent treats them as already present.
+    -->
+
+    <changeSet id="033-account-create-sensitive-data-counts" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="sensitive_data_counts"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="sensitive_data_counts"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="sensitive_data_counts"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="033-account-sensitive-data-counts-bucket-unique-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="sensitive_data_counts"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="sensitive_data_counts">
+            <mongodb:keys>{ "subType": 1, "hour": 1, "apiCollectionId": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "subType_hour_apiCollectionId", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="sensitive_data_counts">
+                <mongodb:keys>{ "subType": 1, "hour": 1, "apiCollectionId": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="033-account-sensitive-data-counts-expire-at-ttl" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="sensitive_data_counts"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="sensitive_data_counts">
+            <mongodb:keys>{ "expireAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "expireAt_ttl", "expireAfterSeconds": 0 }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="sensitive_data_counts">
+                <mongodb:keys>{ "expireAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="033-account-create-sensitive-data-count-requests" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="sensitive_data_count_requests"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="sensitive_data_count_requests"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="sensitive_data_count_requests"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="033-account-sensitive-data-count-requests-created-at-ttl" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="sensitive_data_count_requests"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="sensitive_data_count_requests">
+            <mongodb:keys>{ "createdAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "createdAt_ttl", "expireAfterSeconds": 86400 }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="sensitive_data_count_requests">
+                <mongodb:keys>{ "createdAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

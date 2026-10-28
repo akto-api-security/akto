@@ -55,6 +55,11 @@ if MODE == "atlas":
 else:
     AI_AGENT_API_URL = os.getenv("AKTO_API_URL", "")
 
+
+def invoked_by_claude_code() -> bool:
+    """True only when Claude Code launched the hook (it sets CLAUDECODE=1); other agents like Cursor can run Claude hooks too."""
+    return os.getenv("CLAUDECODE") == "1"
+
 # ── Logging helpers ───────────────────────────────────────────────────────────
 
 _CONNECTOR_LOG_DIR: Dict[str, str] = {
@@ -174,7 +179,8 @@ SESSION_STATE_PATH = os.path.join(LOG_DIR, "akto_session_state.json")
 #   extra_fields        -> other session fields to also forward (raw)
 _SESSION_FIELD_MAP: Dict[str, Dict[str, Any]] = {
     "cursor": {
-        "session_id_field": None,
+        # conversation_id is on every Cursor hook; backend groups sessions by akto_session_id
+        "session_id_field": "conversation_id",
         "conversation_field": "conversation_id",
         "message_id_field": "generation_id",
         "message_id_strategy": "passthrough",

@@ -1,7 +1,9 @@
 package com.akto.threat.backend.utils;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.HostScope;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -231,6 +233,25 @@ public class ThreatUtils {
                 new Document("_id", configScanDedupeKey()).append("doc", new Document("$first", "$$ROOT"))),
             new Document("$replaceRoot", new Document("newRoot", "$doc")),
             new Document("$sort", new Document("detectedAt", -1)));
+    }
+
+    // An event's case history as the proto the dashboard reads, oldest first; empty for events with none.
+    public static List<ListMaliciousRequestsResponse.CaseActivity> caseActivities(MaliciousEventDto event) {
+        List<ListMaliciousRequestsResponse.CaseActivity> out = new ArrayList<>();
+        if (event.getCaseTimeline() == null) {
+            return out;
+        }
+        for (MaliciousEventDto.CaseActivity c : event.getCaseTimeline()) {
+            out.add(ListMaliciousRequestsResponse.CaseActivity.newBuilder()
+                .setTimestamp(c.getTimestamp())
+                .setUpdatedBy(c.getUpdatedBy() != null ? c.getUpdatedBy() : "")
+                .setActivityType(c.getActivityType() != null ? c.getActivityType() : "")
+                .setStatus(c.getStatus() != null ? c.getStatus() : "")
+                .setOwner(c.getOwner() != null ? c.getOwner() : "")
+                .setNotes(c.getNotes() != null ? c.getNotes() : "")
+                .build());
+        }
+        return out;
     }
 
     public static boolean isAgenticOrEndpointContext(String contextSource) {

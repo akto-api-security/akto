@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActionList,
     Badge,
@@ -22,6 +22,7 @@ import AgenticFlyoutShell from "@/apps/dashboard/pages/observe/agentic/AgenticFl
 import AiChatSection from "@/apps/dashboard/pages/observe/agentic/AiChatSection";
 import { buildAgenticObserveChatMetadata } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import { SeverityBadge } from "@/apps/dashboard/pages/observe/agentic/AgenticCellRenderers";
+import { isBackfillRefId } from "@/apps/dashboard/pages/threat_detection/utils/formatUtils";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import JiraTicketCreationModal from "@/apps/dashboard/components/shared/JiraTicketCreationModal";
 import SampleDataList from "@/apps/dashboard/components/shared/SampleDataList";
@@ -34,6 +35,10 @@ import settingFunctions from "@/apps/dashboard/pages/settings/module";
 import issuesFunctions from "@/apps/dashboard/pages/issues/module";
 import { usePermissions, withPermissions } from "@/util/permissions";
 import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
+import ReviewCaseModal from "@/apps/dashboard/pages/guardrails/components/ReviewCaseModal";
+import CasePanel from "@/apps/dashboard/pages/guardrails/components/CasePanel";
+import useCaseOwners from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
+import { buildCaseTimeline } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
 
 import {
     ChatSessionSection,
@@ -69,9 +74,12 @@ function buildViolationDescription(row) {
     ].join("\n");
 }
 
+// onStatusUpdate({ status?, caseOwner?, caseNotes? }) tells the page what was saved, so the open flyout and the
+// table can show it. Marking for review opens a case: the dialog sets its owner and notes.
 function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row }) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [reviewOpen, setReviewOpen] = useState(false);
 
     // Jira state
     const [jiraModalActive, setJiraModalActive]   = useState(false);
@@ -93,14 +101,14 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
         }
     }, []);
 
-    const handleStatusChange = async (newStatus) => {
+    const handleStatusChange = async (newStatus, caseFields = {}) => {
         if (!violationId) return;
         setOpen(false);
         setLoading(true);
         try {
-            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: violationId, status: newStatus });
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: violationId, status: newStatus, ...caseFields });
             if (response?.updateSuccess) {
-                onStatusUpdate?.(newStatus);
+                onStatusUpdate?.({ status: newStatus, ...caseFields });
                 const label = newStatus === "UNDER_REVIEW" ? "marked for review"
                     : newStatus === "IGNORED" ? "ignored" : "reactivated";
                 func.setToast(true, false, `Event ${label} successfully`);
@@ -204,7 +212,7 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
     const items = [
         (eventStatus === "UNDER_REVIEW" || eventStatus === "TRIAGE")
             ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE"), requires: "api/updateMaliciousEventStatus" }
-            : { content: "Mark for Review", onAction: () => handleStatusChange("UNDER_REVIEW"), requires: "api/updateMaliciousEventStatus" },
+            : { content: "Mark for Review", onAction: () => { setOpen(false); setReviewOpen(true); }, requires: "api/updateMaliciousEventStatus" },
         eventStatus === "IGNORED"
             ? { content: "Reactivate", onAction: () => handleStatusChange("ACTIVE"), requires: "api/updateMaliciousEventStatus" }
             : { content: "Ignore", onAction: () => handleStatusChange("IGNORED"), requires: "api/updateMaliciousEventStatus" },
@@ -233,6 +241,14 @@ function EventActionsDropdown({ violationId, eventStatus, onStatusUpdate, row })
                     <ActionList actionRole="menuitem" items={withPermissions(items)} />
                 </Box>
             </Popover>
+
+            <ReviewCaseModal
+                open={reviewOpen}
+                onClose={() => setReviewOpen(false)}
+                onConfirm={(caseFields) => { setReviewOpen(false); handleStatusChange("UNDER_REVIEW", caseFields); }}
+                initialOwner={row?.caseOwner || ""}
+                initialNotes={row?.caseNotes || ""}
+            />
 
             <JiraTicketCreationModal
                 activator={null}
@@ -365,7 +381,9 @@ function FlyoutHeader({ row, onClose, onStatusUpdate, onHumanApproval }) {
                     <HorizontalStack gap="2" blockAlign="center">
                         <Text variant="headingMd" fontWeight="semibold">{row.violation}</Text>
                         <SeverityBadge severity={row.severity} />
-                        {row.action && (
+                        {isBackfillRefId(row.refId) ? (
+                            <Badge size="small" status="info">Backfill</Badge>
+                        ) : row.action && (
                             <Badge size="small" status={row.action === "Blocked" ? "critical" : "warning"}>
                                 {row.action}
                             </Badge>
@@ -452,20 +470,19 @@ export default function ViolationFlyout({ violation: rowViolation, toAttemptRow,
         return buildAgenticObserveChatMetadata("violation", buildViolationChatContext(violation, detail));
     }, [violation, detail]);
 
-    // Timeline for the selected violation — shows just this event.
-    // Previously iterated allRows (the entire dataset) client-side; now the flyout
-    // only has the current page's data so we show a single-entry timeline.
+    // Timeline of the selected event: when it was detected, then every status, owner and notes change.
+    const { owners: caseOwners } = useCaseOwners();
     const timelineActivity = useMemo(() => {
         if (!violation) return [];
-        return [{
-            description: (violation.violation || "Violation detected") + " (this event)",
-            timestamp: violation.detected,
-        }];
-    }, [violation]);
+        return buildCaseTimeline(violation.caseTimeline, violation.detected, caseOwners, `${violation.violation || "Violation"} detected`);
+    }, [violation, caseOwners]);
 
     const isHumanApprovalEvent = String(violation?._status || "").toUpperCase() === "HUMAN_APPROVAL";
+    // An event marked for review is a case (owner, notes); one that has been one keeps its case data.
+    const hasCase = violation?._status === "UNDER_REVIEW" || !!violation?.caseOwner || !!violation?.caseNotes;
 
-    // Tabs: Overview · Values · (type-specific middle tab) · Remediation · Timeline.
+    // Tabs: Overview · Values · Remediation · and last either Review case or Timeline. A case is one tab: its
+    // owner and notes, with the timeline below them. An event that isn't a case keeps the plain Timeline tab.
     // Human Approval only needs Overview and Values.
     const tabModel = useMemo(() => {
         const tabs = [
@@ -475,12 +492,28 @@ export default function ViolationFlyout({ violation: rowViolation, toAttemptRow,
         let middle = null;
         if (!isHumanApprovalEvent) {
             if (detail?.remediation) tabs.push({ id: "remediation", content: "Remediation" });
-            tabs.push({ id: "timeline", content: "Timeline" });
+            tabs.push(hasCase ? { id: "case", content: "Review case" } : { id: "timeline", content: "Timeline" });
         }
         return { tabs, middle };
-    }, [detail, violation, isHumanApprovalEvent]);
+    }, [detail, violation, isHumanApprovalEvent, hasCase]);
 
-    const handleTabSelect = useCallback((idx) => setSelectedTab(idx), []);
+    // Tabs are picked by position, but the last tab changes between Case and Timeline with the event's status:
+    // keep the tab the user is on when the list changes under them (marking for review turns Timeline into Case).
+    const activeTabIdRef = useRef("overview");
+    useEffect(() => { activeTabIdRef.current = "overview"; }, [rowViolation?.id]);
+    useEffect(() => {
+        const ids = tabModel.tabs.map((t) => t.id);
+        const wanted = activeTabIdRef.current;
+        const idx = ids.indexOf(ids.includes(wanted) ? wanted : (wanted === "case" ? "timeline" : wanted === "timeline" ? "case" : wanted));
+        if (idx >= 0) {
+            activeTabIdRef.current = ids[idx];
+            setSelectedTab(idx);
+        }
+    }, [tabModel]);
+    const handleTabSelect = useCallback((idx) => {
+        activeTabIdRef.current = tabModel.tabs[idx]?.id;
+        setSelectedTab(idx);
+    }, [tabModel]);
 
     if (!violation) return null;
 
@@ -524,6 +557,15 @@ export default function ViolationFlyout({ violation: rowViolation, toAttemptRow,
                     );
                 }
                 return <FileSection detail={detail} />;
+            case "case":        return (
+                <CasePanel
+                    eventIds={violation.groupCount > 1 && violation.groupEventIds?.length ? violation.groupEventIds : [violation.id]}
+                    caseOwner={violation.caseOwner || ""}
+                    caseNotes={violation.caseNotes || ""}
+                    activity={timelineActivity}
+                    onSaved={(fields) => onStatusUpdate?.(fields)}
+                />
+            );
             case "remediation": return <RemediationSection markdown={detail?.remediation} />;
             case "timeline":    return <ActivityTracker latestActivity={timelineActivity} />;
             default:            return null;

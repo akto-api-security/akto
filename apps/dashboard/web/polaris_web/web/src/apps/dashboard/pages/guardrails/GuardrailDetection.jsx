@@ -91,7 +91,13 @@ function GuardrailDetection() {
                 // For the "Approve server" action on approval-behaviour guardrail events.
                 // Prefer the precomputed row field (data.metadata passthrough is dropped by the table).
                 behaviour: data.behaviourRaw || extractBehaviour(data.metadata),
+                refId: data.refId,
                 host: data.host,
+                // The case (events marked for review): this page opens the flyout from the row, with no payload fetch.
+                caseOwner: data.caseOwner,
+                caseNotes: data.caseNotes,
+                caseTimeline: data.caseTimeline,
+                detectedAt: data.timestamp,
             })
         } else {
             setShowDetails(!showDetails)

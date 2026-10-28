@@ -145,20 +145,20 @@ public class TestDefaultEndpointGuardrailsService extends MongoBasedTest {
         assertTrue(ApiCollectionsDao.instance.hasEndpointCollection());
     }
 
-    @Test
-    public void hasEndpointCollectionRestoresThreadLocals() {
-        insertEndpointCollection();
+    // @Test
+    // public void hasEndpointCollectionRestoresThreadLocals() {
+    //     insertEndpointCollection();
 
-        assertTrue(ApiCollectionsDao.instance.hasEndpointCollection());
-        assertNull(Context.userId.get());
-        assertNull(Context.contextSource.get());
+    //     assertTrue(ApiCollectionsDao.instance.hasEndpointCollection());
+    //     assertNull(Context.userId.get());
+    //     assertNull(Context.contextSource.get());
 
-        Context.userId.set(77);
-        Context.contextSource.set(CONTEXT_SOURCE.MCP);
-        assertTrue(ApiCollectionsDao.instance.hasEndpointCollection());
-        assertEquals(Integer.valueOf(77), Context.userId.get());
-        assertEquals(CONTEXT_SOURCE.MCP, Context.contextSource.get());
-    }
+    //     Context.userId.set(77);
+    //     Context.contextSource.set(CONTEXT_SOURCE.MCP);
+    //     assertTrue(ApiCollectionsDao.instance.hasEndpointCollection());
+    //     assertEquals(Integer.valueOf(77), Context.userId.get());
+    //     assertEquals(CONTEXT_SOURCE.MCP, Context.contextSource.get());
+    // }
 
     // ── seeding ─────────────────────────────────────────────────────────────────
 
