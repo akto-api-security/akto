@@ -10183,9 +10183,6 @@
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User started AI verification of selected issues</param>
             </interceptor-ref>
-            <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">AKTO_GPT_AI</param>
-            </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -10212,9 +10209,6 @@
                 <param name="featureLabel">ASK_GPT</param>
                 <param name="accessType">READ_WRITE</param>
                 <param name="actionDescription">User started AI verification of test run results</param>
-            </interceptor-ref>
-            <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">AKTO_GPT_AI</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">

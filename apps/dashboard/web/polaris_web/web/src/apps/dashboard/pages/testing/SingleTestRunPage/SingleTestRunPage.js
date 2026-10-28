@@ -133,6 +133,16 @@ let filterOptions = [
     title: mapLabel('API', getDashboardCategory()) + ' name',
     choices: [],
   },
+  {
+    key: 'aiVerdict',
+    label: 'AI verdict',
+    title: 'AI verdict',
+    choices: [
+      { label: 'False positive', value: 'FALSE_POSITIVE' },
+      { label: 'True positive', value: 'TRUE_POSITIVE' },
+      { label: 'Not verified', value: 'NOT_VERIFIED' }
+    ],
+  },
 ]
 
 // CSV export pages through fetchTestingRunResults in raw-result units (skip/limit count results, not
@@ -626,7 +636,7 @@ function SingleTestRunPage() {
     setSeverityModalActive(true);
   };
 
-  const showVerifyWithAi = !workflowTest && func.checkForFeatureSaas('AKTO_GPT_AI') && (testRunCountMap?.VULNERABLE || 0) > 0
+  const showVerifyWithAi = !workflowTest && (testRunCountMap?.VULNERABLE || 0) > 0
 
   // Reopens the issues behind the selected results in the Ignored Issues tab, the same as "Reopen"
   // in the result flyout, then recounts this run so the results move back to Vulnerable.
@@ -1076,7 +1086,7 @@ function SingleTestRunPage() {
         ]}
       >
         <Modal.Section>
-          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'}. Results it judges as false positives will be moved to Ignored Issues. You can reopen them anytime.`}</Text>
+          <Text>{`AI will review ${aiVerifyTargets.length > 0 ? `the ${aiVerifyTargets.length} selected result${aiVerifyTargets.length === 1 ? '' : 's'}` : 'all vulnerable results of this test run'} and add its verdict and confidence to each issue's description. No issue is ignored automatically; select the false positives and ignore them yourself.`}</Text>
         </Modal.Section>
       </Modal>
     </>
@@ -1186,7 +1196,7 @@ function SingleTestRunPage() {
     try {
       await api.verifyTestRunWithAi(summaryHexId, resultHexIds)
       setAiVerifyStartedFor(summaryHexId)
-      func.setToast(true, false, "AI verification started. False positives will move to Ignored Issues - refresh in a few minutes to see the results.")
+      func.setToast(true, false, "AI verification started. Refresh in a few minutes to see the verdicts in the issue descriptions.")
     } catch (e) {
       // request() already shows the server's error (e.g. "Verification already running") as a toast
     }

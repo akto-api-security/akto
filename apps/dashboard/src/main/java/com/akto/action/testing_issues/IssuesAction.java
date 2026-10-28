@@ -88,6 +88,8 @@ public class IssuesAction extends UserAction {
     private List<Severity> filterSeverity;
     private List<String> filterCompliance;
     private List<String> filterSubCategory;
+    @Setter
+    private List<String> filterAiVerdict;
     private List<TestingRunIssues> similarlyAffectedIssues;
     private boolean activeCollections;
 
@@ -130,6 +132,9 @@ public class IssuesAction extends UserAction {
         if (filterSubCategory != null && !filterSubCategory.isEmpty()) {
             filters = Filters.and(filters, Filters.in(ID + "."
                     + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory));
+        }
+        if (filterAiVerdict != null && !filterAiVerdict.isEmpty()) {
+            filters = Filters.and(filters, AiVerificationAction.aiVerdictFilter(filterAiVerdict));
         }
 
         if (startEpoch != 0) {
