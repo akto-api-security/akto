@@ -364,7 +364,9 @@ public class AiVerificationAction extends UserAction {
         updates.add(Updates.set(TestingRunIssues.LAST_UPDATED_BY, UPDATED_BY));
         String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
         if ((issue.getDescription() == null || issue.getDescription().trim().isEmpty()) && reason != null && !reason.isEmpty()) {
-            updates.add(Updates.set(TestingRunIssues.DESCRIPTION, DESCRIPTION_PREFIX + reason));
+            int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
+            updates.add(Updates.set(TestingRunIssues.DESCRIPTION,
+                DESCRIPTION_PREFIX + "Confidence " + confidence + "%. " + reason));
         }
 
         // Only while still OPEN, so a user's ignore/fix made in the meantime is never overridden.
