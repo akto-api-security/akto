@@ -33,6 +33,7 @@ public class Cluster {
     public static final String AGENT_BASE_RISK_SCORE_CRON_INFO = "agent-base-risk-score-cron-info";
     public static final String TOOL_CLASSIFICATION_CRON_INFO = "tool-classification-cron-info";
     public static final String AGENTIC_POSTURE_SCORE_CRON_INFO = "agentic-posture-score-cron-info";
+    public static final String IMPERVA_API_IMPORT_CRON_INFO = "imperva-api-import-cron-info";
 
     public static final String winnerId = UUID.randomUUID().toString();
 
