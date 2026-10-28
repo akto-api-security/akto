@@ -1,11 +1,14 @@
 package com.akto.dto.testing.custom_groups;
 
 import java.util.List;
+import java.util.Set;
 import org.bson.conversions.Bson;
 
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
 
 public class AllAPIsGroup extends TestingEndpoints {
@@ -28,6 +31,10 @@ public class AllAPIsGroup extends TestingEndpoints {
 
     @Override
     public Bson createFilters(CollectionType type) {
-        return Filters.empty();
+        Set<Integer> excluded = UsersCollectionsList.getNonApiContextCollectionIds();
+        if (excluded.isEmpty()) {
+            return Filters.empty();
+        }
+        return Filters.nin(getFilterPrefix(type) + SingleTypeInfo._API_COLLECTION_ID, excluded);
     }
 }
