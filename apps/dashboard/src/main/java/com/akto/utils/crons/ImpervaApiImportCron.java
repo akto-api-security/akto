@@ -1,70 +1,72 @@
 package com.akto.utils.crons;
 
+import com.akto.dao.ImpervaIntegrationDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.imperva_integration.ImpervaIntegration;
 import com.akto.imperva.ImpervaApiClient;
 import com.akto.imperva.ImpervaApiEndpointsImporter;
 import com.akto.imperva.ImpervaApiEndpointsImporter.ImportResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.task.Cluster;
 import com.akto.utils.imperva.ImpervaApiEndpointsImportJobUtil;
-import org.apache.commons.lang3.StringUtils;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import static com.akto.task.Cluster.callDibs;
-
-// Imports the API inventory from Imperva API Security every 24 hours for the single account configured via env.
-// Does nothing unless IMPERVA_API_IMPORT_ACCOUNT_ID, IMPERVA_API_ID and IMPERVA_API_KEY are set.
+// Imports the API inventory from Imperva API Security for ImpervaIntegration.ENABLED_ACCOUNT_ID
+// whenever an import is requested from the dashboard (Settings > Integrations > Imperva).
 public class ImpervaApiImportCron {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ImpervaApiImportCron.class, LogDb.DASHBOARD);
 
-    private static final int INTERVAL_HOURS = 24;
-    private static final int INITIAL_DELAY_MINUTES = 10;
-    // a little under the interval so the next scheduled run on any instance can take over
-    private static final int DIBS_EXPIRY_SECONDS = INTERVAL_HOURS * 3600 - 600;
+    private static final int CHECK_INTERVAL_MINUTES = 5;
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpImpervaApiImportCronScheduler() {
-        if (getAccountId() == null || StringUtils.isEmpty(System.getenv("IMPERVA_API_ID")) || StringUtils.isEmpty(System.getenv("IMPERVA_API_KEY"))) {
-            return;
-        }
-        scheduler.scheduleWithFixedDelay(this::run, INITIAL_DELAY_MINUTES * 60, INTERVAL_HOURS * 3600, TimeUnit.SECONDS);
-    }
-
-    private static Integer getAccountId() {
-        try {
-            return Integer.parseInt(System.getenv("IMPERVA_API_IMPORT_ACCOUNT_ID").trim());
-        } catch (Exception e) {
-            return null;
-        }
+        scheduler.scheduleWithFixedDelay(this::run, CHECK_INTERVAL_MINUTES, CHECK_INTERVAL_MINUTES, TimeUnit.MINUTES);
     }
 
     private void run() {
+        Context.accountId.set(ImpervaIntegration.ENABLED_ACCOUNT_ID);
+        ImpervaIntegration integration;
         try {
-            Context.accountId.set(1_000_000);
-            if (!callDibs(Cluster.IMPERVA_API_IMPORT_CRON_INFO, DIBS_EXPIRY_SECONDS, 60)) {
-                loggerMaker.debugAndAddToDb("Imperva API import cron dibs not acquired, thus skipping cron");
-                return;
-            }
+            // clearing the flag atomically makes sure only one instance runs the requested import
+            integration = ImpervaIntegrationDao.instance.getMCollection().findOneAndUpdate(
+                Filters.eq(ImpervaIntegration.SYNC_REQUESTED, true),
+                Updates.combine(
+                    Updates.set(ImpervaIntegration.SYNC_REQUESTED, false),
+                    Updates.set(ImpervaIntegration.LAST_SYNC_START_TS, Context.now())
+                )
+            );
+        } catch (Exception e) {
+            loggerMaker.error("Error checking for a requested Imperva API import: " + e.getMessage(), e);
+            return;
+        }
+        if (integration == null) {
+            return;
+        }
 
-            int accountId = getAccountId();
-            Context.accountId.set(accountId);
-            loggerMaker.infoAndAddToDb("Starting Imperva API import for account " + accountId);
-
-            ImpervaApiClient client = new ImpervaApiClient(System.getenv("IMPERVA_API_BASE_URL"),
-                System.getenv("IMPERVA_API_ID"), System.getenv("IMPERVA_API_KEY"));
+        try {
+            loggerMaker.infoAndAddToDb("Starting Imperva API import");
+            ImpervaApiClient client = new ImpervaApiClient(null, integration.getApiId(), integration.getApiKey());
             ImportResult result = ImpervaApiEndpointsImporter.importEndpoints(client,
                 ImpervaApiEndpointsImportJobUtil::impervaApiEndpointsProcessor);
-
-            loggerMaker.infoAndAddToDb(String.format("Imperva API import finished for account %d. Endpoints: %d, basic samples: %d",
-                accountId, result.getEndpointCount(), result.getFallbackCount()));
+            loggerMaker.infoAndAddToDb(String.format("Imperva API import finished. Endpoints: %d, basic samples: %d",
+                result.getEndpointCount(), result.getFallbackCount()));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in Imperva API import cron: " + e.getMessage());
+        }
+
+        try {
+            ImpervaIntegrationDao.instance.updateOneNoUpsert(new BasicDBObject(),
+                Updates.set(ImpervaIntegration.LAST_SYNC_END_TS, Context.now()));
+        } catch (Exception e) {
+            loggerMaker.error("Error updating Imperva API import end time: " + e.getMessage(), e);
         }
     }
 }
