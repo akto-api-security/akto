@@ -141,6 +141,9 @@ func (c Config) validate() error {
 		return fmt.Errorf("MAX_REPLICAS (%d) must be >= MIN_REPLICAS (%d)", c.MaxReplicas, c.MinReplicas)
 	case c.ScaleUpStep < 1:
 		return fmt.Errorf("SCALE_UP_STEP must be >= 1, got %d", c.ScaleUpStep)
+	case c.ControlToken == "":
+		// mini-testing pods refuse every caller without a token, so there is nothing to scale with
+		return fmt.Errorf("no control token: set DATABASE_ABSTRACTOR_SERVICE_TOKEN (the token is derived from it) or CONTROL_TOKEN")
 	case c.PollInterval <= 0:
 		return fmt.Errorf("POLL_INTERVAL must be positive")
 	case c.ScaleDownDelay < 0:

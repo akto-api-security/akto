@@ -113,7 +113,7 @@ orchestrator doesn't see how many test runs are queued.
 | `SUMMARY_EVERY` | `5m` | |
 | `POD_STATUS_PORT` | `9400` | |
 | `POD_STATUS_TIMEOUT` | `3s` | |
-| `CONTROL_TOKEN` | derived | token for the pods' control endpoints; must match their `ORCHESTRATOR_TOKEN`. When empty, both sides derive the same token from `DATABASE_ABSTRACTOR_SERVICE_TOKEN` (HMAC-SHA256 of a fixed label), so no shared secret has to be generated or distributed |
+| `CONTROL_TOKEN` | derived | token for the pods' control endpoints; must match their `ORCHESTRATOR_TOKEN`. When empty, both sides derive the same token from `DATABASE_ABSTRACTOR_SERVICE_TOKEN` (HMAC-SHA256 of a fixed label), so no shared secret has to be generated or distributed. One of the two is required: without a token the orchestrator refuses to start, and pods refuse every caller |
 | `LEADER_ELECTION` | `true` | Lease-based, so two replicas never act at once |
 | `LEASE_NAME` | `mini-testing-orchestrator` | |
 | `POD_NAME` | hostname | leader identity |

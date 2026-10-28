@@ -1,10 +1,14 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLoadDefaultsAndRejectsBadDurations(t *testing.T) {
 	t.Setenv("NAMESPACE", "akto")
 	t.Setenv("TARGET_DEPLOYMENT", "akto-mini-testing")
+	t.Setenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "test-database-abstractor-token")
 	c, err := Load()
 	if err != nil {
 		t.Fatalf("defaults: %v", err)
@@ -55,5 +59,19 @@ func TestControlTokenDerivedFromAbstractorToken(t *testing.T) {
 	}
 	if c.ControlToken != want || c.ControlTokenSource != "derived" {
 		t.Errorf("Load: token %q source %s", c.ControlToken, c.ControlTokenSource)
+	}
+}
+
+func TestRefusesToStartWithoutControlToken(t *testing.T) {
+	t.Setenv("NAMESPACE", "akto")
+	t.Setenv("TARGET_DEPLOYMENT", "akto-mini-testing")
+	t.Setenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN", "")
+	t.Setenv("CONTROL_TOKEN", "")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "no control token") {
+		t.Fatalf("Load() error = %v, want a missing control token error", err)
+	}
+	t.Setenv("CONTROL_TOKEN", "explicit")
+	if _, err := Load(); err != nil {
+		t.Fatalf("explicit CONTROL_TOKEN alone should be enough: %v", err)
 	}
 }

@@ -96,9 +96,6 @@ func main() {
 		"scale_down_delay", cfg.ScaleDownDelay.String(), "scale_down", scaleDown,
 		"leader_election", cfg.LeaderElection, "report_to_akto", reportOpts.Client != nil,
 		"heartbeat", cfg.Heartbeat && cyborg != nil, "control_token", cfg.ControlTokenSource)
-	if cfg.ControlTokenSource == "none" {
-		events.Warn("no control token: set DATABASE_ABSTRACTOR_SERVICE_TOKEN or CONTROL_TOKEN; pods without a token accept any caller")
-	}
 	// Every replica heartbeats; only the leader's carries scaling state.
 	if cfg.Heartbeat && cyborg != nil {
 		go heartbeat.New(cyborg, log, cfg.HeartbeatEvery, cfg.ModuleName, version, ctrl.Snapshot).Run(ctx)
