@@ -95,6 +95,7 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
+import com.akto.utils.SensitiveSampleWriteDedupe;
 import com.akto.utils.SampleDataLogs;
 import com.akto.utils.StiCountAlert;
 import com.akto.utils.TrafficCollectorAlert;
@@ -1397,6 +1398,12 @@ public class DbAction extends ActionSupport {
 
     public String bulkWriteSensitiveSampleData() {
         int accId = Context.accountId.get();
+        if (SensitiveSampleWriteDedupe.isEnabled() && writesForSensitiveSampleData != null && !writesForSensitiveSampleData.isEmpty()) {
+            writesForSensitiveSampleData = SensitiveSampleWriteDedupe.filter(accId, writesForSensitiveSampleData);
+            if (writesForSensitiveSampleData.isEmpty()) {
+                return Action.SUCCESS.toUpperCase();
+            }
+        }
         if (kafkaUtils.isWriteEnabled()) {
             kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
         } else {
