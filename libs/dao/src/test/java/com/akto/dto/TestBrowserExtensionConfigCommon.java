@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dao.BrowserExtensionConfigDao;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.Test;
@@ -259,5 +260,86 @@ public class TestBrowserExtensionConfigCommon {
         List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("not-in-common.ai", false));
         List<BrowserExtensionConfigCommon> merged = BrowserExtensionConfigCommon.merge(common, account);
         assertEquals(Arrays.asList("chatgpt.com"), hosts(merged));
+    }
+
+    private static BrowserExtensionConfigCommon cfg(String host, long updatedAt, int id) {
+        BrowserExtensionConfigCommon c = new BrowserExtensionConfigCommon();
+        c.setHost(host);
+        c.setId(new ObjectId(String.format("%024x", id)));
+        c.setUpdatedAt(updatedAt);
+        return c;
+    }
+
+    @Test
+    public void testUpdatedAtParsing() {
+        assertEquals(100, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com','updatedAt':100}")).getUpdatedAt());
+        assertEquals(0, BrowserExtensionConfigCommon.fromDocument(Document.parse("{'host':'a.com'}")).getUpdatedAt());
+    }
+
+    @Test
+    public void testFullSyncReturnsEverything() {
+        List<BrowserExtensionConfigCommon> all = Arrays.asList(cfg("b.com", 3, 2), cfg("c.com", 1, 3), cfg("a.com", 2, 1), cfg("z.com", 0, 4));
+        assertEquals(Arrays.asList("b.com", "c.com", "a.com", "z.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 0)));
+    }
+
+    @Test
+    public void testIncrementalIsStrictlyAfterTheClientsTime() {
+        List<BrowserExtensionConfigCommon> all = Arrays.asList(cfg("a.com", 10, 1), cfg("b.com", 15, 2), cfg("c.com", 20, 3));
+        assertEquals(Arrays.asList("c.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 15)));
+        assertEquals(Arrays.asList("b.com", "c.com"), hosts(BrowserExtensionConfigCommon.updatedAfter(all, 14)));
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(all, 20).isEmpty());
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(all, 21).isEmpty());
+    }
+
+    @Test
+    public void testEveryConfigSharingOneTimestampIsSentTogether() {
+        List<BrowserExtensionConfigCommon> all = new java.util.ArrayList<>();
+        for (int i = 1; i <= 1800; i++) {
+            all.add(cfg("h" + i + ".com", 16, i));
+        }
+        assertEquals(1800, BrowserExtensionConfigCommon.updatedAfter(all, 15).size());
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(all, 16).isEmpty());
+    }
+
+    @Test
+    public void testConfigWithoutHostIsSkipped() {
+        assertTrue(BrowserExtensionConfigCommon.updatedAfter(Arrays.asList(new BrowserExtensionConfigCommon()), 0).isEmpty());
+    }
+
+    @Test
+    public void testFullSyncPageDropsOptedOutHostsButAddsNoCustomHosts() {
+        List<BrowserExtensionConfigCommon> page = Arrays.asList(cfg("chatgpt.com", true), cfg("claude.ai", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(cfg("claude.ai", false), cfg("my-internal.ai", true));
+        assertEquals(Arrays.asList("chatgpt.com"), hosts(BrowserExtensionConfigCommon.withoutOptOuts(page, account)));
+    }
+
+    @Test
+    public void testCustomHostsSkipCatalogueHostsAndOptOuts() {
+        List<BrowserExtensionConfigCommon> commonOfAccountHosts = Arrays.asList(cfg("chatgpt.com", true));
+        List<BrowserExtensionConfigCommon> account = Arrays.asList(
+                cfg("ChatGPT.com", true),     // catalogue wins (any case)
+                cfg("claude.ai", false),      // opt-out, not a custom host
+                cfg("my-internal.ai", true),
+                cfg("my-internal.ai", true)); // repeated host is sent once
+        assertEquals(Arrays.asList("my-internal.ai"), hosts(BrowserExtensionConfigCommon.customHosts(commonOfAccountHosts, account)));
+    }
+
+    @Test
+    public void testSyncModeResolvesFromAnOldClientsParams() {
+        assertEquals(BrowserExtensionConfigDao.SyncMode.FULL, BrowserExtensionConfigDao.SyncMode.resolve(null, 0));
+        assertEquals(BrowserExtensionConfigDao.SyncMode.DELTA, BrowserExtensionConfigDao.SyncMode.resolve("", 5));
+        assertEquals(BrowserExtensionConfigDao.SyncMode.DELTA, BrowserExtensionConfigDao.SyncMode.resolve("delta", 0));
+    }
+
+    @Test
+    public void testSyncModeValidation() {
+        assertNull(BrowserExtensionConfigDao.SyncMode.validate(null, 5, "abc", 3));       // no mode: lenient, as before
+        assertNull(BrowserExtensionConfigDao.SyncMode.validate("FULL", 0, "abc", 50));
+        assertNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 5, null, 0));
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("BOGUS", 0, null, 0));
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 0, null, 0));   // needs updatedAfter
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 5, "abc", 0));  // no cursor
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("DELTA", 5, null, 10));  // no limit
+        assertNotNull(BrowserExtensionConfigDao.SyncMode.validate("FULL", 5, null, 0));    // no updatedAfter
     }
 }

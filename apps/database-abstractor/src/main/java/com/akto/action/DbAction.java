@@ -1544,6 +1544,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteTrafficMetrics() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         if (kafkaUtils.isWriteEnabled()) {
             // int accId = Context.accountId.get();
             // kafkaUtils.insertDataTraffic(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
@@ -1832,6 +1835,8 @@ public class DbAction extends ActionSupport {
 
     private static final List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
     private static final int STI_LIMIT = 20_000_000;
+    // When true, log-insert and traffic-metrics APIs return success without writing to Kafka/DB.
+    private static final boolean disableLogWrites = Boolean.parseBoolean(System.getenv().getOrDefault("DISABLE_LOG_WRITES", "false"));
     private static final int higherStiLimit = Integer.parseInt(System.getenv().getOrDefault("HIGHER_STI_LIMIT", String.valueOf(5_000_000)));
 
     public String fetchEstimatedDocCount() {
@@ -2092,6 +2097,9 @@ public class DbAction extends ActionSupport {
 
     public String insertRuntimeLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             int accId = Context.accountId.get();
             if (accId == 1733164172) {
                 return Action.SUCCESS.toUpperCase();
@@ -2120,6 +2128,9 @@ public class DbAction extends ActionSupport {
 
     public String insertEndpointShieldLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             LogsEndpointShield dbLog = new LogsEndpointShield(
                 log.getString("agentId"),
                 log.getString("deviceId"),
@@ -3283,6 +3294,9 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             int accId = Context.accountId.get();
             if (accId == 1733164172) {
                 return Action.SUCCESS.toUpperCase();
@@ -3326,6 +3340,9 @@ public class DbAction extends ActionSupport {
 
     public String insertProtectionLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertProtectionLog(dbLog);
         } catch (Exception e) {
