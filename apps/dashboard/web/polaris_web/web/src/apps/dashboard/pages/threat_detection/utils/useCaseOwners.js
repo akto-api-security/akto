@@ -8,9 +8,20 @@ import settingRequests from "@/apps/dashboard/pages/settings/api";
 let loadedOwners = null;
 let inFlight = null;
 
+const isAktoUser = (user) => String(user?.login || "").toLowerCase().endsWith("@akto.io");
+
+// Admin in the account's base role or in any product (scope) it has roles for.
+const isAdmin = (user) => [user?.role, ...Object.values(user?.scopeRoleMapping || {})]
+    .some((role) => String(role || "").toUpperCase() === "ADMIN");
+
+// Akto staff are added to customer accounts for support; they are not who the customer assigns a case to, so
+// they are left out of the list. An account is the customer's when one of its admins is not Akto staff. When
+// all its admins are Akto staff the account is Akto's own (e.g. the Ironheart demo), and there they stay.
 export function toCaseOwners(team) {
-    return (Array.isArray(team) ? team : [])
-        .filter((user) => user?.login && !user.isInvitation)
+    const members = (Array.isArray(team) ? team : []).filter((user) => user?.login && !user.isInvitation);
+    const customerOwned = members.some((user) => isAdmin(user) && !isAktoUser(user));
+    return members
+        .filter((user) => !(customerOwned && isAktoUser(user)))
         .map((user) => ({ login: user.login, name: user.name }))
         .sort((a, b) => a.login.localeCompare(b.login));
 }
