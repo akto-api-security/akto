@@ -15,6 +15,10 @@ public class MaliciousPayloadsResponse {
     private String evidenceLine;
     private String remediation;
     private String status;
+    // The event's case, for a flyout opened without a table row behind it.
+    private String caseOwner;
+    private String caseNotes;
+    private java.util.List<DashboardMaliciousEvent.CaseActivity> caseTimeline;
 
     public MaliciousPayloadsResponse(String orig, String metadata, long ts) {
         this.orig = orig;
@@ -121,5 +125,29 @@ public class MaliciousPayloadsResponse {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getCaseOwner() {
+        return caseOwner;
+    }
+
+    public void setCaseOwner(String caseOwner) {
+        this.caseOwner = caseOwner;
+    }
+
+    public String getCaseNotes() {
+        return caseNotes;
+    }
+
+    public void setCaseNotes(String caseNotes) {
+        this.caseNotes = caseNotes;
+    }
+
+    public java.util.List<DashboardMaliciousEvent.CaseActivity> getCaseTimeline() {
+        return caseTimeline;
+    }
+
+    public void setCaseTimeline(java.util.List<DashboardMaliciousEvent.CaseActivity> caseTimeline) {
+        this.caseTimeline = caseTimeline;
     }
 }

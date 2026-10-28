@@ -91,6 +91,8 @@ _FIELDS = (
     "CACHE_REDIS_INDEX",
     # Separate webhook for cache shadow/served alerts (keeps SLACK_WEBHOOK_URL clean).
     "CACHE_SHADOW_SLACK_WEBHOOK_URL",
+    # Separate webhook for model-fallback alerts (a primary model failed and its backup answered).
+    "FALLBACK_SLACK_WEBHOOK_URL",
     # INTENT_SCOPE_DISTANCE: still used by the semantic verdict cache's
     # cache-neighbour check (cache.py) — unrelated to the multi-class classifier.
     "INTENT_SCOPE_DISTANCE",
@@ -159,6 +161,7 @@ class Settings:
     BEDROCK_SESSION_TOKEN: str
     BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC: str
     SLACK_WEBHOOK_URL: str
+    FALLBACK_SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
     SCANNER_RESPONSE_FORMAT: str

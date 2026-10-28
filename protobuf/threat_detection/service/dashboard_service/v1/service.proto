@@ -46,6 +46,21 @@ message ListMaliciousRequestsResponse {
       int64 group_first_detected_at = 32;
       repeated string group_event_ids = 33;  // every event in the activity, for actions on the whole row
       repeated string group_filter_ids = 34;  // distinct policies the activity's events tripped
+      // Guardrail case management (events marked for review): owner, notes and the history of status/owner/notes changes.
+      string case_owner = 35;  // login of the account member the case is assigned to; empty = unassigned
+      string case_notes = 36;
+      repeated CaseActivity case_timeline = 37;  // oldest first
+    }
+    // One entry of an event's case history. activity_type says which of status, owner and notes the entry is
+    // about; the others are empty. STATUS: status = the new status. OWNER: owner = the new owner (empty when
+    // unassigned). NOTES: notes = the notes as saved (empty when cleared).
+    message CaseActivity {
+      int64 timestamp = 1;
+      string updated_by = 2;  // login of the user who made the change
+      string activity_type = 3;
+      string owner = 4;
+      string notes = 5;
+      string status = 6;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -89,6 +104,8 @@ message ListMaliciousRequestsRequest {
       optional bool ungroup_activities = 23;  // list repeated Bedrock activities one event per row
       repeated string agentic_types = 24;  // Prompt, Tool, Skill, Resource, Config — derived from the endpoint
       repeated string behaviours = 25;  // block, alert, flag — read from the event metadata
+      repeated string case_owners = 26;  // case owner logins; "__unassigned__" matches events with no owner
+      optional bool has_case_notes = 27;  // true: only events with case notes; false: only events without
     }
 
     // The number of alerts to return
@@ -212,6 +229,11 @@ message FetchMaliciousEventsResponse {
     string evidence_line = 10;
     string remediation = 11;
     string status = 12;
+    // The event's case (see ListMaliciousRequestsResponse.MaliciousEvent), so a flyout opened from a link or after
+    // a reload, with no table row behind it, still shows the owner, notes and history.
+    string case_owner = 13;
+    string case_notes = 14;
+    repeated ListMaliciousRequestsResponse.CaseActivity case_timeline = 15;
   }
   repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
 }
@@ -396,6 +418,11 @@ message UpdateMaliciousEventStatusRequest {
   optional string status = 4;  // The new status to set
   optional string jira_ticket_url = 5;  // Jira ticket URL to associate with the event(s)
   optional string human_response = 6;  // PENDING, APPROVED, BLOCKED — Human Approval tab
+  // Case management. Absent = leave as is; present but empty = clear. Every change that takes effect is
+  // added to the event's case timeline under updated_by.
+  optional string case_owner = 7;
+  optional string case_notes = 8;
+  optional string updated_by = 9;  // login of the user making the change
 }
 
 message UpdateMaliciousEventStatusResponse {

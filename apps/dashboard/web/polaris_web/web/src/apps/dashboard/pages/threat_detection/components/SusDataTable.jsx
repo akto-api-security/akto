@@ -23,6 +23,9 @@ import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } fr
 import { usePermissions } from "@/util/permissions";
 import AllowedAction from "../../../components/shared/AllowedAction";
 import { HumanApprovalActions, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "../../guardrails/violations/ViolationFlyoutSections";
+import ReviewCaseModal from "../../guardrails/components/ReviewCaseModal";
+import useCaseOwners from "../utils/useCaseOwners";
+import { CASE_NOTES_FILTER_CHOICES, caseFilterRequestParams, caseOwnerFilterChoices, ownerLabel, truncateText } from "../utils/caseManagement";
 
 const resourceName = {
   singular: "activity",
@@ -309,6 +312,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const [currentTab, setCurrentTab] = useState(resolvedInitialTab);
   const [selected, setSelected] = useState(tabIndexMap[resolvedInitialTab] || 0)
   const [currentFilters, setCurrentFilters] = useState({})
+  // The account members a case can be assigned to, and the open "Mark for review" dialog ({ summary, onConfirm }).
+  const { owners: caseOwners, loaded: caseOwnersLoaded } = useCaseOwners();
+  const [reviewDialog, setReviewDialog] = useState(null);
   const [totalFilteredCount, setTotalFilteredCount] = useState(0)
   const [pendingHumanApprovalCount, setPendingHumanApprovalCount] = useState(null)
   const [usernameMap, setUsernameMap] = useState({});
@@ -600,7 +606,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   // Generic handler for bulk operations on selected IDs
-  const handleBulkOperation = async (selectedIds, operation, newState = null) => {
+  // caseFields: { caseOwner?, caseNotes? } set in the "Mark for review" dialog, applied with the status.
+  const handleBulkOperation = async (selectedIds, operation, newState = null, caseFields = {}) => {
     const actionLabels = {
       ignore: { ing: 'ignoring', ed: 'ignored' },
       delete: { ing: 'deleting', ed: 'deleted' },
@@ -628,7 +635,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       if (operation === 'delete') {
         response = await threatDetectionRequests.deleteMaliciousEvents({ eventIds: validIds });
       } else {
-        response = await threatDetectionRequests.updateMaliciousEventStatus({ eventIds: validIds, status: newState });
+        response = await threatDetectionRequests.updateMaliciousEventStatus({ eventIds: validIds, status: newState, ...caseFields });
       }
 
       const isSuccess = operation === 'delete' ? response?.deleteSuccess : response?.updateSuccess;
@@ -649,7 +656,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   // Generic handler for filtered bulk operations
-  const handleFilteredOperation = async (operation, newState = null) => {
+  const handleFilteredOperation = async (operation, newState = null, caseFields = {}) => {
     const actionLabels = {
       ignore: { ing: 'ignoring', ed: 'ignored' },
       delete: { ing: 'deleting', ed: 'deleted' },
@@ -678,6 +685,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         currentTab.toUpperCase(),
         currentFilters.host || []
       ];
+      // A bulk action on the filtered view must reach exactly the rows the view shows, case filters included.
+      const caseFilterParams = caseFilterRequestParams(currentTab, currentFilters);
 
       if (operation === 'delete') {
         response = await threatDetectionRequests.deleteMaliciousEvents({
@@ -688,7 +697,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           startTimestamp: filterParams[4],
           endTimestamp: filterParams[5],
           statusFilter: filterParams[6],
-          hosts: filterParams[7]
+          hosts: filterParams[7],
+          ...caseFilterParams
         });
       } else if (operation === 'approve' || operation === 'block') {
         response = await threatDetectionRequests.updateMaliciousEventStatus({
@@ -700,7 +710,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           endTimestamp: filterParams[5],
           statusFilter: 'HUMAN_APPROVAL',
           humanResponse: operation === 'approve' ? HUMAN_RESPONSE.APPROVED : HUMAN_RESPONSE.BLOCKED,
-          hosts: filterParams[7]
+          hosts: filterParams[7],
+          ...caseFilterParams
         });
       } else {
         response = await threatDetectionRequests.updateMaliciousEventStatus({
@@ -712,7 +723,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
           endTimestamp: filterParams[5],
           statusFilter: filterParams[6],
           status: newState,
-          hosts: filterParams[7]
+          hosts: filterParams[7],
+          ...caseFilterParams,
+          ...caseFields
         });
       }
 
@@ -758,7 +771,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       func.setToast(true, true, 'Error deleting events');
     }
   };
-  const handleBulkMarkForReview = (selectedIds) => handleBulkOperation(selectedIds, 'markForReview', 'UNDER_REVIEW');
+  const handleBulkMarkForReview = (selectedIds, caseFields) => handleBulkOperation(selectedIds, 'markForReview', 'UNDER_REVIEW', caseFields);
   const handleBulkRemoveFromReview = (selectedIds) => handleBulkOperation(selectedIds, 'removeFromReview', 'ACTIVE');
   const handleBulkMarkForTraining = async (selectedIds) => {
     if (!hasAgentTrafficLogsAccess) return;
@@ -769,7 +782,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // Simplified filtered operation handlers
   const handleIgnoreAllFiltered = () => handleFilteredOperation('ignore', 'IGNORED');
   const handleDeleteAllFiltered = () => handleFilteredOperation('delete');
-  const handleMarkAllFilteredForReview = () => handleFilteredOperation('markForReview', 'UNDER_REVIEW');
+  const handleMarkAllFilteredForReview = (caseFields) => handleFilteredOperation('markForReview', 'UNDER_REVIEW', caseFields);
   const handleRemoveAllFilteredFromReview = () => handleFilteredOperation('removeFromReview', 'ACTIVE');
   const handleMarkAllFilteredForTraining = async () => {
     if (!hasAgentTrafficLogsAccess) {
@@ -817,6 +830,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         content: `${label} ${displayText}`,
         requires: actionType === 'delete' ? 'api/deleteMaliciousEvents' : 'api/updateMaliciousEventStatus',
         onAction: () => {
+          // Marking for review opens a case: ask for its owner and notes instead of a plain confirmation.
+          if (actionType === 'markForReview') {
+            if (useFilters && !validateFiltersForBulkOperation(validationType)) return;
+            setReviewDialog({
+              summary: `${displayText} will be marked for review.`,
+              onConfirm: (caseFields) => (useFilters ? handleMarkAllFilteredForReview(caseFields) : handleBulkMarkForReview(actionIds, caseFields)),
+            });
+            return;
+          }
           if (useFilters) {
             if (!validateFiltersForBulkOperation(validationType)) return;
             const message = actionType === 'delete'
@@ -1005,6 +1027,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       latestAttack: latestAttack,
       host: hostFilter,
       severity: severityFilter,
+      caseOwner: filters?.caseOwner,
+      caseNotes: filters?.caseNotes,
       sortKey: sortKey,
       sortOrder: sortOrder
     });
@@ -1035,6 +1059,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       riskScoreFilterType,
       riskScoreFilterValue,
       isNeedsApproval,
+      caseFilters: caseFilterRequestParams(currentTab, filters),
     };
 
     const res = await api.fetchSuspectSampleData(
@@ -1061,7 +1086,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       riskScoreFilterType,
       riskScoreFilterValue,
       undefined,
-      !groupActivities
+      !groupActivities,
+      caseFilterRequestParams(currentTab, filters)
     );
 
     // Store the total count for filtered results
@@ -1136,6 +1162,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         discoveredTs: func.prettifyEpoch(x.timestamp || 0),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
+        // Case management (events marked for review): the raw caseOwner/caseNotes/caseTimeline come with ...x above.
+        caseOwnerComp: x?.caseOwner
+          ? <Text variant="bodyMd" as="span">{ownerLabel(x.caseOwner, caseOwners)}</Text>
+          : <Text variant="bodyMd" color="subdued" as="span">Unassigned</Text>,
+        caseNotesPreview: truncateText(x?.caseNotes, 80) || "-",
+        caseNotesFull: x?.caseNotes || "",
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
@@ -1296,7 +1328,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       p.riskScoreFilterType,
       p.riskScoreFilterValue,
       undefined,
-      showsActivityGrouping() // export every event, not one row per grouped activity
+      showsActivityGrouping(), // export every event, not one row per grouped activity
+      p.caseFilters
     );
     let events = res?.maliciousEvents || [];
     // "Needs Approval" is a client-side view over ACTIVE events (see fetchData above) — apply the
@@ -1446,6 +1479,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         const opLabel = RISK_SCORE_OP_LABELS[parsed.operator] || parsed.operator;
         return parsed.amount !== "" ? `${opLabel} ${parsed.amount}` : opLabel;
       }
+      case "caseOwner": {
+        const labelByLogin = Object.fromEntries(caseOwnerFilterChoices(caseOwners).map((c) => [c.value, c.label]));
+        return func.convertToDisambiguateLabelObj(value, labelByLogin, 2);
+      }
+      case "caseNotes": {
+        const labelByValue = Object.fromEntries(CASE_NOTES_FILTER_CHOICES.map((c) => [c.value, c.label]));
+        return func.convertToDisambiguateLabelObj(value, labelByValue, 2);
+      }
       default:
         return func.convertToDisambiguateLabelObj(value, null, 2);
     }
@@ -1453,8 +1494,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   // Recompute rows once the async guardrail compliance map has loaded (same pattern as usernameMapLoaded).
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
-  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '');
+  // Owners' names fill the Owner column, so the Under Review tab refetches once they have loaded (as for usernames).
+  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '') + (currentTab === 'under_review' && caseOwnersLoaded ? '_co' : '');
   const headers = getHeaders();
+  // Under Review is where cases live: its table also shows each case's owner and notes.
+  if (currentTab === 'under_review') {
+    const detectedIdx = headers.findIndex((h) => h.value === "discoveredTs");
+    headers.splice(detectedIdx >= 0 ? detectedIdx : headers.length, 0,
+      { text: "Owner", value: "caseOwnerComp", title: "Owner", maxWidth: "160px" },
+      { text: "Notes", value: "caseNotesPreview", title: "Notes", maxWidth: "240px", type: CellType.TEXT, tooltipKey: "caseNotesFull" },
+    );
+  }
   if (currentTab === 'needs_approval' && func.canManageGuardrailPolicies()) {
     headers.push({ text: "Action", value: "approveAction", title: "Action" });
   }
@@ -1469,6 +1519,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
     headers.unshift({ text: "Status", value: "humanResponseComp", title: "Status" });
   }
   const sortOptions = getSortOptions(headers);
+  // The Under Review tab can also be filtered by case owner (or Unassigned) and by whether a case has notes.
+  const tableFilters = currentTab === 'under_review'
+    ? [
+        ...filters,
+        { key: 'caseOwner', label: 'Owner', title: 'Owner', choices: caseOwnerFilterChoices(caseOwners), multiple: true },
+        { key: 'caseNotes', label: 'Notes', title: 'Notes', choices: CASE_NOTES_FILTER_CHOICES, singleSelect: true },
+      ]
+    : filters;
   return (
     <>
       <GithubServerTable
@@ -1481,7 +1539,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         disambiguateLabel={disambiguateLabel}
         loading={loading}
         fetchData={fetchData}
-        filters={filters}
+        filters={tableFilters}
         selectable={true}
         promotedBulkActions={promotedBulkActions}
         headings={headers}
@@ -1510,6 +1568,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
         ) : null}
         callFromOutside={advancedFetchKey + refreshNonce + groupToggles}
         clearSelectionKey={refreshNonce}
+      />
+
+      <ReviewCaseModal
+        open={reviewDialog !== null}
+        onClose={() => setReviewDialog(null)}
+        onConfirm={(caseFields) => {
+          const dialog = reviewDialog;
+          setReviewDialog(null);
+          dialog?.onConfirm(caseFields);
+        }}
+        summary={reviewDialog?.summary}
       />
 
       <Modal

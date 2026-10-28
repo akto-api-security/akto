@@ -52,7 +52,11 @@ public class ProfileAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void executeMeta1(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
+    public static boolean executeMeta1(Utility utility, User user, HttpServletRequest request, HttpServletResponse response) {
+        if (user == null || user.getAccounts() == null || user.getAccounts().isEmpty()) {
+            logger.errorAndAddToDb("Signed-in user has no account: " + (user == null ? "" : user.getLogin()), LogDb.DASHBOARD);
+            return false;
+        }
         BasicDBObject userDetails = new BasicDBObject();
         BasicDBObject accounts = new BasicDBObject();
         Integer sessionAccId = Context.accountId.get();
@@ -76,7 +80,8 @@ public class ProfileAction extends UserAction {
         };
 
         if (sessionAccId == 0) {
-            throw new IllegalStateException("user has no accounts associated");
+            logger.errorAndAddToDb("Signed-in user has no account: " + user.getLogin(), LogDb.DASHBOARD);
+            return false;
         } else {
             logger.debug("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
@@ -398,7 +403,7 @@ public class ProfileAction extends UserAction {
             request.setAttribute(k, userDetails.get(k));
         }
 
-        return;
+        return true;
     }
 
     private String type;

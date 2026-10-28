@@ -383,7 +383,7 @@ async def test_fallback_uses_primary_when_available_or_unknown(monkeypatch):
     assert await fb.complete("hi") == "from primary"
 
 
-async def test_connect_error_marks_primary_down_and_falls_back(monkeypatch):
+async def test_connect_error_is_raised_without_backup_or_flagging_down(monkeypatch):
     import httpx
 
     import providers
@@ -393,8 +393,9 @@ async def test_connect_error_marks_primary_down_and_falls_back(monkeypatch):
             raise httpx.ConnectError("refused")
 
     fb = _fallback(monkeypatch, Refused())
-    assert await fb.complete("hi") == "from backup"
-    assert providers._PRIMARY_AVAILABLE[fb.health_url] is False
+    with pytest.raises(httpx.ConnectError):
+        await fb.complete("hi")
+    assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
 
 
 async def test_health_probe_sets_the_flag_back_to_available(monkeypatch):
@@ -420,7 +421,40 @@ async def test_health_probe_sets_the_flag_back_to_available(monkeypatch):
     assert providers._PRIMARY_AVAILABLE["u"] is True
 
 
-async def test_other_errors_fall_back_without_flagging_down(monkeypatch):
+async def test_health_probe_marks_down_only_after_consecutive_failures(monkeypatch):
+    import asyncio
+
+    import providers
+
+    monkeypatch.setattr(providers, "_PRIMARY_AVAILABLE", {})
+    monkeypatch.setattr(providers, "_HEALTH_FAILURES", {})
+    monkeypatch.setattr(providers, "_HEALTH_FAILURES_TO_DOWN", 3)
+    # A good probe in between resets the count; a probe that raises counts as a failure.
+    statuses = iter([503, 503, 200, 503, 503, None])
+    seen: list[bool | None] = []
+
+    class Client:
+        async def get(self, url, timeout=None):
+            status = next(statuses)
+            if status is None:
+                raise ConnectionError("refused")
+            return type("R", (), {"status_code": status})()
+
+    async def record(_):
+        seen.append(providers._PRIMARY_AVAILABLE.get("u"))
+        if len(seen) == 6:
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(providers.http_client, "get_client", lambda: Client())
+    monkeypatch.setattr(providers.asyncio, "sleep", record)
+    try:
+        await providers._health_loop("u")
+    except asyncio.CancelledError:
+        pass
+    assert seen == [None, None, True, True, True, False]
+
+
+async def test_other_errors_are_raised_without_backup_or_flagging_down(monkeypatch):
     import providers
 
     class Boom(_Primary):
@@ -428,11 +462,12 @@ async def test_other_errors_fall_back_without_flagging_down(monkeypatch):
             raise ValueError("bad reply")
 
     fb = _fallback(monkeypatch, Boom())
-    assert await fb.complete("hi") == "from backup"
+    with pytest.raises(ValueError):
+        await fb.complete("hi")
     assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
 
 
-async def test_hung_primary_times_out_marks_down_and_falls_back(monkeypatch):
+async def test_hung_primary_times_out_without_backup_or_flagging_down(monkeypatch):
     import asyncio
 
     import providers
@@ -443,8 +478,9 @@ async def test_hung_primary_times_out_marks_down_and_falls_back(monkeypatch):
 
     fb = _fallback(monkeypatch, Hung())
     fb.primary_timeout_s = 0.05
-    assert await fb.complete("hi") == "from backup"
-    assert providers._PRIMARY_AVAILABLE[fb.health_url] is False
+    with pytest.raises(TimeoutError):
+        await fb.complete("hi")
+    assert providers._PRIMARY_AVAILABLE.get(fb.health_url, True) is True
 
 
 async def test_arbiter_primary_gets_its_timeout_and_backup_gets_extra_time():
@@ -466,3 +502,15 @@ async def test_primary_without_health_path_is_never_monitored(monkeypatch):
         health_path = ""
 
     assert _fallback(monkeypatch, Plain()).health_url == ""
+
+
+async def test_primary_without_health_path_falls_back_on_a_failed_request(monkeypatch):
+    """No probe can ever mark it down, so a failed request is the only signal to use the backup."""
+
+    class Plain(_Primary):
+        health_path = ""
+
+        async def complete(self, prompt):
+            raise ValueError("bad reply")
+
+    assert await _fallback(monkeypatch, Plain()).complete("hi") == "from backup"

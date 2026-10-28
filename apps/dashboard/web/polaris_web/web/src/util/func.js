@@ -280,28 +280,34 @@ prettifyEpoch(epoch) {
       return ret
     }
   },
-  valToString(val) {
-    if (val instanceof Set) {
-      return [...val].join(" & ")
-    } else {
-      return val || "-"
-    }
+  // One CSV cell: always quoted, quotes doubled. Strings starting with = + - @ are prefixed with '
+  // so a spreadsheet won't run them as a formula (urls and names come from customer traffic).
+  // The "-" empty placeholder and plain numbers are left alone.
+  csvCell(text) {
+    const str = text == null ? '' : String(text)
+    const isFormula = typeof text === 'string' && /^[=+\-@\t\r]/.test(str) && str !== '-' && !/^[-+]?\d+(\.\d+)?$/.test(str)
+    const safe = isFormula ? "'" + str : str
+    return `"${safe.replace(/"/g, '""')}"`
+  },
+  // Plain-data cell text. Absent stays empty (never "-"), a real 0 stays 0, objects are JSON.
+  csvValue(val) {
+    if (val == null) return ''
+    if (Array.isArray(val)) return val.map(x => this.csvValue(x)).filter(x => x !== '').join(', ')
+    if (typeof val === 'object') return JSON.stringify(val)
+    return val
+  },
+  saveCsv(lines, fileName) {
+    saveAs(new Blob([lines.join("\r\n")], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
   },
   downloadAsCSV(data, selectedTestRun) {
-    // use correct function, this does not expand objects.
-    if(Object.keys(data).length === 0){
+    if (!Array.isArray(data) || data.length === 0) {
       return;
     }
-    let headerTextToValueMap = Object.keys(data[0])
-
-    let csv = headerTextToValueMap.join(",") + "\r\n"
-    data.forEach(i => {
-      csv += Object.values(headerTextToValueMap).map(h => this.valToString(i[h])).join(",") + "\r\n"
-    })
-    let blob = new Blob([csv], {
-      type: "application/csvcharset=UTF-8"
-    });
-    saveAs(blob, (selectedTestRun.name || "file") + ".csv");
+    const keys = Object.keys(data[0])
+    this.saveCsv([
+      keys.map(k => this.csvCell(k)).join(","),
+      ...data.map(row => keys.map(k => this.csvCell(this.csvValue(row[k]))).join(","))
+    ], selectedTestRun.name || "file")
   },
   extractCsvText(val) {
     if (val == null) return '-'
@@ -313,14 +319,10 @@ prettifyEpoch(epoch) {
   },
   exportTableAsCSV(headers, data, fileName) {
     const cols = headers.filter(x => x.text?.length > 0)
-    const csv = [
+    this.saveCsv([
       cols.map(x => x.text).join(","),
-      ...data.map(row => cols.map(x => {
-        const val = row[x.textValue || x.value]
-        return `"${this.extractCsvText(val).replace(/"/g, '""')}"`
-      }).join(","))
-    ].join("\r\n")
-    saveAs(new Blob([csv], { type: "text/csv;charset=UTF-8" }), `${fileName}.csv`)
+      ...data.map(row => cols.map(x => this.csvCell(this.extractCsvText(row[x.textValue || x.value]))).join(","))
+    ], fileName)
     this.setToast(true, false, "CSV exported successfully")
   },
   flattenObject(obj, prefix = '') {
