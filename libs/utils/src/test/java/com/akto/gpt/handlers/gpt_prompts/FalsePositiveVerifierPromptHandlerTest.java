@@ -86,6 +86,9 @@ class FalsePositiveVerifierPromptHandlerTest {
         assertTrue(prompt.contains("Why the scanner flagged it: status 200 with other user's id"));
         assertTrue(prompt.contains("<<<EVIDENCE") && prompt.contains("EVIDENCE>>>"));
         assertTrue(prompt.contains("answer FALSE_POSITIVE, even with status 200"));
+        // tests that only inspect the response are judged by `validate`, not by an injected payload
+        assertTrue(prompt.contains("B. The test sends the request unchanged (`req: []`, or `type: passive`)"));
+        assertTrue(prompt.contains("are NOT a reason for FALSE_POSITIVE"));
         assertTrue(prompt.contains("Baseline (original) request/response:\n(not available)"));
         // the template sits outside the untrusted evidence block
         assertTrue(prompt.indexOf("validate:") < prompt.indexOf("\n<<<EVIDENCE\n"));
