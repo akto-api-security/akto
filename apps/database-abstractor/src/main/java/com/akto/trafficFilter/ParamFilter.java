@@ -33,6 +33,9 @@ public class ParamFilter {
     private static final String DOLLAR = "$";
     private static final String HOST = "host";
 
+    public static final String BLOOM_PARAM_SAMPLE_DATA = "$aktoSampleData";
+    public static final String BLOOM_PARAM_SENSITIVE_SAMPLE_DATA = "$aktoSensitiveSampleData";
+
     private static void insertInFilter(String key) {
         filterList.get(currentFilterIndex).put(key);
     }
