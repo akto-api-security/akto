@@ -8,7 +8,6 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -17,7 +16,6 @@ import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.gpt.handlers.gpt_prompts.FalsePositiveVerifierPromptHandler;
-import com.akto.gpt.handlers.gpt_prompts.FalsePositiveVerifierPromptHandler.TestDefinition;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing_utils.TestingUtils;
@@ -270,15 +268,15 @@ public class AiVerificationAction extends UserAction {
         }
         List<TestingRunResult> results = new ArrayList<>();
         for (Target target : targets) results.add(target.result);
-        Map<String, TestDefinition> testDefinitions = loadTestDefinitions(results);
+        Map<String, String> templates = loadTemplates(results);
 
         int accountId = Context.accountId.get();
         List<Future<Outcome>> calls = new ArrayList<>();
         for (Target target : targets) {
-            TestDefinition test = testDefinitions.get(target.result.getTestSubType());
+            String template = templates.get(target.result.getTestSubType());
             calls.add(LLM_EXECUTOR.submit(() -> {
                 Context.accountId.set(accountId);
-                return verifyResult(target.issue, target.result, test);
+                return verifyResult(target.issue, target.result, template);
             }));
         }
 
@@ -307,40 +305,23 @@ public class AiVerificationAction extends UserAction {
         }
     }
 
-    /** The test template (YAML + name/description/category) for every test in the batch, in one query. */
-    private static Map<String, TestDefinition> loadTestDefinitions(List<TestingRunResult> results) {
+    /** The test template YAML of every test in the batch, by test id, in one query. */
+    private static Map<String, String> loadTemplates(List<TestingRunResult> results) {
         Set<String> testIds = new HashSet<>();
         for (TestingRunResult result : results) {
             if (result.getTestSubType() != null) testIds.add(result.getTestSubType());
         }
-        Map<String, TestDefinition> definitions = new HashMap<>();
-        if (testIds.isEmpty()) return definitions;
-        List<YamlTemplate> templates = YamlTemplateDao.instance.findAll(
-            Filters.in(Constants.ID, new ArrayList<>(testIds)),
-            Projections.include(YamlTemplate.CONTENT, YamlTemplate.INFO)
-        );
-        for (YamlTemplate template : templates) {
-            Info info = template.getInfo();
-            String category = null;
-            if (info != null && info.getCategory() != null) {
-                category = info.getCategory().getDisplayName() != null
-                    ? info.getCategory().getDisplayName() : info.getCategory().getName();
-            }
-            definitions.put(template.getId(), new TestDefinition(template.getId(),
-                info == null ? null : info.getName(),
-                info == null ? null : info.getDescription(),
-                category,
-                template.getContent()));
+        Map<String, String> templates = new HashMap<>();
+        if (testIds.isEmpty()) return templates;
+        for (YamlTemplate template : YamlTemplateDao.instance.findAll(
+                Filters.in(Constants.ID, new ArrayList<>(testIds)), Projections.include(YamlTemplate.CONTENT))) {
+            templates.put(template.getId(), template.getContent());
         }
-        // Tests whose template is gone still get verified, with just their id.
-        for (String testId : testIds) {
-            definitions.putIfAbsent(testId, new TestDefinition(testId, null, null, null, null));
-        }
-        return definitions;
+        return templates;
     }
 
     /** Asks the LLM about one result and moves its issue to ignored if it is a false positive. */
-    private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, TestDefinition test) {
+    private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, String template) {
         List<TestResult> attempts = attemptsToJudge(result);
         if (attempts.isEmpty()) return Outcome.KEPT;
 
@@ -352,7 +333,7 @@ public class AiVerificationAction extends UserAction {
                 reasons.add(attempt.getValidationReason().trim());
             }
         }
-        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(test, String.join("; ", reasons),
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(result.getTestSubType(), template, String.join("; ", reasons),
             attempts.get(0).getOriginalMessage(), attemptMessages);
         BasicDBObject verdict = new FalsePositiveVerifierPromptHandler().handle(new BasicDBObject("prompt", prompt));
         if (verdict.containsField("error")) {
