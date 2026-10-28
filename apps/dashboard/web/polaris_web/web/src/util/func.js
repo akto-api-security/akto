@@ -747,18 +747,41 @@ prettifyEpoch(epoch) {
     }
     return result
   },
-  // Brotli bodies arrive as a broken string. A valid JSON body is left alone, so a sample that was already inflated still renders.
-  undecodedBrotliPayload: function (responseHeaders, responsePayloadString) {
+  // Brotli bodies arrive as a broken string. A valid JSON body was already inflated and should still render.
+  isUndecodedBrotliPayload: function (responseHeaders, responsePayloadString) {
     const raw = responseHeaders && responseHeaders["content-encoding"]
     const encoding = (Array.isArray(raw) ? raw.join(",") : (raw == null ? "" : String(raw))).toLowerCase()
     const isBrotli = encoding.split(",").some((part) => part.trim() === "br")
-    if (!isBrotli || typeof responsePayloadString !== "string") return null
+    if (!isBrotli || typeof responsePayloadString !== "string") return false
     try {
       JSON.parse(responsePayloadString)
-      return null
+      return false
     } catch (e) {
-      return "Response body is brotli-compressed and was not decoded."
+      return true
     }
+  },
+  isUndecodedBrotliSample: function (sample) {
+    const raw = sample && typeof sample === "object" ? sample.message : sample
+    if (typeof raw !== "string" || raw.length === 0) return false
+    let message
+    try {
+      message = JSON.parse(raw)
+    } catch (e) {
+      return false
+    }
+    if (!message || typeof message !== "object") return false
+    const nested = message["response"]
+    const responseHeadersString = nested ? (nested["headers"] || "{}") : (message["responseHeaders"] || "{}")
+    const responsePayloadString = nested ? (nested["body"] || "") : (message["responsePayload"] || "")
+    let responseHeaders = {}
+    try {
+      responseHeaders = func.convertKeysToLowercase(
+        typeof responseHeadersString === "string" ? JSON.parse(responseHeadersString) : responseHeadersString
+      )
+    } catch (e) {
+      return false
+    }
+    return func.isUndecodedBrotliPayload(responseHeaders, responsePayloadString)
   },
   responseJson: function (message, highlightPaths, metadata = []) {
 
@@ -784,16 +807,11 @@ prettifyEpoch(epoch) {
     } catch (e) {
       // eat it
     }
-    const brotliNotice = func.undecodedBrotliPayload(responseHeaders, responsePayloadString)
     let responsePayload = {}
-    if (brotliNotice) {
-      responsePayload = brotliNotice
-    } else {
-      try {
-        responsePayload = JSON.parse(responsePayloadString)
-      } catch (e) {
-        responsePayload = responsePayloadString
-      }
+    try {
+      responsePayload = JSON.parse(responsePayloadString)
+    } catch (e) {
+      responsePayload = responsePayloadString
     }    
 
     Object.keys(responseHeaders).forEach((key) => {

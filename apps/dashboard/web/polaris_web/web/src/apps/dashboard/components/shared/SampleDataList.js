@@ -155,6 +155,11 @@ function SampleDataList(props) {
 
     const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine, onPageChange} = props;
 
+    const visibleSamples = useMemo(
+      () => (sampleData || []).filter((sample) => !func.isUndecodedBrotliSample(sample)),
+      [sampleData]
+    )
+
     const [page, setPage] = useState(0);
 
     useEffect(() => {
@@ -166,7 +171,7 @@ function SampleDataList(props) {
       onPageChange?.(page);
     }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
   
-    const currentSample = sampleData[Math.min(page, sampleData.length - 1)];
+    const currentSample = visibleSamples[Math.min(page, visibleSamples.length - 1)];
     const parsedSample = func.parseWebSocketSampleMessage(currentSample?.message)
     const isWebSocket = isWebSocketProp === true || func.isWebSocketApiType(parsedSample?.type)
     const panelTypes = isWebSocket ? ['events'] : ['request', 'response'];
@@ -201,6 +206,10 @@ function SampleDataList(props) {
         return { ...currentSample, vulnerabilitySegments: validated };
     }, [currentSample, isNewDiff, redactHeaders, metadata, isWebSocket]);
 
+    if ((sampleData || []).length > 0 && visibleSamples.length === 0) {
+        return null
+    }
+
     return (
       <VerticalStack gap="3">
          {showDetectionReason ? <DetectionReason sampleData={currentSample} /> : null}
@@ -217,20 +226,20 @@ function SampleDataList(props) {
           </HorizontalStack>
         <Pagination
                 label={
-                  sampleData?.length==0 ? 'No ' + mapLabel("Test runs", getDashboardCategory()) + " found" :
-                  `${page+1} of ${sampleData?.length}`
+                  visibleSamples.length==0 ? 'No ' + mapLabel("Test runs", getDashboardCategory()) + " found" :
+                  `${page+1} of ${visibleSamples.length}`
                 }
                 hasPrevious = {page > 0}
                 previousKeys={[Key.LeftArrow]}
                 onPrevious={() => {setPage((old) => (old-1))}}
-                hasNext = {sampleData?.length > (page+1)}
+                hasNext = {visibleSamples.length > (page+1)}
                 nextKeys={[Key.RightArrow]}
                 onNext={() => {setPage((old) => (old+1))}}
               />
         </HorizontalStack>
         <HorizontalGrid columns={vertical ? "1" : "2"} gap="2">
           {
-            sampleData[Math.min(page, sampleData.length - 1)]?.errorList != undefined ?
+            visibleSamples[Math.min(page, visibleSamples.length - 1)]?.errorList != undefined ?
               <Box key={"errorList"}>
                 <LegacyCard>
                   <Box id='error-editor-container'>
@@ -242,7 +251,7 @@ function SampleDataList(props) {
                       </Box>
                     </LegacyCard.Section>
                     <LegacyCard.Section flush>
-                      <SampleData data={{ original: sampleData[Math.min(page, sampleData.length - 1)]?.errorList }}
+                      <SampleData data={{ original: visibleSamples[Math.min(page, visibleSamples.length - 1)]?.errorList }}
                         language="yaml" minHeight={minHeight} wordWrap={false} />
                     </LegacyCard.Section>
                   </Box>
