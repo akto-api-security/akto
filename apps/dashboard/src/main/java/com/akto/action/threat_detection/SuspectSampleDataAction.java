@@ -580,9 +580,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   // Only Admin and Threat Engineer base roles (custom roles resolve to theirs) assign a case, and only to
-  // someone with one of those roles, like guardrail policies. "" unassigns, null leaves the owner as it is.
-  // (The UI lists the choices from the existing getTeamData; this is the server-side check behind it.)
-  static boolean mayOwnCases(Role role) {
+  // someone with one of those roles, like guardrail policies.
+  private static boolean isCaseOwnerRole(Role role) {
     return role == Role.ADMIN || role == Role.THREAT_ENGINEER;
   }
 
@@ -593,28 +592,39 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
         && UsageMetricCalculator.isRbacFeatureAvailable(accountId);
   }
 
-  // Returns the reason the owner can't be set, or null if it can (or isn't being changed).
+  // The account member with this login, or null. (The UI lists the choices from the existing getTeamData;
+  // this is the server-side check behind it.)
+  private static BasicDBObject findAccountMember(int accountId, String login) {
+    for (Object member : UsersDao.instance.getAllUsersInfoForTheAccount(accountId)) {
+      if (login.equalsIgnoreCase(((BasicDBObject) member).getString("login"))) {
+        return (BasicDBObject) member;
+      }
+    }
+    return null;
+  }
+
+  // The reason the owner can't be set, or null if it can. "" unassigns, null leaves the owner as it is.
   private String caseOwnerError() {
     if (this.caseOwner == null) {
       return null;
     }
     int accountId = Context.accountId.get();
     boolean enforced = caseRolesEnforced();
-    if (enforced && !mayOwnCases(RBACDao.getCurrentRoleForUser(getSUser().getId(), accountId))) {
+    if (enforced && !isCaseOwnerRole(RBACDao.getCurrentRoleForUser(getSUser().getId(), accountId))) {
       return "Only Admin and Threat Engineer roles can assign a case";
     }
     String owner = this.caseOwner.trim();
     if (owner.isEmpty()) {
       return null;
     }
-    for (Object member : UsersDao.instance.getAllUsersInfoForTheAccount(accountId)) {
-      BasicDBObject user = (BasicDBObject) member;
-      if (owner.equalsIgnoreCase(user.getString("login"))) {
-        return enforced && !mayOwnCases(RBACDao.getCurrentRoleForUser(user.getInt("id"), accountId))
-            ? "The owner must have the Admin or Threat Engineer role" : null;
-      }
+    BasicDBObject member = findAccountMember(accountId, owner);
+    if (member == null) {
+      return "The owner must be a member of this account";
     }
-    return "The owner must be a member of this account";
+    if (enforced && !isCaseOwnerRole(RBACDao.getCurrentRoleForUser(member.getInt("id"), accountId))) {
+      return "The owner must have the Admin or Threat Engineer role";
+    }
+    return null;
   }
 
   /**

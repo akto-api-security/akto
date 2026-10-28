@@ -6,7 +6,7 @@ import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
 import ActivityTracker from "@/apps/dashboard/pages/dashboard/components/ActivityTracker";
 import threatDetectionApi from "@/apps/dashboard/pages/threat_detection/api";
 import useCaseOwners, { ASSIGN_ROLES_MESSAGE } from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
-import { CASE_NOTES_MAX_LENGTH, changedCaseFields } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
+import { CASE_NOTES_MAX_LENGTH, canAssignToMe, changedCaseFields } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
 import { ownerSelectOptions } from "./ReviewCaseModal";
 
 // The case of an event marked for review, as shown in a flyout: who owns it and the notes, editable in place,
@@ -15,6 +15,7 @@ import { ownerSelectOptions } from "./ReviewCaseModal";
 // saved ({ caseOwner?, caseNotes? }) so the screen can show them, and the timeline entries they add, at once.
 export default function CasePanel({ eventIds, caseOwner = "", caseNotes = "", activity, onSaved }) {
     const { canCall } = usePermissions();
+    const canUpdate = canCall("api/updateMaliciousEventStatus");
     const { owners, canAssign } = useCaseOwners();
     const [owner, setOwner] = useState(caseOwner);
     const [notes, setNotes] = useState(caseNotes);
@@ -29,7 +30,6 @@ export default function CasePanel({ eventIds, caseOwner = "", caseNotes = "", ac
     const fields = changedCaseFields({ owner, notes }, { initialOwner: caseOwner, initialNotes: caseNotes });
     const dirty = Object.keys(fields).length > 0;
     const me = window.USER_NAME;
-    const canAssignToMe = canAssign && !!me && owner !== me && owners.some((o) => o.login === me);
 
     const save = async () => {
         setSaving(true);
@@ -58,10 +58,10 @@ export default function CasePanel({ eventIds, caseOwner = "", caseNotes = "", ac
                             options={ownerSelectOptions(owners, owner)}
                             value={owner}
                             onChange={setOwner}
-                            disabled={!canCall("api/updateMaliciousEventStatus") || !canAssign}
+                            disabled={!canUpdate || !canAssign}
                             helpText={canAssign ? undefined : ASSIGN_ROLES_MESSAGE}
                         />
-                        {canAssignToMe && <Button plain onClick={() => setOwner(me)}>Assign to me</Button>}
+                        {canAssignToMe({ canAssign, me, owner, owners }) && <Button plain onClick={() => setOwner(me)}>Assign to me</Button>}
                     </VerticalStack>
                     <TextField
                         label="Notes"
@@ -72,11 +72,11 @@ export default function CasePanel({ eventIds, caseOwner = "", caseNotes = "", ac
                         showCharacterCount
                         autoComplete="off"
                         placeholder="What was found, what was decided, what is left to do"
-                        disabled={!canCall("api/updateMaliciousEventStatus")}
+                        disabled={!canUpdate}
                     />
                     <HorizontalStack gap="2" align="space-between" blockAlign="center">
                         <Text variant="bodySm" color="subdued">Every change is added to the timeline.</Text>
-                        <AllowedAction allowed={canCall("api/updateMaliciousEventStatus")}>
+                        <AllowedAction allowed={canUpdate}>
                             <Button primary loading={saving} disabled={!dirty} onClick={save}>Save</Button>
                         </AllowedAction>
                     </HorizontalStack>
