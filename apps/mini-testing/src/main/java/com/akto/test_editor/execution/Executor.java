@@ -225,6 +225,11 @@ public class Executor {
         boolean requestAttempted = false;
         boolean allRequestsSkippedDueToMatch = false;
         int skippedCount = 0;
+        // Smart testing module: every attempt the template marks vulnerable is verified as it is found. A rejected
+        // one is marked not vulnerable and the remaining payloads are still sent.
+        boolean verifyFindings = TestingConfigurations.getInstance().isRunAutomatedTests();
+        String verificationSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
+        RawApi verificationBaseline = null;
 
 
         if (runAutomatedPentest) {
@@ -313,6 +318,25 @@ public class Executor {
                             res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
                         } finally {
                             TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
+                        }
+                        if (res != null && res.getVulnerable() && verifyFindings) {
+                            if (verificationBaseline == null) {
+                                verificationBaseline = applyPreRequestScript(origRawApi, testingRunConfig);
+                            }
+                            // sendRequest already ran the pre-request script on this request
+                            RawApi vulnerableAttempt = new RawApi(testReq.getRequest(), testResponse, null);
+                            PentestExecutionResult verification = automatedAgenticTestExecutor.verifyFinding(
+                                    verificationBaseline, vulnerableAttempt, verificationSubType);
+                            List<TestResult> verdicts = verification.getTestResults();
+                            if (verdicts != null && !verdicts.isEmpty()) {
+                                boolean confirmed = verdicts.get(verdicts.size() - 1).getVulnerable();
+                                res.setVulnerable(confirmed);
+                                aiSummaryTraces = verification.getAiSummaryTraces();
+                                loggerMaker.infoAndAddToDb("SmartVerification: vulnerable=" + confirmed + " for testSubType=" + verificationSubType);
+                            } else {
+                                // couldn't judge it (down, timed out, skipped): the template's verdict stands
+                                loggerMaker.infoAndAddToDb("SmartVerification: not judged, keeping template result for testSubType=" + verificationSubType);
+                            }
                         }
                     }
                     if (res != null && agenticResults == null) {
