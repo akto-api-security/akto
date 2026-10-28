@@ -103,7 +103,13 @@ public class OrchestratorControl {
         }
         // the default handler gets every path except /metrics and /-/healthy
         builder.defaultHandler(OrchestratorControl::handle);
-        loggerMaker.warn("Serving mini-testing-orchestrator endpoints on the metrics port");
+        String current = token;
+        if (current == null || current.isEmpty()) {
+            loggerMaker.errorAndAddToDb("mini-testing-orchestrator endpoints refuse every request: no ORCHESTRATOR_TOKEN"
+                    + " or DATABASE_ABSTRACTOR_SERVICE_TOKEN to authenticate the orchestrator with");
+        } else {
+            loggerMaker.warn("Serving mini-testing-orchestrator endpoints on the metrics port");
+        }
     }
 
     /** Call before looking for a test run. Returns false when the orchestrator has drained this pod. */
@@ -221,7 +227,8 @@ public class OrchestratorControl {
     private static boolean isAuthorized(HttpExchange exchange) {
         String expected = token;
         if (expected == null || expected.isEmpty()) {
-            return true;
+            // no token configured: refuse every caller rather than accept any
+            return false;
         }
         String given = exchange.getRequestHeaders().getFirst(TOKEN_HEADER);
         return given != null && MessageDigest.isEqual(

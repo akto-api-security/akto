@@ -202,6 +202,16 @@ public class OrchestratorControlTest {
     }
 
     @Test
+    public void noTokenRefusesEveryCaller() throws IOException {
+        OrchestratorControl.configure(true, null, DEFAULT_TTL_MILLIS);
+        assertEquals(401, call("GET", "/status", null).code);
+        assertEquals(401, call("GET", "/status", "anything").code);
+        assertEquals(401, call("POST", "/drain", "").code);
+        // nothing was drained
+        assertTrue(OrchestratorControl.tryStartPolling());
+    }
+
+    @Test
     public void disabledControlIsANoOp() throws IOException {
         call("POST", "/drain");
         OrchestratorControl.configure(false, TOKEN, DEFAULT_TTL_MILLIS);
