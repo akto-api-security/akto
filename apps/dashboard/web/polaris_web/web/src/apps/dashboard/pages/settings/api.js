@@ -1216,6 +1216,34 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchImpervaIntegration() {
+        return request({
+            url: '/api/fetchImpervaIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addImpervaIntegration(apiId, apiKey) {
+        return request({
+            url: '/api/addImpervaIntegration',
+            method: 'post',
+            data: {apiId, apiKey}
+        })
+    },
+    triggerImpervaImport() {
+        return request({
+            url: '/api/triggerImpervaImport',
+            method: 'post',
+            data: {}
+        })
+    },
+    removeImpervaIntegration() {
+        return request({
+            url: '/api/removeImpervaIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchWizIntegration() {
         return request({
             url: '/api/fetchWizIntegration',
