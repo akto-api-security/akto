@@ -53,10 +53,11 @@ public class AiVerificationAction extends UserAction {
 
     private static final String FEATURE_LABEL = "AKTO_GPT_AI";
     private static final int MAX_RESULTS_PER_RUN = 500;
-    private static final int MIN_CONFIDENCE_TO_IGNORE = 70;
+    private static final int MIN_CONFIDENCE_TO_IGNORE = 85;
     private static final int MAX_ATTEMPTS_PER_RESULT = 3;
     private static final String IGNORE_REASON = "False positive";
-    public static final String DESCRIPTION_PREFIX = "[AI verified] ";
+    // Descriptions Verify with AI writes start with this, e.g. "[AI verified: false positive, confidence 85%] <reason>".
+    public static final String DESCRIPTION_PREFIX = "[AI verified";
     // Tests the AI cannot judge from the stored request/response, so they are never sent to it:
     // passive tests (e.g. sensitive data exposure) send no attack, multi-step tests are judged across
     // steps the stored attempts do not fully show, and some tests prove the finding through an
@@ -332,7 +333,7 @@ public class AiVerificationAction extends UserAction {
         return templates;
     }
 
-    /** Asks the LLM about one result and moves its issue to ignored if it is a false positive. */
+    /** Asks the LLM about one result, records its verdict on the issue and moves it to ignored if it is a false positive. */
     private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, String template) {
         List<TestResult> attempts = attemptsToJudge(result);
         if (attempts.isEmpty()) return Outcome.KEPT;
@@ -352,20 +353,31 @@ public class AiVerificationAction extends UserAction {
             loggerMaker.infoAndAddToDb("AI verification skipped result " + result.getHexId() + ": " + verdict.get("error"));
             return Outcome.ERROR;
         }
-        if (!FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT))
-            || verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE) < MIN_CONFIDENCE_TO_IGNORE) {
-            return Outcome.KEPT;
-        }
+        String verdictName = verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT);
+        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
+        boolean ignore = FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdictName)
+            && confidence >= MIN_CONFIDENCE_TO_IGNORE;
 
         List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED));
-        updates.add(Updates.set(TestingRunIssues.IGNORE_REASON, IGNORE_REASON));
-        updates.add(Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
-        updates.add(Updates.set(TestingRunIssues.LAST_UPDATED_BY, UPDATED_BY));
-        String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
-        if ((issue.getDescription() == null || issue.getDescription().trim().isEmpty()) && reason != null && !reason.isEmpty()) {
-            updates.add(Updates.set(TestingRunIssues.DESCRIPTION, DESCRIPTION_PREFIX + reason));
+        if (ignore) {
+            updates.add(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED));
+            updates.add(Updates.set(TestingRunIssues.IGNORE_REASON, IGNORE_REASON));
+            updates.add(Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+            updates.add(Updates.set(TestingRunIssues.LAST_UPDATED_BY, UPDATED_BY));
         }
+        // The verdict is written on issues that stay open too, so users can review it and ignore them by hand.
+        // A description the user wrote is kept; one written by an earlier verification is replaced.
+        String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
+        String description = issue.getDescription();
+        boolean canWriteDescription = description == null || description.trim().isEmpty()
+            || description.startsWith(DESCRIPTION_PREFIX);
+        if (canWriteDescription && reason != null && !reason.isEmpty()) {
+            String verdictLabel = FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdictName)
+                ? "false positive" : "true positive";
+            updates.add(Updates.set(TestingRunIssues.DESCRIPTION,
+                DESCRIPTION_PREFIX + ": " + verdictLabel + ", confidence " + confidence + "%] " + reason));
+        }
+        if (updates.isEmpty()) return Outcome.KEPT;
 
         // Only while still OPEN, so a user's ignore/fix made in the meantime is never overridden.
         boolean updated = TestingRunIssuesDao.instance.getMCollection().updateOne(
@@ -375,7 +387,7 @@ public class AiVerificationAction extends UserAction {
             ),
             Updates.combine(updates)
         ).getModifiedCount() > 0;
-        return updated ? Outcome.IGNORED : Outcome.KEPT;
+        return updated && ignore ? Outcome.IGNORED : Outcome.KEPT;
     }
 
     /**
