@@ -1939,6 +1939,10 @@ public class APICatalogSync {
                     updatePayload = new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()), "setOnInsert");
                     sampleDataUpdates.add(updatePayload.toString());
                     bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
+                    if (DataControlFetcher.pushSensitiveSampleOnce()) {
+                        // pushed once; don't re-push the same sample on every sync
+                        deltaInfo.setExamples(new HashSet<>());
+                    }
                 }
             }
 
