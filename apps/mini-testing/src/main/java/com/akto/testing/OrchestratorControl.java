@@ -1,14 +1,18 @@
 package com.akto.testing;
 
 import com.akto.log.LoggerMaker;
+import com.akto.util.SecretUtils;
 import com.sun.net.httpserver.HttpExchange;
 import io.prometheus.metrics.exporter.httpserver.HTTPServer;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Lets mini-testing-orchestrator scale this module without Prometheus or KEDA. It adds
@@ -27,7 +31,8 @@ public class OrchestratorControl {
     // Read from the environment at startup; only tests change them, through configure().
     private static volatile boolean enabled = Boolean.parseBoolean(System.getenv("AUTO_SCALING_ENABLED"))
             && Boolean.parseBoolean(System.getenv("ORCHESTRATOR_ENABLED"));
-    private static volatile String token = System.getenv("ORCHESTRATOR_TOKEN");
+    private static volatile String token = resolveToken(System.getenv("ORCHESTRATOR_TOKEN"),
+            SecretUtils.readSecret("DATABASE_ABSTRACTOR_SERVICE_TOKEN"));
     // A drain lapses unless renewed, so a pod never stays out of service if the orchestrator
     // dies or fails to remove it. The orchestrator removes a drained pod within seconds.
     private static volatile long drainTtlMillis = 1000L * parseSeconds(System.getenv("ORCHESTRATOR_DRAIN_TTL_SECONDS"), 120L);
@@ -45,6 +50,41 @@ public class OrchestratorControl {
     private static volatile boolean holdingRun = false;
     private static volatile boolean claiming = false;
     private static final AtomicLong drainedUntil = new AtomicLong(0);
+
+    // Label for deriving the control token; mini-testing-orchestrator uses the same one.
+    private static final String DERIVED_TOKEN_LABEL = "akto-mini-testing-orchestrator-control-token/v1";
+
+    /**
+     * The control token: ORCHESTRATOR_TOKEN when set, otherwise derived from the database
+     * abstractor token that both this pod and the orchestrator already receive. Deriving it
+     * means the helm chart renders no random secret, so GitOps tools such as Argo CD see a
+     * stable manifest and every pod agrees with the orchestrator without any setup.
+     */
+    static String resolveToken(String explicitToken, String databaseAbstractorToken) {
+        if (explicitToken != null && !explicitToken.trim().isEmpty()) {
+            return explicitToken;
+        }
+        return deriveToken(databaseAbstractorToken);
+    }
+
+    /** HMAC-SHA256 of a fixed label, keyed with the trimmed abstractor token, as hex; null without one. */
+    static String deriveToken(String databaseAbstractorToken) {
+        if (databaseAbstractorToken == null || databaseAbstractorToken.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(databaseAbstractorToken.trim().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(DERIVED_TOKEN_LABEL.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HmacSHA256 unavailable", e);
+        }
+    }
 
     /** For tests: sets what the environment would, and clears all state. */
     static void configure(boolean isEnabled, String controlToken, long ttlMillis) {
