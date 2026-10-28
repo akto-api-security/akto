@@ -7,6 +7,34 @@ import ModuleEnvConfigComponent from "../health_logs/ModuleEnvConfig"
 import EmptyCard from "../../dashboard/new_components/EmptyCard"
 import { usePermissions, whenAllowed } from "@/util/permissions"
 
+// A restart writes a new module_info row while the previous heartbeat stays inside the
+// 5-minute fetch window. Same module type + name is the same instance; keep the latest start.
+function moduleInstanceKey(module) {
+    const name = module?.name || module?.id || ''
+    return `${module?.moduleType || ''}::${name}`
+}
+
+function isLaterInstance(candidate, current) {
+    const candidateStarted = candidate?.startedTs || 0
+    const currentStarted = current?.startedTs || 0
+    if (candidateStarted !== currentStarted) {
+        return candidateStarted > currentStarted
+    }
+    return (candidate?.lastHeartbeatReceived || 0) > (current?.lastHeartbeatReceived || 0)
+}
+
+function latestModuleInstances(modules) {
+    const byKey = new Map()
+    for (const module of modules || []) {
+        const key = moduleInstanceKey(module)
+        const existing = byKey.get(key)
+        if (!existing || isLaterInstance(module, existing)) {
+            byKey.set(key, module)
+        }
+    }
+    return Array.from(byKey.values())
+}
+
 const ModuleInfo = () => {
     const { canCall, canCallAll } = usePermissions()
     const [ moduleInfos, setModuleInfos ] = useState([])
@@ -76,7 +104,9 @@ const ModuleInfo = () => {
         try {
             if (selectedModule?.moduleType === 'MINI_RUNTIME') {
                 await settingRequests.updateRuntimeEnvOverrides(envData);
-                const miniRuntimeIds = moduleInfos.filter(m => m.moduleType === 'MINI_RUNTIME' && canRebootModule(m)).map(m => m.id);
+                const miniRuntimeIds = latestModuleInstances(moduleInfos)
+                    .filter(m => m.moduleType === 'MINI_RUNTIME' && canRebootModule(m))
+                    .map(m => m.id);
                 await settingRequests.rebootModules(miniRuntimeIds, false);
             } else {
                 await settingRequests.updateModuleEnvAndReboot(moduleId, moduleName, envData);
@@ -95,7 +125,8 @@ const ModuleInfo = () => {
         : canCall('api/updateModuleEnvAndReboot')
     const isEnvEditable = CONFIGURABLE_MODULE_TYPES.includes(selectedModule?.moduleType) && canSaveEnv
 
-    const sortedModuleInfos = [...moduleInfos].sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
+    const sortedModuleInfos = latestModuleInstances(moduleInfos)
+        .sort((a, b) => (b.lastHeartbeatReceived || 0) - (a.lastHeartbeatReceived || 0));
 
     const moduleInfoRows = sortedModuleInfos.map(module => {
         const isEligible = canRebootModule(module);
@@ -135,7 +166,7 @@ const ModuleInfo = () => {
 
     return (
         <>
-            {moduleInfos && moduleInfos.length > 0 ? (
+            {sortedModuleInfos.length > 0 ? (
                 <LegacyCard
                     sectioned
                     title="Module Information"
