@@ -148,7 +148,7 @@ func TestSeverityForPolicy(t *testing.T) {
 	}
 }
 
-// Org email domains load once at startup, then refresh only while a policy classifies accounts by email.
+// Domains load at startup, then refresh only if a policy checks account type.
 func TestNeedsOrgEmailDomains(t *testing.T) {
 	s := &Service{cache: &policyCache{}}
 	if !s.needsOrgEmailDomains() {

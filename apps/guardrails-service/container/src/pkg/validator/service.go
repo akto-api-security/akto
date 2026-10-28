@@ -632,7 +632,7 @@ func openAITokenEmail(authorization string) string {
 	return strings.TrimSpace(claims.Profile.Email)
 }
 
-// orgDomains returns this account's work email domains; nil until the first successful fetch.
+// orgDomains returns the cached work email domains, nil until the first fetch.
 func (s *Service) orgDomains() []string {
 	if d := s.orgEmailDomains.Load(); d != nil {
 		return *d
@@ -640,7 +640,7 @@ func (s *Service) orgDomains() []string {
 	return nil
 }
 
-// needsOrgEmailDomains is true until domains first load, then only while a cached policy classifies accounts by email.
+// needsOrgEmailDomains is true until domains load, then only if a policy checks account type.
 func (s *Service) needsOrgEmailDomains() bool {
 	if s.orgEmailDomains.Load() == nil {
 		return true
@@ -652,7 +652,7 @@ func (s *Service) needsOrgEmailDomains() bool {
 	})
 }
 
-// refreshOrgEmailDomains caches the email domains of this account's users; on failure the previous list stays.
+// refreshOrgEmailDomains caches the account's email domains, keeping the old list on failure.
 func (s *Service) refreshOrgEmailDomains() {
 	domains, err := s.dbClient.FetchOrgEmailDomains()
 	if err != nil {
@@ -1052,7 +1052,7 @@ func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[s
 // loadPolicies refreshes the policy cache, coalescing concurrent callers into one fetch.
 func (s *Service) loadPolicies() (*policyRefreshResult, error) {
 	v, err, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
-		// Domains load before policies so a request is never evaluated against a policy without them.
+		// Load domains first so policies never run without them.
 		if s.needsOrgEmailDomains() {
 			s.refreshOrgEmailDomains()
 		}
