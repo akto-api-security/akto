@@ -96,7 +96,8 @@ type Service struct {
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
 	threatAPIClient       *threatapi.Client
-	orgEmailDomains       atomic.Pointer[[]string] // email domains of this account's users, refreshed with policies
+	orgEmailDomains       atomic.Pointer[[]string] // email domains of this account's users, refreshed daily
+	orgDomainsLoadedAt    time.Time                // last successful domain fetch, used only inside loadPolicies
 	// redactionCache holds display redactions for POST /api/redact/payloads; nil when disabled.
 	redactionCache *mcp.RedactionCache
 	// displayRedactor masks one payload; mcp.RedactForDisplay, replaceable in tests.
@@ -640,29 +641,18 @@ func (s *Service) orgDomains() []string {
 	return nil
 }
 
-// needsOrgEmailDomains is true until domains load, then only if a policy checks account type.
-func (s *Service) needsOrgEmailDomains() bool {
-	if s.orgEmailDomains.Load() == nil {
-		return true
-	}
-	s.cache.mu.RLock()
-	defer s.cache.mu.RUnlock()
-	return slices.ContainsFunc(s.cache.policies, func(p types.Policy) bool {
-		return p.BlockPersonalAccounts || p.SkipEnterpriseAccounts
-	})
-}
+// orgDomainsRefreshInterval is how often team email domains are re-fetched; team changes are rare.
+const orgDomainsRefreshInterval = 24 * time.Hour
 
-// refreshOrgEmailDomains caches the account's email domains, keeping the old list on failure.
-func (s *Service) refreshOrgEmailDomains() {
+// loadOrgEmailDomains caches the account's email domains; on failure the old list stays.
+func (s *Service) loadOrgEmailDomains() {
 	domains, err := s.dbClient.FetchOrgEmailDomains()
 	if err != nil {
-		s.logger.Warn("Org email domains refresh failed, keeping previous list", zap.Error(err))
+		s.logger.Warn("Org email domains fetch failed, keeping previous list and retrying on next policy refresh", zap.Error(err))
 		return
 	}
-	slices.Sort(domains)
-	if prev := s.orgEmailDomains.Swap(&domains); prev != nil && slices.Equal(*prev, domains) {
-		return
-	}
+	s.orgEmailDomains.Store(&domains)
+	s.orgDomainsLoadedAt = time.Now()
 	s.logger.Info("Work email domains for personal-account policies",
 		zap.String("accountId", auth.AccountIDFromServiceToken()),
 		zap.Strings("orgEmailDomains", domains))
@@ -1052,9 +1042,9 @@ func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[s
 // loadPolicies refreshes the policy cache, coalescing concurrent callers into one fetch.
 func (s *Service) loadPolicies() (*policyRefreshResult, error) {
 	v, err, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
-		// Load domains first so policies never run without them.
-		if s.needsOrgEmailDomains() {
-			s.refreshOrgEmailDomains()
+		// Load domains before policies at startup, then refresh daily.
+		if time.Since(s.orgDomainsLoadedAt) >= orgDomainsRefreshInterval {
+			s.loadOrgEmailDomains()
 		}
 		policies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
 		if err != nil {

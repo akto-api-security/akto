@@ -147,21 +147,3 @@ func TestSeverityForPolicy(t *testing.T) {
 		}
 	}
 }
-
-// Domains load at startup, then refresh only if a policy checks account type.
-func TestNeedsOrgEmailDomains(t *testing.T) {
-	s := &Service{cache: &policyCache{}}
-	if !s.needsOrgEmailDomains() {
-		t.Error("not loaded yet: want true")
-	}
-	s.orgEmailDomains.Store(&[]string{"acme.com"})
-	if s.needsOrgEmailDomains() {
-		t.Error("loaded, no account-type policy: want false")
-	}
-	for _, p := range []types.Policy{{BlockPersonalAccounts: true}, {SkipEnterpriseAccounts: true}} {
-		s.cache.policies = []types.Policy{{}, p}
-		if !s.needsOrgEmailDomains() {
-			t.Errorf("policy %+v: want true", p)
-		}
-	}
-}
