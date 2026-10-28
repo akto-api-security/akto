@@ -72,23 +72,20 @@ class FalsePositiveVerifierPromptHandlerTest {
             .toString();
     }
 
-    private static final FalsePositiveVerifierPromptHandler.TestDefinition BOLA = new FalsePositiveVerifierPromptHandler.TestDefinition(
-        "REPLACE_AUTH_TOKEN", "BOLA by replacing auth token", "Checks if another user's token can read the resource",
-        "Broken Object Level Authorization (BOLA)",
-        "id: REPLACE_AUTH_TOKEN\nvalidate:\n  response_code:\n    gte: 200\n    lt: 300");
+    private static final String BOLA_ID = "REPLACE_AUTH_TOKEN";
+    private static final String BOLA_TEMPLATE = "id: REPLACE_AUTH_TOKEN\ninfo:\n  name: \"BOLA by replacing auth token\"\n"
+        + "validate:\n  response_code:\n    gte: 200\n    lt: 300";
 
     @Test
-    void promptIncludesTestDefinitionTemplateAndRules() throws Exception {
-        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(BOLA, "status 200 with other user's id",
+    void promptIncludesTestIdTemplateAndRules() throws Exception {
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(BOLA_ID, BOLA_TEMPLATE, "status 200 with other user's id",
             null, java.util.Collections.singletonList(testResultMessage("", 200, "{\"email\":\"victim@x.com\"}")));
         assertTrue(prompt.contains("Test id: REPLACE_AUTH_TOKEN"));
-        assertTrue(prompt.contains("Test name: BOLA by replacing auth token"));
-        assertTrue(prompt.contains("Category: Broken Object Level Authorization (BOLA)"));
-        assertTrue(prompt.contains("Description: Checks if another user's token can read the resource"));
+        assertTrue(prompt.contains("info:\n  name: \"BOLA by replacing auth token\""));
         assertTrue(prompt.contains("validate:\n  response_code:"));
         assertTrue(prompt.contains("Why the scanner flagged it: status 200 with other user's id"));
         assertTrue(prompt.contains("<<<EVIDENCE") && prompt.contains("EVIDENCE>>>"));
-        assertTrue(prompt.contains("answer TRUE_POSITIVE"));
+        assertTrue(prompt.contains("answer FALSE_POSITIVE, even with status 200"));
         assertTrue(prompt.contains("Baseline (original) request/response:\n(not available)"));
         // the template sits outside the untrusted evidence block
         assertTrue(prompt.indexOf("validate:") < prompt.indexOf("\n<<<EVIDENCE\n"));
@@ -136,7 +133,7 @@ class FalsePositiveVerifierPromptHandlerTest {
 
     @Test
     void everyAttemptIsNumbered() throws Exception {
-        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(BOLA, null, null, java.util.Arrays.asList(
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(BOLA_ID, BOLA_TEMPLATE, null, null, java.util.Arrays.asList(
             testResultMessage("", 200, "{\"a\":1}"), testResultMessage("", 200, "{\"b\":2}")));
         assertTrue(prompt.contains("Attack attempt 1 of 2 (flagged vulnerable):"));
         assertTrue(prompt.contains("Attack attempt 2 of 2 (flagged vulnerable):"));
@@ -144,11 +141,25 @@ class FalsePositiveVerifierPromptHandlerTest {
 
     @Test
     void missingTemplateIsMarkedNotAvailable() {
-        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(
-            new FalsePositiveVerifierPromptHandler.TestDefinition("CUSTOM_TEST", null, null, null, null),
-            null, null, java.util.Collections.emptyList());
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt("CUSTOM_TEST", null, null, null,
+            java.util.Collections.emptyList());
         assertTrue(prompt.contains("Test id: CUSTOM_TEST"));
         assertTrue(prompt.contains("```yaml\n(not available)\n```"));
         assertTrue(prompt.contains("Attack request/response:\n(not available)"));
+    }
+
+    // Shaped like LFIAddingNewParam.yaml: validate comes after a long word list.
+    private static final String LFI_TEMPLATE = "id: FILE_INCLUSION_NEW_PARAM\n"
+        + "wordLists:\n  filePaths:\n    - /etc/passwd\n    - " + repeat('A', 3000) + "/..//etc/passwd\n\n"
+        + "execute:\n  type: single\n  requests:\n    - req:\n      - add_query_param:\n          file: ${filePaths}\n\n"
+        + "validate:\n  response_payload:\n    regex: \"root:.*:0:0:\"\n";
+
+    @Test
+    void fullTemplateAndResponseAreSent() throws Exception {
+        String body = "{\"pad\":\"" + repeat('p', 10000) + "\",\"tail\":\"end-of-body\"}";
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt("FILE_INCLUSION_NEW_PARAM", LFI_TEMPLATE, null, null,
+            java.util.Collections.singletonList(testResultMessage("", 200, body)));
+        assertTrue(prompt.contains("validate:\n  response_payload:\n    regex: \"root:.*:0:0:\""));
+        assertTrue(prompt.contains("end-of-body"));
     }
 }
