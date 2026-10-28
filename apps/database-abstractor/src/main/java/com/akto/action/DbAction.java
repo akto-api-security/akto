@@ -125,10 +125,6 @@ public class DbAction extends ActionSupport {
     private static final Set<String> IGNORED_SUB_TYPES = new HashSet<>(Arrays.asList(
         "GENERIC", "FLOAT", "NULL", "INTEGER_32", "FALSE", "TRUE", "INTEGER_64", "UUID", "DICT"
     ));
-    /** Synthetic ParamFilter param keys (not STI params) to avoid bloom collisions with real params. */
-    private static final String BLOOM_PARAM_SAMPLE_DATA = "$aktoSampleData";
-    private static final String BLOOM_PARAM_SENSITIVE_SAMPLE_DATA = "$aktoSensitiveSampleData";
-
     // Accounts for which tagsList is filtered to only relevant keys
     private static final Set<Integer> TAGS_FILTER_ACCOUNTS = new HashSet<>(Arrays.asList(1736798101, 1718042191, 1759692400));
     private static final Set<String> ALLOWED_TAG_KEYS = new HashSet<>(Arrays.asList(
@@ -1310,7 +1306,7 @@ public class DbAction extends ActionSupport {
                         String url = (String) mObj.get("url");
                         String method = (String) mObj.get("method");
                         if (url != null && method != null && !ParamFilter.isNewEntry(accId, apiCollectionId, url,
-                                method, BLOOM_PARAM_SAMPLE_DATA)) {
+                                method, ParamFilter.BLOOM_PARAM_SAMPLE_DATA)) {
                             indicesToDelete.add(i);
                         }
                     }
@@ -1460,7 +1456,7 @@ public class DbAction extends ActionSupport {
                             }
                         }
                         if (url != null && method != null && apiCollectionId != 0 && !ParamFilter.isNewEntry(accId,
-                                apiCollectionId, url, method, BLOOM_PARAM_SENSITIVE_SAMPLE_DATA)) {
+                                apiCollectionId, url, method, ParamFilter.BLOOM_PARAM_SENSITIVE_SAMPLE_DATA)) {
                             indicesToDelete.add(i);
                         }
                     }
