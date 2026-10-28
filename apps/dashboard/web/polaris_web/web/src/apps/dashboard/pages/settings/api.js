@@ -1237,13 +1237,6 @@ const settingRequests = {
             data: {}
         })
     },
-    removeImpervaIntegration() {
-        return request({
-            url: '/api/removeImpervaIntegration',
-            method: 'post',
-            data: {}
-        })
-    },
     fetchWizIntegration() {
         return request({
             url: '/api/fetchWizIntegration',
