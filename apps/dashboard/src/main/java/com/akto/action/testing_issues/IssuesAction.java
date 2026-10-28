@@ -1,6 +1,7 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
+import com.akto.action.testing.AiVerificationAction;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -804,6 +805,17 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    /**
+     * An issue that leaves Ignored is no longer a false positive, so the reason Verify with AI wrote
+     * when it ignored the issue is removed. Descriptions written by users are left as they are.
+     */
+    private static void clearAiVerifiedDescription(Bson issuesFilter) {
+        String prefix = AiVerificationAction.DESCRIPTION_PREFIX.replace("[", "\\[").replace("]", "\\]");
+        TestingRunIssuesDao.instance.getMCollection().updateMany(
+            Filters.and(issuesFilter, Filters.regex(TestingRunIssues.DESCRIPTION, "^" + prefix)),
+            Updates.unset(TestingRunIssues.DESCRIPTION));
+    }
+
     public String updateIssueStatus () {
         if (issueId == null || statusToBeUpdated == null || ignoreReason == null) {
             throw new IllegalStateException();
@@ -822,6 +834,9 @@ public class IssuesAction extends UserAction {
         }
         // Verify issue exists and user has access (via dashboard filtering) before updating
         Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.eq(ID, issueId));
+        if (statusToBeUpdated != TestRunIssueStatus.IGNORED) {
+            clearAiVerifiedDescription(accessFilter);
+        }
         TestingRunIssues updatedIssue = TestingRunIssuesDao.instance.getMCollection()
             .findOneAndUpdate(accessFilter, update, new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
         if (updatedIssue != null) {
@@ -862,6 +877,9 @@ public class IssuesAction extends UserAction {
         // Apply dashboard filtering to ensure user has access to all issues before updating
         Bson accessFilter = TestingRunIssuesDao.instance.addCollectionsFilterForDashboard(Filters.in(ID, issueIdArray));
         TestingRunIssuesDao.instance.getMCollection().updateMany(accessFilter, update);
+        if (statusToBeUpdated != TestRunIssueStatus.IGNORED && StringUtils.isEmpty(this.description)) {
+            clearAiVerifiedDescription(accessFilter);
+        }
 
         int accountId = Context.accountId.get();
         executorService.schedule( new Runnable() {

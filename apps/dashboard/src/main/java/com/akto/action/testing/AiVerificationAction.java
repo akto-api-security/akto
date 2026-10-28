@@ -40,6 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.regex.Pattern;
 
 /**
  * "Verify with AI" on the test run page: asks the LLM about every vulnerable result of a test run
@@ -55,7 +56,9 @@ public class AiVerificationAction extends UserAction {
     private static final int MIN_CONFIDENCE_TO_IGNORE = 70;
     private static final int MAX_ATTEMPTS_PER_RESULT = 3;
     private static final String IGNORE_REASON = "False positive";
-    private static final String DESCRIPTION_PREFIX = "[AI verified] ";
+    public static final String DESCRIPTION_PREFIX = "[AI verified] ";
+    // Passive tests (e.g. sensitive data exposure) send no attack, so there is nothing for the AI to judge.
+    private static final Pattern PASSIVE_TEST = Pattern.compile("(?m)^\\s*type:\\s*passive\\s*$");
     private static final String UPDATED_BY = "Akto AI";
 
     // One background job per test run at a time; jobs run here, LLM calls in a separate pool so a
@@ -272,8 +275,13 @@ public class AiVerificationAction extends UserAction {
 
         int accountId = Context.accountId.get();
         List<Future<Outcome>> calls = new ArrayList<>();
+        int passive = 0;
         for (Target target : targets) {
             String template = templates.get(target.result.getTestSubType());
+            if (template != null && PASSIVE_TEST.matcher(template).find()) {
+                passive++;
+                continue;
+            }
             calls.add(LLM_EXECUTOR.submit(() -> {
                 Context.accountId.set(accountId);
                 return verifyResult(target.issue, target.result, template);
@@ -297,8 +305,8 @@ public class AiVerificationAction extends UserAction {
         }
 
         String summary = "AI verification for " + label + ": checked " + calls.size() + ", moved " + ignored
-            + " false positives to ignored, kept " + kept + ", errors " + errors;
-        if (errors == calls.size()) {
+            + " false positives to ignored, kept " + kept + ", errors " + errors + ", skipped " + passive + " passive";
+        if (!calls.isEmpty() && errors == calls.size()) {
             loggerMaker.errorAndAddToDb(summary + ". Every AI call failed; check the AI provider configuration and logs.");
         } else {
             loggerMaker.infoAndAddToDb(summary);
