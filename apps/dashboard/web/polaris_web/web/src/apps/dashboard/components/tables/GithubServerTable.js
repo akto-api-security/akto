@@ -767,10 +767,6 @@ function GithubServerTable(props) {
 
 
   const handleExportCsv = useCallback(async () => {
-    if (props.onExportCsv) return props.onExportCsv()
-    const fileName = props.csvFileName || props.resourceName?.plural || "export"
-
-    // Fetch all data (not just current page) for export
     let [sortKey, sortOrder] = sortSelected.length == 0 ? ["", ""] : sortSelected[0].split(" ");
     let filters = props.headers.reduce((map, e) => { map[e.filterKey || e.value] = []; return map }, {})
     appliedFilters.forEach((filter) => {
@@ -783,6 +779,11 @@ function GithubServerTable(props) {
         filters[filter.key] = value;
       }
     });
+
+    // Pages that export on their own get the table's active sort, filters and query, in the same
+    // shape fetchData receives them
+    if (props.onExportCsv) return props.onExportCsv({ sortKey, sortOrder: sortOrder == 'asc' ? -1 : 1, filters, queryValue })
+    const fileName = props.csvFileName || props.resourceName?.plural || "export"
 
     func.setToast(true, false, "Exporting CSV, please wait...")
     // Page through in bounded chunks rather than one huge request. Backends also cap rows per

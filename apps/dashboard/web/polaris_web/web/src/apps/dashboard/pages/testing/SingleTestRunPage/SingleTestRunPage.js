@@ -34,6 +34,7 @@ import {
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
+import observeFunc from "../../observe/transform";
 import func from '@/util/func';
 import { useParams } from 'react-router';
 import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
@@ -134,9 +135,29 @@ let filterOptions = [
   },
 ]
 
+// CSV export pages through fetchTestingRunResults in raw-result units (skip/limit count results, not
+// the grouped rows the table shows). The backend honours `limit` except for the Ignored tab, which
+// it fixes at 1000 (StartTestAction.fetchTestingRunResults).
+const EXPORT_PAGE_SIZE = 500
+const EXPORT_PAGE_SIZE_IGNORED = 1000
+const EXPORT_MAX_RESULTS = 50000
+
+// Turns the raw per-query-mode counts into the per-tab counts the page shows.
+function withDerivedCounts(rawCountMap) {
+  const counts = { ...rawCountMap }
+  let countOthers = 0
+  Object.keys(counts).forEach((x) => {
+    if (x !== 'ALL') {
+      countOthers += counts[x]
+    }
+  })
+  counts['SECURED'] = counts['ALL'] >= countOthers ? counts['ALL'] - countOthers : 0
+  counts['VULNERABLE'] = Math.abs(counts['VULNERABLE'] - counts['IGNORED_ISSUES'])
+  return counts
+}
+
 function SingleTestRunPage() {
 
-  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
   const [selectedTestRun, setSelectedTestRun] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const params = useParams()
@@ -207,6 +228,7 @@ function SingleTestRunPage() {
   const [responseCodeFilterChoices, setResponseCodeFilterChoices] = useState([])
 
   const refreshId = useRef(null);
+  const exportInProgress = useRef(false);
   const hexId = params.hexId;
   const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
@@ -244,13 +266,6 @@ function SingleTestRunPage() {
     "domain_unreachable",
     "ignored_issues"
   ]
-
-  function fillTempData(data, key) {
-    setTestRunResultsText((prev) => {
-      prev[key] = data;
-      return { ...prev };
-    })
-  }
 
   // Pull the full per-status-code execution breakdown (403, 404, 429, 5xx, cloudflare, domain
   // unreachable, skipped, ...) from the same bulk endpoint the test runs list column uses, so the
@@ -451,6 +466,18 @@ function SingleTestRunPage() {
     }
   }
 
+  // A category filter plus an issue-name filter selects the union of both; sets filters.testFilter in place.
+  const mergeCategoryIntoTestFilter = (filters) => {
+    if (filters?.categoryFilter?.length > 0 && filters?.testFilter?.length > 0) {
+      let filterSubCategory = []
+      filters?.categoryFilter?.forEach((issue) => {
+        filterSubCategory = filterSubCategory.concat(store[issue])
+      })
+      filterSubCategory = [...filterSubCategory, ...filters?.testFilter]
+      filters.testFilter = [...filterSubCategory]
+    }
+  }
+
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
     let localCountMap = testRunCountMap;
@@ -464,14 +491,7 @@ function SingleTestRunPage() {
     }
 
 
-    if (filters?.categoryFilter?.length > 0 && filters?.testFilter?.length > 0) {
-      let filterSubCategory = []
-      filters?.categoryFilter?.forEach((issue) => {
-        filterSubCategory = filterSubCategory.concat(store[issue])
-      })
-      filterSubCategory = [...filterSubCategory, ...filters?.testFilter]
-      filters.testFilter = [...filterSubCategory]
-    }
+    mergeCategoryIntoTestFilter(filters)
 
     let cicd = testingRunType === "CI_CD";
     const localSelectedTestRun = transform.prepareTestRun(testingRun, currentSummary, cicd, false);
@@ -515,14 +535,7 @@ function SingleTestRunPage() {
         if (testCountMap !== null) {
           localCountMap = JSON.parse(JSON.stringify(testCountMap))
         }
-        let countOthers = 0;
-        Object.keys(localCountMap).forEach((x) => {
-          if (x !== 'ALL') {
-            countOthers += localCountMap[x]
-          }
-        })
-        localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-        localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
+        localCountMap = withDerivedCounts(localCountMap)
         const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
         setTestRunResultsCount(orderedValues)
         setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
@@ -538,7 +551,6 @@ function SingleTestRunPage() {
     }
     const key = tableTabMap[selectedTab]
     const total = localCountMap[key]
-    fillTempData(testRunResultsRes, selectedTab)
     return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: total }
   }
 
@@ -889,6 +901,85 @@ function SingleTestRunPage() {
     return (testingEndpoints.apisList?.length > 0) ? testingEndpoints.apisList[0].apiCollectionId : undefined;
   }
 
+  // Sort and filters of the current tab as the table has them persisted, for when the export is
+  // started from outside the table (the table passes its own when its CSV icon is used).
+  const buildExportContext = () => {
+    const stored = PersistStore.getState().filtersMap["/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab]
+    const filters = tableHeaders.reduce((map, h) => { map[h.filterKey || h.value] = []; return map }, {})
+    ;(stored?.filters || []).forEach((filter) => {
+      const value = filter.value
+      filters[filter.key] = Array.isArray(value) ? value : (value?.values ?? value)
+    })
+    const [sortKey, sortDirection] = (stored?.sort?.[0] || sortOptions[0].value).split(" ")
+    return { sortKey, sortOrder: sortDirection === 'asc' ? -1 : 1, filters, queryValue: undefined }
+  }
+
+  // Exports every result of the current tab, one CSV row per test result, honouring the active
+  // filters. Aborts without a file when a page fails or the run is over the cap; a count mismatch
+  // is reported instead of being presented as a complete export.
+  const exportTestRunResults = async (exportContext) => {
+    const summaryHexId = selectedTestRun?.testingRunResultSummaryHexId
+    if (!summaryHexId) {
+      func.setToast(true, true, "No test run results to export")
+      return
+    }
+    if (exportInProgress.current) return
+    exportInProgress.current = true
+    try {
+      const queryMode = tableTabMap[selectedTab]
+      const tabLabel = definedTableTabs[tableTabsOrder.indexOf(selectedTab)]
+      const { sortKey, sortOrder, filters: tableFilters, queryValue } = exportContext || buildExportContext()
+      const filters = structuredClone(tableFilters)
+      mergeCategoryIntoTestFilter(filters)
+
+      func.setToast(true, false, "Exporting CSV, please wait...")
+      // The raw count bounds the paging: the backend drops ignored issues from a vulnerable page
+      // after fetching it, so a short page doesn't mean the end. A missing count is unknown, not zero.
+      const rawCounts = await api.fetchTestRunResultsCount(summaryHexId, filters)
+      const counts = rawCounts && typeof rawCounts.ALL === 'number' ? withDerivedCounts(rawCounts) : null
+      const fetchBound = queryMode === 'SECURED' ? counts?.SECURED : rawCounts?.[queryMode]
+      if (!counts || typeof fetchBound !== 'number') {
+        throw new Error("Could not determine how many results to export")
+      }
+      if (fetchBound === 0) {
+        func.setToast(true, false, `No ${tabLabel.toLowerCase()} results to export`)
+        return
+      }
+      if (fetchBound > EXPORT_MAX_RESULTS) {
+        throw new Error(`${observeFunc.formatNumberWithCommas(fetchBound)} results is over the ${observeFunc.formatNumberWithCommas(EXPORT_MAX_RESULTS)} export limit. Apply filters to narrow it down.`)
+      }
+
+      const pageSize = queryMode === 'IGNORED_ISSUES' ? EXPORT_PAGE_SIZE_IGNORED : EXPORT_PAGE_SIZE
+      const seen = new Set()
+      const results = []
+      for (let skip = 0; skip < fetchBound; skip += pageSize) {
+        const res = await api.fetchTestingRunResults(summaryHexId, queryMode, sortKey, sortOrder, skip, pageSize, structuredClone(filters), queryValue)
+        if (!Array.isArray(res?.testingRunResults)) {
+          throw new Error("Could not fetch all test results for the export")
+        }
+        transform.prepareTestRunResults(hexId, res.testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, res.issuesDescriptionMap, res.jiraIssuesMapForResults, res.devrevIssuesMapForResults)
+          .forEach((result) => {
+            if (!seen.has(result.id)) {
+              seen.add(result.id)
+              results.push(result)
+            }
+          })
+      }
+
+      func.downloadAsCSV(transform.getTestRunResultsCsvRows(results, tabLabel), { name: `${selectedTestRun.name || "test_run"} - ${tabLabel}` })
+      const expected = counts[queryMode]
+      if (results.length === expected) {
+        func.setToast(true, false, `CSV exported successfully (${observeFunc.formatNumberWithCommas(results.length)} results)`)
+      } else {
+        func.setToast(true, true, `Exported ${observeFunc.formatNumberWithCommas(results.length)} of ${observeFunc.formatNumberWithCommas(expected)} results. Some results may be missing, try again.`)
+      }
+    } catch (e) {
+      func.setToast(true, true, e?.message || "CSV export failed")
+    } finally {
+      exportInProgress.current = false
+    }
+  }
+
   const [activeFromTesting, setActiveFromTesting] = useState(false)
 
   const [showTestingEndpointsModal, setShowTestingEndpointsModal] = useState(false)
@@ -948,6 +1039,7 @@ function SingleTestRunPage() {
           "selected": 1
         }}
         callFromOutside={updateTable}
+        onExportCsv={exportTestRunResults}
       />
       <Modal
         open={confirmationModal}
@@ -1292,10 +1384,6 @@ function SingleTestRunPage() {
         content: 'Export Test Results as Markdown',
         icon: ReportMinor,
         onAction: async () => {
-          // Fetch all results logic
-          let allResults = [];
-          // Reuse fetchTableData logic or similar but we need strict "All" for this run.
-          // We can use api.fetchTestingRunResults with a large limit.
           const { testingRunResultSummaryHexId } = selectedTestRun;
           if (!testingRunResultSummaryHexId) return;
 
@@ -1304,24 +1392,6 @@ function SingleTestRunPage() {
           // Since we don't have modifyDataForCSV here, I'll use a safe large limit approach for now.
 
           try {
-            // Fetching vulnerable results as primary interest, but user said "whole test results".
-            // So we might need to fetch multiple statuses if tabs are separate.
-            // Or just fetch everything? API usually filters by status.
-            // Let's assume user wants what's currently viewable or "all relevant".
-            // The table has tabs: Vulnerable, Need Config, Skipped, Secured, etc.
-            // Fetching ALL might be huge. I will focus on Vulnerable for "Export Test Results" 
-            // but user said "export whole test results".
-            // Let's try to fetch VULNERABLE as it's the most critical. 
-            // If they want EVERYTHING, I'd need to make multiple calls.
-            // Let's fetch VULNERABLE for now as it maps to "vulnerability report".
-            // Or I can chain requests for all tabs.
-
-            // For simplicity and performance, let's fetch VULNERABLE issues first.
-            // If the user wants ALL statuses, that's heavy.
-            // "Export vulnerability report" usually implies vulnerabilities.
-
-            // Wait, the existing "Export results as CSV" wasn't there.
-            // I'll fetch VULNERABLE results (limit 10000).
 
             const { testingRunResults } = await api.fetchTestingRunResults(
               testingRunResultSummaryHexId,
@@ -1435,9 +1505,7 @@ function SingleTestRunPage() {
     <>
       <PageWithMultipleCards
         title={headingComp}
-        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() =>
-          func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
-        }>Export results</Button></Box> : undefined}
+        primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() => exportTestRunResults()}>Export results</Button></Box> : undefined}
         secondaryActions={!workflowTest ? moreActionsComp : undefined}
         components={useComponents}
         backUrl={"/dashboard/testing"}
