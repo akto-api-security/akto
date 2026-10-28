@@ -485,6 +485,31 @@ const transform = {
     })
     return testRunResults;
   },
+  // One CSV row per test result (per endpoint), from prepareTestRunResults output. The tab label is
+  // the result status: `vulnerable: false` also covers skipped runs, so it can't say "secured".
+  getTestRunResultsCsvRows(testRunResults, statusLabel) {
+    const time = (epoch) => epoch > 0 ? func.epochToDateTime(epoch) : ''
+    return testRunResults.map((res) => {
+      const url = res.url || ''
+      const split = url.indexOf(' ')
+      return {
+        'Issue name': res.name,
+        'Result status': statusLabel,
+        'Severity': res.severity?.[0],
+        'Category': res.testCategory,
+        'Method': split > 0 ? url.slice(0, split) : '',
+        'URL': split > 0 ? url.slice(split + 1) : url,
+        'CWE': res.cwe,
+        'CVE': res.cve,
+        'Started at': time(res.startTimestamp),
+        'Scanned at': time(res.endTimestamp),
+        'Errors': res.errors,
+        'Jira issue': res.jiraIssueUrl,
+        'DevRev work item': res.devrevWorkUrl,
+        'Result ID': res.id,
+      }
+    })
+  },
   issueSummaryTable(issuesDetails, subCategoryMap) {
     if (issuesDetails) {
       return [
