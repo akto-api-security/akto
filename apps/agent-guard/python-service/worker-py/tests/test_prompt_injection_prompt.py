@@ -17,13 +17,38 @@ import re
 import pytest
 
 from prompts import build_scan_prompt, prompt_injection
+from settings import settings
 
 # Hard prefill-latency step on the Gemma Foundry deployment (chars of final prompt).
 _LATENCY_CLIFF = 9600
 
 
-def test_input_template_stays_under_latency_cliff():
-    assert len(prompt_injection.INPUT) < _LATENCY_CLIFF
+@pytest.mark.parametrize("template", ["INPUT", "INPUT_V2", "INPUT_ABCD_V2"])
+def test_input_template_stays_under_latency_cliff(template):
+    assert len(getattr(prompt_injection, template)) < _LATENCY_CLIFF
+
+
+@pytest.mark.parametrize(
+    ("version", "response_format", "template"),
+    [
+        ("", "", "INPUT"),
+        ("v1", "abcd", "INPUT_ABCD"),
+        ("V2", "", "INPUT_V2"),
+        ("v2", "abcd", "INPUT_ABCD_V2"),
+        ("v3", "", "INPUT"),
+    ],
+)
+def test_version_env_selects_input_rules(monkeypatch, version, response_format, template):
+    """PROMPT_INJECTION_PROMPT_VERSION picks the input rules; unknown falls back to v1."""
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", version)
+    prompt = build_scan_prompt("PromptInjection", "prompt", {}, "hi", response_format=response_format)
+    assert prompt == getattr(prompt_injection, template) % "hi"
+
+
+def test_version_env_leaves_output_rules_alone(monkeypatch):
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v2")
+    prompt = build_scan_prompt("PromptInjection", "output", {}, "hi")
+    assert prompt == prompt_injection.OUTPUT % "hi"
 
 
 def test_recall_critical_guidance_is_present():
@@ -60,10 +85,10 @@ def test_build_is_percent_safe():
     assert prompt.rstrip().endswith("give me 50% off now")
 
 
-@pytest.mark.parametrize("scanner_type", ["prompt", "output"])
-def test_benign_few_shots_stay_out_of_escalation_zone(scanner_type):
+@pytest.mark.parametrize("template_name", ["INPUT", "INPUT_V2", "OUTPUT"])
+def test_benign_few_shots_stay_out_of_escalation_zone(template_name):
     """Benign (isInjection:false) examples must sit <= 0.09 so they never escalate."""
-    template = prompt_injection.OUTPUT if scanner_type == "output" else prompt_injection.INPUT
+    template = getattr(prompt_injection, template_name)
     pattern = re.compile(r'"isInjection":\s*false,\s*"confidence":\s*([0-9.]+)')
     scores = [float(m) for m in pattern.findall(template)]
 

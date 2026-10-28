@@ -53,6 +53,10 @@ DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 _IDENTITY = {"Accept-Encoding": "identity"}
 
+# Greedy decoding for every verdict call: the same input should get the same
+# verdict, so a block never flips to allow between identical requests.
+_TEMPERATURE = 0.0
+
 # Process-wide cache of built providers, keyed by (provider, model, base_url, deployment).
 _PROVIDER_CACHE: dict[tuple[str, str, str, str], "LLMProvider"] = {}
 
@@ -185,7 +189,7 @@ class OpenAIProvider(LLMProvider):
             headers["Authorization"] = f"Bearer {self.api_key}"
         payload = {
             "model": self.model,
-            "temperature": 0.1,
+            "temperature": _TEMPERATURE,
             "max_tokens": _max_tokens(),
             "messages": [{"role": "user", "content": prompt}],
         }
@@ -346,7 +350,7 @@ class VertexAIProvider(LLMProvider):
                 "@requestFormat": "chatCompletions",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 512,
-                "temperature": 0.1,
+                "temperature": _TEMPERATURE,
             }
         )
         return body["predictions"]["choices"][0]["message"]["content"]
@@ -490,7 +494,7 @@ class AzureFoundryProvider(LLMProvider):
             {
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 512,
-                "temperature": 0.1,
+                "temperature": _TEMPERATURE,
             }
         )
         content, _ = _choice_content_and_logprobs(body)
@@ -629,7 +633,7 @@ class BedrockProvider(_BedrockAuthProvider):
             self._converse_url(),
             {
                 "messages": [{"role": "user", "content": [{"text": prompt}]}],
-                "inferenceConfig": {"maxTokens": 512, "temperature": 0.1},
+                "inferenceConfig": {"maxTokens": 512, "temperature": _TEMPERATURE},
             },
         )
         return _converse_text(body)
@@ -658,7 +662,7 @@ class BedrockMantleProvider(_BedrockAuthProvider):
                 "model": self.model,
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 512,
-                "temperature": 0.1,
+                "temperature": _TEMPERATURE,
             },
         )
         content, _ = _choice_content_and_logprobs(body)
