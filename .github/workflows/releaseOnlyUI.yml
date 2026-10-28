@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '17'
+          node-version: '20'
       - name: Download dashboard static assets
         run: bash apps/dashboard/scripts/download-dashboard-vendor-assets.sh
 
