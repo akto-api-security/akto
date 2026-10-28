@@ -6,15 +6,22 @@ Public API:
     - LLMScanner                (one scanner = one provider + result parser)
 """
 
+import asyncio
 import json
 import logging
 import time
+from collections.abc import Callable
 from typing import Any
 
 from prompts import build_scan_prompt, resolve_response_format
 from providers import LLMProvider, Qwen3GuardOutput, parse_qwen3guard_result
 
 logger = logging.getLogger(__name__)
+
+# A text whose prompt doesn't fit the model's context window is split into overlapping chunks, each scanned
+# with the full prompt, in parallel. Past _MAX_CHUNKS only the first chunks and the last one are scanned.
+_MAX_CHUNKS = 8
+_CHUNK_OVERLAP_CHARS = 1000
 
 LLM_SUPPORTED_SCANNERS = {"PromptInjection", "BanTopics", "Toxicity", "Gibberish", "BanCode", "Password"}
 
@@ -161,6 +168,49 @@ _FORMAT_PARSERS = {
 }
 
 
+def _nbytes(text: str) -> int:
+    return len(text.encode("utf-8", "surrogatepass"))  # a lone surrogate from JSON must not raise here
+
+
+def _split(text: str, fits: Callable[[str], bool], size: int) -> list[str]:
+    """Cut text into pieces of up to `size` new characters, each starting _CHUNK_OVERLAP_CHARS before the previous
+    one ends, so an instruction shorter than that is whole in one piece. A piece that still doesn't fit is halved."""
+    pieces: list[str] = []
+    start = 0
+    while start < len(text):
+        end = min(start + size, len(text))
+        if end < len(text):  # end on a line break or space near the limit, not mid-word
+            lo = max(start, end - _CHUNK_OVERLAP_CHARS)
+            cut = text.rfind("\n", lo, end)
+            if cut == -1:
+                cut = text.rfind(" ", lo, end)
+            if cut != -1:
+                end = cut + 1
+        piece = text[max(0, start - _CHUNK_OVERLAP_CHARS) : end]
+        if fits(piece) or len(piece) <= 4 * _CHUNK_OVERLAP_CHARS:  # too short to shrink further: send as is
+            pieces.append(piece)
+        else:
+            pieces.extend(_split(piece, fits, len(piece) // 2 + 1))
+        start = end
+    return pieces
+
+
+def _merge(results: list[Any], chunks: int, skipped: int) -> dict[str, Any]:
+    """One verdict for the chunks: flagged if any chunk is, safe only if every chunk answered safe."""
+    done = [r for r in results if not isinstance(r, BaseException)]
+    flagged = [r for r in done if not r["is_valid"]]
+    if not flagged and len(done) < len(results):
+        raise next(r for r in results if isinstance(r, BaseException))  # part of the text has no verdict
+    winner = max(flagged or done, key=lambda r: r["risk_score"])
+    values = list(dict.fromkeys(v for r in flagged for v in r["details"].get("values", [])))
+    if values:
+        winner["details"]["values"] = values  # Password: the secrets of every chunk, for the caller to redact
+    winner["details"]["chunks"] = chunks
+    if skipped:
+        winner["details"]["chunks_skipped"] = skipped
+    return winner
+
+
 class LLMScanner:
     """Evaluates one of LLM_SUPPORTED_SCANNERS against a single provider.
 
@@ -188,21 +238,7 @@ class LLMScanner:
             logger.debug(f"[LLMScanner] {scanner_name} qwen3guard raw response: {raw!r}")
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
         else:
-            prompt = build_scan_prompt(
-                scanner_name,
-                scanner_type,
-                config,
-                text,
-                provider_name=self.provider.prompt_name,
-                response_format=self.response_format,
-            )
-            if prompt is None:
-                raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
-            logger.debug(f"[LLMScanner] {scanner_name} prompt: {prompt!r}")
-            raw = await self.provider.complete(prompt)
-            logger.debug(f"[LLMScanner] {scanner_name} raw response: {raw!r}")
-            effective = resolve_response_format(scanner_name, scanner_type, self.response_format)
-            result = _FORMAT_PARSERS.get(effective, parse_llm_result)(scanner_name, raw)
+            result = await self._scan_prompt(scanner_name, scanner_type, text, config)
 
         elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name
@@ -213,6 +249,60 @@ class LLMScanner:
             f"isValid={result['is_valid']} risk={result['risk_score']:.2f} ms={elapsed_ms:.0f}"
         )
         return result
+
+    def _build(self, scanner_name: str, scanner_type: str, config: dict[str, Any], text: str) -> str:
+        prompt = build_scan_prompt(
+            scanner_name,
+            scanner_type,
+            config,
+            text,
+            provider_name=self.provider.prompt_name,
+            response_format=self.response_format,
+        )
+        if prompt is None:
+            raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
+        return prompt
+
+    async def _complete(self, scanner_name: str, scanner_type: str, prompt: str) -> dict[str, Any]:
+        logger.debug(f"[LLMScanner] {scanner_name} prompt: {prompt!r}")
+        raw = await self.provider.complete(prompt)
+        logger.debug(f"[LLMScanner] {scanner_name} raw response: {raw!r}")
+        effective = resolve_response_format(scanner_name, scanner_type, self.response_format)
+        return _FORMAT_PARSERS.get(effective, parse_llm_result)(scanner_name, raw)
+
+    async def _scan_prompt(
+        self, scanner_name: str, scanner_type: str, text: str, config: dict[str, Any]
+    ) -> dict[str, Any]:
+        """One call if the prompt fits the model's context window, else one call per chunk of the text."""
+        prompt = self._build(scanner_name, scanner_type, config, text)
+        budget = await self.provider.prompt_budget_bytes()
+        if budget is None or _nbytes(prompt) <= budget:
+            return await self._complete(scanner_name, scanner_type, prompt)
+        per_char = _nbytes(text) / len(text) if text else 1.0  # 1 for ASCII, ~3 for CJK
+        template = _nbytes(self._build(scanner_name, scanner_type, config, ""))
+        room = (budget - template) / per_char - _CHUNK_OVERLAP_CHARS  # new characters one chunk can carry
+        if room < _CHUNK_OVERLAP_CHARS:
+            logger.warning(f"[LLMScanner] {scanner_name} prompt template alone nearly fills {budget} bytes, unsplit")
+            return await self._complete(scanner_name, scanner_type, prompt)
+
+        fits = lambda piece: _nbytes(self._build(scanner_name, scanner_type, config, piece)) <= budget
+        pieces = _split(text, fits, int(room))
+        skipped = max(0, len(pieces) - _MAX_CHUNKS)
+        if skipped:
+            pieces = pieces[: _MAX_CHUNKS - 1] + pieces[-1:]
+        logger.info(
+            f"[LLMScanner] {scanner_name} provider={self.provider.name} prompt {_nbytes(prompt)} bytes over "
+            f"budget {budget}: scanning {len(pieces)} chunks"
+            + (f", {skipped} middle chunks SKIPPED" if skipped else "")
+        )
+        results = await asyncio.gather(
+            *(
+                self._complete(scanner_name, scanner_type, self._build(scanner_name, scanner_type, config, p))
+                for p in pieces
+            ),
+            return_exceptions=True,
+        )
+        return _merge(results, len(pieces), skipped)
 
 
 async def scan_with_model_map(
