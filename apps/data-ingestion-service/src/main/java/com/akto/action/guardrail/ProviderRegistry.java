@@ -13,6 +13,7 @@ public class ProviderRegistry {
 
     static {
         register(new ClaudeAdapter());
+        register(new GrokBotAdapter());
         // register(new OpenAiAdapter()); // future: ChatGPT, etc.
     }
 
