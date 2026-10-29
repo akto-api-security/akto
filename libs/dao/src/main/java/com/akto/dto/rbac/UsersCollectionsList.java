@@ -38,6 +38,8 @@ public class UsersCollectionsList {
             new HashSet<>(Arrays.asList(1737014476, 1726615470, 1000000)));
     private static final int EXPIRY_TIME = 15 * 60;
     private static final int CONTEXT_EXPIRY_TIME = 120;
+    private static final ConcurrentHashMap<Integer, Pair<Set<Integer>, Integer>> agenticCollectionsMap = new ConcurrentHashMap<>();
+    private static final int AGENTIC_EXPIRY_TIME = 30;
     // Collections assigned to the user (RBACDao.getUserCollectionsById) per product scope, before narrowing to the scope's collections
     private static final ConcurrentHashMap<String, Pair<List<Integer>, Integer>> assignedCollectionsMap = new ConcurrentHashMap<>();
     private static final int ASSIGNED_EXPIRY_TIME = 120;
@@ -216,13 +218,7 @@ public class UsersCollectionsList {
         Set<Integer> collectionIds = new HashSet<>();
         Bson finalFilter = Filters.or(
             Filters.exists(ApiCollection.TAGS_STRING, false),
-            Filters.nor(
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG)),
-                getEndpointSourceFilter()
-            )
+            Filters.nor(nonApiContextTagFilters())
         );
         switch (source) {
             case MCP:
@@ -269,6 +265,42 @@ public class UsersCollectionsList {
         while (cursor.hasNext()) {
             collectionIds.add(cursor.next().getId());
         }
+        return collectionIds;
+    }
+
+    private static List<Bson> nonApiContextTagFilters() {
+        return Arrays.asList(
+            Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+            Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+            Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG)),
+            Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG)),
+            getEndpointSourceFilter()
+        );
+    }
+
+    public static Set<Integer> getAgenticCollectionIds() {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null) {
+            return Collections.emptySet();
+        }
+        Pair<Set<Integer>, Integer> entry = agenticCollectionsMap.get(accountId);
+        if (entry != null && Context.now() - entry.getSecond() <= AGENTIC_EXPIRY_TIME) {
+            return entry.getFirst();
+        }
+        Set<Integer> collectionIds = new HashSet<>();
+        Bson filter = Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING),
+            Filters.or(nonApiContextTagFilters())
+        );
+        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(filter).projection(Projections.include(Constants.ID)).iterator();
+        try {
+            while (cursor.hasNext()) {
+                collectionIds.add(cursor.next().getId());
+            }
+        } finally {
+            cursor.close();
+        }
+        agenticCollectionsMap.put(accountId, new Pair<>(collectionIds, Context.now()));
         return collectionIds;
     }
 

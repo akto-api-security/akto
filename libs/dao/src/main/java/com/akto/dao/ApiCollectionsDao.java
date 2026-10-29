@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -487,6 +488,8 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             try {
                 if(!groupCollectionIds.isEmpty()) {
                     Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
+                    final Set<Integer> agenticIds = groupCollectionIds.contains(AllAPIsGroup.ALL_APIS_GROUP_ID)
+                        ? UsersCollectionsList.getAgenticCollectionIds() : Collections.<Integer>emptySet();
                     
                     // For small number of groups, individual queries are faster than $unwind
                     if (groupCollectionIds.size() <= 50) {
@@ -504,11 +507,15 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                                 
                                 try {
                                     // Use Filters.in for array field - checks if array contains the value
-                                    Bson matchFilter = Filters.and(
+                                    List<Bson> matchFilters = new ArrayList<>(Arrays.asList(
                                         hostHeaderFilter,
                                         Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionId),
                                         filter
-                                    );
+                                    ));
+                                    if (collectionId == AllAPIsGroup.ALL_APIS_GROUP_ID && !agenticIds.isEmpty()) {
+                                        matchFilters.add(Filters.nin(SingleTypeInfo._API_COLLECTION_ID, agenticIds));
+                                    }
+                                    Bson matchFilter = Filters.and(matchFilters);
                                     long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(matchFilter);
                                     return new Pair<>(collectionId, (int)count);
                                 } finally {
@@ -545,6 +552,12 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                             filter
                         )));
                         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
+                        if (!agenticIds.isEmpty()) {
+                            pipeline.add(Aggregates.match(Filters.nor(Filters.and(
+                                Filters.eq(SingleTypeInfo._COLLECTION_IDS, AllAPIsGroup.ALL_APIS_GROUP_ID),
+                                Filters.in(SingleTypeInfo._API_COLLECTION_ID, agenticIds)
+                            ))));
+                        }
                         // REMOVED redundant match - unwind already filtered the documents
                         pipeline.add(Aggregates.group(
                             "$" + SingleTypeInfo._COLLECTION_IDS,
@@ -677,6 +690,12 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, false);
         if(lastScannedId != null){
             filterQ = Filters.and(filterQ, Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId), Filters.gte(Constants.ID, lastScannedId));
+        }
+        if (apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID) {
+            Set<Integer> agenticIds = UsersCollectionsList.getAgenticCollectionIds();
+            if (!agenticIds.isEmpty()) {
+                filterQ = Filters.and(filterQ, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, agenticIds));
+            }
         }
         return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, Sorts.ascending(Constants.ID), projection);
     }
