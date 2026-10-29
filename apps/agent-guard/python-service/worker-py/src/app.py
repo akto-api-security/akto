@@ -49,11 +49,6 @@ class GuardrailsLLMRequest(BaseModel):
     model: str = ""
 
 
-class ReachbackTestRequest(BaseModel):
-    prompt: str
-    model: str
-
-
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     scan_diag.configure_process_logging()
@@ -181,14 +176,15 @@ async def guardrails_llm_async(body: GuardrailsLLMRequest):
 
 
 @app.post("/reachback/test")
-async def reachback_test(body: ReachbackTestRequest):
-    """Demo: one chat completion against a model behind Morgan Stanley's reach-back gateway
-    (Azure AD token + mTLS). Failures return 502 with the stage that failed: token / connect / http."""
+async def reachback_test(body: dict[str, Any]):
+    """Demo: forward an OpenAI chat-completions body as-is to a model behind Morgan Stanley's
+    reach-back gateway (Azure AD token + mTLS) and return the gateway's JSON reply under "response".
+    Failures return 502 with the stage that failed: token / connect / http."""
     missing = reachback.missing_settings()
     if missing:
         raise HTTPException(status_code=503, detail=f"reach-back not configured; missing {missing}")
     try:
-        return await reachback.chat(body.prompt, body.model)
+        return await reachback.chat(body)
     except reachback.ReachbackError as exc:
         return JSONResponse(status_code=502, content=exc.as_dict())
 

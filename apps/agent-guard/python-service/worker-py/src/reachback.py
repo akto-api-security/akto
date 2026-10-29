@@ -33,8 +33,6 @@ _REQUIRED = (
     "REACHBACK_MTLS_KEY_FILE",
     "REACHBACK_CA_FILE",
 )
-# GPT-5-class models reject `max_tokens` and any non-default `temperature`.
-_MAX_COMPLETION_TOKENS = 512
 _TIMEOUT_S = 120.0
 
 # (cert_file, key_file, ca_file) -> client presenting that client certificate
@@ -94,43 +92,31 @@ async def _token() -> str:
         raise ReachbackError("token", repr(exc)) from exc
 
 
-async def _post(token: str, prompt: str, model: str) -> httpx.Response:
+async def _post(token: str, body: dict[str, Any]) -> httpx.Response:
     try:
-        return await _mtls_client().post(
-            _chat_url(),
-            headers={"Authorization": f"Bearer {token}"},
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_completion_tokens": _MAX_COMPLETION_TOKENS,
-            },
-        )
+        return await _mtls_client().post(_chat_url(), headers={"Authorization": f"Bearer {token}"}, json=body)
     except (httpx.RequestError, ssl.SSLError, OSError) as exc:
         raise ReachbackError("connect", repr(exc)) from exc
 
 
-async def chat(prompt: str, model: str) -> dict[str, Any]:
-    """One chat completion; a 401 drops the cached token and retries once with a fresh one."""
+async def chat(body: dict[str, Any]) -> dict[str, Any]:
+    """Forward `body` as-is to the gateway's chat completions route and return its JSON reply.
+    A 401 drops the cached token and retries once with a fresh one."""
+    model = body.get("model")
     started = time.perf_counter()
     token = await _token()
     token_ms = (time.perf_counter() - started) * 1000
 
     call_started = time.perf_counter()
-    resp = await _post(token, prompt, model)
+    resp = await _post(token, body)
     if resp.status_code == 401:
         logger.warning(f"[Reachback] 401 from gateway model={model}; refreshing token and retrying once")
         azure_ad_auth.invalidate(*_token_key())
-        resp = await _post(await _token(), prompt, model)
+        resp = await _post(await _token(), body)
     call_ms = (time.perf_counter() - call_started) * 1000
 
     if resp.is_error:
         logger.error(f"[Reachback] HTTP {resp.status_code} model={model}: {resp.text[:1000]!r}")
         raise ReachbackError("http", resp.text[:1000], resp.status_code)
-    body = resp.json()
     logger.info(f"[Reachback] model={model} token_ms={token_ms:.0f} call_ms={call_ms:.0f}")
-    return {
-        "content": body["choices"][0]["message"]["content"],
-        "model": body.get("model", model),
-        "token_ms": round(token_ms),
-        "call_ms": round(call_ms),
-    }
+    return {"response": resp.json(), "token_ms": round(token_ms), "call_ms": round(call_ms)}
