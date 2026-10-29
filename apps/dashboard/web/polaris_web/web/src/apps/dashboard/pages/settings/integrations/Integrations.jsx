@@ -279,7 +279,7 @@ function Integrations() {
 
   function allTabItems(tabId) {
     const emptyItem = [];
-    const trafficItems = window.ACTIVE_ACCOUNT === 1745563576 ? [burpSuiteObj, postmanObj, impervaObj] : [burpSuiteObj, postmanObj];
+    const trafficItems = func.checkForFeatureSaas('IMPERVA_API_IMPORT') ? [burpSuiteObj, postmanObj, impervaObj] : [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];

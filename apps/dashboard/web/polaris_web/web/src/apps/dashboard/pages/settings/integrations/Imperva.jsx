@@ -35,10 +35,10 @@ function Imperva() {
     }
 
     let importStatus = "No import has run yet."
-    if (integration?.syncRequested) {
-        importStatus = "Import requested. It will start in a few minutes."
-    } else if (integration?.lastSyncStartTs > (integration?.lastSyncEndTs || 0)) {
+    if (integration?.syncRequested && integration?.lastSyncStartTs > (integration?.lastSyncEndTs || 0)) {
         importStatus = `Import running since ${func.epochToDateTime(integration.lastSyncStartTs)}.`
+    } else if (integration?.syncRequested) {
+        importStatus = "Import requested. It will start shortly."
     } else if (integration?.lastSyncEndTs > 0) {
         importStatus = `Last import finished at ${func.epochToDateTime(integration.lastSyncEndTs)}.`
     }
