@@ -64,6 +64,18 @@ _FIELDS = (
     # Seconds before expiry to refresh pod IAM-role credentials (EKS Pod
     # Identity / IRSA). Default 1800 (30 min); capped at half their lifetime.
     "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC",
+    # Morgan Stanley reach-back gateway (POST /reachback/test). Azure AD token
+    # (TENANT/CLIENT_ID/SCOPE/THUMBPRINT + SPN key file) and mTLS (cert/key/CA
+    # files) are both required — see reachback.py.
+    "REACHBACK_BASE_URL",
+    "REACHBACK_TENANT",
+    "REACHBACK_CLIENT_ID",
+    "REACHBACK_SCOPE",
+    "REACHBACK_THUMBPRINT",
+    "REACHBACK_SPN_KEY_FILE",
+    "REACHBACK_MTLS_CERT_FILE",
+    "REACHBACK_MTLS_KEY_FILE",
+    "REACHBACK_CA_FILE",
     # Integrations
     "SLACK_WEBHOOK_URL",
     "DATABASE_ABSTRACTOR_SERVICE_URL",
@@ -162,6 +174,15 @@ class Settings:
     BEDROCK_SECRET_ACCESS_KEY: str
     BEDROCK_SESSION_TOKEN: str
     BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC: str
+    REACHBACK_BASE_URL: str
+    REACHBACK_TENANT: str
+    REACHBACK_CLIENT_ID: str
+    REACHBACK_SCOPE: str
+    REACHBACK_THUMBPRINT: str
+    REACHBACK_SPN_KEY_FILE: str
+    REACHBACK_MTLS_CERT_FILE: str
+    REACHBACK_MTLS_KEY_FILE: str
+    REACHBACK_CA_FILE: str
     SLACK_WEBHOOK_URL: str
     FALLBACK_SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
