@@ -113,10 +113,7 @@ public class ServiceGraphBuilder {
         }
     }
 
-    /**
-     * Adds the incoming edges the collection doesn't have yet; an existing edge is never replaced.
-     * Returns whether anything was added. Pure, so it's testable without a DB.
-     */
+    /** Adds the incoming edges the collection doesn't have yet and returns whether any was added; an existing edge is never replaced. */
     static boolean mergeNewEdges(Map<String, ServiceGraphEdgeInfo> existingEdges, Map<String, ServiceGraphEdgeInfo> incomingEdges) {
         boolean edgeAdded = false;
         for (Map.Entry<String, ServiceGraphEdgeInfo> entry : incomingEdges.entrySet()) {

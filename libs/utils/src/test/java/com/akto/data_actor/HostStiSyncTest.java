@@ -23,10 +23,8 @@ public class HostStiSyncTest {
 
     private static final int START_TS = 1_000_000;
 
-    /*
-     * Plays the DB. lastSeen drives what a delta fetch returns, like the lastSeenGte filter, and ids sort in
-     * creation order, like ObjectIds, so "created after" is "id greater than".
-     */
+    // Plays the DB. lastSeen drives what a delta fetch returns, like the lastSeenGte filter, and ids sort in creation
+    // order, like ObjectIds, so "created after" is "id greater than".
     private static class FakeDb implements HostStiSync.Source {
         final TreeMap<String, Integer> lastSeenById = new TreeMap<>();
         int fullFetchCount;
@@ -196,8 +194,7 @@ public class HostStiSyncTest {
 
     @Test
     public void aNewStiIsPickedUpEvenWhenItsLastSeenIsOld() {
-        // lastSeen is traffic time, so a new STI can carry an old one. It must still be found without a full
-        // fetch, or the runtime would count that API as new again against the usage limit of the plan
+        // lastSeen is traffic time, so a new STI can carry an old one; it must still be found without a full fetch
         FakeDb fakeDb = new FakeDb();
         fakeDb.addSti("a", START_TS);
         fakeDb.addSti("b", START_TS);
@@ -387,10 +384,8 @@ public class HostStiSyncTest {
         assertEquals(1, fakeDb.fullFetchCount, "concurrent callers must not each fall back to a full fetch");
     }
 
-    /*
-     * Cyborg and the mini-runtimes are updated independently. These are the mixes that can happen: a runtime that is
-     * newer than the cyborg it talks to, and requests that land on old and new cyborg instances during a rollout.
-     */
+    // Cyborg and the mini-runtimes are updated independently: a runtime newer than the cyborg it talks to, and
+    // requests that land on old and new cyborg instances during a rollout
     @Test
     public void aServerThatPredatesLastSeenGteStillGivesTheRightList() {
         FakeDb fakeDb = new FakeDb();

@@ -10,10 +10,9 @@ import java.util.TreeMap;
 import java.util.function.IntSupplier;
 
 /*
- * Host-header STIs rarely change between refreshes of the mini-runtime, so instead of downloading all of them
- * every time, their raw JSON is kept (one instance per account) and a refresh only downloads what changed.
- * Anything that cannot be shown to match a full fetch falls back to one, and a full fetch is done at least
- * once every FULL_FETCH_INTERVAL_SECONDS.
+ * Host-header STIs rarely change between refreshes of the mini-runtime, so their raw JSON is kept (one instance
+ * per account) and a refresh only downloads what changed. Anything that cannot be shown to match a full fetch
+ * falls back to one, and a full fetch is done at least once every FULL_FETCH_INTERVAL_SECONDS.
  */
 public class HostStiSync {
 
@@ -24,8 +23,7 @@ public class HostStiSync {
     static final int FULL_FETCH_INTERVAL_SECONDS = 24 * 60 * 60;
     static final int MAX_CACHED_STIS = 100_000;
 
-    // rawStis is the raw JSON of the STIs keyed by _id hex. complete is false if the walk ended early, i.e. stis is
-    // only what was fetched before it did
+    // rawStis is the raw JSON keyed by _id hex; complete is false if the walk ended early, so stis is only what came before
     public static class FullFetch {
         final List<SingleTypeInfo> stis;
         final Map<String, String> rawStis;
@@ -86,11 +84,8 @@ public class HostStiSync {
             return null;
         }
 
-        /*
-         * A new STI is found by its _id and not by lastSeen, which is the traffic time, so a new STI can carry
-         * an old one (delayed or replayed traffic). Missing it would make the runtime count that API as new
-         * again against the usage limit of the plan.
-         */
+        // a new STI is found by its _id, not by lastSeen (traffic time): it can carry an old one (delayed or replayed
+        // traffic), and missing it would make the runtime count that API as new again against the usage limit of the plan
         Map<String, String> createdRawStis = source.fetchCreatedAfter(cachedRawStis.isEmpty() ? null : cachedRawStis.lastKey());
         if (createdRawStis == null) {
             return null;
