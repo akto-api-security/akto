@@ -48,6 +48,7 @@ import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.TicketSyncJobParams;
 import com.akto.dto.jobs.WizApiEndpointsImportJobParams;
+import com.akto.dto.jobs.ImpervaApiEndpointsImportJobParams;
 import com.akto.dto.jobs.WizSyncJobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
@@ -363,6 +364,7 @@ public class DaoInit {
         ClassModel<WizEndpointAsset> wizEndpointAssetClassModel = ClassModel.builder(WizEndpointAsset.class).enableDiscriminator(true).build();
         ClassModel<WizSyncJobParams> wizSyncJobParamsClassModel = ClassModel.builder(WizSyncJobParams.class).enableDiscriminator(true).build();
         ClassModel<WizApiEndpointsImportJobParams> wizApiEndpointsImportJobParamsClassModel = ClassModel.builder(WizApiEndpointsImportJobParams.class).enableDiscriminator(true).build();
+        ClassModel<ImpervaApiEndpointsImportJobParams> impervaApiEndpointsImportJobParamsClassModel = ClassModel.builder(ImpervaApiEndpointsImportJobParams.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
@@ -412,7 +414,7 @@ public class DaoInit {
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
-                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel,
+                wizIntegrationClassModel, wizEndpointAssetClassModel, wizSyncJobParamsClassModel, wizApiEndpointsImportJobParamsClassModel, impervaApiEndpointsImportJobParamsClassModel,
                 mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, newRelicIntegrationClassModel, modelConfigClassModel,
                 openTelemetryIntegrationClassModel, copilotStudioIntegrationClassModel, insightNarrativeCacheClassModel, insightClassificationCacheClassModel)
             .automatic(true).build());

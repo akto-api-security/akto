@@ -188,6 +188,12 @@ function Integrations() {
       source: '/public/cloudflareWaf.png'
     }
 
+    let impervaObj = {
+        id: 'imperva',
+        name:'Imperva',
+        source: '/public/imperva.svg'
+    }
+
     let wizObj = {
         id: 'wiz',
         name:'Wiz',
@@ -273,7 +279,7 @@ function Integrations() {
 
   function allTabItems(tabId) {
     const emptyItem = [];
-    const trafficItems = [burpSuiteObj, postmanObj];
+    const trafficItems = func.checkForFeatureSaas('IMPERVA_API_IMPORT') ? [burpSuiteObj, postmanObj, impervaObj] : [burpSuiteObj, postmanObj];
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [/* aktoGptObj, */ agentConfigObj, mcpRegistryObj];
