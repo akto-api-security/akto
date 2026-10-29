@@ -36,6 +36,8 @@ public class ImpervaApiEndpointsImportJobUtil {
     private static final int MAX_CONSECUTIVE_DETAILS_FAILURES = 100;
     // how often to send the job heartbeat and check if the import was stopped from the dashboard
     private static final int CHECK_INTERVAL_SECONDS = 15;
+    // messages are pushed in batches with a check in between, so a large host doesn't miss the job heartbeat
+    private static final int PUSH_BATCH_SIZE = 500;
 
     public static void importApis(ImpervaIntegration integration, BooleanSupplier shouldContinue) {
         ImpervaApiClient client = new ImpervaApiClient(null, integration.getApiId(), integration.getApiKey());
@@ -43,8 +45,9 @@ public class ImpervaApiEndpointsImportJobUtil {
         try {
             endpoints = client.fetchAllEndpoints();
         } catch (Exception e) {
+            // fails the job, so the dashboard shows the import as failed (e.g. wrong API ID or key)
             loggerMaker.errorAndAddToDb(e, "Error fetching Imperva API inventory: " + e.getMessage());
-            return;
+            throw new RuntimeException("Error fetching Imperva API inventory: " + e.getMessage(), e);
         }
         Map<String, List<EndpointSummary>> endpointsByHost = endpoints.stream()
             .filter(e -> StringUtils.isNotBlank(e.getHostName()))
@@ -95,17 +98,20 @@ public class ImpervaApiEndpointsImportJobUtil {
             if (messages.isEmpty()) {
                 continue;
             }
-            if (!shouldContinue.getAsBoolean()) {
-                loggerMaker.infoAndAddToDb("Imperva API import stopped from the dashboard");
-                return;
-            }
-            lastCheckTs = Context.now();
-            try {
-                // skipKafka=true processes the messages directly, so the topic isn't used
-                int collectionId = collectionIds.computeIfAbsent(entry.getKey(), ImpervaApiEndpointsImportJobUtil::createCollection);
-                Utils.pushDataToKafka(collectionId, null, messages, new ArrayList<>(), true, false, true);
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error importing Imperva APIs for host " + entry.getKey() + ": " + e.getMessage());
+            for (int start = 0; start < messages.size(); start += PUSH_BATCH_SIZE) {
+                if (!shouldContinue.getAsBoolean()) {
+                    loggerMaker.infoAndAddToDb("Imperva API import stopped from the dashboard");
+                    return;
+                }
+                lastCheckTs = Context.now();
+                List<String> batch = new ArrayList<>(messages.subList(start, Math.min(start + PUSH_BATCH_SIZE, messages.size())));
+                try {
+                    // skipKafka=true processes the messages directly, so the topic isn't used
+                    int collectionId = collectionIds.computeIfAbsent(entry.getKey(), ImpervaApiEndpointsImportJobUtil::createCollection);
+                    Utils.pushDataToKafka(collectionId, null, batch, new ArrayList<>(), true, false, true);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error importing Imperva APIs for host " + entry.getKey() + ": " + e.getMessage());
+                }
             }
         }
 
