@@ -15,6 +15,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -132,11 +133,7 @@ public class UsersCollectionsList {
         Set<Integer> collectionIds = new HashSet<>();
         Bson finalFilter = Filters.or(
             Filters.exists(ApiCollection.TAGS_STRING, false),
-            Filters.nor(
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG))
-            )
+            Filters.nor(nonApiContextTagFilters())
         );
         switch (source) {
             case MCP:
@@ -174,6 +171,43 @@ public class UsersCollectionsList {
         MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
         while (cursor.hasNext()) {
             collectionIds.add(cursor.next().getId());
+        }
+        return collectionIds;
+    }
+
+    private static List<Bson> nonApiContextTagFilters() {
+        return Arrays.asList(
+            Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+            Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG)),
+            Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_DAST_TAG))
+        );
+    }
+
+    private static List<Bson> agenticTagFilters() {
+        List<Bson> filters = new ArrayList<>(nonApiContextTagFilters());
+        filters.add(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG)));
+        filters.add(Filters.elemMatch(ApiCollection.TAGS_STRING,
+            Filters.and(
+                Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
+                Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
+            )
+        ));
+        return filters;
+    }
+
+    public static Set<Integer> getAgenticCollectionIds() {
+        Set<Integer> collectionIds = new HashSet<>();
+        Bson filter = Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING),
+            Filters.or(agenticTagFilters())
+        );
+        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(filter).projection(Projections.include(Constants.ID)).iterator();
+        try {
+            while (cursor.hasNext()) {
+                collectionIds.add(cursor.next().getId());
+            }
+        } finally {
+            cursor.close();
         }
         return collectionIds;
     }
