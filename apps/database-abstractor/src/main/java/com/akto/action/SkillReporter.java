@@ -112,8 +112,6 @@ public class SkillReporter {
     static void ingestSkill(SkillRef skill, List<String> tagLabels) {
         String url = ingestionUrl(skill.accountId);
         String body = buildIngestBody(skill, tagLabels, System.currentTimeMillis() / 1000).toString();
-        logger.infoAndAddToDb("[SkillValidation] ingesting skill=" + skill.skillName + " url=" + url
-                + " body=" + body, LogDb.DB_ABS);
         try {
             // The ingestion service takes the raw token, unlike the threat backend.
             post(url, body, skill.authToken);
@@ -127,8 +125,6 @@ public class SkillReporter {
 
     static void reportThreat(SkillRef skill, Threat threat) {
         String body = buildThreatBody(skill, threat, System.currentTimeMillis() / 1000).toString();
-        logger.infoAndAddToDb("[SkillValidation] raising guardrail activity skill=" + skill.skillName
-                + " url=" + THREAT_DETECTION_API_URL + " body=" + body, LogDb.DB_ABS);
         try {
             post(THREAT_DETECTION_API_URL, body, bearer(skill.authToken));
             logger.infoAndAddToDb("[SkillValidation] guardrail activity raised skill=" + skill.skillName

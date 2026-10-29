@@ -298,8 +298,6 @@ public class SkillValidationV2Action extends ActionSupport {
             addActionError("LLM call failed: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
-        logger.infoAndAddToDb("[SkillValidation] LLM response skill=" + skillName + " agent=" + agentName
-                + " response=" + rawContent, LogDb.DB_ABS);
 
         // Step 3: parse JSON response
         Map<String, Object> parsed;
@@ -426,12 +424,7 @@ public class SkillValidationV2Action extends ActionSupport {
             new Thread(() -> {
                 Context.accountId.set(accountId);
                 SkillReporter.ingestSkill(skill, labels);
-                if (threat != null) {
-                    SkillReporter.reportThreat(skill, threat);
-                } else {
-                    logger.infoAndAddToDb("[SkillValidation] no guardrail activity, skill not malicious skill="
-                            + skill.skillName, LogDb.DB_ABS);
-                }
+                if (threat != null) SkillReporter.reportThreat(skill, threat);
             }, "skill-publisher").start();
         }
 
