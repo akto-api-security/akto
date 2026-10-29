@@ -82,8 +82,9 @@ IRSA, `sts.<region>` (VPC interface endpoints keep both private), plus
 
 ## Morgan Stanley reach-back gateway (`POST /reachback/test`)
 
-Demo endpoint that sends one chat completion to a model behind Morgan
-Stanley's reach-back gateway. Not wired into `modelConfigs` or the cascade.
+Demo endpoint that forwards an OpenAI chat-completions body, unchanged, to a
+model behind Morgan Stanley's reach-back gateway and returns the gateway's
+JSON reply. Not wired into `modelConfigs` or the cascade.
 Container runtime only (needs mounted files and client-certificate TLS).
 
 Every call carries two credentials:
@@ -113,8 +114,8 @@ mTLS files are loaded once per process, so a renewed cert needs a pod restart.
 
 ```bash
 curl -s localhost:8090/reachback/test -H 'Content-Type: application/json' \
-  -d '{"prompt": "Say hello", "model": "gpt-6-luna"}'
-# 200 {"content": "...", "model": "gpt-6-luna", "token_ms": 412, "call_ms": 1830}
+  -d '{"model": "gpt-6-luna", "messages": [{"role": "user", "content": "Say hello"}], "max_completion_tokens": 64}'
+# 200 {"response": {<gateway chat-completions JSON>}, "token_ms": 412, "call_ms": 1830}
 # 502 {"stage": "token" | "connect" | "http", "status": 401, "error": "..."}
 ```
 

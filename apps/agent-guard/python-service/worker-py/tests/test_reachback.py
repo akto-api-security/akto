@@ -25,7 +25,7 @@ _CLIENT_ID = "11111111-2222-3333-4444-555555555555"
 _SCOPE = "api://reachback-gw/.default"
 _THUMBPRINT = hashlib.sha1(b"public_key.cer").hexdigest().upper()
 _BASE_URL = "https://reach-back-gateway.ms.com/openai/v1"
-_REQUEST = app_module.ReachbackTestRequest(prompt="hi", model="gpt-6-luna")
+_REQUEST = {"model": "gpt-6-luna", "messages": [{"role": "user", "content": "hi"}]}
 _COMPLETION = {"model": "gpt-6-luna", "choices": [{"message": {"role": "assistant", "content": "ok"}}]}
 
 
@@ -96,7 +96,7 @@ def _wire(monkeypatch, token_replies, gateway_replies):
 async def test_token_request_carries_verifiable_certificate_assertion(key, monkeypatch):
     token_client, _ = _wire(monkeypatch, [_token_reply()], [_gateway_reply()])
 
-    await reachback.chat("hi", "gpt-6-luna")
+    await reachback.chat({"model": "gpt-6-luna", "messages": []})
 
     post = token_client.posts[0]
     assert post["url"] == f"https://login.microsoftonline.com/{_TENANT}/oauth2/v2.0/token"
@@ -121,28 +121,30 @@ async def test_token_request_carries_verifiable_certificate_assertion(key, monke
     assert rsa.verify(f"{header_b64}.{claims_b64}".encode(), _unb64(sig_b64), pub) == "SHA-256"
 
 
-async def test_gateway_request_shape(key, monkeypatch):
+async def test_body_is_forwarded_untouched_and_reply_returned(key, monkeypatch):
     _, gateway_client = _wire(monkeypatch, [_token_reply("tok-1")], [_gateway_reply()])
 
-    result = await reachback.chat("hello", "gpt-6-luna")
+    body = {
+        "model": "gpt-6-luna",
+        "messages": [{"role": "system", "content": "Be brief."}, {"role": "user", "content": "hello"}],
+        "max_completion_tokens": 64,
+        "response_format": {"type": "json_object"},
+    }
+
+    result = await reachback.chat(body)
 
     post = gateway_client.posts[0]
     assert post["url"] == f"{_BASE_URL}/chat/completions"
     assert post["headers"] == {"Authorization": "Bearer tok-1"}
-    assert post["json"] == {
-        "model": "gpt-6-luna",
-        "messages": [{"role": "user", "content": "hello"}],
-        "max_completion_tokens": 512,
-    }
-    assert result["content"] == "ok"
-    assert result["model"] == "gpt-6-luna"
+    assert post["json"] == body  # forwarded untouched
+    assert result["response"] == _COMPLETION
 
 
 async def test_full_chat_completions_url_is_accepted(key, monkeypatch):
     monkeypatch.setattr(settings, "REACHBACK_BASE_URL", f"{_BASE_URL}/chat/completions/")
     _, gateway_client = _wire(monkeypatch, [_token_reply()], [_gateway_reply()])
 
-    await reachback.chat("hi", "gpt-6-sol")
+    await reachback.chat({"model": "gpt-6-sol", "messages": []})
 
     assert gateway_client.posts[0]["url"] == f"{_BASE_URL}/chat/completions"
 
@@ -150,8 +152,8 @@ async def test_full_chat_completions_url_is_accepted(key, monkeypatch):
 async def test_token_is_cached_across_calls(key, monkeypatch):
     token_client, gateway_client = _wire(monkeypatch, [_token_reply()], [_gateway_reply(), _gateway_reply()])
 
-    await reachback.chat("one", "gpt-6-luna")
-    await reachback.chat("two", "gpt-6-luna")
+    await reachback.chat({"model": "gpt-6-luna", "messages": []})
+    await reachback.chat({"model": "gpt-6-luna", "messages": []})
 
     assert len(token_client.posts) == 1
     assert len(gateway_client.posts) == 2
@@ -162,9 +164,9 @@ async def test_401_refreshes_token_and_retries_once(key, monkeypatch):
         monkeypatch, [_token_reply("stale"), _token_reply("fresh")], [_gateway_reply(401, {}), _gateway_reply()]
     )
 
-    result = await reachback.chat("hi", "gpt-6-luna")
+    result = await reachback.chat({"model": "gpt-6-luna", "messages": []})
 
-    assert result["content"] == "ok"
+    assert result["response"] == _COMPLETION
     assert len(token_client.posts) == 2
     assert [p["headers"]["Authorization"] for p in gateway_client.posts] == ["Bearer stale", "Bearer fresh"]
 
@@ -173,7 +175,7 @@ async def test_gateway_error_reports_http_stage(key, monkeypatch):
     _wire(monkeypatch, [_token_reply()], [_gateway_reply(403, {"error": "forbidden"})])
 
     with pytest.raises(reachback.ReachbackError) as err:
-        await reachback.chat("hi", "gpt-6-luna")
+        await reachback.chat({"model": "gpt-6-luna", "messages": []})
 
     assert err.value.as_dict() == {"stage": "http", "status": 403, "error": '{"error":"forbidden"}'}
 
@@ -182,7 +184,7 @@ async def test_entra_rejection_reports_token_stage(key, monkeypatch):
     _, gateway_client = _wire(monkeypatch, [_token_reply(status=401)], [])
 
     with pytest.raises(reachback.ReachbackError) as err:
-        await reachback.chat("hi", "gpt-6-luna")
+        await reachback.chat({"model": "gpt-6-luna", "messages": []})
 
     assert err.value.stage == "token"
     assert err.value.status == 401
@@ -195,7 +197,7 @@ async def test_missing_key_file_reports_token_stage(key, monkeypatch):
     _wire(monkeypatch, [], [])
 
     with pytest.raises(reachback.ReachbackError) as err:
-        await reachback.chat("hi", "gpt-6-luna")
+        await reachback.chat({"model": "gpt-6-luna", "messages": []})
 
     assert err.value.stage == "token"
     assert "FileNotFoundError" in err.value.error
@@ -205,7 +207,7 @@ async def test_handshake_failure_reports_connect_stage(key, monkeypatch):
     _wire(monkeypatch, [_token_reply()], [httpx.ConnectError("[SSL: TLSV13_ALERT_CERTIFICATE_REQUIRED]")])
 
     with pytest.raises(reachback.ReachbackError) as err:
-        await reachback.chat("hi", "gpt-6-luna")
+        await reachback.chat({"model": "gpt-6-luna", "messages": []})
 
     assert err.value.stage == "connect"
     assert "CERTIFICATE_REQUIRED" in err.value.error
@@ -239,7 +241,8 @@ async def test_endpoint_returns_completion(key, monkeypatch):
 
     result = await app_module.reachback_test(_REQUEST)
 
-    assert result["content"] == "ok"
+    assert result["response"] == _COMPLETION
+    assert set(result) == {"response", "token_ms", "call_ms"}
 
 
 async def test_endpoint_returns_502_with_failed_stage(key, monkeypatch):
