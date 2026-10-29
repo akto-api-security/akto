@@ -54,13 +54,12 @@ public class AuthFilter implements Filter {
         return tokens;
     }
 
-    private static final String UNAUTHORIZED_BODY = "{\"success\":false,\"message\":\"Unauthorized\"}";
-
-    private static void writeUnauthorized(HttpServletResponse response) throws IOException {
+    private static void writeUnauthorized(HttpServletResponse response, String error, String description) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setHeader("WWW-Authenticate", "Bearer error=\"" + error + "\", error_description=\"" + description + "\"");
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write(UNAUTHORIZED_BODY);
+        response.getWriter().write("{\"error\":\"" + error + "\",\"error_description\":\"" + description + "\"}");
     }
 
     @Override
@@ -109,7 +108,7 @@ public class AuthFilter implements Filter {
         // Reject revoked tokens up front, regardless of the AKTO_DI_AUTHENTICATE setting.
         if (accessTokenFromRequest != null && REVOKED_TOKENS.contains(accessTokenFromRequest.trim())) {
             logger.warn("Blocked request using a revoked token");
-            writeUnauthorized(httpServletResponse);
+            writeUnauthorized(httpServletResponse, "invalid_token", "The access token has been revoked");
             return;
         }
 
@@ -131,13 +130,17 @@ public class AuthFilter implements Filter {
             if (!isForThisDeployment(tokenAccountId, DEPLOYMENT_ACCOUNT_ID)) {
                 logger.error("Rejected a token for account {} on the deployment of account {}",
                         tokenAccountId, DEPLOYMENT_ACCOUNT_ID);
-                writeUnauthorized(httpServletResponse);
+                writeUnauthorized(httpServletResponse, "invalid_token", "The access token is not valid for this deployment");
                 return;
             }
             Context.accountId.set(tokenAccountId);
         } catch (Exception e) {
             logger.error("Authentication failed: {}", e.getMessage());
-            writeUnauthorized(httpServletResponse);
+            if (accessTokenFromRequest == null || accessTokenFromRequest.trim().isEmpty()) {
+                writeUnauthorized(httpServletResponse, "invalid_request", "The Authorization header is missing");
+            } else {
+                writeUnauthorized(httpServletResponse, "invalid_token", "The access token is invalid or expired");
+            }
             return;
         }
         chain.doFilter(servletRequest, servletResponse);
