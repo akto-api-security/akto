@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 
 // Imports the API inventory from Imperva API Security, run by ImpervaApiEndpointsImportJobExecutor
@@ -33,10 +34,10 @@ public class ImpervaApiEndpointsImportJobUtil {
 
     // after this many failed detail calls in a row (e.g. Imperva blocking us) use the inventory data only
     private static final int MAX_CONSECUTIVE_DETAILS_FAILURES = 100;
-    // the jobs cron re-runs a job whose heartbeat is older than 5 minutes
-    private static final int HEARTBEAT_INTERVAL_SECONDS = 60;
+    // how often to send the job heartbeat and check if the import was stopped from the dashboard
+    private static final int CHECK_INTERVAL_SECONDS = 15;
 
-    public static void importApis(ImpervaIntegration integration, Runnable heartbeat) {
+    public static void importApis(ImpervaIntegration integration, BooleanSupplier shouldContinue) {
         ImpervaApiClient client = new ImpervaApiClient(null, integration.getApiId(), integration.getApiKey());
         List<EndpointSummary> endpoints;
         try {
@@ -61,13 +62,16 @@ public class ImpervaApiEndpointsImportJobUtil {
 
         int consecutiveFailures = 0;
         int detailsFailures = 0;
-        int lastHeartbeatTs = Context.now();
+        int lastCheckTs = Context.now();
         for (Map.Entry<String, List<EndpointSummary>> entry : endpointsByHost.entrySet()) {
             List<String> messages = new ArrayList<>();
             for (EndpointSummary endpoint : entry.getValue()) {
-                if (Context.now() - lastHeartbeatTs >= HEARTBEAT_INTERVAL_SECONDS) {
-                    heartbeat.run();
-                    lastHeartbeatTs = Context.now();
+                if (Context.now() - lastCheckTs >= CHECK_INTERVAL_SECONDS) {
+                    if (!shouldContinue.getAsBoolean()) {
+                        loggerMaker.infoAndAddToDb("Imperva API import stopped from the dashboard");
+                        return;
+                    }
+                    lastCheckTs = Context.now();
                 }
                 ImpervaSchema schema = null;
                 if (consecutiveFailures < MAX_CONSECUTIVE_DETAILS_FAILURES) {
@@ -91,8 +95,11 @@ public class ImpervaApiEndpointsImportJobUtil {
             if (messages.isEmpty()) {
                 continue;
             }
-            heartbeat.run();
-            lastHeartbeatTs = Context.now();
+            if (!shouldContinue.getAsBoolean()) {
+                loggerMaker.infoAndAddToDb("Imperva API import stopped from the dashboard");
+                return;
+            }
+            lastCheckTs = Context.now();
             try {
                 // skipKafka=true processes the messages directly, so the topic isn't used
                 int collectionId = collectionIds.computeIfAbsent(entry.getKey(), ImpervaApiEndpointsImportJobUtil::createCollection);
