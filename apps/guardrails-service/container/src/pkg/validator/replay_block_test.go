@@ -8,8 +8,8 @@ func TestStripBlockSuffix(t *testing.T) {
 		name, raw, body string
 		pureBlock       bool
 	}{
-		{"array", `[{"a":1},` + block + `]`, `{"a":1}`, false},
-		{"array with string body", `["event: x\ndata: {}",` + block + `]`, "event: x\ndata: {}", false},
+		{"array", `[{"a": 1},` + block + `]`, `{"a": 1}`, false},
+		{"array with non-json body", `["event: x\ndata: {}",` + block + `]`, "event: x\ndata: {}", false},
 		{"old separator", `{"a":1}` + "\n\n" + block, `{"a":1}`, false},
 		{"request blocked", block, "", true},
 		{"upstream array", `[{"a":1},{"b":2}]`, `[{"a":1},{"b":2}]`, false},
