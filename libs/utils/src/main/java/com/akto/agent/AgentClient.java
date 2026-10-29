@@ -7,6 +7,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.util.ApiCollectionMetaCache;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.dto.testing.AgentConversationResult;
@@ -67,7 +68,8 @@ public class AgentClient {
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
 
-        ApiCollection col = dataActor.fetchApiCollectionMeta(apiCollectionId);
+        // only the collection's tags are read below; they are set at discovery time, so a per-process cache is enough
+        ApiCollection col = ApiCollectionMetaCache.get(apiCollectionId);
         boolean isCopilot = isCopilotBotCollection(col);
         boolean shouldFetchRecords = false;
         if(!isCopilot){
