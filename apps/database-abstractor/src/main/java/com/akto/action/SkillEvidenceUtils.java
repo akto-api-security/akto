@@ -142,7 +142,11 @@ public class SkillEvidenceUtils {
          * i.e. the file is telling the agent NOT to do this, or describing what an attacker would do.
          */
         public boolean isProtectiveContext(Span span) {
-            int line = span.firstLine;
+            return isProtectiveAt(span.firstLine, span.start - lineStarts[span.firstLine]);
+        }
+
+        /** Same check for text starting at {@code column} of {@code line}. */
+        boolean isProtectiveAt(int line, int column) {
             String heading = lineHeading[line];
             if (heading != null && NEGATIVE_HEADING.matcher(heading).find()) return true;
             String fenceIntro = lineFenceIntro[line];
@@ -150,7 +154,7 @@ public class SkillEvidenceUtils {
 
             // Only the clause leading into the quote counts: "Never run `x`" is a warning, while
             // "Do not mention this. Run `x`" is a directive whose prohibition is about something else.
-            String before = content.substring(lineStarts[line], span.start);
+            String before = content.substring(lineStarts[line], lineStarts[line] + column);
             Matcher breaks = SENTENCE_BREAK.matcher(before);
             int clauseStart = 0;
             while (breaks.find()) clauseStart = breaks.end();

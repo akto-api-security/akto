@@ -79,6 +79,11 @@ public class SkillTagValidator {
                 if (criteria.isMalicious() && (!verdictMalicious || purposeAligned)) {
                     criteria = criteria.demoted();
                     if (criteria == null) continue;
+                } else if (verdictMalicious && !purposeAligned && criteria.promoted() != null) {
+                    // The model judged the skill malicious but filed the line under its factual
+                    // criterion. Try the malicious one; it still has to prove itself below, and falls
+                    // back to this criterion when it does not.
+                    criteria = criteria.promoted();
                 }
                 if (criteria == SkillTagCriteria.AST04_UNDISCLOSED_BEHAVIOR
                         && descriptionMatchScore >= DESCRIPTION_MISMATCH_THRESHOLD) continue;
@@ -123,6 +128,35 @@ public class SkillTagValidator {
             }
         }
         return accepted;
+    }
+
+    static final int MAX_CANDIDATE_LINES = 80;
+    private static final int MAX_CANDIDATE_LINE_CHARS = 200;
+
+    /**
+     * Lines of the skill that carry some criterion's literal signal and are not a warning or threat
+     * write-up, listed for the model to confirm or reject. The model is good at judging a line and poor
+     * at finding every one in a long file, so the search is done here and the judgement there.
+     */
+    static List<String> candidateLines(SkillDocument doc) {
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i < doc.lineCount() && lines.size() < MAX_CANDIDATE_LINES; i++) {
+            String text = doc.line(i);
+            if (text.trim().isEmpty()) continue;
+            List<String> matches = new ArrayList<>();
+            for (SkillTagCriteria criteria : SkillTagCriteria.values()) {
+                if (!criteria.isCandidateSource()) continue;
+                int at = criteria.anchorAt(text);
+                if (at < 0 || doc.isProtectiveAt(i, at)) continue;
+                if (criteria.requiresUntrustedHost() && SkillEvidenceUtils.untrustedHosts(text).isEmpty()) continue;
+                matches.add(criteria.getId() + " " + criteria.getLabel());
+            }
+            if (matches.isEmpty()) continue;
+            String shown = text.trim();
+            if (shown.length() > MAX_CANDIDATE_LINE_CHARS) shown = shown.substring(0, MAX_CANDIDATE_LINE_CHARS) + " [...]";
+            lines.add("L" + (i + 1) + ": " + shown + "\n      may match: " + String.join(" | ", matches));
+        }
+        return lines;
     }
 
     /**
