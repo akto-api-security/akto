@@ -26,6 +26,7 @@ public class FileInspectionResult {
     public static final String AGENT_ID = "agentId";
     public static final String DEVICE_ID = "deviceId";
     public static final String DEVICE_LABEL = "deviceLabel";
+    public static final String USER_HOME = "userHome";
     public static final String EXECUTED_AT = "executedAt";
     public static final String STATUS = "status";
     public static final String ERROR_MESSAGE = "errorMessage";
@@ -75,6 +76,7 @@ public class FileInspectionResult {
     private String agentId;
     private String deviceId;
     private String deviceLabel;
+    private String userHome; // home of the OS user whose agent ran the rule (several users can share a device)
     private int executedAt;
     private Status status;
     private String errorMessage;
