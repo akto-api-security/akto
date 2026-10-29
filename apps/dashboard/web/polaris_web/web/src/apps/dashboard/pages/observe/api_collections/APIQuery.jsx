@@ -328,7 +328,7 @@ function APIQuery() {
         }
     }
 
-    const primaryActionLabel = isUpdate ? 'Update conditions' : 'Save as API Group'
+    const primaryActionLabel = isUpdate ? 'Update conditions' : `Save as ${mapLabel('API Group', getDashboardCategory())}`
     const canSave = canCall(isUpdate ? 'api/updateCustomCollection' : 'api/createCustomCollection')
 
     const findMissingUrls = useCallback(() => {

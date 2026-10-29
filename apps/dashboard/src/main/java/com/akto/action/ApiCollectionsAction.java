@@ -952,6 +952,9 @@ public class ApiCollectionsAction extends UserAction {
             ApiCollection apiCollection = new ApiCollection(Context.now(), collectionName, conditions);
             ApiCollectionsDao.instance.insertOne(apiCollection);
 
+            // keep the group in the dashboard it was created from (e.g. ARGUS), else it falls into API Security
+            addContextSpecificTags(apiCollection.getId());
+
             ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
 
             this.apiCollections = new ArrayList<>();
