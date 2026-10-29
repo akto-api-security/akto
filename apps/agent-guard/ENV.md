@@ -41,6 +41,7 @@ cp .env.example .env   # edit once — never commit .env
 | Vertex / Slack / model map keys | yes | yes |
 | `*_FOUNDRY_*` (Azure AI Foundry providers) | yes | yes |
 | `BEDROCK_*` (AWS Bedrock provider) | yes | yes |
+| `REACHBACK_*` (Morgan Stanley reach-back demo API) | yes | no |
 
 ## AWS Bedrock (`bedrock` provider)
 
@@ -78,6 +79,53 @@ IRSA, `sts.<region>` (VPC interface endpoints keep both private), plus
   interface endpoint); credentials and region are env-only.
 - Converse returns no logprobs, so Bedrock suits the LLM-judge roles (JSON
   verdict prompts), not the Qwen3Guard logprob-confidence path.
+
+## Morgan Stanley reach-back gateway (`POST /reachback/test`)
+
+Demo endpoint that sends one chat completion to a model behind Morgan
+Stanley's reach-back gateway. Not wired into `modelConfigs` or the cascade.
+Container runtime only (needs mounted files and client-certificate TLS).
+
+Every call carries two credentials:
+
+1. **Azure AD app token** — a client assertion signed with the SPN private key
+   (`x5t` = the certificate thumbprint) is exchanged at
+   `https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token` for a
+   token, cached until 5 min before expiry and sent as `Authorization: Bearer`.
+   The pod needs egress to `login.microsoftonline.com`.
+2. **mTLS** — the connection to the gateway presents the client cert/key and
+   trusts only the CA bundle.
+
+| Variable | Notes |
+|----------|-------|
+| `REACHBACK_BASE_URL` | e.g. `https://<gateway>/openai/v1`; a pasted `.../chat/completions` URL is trimmed |
+| `REACHBACK_TENANT` | e.g. `morganstanley.onmicrosoft.com` |
+| `REACHBACK_CLIENT_ID` | Azure AD app (SPN) client id |
+| `REACHBACK_SCOPE` | e.g. `api://<gateway-app>/.default` |
+| `REACHBACK_THUMBPRINT` | SHA-1 thumbprint of the SPN's `public_key.cer`, hex (colons allowed) |
+| `REACHBACK_SPN_KEY_FILE` | SPN private key, PEM (PKCS#1 or PKCS#8, unencrypted), e.g. under `/etc/reachback/spn/`; re-read on each token fetch |
+| `REACHBACK_MTLS_CERT_FILE` | mTLS client cert, e.g. `/etc/reachback/mtls/tls.crt` (cert-manager Secret) |
+| `REACHBACK_MTLS_KEY_FILE` | mTLS client key, e.g. `/etc/reachback/mtls/tls.key` |
+| `REACHBACK_CA_FILE` | CA bundle for the gateway's server cert, e.g. `/etc/reachback/ca/ca.pem` |
+
+All are required; with any missing the endpoint returns 503 naming them. The
+mTLS files are loaded once per process, so a renewed cert needs a pod restart.
+
+```bash
+curl -s localhost:8090/reachback/test -H 'Content-Type: application/json' \
+  -d '{"prompt": "Say hello", "model": "gpt-6-luna"}'
+# 200 {"content": "...", "model": "gpt-6-luna", "token_ms": 412, "call_ms": 1830}
+# 502 {"stage": "token" | "connect" | "http", "status": 401, "error": "..."}
+```
+
+`stage` says where it failed: `token` = Azure AD rejected the assertion or
+the key file is unreadable; `connect` = DNS/TCP/TLS handshake/timeout to the
+gateway (wrong client cert or CA); `http` = the gateway answered with an
+error status (401 is retried once with a fresh token first).
+
+The endpoint has no auth of its own: anything that can reach the agent-guard
+Service can call these models through it. Fine for the demo; gate or remove it
+before production.
 
 > The per-scanner semantic cache has moved out of agent-guard to
 > guardrails-service (which now owns the Redis vector store + embedder in front of

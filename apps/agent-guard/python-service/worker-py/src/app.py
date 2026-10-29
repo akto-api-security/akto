@@ -8,11 +8,13 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 import cascade_backpressure
 import metrics_push
 import providers
+import reachback
 import scan_diag
 from constants import get_default_config
 from model_map import build_arbiter
@@ -45,6 +47,11 @@ class ScanRequest(BaseModel):
 class GuardrailsLLMRequest(BaseModel):
     prompt: str
     model: str = ""
+
+
+class ReachbackTestRequest(BaseModel):
+    prompt: str
+    model: str
 
 
 @asynccontextmanager
@@ -171,6 +178,19 @@ async def guardrails_llm_async(body: GuardrailsLLMRequest):
     """Same as /guardrails/llm for the calls that run after the block has been returned (reason, evidence,
     remediation): a larger reply ceiling, since nobody is waiting on them."""
     return await _run_guardrails_llm(body, relaxed=True)
+
+
+@app.post("/reachback/test")
+async def reachback_test(body: ReachbackTestRequest):
+    """Demo: one chat completion against a model behind Morgan Stanley's reach-back gateway
+    (Azure AD token + mTLS). Failures return 502 with the stage that failed: token / connect / http."""
+    missing = reachback.missing_settings()
+    if missing:
+        raise HTTPException(status_code=503, detail=f"reach-back not configured; missing {missing}")
+    try:
+        return await reachback.chat(body.prompt, body.model)
+    except reachback.ReachbackError as exc:
+        return JSONResponse(status_code=502, content=exc.as_dict())
 
 
 async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool):
