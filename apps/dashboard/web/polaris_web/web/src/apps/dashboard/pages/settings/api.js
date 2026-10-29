@@ -1237,6 +1237,13 @@ const settingRequests = {
             data: {}
         })
     },
+    stopImpervaImport() {
+        return request({
+            url: '/api/stopImpervaImport',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchWizIntegration() {
         return request({
             url: '/api/fetchWizIntegration',
