@@ -54,6 +54,15 @@ public class AuthFilter implements Filter {
         return tokens;
     }
 
+    private static final String UNAUTHORIZED_BODY = "{\"success\":false,\"message\":\"Unauthorized\"}";
+
+    private static void writeUnauthorized(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(UNAUTHORIZED_BODY);
+    }
+
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
     }
@@ -100,7 +109,7 @@ public class AuthFilter implements Filter {
         // Reject revoked tokens up front, regardless of the AKTO_DI_AUTHENTICATE setting.
         if (accessTokenFromRequest != null && REVOKED_TOKENS.contains(accessTokenFromRequest.trim())) {
             logger.warn("Blocked request using a revoked token");
-            httpServletResponse.sendError(401);
+            writeUnauthorized(httpServletResponse);
             return;
         }
 
@@ -122,13 +131,13 @@ public class AuthFilter implements Filter {
             if (!isForThisDeployment(tokenAccountId, DEPLOYMENT_ACCOUNT_ID)) {
                 logger.error("Rejected a token for account {} on the deployment of account {}",
                         tokenAccountId, DEPLOYMENT_ACCOUNT_ID);
-                httpServletResponse.sendError(401);
+                writeUnauthorized(httpServletResponse);
                 return;
             }
             Context.accountId.set(tokenAccountId);
         } catch (Exception e) {
             logger.error("Authentication failed: {}", e.getMessage());
-            httpServletResponse.sendError(401);
+            writeUnauthorized(httpServletResponse);
             return;
         }
         chain.doFilter(servletRequest, servletResponse);
