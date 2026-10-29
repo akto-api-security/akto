@@ -74,6 +74,9 @@ public class Constants {
     public static final String AKTO_MALICIOUS_MCP_SERVER_TAG = "malicious-mcp-server";
     public static final String AKTO_DAST_TAG = "dast";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    public static final String AKTO_AI_AGENT_CALLER_TAG = "ai-agent-caller";
+    public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
+    public static final String AKTO_ENDPOINT_SOURCE_VALUE = "ENDPOINT";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_RAG_DATABASE_TAG = "rag-database";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
