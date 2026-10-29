@@ -31,7 +31,7 @@ public class AllAPIsGroup extends TestingEndpoints {
 
     @Override
     public Bson createFilters(CollectionType type) {
-        Set<Integer> excluded = UsersCollectionsList.getNonApiContextCollectionIds();
+        Set<Integer> excluded = UsersCollectionsList.getAgenticCollectionIds();
         if (excluded.isEmpty()) {
             return Filters.empty();
         }

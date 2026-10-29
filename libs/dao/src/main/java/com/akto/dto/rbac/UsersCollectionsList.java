@@ -183,11 +183,23 @@ public class UsersCollectionsList {
         );
     }
 
-    public static Set<Integer> getNonApiContextCollectionIds() {
+    private static List<Bson> agenticTagFilters() {
+        List<Bson> filters = new ArrayList<>(nonApiContextTagFilters());
+        filters.add(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_AI_AGENT_CALLER_TAG)));
+        filters.add(Filters.elemMatch(ApiCollection.TAGS_STRING,
+            Filters.and(
+                Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_ENDPOINT_SOURCE_TAG),
+                Filters.eq(CollectionTags.VALUE, Constants.AKTO_ENDPOINT_SOURCE_VALUE)
+            )
+        ));
+        return filters;
+    }
+
+    public static Set<Integer> getAgenticCollectionIds() {
         Set<Integer> collectionIds = new HashSet<>();
         Bson filter = Filters.and(
             Filters.exists(ApiCollection.TAGS_STRING),
-            Filters.or(nonApiContextTagFilters())
+            Filters.or(agenticTagFilters())
         );
         MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(filter).projection(Projections.include(Constants.ID)).iterator();
         try {
