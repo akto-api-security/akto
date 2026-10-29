@@ -444,15 +444,12 @@ public class InventoryAction extends UserAction {
         if (apiCollectionIds != null && !apiCollectionIds.isEmpty()) {
             return fetchApiInfosForCollectionBatch();
         }
-        Set<Integer> excludedCollections = deactivatedCollections;
-        if (apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID) {
-            excludedCollections = new HashSet<>(deactivatedCollections);
-            excludedCollections.addAll(UsersCollectionsList.getAgenticCollectionIds());
-        }
         List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
                 Filters.and(
                         Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
-                        Filters.nin(ApiInfo.ID_API_COLLECTION_ID, excludedCollections)
+                        Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections),
+                        apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID
+                                ? AllAPIsGroup.visibleOwnerFilter(ApiInfo.ID_API_COLLECTION_ID) : Filters.empty()
                 ));
         for(ApiInfo apiInfo: apiInfos){
             apiInfo.calculateActualAuth();
