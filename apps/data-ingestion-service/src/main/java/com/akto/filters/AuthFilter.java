@@ -5,6 +5,7 @@ import com.akto.data_actor.ClientActor;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.log.LoggerMaker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
@@ -17,6 +18,7 @@ import java.security.KeyFactory;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -54,12 +56,14 @@ public class AuthFilter implements Filter {
         return tokens;
     }
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private static void writeUnauthorized(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader("WWW-Authenticate", "Bearer");
         response.setContentType("application/json");
         response.setCharacterEncoding("UTF-8");
-        response.getWriter().write("{\"actionErrors\":[\"" + message + "\"]}");
+        MAPPER.writeValue(response.getWriter(), Collections.singletonMap("actionErrors", Collections.singletonList(message)));
     }
 
     @Override
