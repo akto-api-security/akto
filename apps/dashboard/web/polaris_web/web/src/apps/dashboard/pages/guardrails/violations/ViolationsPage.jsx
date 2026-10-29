@@ -55,7 +55,7 @@ import { fetchEndpointViolationCounts } from "@/apps/dashboard/pages/threat_dete
 import { getDashboardCategory, mapLabel } from "@/apps/main/labelHelper";
 import ViolationFlyout from "./ViolationFlyout";
 import { HumanApprovalActions, HumanApprovalTabLabel, HumanResponseBadge, humanApprovalTabAccessibilityLabel, isHumanApprovalPending } from "./ViolationFlyoutSections";
-import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation } from "./violationsData";
+import { coerceToText, sanitizeDisplayText, extractPromptBody, isEmptyJsonText, normalizeReasonPunctuation, parseResponsePayload } from "./violationsData";
 import AdvancedPayloadSearch from "./AdvancedPayloadSearch";
 import { addAdvancedFilter, filterFromEditorSelection, toLatestApiOrigRegex } from "./attributeSearch";
 import InsightsFlyout from "@/apps/dashboard/pages/observe/agentic/insights/InsightsFlyout";
@@ -549,7 +549,7 @@ function parseAktoPayload(payloadStr) {
         const reqStr = outer.requestPayload || outer.request_body;
         const respStr = outer.responsePayload || outer.response_body;
         const req = reqStr ? safeJson(reqStr) : null;
-        const resp = respStr ? safeJson(respStr) : null;
+        const resp = respStr ? parseResponsePayload(respStr) : null;
         return { req, resp, raw: outer };
     } catch { return {}; }
 }

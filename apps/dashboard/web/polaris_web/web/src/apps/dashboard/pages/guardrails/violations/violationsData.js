@@ -33,6 +33,20 @@ function _parseJson(str) {
     try { return JSON.parse(str); } catch { return null; }
 }
 
+const _isPolicyBlock = (v) => v?.error?.data?.blocked_by === "policy_validator";
+
+// A response-blocked sample is [upstreamBody, blockJSON] (older events: body + "\n\n" + blockJSON).
+// Returns the block for those, so its reason / blocked_at / blocked_by render; otherwise the
+// parsed payload, as before.
+export function parseResponsePayload(str) {
+    const parsed = _parseJson(str);
+    if (Array.isArray(parsed) && parsed.length === 2 && _isPolicyBlock(parsed[1])) return parsed[1];
+    if (parsed || typeof str !== "string") return parsed;
+    const idx = str.lastIndexOf("\n\n");
+    const block = idx >= 0 ? _parseJson(str.slice(idx + 2)) : null;
+    return _isPolicyBlock(block) ? block : null;
+}
+
 // Some events capture only the raw request body (e.g. {"messages":[...]}) instead of the
 // {requestPayload, responsePayload, ...} envelope - that body itself is the request.
 function _isBareRequestBody(outer) {
@@ -283,7 +297,7 @@ export function buildFallbackDetail(row) {
         if (outer) {
             // Standard Akto payload: {requestPayload, responsePayload, ...}
             const req = _requestFromOuter(outer);
-            const resp = _parseJson(outer.responsePayload);
+            const resp = parseResponsePayload(outer.responsePayload);
 
             guardrailReason = _extractGuardrailReason(resp, req);
 
@@ -381,7 +395,7 @@ export function buildFallbackDetail(row) {
     const metaRemediation = meta.remediation || _metaField(row.metadata, "remediation");
     const outer = _parseAktoOuter(row.payload) || {};
     const req = _requestFromOuter(outer);
-    const resp = _parseJson(outer.responsePayload);
+    const resp = parseResponsePayload(outer.responsePayload);
 
     // metadata.reason is often empty — fall back to the guardrail's own explanation
     // extracted from the response payload (resp.error.data.reason, etc.) so the trigger

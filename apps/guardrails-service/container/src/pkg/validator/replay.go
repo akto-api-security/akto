@@ -53,8 +53,8 @@ const (
 )
 
 // blockedResponseSeparator mirrors the unexported constant of the same name in
-// mcp-endpoint-shield's processor: when a *response* is blocked, the reported payload is
-// rawResponse + separator + blockJSON.
+// mcp-endpoint-shield's processor: response-blocked payloads reported before the array format
+// are rawResponse + separator + blockJSON.
 const blockedResponseSeparator = "\n\n"
 
 // replayConcurrency bounds in-flight evaluations per batch. Each one can reach the LLM/model
@@ -506,18 +506,22 @@ func isNonReplayableScan(env replayEnvelope) bool {
 }
 
 // stripBlockSuffix separates a recorded responsePayload from the policy-block JSON the processor
-// attaches when it enforces a violation. Two shapes exist:
+// attaches when it enforces a violation. These shapes exist:
 //
-//	response blocked -> "<real upstream body>" + "\n\n" + <blockJSON>
+//	response blocked -> [<real upstream body>, <blockJSON>]
+//	                    (older events: "<real upstream body>" + "\n\n" + <blockJSON>)
 //	request blocked  -> <blockJSON> only (the origin was never called)
 //
-// Returns the usable upstream body, and pureBlock=true for the second shape.
+// Returns the usable upstream body, and pureBlock=true for the request-blocked shape.
 func stripBlockSuffix(raw string) (body string, pureBlock bool) {
 	if strings.TrimSpace(raw) == "" {
 		return raw, false
 	}
 	if isPolicyBlockResponse(raw) {
 		return "", true
+	}
+	if body, ok := blockedArrayBody(raw); ok {
+		return body, false
 	}
 	idx := strings.LastIndex(raw, blockedResponseSeparator)
 	if idx < 0 {
@@ -527,6 +531,24 @@ func stripBlockSuffix(raw string) (body string, pureBlock bool) {
 		return raw, false
 	}
 	return raw[:idx], false
+}
+
+// blockedArrayBody returns the upstream body of a [body, blockJSON] response sample. A body that
+// wasn't JSON is stored as a JSON string and comes back decoded.
+func blockedArrayBody(raw string) (string, bool) {
+	if !strings.HasPrefix(strings.TrimSpace(raw), "[") {
+		return "", false
+	}
+	var parts []json.RawMessage
+	if json.Unmarshal([]byte(raw), &parts) != nil || len(parts) != 2 || !isPolicyBlockResponse(string(parts[1])) {
+		return "", false
+	}
+	body := string(parts[0])
+	var s string
+	if strings.HasPrefix(body, `"`) && json.Unmarshal(parts[0], &s) == nil {
+		return s, true
+	}
+	return body, true
 }
 
 // isPolicyBlockResponse reports whether s is one of our own block bodies, matching the marker
