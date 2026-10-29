@@ -4,6 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -507,7 +508,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                                     Bson matchFilter = Filters.and(
                                         hostHeaderFilter,
                                         Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionId),
-                                        filter
+                                        filter,
+                                        collectionId == AllAPIsGroup.ALL_APIS_GROUP_ID
+                                            ? AllAPIsGroup.visibleOwnerFilter(SingleTypeInfo._API_COLLECTION_ID) : Filters.empty()
                                     );
                                     long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(matchFilter);
                                     return new Pair<>(collectionId, (int)count);
@@ -545,6 +548,12 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                             filter
                         )));
                         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
+                        if (groupCollectionIds.contains(AllAPIsGroup.ALL_APIS_GROUP_ID)) {
+                            pipeline.add(Aggregates.match(Filters.nor(Filters.and(
+                                Filters.eq(SingleTypeInfo._COLLECTION_IDS, AllAPIsGroup.ALL_APIS_GROUP_ID),
+                                Filters.not(AllAPIsGroup.visibleOwnerFilter(SingleTypeInfo._API_COLLECTION_ID))
+                            ))));
+                        }
                         // REMOVED redundant match - unwind already filtered the documents
                         pipeline.add(Aggregates.group(
                             "$" + SingleTypeInfo._COLLECTION_IDS,
@@ -677,6 +686,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, false);
         if(lastScannedId != null){
             filterQ = Filters.and(filterQ, Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId), Filters.gte(Constants.ID, lastScannedId));
+        }
+        if (apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID) {
+            filterQ = Filters.and(filterQ, AllAPIsGroup.visibleOwnerFilter(SingleTypeInfo._API_COLLECTION_ID));
         }
         return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, Sorts.ascending(Constants.ID), projection);
     }
