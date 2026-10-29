@@ -23,7 +23,7 @@ from settings import settings
 _LATENCY_CLIFF = 9600
 
 
-@pytest.mark.parametrize("template", ["INPUT", "INPUT_V2", "INPUT_ABCD_V2"])
+@pytest.mark.parametrize("template", ["INPUT", "INPUT_V2", "INPUT_ABCD_V2", "INPUT_ATLAS", "INPUT_ABCD_ATLAS"])
 def test_input_template_stays_under_latency_cliff(template):
     assert len(getattr(prompt_injection, template)) < _LATENCY_CLIFF
 
@@ -35,6 +35,8 @@ def test_input_template_stays_under_latency_cliff(template):
         ("v1", "abcd", "INPUT_ABCD"),
         ("V2", "", "INPUT_V2"),
         ("v2", "abcd", "INPUT_ABCD_V2"),
+        ("atlas", "", "INPUT_ATLAS"),
+        ("atlas", "abcd", "INPUT_ABCD_ATLAS"),
         ("v3", "", "INPUT"),
     ],
 )
