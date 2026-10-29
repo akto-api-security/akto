@@ -13,9 +13,11 @@ import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.JobType;
 import com.akto.jobs.JobExecutorFactory;
+import com.akto.jobs.executors.ImpervaApiEndpointsImportJobExecutor;
 import com.akto.jobs.executors.WizApiEndpointsImportJobExecutor;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.imperva.ImpervaApiEndpointsImportJobUtil;
 import com.akto.utils.wiz.WizApiEndpointsImportJobUtil;
 import com.mongodb.client.model.*;
 
@@ -33,6 +35,7 @@ public class JobsCron {
 
     private JobsCron() {
         WizApiEndpointsImportJobExecutor.INSTANCE.setWizApiEndpointsProcessor(WizApiEndpointsImportJobUtil::wizApiEndpointsProcessor);
+        ImpervaApiEndpointsImportJobExecutor.INSTANCE.setImpervaApiEndpointsImporter(ImpervaApiEndpointsImportJobUtil::importApis);
     }
 
     public void jobsScheduler(JobExecutorType jobExecutorType) {
@@ -97,7 +100,7 @@ public class JobsCron {
             Job finalJob = job;
             try {
                 JobParams params = finalJob.getJobParams();
-                if(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS || params.getJobType() == JobType.WIZ_SYNC || params.getJobType() == JobType.WIZ_API_ENDPOINTS_IMPORT) {
+                if(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS || params.getJobType() == JobType.WIZ_SYNC || params.getJobType() == JobType.WIZ_API_ENDPOINTS_IMPORT || params.getJobType() == JobType.IMPERVA_API_ENDPOINTS_IMPORT) {
                     executorService.submit(
                         () -> {
                             Context.accountId.set(finalJob.getAccountId());

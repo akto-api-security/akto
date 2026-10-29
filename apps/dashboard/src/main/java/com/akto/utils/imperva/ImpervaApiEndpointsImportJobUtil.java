@@ -1,7 +1,6 @@
-package com.akto.utils.crons;
+package com.akto.utils.imperva;
 
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ImpervaIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.imperva_integration.ImpervaIntegration;
@@ -16,7 +15,6 @@ import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
@@ -24,59 +22,29 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-// Imports the API inventory from Imperva API Security for ImpervaIntegration.ENABLED_ACCOUNT_ID
-// whenever an import is requested from the dashboard (Settings > Integrations > Imperva).
+// Imports the API inventory from Imperva API Security, run by ImpervaApiEndpointsImportJobExecutor
+// when an import is triggered from the dashboard (Settings > Integrations > Imperva).
 // Each Imperva host goes into a collection named after it, the same as the manual Imperva upload.
-public class ImpervaApiImportCron {
+public class ImpervaApiEndpointsImportJobUtil {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ImpervaApiImportCron.class, LogDb.DASHBOARD);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ImpervaApiEndpointsImportJobUtil.class, LogDb.DASHBOARD);
 
-    private static final int CHECK_INTERVAL_MINUTES = 5;
     // after this many failed detail calls in a row (e.g. Imperva blocking us) use the inventory data only
     private static final int MAX_CONSECUTIVE_DETAILS_FAILURES = 100;
+    // the jobs cron re-runs a job whose heartbeat is older than 5 minutes
+    private static final int HEARTBEAT_INTERVAL_SECONDS = 60;
 
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-    public void setUpImpervaApiImportCronScheduler() {
-        scheduler.scheduleWithFixedDelay(this::run, CHECK_INTERVAL_MINUTES, CHECK_INTERVAL_MINUTES, TimeUnit.MINUTES);
-    }
-
-    private void run() {
+    public static void importApis(ImpervaIntegration integration, Runnable heartbeat) {
+        ImpervaApiClient client = new ImpervaApiClient(null, integration.getApiId(), integration.getApiKey());
+        List<EndpointSummary> endpoints;
         try {
-            Context.accountId.set(ImpervaIntegration.ENABLED_ACCOUNT_ID);
-
-            // clearing the flag atomically makes sure only one instance runs the requested import
-            ImpervaIntegration integration = ImpervaIntegrationDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq(ImpervaIntegration.SYNC_REQUESTED, true),
-                Updates.combine(
-                    Updates.set(ImpervaIntegration.SYNC_REQUESTED, false),
-                    Updates.set(ImpervaIntegration.LAST_SYNC_START_TS, Context.now())
-                )
-            );
-            if (integration == null) {
-                return;
-            }
-
-            try {
-                importApis(new ImpervaApiClient(null, integration.getApiId(), integration.getApiKey()));
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in Imperva API import: " + e.getMessage());
-            }
-
-            ImpervaIntegrationDao.instance.updateOneNoUpsert(new BasicDBObject(),
-                Updates.set(ImpervaIntegration.LAST_SYNC_END_TS, Context.now()));
+            endpoints = client.fetchAllEndpoints();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in Imperva API import cron: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error fetching Imperva API inventory: " + e.getMessage());
+            return;
         }
-    }
-
-    private void importApis(ImpervaApiClient client) throws Exception {
-        List<EndpointSummary> endpoints = client.fetchAllEndpoints();
         Map<String, List<EndpointSummary>> endpointsByHost = endpoints.stream()
             .filter(e -> StringUtils.isNotBlank(e.getHostName()))
             .collect(Collectors.groupingBy(e -> e.getHostName().trim().toLowerCase()));
@@ -93,9 +61,14 @@ public class ImpervaApiImportCron {
 
         int consecutiveFailures = 0;
         int detailsFailures = 0;
+        int lastHeartbeatTs = Context.now();
         for (Map.Entry<String, List<EndpointSummary>> entry : endpointsByHost.entrySet()) {
             List<String> messages = new ArrayList<>();
             for (EndpointSummary endpoint : entry.getValue()) {
+                if (Context.now() - lastHeartbeatTs >= HEARTBEAT_INTERVAL_SECONDS) {
+                    heartbeat.run();
+                    lastHeartbeatTs = Context.now();
+                }
                 ImpervaSchema schema = null;
                 if (consecutiveFailures < MAX_CONSECUTIVE_DETAILS_FAILURES) {
                     try {
@@ -118,9 +91,11 @@ public class ImpervaApiImportCron {
             if (messages.isEmpty()) {
                 continue;
             }
+            heartbeat.run();
+            lastHeartbeatTs = Context.now();
             try {
                 // skipKafka=true processes the messages directly, so the topic isn't used
-                int collectionId = collectionIds.computeIfAbsent(entry.getKey(), ImpervaApiImportCron::createCollection);
+                int collectionId = collectionIds.computeIfAbsent(entry.getKey(), ImpervaApiEndpointsImportJobUtil::createCollection);
                 Utils.pushDataToKafka(collectionId, null, messages, new ArrayList<>(), true, false, true);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error importing Imperva APIs for host " + entry.getKey() + ": " + e.getMessage());

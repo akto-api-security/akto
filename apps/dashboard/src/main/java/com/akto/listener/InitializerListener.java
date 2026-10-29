@@ -194,7 +194,6 @@ public class InitializerListener implements ServletContextListener {
     AgentBaseRiskScoreCron agentBaseRiskScoreCron = new AgentBaseRiskScoreCron();
     ToolClassificationCron toolClassificationCron = new ToolClassificationCron();
     AgenticPostureScoreCron agenticPostureScoreCron = new AgenticPostureScoreCron();
-    ImpervaApiImportCron impervaApiImportCron = new ImpervaApiImportCron();
 
     public static String getDomain() {
         if (domain == null) {
@@ -2557,7 +2556,6 @@ public class InitializerListener implements ServletContextListener {
                     agentBaseRiskScoreCron.setUpAgentBaseRiskScoreCronScheduler();
                     toolClassificationCron.setUpToolClassificationCronScheduler();
                     agenticPostureScoreCron.setUpAgenticPostureScoreCronScheduler();
-                    impervaApiImportCron.setUpImpervaApiImportCronScheduler();
                     // Disabled temporarily: Azure OpenAI input-token cost.
                     // collectionDescriptionCron.setUpCollectionDescriptionCronScheduler();
                     // endpointDescriptionCron.setUpEndpointDescriptionCronScheduler();

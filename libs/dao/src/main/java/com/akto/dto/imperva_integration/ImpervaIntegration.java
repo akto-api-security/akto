@@ -9,9 +9,6 @@ import lombok.Setter;
 @NoArgsConstructor
 public class ImpervaIntegration {
 
-    // the Imperva API import is only enabled for this account
-    public static final int ENABLED_ACCOUNT_ID = 1745563576;
-
     public static final String API_ID = "apiId";
     public static final String API_KEY = "apiKey";
     public static final String SYNC_REQUESTED = "syncRequested";
@@ -21,7 +18,7 @@ public class ImpervaIntegration {
     private String apiId;
     private String apiKey;
 
-    // set from the dashboard, picked up and cleared by the import job
+    // set when an import is triggered from the dashboard, cleared once the import job finishes
     private boolean syncRequested;
     private int lastSyncStartTs;
     private int lastSyncEndTs;

@@ -3,6 +3,7 @@ package com.akto.jobs;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobType;
 import com.akto.jobs.executors.DatadogTrafficCollectorJobExecutor;
+import com.akto.jobs.executors.ImpervaApiEndpointsImportJobExecutor;
 import com.akto.jobs.executors.JiraTicketJobExecutor;
 import com.akto.jobs.executors.PendingTestsAlertsJobExecutor;
 import com.akto.jobs.executors.TicketSyncJobExecutor;
@@ -24,6 +25,7 @@ public class JobExecutorFactory {
         map.put(JobType.DATADOG_TRAFFIC_COLLECTOR, DatadogTrafficCollectorJobExecutor.INSTANCE);
         map.put(JobType.WIZ_SYNC, WizSyncJobExecutor.INSTANCE);
         map.put(JobType.WIZ_API_ENDPOINTS_IMPORT, WizApiEndpointsImportJobExecutor.INSTANCE);
+        map.put(JobType.IMPERVA_API_ENDPOINTS_IMPORT, ImpervaApiEndpointsImportJobExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }
