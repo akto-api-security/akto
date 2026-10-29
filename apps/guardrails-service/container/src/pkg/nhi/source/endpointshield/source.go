@@ -338,11 +338,15 @@ func DefaultTargets() []Target {
 		AgentName: "Claude Code", AgentType: "CODE_EDITOR",
 		Extractor: extract.ClaudeCodeConfig,
 	})
-	targets = append(targets, Target{
-		Path: "~/.claude/credentials.json", SourceType: "claude_credentials",
-		AgentName: "Claude Code", AgentType: "CODE_EDITOR",
-		Extractor: extract.ClaudeCredentials,
-	})
+	// Claude Code's OAuth store (login + every remote MCP server's token): a file on Linux/Windows,
+	// a Keychain item on macOS, read by the shield's inspection executor via the "keychain:" scheme.
+	for _, p := range []string{"~/.claude/credentials.json", "~/.claude/.credentials.json", "keychain:Claude Code-credentials"} {
+		targets = append(targets, Target{
+			Path: p, SourceType: "claude_credentials",
+			AgentName: "Claude Code", AgentType: "CODE_EDITOR",
+			Extractor: extract.ClaudeCredentials,
+		})
+	}
 
 	addMCP("Cursor",
 		"~/.cursor/mcp.json",

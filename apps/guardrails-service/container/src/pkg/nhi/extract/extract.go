@@ -734,20 +734,53 @@ func FlatYAMLCredentials(_ string, content []byte) []Finding {
 // Claude Code credentials.json (OAuth tokens)
 // ============================================================================
 
-// ClaudeCredentials extracts the OAuth access / refresh tokens that
-// Claude Code stores at ~/.claude/credentials.json after login.
+// claudeOAuthEntry is one token set in Claude Code's credential store: the login under
+// claudeAiOauth, or one remote MCP server under mcpOAuth["<serverName>|<configHash>"].
+type claudeOAuthEntry struct {
+	ServerName            string   `json:"serverName"`
+	ServerURL             string   `json:"serverUrl"`
+	AccessToken           string   `json:"accessToken"`
+	RefreshToken          string   `json:"refreshToken"`
+	ExpiresAt             int64    `json:"expiresAt"`
+	RefreshTokenExpiresAt int64    `json:"refreshTokenExpiresAt"`
+	Scope                 string   `json:"scope"`
+	Scopes                []string `json:"scopes"`
+	ClientID              string   `json:"clientId"`
+	Issuer                string   `json:"issuer"`
+	SubscriptionType      string   `json:"subscriptionType"`
+}
+
+// ClaudeCredentials extracts the OAuth tokens Claude Code stores after login: the legacy
+// flat ~/.claude/credentials.json, and the current store ({claudeAiOauth, mcpOAuth}) that is
+// ~/.claude/.credentials.json on Linux/Windows and the "Claude Code-credentials" Keychain item on macOS.
 func ClaudeCredentials(_ string, content []byte) []Finding {
 	var doc struct {
-		AccessToken  string `json:"accessToken"`
-		RefreshToken string `json:"refreshToken"`
-		ExpiresAt    any    `json:"expiresAt"`
-		OAuthToken   string `json:"oauth_token"`
-		Token        string `json:"token"`
+		AccessToken   string                      `json:"accessToken"`
+		RefreshToken  string                      `json:"refreshToken"`
+		ExpiresAt     any                         `json:"expiresAt"`
+		OAuthToken    string                      `json:"oauth_token"`
+		Token         string                      `json:"token"`
+		ClaudeAiOauth *claudeOAuthEntry           `json:"claudeAiOauth"`
+		McpOAuth      map[string]claudeOAuthEntry `json:"mcpOAuth"`
 	}
-	if err := json.Unmarshal(content, &doc); err != nil {
+	if err := json.Unmarshal(bytes.TrimSpace(content), &doc); err != nil {
 		return nil
 	}
 	var out []Finding
+	if doc.ClaudeAiOauth != nil {
+		if f, ok := claudeOAuthFinding("claude_code.login", "", *doc.ClaudeAiOauth); ok {
+			out = append(out, f)
+		}
+	}
+	for key, e := range doc.McpOAuth {
+		name := e.ServerName
+		if name == "" {
+			name = strings.SplitN(key, "|", 2)[0]
+		}
+		if f, ok := claudeOAuthFinding(name, key, e); ok {
+			out = append(out, f)
+		}
+	}
 	if doc.AccessToken != "" && isLikelyCredentialValue(doc.AccessToken) {
 		out = append(out, Finding{
 			IdentityName: "claude_code.accessToken",
@@ -789,6 +822,44 @@ func ClaudeCredentials(_ string, content []byte) []Finding {
 		})
 	}
 	return out
+}
+
+// claudeOAuthFinding turns one Claude credential-store entry into a Finding. The refresh token is
+// fingerprinted when present: the access token is replaced on every refresh (~daily), which the
+// upsert would otherwise report as a rotation. An entry with no token (discovery started, never
+// authorized) is skipped.
+func claudeOAuthFinding(name, storeKey string, e claudeOAuthEntry) (Finding, bool) {
+	secret, field := e.RefreshToken, "refreshToken"
+	if secret == "" {
+		secret, field = e.AccessToken, "accessToken"
+	}
+	if !isLikelyCredentialValue(secret) {
+		return Finding{}, false
+	}
+	scope := e.Scope
+	if scope == "" && len(e.Scopes) > 0 {
+		scope = strings.Join(e.Scopes, " ")
+	}
+	meta := map[string]any{"field": field}
+	for k, v := range map[string]string{
+		"mcpServer": e.ServerName, "serverUrl": e.ServerURL, "scope": scope, "clientId": e.ClientID,
+		"issuer": e.Issuer, "storeKey": storeKey, "subscriptionType": e.SubscriptionType,
+	} {
+		if v != "" {
+			meta[k] = v
+		}
+	}
+	if e.ExpiresAt > 0 {
+		meta["accessTokenExpiresAt"] = int(e.ExpiresAt / 1000)
+	}
+	return Finding{
+		IdentityName: name,
+		IdentityType: "OAuth Token",
+		RiskLevel:    "HIGH",
+		Secret:       secret,
+		ExpiryDate:   int(e.RefreshTokenExpiresAt / 1000),
+		Metadata:     meta,
+	}, true
 }
 
 // ============================================================================
