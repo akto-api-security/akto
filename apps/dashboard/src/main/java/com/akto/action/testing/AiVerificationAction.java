@@ -57,12 +57,17 @@ public class AiVerificationAction extends UserAction {
     // Values of the "AI verdict" filter on the issues and test run tables.
     public static final String AI_VERDICT_FILTER = "aiVerdict";
     private static final String VERDICT_NOT_VERIFIED = "NOT_VERIFIED";
+    // Passive tests (e.g. sensitive data exposure) send no attack: the finding is in the captured
+    // traffic itself, so they are recorded as true positives without asking the AI.
+    private static final Pattern PASSIVE_TEST = Pattern.compile("(?m)^\\s*type:\\s*passive\\s*$");
+    private static final int PASSIVE_CONFIDENCE = 90;
+    private static final String PASSIVE_REASON = "Passive test: the finding comes from the captured traffic itself and "
+        + "no attack was sent, so it is kept as reported.";
     // Tests the AI cannot judge from the stored request/response, so they are never sent to it:
-    // passive tests (e.g. sensitive data exposure) send no attack, multi-step tests are judged across
-    // steps the stored attempts do not fully show, and some tests prove the finding through an
-    // out-of-band callback (ssrf_url_hit) or response timing, which are not stored.
+    // multi-step tests are judged across steps the stored attempts do not fully show, and some tests
+    // prove the finding through an out-of-band callback (ssrf_url_hit) or response timing, which are not stored.
     private static final Pattern NOT_VERIFIABLE_TEST = Pattern.compile(
-        "(?m)^\\s*type:\\s*(passive|multiple|graph)\\s*$|ssrf_url_hit|response_time|median_response|compare_greater|\\.stats\\.");
+        "(?m)^\\s*type:\\s*(multiple|graph)\\s*$|ssrf_url_hit|response_time|median_response|compare_greater|\\.stats\\.");
 
     // One background job per test run at a time; jobs run here, LLM calls in a separate pool so a
     // job waiting on its calls cannot starve them.
@@ -265,7 +270,7 @@ public class AiVerificationAction extends UserAction {
     }
 
     /** Result of judging one target. */
-    private enum Outcome { FALSE_POSITIVE, TRUE_POSITIVE, ERROR }
+    private enum Outcome { FALSE_POSITIVE, TRUE_POSITIVE, SKIPPED, ERROR }
 
     /** Asks the LLM about every target in parallel and records each verdict on its issue. */
     private void verifyTargets(String label, List<Target> targets) {
@@ -280,8 +285,14 @@ public class AiVerificationAction extends UserAction {
         int accountId = Context.accountId.get();
         List<Future<Outcome>> calls = new ArrayList<>();
         int notVerifiable = 0;
+        int passive = 0;
         for (Target target : targets) {
             String template = templates.get(target.result.getTestSubType());
+            if (template != null && PASSIVE_TEST.matcher(template).find()) {
+                writeVerdict(target.issue, false, PASSIVE_CONFIDENCE, PASSIVE_REASON);
+                passive++;
+                continue;
+            }
             if (template != null && NOT_VERIFIABLE_TEST.matcher(template).find()) {
                 notVerifiable++;
                 continue;
@@ -305,11 +316,13 @@ public class AiVerificationAction extends UserAction {
             }
             if (outcome == Outcome.FALSE_POSITIVE) falsePositives++;
             else if (outcome == Outcome.TRUE_POSITIVE) truePositives++;
+            else if (outcome == Outcome.SKIPPED) notVerifiable++;
             else errors++;
         }
 
         String summary = "AI verification for " + label + ": checked " + calls.size() + ", false positives "
-            + falsePositives + ", true positives " + truePositives + ", errors " + errors + ", skipped " + notVerifiable + " not verifiable by AI";
+            + falsePositives + ", true positives " + truePositives + ", errors " + errors + ", passive tests marked true positive "
+            + passive + ", skipped " + notVerifiable + " not verifiable by AI";
         if (!calls.isEmpty() && errors == calls.size()) {
             loggerMaker.errorAndAddToDb(summary + ". Every AI call failed; check the AI provider configuration and logs.");
         } else {
@@ -335,7 +348,7 @@ public class AiVerificationAction extends UserAction {
     /** Asks the LLM about one result and writes its verdict into the issue's description. */
     private Outcome verifyResult(TestingRunIssues issue, TestingRunResult result, String template) {
         List<TestResult> attempts = attemptsToJudge(result);
-        if (attempts.isEmpty()) return Outcome.TRUE_POSITIVE;
+        if (attempts.isEmpty()) return Outcome.SKIPPED;
 
         List<String> attemptMessages = new ArrayList<>();
         for (TestResult attempt : attempts) attemptMessages.add(attempt.getMessage());
@@ -350,12 +363,21 @@ public class AiVerificationAction extends UserAction {
             verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT));
         Outcome outcome = falsePositive ? Outcome.FALSE_POSITIVE : Outcome.TRUE_POSITIVE;
 
-        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
+        writeVerdict(issue, falsePositive, verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE),
+            verdict.getString(FalsePositiveVerifierPromptHandler.REASON));
+        return outcome;
+    }
+
+    /**
+     * Records a verdict on the issue: the aiVerdict and aiConfidence fields, and the reason at the start of
+     * the description. A description the user wrote is kept; one written by an earlier verification is
+     * replaced. Only while the issue is still OPEN, so one the user ignored or fixed meanwhile is left as it is.
+     */
+    private static void writeVerdict(TestingRunIssues issue, boolean falsePositive, int confidence, String reason) {
         List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.set(TestingRunIssues.AI_VERDICT, falsePositive ? FalsePositiveVerifierPromptHandler.FALSE_POSITIVE : FalsePositiveVerifierPromptHandler.TRUE_POSITIVE));
+        updates.add(Updates.set(TestingRunIssues.AI_VERDICT, falsePositive
+            ? FalsePositiveVerifierPromptHandler.FALSE_POSITIVE : FalsePositiveVerifierPromptHandler.TRUE_POSITIVE));
         updates.add(Updates.set(TestingRunIssues.AI_CONFIDENCE, confidence));
-        // A description the user wrote is kept; one written by an earlier verification is replaced.
-        String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
         String description = issue.getDescription();
         boolean canWriteDescription = description == null || description.trim().isEmpty()
             || description.startsWith(DESCRIPTION_PREFIX);
@@ -363,7 +385,6 @@ public class AiVerificationAction extends UserAction {
             updates.add(Updates.set(TestingRunIssues.DESCRIPTION, DESCRIPTION_PREFIX + ": "
                 + (falsePositive ? "false positive" : "true positive") + ", confidence " + confidence + "%] " + reason));
         }
-        // Only while still OPEN, so an issue the user ignored or fixed in the meantime is left as it is.
         TestingRunIssuesDao.instance.getMCollection().updateOne(
             Filters.and(
                 Filters.eq(Constants.ID, issue.getId()),
@@ -371,7 +392,6 @@ public class AiVerificationAction extends UserAction {
             ),
             Updates.combine(updates)
         );
-        return outcome;
     }
 
     /**
