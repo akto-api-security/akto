@@ -125,13 +125,12 @@ public abstract class AzureOpenAIPromptHandler {
 
     public BasicDBObject handle(BasicDBObject queryData) {
         try {
-            logger.warn("Handling request with query data: " + queryData.toString());
+            // Prompts carry captured requests (auth headers, cookies, PII), so only sizes are logged.
             validate(queryData);
-            logger.warn("Validated query data");
             String prompt = getPrompt(queryData);
-            logger.warn("Got prompt: " + prompt);
             String rawResponse = call(prompt);
-            logger.warn("Got raw response: " + rawResponse);
+            logger.info(getClass().getSimpleName() + ": prompt " + prompt.length() + " chars, response "
+                + (rawResponse == null ? 0 : rawResponse.length()) + " chars");
             BasicDBObject resp = processResponse(rawResponse);
             return resp;
         } catch (ValidationException exception) {
@@ -275,7 +274,6 @@ public abstract class AzureOpenAIPromptHandler {
                 .addHeader("authorization", apiKey)
                 .build();
 
-        logger.warn("Calling ai with payload: " + payload.toString());
         try (Response response = client.newCall(request).execute()) {
             if (!response.isSuccessful()) {
                 ResponseBody errorBody = response.body();
@@ -285,7 +283,6 @@ public abstract class AzureOpenAIPromptHandler {
             }
             ResponseBody responseBody = response.body();
             String rawResponse = responseBody != null ? responseBody.string() : null;
-            logger.warn("Response from ai: " + rawResponse);
             if (rawResponse == null) return null;
 
             JSONObject jsonResponse = new JSONObject(rawResponse);

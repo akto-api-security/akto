@@ -63,6 +63,15 @@ public class TestingRunIssues {
     @Getter @Setter
     private String wizFindingCreationStatus;
 
+    // Verify with AI's verdict (FALSE_POSITIVE / TRUE_POSITIVE) and its confidence (0-100).
+    public static final String AI_VERDICT = "aiVerdict";
+    @Getter @Setter
+    private String aiVerdict;
+
+    public static final String AI_CONFIDENCE = "aiConfidence";
+    @Getter @Setter
+    private Integer aiConfidence;
+
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
     public static final String ID_METHOD = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD;
