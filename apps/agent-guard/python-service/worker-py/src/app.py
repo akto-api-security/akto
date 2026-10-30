@@ -42,6 +42,11 @@ class ScanRequest(BaseModel):
     # prompt). Omitted requests fall back to segmenting `text` alone.
     system_prompt: str = ""
     enrichment: str = ""
+    # Traffic source from the gateway ("ENDPOINT" for Atlas, "AGENTIC" for Argus).
+    # scan_payload folds it into config so the prompt builder can pick a
+    # per-source prompt (e.g. the Atlas PromptInjection prompt); empty keeps the
+    # deployment default.
+    context_source: str = ""
 
 
 class GuardrailsLLMRequest(BaseModel):

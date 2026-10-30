@@ -23,7 +23,7 @@ from settings import settings
 _LATENCY_CLIFF = 9600
 
 
-@pytest.mark.parametrize("template", ["INPUT", "INPUT_V2", "INPUT_ABCD_V2"])
+@pytest.mark.parametrize("template", ["INPUT", "INPUT_V2", "INPUT_ABCD_V2", "INPUT_ATLAS", "INPUT_ABCD_ATLAS"])
 def test_input_template_stays_under_latency_cliff(template):
     assert len(getattr(prompt_injection, template)) < _LATENCY_CLIFF
 
@@ -35,6 +35,8 @@ def test_input_template_stays_under_latency_cliff(template):
         ("v1", "abcd", "INPUT_ABCD"),
         ("V2", "", "INPUT_V2"),
         ("v2", "abcd", "INPUT_ABCD_V2"),
+        ("atlas", "", "INPUT_ATLAS"),
+        ("atlas", "abcd", "INPUT_ABCD_ATLAS"),
         ("v3", "", "INPUT"),
     ],
 )
@@ -49,6 +51,24 @@ def test_version_env_leaves_output_rules_alone(monkeypatch):
     monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v2")
     prompt = build_scan_prompt("PromptInjection", "output", {}, "hi")
     assert prompt == prompt_injection.OUTPUT % "hi"
+
+
+@pytest.mark.parametrize("response_format,template", [("", "INPUT_ATLAS"), ("abcd", "INPUT_ABCD_ATLAS")])
+def test_endpoint_context_selects_atlas_overriding_the_env(monkeypatch, response_format, template):
+    """Atlas traffic (contextSource=ENDPOINT) uses the atlas rules per request, even when the
+    deployment-wide version is something else — one agent-guard serves both products."""
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v2")
+    config = {"contextSource": "ENDPOINT"}
+    prompt = build_scan_prompt("PromptInjection", "prompt", config, "hi", response_format=response_format)
+    assert prompt == getattr(prompt_injection, template) % "hi"
+
+
+@pytest.mark.parametrize("context_source", ["", "AGENTIC"])
+def test_non_endpoint_context_keeps_the_env_version(monkeypatch, context_source):
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v2")
+    config = {"contextSource": context_source} if context_source else {}
+    prompt = build_scan_prompt("PromptInjection", "prompt", config, "hi", response_format="abcd")
+    assert prompt == prompt_injection.INPUT_ABCD_V2 % "hi"
 
 
 def test_recall_critical_guidance_is_present():

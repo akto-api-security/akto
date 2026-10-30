@@ -29,6 +29,7 @@ class FakeScanner:
     # Mirrors the real LLMScanner(provider, response_format) signature.
     calls = []
     formats = {}
+    configs = []
 
     def __init__(self, provider, response_format=""):
         self.provider = provider
@@ -37,6 +38,7 @@ class FakeScanner:
 
     async def scan(self, scanner_name, scanner_type, text, config):
         FakeScanner.calls.append(self.provider.name)
+        FakeScanner.configs.append(config)
         r = {k: v for k, v in UNSAFE.items()}
         r["details"] = dict(r["details"], llm_provider=self.provider.name)
         return r
@@ -46,6 +48,7 @@ class FakeScanner:
 def patch_providers(monkeypatch):
     FakeScanner.calls = []
     FakeScanner.formats = {}
+    FakeScanner.configs = []
     monkeypatch.setattr(model_map, "build_provider_from_config", lambda entry: FakeProvider(entry["provider"]))
     monkeypatch.setattr(llm_scanner, "LLMScanner", FakeScanner)
     yield
@@ -66,6 +69,19 @@ async def _scan_password():
         {"scanner_name": "Password", "scanner_type": "prompt", "text": "pwd=hunter2", "config": HOSTILE_CONFIG},
         schedule_fn=lambda coro: coro.close(),
     )
+
+
+async def test_context_source_is_folded_into_the_scanner_config(monkeypatch):
+    # The gateway sends the traffic source top-level; scan_payload must hand it to the
+    # scanner inside config so the prompt builder can pick the per-source (Atlas) prompt.
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
+    monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
+    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "")
+    await scan_handler.scan_payload(
+        {"scanner_name": "PromptInjection", "scanner_type": "prompt", "text": "hi", "context_source": "ENDPOINT"},
+        schedule_fn=lambda coro: coro.close(),
+    )
+    assert FakeScanner.configs and all(c.get("contextSource") == "ENDPOINT" for c in FakeScanner.configs)
 
 
 async def test_password_ignores_caller_models_and_runs_vertex_gemma(monkeypatch):
