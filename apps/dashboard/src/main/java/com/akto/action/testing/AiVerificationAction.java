@@ -242,25 +242,17 @@ public class AiVerificationAction extends UserAction {
     }
 
     /**
-     * Issues filter for Verify with AI's verdict: any of FALSE_POSITIVE, TRUE_POSITIVE and NOT_VERIFIED.
-     * Issues verified before the verdict was stored as a field only carry it in the description, so
-     * that is matched too. Unknown values match nothing.
+     * Issues filter for Verify with AI's verdict (the aiVerdict field): any of FALSE_POSITIVE,
+     * TRUE_POSITIVE and NOT_VERIFIED. Unknown values match nothing.
      */
     public static Bson aiVerdictFilter(List<String> verdicts) {
-        String prefix = "^" + DESCRIPTION_PREFIX.replace("[", "\\[");
         List<Bson> anyOf = new ArrayList<>();
         for (String verdict : verdicts) {
-            if (FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdict)) {
-                // "[AI verified] <reason>" is the older format, written only for false positives.
-                anyOf.add(Filters.eq(TestingRunIssues.AI_VERDICT, FalsePositiveVerifierPromptHandler.FALSE_POSITIVE));
-                anyOf.add(Filters.regex(TestingRunIssues.DESCRIPTION, prefix + "(: false positive|\\] )"));
-            } else if (FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(verdict)) {
-                anyOf.add(Filters.eq(TestingRunIssues.AI_VERDICT, FalsePositiveVerifierPromptHandler.TRUE_POSITIVE));
-                anyOf.add(Filters.regex(TestingRunIssues.DESCRIPTION, prefix + ": true positive"));
+            if (FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdict)
+                || FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(verdict)) {
+                anyOf.add(Filters.eq(TestingRunIssues.AI_VERDICT, verdict));
             } else if (VERDICT_NOT_VERIFIED.equals(verdict)) {
-                anyOf.add(Filters.and(
-                    Filters.exists(TestingRunIssues.AI_VERDICT, false),
-                    Filters.not(Filters.regex(TestingRunIssues.DESCRIPTION, prefix))));
+                anyOf.add(Filters.exists(TestingRunIssues.AI_VERDICT, false));
             }
         }
         return anyOf.isEmpty() ? Filters.in(Constants.ID, new ArrayList<>()) : Filters.or(anyOf);
