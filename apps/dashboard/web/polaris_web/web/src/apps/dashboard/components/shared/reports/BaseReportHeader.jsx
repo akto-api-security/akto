@@ -64,7 +64,8 @@ const BaseReportHeader = ({
     return (
         <div className='report-cover-page-container'>
             <img src='/public/vul_report_bg.svg' alt="Header Image" className='report-cover-page' />
-            <img src='/public/white_logo.svg' alt='akto-logo' className='report-akto-logo'></img>
+            {/* <img src='/public/white_logo.svg' alt='akto-logo' className='report-akto-logo'></img> */}
+            <img src='/public/Halloween-white.svg' alt='akto-logo' className='report-akto-logo'></img>
             <div className='report-cover-page-content'>
                 <Box width="100%">
                     <HorizontalStack align="space-between">
