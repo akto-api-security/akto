@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { VerticalStack, Text, FormLayout, TextField, Box, Checkbox, HorizontalStack, Badge, Banner } from "@shopify/polaris";
+import { VerticalStack, Text, FormLayout, TextField, Box, Checkbox, HorizontalStack, Badge, Banner, Button } from "@shopify/polaris";
 import OwaspTag from "../OwaspTag";
 import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 import guardrailApi from "../../api";
 import { CUSTOM_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
+import { PREDEFINED_CUSTOM_PROMPTS } from "../predefinedCustomPrompts";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -94,9 +95,33 @@ const CustomGuardrailsStep = ({
 }) => {
     const [urlError, setUrlError] = useState("");
     const [llmRuleCompliance, setLlmRuleCompliance] = useState({ loading: false, suggested: {}, accepted: {} });
+    const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
     const requestIdRef = useRef(0);
     const debounceTimerRef = useRef(null);
     const isInitialMount = useRef(true);
+
+    const toggleTemplateSelection = (id) => {
+        setSelectedTemplateIds((prev) =>
+            prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]
+        );
+        if (!enableLlmPrompt) {
+            setEnableLlmPrompt(true);
+        }
+    };
+
+    const handleInsertSelectedPrompts = () => {
+        const selected = PREDEFINED_CUSTOM_PROMPTS.filter((t) => selectedTemplateIds.includes(t.id));
+        if (selected.length === 0) return;
+
+        const insertion = selected
+            .map((t) => `## ${t.label}\n${t.prompt}`)
+            .join("\n\n");
+
+        const current = (llmRule || "").trim();
+        setLlmRule(current.length === 0 ? insertion : `${llmRule}\n\n${insertion}`);
+        setEnableLlmPrompt(true);
+        setSelectedTemplateIds([]);
+    };
 
     useEffect(() => {
         if (llmCompliance && Object.keys(llmCompliance).length > 0) {
@@ -294,6 +319,41 @@ const CustomGuardrailsStep = ({
                     {enableLlmPrompt && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <FormLayout>
+                                <Box
+                                    padding="3"
+                                    background="bg-surface-secondary"
+                                    borderRadius="200"
+                                    borderWidth="025"
+                                    borderColor="border"
+                                >
+                                    <VerticalStack gap="3">
+                                        <Text variant="headingSm" as="h3">
+                                            Use a predefined prompt
+                                        </Text>
+                                        <Text variant="bodyMd" tone="subdued">
+                                            Select one or more templates to insert into the detection instruction below.
+                                        </Text>
+                                        <VerticalStack gap="2">
+                                            {PREDEFINED_CUSTOM_PROMPTS.map((template) => (
+                                                <Checkbox
+                                                    key={template.id}
+                                                    label={template.label}
+                                                    checked={selectedTemplateIds.includes(template.id)}
+                                                    onChange={() => toggleTemplateSelection(template.id)}
+                                                />
+                                            ))}
+                                        </VerticalStack>
+                                        <HorizontalStack>
+                                            <Button
+                                                onClick={handleInsertSelectedPrompts}
+                                                disabled={selectedTemplateIds.length === 0}
+                                            >
+                                                Insert selected into detection instruction
+                                            </Button>
+                                        </HorizontalStack>
+                                    </VerticalStack>
+                                </Box>
+
                                 <TextField
                                     label="Detection instruction"
                                     value={llmRule}
