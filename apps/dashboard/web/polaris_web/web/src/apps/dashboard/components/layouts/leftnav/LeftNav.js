@@ -575,6 +575,16 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
+                        ...(dashboardCategory === "Endpoint Security" ? [{
+                            label: "Overview",
+                            requires: pageRequires("/dashboard/guardrails/overview"),
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/overview");
+                                handleSelect("dashboard_guardrails_overview");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_overview",
+                        }] : []),
                         ...((dashboardCategory === "API Security" || dashboardCategory === "Endpoint Security") ? [{
                             label: "Dashboard",
                             requires: pageRequires("/dashboard/protection/threat-dashboard"),

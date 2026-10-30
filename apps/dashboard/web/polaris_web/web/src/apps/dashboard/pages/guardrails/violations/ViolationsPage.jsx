@@ -64,6 +64,8 @@ import useInsightsEntryPoint from "@/apps/dashboard/pages/observe/agentic/insigh
 import { INSIGHT_GROUP } from "@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers";
 import { usePermissions } from "@/util/permissions";
 import AllowedAction from "@/apps/dashboard/components/shared/AllowedAction";
+import ViolationStatusBadge from "@/apps/dashboard/components/shared/ViolationStatusBadge";
+import GuardrailActionBadge, { guardrailActionLabel } from "@/apps/dashboard/components/shared/GuardrailActionBadge";
 import ReviewCaseModal from "@/apps/dashboard/pages/guardrails/components/ReviewCaseModal";
 import useCaseOwners from "@/apps/dashboard/pages/threat_detection/utils/useCaseOwners";
 import { UNASSIGNED_OWNER, CASE_NOTES_FILTER_CHOICES, applyCaseUpdate, caseFilterRequestParams, ownerLabel, ownerOptionLabel, truncateText } from "@/apps/dashboard/pages/threat_detection/utils/caseManagement";
@@ -175,12 +177,11 @@ function ComplianceCellRenderer({ data }) {
 function ActionCellRenderer({ value, data }) {
     const isBackfill = isBackfillRefId(data?.refId);
     if (!value && !isBackfill) return null;
-    const status = value === "Blocked" ? "critical" : "warning";
     return (
         // One tag only: Backfill replaces the action badge.
         isBackfill
             ? <Badge size="small" status="info">Backfill</Badge>
-            : <Badge size="small" status={status}>{value}</Badge>
+            : <GuardrailActionBadge action={value} />
     );
 }
 
@@ -224,19 +225,8 @@ function ApproveCellRenderer({ data, onApprove }) {
 
 const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLOCKED" };
 
-const STATUS_LABEL = { ACTIVE: "Open", FIXED: "Fixed", IGNORED: "Ignored", UNDER_REVIEW: "In Review", HUMAN_APPROVAL: "Human Approval" };
-const STATUS_DOT_COLOR = { ACTIVE: "#9642FC", FIXED: "#5BC0DE", IGNORED: "#F5C451", UNDER_REVIEW: "#637381", HUMAN_APPROVAL: "#5BC0DE" };
 function StatusCellRenderer({ value }) {
-    if (!value) return null;
-    const key = String(value).toUpperCase();
-    const label = STATUS_LABEL[key] || value;
-    const color = STATUS_DOT_COLOR[key];
-    return (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            {color && <span className="agentic-dot" style={{ "--dot-color": color }} />}
-            <span style={{ fontSize: "12px" }}>{label}</span>
-        </span>
-    );
+    return <ViolationStatusBadge status={value} />;
 }
 
 // ─── Column definitions ─────────────────────────────────────────────────────────
@@ -618,10 +608,7 @@ function transformEvent(event, collectionsMap, usernameMap, guardrailComplianceM
 
     const { req: reqPayload, resp: respPayload, raw: rawPayload } = parseAktoPayload(event.payload);
     const rawBehaviour = respPayload?.error?.data?.behaviour || meta.behaviour || meta.nbehaviour || null;
-    const action = rawBehaviour === "block" ? "Blocked"
-        : (rawBehaviour === "warn" || rawBehaviour === "flag") ? "Flagged"
-        : rawBehaviour ? func.toSentenceCase(rawBehaviour)
-        : "Flagged";
+    const action = guardrailActionLabel(rawBehaviour);
 
     const rawHost = event.host || event.actor || null;
     const resolvedUser = getUsernameForCollection({ displayName: rawHost }, usernameMap || {});

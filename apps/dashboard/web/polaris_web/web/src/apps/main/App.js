@@ -127,6 +127,7 @@ import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetec
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
+import GuardrailsOverview from "../dashboard/pages/guardrails/overview/GuardrailsOverview";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
@@ -403,6 +404,10 @@ const router = createBrowserRouter([
                     {
                         path: "guardrails",
                         children: [
+                            {
+                                path: "overview",
+                                element: <GuardrailsOverview/>
+                            },
                             {
                                 path: "activity",
                                 element: func.isDemoAccount() ? <GuardrailDetectionDemo/> : <GuardrailDetection/>
