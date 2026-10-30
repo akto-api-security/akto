@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/akto-api-security/akto-endpoint-shield/mcp"
@@ -95,7 +96,8 @@ type Service struct {
 	policyRefreshGroup    singleflight.Group
 	allowlistRefreshGroup singleflight.Group
 	threatAPIClient       *threatapi.Client
-	orgEmailDomains       []string // this account's work email domains, see orgEmailDomainsByAccount
+	orgEmailDomains       atomic.Pointer[[]string] // email domains of this account's users, refreshed daily
+	orgDomainsLoadedAt    time.Time                // last successful domain fetch, used only inside loadPolicies
 	// redactionCache holds display redactions for POST /api/redact/payloads; nil when disabled.
 	redactionCache *mcp.RedactionCache
 	// displayRedactor masks one payload; mcp.RedactForDisplay, replaceable in tests.
@@ -183,11 +185,7 @@ func NewService(cfg *config.Config, logger *zap.Logger) (*Service, error) {
 		schemaFetcher:       schemaFetcher,
 		skipPaths:           skipPaths,
 		threatAPIClient:     threatapi.NewClient(),
-		orgEmailDomains:     orgEmailDomainsByAccount[auth.AccountIDFromServiceToken()],
 	}
-	logger.Info("Work email domains for personal-account policies",
-		zap.String("accountId", auth.AccountIDFromServiceToken()),
-		zap.Strings("orgEmailDomains", svc.orgEmailDomains))
 	bp := mcp.GetScanBackpressureSnapshot()
 	logger.Info("Scan backpressure breaker active (mcp processor, remote-scanner boundary)",
 		zap.Bool("enabled", bp.Enabled),
@@ -635,14 +633,29 @@ func openAITokenEmail(authorization string) string {
 	return strings.TrimSpace(claims.Profile.Email)
 }
 
-// orgEmailDomainsByAccount maps an Akto accountId to its company email domains; only these count as work emails.
-var orgEmailDomainsByAccount = map[string][]string{
-	"1786073624": {"supremelending.com"},
-	"1783981503": {"lguplus.co.kr"},
-	"1726615470": {"akto.io"},
-	"1791484402": {"cookunity.com"},
-	"1786100206": {"chargepoint.com"},
-	"1768362636": {"uscca.com"},
+// orgDomains returns the cached work email domains, nil until the first fetch.
+func (s *Service) orgDomains() []string {
+	if d := s.orgEmailDomains.Load(); d != nil {
+		return *d
+	}
+	return nil
+}
+
+// orgDomainsRefreshInterval is how often team email domains are re-fetched; team changes are rare.
+const orgDomainsRefreshInterval = 24 * time.Hour
+
+// loadOrgEmailDomains caches the account's email domains; on failure the old list stays.
+func (s *Service) loadOrgEmailDomains() {
+	domains, err := s.dbClient.FetchOrgEmailDomains()
+	if err != nil {
+		s.logger.Warn("Org email domains fetch failed, keeping previous list and retrying on next policy refresh", zap.Error(err))
+		return
+	}
+	s.orgEmailDomains.Store(&domains)
+	s.orgDomainsLoadedAt = time.Now()
+	s.logger.Info("Work email domains for personal-account policies",
+		zap.String("accountId", auth.AccountIDFromServiceToken()),
+		zap.Strings("orgEmailDomains", domains))
 }
 
 // requestAccountType resolves browser requests via browser-user-email and everything else via the proxy token email.
@@ -671,7 +684,7 @@ func (s *Service) classifyEmail(email string) string {
 	if !ok || local == "" || domain == "" || strings.Contains(domain, "@") {
 		return accountTypeEnterprise
 	}
-	if slices.Contains(s.orgEmailDomains, strings.ToLower(domain)) {
+	if slices.Contains(s.orgDomains(), strings.ToLower(domain)) {
 		return accountTypeEnterprise
 	}
 	return accountTypePersonal
@@ -706,7 +719,7 @@ func (s *Service) filterPoliciesByAccountType(policies []types.Policy, valCtx *m
 		zap.String("accountType", accountType),
 		zap.String("accountTypeSource", source),
 		zap.String("emailDomain", domain),
-		zap.Bool("orgDomainsConfigured", len(s.orgEmailDomains) > 0),
+		zap.Bool("orgDomainsConfigured", len(s.orgDomains()) > 0),
 		zap.Strings("personalOnlyPolicies", scoped))
 	return filtered
 }
@@ -1029,6 +1042,10 @@ func (s *Service) getCachedPolicies(contextSource string) ([]types.Policy, map[s
 // loadPolicies refreshes the policy cache, coalescing concurrent callers into one fetch.
 func (s *Service) loadPolicies() (*policyRefreshResult, error) {
 	v, err, _ := s.policyRefreshGroup.Do("guardrail-policies", func() (interface{}, error) {
+		// Load domains before policies at startup, then refresh daily.
+		if time.Since(s.orgDomainsLoadedAt) >= orgDomainsRefreshInterval {
+			s.loadOrgEmailDomains()
+		}
 		policies, auditPolicies, compiledRules, hasAuditRules, err := s.refreshPolicies()
 		if err != nil {
 			return nil, err
@@ -1269,7 +1286,7 @@ func (s *Service) resolvePersonalAccountBlock(policies []types.Policy, tag, full
 		zap.String("accountType", accountType),
 		zap.String("accountTypeSource", source),
 		zap.String("emailDomain", domain),
-		zap.Bool("orgDomainsConfigured", len(s.orgEmailDomains) > 0),
+		zap.Bool("orgDomainsConfigured", len(s.orgDomains()) > 0),
 		zap.String("policyName", policyName),
 	}
 	if accountType == accountTypePersonal {
