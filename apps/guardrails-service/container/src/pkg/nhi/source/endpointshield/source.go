@@ -2,6 +2,7 @@ package endpointshield
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ type Source struct {
 	mu             sync.Mutex
 	cursor         int // last processed executedAt
 	ruleIDToTarget map[string]Target
+	logins         map[string]string // loginKey(device, home, agent) -> email
 }
 
 // NewSource builds the source. interval <= 0 uses the default cadence (30 min);
@@ -56,6 +58,7 @@ func NewSource(client *dbabstractor.Client, publisher *nhi.Publisher, logger *za
 		interval:       interval,
 		logger:         logger,
 		ruleIDToTarget: make(map[string]Target),
+		logins:         make(map[string]string),
 	}
 }
 
@@ -162,7 +165,7 @@ func (s *Source) drainResults(ctx context.Context) error {
 		}
 
 		maxSeen := since
-		for _, r := range results {
+		for _, r := range s.loginsFirst(results) {
 			s.processResult(r)
 			if r.ExecutedAt > maxSeen {
 				maxSeen = r.ExecutedAt
@@ -212,6 +215,17 @@ func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
 		if len(content) == 0 {
 			continue
 		}
+		home := homeOf(r, target, m)
+		if target.Login != nil {
+			if email, ok := target.Login(content, s.logInfo); ok {
+				s.setLogin(r.DeviceID, home, target.AgentName, email)
+			}
+		}
+		source := m.Path
+		if strings.HasPrefix(m.Path, keychainPathPrefix) && home != "" {
+			// one Keychain item per OS user; without the home, users of one device overwrite each other
+			source = home + "#" + m.Path
+		}
 		findings := target.Extractor(m.Path, content)
 		s.logger.Debug("NHI: extractor ran",
 			zap.String("path", m.Path),
@@ -222,7 +236,8 @@ func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
 		s.publisher.Publish(nhi.PublishContext{
 			DeviceID:      r.DeviceID,
 			DeviceLabel:   r.DeviceLabel,
-			Source:        m.Path,
+			OwnerEmail:    s.login(r.DeviceID, home, target.AgentName),
+			Source:        source,
 			SourceType:    target.SourceType,
 			AgentName:     target.AgentName,
 			AgentType:     target.AgentType,
@@ -286,6 +301,8 @@ type Target struct {
 	AgentName string
 	AgentType string
 	Extractor extract.ExtractorFunc
+	// Login is set on the target that holds the agent's login (e.g. ~/.claude.json for Claude Code).
+	Login extract.LoginFunc
 }
 
 // DefaultTargets is the curated set of credential locations the guardrails
@@ -337,12 +354,17 @@ func DefaultTargets() []Target {
 		Path: "~/.claude.json", SourceType: "mcp_config",
 		AgentName: "Claude Code", AgentType: "CODE_EDITOR",
 		Extractor: extract.ClaudeCodeConfig,
+		Login:     extract.ClaudeCodeLogin,
 	})
-	targets = append(targets, Target{
-		Path: "~/.claude/credentials.json", SourceType: "claude_credentials",
-		AgentName: "Claude Code", AgentType: "CODE_EDITOR",
-		Extractor: extract.ClaudeCredentials,
-	})
+	// Claude Code's OAuth store (login + every remote MCP server's token): a file on Linux/Windows,
+	// a Keychain item on macOS, read by the shield's inspection executor via the "keychain:" scheme.
+	for _, p := range []string{"~/.claude/credentials.json", "~/.claude/.credentials.json", "keychain:Claude Code-credentials"} {
+		targets = append(targets, Target{
+			Path: p, SourceType: "claude_credentials",
+			AgentName: "Claude Code", AgentType: "CODE_EDITOR",
+			Extractor: extract.ClaudeCredentials,
+		})
+	}
 
 	addMCP("Cursor",
 		"~/.cursor/mcp.json",

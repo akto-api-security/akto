@@ -42,6 +42,7 @@ type FileInspectionResult struct {
 	AgentID      string                `json:"agentId"`
 	DeviceID     string                `json:"deviceId"`
 	DeviceLabel  string                `json:"deviceLabel"`
+	UserHome     string                `json:"userHome"`
 	ExecutedAt   int                   `json:"executedAt"`
 	Status       string                `json:"status"`
 	ErrorMessage string                `json:"errorMessage"`

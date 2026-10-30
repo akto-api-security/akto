@@ -16,6 +16,7 @@ type Source interface {
 type PublishContext struct {
 	DeviceID      string
 	DeviceLabel   string
+	OwnerEmail    string // signed-in user of the agent holding the credentials; empty when unknown
 	Source        string
 	SourceType    string
 	AgentName     string
