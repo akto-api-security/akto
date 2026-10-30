@@ -57,6 +57,28 @@ public class ImpervaSchemaParser {
     ));
 
     public static ParserResult convertImpervaSchemaToAkto(ImpervaSchema schema, String uploadId, boolean useHost, boolean generateMultipleSamples) {
+        return convertImpervaSchemaToAkto(schema, uploadId, useHost, generateMultipleSamples, false);
+    }
+
+    /**
+     * Imperva marks path parameters as "*" segments, e.g. /users/{@literal *}/orders. Akto expects STRING
+     * tokens so the endpoint is stored as a templated URL.
+     */
+    public static String replacePathWildcards(String resource) {
+        String[] segments = resource.split("/", -1);
+        for (int i = 0; i < segments.length; i++) {
+            if ("*".equals(segments[i])) {
+                segments[i] = "STRING";
+            }
+        }
+        return String.join("/", segments);
+    }
+
+    /**
+     * @param generateBodylessSample when true, endpoints without a usable request body (e.g. GET) still
+     *                               produce one sample with an empty body instead of being skipped.
+     */
+    public static ParserResult convertImpervaSchemaToAkto(ImpervaSchema schema, String uploadId, boolean useHost, boolean generateMultipleSamples, boolean generateBodylessSample) {
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
 
@@ -66,12 +88,12 @@ public class ImpervaSchemaParser {
                 return createErrorResult(fileLevelErrors, uploadLogs);
             }
 
-            loggerMaker.debugAndAddToDb("Processing Imperva API: " + schema.getMethod() + " " + schema.getResource(), LogDb.DASHBOARD);
+            loggerMaker.debug("Processing Imperva API: " + schema.getMethod() + " " + schema.getResource());
 
             // Extract all request samples
-            uploadLogs = extractRequestSamples(schema, uploadId, useHost, generateMultipleSamples);
+            uploadLogs = extractRequestSamples(schema, uploadId, useHost, generateMultipleSamples, generateBodylessSample);
 
-            loggerMaker.infoAndAddToDb("Generated " + uploadLogs.size() + " samples from Imperva schema");
+            loggerMaker.debug("Generated " + uploadLogs.size() + " samples from Imperva schema");
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing Imperva schema: " + e.getMessage());
@@ -89,7 +111,8 @@ public class ImpervaSchemaParser {
         ImpervaSchema schema,
         String uploadId,
         boolean useHost,
-        boolean generateMultipleSamples
+        boolean generateMultipleSamples,
+        boolean generateBodylessSample
     ) {
         List<SwaggerUploadLog> logs = new ArrayList<>();
 
@@ -100,15 +123,19 @@ public class ImpervaSchemaParser {
 
         RequestDrillDown request = schema.getRequest();
         if (request == null || request.getContentTypeToRequestBody() == null) {
-            loggerMaker.infoAndAddToDb("No request data found in Imperva schema");
+            loggerMaker.debug("No request data found in Imperva schema");
+            if (generateBodylessSample) {
+                addBodylessSample(logs, schema, request, fullPath, uploadId);
+            }
             return logs;
         }
 
         Map<String, String> requestHeaders = parseHeaders(request.getHeaderList(), true);
         Map<String, String> authHeaders = parseAuthenticationInfo(schema.getAuthenticationInfo());
         requestHeaders.putAll(authHeaders);
-        loggerMaker.infoAndAddToDb("Parsed " + requestHeaders.size() + " request headers from Imperva schema");
+        loggerMaker.debug("Parsed " + requestHeaders.size() + " request headers from Imperva schema");
 
+        String basePath = fullPath;
         fullPath = appendQueryParamsToPath(fullPath, request.getQueryParamList());
 
         for (Map.Entry<String, ParameterDrillDown[]> entry : request.getContentTypeToRequestBody().entrySet()) {
@@ -116,12 +143,12 @@ public class ImpervaSchemaParser {
             ParameterDrillDown[] bodyArray = entry.getValue();
 
             if (!isValidContentType(contentType)) {
-                loggerMaker.infoAndAddToDb("Skipping invalid/malformed content-type: " + contentType);
+                loggerMaker.debug("Skipping invalid/malformed content-type: " + contentType);
                 continue;
             }
 
             if (bodyArray == null || bodyArray.length == 0) {
-                loggerMaker.infoAndAddToDb("No body parameters found for content-type: " + contentType);
+                loggerMaker.debug("No body parameters found for content-type: " + contentType);
                 continue;
             }
 
@@ -129,7 +156,7 @@ public class ImpervaSchemaParser {
             ParameterDrillDown bodyParam = bodyArray[0];
 
             if (bodyParam.getDataTypes() == null || bodyParam.getDataTypes().length == 0) {
-                loggerMaker.infoAndAddToDb("No dataTypes found for body in content-type: " + contentType);
+                loggerMaker.debug("No dataTypes found for body in content-type: " + contentType);
                 continue;
             }
 
@@ -158,7 +185,50 @@ public class ImpervaSchemaParser {
             }
         }
 
+        if (logs.isEmpty() && generateBodylessSample) {
+            addBodylessSample(logs, schema, request, basePath, uploadId);
+        }
+
         return logs;
+    }
+
+    /**
+     * Adds a single sample with an empty request body, keeping headers, auth, query params
+     * and the first parseable 200 response from the schema.
+     */
+    private static void addBodylessSample(List<SwaggerUploadLog> logs, ImpervaSchema schema, RequestDrillDown request, String path, String uploadId) {
+        try {
+            Map<String, String> requestHeaders = new HashMap<>();
+            if (request != null) {
+                requestHeaders.putAll(parseHeaders(request.getHeaderList(), true));
+                path = appendQueryParamsToPath(path, request.getQueryParamList());
+            }
+            requestHeaders.putAll(parseAuthenticationInfo(schema.getAuthenticationInfo()));
+
+            Map<String, String> responseHeaders = new HashMap<>();
+            String responsePayload = null;
+            ResponseDrillDown response200 = schema.getResponses() != null ? schema.getResponses().get("200") : null;
+            if (response200 != null && response200.getContentTypeToResponseBody() != null) {
+                for (Map.Entry<String, ParameterDrillDown[]> entry : response200.getContentTypeToResponseBody().entrySet()) {
+                    if (!isValidContentType(entry.getKey())) {
+                        continue;
+                    }
+                    responsePayload = generateResponsePayload(new Pair<>(null, entry.getValue()), entry.getKey());
+                    if (responsePayload != null) {
+                        responseHeaders.putAll(parseHeaders(response200.getHeaderList(), false));
+                        responseHeaders.put("Content-Type", entry.getKey());
+                        break;
+                    }
+                }
+            }
+
+            logs.add(createSwaggerUploadLog(
+                schema.getMethod(), path, null, "", requestHeaders,
+                uploadId, schema.getHostName(), responsePayload, responseHeaders, 200
+            ));
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error creating bodyless sample for Imperva API: " + schema.getMethod() + " " + schema.getResource());
+        }
     }
 
     private static Pair<Map<String, String>, ParameterDrillDown[]> getMatchingResponse(ImpervaSchema schema, String requestContentType) {
@@ -203,7 +273,7 @@ public class ImpervaSchemaParser {
     ) {
         List<Pair<String, String>> samples = new ArrayList<>();
 
-        loggerMaker.infoAndAddToDb("Generating " + bodyParam.getDataTypes().length + " samples from dataTypes array");
+        loggerMaker.debug("Generating " + bodyParam.getDataTypes().length + " samples from dataTypes array");
 
         for (DataTypeDto dataType : bodyParam.getDataTypes()) {
             try {
@@ -313,7 +383,9 @@ public class ImpervaSchemaParser {
 
         // Add standard request headers
         Map<String, String> requestHeaders = new HashMap<>(mergedRequestHeaders);
-        requestHeaders.put("Content-Type", contentType);
+        if (!StringUtils.isEmpty(contentType)) {
+            requestHeaders.put("Content-Type", contentType);
+        }
         if (!StringUtils.isEmpty(hostName)) {
             requestHeaders.put("host", hostName);
         }

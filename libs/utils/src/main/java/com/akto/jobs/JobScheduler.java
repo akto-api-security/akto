@@ -18,11 +18,10 @@ import org.bson.types.ObjectId;
 public final class JobScheduler {
     private static final LoggerMaker logger = new LoggerMaker(JobScheduler.class, LoggerMaker.LogDb.DASHBOARD);
 
-    public static void scheduleRunOnceJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+    public static Job scheduleRunOnceJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
         try {
             int now = Context.now();
-            JobsDao.instance.insertOne(
-                new Job(
+            Job job = new Job(
                     accountId,
                     ScheduleType.RUN_ONCE,
                     JobStatus.SCHEDULED,
@@ -34,10 +33,13 @@ public final class JobScheduler {
                     0,
                     now,
                     now
-                ));
+                );
+            JobsDao.instance.insertOne(job);
             logger.debug("Job scheduled with parameters. accountId: {}. jobParams: {}", accountId, params);
+            return job;
         } catch (Exception e) {
             logger.error("Error while scheduling job for accountId: {} and jobParams: {}", accountId, params, e);
+            return null;
         }
     }
 
