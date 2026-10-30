@@ -50,8 +50,11 @@ const sortOptions = [
     { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 2 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
-    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 7 },
-    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
+    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 8 },
+    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 8 },
+    // No column: these only appear in the Sort menu. Verify with AI's verdict and confidence are in the description.
+    { label: 'AI confidence', value: 'aiConfidence asc', directionLabel: 'High', sortKey: 'aiConfidence' },
+    { label: 'AI confidence', value: 'aiConfidence desc', directionLabel: 'Low', sortKey: 'aiConfidence' },
 ];
 
 let filtersOptions = [

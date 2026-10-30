@@ -31,7 +31,6 @@ import org.bson.types.ObjectId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -57,8 +56,6 @@ public class AiVerificationAction extends UserAction {
     public static final String DESCRIPTION_PREFIX = "[AI verified";
     // Values of the "AI verdict" filter on the issues and test run tables.
     public static final String AI_VERDICT_FILTER = "aiVerdict";
-    private static final String VERDICT_FALSE_POSITIVE = "FALSE_POSITIVE";
-    private static final String VERDICT_TRUE_POSITIVE = "TRUE_POSITIVE";
     private static final String VERDICT_NOT_VERIFIED = "NOT_VERIFIED";
     // Tests the AI cannot judge from the stored request/response, so they are never sent to it:
     // passive tests (e.g. sensitive data exposure) send no attack, multi-step tests are judged across
@@ -245,20 +242,25 @@ public class AiVerificationAction extends UserAction {
     }
 
     /**
-     * Issues filter for the verdict Verify with AI wrote into the description: any of FALSE_POSITIVE,
-     * TRUE_POSITIVE and NOT_VERIFIED. Unknown values match nothing.
+     * Issues filter for Verify with AI's verdict: any of FALSE_POSITIVE, TRUE_POSITIVE and NOT_VERIFIED.
+     * Issues verified before the verdict was stored as a field only carry it in the description, so
+     * that is matched too. Unknown values match nothing.
      */
     public static Bson aiVerdictFilter(List<String> verdicts) {
         String prefix = "^" + DESCRIPTION_PREFIX.replace("[", "\\[");
         List<Bson> anyOf = new ArrayList<>();
         for (String verdict : verdicts) {
-            if (VERDICT_FALSE_POSITIVE.equals(verdict)) {
+            if (FalsePositiveVerifierPromptHandler.FALSE_POSITIVE.equals(verdict)) {
                 // "[AI verified] <reason>" is the older format, written only for false positives.
+                anyOf.add(Filters.eq(TestingRunIssues.AI_VERDICT, FalsePositiveVerifierPromptHandler.FALSE_POSITIVE));
                 anyOf.add(Filters.regex(TestingRunIssues.DESCRIPTION, prefix + "(: false positive|\\] )"));
-            } else if (VERDICT_TRUE_POSITIVE.equals(verdict)) {
+            } else if (FalsePositiveVerifierPromptHandler.TRUE_POSITIVE.equals(verdict)) {
+                anyOf.add(Filters.eq(TestingRunIssues.AI_VERDICT, FalsePositiveVerifierPromptHandler.TRUE_POSITIVE));
                 anyOf.add(Filters.regex(TestingRunIssues.DESCRIPTION, prefix + ": true positive"));
             } else if (VERDICT_NOT_VERIFIED.equals(verdict)) {
-                anyOf.add(Filters.not(Filters.regex(TestingRunIssues.DESCRIPTION, prefix)));
+                anyOf.add(Filters.and(
+                    Filters.exists(TestingRunIssues.AI_VERDICT, false),
+                    Filters.not(Filters.regex(TestingRunIssues.DESCRIPTION, prefix))));
             }
         }
         return anyOf.isEmpty() ? Filters.in(Constants.ID, new ArrayList<>()) : Filters.or(anyOf);
@@ -344,14 +346,8 @@ public class AiVerificationAction extends UserAction {
         if (attempts.isEmpty()) return Outcome.TRUE_POSITIVE;
 
         List<String> attemptMessages = new ArrayList<>();
-        Set<String> reasons = new LinkedHashSet<>();
-        for (TestResult attempt : attempts) {
-            attemptMessages.add(attempt.getMessage());
-            if (attempt.getValidationReason() != null && !attempt.getValidationReason().trim().isEmpty()) {
-                reasons.add(attempt.getValidationReason().trim());
-            }
-        }
-        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(result.getTestSubType(), template, String.join("; ", reasons),
+        for (TestResult attempt : attempts) attemptMessages.add(attempt.getMessage());
+        String prompt = FalsePositiveVerifierPromptHandler.buildPrompt(result.getTestSubType(), template,
             attempts.get(0).getOriginalMessage(), attemptMessages);
         BasicDBObject verdict = new FalsePositiveVerifierPromptHandler().handle(new BasicDBObject("prompt", prompt));
         if (verdict.containsField("error")) {
@@ -362,23 +358,26 @@ public class AiVerificationAction extends UserAction {
             verdict.getString(FalsePositiveVerifierPromptHandler.VERDICT));
         Outcome outcome = falsePositive ? Outcome.FALSE_POSITIVE : Outcome.TRUE_POSITIVE;
 
+        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
+        List<Bson> updates = new ArrayList<>();
+        updates.add(Updates.set(TestingRunIssues.AI_VERDICT, falsePositive ? FalsePositiveVerifierPromptHandler.FALSE_POSITIVE : FalsePositiveVerifierPromptHandler.TRUE_POSITIVE));
+        updates.add(Updates.set(TestingRunIssues.AI_CONFIDENCE, confidence));
         // A description the user wrote is kept; one written by an earlier verification is replaced.
         String reason = verdict.getString(FalsePositiveVerifierPromptHandler.REASON);
         String description = issue.getDescription();
         boolean canWriteDescription = description == null || description.trim().isEmpty()
             || description.startsWith(DESCRIPTION_PREFIX);
-        if (!canWriteDescription || reason == null || reason.isEmpty()) return outcome;
-
-        int confidence = verdict.getInt(FalsePositiveVerifierPromptHandler.CONFIDENCE);
-        String newDescription = DESCRIPTION_PREFIX + ": " + (falsePositive ? "false positive" : "true positive")
-            + ", confidence " + confidence + "%] " + reason;
+        if (canWriteDescription && reason != null && !reason.isEmpty()) {
+            updates.add(Updates.set(TestingRunIssues.DESCRIPTION, DESCRIPTION_PREFIX + ": "
+                + (falsePositive ? "false positive" : "true positive") + ", confidence " + confidence + "%] " + reason));
+        }
         // Only while still OPEN, so an issue the user ignored or fixed in the meantime is left as it is.
         TestingRunIssuesDao.instance.getMCollection().updateOne(
             Filters.and(
                 Filters.eq(Constants.ID, issue.getId()),
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN)
             ),
-            Updates.set(TestingRunIssues.DESCRIPTION, newDescription)
+            Updates.combine(updates)
         );
         return outcome;
     }
