@@ -53,6 +53,24 @@ def test_version_env_leaves_output_rules_alone(monkeypatch):
     assert prompt == prompt_injection.OUTPUT % "hi"
 
 
+@pytest.mark.parametrize("response_format,template", [("", "INPUT_ATLAS"), ("abcd", "INPUT_ABCD_ATLAS")])
+def test_endpoint_context_selects_atlas_overriding_the_env(monkeypatch, response_format, template):
+    """Atlas traffic (contextSource=ENDPOINT) uses the atlas rules per request, even when the
+    deployment-wide version is something else — one agent-guard serves both products."""
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v2")
+    config = {"contextSource": "ENDPOINT"}
+    prompt = build_scan_prompt("PromptInjection", "prompt", config, "hi", response_format=response_format)
+    assert prompt == getattr(prompt_injection, template) % "hi"
+
+
+@pytest.mark.parametrize("context_source", ["", "AGENTIC"])
+def test_non_endpoint_context_keeps_the_env_version(monkeypatch, context_source):
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v2")
+    config = {"contextSource": context_source} if context_source else {}
+    prompt = build_scan_prompt("PromptInjection", "prompt", config, "hi", response_format="abcd")
+    assert prompt == prompt_injection.INPUT_ABCD_V2 % "hi"
+
+
 def test_recall_critical_guidance_is_present():
     prompt = prompt_injection.INPUT
     # Conversation-state overrides (multi-lingual), per-segment evaluation, and

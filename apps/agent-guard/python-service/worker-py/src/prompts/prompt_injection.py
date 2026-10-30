@@ -573,7 +573,18 @@ def input_version() -> str:
     return _DEFAULT_VERSION
 
 
-def build(scanner_type: str, text: str, response_format: str = "") -> str:
+def _version_for(context_source: str) -> str:
+    """Input-side rules for one scan. Atlas traffic (contextSource=ENDPOINT, the
+    endpoint shield's tag for a coding agent on a developer's machine) uses the
+    atlas rules; everything else keeps the deployment-wide input_version(). One
+    agent-guard can serve both products because the gateway sends contextSource
+    per request."""
+    if context_source.strip().upper() == "ENDPOINT" and "atlas" in _INPUT_TEMPLATES:
+        return "atlas"
+    return input_version()
+
+
+def build(scanner_type: str, text: str, response_format: str = "", context_source: str = "") -> str:
     """Render the scan prompt.
 
     response_format="abcd" selects the single-letter variant on whichever side is
@@ -581,11 +592,12 @@ def build(scanner_type: str, text: str, response_format: str = "") -> str:
     two sides keep their own rules — an output scan is never judged with
     input-side rules — only the answer contract is shared.
 
-    PROMPT_INJECTION_PROMPT_VERSION picks the input-side rules (input_version);
-    the output side has a single version.
+    The input-side rules are PROMPT_INJECTION_PROMPT_VERSION (input_version), or
+    the atlas rules when context_source is ENDPOINT (see _version_for). The output
+    side has a single version.
     """
     abcd = response_format.strip().lower() == "abcd"
     if scanner_type == "output":
         return (OUTPUT_ABCD if abcd else OUTPUT) % _augment(text)
-    json_template, abcd_template = _INPUT_TEMPLATES[input_version()]
+    json_template, abcd_template = _INPUT_TEMPLATES[_version_for(context_source)]
     return (abcd_template if abcd else json_template) % _augment(text)
