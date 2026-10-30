@@ -2431,14 +2431,11 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 		return blockResult, activityID, nil
 	}
 
-	// Browser LLM / AI agent rejected in Audit Data; like MCP audit, enforced only when a policy applies.
-	if len(policies) > 0 {
-		if blockResult := s.checkRejectedLLM(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
-			return blockResult, "", nil
-		}
-		if blockResult := s.checkRejectedAgent(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
-			return blockResult, "", nil
-		}
+	if blockResult := s.checkRejectedLLM(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+		return blockResult, "", nil
+	}
+	if blockResult := s.checkRejectedAgent(params, valCtx, payloadBare, sessionID, requestID); blockResult != nil {
+		return blockResult, "", nil
 	}
 
 	// Anomaly detection: check each filtered policy's anomaly config.
