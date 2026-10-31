@@ -330,7 +330,7 @@ function ThreatDetectionPage() {
         }
         const specialAccounts = [1776384040, 1776625569, 1776626846];
         if (specialAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return values.ranges[4];
-        return values.ranges[2];
+        return func.getDefaultDateRange(values.ranges[2]);
     }, [location.state, searchParams]);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
