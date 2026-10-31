@@ -77,7 +77,7 @@ function ThreatActorPage() {
       }
     }
     const specialAccounts = [1776384040, 1776625569, 1776626846];
-    return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? func.getLast30DaysRange() : func.getLast30DaysRange();
+    return specialAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? values.ranges[4] : func.getDefaultDateRange(values.ranges[2]);
   };
   const initialDateRange = getInitialDateRange();
   const [currDateRange, dispatchCurrDateRange] = useReducer(

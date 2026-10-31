@@ -140,7 +140,7 @@ function ThreatCompliancePage() {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        func.getLast30DaysRange()
+        func.getDefaultDateRange(values.ranges.find((r) => r.alias === 'last7days') || values.ranges[2])
     );
 
     const getTimeEpoch = (key) => {

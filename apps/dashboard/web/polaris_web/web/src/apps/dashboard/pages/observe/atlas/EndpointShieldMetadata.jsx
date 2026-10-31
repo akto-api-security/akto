@@ -231,7 +231,7 @@ const mapModuleToAgent = (module) => ({
 function EndpointShieldMetadata() {
 
     const [loading, setLoading] = useState(false);
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getLast30DaysRange());
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getDefaultDateRange(values.ranges[5]));
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
     const allCollections = PersistStore((state) => state.allCollections) || [];
     const [selectedAgent, setSelectedAgent] = useState(null);

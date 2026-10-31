@@ -80,7 +80,7 @@ function Metrics() {
     const [hostsActive, setHostsActive] = useState(false)
     const [currentHost, setCurrentHost] = useState(null)
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getLast30DaysRange());
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getDefaultDateRange(values.ranges[2]));
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
     }

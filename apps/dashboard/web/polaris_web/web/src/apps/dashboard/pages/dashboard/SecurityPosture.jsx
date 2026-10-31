@@ -668,8 +668,8 @@ function ActNowCard({ actNow, onOpenInsight }) {
     )
 }
 
-// "Last 30 days" — same default EndpointPosture uses.
-const DEFAULT_DATE_RANGE = func.getLast30DaysRange()
+// Evaluated per mount so a category switch without reload picks the right default.
+const getDefaultDateRange = () => func.getDefaultDateRange(values.ranges[3])
 
 // A shared drilldown link is only reproducible if the page's date filter comes back with it —
 // this page's range was pure local state until now. `since`/`until` (raw epoch seconds) mirror the
@@ -690,7 +690,7 @@ function SecurityPosture() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
         searchParams,
-        (sp) => dateRangeFromSearchParams(sp) || DEFAULT_DATE_RANGE
+        (sp) => dateRangeFromSearchParams(sp) || getDefaultDateRange()
     )
     const [pageData, setPageData] = useState({})
     const [loading, setLoading] = useState(true)

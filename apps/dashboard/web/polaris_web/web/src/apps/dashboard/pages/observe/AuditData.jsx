@@ -498,7 +498,7 @@ function AuditData() {
     // When opening conditional approval from bulk selection (1+ MCP server rows); same approval applies to each.
     const [conditionalBulkRows, setConditionalBulkRows] = useState(null);
 
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getLast30DaysRange());
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getDefaultDateRange(values.ranges[5]));
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
     }
