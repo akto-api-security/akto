@@ -151,8 +151,18 @@ const VerdictBadge = ({ diagnostic }) => {
     )
 }
 
-const verdictText = (verdict) => (verdict || '').replace(/^[A-Z ]+—\s*/, '')
-const verdictTitle = (verdict) => (verdict || '').split('—')[0].trim()
+// A verdict is "STATE — one sentence". Windows agents before the em-dash fix
+// write "STATE - sentence" (ASCII), and those reports stay in the history, so an
+// en dash or a spaced hyphen also separates — but only right after the all-caps
+// state, never a hyphen inside the sentence. No separator: the whole verdict is
+// the title and there is no sentence (it used to be shown twice).
+const VERDICT_PARTS = /^([A-Z][A-Z ]*[A-Z])\s*(?:—|–|\s-)\s*([\s\S]*)$/
+const verdictParts = (verdict) => {
+    const m = (verdict || '').match(VERDICT_PARTS)
+    return m ? { title: m[1], text: m[2].trim() } : { title: (verdict || '').trim(), text: '' }
+}
+const verdictText = (verdict) => verdictParts(verdict).text
+const verdictTitle = (verdict) => verdictParts(verdict).title
 
 function ReportSection({ section, query, defaultOpen }) {
     const [open, setOpen] = useState(defaultOpen)
@@ -262,13 +272,17 @@ function SummaryCard({ diagnostic, onOpen, outcomeFrom, related = [], onOpenRela
     return (
         <Box background="bg-surface-secondary" padding="4" borderRadius="2">
             <VerticalStack gap="2">
-                <HorizontalStack align="space-between" blockAlign="center">
-                    <HorizontalStack gap="2" blockAlign="center">
-                        <OutcomeBadge diagnostic={outcomeFrom || diagnostic} />
-                        <VerdictBadge diagnostic={diagnostic} />
-                        <Text variant="headingSm" as="h3">{verdictTitle(diagnostic.verdict) || 'Diagnostic report'}</Text>
-                    </HorizontalStack>
-                    {onOpen && <Button size="slim" onClick={onOpen}>Open report</Button>}
+                {/* Badges and title wrap within their own column, so a long title
+                    never pushes "Open report" onto a line of its own. */}
+                <HorizontalStack align="space-between" blockAlign="start" gap="2" wrap={false}>
+                    <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                        <HorizontalStack gap="2" blockAlign="center">
+                            <OutcomeBadge diagnostic={outcomeFrom || diagnostic} />
+                            <VerdictBadge diagnostic={diagnostic} />
+                            <Text variant="headingSm" as="h3" breakWord>{verdictTitle(diagnostic.verdict) || 'Diagnostic report'}</Text>
+                        </HorizontalStack>
+                    </div>
+                    {onOpen && <div style={{ flexShrink: 0 }}><Button size="slim" onClick={onOpen}>Open report</Button></div>}
                 </HorizontalStack>
                 {verdictText(diagnostic.verdict) && <Text as="p" variant="bodySm">{verdictText(diagnostic.verdict)}</Text>}
                 {findings.length > 0 && (
