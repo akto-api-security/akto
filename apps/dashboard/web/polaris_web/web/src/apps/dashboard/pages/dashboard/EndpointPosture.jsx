@@ -94,7 +94,7 @@ function EndpointPosture() {
     const [loading, setLoading] = useState(true)
 
     // Date range filter state
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getDefaultDateRange(values.ranges[3]))
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[3])
 
     const [gridWidth, setGridWidth] = useState(1200)
     const resizeObserverRef = useRef(null)

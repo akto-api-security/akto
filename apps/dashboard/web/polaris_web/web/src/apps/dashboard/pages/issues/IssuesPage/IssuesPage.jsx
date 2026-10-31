@@ -238,7 +238,7 @@ function IssuesPage() {
                 return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
             }
         }
-        return func.getDefaultDateRange(values.ranges[5]);
+        return values.ranges[5];
     };
     const initialDateRange = getInitialDateRange();
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialDateRange)
