@@ -77,7 +77,7 @@ const sortOptions = [
 
 function GuardrailDetectionDemo() {
 
-    const initialVal = values.ranges[3]
+    const initialVal = func.getLast30DaysRange()
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [moreActions, setMoreActions] = useState(false);
     const [showDetails, setShowDetails] = useState(false);

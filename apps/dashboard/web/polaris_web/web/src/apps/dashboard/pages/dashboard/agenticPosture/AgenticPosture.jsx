@@ -48,7 +48,7 @@ function Section({ title, description, action, children }) {
 const DRILL_PAGE_SIZE = { highRiskAgents: 10, postureScore: 10 }
 const REGENERATE_POLL_MS = 5000
 
-const DEFAULT_DATE_RANGE = values.ranges[3] // "Last 30 days" — same default the other posture pages use
+const DEFAULT_DATE_RANGE = func.getLast30DaysRange() // "Last 30 days" — same default the other posture pages use
 
 function dateRangeFromSearchParams(searchParams) {
     const sinceParam = searchParams.get('since')

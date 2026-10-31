@@ -669,7 +669,7 @@ function ActNowCard({ actNow, onOpenInsight }) {
 }
 
 // "Last 30 days" — same default EndpointPosture uses.
-const DEFAULT_DATE_RANGE = values.ranges[3]
+const DEFAULT_DATE_RANGE = func.getLast30DaysRange()
 
 // A shared drilldown link is only reproducible if the page's date filter comes back with it —
 // this page's range was pure local state until now. `since`/`until` (raw epoch seconds) mirror the

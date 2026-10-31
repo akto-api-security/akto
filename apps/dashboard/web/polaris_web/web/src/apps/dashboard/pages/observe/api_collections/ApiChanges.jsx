@@ -61,7 +61,7 @@ function ApiChanges() {
                 return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
             }
         }
-        return values.ranges[3];
+        return func.getLast30DaysRange();
     };
 
     const initialVal = getInitialDateRange();

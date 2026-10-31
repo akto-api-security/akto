@@ -45,7 +45,7 @@ function ThreatApiPage() {
         return { alias: "custom", title, period: { since: sinceDate, until: untilDate } };
       }
     }
-    return values.ranges[3];
+    return func.getLast30DaysRange();
   };
   const initialDateRange = getInitialDateRange();
   const [currDateRange, dispatchCurrDateRange] = useReducer(

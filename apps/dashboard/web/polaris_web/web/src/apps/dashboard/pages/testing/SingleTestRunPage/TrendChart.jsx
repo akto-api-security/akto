@@ -23,7 +23,7 @@ import SummaryTable from "./SummaryTable";
 function TrendChart(props) {
 
     const { hexId, setSummary, show } = props;
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getLast30DaysRange());
     const [appliedFilters, setAppliedFilters] = useState([]);
     const [testingRunResultSummaries, setTestingRunResultSummaries] = useState([]);
     const [metadataFilterData, setMetadataFilterData] = useState([]);
@@ -249,7 +249,7 @@ function TrendChart(props) {
             return filter.key != key
         })
         if (key == "dateRange") {
-            getDate({ type: "update", period: values.ranges[2] });
+            getDate({ type: "update", period: func.getLast30DaysRange() });
         } else {
             setAppliedFilters(temp);
         }
@@ -284,7 +284,7 @@ function TrendChart(props) {
 
     const handleFiltersClearAll = useCallback(() => {
         setAppliedFilters([])
-        getDate({ type: "update", period: values.ranges[2] });
+        getDate({ type: "update", period: func.getLast30DaysRange() });
     }, []);
 
     const metadataFilters = processMetadataFilters(metadataFilterData);

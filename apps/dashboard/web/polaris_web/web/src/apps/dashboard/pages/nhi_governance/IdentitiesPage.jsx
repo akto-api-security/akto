@@ -156,7 +156,7 @@ export default function IdentitiesPage() {
     const [showDetailsPanel, setShowDetailsPanel]   = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[2]
+        func.getLast30DaysRange()
     );
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime() / 1000);

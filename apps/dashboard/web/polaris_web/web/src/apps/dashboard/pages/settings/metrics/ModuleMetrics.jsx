@@ -99,7 +99,7 @@ function ModuleMetrics({ config }) {
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[2]
+        func.getLast30DaysRange()
     )
 
     const getTimeEpoch = (key) => {
