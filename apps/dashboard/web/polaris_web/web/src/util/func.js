@@ -2574,7 +2574,10 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return { title: "Last 30 days", alias: "last30days", period: { since, until } };
   },
   // Atlas (Endpoint Security) and Argus (Agentic Security) default to 30 days; every other product keeps `fallback`.
+  // Heavy accounts keep `fallback` too (their data volume makes a 30-day default slow).
   getDefaultDateRange(fallback){
+    const heavyAccounts = [1745303931, 1768175789];
+    if (heavyAccounts.includes(Number(window.ACTIVE_ACCOUNT))) return fallback;
     return (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? this.getLast30DaysRange() : fallback;
   },
 
