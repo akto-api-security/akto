@@ -78,7 +78,7 @@ export const EMPTY_PEOPLE_FILTERS = {
     hasUnapproved: false,
     usesPersonal: false,
     agentIssues: false,
-    monitorMode: false,
+    guardrailModes: [],
     riskMin: 0,
     riskMax: RISK_MAX,
 };

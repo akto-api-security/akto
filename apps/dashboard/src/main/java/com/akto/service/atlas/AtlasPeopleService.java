@@ -163,7 +163,7 @@ public class AtlasPeopleService {
         public boolean hasUnapproved;
         public boolean usesPersonal;
         public boolean agentIssues;
-        public boolean monitorMode;
+        public List<String> guardrailModes;
         public double riskMin;
         public double riskMax = RISK_MAX;
         public String sortKey;
@@ -448,12 +448,13 @@ public class AtlasPeopleService {
     }
 
     private static boolean hasDeviceFilters(PeopleQuery query) {
-        return notEmpty(query.osList) || notEmpty(query.categories) || notEmpty(query.healthStates);
+        return notEmpty(query.osList) || notEmpty(query.categories) || notEmpty(query.healthStates) || notEmpty(query.guardrailModes);
     }
 
     private static boolean matchesDeviceFilters(DeviceRow device, PeopleQuery query) {
         if (notEmpty(query.osList) && !query.osList.contains(device.os)) return false;
         if (notEmpty(query.healthStates) && !query.healthStates.contains(device.health)) return false;
+        if (notEmpty(query.guardrailModes) && !query.guardrailModes.contains(device.guardrailMode)) return false;
         if (notEmpty(query.categories)) {
             boolean hasCategory = false;
             for (String category : query.categories) {
@@ -472,7 +473,6 @@ public class AtlasPeopleService {
         if (hasText(query) && !contains(device.name, query.text) && !contains(device.username, query.text)
                 && !contains(device.os, query.text)) return false;
         if (query.agentIssues && HEALTH_HEALTHY.equals(device.health)) return false;
-        if (query.monitorMode && !MODE_MONITOR.equals(device.guardrailMode)) return false;
         return !(query.hasUnapproved && device.unapprovedTools == 0);
     }
 

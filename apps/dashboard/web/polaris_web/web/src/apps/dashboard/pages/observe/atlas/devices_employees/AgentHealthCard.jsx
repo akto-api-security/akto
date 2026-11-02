@@ -76,7 +76,17 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
                 <SegmentedBar segments={modeSegments} onSelect={onSelectMode} activeKey={activeMode} thin />
                 <HorizontalStack align="space-between">
                     {MODE_ORDER.map((key) => (
-                        <Text key={key} as="span" variant="bodySm" color="subdued">{MODE_LABELS[key]} · {(modes[key] || 0).toLocaleString("en-US")}</Text>
+                        <Pressable
+                            key={key}
+                            accessibilityLabel={MODE_LABELS[key]}
+                            onClick={() => onSelectMode(key)}
+                            background={activeMode === key ? "bg-primary-subdued-hover" : undefined}
+                            hoverBackground="bg-subdued"
+                            borderRadius="2"
+                            padding="1"
+                        >
+                            <Text as="span" variant="bodySm" color={activeMode === key ? undefined : "subdued"}>{MODE_LABELS[key]} · {(modes[key] || 0).toLocaleString("en-US")}</Text>
+                        </Pressable>
                     ))}
                 </HorizontalStack>
             </VerticalStack>

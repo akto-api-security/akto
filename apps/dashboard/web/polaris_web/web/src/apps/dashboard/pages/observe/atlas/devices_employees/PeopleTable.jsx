@@ -10,7 +10,7 @@ import {
     LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, OS_LABELS, RISK_MAX,
+    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, RISK_MAX,
 } from "./peopleConstants";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: false, filter: false, suppressHeaderMenuButton: true, cellStyle: { display: "flex", alignItems: "center" } };
@@ -38,13 +38,23 @@ const DEVICE_COLUMNS = [
     { field: "lastHeartbeat", headerName: "Last check-in", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
 
+function isMonitorOnly(filters) {
+    return filters.guardrailModes.length === 1 && filters.guardrailModes[0] === "monitor";
+}
+
 function isChipActive(chipKey, filters) {
-    return chipKey === "highRisk" ? filters.riskMin >= HIGH_RISK_THRESHOLD : !!filters[chipKey];
+    if (chipKey === "highRisk") return filters.riskMin >= HIGH_RISK_THRESHOLD;
+    if (chipKey === "monitorMode") return isMonitorOnly(filters);
+    return !!filters[chipKey];
 }
 
 function toggleChip(chipKey, filters, onFiltersChange) {
     if (chipKey === "highRisk") {
         onFiltersChange({ riskMin: filters.riskMin >= HIGH_RISK_THRESHOLD ? 0 : HIGH_RISK_THRESHOLD, riskMax: RISK_MAX });
+        return;
+    }
+    if (chipKey === "monitorMode") {
+        onFiltersChange({ guardrailModes: isMonitorOnly(filters) ? [] : ["monitor"] });
         return;
     }
     onFiltersChange({ [chipKey]: !filters[chipKey] });
@@ -54,6 +64,9 @@ function appliedTags(filters) {
     const tags = [];
     filters.osList.forEach((os) => tags.push({ key: `os-${os}`, label: OS_LABELS[os] || os, clear: { osList: filters.osList.filter((x) => x !== os) } }));
     filters.categories.forEach((category) => tags.push({ key: `cat-${category}`, label: CATEGORY_LABELS[category] || category, clear: { categories: filters.categories.filter((x) => x !== category) } }));
+    if (!isMonitorOnly(filters)) {
+        filters.guardrailModes.forEach((mode) => tags.push({ key: `mode-${mode}`, label: MODE_LABELS[mode] || mode, clear: { guardrailModes: filters.guardrailModes.filter((x) => x !== mode) } }));
+    }
     filters.healthStates.forEach((state) => tags.push({ key: `health-${state}`, label: HEALTH_LABELS[state] || state, clear: { healthStates: filters.healthStates.filter((x) => x !== state) } }));
     const isCustomRiskRange = (filters.riskMin > 0 || filters.riskMax < RISK_MAX)
         && !(filters.riskMin === HIGH_RISK_THRESHOLD && filters.riskMax === RISK_MAX);
@@ -129,7 +142,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
             deviceScope, skip, limit, sortKey, sortOrder: sortOrder === -1 ? 1 : -1, atlasQuery: searchString,
             atlasOs: filters.osList, toolCategories: filters.categories, healthStates: filters.healthStates,
             hasUnapproved: filters.hasUnapproved, usesPersonal: filters.usesPersonal, agentIssues: filters.agentIssues,
-            monitorMode: filters.monitorMode, riskMin: filters.riskMin, riskMax: filters.riskMax,
+            guardrailModes: filters.guardrailModes, riskMin: filters.riskMin, riskMax: filters.riskMax,
         };
         const request = isEmployees ? settingRequests.fetchAtlasEmployees(params) : settingRequests.fetchAtlasDevices(params);
         setLoading(true);

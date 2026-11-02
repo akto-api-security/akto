@@ -1,4 +1,5 @@
 import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import Pressable from "../../../dashboard/ask/components/Pressable";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
 import InsightCard from "./InsightCard";
 import SegmentedBar from "./SegmentedBar";
@@ -7,7 +8,7 @@ import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, OS_LABELS, tokenVar } from "./pe
 const CATEGORY_ORDER = ["agents", "ide", "mcp", "browser"];
 const DARK_CATEGORIES = ["agents"];
 
-function AiToolsByOsCard({ overview, status, onSelect }) {
+function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectCategory }) {
     const rows = (overview?.osMatrix || []).filter((row) => row.os !== "unknown");
     const toolsAvailable = overview?.toolsAvailable !== false;
 
@@ -38,10 +39,20 @@ function AiToolsByOsCard({ overview, status, onSelect }) {
             ))}
             <HorizontalStack gap="3" wrap>
                 {CATEGORY_ORDER.map((category) => (
-                    <HorizontalStack key={category} gap="1" blockAlign="center" wrap={false}>
-                        <LegendDot color={tokenVar(CATEGORY_BACKGROUNDS[category])} />
-                        <Text as="span" variant="bodySm" color="subdued">{CATEGORY_LABELS[category]}</Text>
-                    </HorizontalStack>
+                    <Pressable
+                        key={category}
+                        accessibilityLabel={CATEGORY_LABELS[category]}
+                        onClick={() => onSelectCategory(category)}
+                        background={activeCategory === category ? "bg-primary-subdued-hover" : undefined}
+                        hoverBackground="bg-subdued"
+                        borderRadius="2"
+                        padding="1"
+                    >
+                        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+                            <LegendDot color={tokenVar(CATEGORY_BACKGROUNDS[category])} />
+                            <Text as="span" variant="bodySm" color={activeCategory === category ? undefined : "subdued"}>{CATEGORY_LABELS[category]}</Text>
+                        </HorizontalStack>
+                    </Pressable>
                 ))}
             </HorizontalStack>
         </InsightCard>

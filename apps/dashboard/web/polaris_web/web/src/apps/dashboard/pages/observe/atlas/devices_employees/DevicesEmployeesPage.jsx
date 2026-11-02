@@ -65,13 +65,14 @@ function DevicesEmployeesPage() {
     };
     const onDevicesTab = tab === "devices";
     const activeHealth = onDevicesTab && filters.healthStates.length === 1 ? filters.healthStates[0] : null;
-    const activeMode = onDevicesTab && filters.monitorMode ? "monitor" : null;
+    const activeMode = onDevicesTab && filters.guardrailModes.length === 1 ? filters.guardrailModes[0] : null;
+    const activeCategory = onDevicesTab && filters.osList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
 
     const onSelectStat = (id) => {
         const target = transform.statCardTarget(id);
         if (target) toggleView(target.tab, target.filters);
     };
-    const onSelectMode = (mode) => toggleView("devices", mode === "monitor" ? { monitorMode: true } : {});
+    const onSelectMode = (mode) => toggleView("devices", { guardrailModes: [mode] });
     const onSelectBucket = (index) => toggleView("employees", {
         riskMin: index * RISK_BUCKET_WIDTH,
         riskMax: (index + 1) * RISK_BUCKET_WIDTH,
@@ -110,6 +111,8 @@ function DevicesEmployeesPage() {
                     <AiToolsByOsCard
                         overview={overview}
                         status={overviewStatus}
+                        activeCategory={activeCategory}
+                        onSelectCategory={(category) => toggleView("devices", { categories: [category] })}
                         onSelect={(os, category) => toggleView("devices", { osList: [os], categories: [category] })}
                     />
                     <RiskHistogramCard

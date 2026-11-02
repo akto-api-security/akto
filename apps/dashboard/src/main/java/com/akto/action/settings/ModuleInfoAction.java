@@ -110,7 +110,7 @@ public class ModuleInfoAction extends UserAction {
     @Setter private boolean hasUnapproved;
     @Setter private boolean usesPersonal;
     @Setter private boolean agentIssues;
-    @Setter private boolean monitorMode;
+    @Setter private List<String> guardrailModes;
     @Setter private double riskMin;
     @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
     @Getter private Map<String, Object> atlasOverview;
@@ -442,7 +442,7 @@ public class ModuleInfoAction extends UserAction {
         query.hasUnapproved = hasUnapproved;
         query.usesPersonal = usesPersonal;
         query.agentIssues = agentIssues;
-        query.monitorMode = monitorMode;
+        query.guardrailModes = guardrailModes;
         query.riskMin = riskMin;
         query.riskMax = riskMax;
         query.sortKey = sortKey;

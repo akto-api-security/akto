@@ -6,7 +6,7 @@ const STAT_CARD_TARGETS = {
     devicesWithAiTools: { tab: "devices", filters: { categories: ALL_CATEGORIES } },
     employeesUsingAi: { tab: "employees", filters: {} },
     devicesWithUnapprovedTools: { tab: "devices", filters: { hasUnapproved: true } },
-    monitorOnlyDevices: { tab: "devices", filters: { monitorMode: true } },
+    monitorOnlyDevices: { tab: "devices", filters: { guardrailModes: ["monitor"] } },
 };
 
 const formatCount = (count) => count.toLocaleString("en-US");
