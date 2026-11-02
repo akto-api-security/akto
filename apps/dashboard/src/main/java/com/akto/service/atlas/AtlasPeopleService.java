@@ -500,6 +500,7 @@ public class AtlasPeopleService {
         switch (query.sortKey == null ? "" : query.sortKey) {
             case "name": comparator = Comparator.comparing(d -> d.name.toLowerCase(Locale.ROOT)); break;
             case "owner": comparator = Comparator.comparing(d -> d.username.toLowerCase(Locale.ROOT)); break;
+            case "os": comparator = Comparator.comparing(d -> d.os); break;
             case "health": comparator = Comparator.comparing(d -> d.health); break;
             case "guardrailMode": comparator = Comparator.comparing(d -> d.guardrailMode); break;
             case "toolCount": comparator = Comparator.comparingInt(DeviceRow::toolCount); break;

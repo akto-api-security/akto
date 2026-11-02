@@ -1,19 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
-import { Box, Button, HorizontalStack, Tabs, Tag, Text } from "@shopify/polaris";
+import { Box, Button, HorizontalStack, Icon, Tabs, Tag, TextField } from "@shopify/polaris";
+import { SearchMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import AgGridTable from "../../../../components/tables/AgGridTable";
 import settingRequests from "../../../settings/api";
-import Pressable from "../../../dashboard/ask/components/Pressable";
 import {
     AgentCellRenderer, CountCellRenderer, DeviceCellRenderer, EmployeeCellRenderer, GuardrailModeCellRenderer,
-    LastSeenCellRenderer, OwnerCellRenderer, RiskCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
+    LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
     CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, OS_LABELS,
 } from "./peopleConstants";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: false, filter: false, suppressHeaderMenuButton: true, cellStyle: { display: "flex", alignItems: "center" } };
-const ROW_HEIGHT = 56;
+const ROW_HEIGHT = 48;
 
 const EMPLOYEE_COLUMNS = [
     { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer },
@@ -28,6 +28,7 @@ const EMPLOYEE_COLUMNS = [
 
 const DEVICE_COLUMNS = [
     { field: "name", headerName: "Device", flex: 2, minWidth: 220, cellRenderer: DeviceCellRenderer },
+    { field: "os", headerName: "OS", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer },
     { field: "owner", headerName: "Owner", flex: 1, minWidth: 140, cellRenderer: OwnerCellRenderer },
     { field: "health", headerName: "Atlas agent", flex: 1.5, minWidth: 220, cellRenderer: AgentCellRenderer },
     { field: "guardrailMode", headerName: "Guardrail mode", width: 150, cellRenderer: GuardrailModeCellRenderer },
@@ -59,34 +60,29 @@ function appliedTags(filters) {
     return tags;
 }
 
-function ChipRow({ tab, filters, onFiltersChange }) {
+function SearchRow({ value, onChange, placeholder, tab, filters, onFiltersChange }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
     return (
-        <Box paddingInlineStart="2" paddingInlineEnd="3">
+        <Box padding="3">
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                {chips.map((chip) => {
-                    const active = isChipActive(chip.key, filters);
-                    return (
-                        <Pressable
-                            key={chip.key}
-                            accessibilityLabel={chip.label}
-                            onClick={() => toggleChip(chip.key, filters, onFiltersChange)}
-                            background={active ? "bg-primary-subdued-hover" : "bg"}
-                            hoverBackground="bg-primary-subdued-hover"
-                            borderWidth="1"
-                            borderColor={active ? "border-magic" : "border"}
-                            borderRadius="2"
-                            paddingBlockStart="1"
-                            paddingBlockEnd="1"
-                            paddingInlineStart="3"
-                            paddingInlineEnd="3"
-                        >
-                            <Box as="span" color={active ? "text-ask-magic" : undefined}>
-                                <Text as="span" variant="bodySm" fontWeight={active ? "semibold" : "regular"}>{chip.label}</Text>
-                            </Box>
-                        </Pressable>
-                    );
-                })}
+                <Box width="100%">
+                    <TextField
+                        label={placeholder}
+                        labelHidden
+                        autoComplete="off"
+                        prefix={<Icon source={SearchMinor} />}
+                        placeholder={placeholder}
+                        value={value}
+                        onChange={onChange}
+                        clearButton
+                        onClearButtonClick={() => onChange("")}
+                    />
+                </Box>
+                {chips.map((chip) => (
+                    <Button key={chip.key} pressed={isChipActive(chip.key, filters)} onClick={() => toggleChip(chip.key, filters, onFiltersChange)}>
+                        {chip.label}
+                    </Button>
+                ))}
             </HorizontalStack>
         </Box>
     );
@@ -151,10 +147,18 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 defaultColDef={DEFAULT_COL_DEF}
                 onServerFetch={onServerFetch}
                 filterStateUrl={`/dashboard/observe/devices-employees/${tab}`}
-                searchPlaceholder={isEmployees ? "Search employees or their devices" : "Search devices, owners or OS"}
                 searchValue={search}
                 onSearchChange={onSearchChange}
-                searchAccessory={<ChipRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} />}
+                renderSearch={({ value, onChange }) => (
+                    <SearchRow
+                        value={value}
+                        onChange={onChange}
+                        placeholder={isEmployees ? "Search employees or their devices" : "Search devices, owners or OS"}
+                        tab={tab}
+                        filters={filters}
+                        onFiltersChange={onFiltersChange}
+                    />
+                )}
                 searchBelow={hasAppliedFilters ? <AppliedTags filters={filters} onFiltersChange={onFiltersChange} /> : null}
                 rowHeight={ROW_HEIGHT}
                 noOuterBorder

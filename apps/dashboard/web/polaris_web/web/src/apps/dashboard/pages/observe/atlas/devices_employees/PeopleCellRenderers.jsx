@@ -1,4 +1,4 @@
-import { Avatar, Badge, Box, HorizontalStack, ProgressBar, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Avatar, Badge, Box, HorizontalStack, ProgressBar, Text, Tooltip } from "@shopify/polaris";
 import func from "@/util/func";
 import { HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS } from "./peopleConstants";
 
@@ -14,13 +14,15 @@ export function EmployeeCellRenderer({ data }) {
 
 export function DeviceCellRenderer({ data }) {
     if (!data) return null;
+    return <Text as="span" fontWeight="semibold" truncate>{data.name}</Text>;
+}
+
+export function OsCellRenderer({ data }) {
+    if (!data) return null;
     return (
-        <VerticalStack gap="0">
-            <Text as="span" fontWeight="semibold" truncate>{data.name}</Text>
-            <Text as="span" variant="bodySm" color="subdued" truncate>
-                {OS_LABELS[data.os] || data.os} · {data.extension ? "Browser extension" : "Atlas agent"}
-            </Text>
-        </VerticalStack>
+        <Text as="span" color="subdued" truncate>
+            {OS_LABELS[data.os] || data.os}{data.extension ? " · Browser extension" : ""}
+        </Text>
     );
 }
 

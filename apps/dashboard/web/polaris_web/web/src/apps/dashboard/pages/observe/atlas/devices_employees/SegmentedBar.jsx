@@ -4,7 +4,7 @@ import Pressable from "../../../dashboard/ask/components/Pressable";
 const MIN_LABEL_PERCENT = 10;
 const BLANK_LABEL = "\u00A0";
 
-function SegmentedBar({ segments, onSelect }) {
+function SegmentedBar({ segments, onSelect, showPercent = true }) {
     const total = segments.reduce((sum, segment) => sum + segment.count, 0);
     if (!total) return <Box background="bg-strong" borderRadius="2" paddingBlockStart="4" paddingBlockEnd="4" width="100%" />;
 
@@ -16,7 +16,7 @@ function SegmentedBar({ segments, onSelect }) {
                     const content = (
                         <HorizontalStack align="center">
                             <Text as="span" variant="bodySm" fontWeight="semibold">
-                                {percent >= MIN_LABEL_PERCENT ? `${Math.round(percent)}%` : BLANK_LABEL}
+                                {showPercent && percent >= MIN_LABEL_PERCENT ? `${Math.round(percent)}%` : BLANK_LABEL}
                             </Text>
                         </HorizontalStack>
                     );
@@ -26,7 +26,7 @@ function SegmentedBar({ segments, onSelect }) {
                         color: segment.lightText ? "text-on-color" : undefined,
                         paddingBlockStart: "3",
                         paddingBlockEnd: "3",
-                        title: segment.tooltip || `${segment.label}: ${segment.count}`,
+                        title: segment.tooltip || `${segment.label}: ${segment.count.toLocaleString("en-US")} (${Math.round(percent)}%)`,
                     };
                     return onSelect ? (
                         <Pressable key={segment.key} accessibilityLabel={segment.label} onClick={() => onSelect(segment.key)} {...boxProps}>

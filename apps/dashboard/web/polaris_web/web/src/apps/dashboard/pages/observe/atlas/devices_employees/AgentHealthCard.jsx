@@ -63,7 +63,7 @@ function AgentHealthCard({ overview, status, onSelectHealth, onSelectMode, onUpd
             status={status}
         >
             <VerticalStack gap="3">
-                <SegmentedBar segments={healthSegments} onSelect={onSelectHealth} />
+                <SegmentedBar segments={healthSegments} onSelect={onSelectHealth} showPercent={false} />
                 <VerticalStack gap="1">
                     {HEALTH_ORDER.map((key) => (
                         <LegendRow key={key} color={tokenVar(HEALTH_BACKGROUNDS[key])} label={HEALTH_LABELS[key]} count={health[key] || 0}
@@ -79,7 +79,7 @@ function AgentHealthCard({ overview, status, onSelectHealth, onSelectMode, onUpd
             <Divider />
             <VerticalStack gap="2">
                 <Text as="h4" variant="headingSm">Guardrail mode</Text>
-                <SegmentedBar segments={modeSegments} onSelect={onSelectMode} />
+                <SegmentedBar segments={modeSegments} onSelect={onSelectMode} showPercent={false} />
                 <HorizontalStack align="space-between">
                     {MODE_ORDER.map((key) => (
                         <Text key={key} as="span" variant="bodySm" color="subdued">{MODE_LABELS[key]} · {(modes[key] || 0).toLocaleString("en-US")}</Text>
