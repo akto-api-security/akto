@@ -4749,15 +4749,23 @@ public class DbLayer {
             updates.add(Updates.setOnInsert(NhiIdentity.LAST_ROTATED_AT, now));
         }
 
-        // Owner: inferred from deviceLabel. Set on insert; backfill for older records
-        // that were created before this field was populated (owner == null).
-        if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
+        // Owner: the scanner sends the signed-in user of the agent that holds the credential
+        // (email). It is the current login, so it always wins. Without an email the owner is
+        // inferred from deviceLabel: set on insert; backfill for older records that were
+        // created before this field was populated (owner == null).
+        NhiIdentity.Owner sentOwner = identity.getOwner();
+        if (sentOwner != null && StringUtils.isNotBlank(sentOwner.getEmail())) {
+            NhiIdentity.Owner o = new NhiIdentity.Owner();
+            o.setEmail(sentOwner.getEmail());
+            o.setName(StringUtils.isNotBlank(sentOwner.getName()) ? sentOwner.getName() : identity.getDeviceLabel());
+            updates.add(Updates.set(NhiIdentity.OWNER, o));
+        } else if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
             if (existing == null) {
-                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                NhiIdentity.Owner o = new NhiIdentity.Owner();
                 o.setName(identity.getDeviceLabel());
                 updates.add(Updates.setOnInsert(NhiIdentity.OWNER, o));
             } else if (existing.getOwner() == null) {
-                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                NhiIdentity.Owner o = new NhiIdentity.Owner();
                 o.setName(identity.getDeviceLabel());
                 updates.add(Updates.set(NhiIdentity.OWNER, o));
             }
