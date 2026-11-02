@@ -100,7 +100,7 @@ public class JobsCron {
             Job finalJob = job;
             try {
                 JobParams params = finalJob.getJobParams();
-                if(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS || params.getJobType() == JobType.WIZ_SYNC || params.getJobType() == JobType.WIZ_API_ENDPOINTS_IMPORT || params.getJobType() == JobType.IMPERVA_API_ENDPOINTS_IMPORT) {
+                if(params.getJobType() == JobType.DATADOG_TRAFFIC_COLLECTOR || params.getJobType() == JobType.JIRA_AUTO_CREATE_TICKETS || params.getJobType() == JobType.WIZ_SYNC || params.getJobType() == JobType.WIZ_API_ENDPOINTS_IMPORT || params.getJobType() == JobType.IMPERVA_API_ENDPOINTS_IMPORT || params.getJobType() == JobType.SKILL_REVALIDATION) {
                     executorService.submit(
                         () -> {
                             Context.accountId.set(finalJob.getAccountId());
