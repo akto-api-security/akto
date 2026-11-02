@@ -2,11 +2,12 @@ import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import Pressable from "../../../dashboard/ask/components/Pressable";
 import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
-import SegmentedBar from "./SegmentedBar";
+import SegmentBar from "../../../../components/shared/SegmentBar";
 import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, CATEGORY_ORDER, OS_LABELS, tokenVar } from "./peopleConstants";
 import transform from "./transform";
 
 const DARK_CATEGORIES = ["agents"];
+const OS_BAR_HEIGHT = "22px";
 
 function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectCategory }) {
     const rows = (overview?.osMatrix || []).filter((row) => row.os !== "unknown");
@@ -25,16 +26,18 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectC
                             {row.devices.toLocaleString("en-US")} devices · avg {row.avgTools} tools
                         </Text>
                     </HorizontalStack>
-                    <SegmentedBar
+                    <SegmentBar
                         segments={CATEGORY_ORDER.map((category) => ({
                             key: category,
                             label: CATEGORY_LABELS[category],
                             count: row.toolsByCategory[category] || 0,
-                            background: CATEGORY_BACKGROUNDS[category],
+                            color: tokenVar(CATEGORY_BACKGROUNDS[category]),
                             lightText: DARK_CATEGORIES.includes(category),
                             tooltip: `${CATEGORY_LABELS[category]} on ${OS_LABELS[row.os]}: ${row.toolsByCategory[category] || 0} tools`,
                         }))}
-                        onSelect={(category) => onSelect(row.os, category)}
+                        height={OS_BAR_HEIGHT}
+                        showLabels
+                        onSegmentClick={(category) => onSelect(row.os, category)}
                     />
                 </VerticalStack>
             ))}

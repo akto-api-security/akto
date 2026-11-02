@@ -4,11 +4,14 @@ import settingRequests from "../../../settings/api";
 import Pressable from "../../../dashboard/ask/components/Pressable";
 import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
-import SegmentedBar from "./SegmentedBar";
+import SegmentBar from "../../../../components/shared/SegmentBar";
 import { HEALTH_BACKGROUNDS, HEALTH_LABELS, HEALTH_ORDER, MODE_BACKGROUNDS, MODE_LABELS, MODE_ORDER, tokenVar } from "./peopleConstants";
 import transform from "./transform";
 
 const HEALTH_TOOLTIP = "Offline: no heartbeat for 7+ days. Outdated: older than the latest release for the device's OS.";
+
+const HEALTH_BAR_HEIGHT = "12px";
+const MODE_BAR_HEIGHT = "8px";
 
 function LegendRow({ color, label, count, active, onClick }) {
     return (
@@ -45,17 +48,17 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
     };
 
     const healthSegments = HEALTH_ORDER.map((key) => ({
-        key, label: HEALTH_LABELS[key], count: health[key] || 0, background: HEALTH_BACKGROUNDS[key], lightText: key !== "outdated",
+        key, label: HEALTH_LABELS[key], count: health[key] || 0, color: tokenVar(HEALTH_BACKGROUNDS[key]),
     }));
     const modeSegments = MODE_ORDER.map((key) => ({
-        key, label: MODE_LABELS[key], count: modes[key] || 0, background: MODE_BACKGROUNDS[key], lightText: key === "enforce",
+        key, label: MODE_LABELS[key], count: modes[key] || 0, color: tokenVar(MODE_BACKGROUNDS[key]),
     }));
 
     const body = (
         <VerticalStack gap="4">
             <Text as="p" color="subdued">{`${(overview?.deviceCount || 0).toLocaleString("en-US")} managed devices`}</Text>
             <VerticalStack gap="3">
-                <SegmentedBar segments={healthSegments} onSelect={onSelectHealth} activeKey={activeHealth} thin />
+                <SegmentBar segments={healthSegments} height={HEALTH_BAR_HEIGHT} onSegmentClick={onSelectHealth} activeKey={activeHealth} />
                 <VerticalStack gap="1">
                     {HEALTH_ORDER.map((key) => (
                         <LegendRow key={key} color={tokenVar(HEALTH_BACKGROUNDS[key])} label={HEALTH_LABELS[key]} count={health[key] || 0}
@@ -66,7 +69,7 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
             <Divider />
             <VerticalStack gap="2">
                 <Text as="h4" variant="headingSm">Guardrail mode</Text>
-                <SegmentedBar segments={modeSegments} onSelect={onSelectMode} activeKey={activeMode} thin />
+                <SegmentBar segments={modeSegments} height={MODE_BAR_HEIGHT} onSegmentClick={onSelectMode} activeKey={activeMode} />
                 <HorizontalStack align="space-between">
                     {MODE_ORDER.map((key) => (
                         <Pressable
