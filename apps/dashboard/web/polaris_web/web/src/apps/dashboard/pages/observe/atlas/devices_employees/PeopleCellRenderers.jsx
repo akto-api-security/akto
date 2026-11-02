@@ -1,14 +1,6 @@
-import { Avatar, Badge, Box, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Avatar, Badge, Box, HorizontalStack, ProgressBar, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
-import CustomProgressBar from "../../../dashboard/new_components/CustomProgressBar";
-import { HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, RISK_COLORS } from "./peopleConstants";
-
-const MEDIUM_RISK_THRESHOLD = 50;
-
-function riskColor(score) {
-    if (score >= HIGH_RISK_THRESHOLD) return RISK_COLORS.high;
-    return score >= MEDIUM_RISK_THRESHOLD ? RISK_COLORS.medium : RISK_COLORS.low;
-}
+import { HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS } from "./peopleConstants";
 
 export function EmployeeCellRenderer({ data }) {
     if (!data) return null;
@@ -61,7 +53,7 @@ export function RiskCellRenderer({ data }) {
     return (
         <Tooltip content={content} width="wide">
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <Box width="90px"><CustomProgressBar progress={data.risk} topColor={riskColor(data.risk)} backgroundColor="#EDEEEF" height="8px" borderRadius="4px" /></Box>
+                <Box width="90px"><ProgressBar progress={data.risk} size="small" color={data.risk >= HIGH_RISK_THRESHOLD ? "critical" : "primary"} /></Box>
                 <Text as="span" fontWeight="semibold">{data.risk}</Text>
             </HorizontalStack>
         </Tooltip>

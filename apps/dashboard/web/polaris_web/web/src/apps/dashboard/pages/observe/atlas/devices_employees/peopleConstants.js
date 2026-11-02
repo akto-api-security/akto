@@ -12,11 +12,11 @@ export const CATEGORY_LABELS = {
     browser: "Browser AI",
 };
 
-export const CATEGORY_COLORS = {
-    agents: "#6200EA",
-    ide: "#8051FF",
-    mcp: "#B38CFF",
-    browser: "#E5D7FF",
+export const CATEGORY_BACKGROUNDS = {
+    agents: "bg-magic-strong",
+    ide: "bg-magic-active",
+    mcp: "bg-magic-hover",
+    browser: "bg-magic-subdued",
 };
 
 export const HEALTH_LABELS = {
@@ -25,10 +25,10 @@ export const HEALTH_LABELS = {
     offline: "Offline 7+ days",
 };
 
-export const HEALTH_COLORS = {
-    healthy: "#2E7D5B",
-    outdated: "#E4C300",
-    offline: "#D72C0D",
+export const HEALTH_BACKGROUNDS = {
+    healthy: "bg-success-strong",
+    outdated: "bg-caution-strong",
+    offline: "bg-critical-strong",
 };
 
 export const HEALTH_BADGE_STATUS = {
@@ -43,11 +43,13 @@ export const MODE_LABELS = {
     none: "No policy",
 };
 
-export const MODE_COLORS = {
-    enforce: "#6200EA",
-    monitor: "#B38CFF",
-    none: "#C9CCCF",
+export const MODE_BACKGROUNDS = {
+    enforce: "bg-magic-strong",
+    monitor: "bg-magic-active",
+    none: "bg-strong",
 };
+
+export const tokenVar = (token) => `var(--p-color-${token})`;
 
 export const RISK_BUCKET_COUNT = 10;
 export const HIGH_RISK_THRESHOLD = 70;

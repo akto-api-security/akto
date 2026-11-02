@@ -5,7 +5,7 @@ import Pressable from "../../../dashboard/ask/components/Pressable";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
 import InsightCard from "./InsightCard";
 import SegmentedBar from "./SegmentedBar";
-import { HEALTH_COLORS, HEALTH_LABELS, MODE_COLORS, MODE_LABELS, OS_LABELS } from "./peopleConstants";
+import { HEALTH_BACKGROUNDS, HEALTH_LABELS, MODE_BACKGROUNDS, MODE_LABELS, OS_LABELS, tokenVar } from "./peopleConstants";
 
 const HEALTH_ORDER = ["healthy", "outdated", "offline"];
 const MODE_ORDER = ["enforce", "monitor", "none"];
@@ -50,10 +50,10 @@ function AgentHealthCard({ overview, status, onSelectHealth, onSelectMode, onUpd
     };
 
     const healthSegments = HEALTH_ORDER.map((key) => ({
-        key, label: HEALTH_LABELS[key], count: health[key] || 0, color: HEALTH_COLORS[key], lightText: key !== "outdated",
+        key, label: HEALTH_LABELS[key], count: health[key] || 0, background: HEALTH_BACKGROUNDS[key], lightText: key !== "outdated",
     }));
     const modeSegments = MODE_ORDER.map((key) => ({
-        key, label: MODE_LABELS[key], count: modes[key] || 0, color: MODE_COLORS[key], lightText: key === "enforce",
+        key, label: MODE_LABELS[key], count: modes[key] || 0, background: MODE_BACKGROUNDS[key], lightText: key === "enforce",
     }));
 
     return (
@@ -66,7 +66,7 @@ function AgentHealthCard({ overview, status, onSelectHealth, onSelectMode, onUpd
                 <SegmentedBar segments={healthSegments} onSelect={onSelectHealth} />
                 <VerticalStack gap="1">
                     {HEALTH_ORDER.map((key) => (
-                        <LegendRow key={key} color={HEALTH_COLORS[key]} label={HEALTH_LABELS[key]} count={health[key] || 0}
+                        <LegendRow key={key} color={tokenVar(HEALTH_BACKGROUNDS[key])} label={HEALTH_LABELS[key]} count={health[key] || 0}
                             onClick={() => onSelectHealth(key)} />
                     ))}
                 </VerticalStack>
