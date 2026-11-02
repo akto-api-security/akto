@@ -5,12 +5,12 @@ import Pressable from "../../../dashboard/ask/components/Pressable";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
 import InsightCard from "./InsightCard";
 import SegmentedBar from "./SegmentedBar";
-import { HEALTH_BACKGROUNDS, HEALTH_LABELS, MODE_BACKGROUNDS, MODE_LABELS, OS_LABELS, tokenVar } from "./peopleConstants";
+import { HEALTH_BACKGROUNDS, HEALTH_LABELS, MODE_BACKGROUNDS, MODE_LABELS, tokenVar } from "./peopleConstants";
 
 const HEALTH_ORDER = ["healthy", "outdated", "offline"];
 const MODE_ORDER = ["enforce", "monitor", "none"];
 
-function LegendRow({ color, label, count, onClick }) {
+function LegendRow({ color, label, count, active, onClick }) {
     const row = (
         <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
@@ -22,18 +22,17 @@ function LegendRow({ color, label, count, onClick }) {
     );
     if (!onClick) return row;
     return (
-        <Pressable onClick={onClick} accessibilityLabel={label} hoverBackground="bg-subdued" borderRadius="2" padding="1">
+        <Pressable onClick={onClick} accessibilityLabel={label} background={active ? "bg-primary-subdued-hover" : undefined} hoverBackground="bg-subdued" borderRadius="2" padding="1">
             {row}
         </Pressable>
     );
 }
 
-function AgentHealthCard({ overview, status, onSelectHealth, onSelectMode, onUpdated }) {
+function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectHealth, onSelectMode, onUpdated }) {
     const health = overview?.agentHealth || {};
     const modes = overview?.guardrailModes || {};
     const outdatedModuleIds = overview?.outdatedModuleIds || [];
     const outdatedCount = outdatedModuleIds.length;
-    const latestVersions = Object.entries(overview?.latestVersionByOs || {});
 
     const updateOutdated = () => {
         const agentWord = `agent${outdatedCount > 1 ? "s" : ""}`;
@@ -63,23 +62,18 @@ function AgentHealthCard({ overview, status, onSelectHealth, onSelectMode, onUpd
             status={status}
         >
             <VerticalStack gap="3">
-                <SegmentedBar segments={healthSegments} onSelect={onSelectHealth} showPercent={false} />
+                <SegmentedBar segments={healthSegments} onSelect={onSelectHealth} activeKey={activeHealth} thin />
                 <VerticalStack gap="1">
                     {HEALTH_ORDER.map((key) => (
                         <LegendRow key={key} color={tokenVar(HEALTH_BACKGROUNDS[key])} label={HEALTH_LABELS[key]} count={health[key] || 0}
-                            onClick={() => onSelectHealth(key)} />
+                            active={activeHealth === key} onClick={() => onSelectHealth(key)} />
                     ))}
                 </VerticalStack>
-                {latestVersions.length > 0 && (
-                    <Text as="p" variant="bodySm" color="subdued">
-                        Outdated means older than the latest release: {latestVersions.map(([os, version]) => `${OS_LABELS[os]} ${version}`).join(", ")}.
-                    </Text>
-                )}
             </VerticalStack>
             <Divider />
             <VerticalStack gap="2">
                 <Text as="h4" variant="headingSm">Guardrail mode</Text>
-                <SegmentedBar segments={modeSegments} onSelect={onSelectMode} showPercent={false} />
+                <SegmentedBar segments={modeSegments} onSelect={onSelectMode} activeKey={activeMode} thin />
                 <HorizontalStack align="space-between">
                     {MODE_ORDER.map((key) => (
                         <Text key={key} as="span" variant="bodySm" color="subdued">{MODE_LABELS[key]} · {(modes[key] || 0).toLocaleString("en-US")}</Text>

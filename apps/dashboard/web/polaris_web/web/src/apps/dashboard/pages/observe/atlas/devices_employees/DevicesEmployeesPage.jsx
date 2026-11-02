@@ -12,11 +12,8 @@ import RiskHistogramCard from "./RiskHistogramCard";
 import StatsRow from "./StatsRow";
 import DeviceScopeDropdown, { DEVICE_SCOPES } from "./DeviceScopeDropdown";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
-import { EMPTY_PEOPLE_FILTERS, RISK_BUCKET_COUNT } from "./peopleConstants";
+import { EMPTY_PEOPLE_FILTERS, HIGH_RISK_THRESHOLD, RISK_BUCKET_WIDTH } from "./peopleConstants";
 import transform from "./transform";
-
-const RISK_BUCKET_WIDTH = 100 / RISK_BUCKET_COUNT;
-const HIGH_RISK_MIN = 70;
 
 function DevicesEmployeesPage() {
     const [deviceScope, setDeviceScope] = useState(DEVICE_SCOPES[0].id);
@@ -62,15 +59,22 @@ function DevicesEmployeesPage() {
         setFilters({ ...EMPTY_PEOPLE_FILTERS, ...patch });
     }, []);
     const refreshAll = useCallback(() => setRefreshKey((key) => key + 1), []);
+    const toggleView = (nextTab, patch = {}) => {
+        const sameView = tab === nextTab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...patch }) === JSON.stringify(filters);
+        showTable(nextTab, sameView ? {} : patch);
+    };
+    const onDevicesTab = tab === "devices";
+    const activeHealth = onDevicesTab && filters.healthStates.length === 1 ? filters.healthStates[0] : null;
+    const activeMode = onDevicesTab && filters.monitorMode ? "monitor" : null;
 
     const onSelectStat = (id) => {
         const target = transform.statCardTarget(id);
-        if (target) showTable(target.tab, target.filters);
+        if (target) toggleView(target.tab, target.filters);
     };
-    const onSelectMode = (mode) => showTable("devices", mode === "monitor" ? { monitorMode: true } : {});
-    const onSelectBucket = (index) => showTable("employees", {
+    const onSelectMode = (mode) => toggleView("devices", mode === "monitor" ? { monitorMode: true } : {});
+    const onSelectBucket = (index) => toggleView("employees", {
         riskMin: index * RISK_BUCKET_WIDTH,
-        riskMax: index === RISK_BUCKET_COUNT - 1 ? 100 : index * RISK_BUCKET_WIDTH + RISK_BUCKET_WIDTH - 1,
+        riskMax: (index + 1) * RISK_BUCKET_WIDTH,
     });
 
     return (
@@ -97,20 +101,22 @@ function DevicesEmployeesPage() {
                     <AgentHealthCard
                         overview={overview}
                         status={overviewStatus}
-                        onSelectHealth={(state) => showTable("devices", { healthStates: [state] })}
+                        activeHealth={activeHealth}
+                        activeMode={activeMode}
+                        onSelectHealth={(state) => toggleView("devices", { healthStates: [state] })}
                         onSelectMode={onSelectMode}
                         onUpdated={refreshAll}
                     />
                     <AiToolsByOsCard
                         overview={overview}
                         status={overviewStatus}
-                        onSelect={(os, category) => showTable("devices", { osList: [os], categories: [category] })}
+                        onSelect={(os, category) => toggleView("devices", { osList: [os], categories: [category] })}
                     />
                     <RiskHistogramCard
                         overview={overview}
                         status={overviewStatus}
                         onSelectBucket={onSelectBucket}
-                        onSelectHighRisk={() => showTable("employees", { riskMin: HIGH_RISK_MIN })}
+                        onSelectHighRisk={() => toggleView("employees", { riskMin: HIGH_RISK_THRESHOLD })}
                     />
                 </HorizontalGrid>,
                 <PeopleTable
@@ -125,6 +131,7 @@ function DevicesEmployeesPage() {
                     search={search}
                     onSearchChange={setSearch}
                     violationsAvailable={overview?.violationsAvailable}
+                    riskAvailable={overview?.riskAvailable}
                 />,
             ]}
         />

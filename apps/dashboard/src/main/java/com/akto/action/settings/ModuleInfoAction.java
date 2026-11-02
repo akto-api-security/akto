@@ -111,8 +111,8 @@ public class ModuleInfoAction extends UserAction {
     @Setter private boolean usesPersonal;
     @Setter private boolean agentIssues;
     @Setter private boolean monitorMode;
-    @Setter private int riskMin;
-    @Setter private int riskMax = 100;
+    @Setter private double riskMin;
+    @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
     @Getter private Map<String, Object> atlasOverview;
     @Getter private List<Map<String, Object>> atlasRows;
     @Getter private long atlasTotal;

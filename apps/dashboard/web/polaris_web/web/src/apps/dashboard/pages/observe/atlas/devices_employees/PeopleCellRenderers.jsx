@@ -1,6 +1,6 @@
 import { Avatar, Badge, Box, HorizontalStack, ProgressBar, Text, Tooltip } from "@shopify/polaris";
 import func from "@/util/func";
-import { HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS } from "./peopleConstants";
+import { HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, RISK_MAX } from "./peopleConstants";
 
 export function EmployeeCellRenderer({ data }) {
     if (!data) return null;
@@ -49,14 +49,21 @@ export function ViolationsCellRenderer({ value, context }) {
     return <Text as="span" color={value ? undefined : "subdued"}>{value ?? 0}</Text>;
 }
 
-export function RiskCellRenderer({ data }) {
+export function RiskCellRenderer({ data, context }) {
     if (!data) return null;
-    const content = `Unapproved tools +${data.riskUnapprovedPoints} (of 40), personal accounts +${data.riskPersonalPoints} (of 30), violations +${data.riskViolationPoints} (of 30)`;
+    if (context?.riskAvailable === false) {
+        return (
+            <Tooltip content="Risk data is unavailable right now">
+                <Text as="span" color="subdued">—</Text>
+            </Tooltip>
+        );
+    }
+    const score = data.riskScore ?? 0;
     return (
-        <Tooltip content={content} width="wide">
+        <Tooltip content="Highest API risk score (0 to 5) across this employee's AI tools" width="wide">
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <Box width="100%"><ProgressBar progress={data.risk} size="small" color={data.risk >= HIGH_RISK_THRESHOLD ? "critical" : "primary"} /></Box>
-                <Text as="span" fontWeight="semibold">{data.risk}</Text>
+                <Box width="110px"><ProgressBar progress={score * (100 / RISK_MAX)} size="small" color={score >= HIGH_RISK_THRESHOLD ? "critical" : "primary"} /></Box>
+                <Text as="span" fontWeight="semibold">{score.toFixed(1)}</Text>
             </HorizontalStack>
         </Tooltip>
     );

@@ -1,5 +1,6 @@
 package com.akto.service.atlas;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.EndpointShieldSettings;
 import com.akto.dto.GuardrailPolicies;
@@ -50,12 +51,9 @@ public class AtlasPeopleService {
     public static final List<String> OS_ORDER = Arrays.asList(OS_MAC, OS_WINDOWS, OS_LINUX, OS_UNKNOWN);
 
     public static final int VIOLATION_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-    public static final int RISK_UNAPPROVED_POINTS = 40;
-    public static final int RISK_PERSONAL_POINTS = 30;
-    public static final int RISK_VIOLATION_POINTS = 30;
-    public static final int RISK_PERSONAL_CAP = 3;
-    public static final int RISK_VIOLATION_CAP = 50;
-    public static final int RISK_BUCKETS = 10;
+    public static final double RISK_MAX = 5.0;
+    public static final double HIGH_RISK_SCORE = 4.0;
+    public static final int RISK_BUCKETS = 5;
 
     private static final int OFFLINE_SECONDS = 7 * 24 * 60 * 60;
     private static final long CACHE_TTL_MS = 60_000;
@@ -90,6 +88,7 @@ public class AtlasPeopleService {
         public int unapprovedTools;
         public int personalAccounts;
         public long violations;
+        public double riskScore;
 
         public DeviceRow() {
             for (String category : CATEGORIES) toolsByCategory.put(category, 0);
@@ -116,6 +115,7 @@ public class AtlasPeopleService {
             row.put("unapprovedTools", unapprovedTools);
             row.put("personalAccounts", personalAccounts);
             row.put("violations", violations);
+            row.put("riskScore", riskScore);
             row.put("lastHeartbeat", lastHeartbeat);
             return row;
         }
@@ -129,13 +129,7 @@ public class AtlasPeopleService {
         public int personalAccounts;
         public long violations;
         public int lastActive;
-        public int riskUnapprovedPoints;
-        public int riskPersonalPoints;
-        public int riskViolationPoints;
-
-        public int risk() {
-            return riskUnapprovedPoints + riskPersonalPoints + riskViolationPoints;
-        }
+        public double riskScore;
 
         public Map<String, Object> toMap() {
             Map<String, Object> row = new LinkedHashMap<>();
@@ -146,10 +140,7 @@ public class AtlasPeopleService {
             row.put("unapprovedTools", unapprovedTools);
             row.put("personalAccounts", personalAccounts);
             row.put("violations", violations);
-            row.put("risk", risk());
-            row.put("riskUnapprovedPoints", riskUnapprovedPoints);
-            row.put("riskPersonalPoints", riskPersonalPoints);
-            row.put("riskViolationPoints", riskViolationPoints);
+            row.put("riskScore", riskScore);
             row.put("lastActive", lastActive);
             return row;
         }
@@ -161,6 +152,7 @@ public class AtlasPeopleService {
         public final Map<String, String> latestVersionByOs = new HashMap<>();
         public boolean toolsAvailable = true;
         public boolean violationsAvailable = true;
+        public boolean riskAvailable = true;
     }
 
     public static class PeopleQuery {
@@ -172,8 +164,8 @@ public class AtlasPeopleService {
         public boolean usesPersonal;
         public boolean agentIssues;
         public boolean monitorMode;
-        public int riskMin;
-        public int riskMax = 100;
+        public double riskMin;
+        public double riskMax = RISK_MAX;
         public String sortKey;
         public int sortOrder = -1;
         public int skip;
@@ -217,18 +209,24 @@ public class AtlasPeopleService {
             snapshot.toolsAvailable = false;
             snapshot.violationsAvailable = false;
         } else {
+            Map<String, Set<Integer>> collectionIdsByDevice = new HashMap<>();
             try {
-                addTools(devicesByLowerName, bundle, statsService, startTs, endTs);
+                addTools(devicesByLowerName, collectionIdsByDevice, bundle, statsService, startTs, endTs);
                 addGuardrailModes(devicesByLowerName.values(), bundle);
             } catch (Exception e) {
                 snapshot.toolsAvailable = false;
+            }
+            try {
+                addRiskScores(devicesByLowerName, collectionIdsByDevice);
+            } catch (Exception e) {
+                snapshot.riskAvailable = false;
             }
             snapshot.violationsAvailable = bundle.threatBackendAvailable;
             if (snapshot.violationsAvailable) addViolations(devicesByLowerName, bundle);
         }
 
         snapshot.devices.addAll(devicesByLowerName.values());
-        snapshot.employees.addAll(buildEmployees(snapshot.devices, snapshot.violationsAvailable));
+        snapshot.employees.addAll(buildEmployees(snapshot.devices));
         return snapshot;
     }
 
@@ -254,8 +252,8 @@ public class AtlasPeopleService {
         return device;
     }
 
-    private void addTools(Map<String, DeviceRow> devicesByLowerName, InsightDataBundle bundle,
-                          AtlasDeviceStatsService statsService, int startTs, int endTs) {
+    private void addTools(Map<String, DeviceRow> devicesByLowerName, Map<String, Set<Integer>> collectionIdsByDevice,
+                          InsightDataBundle bundle, AtlasDeviceStatsService statsService, int startTs, int endTs) {
         boolean ranged = startTs > 0 || endTs > 0;
         Map<String, String> remarksByServiceName = statsService.loadServerRemarks();
         for (ApiCollection c : bundle.collections) {
@@ -267,8 +265,22 @@ public class AtlasPeopleService {
             if (ranged && !AtlasDeviceStatsService.seenInWindow(bundle.collectionLastTrafficSeen.get(c.getId()), startTs, endTs)) continue;
             String category = categoryOf(c);
             device.toolsByCategory.merge(category, 1, Integer::sum);
+            collectionIdsByDevice.computeIfAbsent(hostDevice.toLowerCase(Locale.ROOT), key -> new HashSet<>()).add(c.getId());
             if (!AtlasDeviceStatsService.isSanctioned(c, bundle.allowlistNamesLower, remarksByServiceName)) device.unapprovedTools++;
             if (InsightUtil.isPersonalAccount(c)) device.personalAccounts++;
+        }
+    }
+
+    private static void addRiskScores(Map<String, DeviceRow> devicesByLowerName, Map<String, Set<Integer>> collectionIdsByDevice) {
+        Set<Integer> allCollectionIds = new HashSet<>();
+        for (Set<Integer> ids : collectionIdsByDevice.values()) allCollectionIds.addAll(ids);
+        Map<Integer, Double> riskByCollection = ApiInfoDao.instance.getRiskScoreForCollections(new ArrayList<>(allCollectionIds));
+        for (Map.Entry<String, Set<Integer>> entry : collectionIdsByDevice.entrySet()) {
+            DeviceRow device = devicesByLowerName.get(entry.getKey());
+            if (device == null) continue;
+            double highest = 0;
+            for (Integer id : entry.getValue()) highest = Math.max(highest, riskByCollection.getOrDefault(id, 0.0));
+            device.riskScore = Math.round(highest * 10) / 10.0;
         }
     }
 
@@ -315,7 +327,7 @@ public class AtlasPeopleService {
         }
     }
 
-    private static List<EmployeeRow> buildEmployees(List<DeviceRow> devices, boolean violationsAvailable) {
+    private static List<EmployeeRow> buildEmployees(List<DeviceRow> devices) {
         Map<String, EmployeeRow> byUsername = new LinkedHashMap<>();
         for (DeviceRow device : devices) {
             if (device.username.isEmpty()) continue;
@@ -330,15 +342,7 @@ public class AtlasPeopleService {
             employee.personalAccounts += device.personalAccounts;
             employee.violations += device.violations;
             employee.lastActive = Math.max(employee.lastActive, device.lastHeartbeat);
-        }
-        for (EmployeeRow employee : byUsername.values()) {
-            double unapprovedShare = employee.toolCount == 0 ? 0 : (double) employee.unapprovedTools / employee.toolCount;
-            employee.riskUnapprovedPoints = (int) Math.round(RISK_UNAPPROVED_POINTS * unapprovedShare);
-            employee.riskPersonalPoints = (int) Math.round(
-                    RISK_PERSONAL_POINTS * (double) Math.min(employee.personalAccounts, RISK_PERSONAL_CAP) / RISK_PERSONAL_CAP);
-            employee.riskViolationPoints = violationsAvailable
-                    ? (int) Math.round(RISK_VIOLATION_POINTS * (double) Math.min(employee.violations, RISK_VIOLATION_CAP) / RISK_VIOLATION_CAP)
-                    : 0;
+            employee.riskScore = Math.max(employee.riskScore, device.riskScore);
         }
         return new ArrayList<>(byUsername.values());
     }
@@ -385,8 +389,8 @@ public class AtlasPeopleService {
         int[] histogram = new int[RISK_BUCKETS];
         int highRisk = 0;
         for (EmployeeRow employee : snapshot.employees) {
-            histogram[Math.min(employee.risk() * RISK_BUCKETS / 100, RISK_BUCKETS - 1)]++;
-            if (employee.risk() >= 70) highRisk++;
+            histogram[Math.min((int) (employee.riskScore * RISK_BUCKETS / RISK_MAX), RISK_BUCKETS - 1)]++;
+            if (employee.riskScore >= HIGH_RISK_SCORE) highRisk++;
         }
         List<Integer> histogramList = new ArrayList<>();
         for (int count : histogram) histogramList.add(count);
@@ -402,6 +406,7 @@ public class AtlasPeopleService {
         overview.put("highRiskEmployees", highRisk);
         overview.put("toolsAvailable", snapshot.toolsAvailable);
         overview.put("violationsAvailable", snapshot.violationsAvailable);
+        overview.put("riskAvailable", snapshot.riskAvailable);
         return overview;
     }
 
@@ -431,7 +436,8 @@ public class AtlasPeopleService {
             if (hasText(query) && !contains(employee.username, query.text) && !anyDeviceContains(employee, query.text)) continue;
             if (query.hasUnapproved && employee.unapprovedTools == 0) continue;
             if (query.usesPersonal && employee.personalAccounts == 0) continue;
-            if (employee.risk() < query.riskMin || employee.risk() > query.riskMax) continue;
+            if (employee.riskScore < query.riskMin) continue;
+            if (query.riskMax < RISK_MAX && employee.riskScore >= query.riskMax) continue;
             matching.add(employee);
         }
         matching.sort(employeeComparator(query));
@@ -520,7 +526,7 @@ public class AtlasPeopleService {
             case "personalAccounts": comparator = Comparator.comparingInt(e -> e.personalAccounts); break;
             case "violations": comparator = Comparator.comparingLong(e -> e.violations); break;
             case "lastActive": comparator = Comparator.comparingInt(e -> e.lastActive); break;
-            default: comparator = Comparator.comparingInt(EmployeeRow::risk);
+            default: comparator = Comparator.comparingDouble(e -> e.riskScore);
         }
         return query.sortOrder >= 0 ? comparator : comparator.reversed();
     }

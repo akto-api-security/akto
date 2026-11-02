@@ -1,15 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
-import { Box, Button, HorizontalStack, Icon, Tabs, Tag, TextField } from "@shopify/polaris";
+import { Box, Button, HorizontalStack, Icon, Tabs, Tag, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { SearchMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import AgGridTable from "../../../../components/tables/AgGridTable";
+import Pressable from "../../../dashboard/ask/components/Pressable";
 import settingRequests from "../../../settings/api";
 import {
     AgentCellRenderer, CountCellRenderer, DeviceCellRenderer, EmployeeCellRenderer, GuardrailModeCellRenderer,
     LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, OS_LABELS,
+    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, OS_LABELS, RISK_MAX,
 } from "./peopleConstants";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: false, filter: false, suppressHeaderMenuButton: true, cellStyle: { display: "flex", alignItems: "center" } };
@@ -22,7 +23,7 @@ const EMPLOYEE_COLUMNS = [
     { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
     { field: "personalAccounts", headerName: "Personal accounts", width: 150, cellRenderer: CountCellRenderer },
     { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
-    { field: "risk", headerName: "Risk score", width: 190, cellRenderer: RiskCellRenderer },
+    { field: "riskScore", headerName: "Risk score (0-5)", width: 200, cellRenderer: RiskCellRenderer },
     { field: "lastActive", headerName: "Last active", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
 
@@ -43,7 +44,7 @@ function isChipActive(chipKey, filters) {
 
 function toggleChip(chipKey, filters, onFiltersChange) {
     if (chipKey === "highRisk") {
-        onFiltersChange({ riskMin: filters.riskMin >= HIGH_RISK_THRESHOLD ? 0 : HIGH_RISK_THRESHOLD, riskMax: 100 });
+        onFiltersChange({ riskMin: filters.riskMin >= HIGH_RISK_THRESHOLD ? 0 : HIGH_RISK_THRESHOLD, riskMax: RISK_MAX });
         return;
     }
     onFiltersChange({ [chipKey]: !filters[chipKey] });
@@ -54,53 +55,68 @@ function appliedTags(filters) {
     filters.osList.forEach((os) => tags.push({ key: `os-${os}`, label: OS_LABELS[os] || os, clear: { osList: filters.osList.filter((x) => x !== os) } }));
     filters.categories.forEach((category) => tags.push({ key: `cat-${category}`, label: CATEGORY_LABELS[category] || category, clear: { categories: filters.categories.filter((x) => x !== category) } }));
     filters.healthStates.forEach((state) => tags.push({ key: `health-${state}`, label: HEALTH_LABELS[state] || state, clear: { healthStates: filters.healthStates.filter((x) => x !== state) } }));
-    if (filters.riskMin > 0 || filters.riskMax < 100) {
-        tags.push({ key: "risk", label: `Risk ${filters.riskMin}-${filters.riskMax}`, clear: { riskMin: 0, riskMax: 100 } });
+    const isCustomRiskRange = (filters.riskMin > 0 || filters.riskMax < RISK_MAX)
+        && !(filters.riskMin === HIGH_RISK_THRESHOLD && filters.riskMax === RISK_MAX);
+    if (isCustomRiskRange) {
+        tags.push({ key: "risk", label: `Risk ${filters.riskMin}-${filters.riskMax}`, clear: { riskMin: 0, riskMax: RISK_MAX } });
     }
     return tags;
 }
 
+function FilterChip({ label, active, onClick }) {
+    return (
+        <Pressable
+            accessibilityLabel={label}
+            onClick={onClick}
+            background="bg"
+            hoverBackground="bg-subdued"
+            borderWidth="1"
+            borderColor={active ? "border-magic-strong" : "border"}
+            borderRadius="2"
+            paddingBlockStart="2"
+            paddingBlockEnd="2"
+            paddingInlineStart="3"
+            paddingInlineEnd="3"
+        >
+            <Box as="span" color={active ? "text-ask-magic" : undefined}>
+                <Text as="span" fontWeight={active ? "semibold" : "regular"}>{label}</Text>
+            </Box>
+        </Pressable>
+    );
+}
+
 function SearchRow({ value, onChange, placeholder, tab, filters, onFiltersChange }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
+    const tags = appliedTags(filters);
     return (
         <Box padding="3">
-            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <Box width="100%">
-                    <TextField
-                        label={placeholder}
-                        labelHidden
-                        autoComplete="off"
-                        prefix={<Icon source={SearchMinor} />}
-                        placeholder={placeholder}
-                        value={value}
-                        onChange={onChange}
-                        clearButton
-                        onClearButtonClick={() => onChange("")}
-                    />
-                </Box>
-                {chips.map((chip) => (
-                    <Button key={chip.key} pressed={isChipActive(chip.key, filters)} onClick={() => toggleChip(chip.key, filters, onFiltersChange)}>
-                        {chip.label}
-                    </Button>
-                ))}
-            </HorizontalStack>
+            <VerticalStack gap="3">
+                <TextField
+                    label={placeholder}
+                    labelHidden
+                    autoComplete="off"
+                    prefix={<Icon source={SearchMinor} />}
+                    placeholder={placeholder}
+                    value={value}
+                    onChange={onChange}
+                    clearButton
+                    onClearButtonClick={() => onChange("")}
+                />
+                <HorizontalStack gap="2" blockAlign="center">
+                    {chips.map((chip) => (
+                        <FilterChip key={chip.key} label={chip.label} active={isChipActive(chip.key, filters)}
+                            onClick={() => toggleChip(chip.key, filters, onFiltersChange)} />
+                    ))}
+                    {tags.map((tag) => <Tag key={tag.key} onRemove={() => onFiltersChange(tag.clear)}>{tag.label}</Tag>)}
+                    {tags.length > 0 && <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>}
+                </HorizontalStack>
+            </VerticalStack>
         </Box>
     );
 }
 
-function AppliedTags({ filters, onFiltersChange }) {
-    const tags = appliedTags(filters);
-    return (
-        <HorizontalStack gap="2" blockAlign="center">
-            {tags.map((tag) => <Tag key={tag.key} onRemove={() => onFiltersChange(tag.clear)}>{tag.label}</Tag>)}
-            <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>
-        </HorizontalStack>
-    );
-}
-
-function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable }) {
+function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable }) {
     const isEmployees = tab === "employees";
-    const hasAppliedFilters = appliedTags(filters).length > 0;
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const tabs = [
@@ -159,11 +175,10 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                         onFiltersChange={onFiltersChange}
                     />
                 )}
-                searchBelow={hasAppliedFilters ? <AppliedTags filters={filters} onFiltersChange={onFiltersChange} /> : null}
                 rowHeight={ROW_HEIGHT}
                 noOuterBorder
                 sideBar={false}
-                context={{ violationsAvailable }}
+                context={{ violationsAvailable, riskAvailable }}
                 getRowStyle={() => ({ cursor: "default" })}
                 rowSelection={undefined}
             />
