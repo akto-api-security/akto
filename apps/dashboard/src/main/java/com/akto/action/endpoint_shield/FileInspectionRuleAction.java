@@ -18,7 +18,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import java.util.List;
 
@@ -26,11 +29,17 @@ public class FileInspectionRuleAction extends UserAction {
 
     private static final LoggerMaker logger = new LoggerMaker(FileInspectionRuleAction.class, LogDb.DASHBOARD);
     private static final int MAX_PATH_LENGTH = 1024;
+    private static final int MAX_AGENT_LENGTH = 100;
+    private static final Set<String> VALID_OS = new HashSet<>(Arrays.asList("darwin", "linux", "windows"));
+    private static final Set<String> VALID_ROLES = new HashSet<>(Arrays.asList("login", "credentials", "mcp_config"));
 
     @Setter private String path;
     @Setter private boolean existenceOnly;
     @Setter private int maxDepth;        // 0 = immediate children, -1 = unlimited
-    @Setter private String ruleId;       // used by delete + result-fetch
+    @Setter private String agent;
+    @Setter private String os;
+    @Setter private String role;
+    @Setter private String ruleId;       // used by update + result-fetch
     @Setter private String sha256;       // used by getFileContent
     @Setter private int sinceExecutedAt; // cursor for result-fetch pagination
     @Setter private int limit;           // page size for result-fetch
@@ -49,6 +58,7 @@ public class FileInspectionRuleAction extends UserAction {
             FileInspectionRuleDao.instance.createIndicesIfAbsent();
 
             String validation = validatePath(path);
+            if (validation == null) validation = validateMetadata();
             if (validation != null) {
                 addActionError(validation);
                 return Action.ERROR.toUpperCase();
@@ -62,6 +72,9 @@ public class FileInspectionRuleAction extends UserAction {
             if (existing != null) {
                 existing.setExistenceOnly(existenceOnly);
                 existing.setMaxDepth(maxDepth);
+                if (StringUtils.isNotBlank(agent)) existing.setAgent(agent.trim());
+                if (StringUtils.isNotBlank(os)) existing.setOs(normalize(os));
+                if (StringUtils.isNotBlank(role)) existing.setRole(normalize(role));
                 existing.setUpdatedTs(now);
                 FileInspectionRuleDao.instance.replaceOne(filter, existing);
                 this.rule = existing;
@@ -73,6 +86,9 @@ public class FileInspectionRuleAction extends UserAction {
                 r.setExistenceOnly(existenceOnly);
                 r.setMaxDepth(maxDepth);
                 r.setAddedBy(addedBy);
+                r.setAgent(StringUtils.trimToNull(agent));
+                r.setOs(normalize(os));
+                r.setRole(normalize(role));
                 r.setCreatedTs(now);
                 r.setUpdatedTs(now);
                 FileInspectionRuleDao.instance.insertOne(r);
@@ -82,6 +98,48 @@ public class FileInspectionRuleAction extends UserAction {
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "addFileInspectionRule failed: " + e.getMessage());
             addActionError("Failed to save rule");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String updateFileInspectionRule() {
+        try {
+            if (StringUtils.isBlank(ruleId) || !ObjectId.isValid(ruleId.trim())) {
+                addActionError("Valid ruleId is required");
+                return Action.ERROR.toUpperCase();
+            }
+            String validation = validatePath(path);
+            if (validation == null) validation = validateMetadata();
+            if (validation != null) {
+                addActionError(validation);
+                return Action.ERROR.toUpperCase();
+            }
+            ObjectId id = new ObjectId(ruleId.trim());
+            Bson filter = Filters.eq(FileInspectionRule.ID, id);
+            FileInspectionRule existing = FileInspectionRuleDao.instance.findOne(filter);
+            if (existing == null) {
+                addActionError("Rule not found");
+                return Action.ERROR.toUpperCase();
+            }
+            String trimmed = path.trim();
+            FileInspectionRule samePath = FileInspectionRuleDao.instance.findOne(Filters.eq(FileInspectionRule.PATH, trimmed));
+            if (samePath != null && !id.equals(samePath.getId())) {
+                addActionError("A rule for this path already exists");
+                return Action.ERROR.toUpperCase();
+            }
+            existing.setPath(trimmed);
+            existing.setExistenceOnly(existenceOnly);
+            existing.setMaxDepth(maxDepth);
+            existing.setAgent(StringUtils.trimToNull(agent));
+            existing.setOs(normalize(os));
+            existing.setRole(normalize(role));
+            existing.setUpdatedTs(Context.now());
+            FileInspectionRuleDao.instance.replaceOne(filter, existing);
+            this.rule = existing;
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "updateFileInspectionRule failed: " + e.getMessage());
+            addActionError("Failed to update rule");
             return Action.ERROR.toUpperCase();
         }
     }
@@ -176,6 +234,20 @@ public class FileInspectionRuleAction extends UserAction {
             addActionError("Failed to fetch content");
             return Action.ERROR.toUpperCase();
         }
+    }
+
+    private String validateMetadata() {
+        if (agent != null && agent.trim().length() > MAX_AGENT_LENGTH) return "Agent name too long (max " + MAX_AGENT_LENGTH + ")";
+        String o = normalize(os);
+        if (o != null && !VALID_OS.contains(o)) return "Invalid os: " + os;
+        String r = normalize(role);
+        if (r != null && !VALID_ROLES.contains(r)) return "Invalid role: " + role;
+        return null;
+    }
+
+    private static String normalize(String v) {
+        String t = StringUtils.trimToNull(v);
+        return t == null ? null : t.toLowerCase();
     }
 
     private static String validatePath(String p) {
