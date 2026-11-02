@@ -35,13 +35,14 @@ def test_input_template_stays_under_latency_cliff(template):
         ("v1", "abcd", "INPUT_ABCD"),
         ("V2", "", "INPUT_V2"),
         ("v2", "abcd", "INPUT_ABCD_V2"),
-        ("atlas", "", "INPUT_ATLAS"),
-        ("atlas", "abcd", "INPUT_ABCD_ATLAS"),
+        # atlas is NOT selectable deployment-wide (trusted-dev rules would reach Argus); falls back to v1.
+        ("atlas", "", "INPUT"),
+        ("atlas", "abcd", "INPUT_ABCD"),
         ("v3", "", "INPUT"),
     ],
 )
 def test_version_env_selects_input_rules(monkeypatch, version, response_format, template):
-    """PROMPT_INJECTION_PROMPT_VERSION picks the input rules; unknown falls back to v1."""
+    """PROMPT_INJECTION_PROMPT_VERSION picks the input rules; atlas and unknown fall back to v1."""
     monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", version)
     prompt = build_scan_prompt("PromptInjection", "prompt", {}, "hi", response_format=response_format)
     assert prompt == getattr(prompt_injection, template) % "hi"
@@ -69,6 +70,24 @@ def test_non_endpoint_context_keeps_the_env_version(monkeypatch, context_source)
     config = {"contextSource": context_source} if context_source else {}
     prompt = build_scan_prompt("PromptInjection", "prompt", config, "hi", response_format="abcd")
     assert prompt == prompt_injection.INPUT_ABCD_V2 % "hi"
+
+
+def test_atlas_rollback_version_moves_endpoint_off_atlas(monkeypatch):
+    """PROMPT_INJECTION_ATLAS_PROMPT_VERSION is the kill switch: ops can move Atlas back to
+    v1/v2 without a code change if the atlas prompt regresses."""
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_ATLAS_PROMPT_VERSION", "v2")
+    prompt = build_scan_prompt("PromptInjection", "prompt", {"contextSource": "ENDPOINT"}, "hi", response_format="abcd")
+    assert prompt == prompt_injection.INPUT_ABCD_V2 % "hi"
+
+
+def test_atlas_variants_render_from_one_example_list():
+    """The JSON and letter atlas prompts must not drift: both are rendered from _ATLAS_EXAMPLES,
+    so every example input appears in both, with matching verdict polarity."""
+    for text, is_inj, _conf, _reason, letter in prompt_injection._ATLAS_EXAMPLES:
+        shown = text.strip('"')
+        assert shown in prompt_injection.INPUT_ATLAS and shown in prompt_injection.INPUT_ABCD_ATLAS, text
+        assert (letter == "D") == is_inj  # letter and JSON verdicts agree
+    assert len(prompt_injection._ATLAS_EXAMPLES) == prompt_injection.INPUT_ABCD_ATLAS.count("\nInput: ")
 
 
 def test_recall_critical_guidance_is_present():

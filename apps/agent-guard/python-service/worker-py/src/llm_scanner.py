@@ -11,7 +11,7 @@ import logging
 import time
 from typing import Any
 
-from prompts import build_scan_prompt, resolve_response_format
+from prompts import build_scan_prompt, prompt_injection, resolve_response_format
 from providers import LLMProvider, Qwen3GuardOutput, parse_qwen3guard_result
 
 logger = logging.getLogger(__name__)
@@ -207,6 +207,16 @@ class LLMScanner:
         elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name
         result["details"]["scanner_type"] = scanner_type
+        # Record which rules judged this verdict: one deployment now mixes the
+        # atlas and v1/v2 PromptInjection prompts per request (by contextSource),
+        # so a disputed block has to be traceable to the prompt that produced it.
+        if scanner_name == "PromptInjection":
+            if isinstance(self.provider, Qwen3GuardOutput):
+                result["details"]["prompt_version"] = "qwen3guard"
+            elif scanner_type == "output":
+                result["details"]["prompt_version"] = "output"
+            else:
+                result["details"]["prompt_version"] = prompt_injection.version_for(str(config.get("contextSource", "")))
         result["execution_time_ms"] = round(elapsed_ms, 2)
         logger.info(
             f"[LLMScanner] {scanner_name} provider={self.provider.name} "

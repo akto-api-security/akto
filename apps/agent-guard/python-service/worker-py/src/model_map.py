@@ -302,6 +302,7 @@ class ModelMapScanner:
         "prob_distribution",
         "confidence_source",
         "decision_confidence",
+        "prompt_version",  # which PromptInjection rules judged the winning verdict
     )
 
     def _shape_result(self, winner: dict[str, Any]) -> dict[str, Any]:
