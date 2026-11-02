@@ -10,18 +10,16 @@ const ALL_CATEGORIES = ["agents", "ide", "mcp", "browser"];
 
 const STAT_CARD_TARGETS = {
     managedDevices: { tab: "devices", filters: {} },
-    agentActive: { tab: "devices", filters: {} },
+    agentActive: { tab: "devices", filters: { agentIssues: true } },
     devicesWithAiTools: { tab: "devices", filters: { categories: ALL_CATEGORIES } },
     employeesUsingAi: { tab: "employees", filters: {} },
     devicesWithUnapprovedTools: { tab: "devices", filters: { hasUnapproved: true } },
     monitorOnlyDevices: { tab: "devices", filters: { guardrailModes: ["monitor"] } },
 };
 
-const GRAPH_COLUMNS_X = [40, 260, 480, 700];
-const GRAPH_ROW_HEIGHT = 84;
-const GRAPH_MIN_HEIGHT = 300;
-const EDGE_COLOR = "#9ca3af";
-const RISKY_EDGE_COLOR = "#D72C0D";
+const FOOTPRINT_LAYOUT = { nodeWidth: 176, columnGap: 40, rowHeight: 84, headHeight: 40, viewWidth: 696, minHeight: 200, dimmedOpacity: 0.3, dimmedEdgeOpacity: 0.07 };
+const FOOTPRINT_EDGE_COLOR = "#B38CFF";
+const FOOTPRINT_RISKY_EDGE_COLOR = "#E0442A";
 
 const CSV_COLUMNS = {
     employees: [
@@ -77,35 +75,20 @@ function statValue(value, subtext, onClick, label) {
     );
 }
 
-function graphNode(id, column, row, offset, category, type, label) {
-    return {
-        id,
-        type: "topoNode",
-        draggable: false,
-        position: { x: GRAPH_COLUMNS_X[column], y: (row + offset) * GRAPH_ROW_HEIGHT },
-        data: { component: { category, type, label } },
-    };
-}
-
-function graphEdge(source, target, risky) {
-    return {
-        id: `e-${source}-${target}`,
-        source,
-        target,
-        type: "smoothstep",
-        style: { stroke: risky ? RISKY_EDGE_COLOR : EDGE_COLOR, strokeWidth: 1.5 },
-    };
-}
-
 function capped(items) {
     if (items.length <= FLYOUT_GRAPH_LIMIT) return { shown: items, hidden: 0 };
     return { shown: items.slice(0, FLYOUT_GRAPH_LIMIT - 1), hidden: items.length - FLYOUT_GRAPH_LIMIT + 1 };
 }
 
-function toolType(tool) {
+function toolStatus(tool) {
+    return !tool.approved || tool.personal ? "bad" : "ok";
+}
+
+function toolSub(tool) {
+    if (tool.plugin) return "Plugin";
     const category = CATEGORY_LABELS[tool.category] || tool.category;
-    if (tool.personal) return `${category} · Personal account`;
-    return tool.approved ? category : `${category} · Unapproved`;
+    if (tool.category === "mcp") return tool.approved ? "Approved" : "Unapproved";
+    return tool.personal ? `${category} · Personal account` : category;
 }
 
 function clientMatches(client, agentName) {
@@ -114,70 +97,117 @@ function clientMatches(client, agentName) {
     return !!left && !!right && (left.startsWith(right) || right.startsWith(left));
 }
 
-function buildGraph(root, devices) {
-    const columns = [[root]];
+function footprintModel(root, devices, heads) {
+    const withDevices = !!root.devicesColumn;
     const edges = [];
-    const toolColumn = root.devicesColumn ? 2 : 1;
     const deviceNodes = [];
     const agentNodes = [];
     const mcpNodes = [];
+    const link = (source, target, status) => edges.push({ source, target, risky: status === "bad" });
 
     const { shown: shownDevices, hidden: hiddenDevices } = capped(devices);
     shownDevices.forEach((device, deviceIndex) => {
-        const deviceId = root.devicesColumn ? `device-${deviceIndex}` : "root";
-        if (root.devicesColumn) {
-            deviceNodes.push({ id: deviceId, category: "external", type: `${OS_LABELS[device.os] || device.os} · ${HEALTH_LABELS[device.health] || device.health}`, label: device.name });
-            edges.push(graphEdge("root", deviceId, device.health !== "healthy"));
+        const deviceId = withDevices ? `device-${deviceIndex}` : "root";
+        if (withDevices) {
+            deviceNodes.push({ id: deviceId, category: "external", label: device.name, sub: `${OS_LABELS[device.os] || device.os} · ${HEALTH_LABELS[device.health] || device.health}`, status: device.health === "healthy" ? "neutral" : "review" });
+            link("root", deviceId, "ok");
         }
         const tools = device.tools || [];
-        const agents = tools.filter((tool) => tool.category !== "mcp");
-        const mcps = tools.filter((tool) => tool.category === "mcp");
-        const agentIds = new Map();
-        agents.forEach((tool) => {
-            const id = `tool-${tool.collectionId}`;
-            agentIds.set(tool, id);
-            agentNodes.push({ id, parent: deviceId, category: "agent", type: toolType(tool), label: tool.name, risky: !tool.approved || tool.personal });
-        });
-        mcps.forEach((tool) => {
+        const agents = tools.filter((tool) => tool.category !== "mcp" && !tool.plugin);
+        const parentOf = (tool) => {
             const parentTool = agents.find((agent) => clientMatches(tool.client, agent.name));
-            mcpNodes.push({
-                id: `tool-${tool.collectionId}`,
-                parent: parentTool ? agentIds.get(parentTool) : deviceId,
-                category: "mcp",
-                type: toolType(tool),
-                label: tool.name,
-                risky: !tool.approved || tool.personal,
-            });
+            return parentTool ? `tool-${parentTool.collectionId}` : deviceId;
+        };
+        agents.forEach((tool) => {
+            agentNodes.push({ id: `tool-${tool.collectionId}`, category: "agent", label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: deviceId });
+        });
+        tools.filter((tool) => tool.category === "mcp" && !tool.plugin).forEach((tool) => {
+            mcpNodes.push({ id: `tool-${tool.collectionId}`, category: "mcp", label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: parentOf(tool) });
+        });
+        tools.filter((tool) => tool.plugin).forEach((tool) => {
+            mcpNodes.push({ id: `plugin-${tool.collectionId}`, category: "plugin", label: tool.plugin, sub: toolSub(tool), status: "neutral", parent: parentOf(tool) });
+        });
+        agents.filter((tool) => tool.skillCount > 0).forEach((tool) => {
+            mcpNodes.push({ id: `skills-${tool.collectionId}`, category: "skill", label: plural(tool.skillCount, "skill"), sub: "Skills", status: "neutral", parent: `tool-${tool.collectionId}` });
         });
     });
-    if (hiddenDevices > 0) deviceNodes.push({ id: "device-more", category: "external", type: "More", label: `+${hiddenDevices} more devices` });
+    if (hiddenDevices > 0) deviceNodes.push({ id: "device-more", category: "external", label: `+${hiddenDevices} more devices`, sub: "", status: "neutral" });
 
     const visibleAgents = capped(agentNodes);
     const visibleMcps = capped(mcpNodes);
-    if (visibleAgents.hidden > 0) visibleAgents.shown.push({ id: "tool-more", category: "agent", type: "More", label: `+${visibleAgents.hidden} more AI tools` });
-    if (visibleMcps.hidden > 0) visibleMcps.shown.push({ id: "mcp-more", category: "mcp", type: "More", label: `+${visibleMcps.hidden} more MCP servers` });
-    const visibleIds = new Set(["root", ...deviceNodes.map((n) => n.id), ...visibleAgents.shown.map((n) => n.id)]);
+    if (visibleAgents.hidden > 0) visibleAgents.shown.push({ id: "tool-more", category: "agent", label: `+${visibleAgents.hidden} more AI tools`, sub: "", status: "neutral" });
+    if (visibleMcps.hidden > 0) visibleMcps.shown.push({ id: "mcp-more", category: "mcp", label: `+${visibleMcps.hidden} more MCP servers`, sub: "", status: "neutral" });
 
-    if (root.devicesColumn) columns.push(deviceNodes);
-    columns[toolColumn] = visibleAgents.shown;
-    columns[toolColumn + 1] = visibleMcps.shown;
-
+    const statusById = new Map([["root", "root"]]);
+    const columns = [[{ id: "root", category: "external", label: root.label, sub: root.sub, status: "root" }]];
+    if (withDevices) columns.push(deviceNodes);
+    columns.push(visibleAgents.shown, visibleMcps.shown);
+    columns.flat().forEach((node) => statusById.set(node.id, node.status));
     visibleAgents.shown.concat(visibleMcps.shown).forEach((node) => {
-        if (node.parent && visibleIds.has(node.parent)) edges.push(graphEdge(node.parent, node.id, node.risky));
+        if (node.parent && statusById.has(node.parent)) link(node.parent, node.id, node.status);
     });
+    return { heads, columns, edges };
+}
 
-    const tallest = Math.max(1, ...columns.map((column) => column.length));
+function connectedIds(edges, start) {
+    const reached = new Set([start]);
+    [["source", "target"], ["target", "source"]].forEach(([from, to]) => {
+        const seen = new Set([start]);
+        const stack = [start];
+        while (stack.length) {
+            const current = stack.pop();
+            edges.forEach((edge) => {
+                if (edge[from] === current && !seen.has(edge[to])) {
+                    seen.add(edge[to]);
+                    reached.add(edge[to]);
+                    stack.push(edge[to]);
+                }
+            });
+        }
+    });
+    return reached;
+}
+
+function footprintLayout(model, highlight) {
+    const layout = FOOTPRINT_LAYOUT;
+    const lit = highlight ? connectedIds(model.edges, highlight) : null;
+    const tallest = Math.max(1, ...model.columns.map((column) => column.length));
+    const statusOf = new Map(model.columns.flat().map((node) => [node.id, node.status]));
     const nodes = [];
-    columns.forEach((column, columnIndex) => {
+    model.columns.forEach((column, columnIndex) => {
+        const x = columnIndex * (layout.nodeWidth + layout.columnGap);
+        nodes.push({ id: `head-${columnIndex}`, type: "topoHead", position: { x, y: 0 }, draggable: false, selectable: false, data: { label: model.heads[columnIndex] } });
         const offset = (tallest - column.length) / 2;
         column.forEach((node, rowIndex) => {
-            nodes.push(graphNode(node.id, columnIndex, rowIndex, offset, node.category, node.type, node.label));
+            nodes.push({
+                id: node.id,
+                type: "topoNode",
+                draggable: false,
+                position: { x, y: layout.headHeight + (rowIndex + offset) * layout.rowHeight },
+                style: lit && !lit.has(node.id) ? { opacity: layout.dimmedOpacity } : undefined,
+                data: { component: { category: node.category, type: node.sub || "More", label: node.label, status: node.status, selected: highlight === node.id } },
+            });
         });
     });
-    return { nodes, edges, height: `${Math.max(GRAPH_MIN_HEIGHT, tallest * GRAPH_ROW_HEIGHT + 60)}px` };
+    const edges = model.edges.map((edge) => {
+        const risky = statusOf.get(edge.source) === "bad" || statusOf.get(edge.target) === "bad";
+        const edgeLit = !lit || (lit.has(edge.source) && lit.has(edge.target));
+        return {
+            id: `e-${edge.source}-${edge.target}`,
+            source: edge.source,
+            target: edge.target,
+            type: "default",
+            style: { stroke: risky ? FOOTPRINT_RISKY_EDGE_COLOR : FOOTPRINT_EDGE_COLOR, strokeWidth: risky ? 2 : 1.5, opacity: edgeLit ? 1 : layout.dimmedEdgeOpacity },
+        };
+    });
+    const contentWidth = model.columns.length * layout.nodeWidth + (model.columns.length - 1) * layout.columnGap;
+    const scale = Math.min(1, layout.viewWidth / contentWidth);
+    const height = Math.max(layout.minHeight, Math.ceil((layout.headHeight + tallest * layout.rowHeight) * scale) + 16);
+    return { nodes, edges, height };
 }
 
 const transform = {
+    footprintLayout,
     statCardTarget: (id) => STAT_CARD_TARGETS[id],
     buildStatItems: (deviceStats, onSelect) => {
         const subtexts = deviceStats ? statSubtexts(deviceStats) : {};
@@ -193,8 +223,11 @@ const transform = {
         return body;
     },
     footprintGraph: (kind, detail) => (kind === "device"
-        ? buildGraph({ id: "root", category: "external", type: OS_LABELS[detail.os] || detail.os, label: detail.name }, [detail])
-        : buildGraph({ id: "root", category: "external", type: (detail.teams || []).join(", ") || "Employee", label: detail.username, devicesColumn: true }, detail.deviceDetails || [])),
+        ? footprintModel({ label: detail.name, sub: OS_LABELS[detail.os] || detail.os }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"])
+        : footprintModel({ label: detail.username, sub: (detail.teams || []).join(", ") || "Employee", devicesColumn: true }, detail.deviceDetails || [], ["Employee", "Devices", "AI tools", "MCP servers, plugins and skills"])),
+    employeeAiToolCount: (employee) => (employee.deviceDetails || []).reduce(
+        (total, device) => total + device.toolCount - (device.toolsByCategory?.mcp || 0), 0),
+    pluginCount: (tools) => tools.filter((tool) => tool.plugin).length,
     peopleParams: (deviceScope, filters, searchString) => ({
         deviceScope,
         atlasQuery: searchString,

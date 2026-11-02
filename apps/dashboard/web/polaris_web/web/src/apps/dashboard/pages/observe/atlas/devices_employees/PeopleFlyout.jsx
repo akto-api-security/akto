@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Badge, Box, Button, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
@@ -8,16 +8,19 @@ import AgenticFlyoutShell from "../../agentic/AgenticFlyoutShell";
 import FlyoutBreadcrumb from "../../agentic/FlyoutBreadcrumb";
 import DetailGrid from "../../agentic/DetailGrid";
 import AssetTopologyGraph from "../../agentic/AssetTopologyGraph";
-import AiChatSection from "../../agentic/AiChatSection";
-import { buildAgenticObserveChatMetadata } from "../../agentic/agenticObserveApi";
-import { ACTION_UNAVAILABLE_TOOLTIP, ATLAS_CHAT_SCOPE, ATLAS_DEVICE_CHAT_SCOPE, GUARDRAIL_VIOLATIONS_PATH } from "./constants";
-import { HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS } from "./peopleConstants";
+import { LegendDot } from "../../agentic/AgenticStatsCard";
+import AskBar from "../../../../components/shared/AskBar";
+import { openViolationInGuardrailViolations } from "../../agentic/agenticObserveApi";
+import {
+    ACTION_UNAVAILABLE_TOOLTIP, ATLAS_CHAT_SCOPE, ATLAS_DEVICE_QUESTIONS, ATLAS_EMPLOYEE_QUESTIONS,
+} from "./constants";
+import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS } from "./peopleConstants";
 import transform from "./transform";
 
 const FLYOUT_WIDTH = 760;
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
-const violationsUrl = (username) => `${GUARDRAIL_VIOLATIONS_PATH}?user=${encodeURIComponent(username)}`;
+const viewViolations = (username) => () => openViolationInGuardrailViolations({ actor: username });
 const lastSeen = (epoch) => (epoch ? func.prettifyEpoch(epoch) : "Never");
 
 function deviceStats(device) {
@@ -25,8 +28,9 @@ function deviceStats(device) {
     return [
         { title: "AI tools", data: device.toolCount - mcpCount },
         { title: "MCP servers", data: mcpCount },
+        { title: "Skills", data: device.skillCount },
+        { title: "Plugins", data: transform.pluginCount(device.tools || []) },
         { title: "Unapproved", data: device.unapprovedTools, color: device.unapprovedTools ? "critical" : undefined },
-        { title: "Guardrail mode", data: MODE_LABELS[device.guardrailMode] || device.guardrailMode, color: device.guardrailMode === "monitor" ? "warning" : undefined },
     ];
 }
 
@@ -34,7 +38,8 @@ function employeeStats(employee) {
     return [
         { title: "Risk score", data: employee.riskScore, color: employee.riskScore >= HIGH_RISK_THRESHOLD ? "critical" : undefined },
         { title: "Devices", data: employee.deviceCount },
-        { title: "AI tools", data: employee.toolCount },
+        { title: "AI tools", data: transform.employeeAiToolCount(employee) },
+        { title: "Skills", data: employee.skillCount },
         { title: "Violations (7d)", data: employee.violationCount },
     ];
 }
@@ -61,14 +66,14 @@ function employeeDetails(employee) {
 }
 
 function ActionButton({ action }) {
-    if (!action.onClick && !action.url) {
+    if (!action.onClick) {
         return (
             <Tooltip content={ACTION_UNAVAILABLE_TOOLTIP}>
                 <Button primary={action.primary} disabled>{action.label}</Button>
             </Tooltip>
         );
     }
-    return <Button primary={action.primary} plain={action.plain} url={action.url} onClick={action.onClick}>{action.label}</Button>;
+    return <Button primary={action.primary} plain={action.plain} onClick={action.onClick}>{action.label}</Button>;
 }
 
 function devicePrimary(device) {
@@ -97,8 +102,10 @@ function DeviceActions({ device, onOpen, onUpdated }) {
         primaryLabel === updateAction.label ? { ...updateAction, primary: true } : { label: primaryLabel, primary: true },
         ...(device.health === "outdated" && primaryLabel !== updateAction.label ? [updateAction] : []),
         { label: "Isolate AI tools" },
-        { label: "Open owner", onClick: device.owner ? () => onOpen("employee", device.owner) : undefined },
-        { label: "View violations", plain: true, url: device.owner ? violationsUrl(device.owner) : undefined },
+        ...(device.owner ? [
+            { label: "Open owner", onClick: () => onOpen("employee", device.owner) },
+            { label: "View violations", plain: true, onClick: viewViolations(device.owner) },
+        ] : []),
     ];
     return (
         <HorizontalStack gap="2" blockAlign="center">
@@ -112,7 +119,7 @@ function EmployeeActions({ employee }) {
         { label: "Send coaching message", primary: true },
         { label: "Notify manager" },
         { label: "Watch employee" },
-        { label: "View violations", plain: true, url: violationsUrl(employee.username) },
+        { label: "View violations", plain: true, onClick: viewViolations(employee.username) },
     ];
     return (
         <HorizontalStack gap="2" blockAlign="center">
@@ -122,16 +129,41 @@ function EmployeeActions({ employee }) {
 }
 
 function Footprint({ kind, detail }) {
-    const graph = useMemo(() => transform.footprintGraph(kind, detail), [kind, detail]);
+    const [highlight, setHighlight] = useState(null);
+    const model = useMemo(() => transform.footprintGraph(kind, detail), [kind, detail]);
+    const graph = useMemo(() => transform.footprintLayout(model, highlight), [model, highlight]);
+    const onNodeClick = useCallback((event, node) => {
+        if (node.type !== "topoNode") return;
+        setHighlight((current) => (current === node.id ? null : node.id));
+    }, []);
+    const clearHighlight = useCallback(() => setHighlight(null), []);
     return (
         <VerticalStack gap="2">
             <HorizontalStack align="space-between" blockAlign="baseline">
                 <Text as="h3" variant="headingSm">AI footprint</Text>
-                <Text as="span" variant="bodySm" color="subdued">Red links lead to unapproved or personal-account tools</Text>
+                <Text as="span" variant="bodySm" color="subdued">Select a node to trace its paths</Text>
             </HorizontalStack>
-            {detail.toolCount > 0
-                ? <AssetTopologyGraph nodes={graph.nodes} edges={graph.edges} height={graph.height} />
-                : <Text as="p" color="subdued">No AI tools were seen in the last 7 days.</Text>}
+            {detail.toolCount > 0 ? (
+                <VerticalStack gap="3">
+                    <AssetTopologyGraph
+                        nodes={graph.nodes}
+                        edges={graph.edges}
+                        height={graph.height}
+                        onNodeClick={onNodeClick}
+                        onPaneClick={clearHighlight}
+                        fitKey={model}
+                        fitPadding={0.02}
+                    />
+                    <HorizontalStack gap="4" blockAlign="center" wrap>
+                        {FOOTPRINT_LEGEND.map((item) => (
+                            <HorizontalStack key={item.label} gap="1" blockAlign="center" wrap={false}>
+                                <LegendDot color={item.color} />
+                                <Text as="span" variant="bodySm" color="subdued">{item.label}</Text>
+                            </HorizontalStack>
+                        ))}
+                    </HorizontalStack>
+                </VerticalStack>
+            ) : <Text as="p" color="subdued">No AI tools were seen in the last 7 days.</Text>}
         </VerticalStack>
     );
 }
@@ -158,12 +190,12 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
         return () => { ignore = true; };
     }, [target, deviceScope]);
 
-    const chatMetadata = useMemo(() => {
-        if (!target) return null;
-        return isDevice
-            ? buildAgenticObserveChatMetadata(ATLAS_DEVICE_CHAT_SCOPE, { deviceEndpoint: target.id, deviceId: target.id })
-            : buildAgenticObserveChatMetadata(ATLAS_CHAT_SCOPE, { username: target.id, devices: detail?.devices || [] });
-    }, [target, isDevice, detail]);
+    useEffect(() => {
+        if (!target) return undefined;
+        const closeOnEscape = (event) => { if (event.key === "Escape") onClose(); };
+        window.addEventListener("keydown", closeOnEscape);
+        return () => window.removeEventListener("keydown", closeOnEscape);
+    }, [target, onClose]);
 
     if (!target) return null;
 
@@ -171,46 +203,48 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
     const subtitle = !ready ? undefined : isDevice
         ? `${OS_LABELS[detail.os] || detail.os} · ${detail.owner || "No owner"}`
         : `${(detail.teams || []).join(", ") || "No team"} · ${plural(detail.deviceCount, "device")}`;
+    const questions = (isDevice ? ATLAS_DEVICE_QUESTIONS : ATLAS_EMPLOYEE_QUESTIONS).map((question) => question.replace("{name}", target.id));
 
     return (
-        <AgenticFlyoutShell
-            show
-            width={FLYOUT_WIDTH}
-            header={
-                <FlyoutBreadcrumb
-                    items={[{ label: target.id, badge: ready && detail.riskScore ? detail.riskScore : undefined }]}
-                    onClose={onClose}
-                    subtitle={subtitle}
-                >
-                    {ready && isDevice && <Badge size="small" status={HEALTH_BADGE_STATUS[detail.health]}>{HEALTH_LABELS[detail.health]}</Badge>}
-                </FlyoutBreadcrumb>
-            }
-            footer={
-                <AiChatSection
-                    placeholder={`Ask Atlas about ${target.id}...`}
-                    resetKey={`${target.kind}:${target.id}`}
-                    conversationType="AGENTIC_OBSERVE"
-                    chatMetadata={chatMetadata}
-                />
-            }
-        >
-            <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-                <Box padding="4">
-                    {status === "loading" && <SpinnerCentered />}
-                    {status === "error" && <Text as="p" color="subdued">Details for {target.id} could not be loaded.</Text>}
-                    {ready && (
-                        <VerticalStack gap="5">
-                            {isDevice
-                                ? <DeviceActions device={detail} onOpen={onOpen} onUpdated={onUpdated} />
-                                : <EmployeeActions employee={detail} />}
-                            <SummaryCardInfo summaryItems={isDevice ? deviceStats(detail) : employeeStats(detail)} />
-                            <Footprint kind={target.kind} detail={detail} />
-                            <DetailGrid items={isDevice ? deviceDetails(detail) : employeeDetails(detail)} labelWidth="160px" />
-                        </VerticalStack>
-                    )}
+        <>
+            <AgenticFlyoutShell
+                show
+                width={FLYOUT_WIDTH}
+                header={
+                    <FlyoutBreadcrumb
+                        items={[{ label: target.id, badge: ready && !isDevice && detail.riskScore ? detail.riskScore : undefined }]}
+                        onClose={onClose}
+                        subtitle={subtitle}
+                    >
+                        {ready && isDevice && <Badge size="small" status={HEALTH_BADGE_STATUS[detail.health]}>{HEALTH_LABELS[detail.health]}</Badge>}
+                    </FlyoutBreadcrumb>
+                }
+            >
+                <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                    <Box padding="4">
+                        {status === "loading" && <SpinnerCentered />}
+                        {status === "error" && <Text as="p" color="subdued">Details for {target.id} could not be loaded.</Text>}
+                        {ready && (
+                            <VerticalStack gap="5">
+                                {isDevice
+                                    ? <DeviceActions device={detail} onOpen={onOpen} onUpdated={onUpdated} />
+                                    : <EmployeeActions employee={detail} />}
+                                <AskBar
+                                    key={`${target.kind}:${target.id}`}
+                                    label="Ask Atlas"
+                                    placeholder={`Ask Atlas about ${target.id}`}
+                                    suggestions={questions}
+                                    chatScope={ATLAS_CHAT_SCOPE}
+                                />
+                                <SummaryCardInfo summaryItems={isDevice ? deviceStats(detail) : employeeStats(detail)} />
+                                <Footprint key={`${target.kind}:${target.id}`} kind={target.kind} detail={detail} />
+                                <DetailGrid items={isDevice ? deviceDetails(detail) : employeeDetails(detail)} labelWidth="160px" />
+                            </VerticalStack>
+                        )}
+                    </Box>
                 </Box>
-            </Box>
-        </AgenticFlyoutShell>
+            </AgenticFlyoutShell>
+        </>
     );
 }
 

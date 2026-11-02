@@ -101,6 +101,12 @@ export const SEARCH_HINTS = {
 
 export const FLYOUT_GRAPH_LIMIT = 8;
 
+export const FOOTPRINT_LEGEND = [
+    { color: "#D72C0D", label: "Unapproved or personal account" },
+    { color: "#E4C300", label: "Device needs attention" },
+    { color: "#6200EA", label: "Selected" },
+];
+
 export const PEOPLE_TABLE_HEIGHT = 500;
 
 export const MIN_SEARCH_LENGTH = 3;

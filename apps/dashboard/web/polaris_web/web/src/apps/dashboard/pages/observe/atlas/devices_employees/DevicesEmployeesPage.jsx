@@ -74,6 +74,7 @@ function DevicesEmployeesPage() {
     const activeCategory = onDevicesTab && filters.osList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
 
     const openPerson = useCallback((kind, id) => setOpenTarget({ kind, id }), []);
+    const closePerson = useCallback(() => setOpenTarget(null), []);
 
     const exportTable = async () => {
         const requestName = tab === "employees" ? "fetchAtlasEmployees" : "fetchAtlasDevices";
@@ -168,12 +169,13 @@ function DevicesEmployeesPage() {
                     violationsAvailable={overview?.violationsAvailable}
                     riskAvailable={overview?.riskAvailable}
                     onOpen={openPerson}
+                    selected={openTarget}
                 />,
                 <PeopleFlyout
                     key="people-flyout"
                     target={openTarget}
                     deviceScope={deviceScope}
-                    onClose={() => setOpenTarget(null)}
+                    onClose={closePerson}
                     onOpen={openPerson}
                     onUpdated={refreshAll}
                 />,

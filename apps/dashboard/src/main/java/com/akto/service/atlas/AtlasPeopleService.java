@@ -10,6 +10,7 @@ import com.akto.dto.EndpointShieldSettings;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.PlatformShieldConfig;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightUtil;
@@ -52,6 +53,7 @@ public class AtlasPeopleService {
     public static final String CAT_IDE = "ide";
     public static final String CAT_MCP = "mcp";
     public static final String CAT_BROWSER = "browser";
+    public static final String CAT_PLUGIN = "plugin";
     public static final List<String> CATEGORIES = Arrays.asList(CAT_AGENTS, CAT_IDE, CAT_MCP, CAT_BROWSER);
 
     public static final String OS_MAC = "macos";
@@ -97,9 +99,13 @@ public class AtlasPeopleService {
         public boolean approved;
         public boolean personal;
         public double riskScore;
+        public String plugin;
+        public int skillCount;
 
         public Map<String, Object> toMap() {
             Map<String, Object> row = new LinkedHashMap<>();
+            row.put("plugin", plugin);
+            row.put("skillCount", skillCount);
             row.put("collectionId", collectionId);
             row.put("hostName", hostName);
             row.put("name", name);
@@ -126,6 +132,8 @@ public class AtlasPeopleService {
         public final Map<String, Integer> toolsByCategory = new LinkedHashMap<>();
         public final Map<String, Integer> violationsBySeverity = emptySeverityCounts();
         public final List<ToolRow> tools = new ArrayList<>();
+        public final Set<String> skillNames = new LinkedHashSet<>();
+        public final Set<Set<String>> skillSets = new HashSet<>();
         public int unapprovedTools;
         public int personalAccounts;
         public double riskScore;
@@ -152,6 +160,7 @@ public class AtlasPeopleService {
             row.put("guardrailMode", guardrailMode);
             row.put("toolCount", toolCount());
             row.put("toolsByCategory", toolsByCategory);
+            row.put("skillCount", skillNames.size());
             row.put("unapprovedTools", unapprovedTools);
             row.put("personalAccounts", personalAccounts);
             row.put("violations", violationsBySeverity);
@@ -174,6 +183,7 @@ public class AtlasPeopleService {
         public String username;
         public final List<String> deviceNames = new ArrayList<>();
         public final Set<String> teams = new LinkedHashSet<>();
+        public final Set<String> skillNames = new LinkedHashSet<>();
         public final Map<String, Integer> violationsBySeverity = emptySeverityCounts();
         public int toolCount;
         public int unapprovedTools;
@@ -188,6 +198,7 @@ public class AtlasPeopleService {
             row.put("devices", deviceNames);
             row.put("teams", new ArrayList<>(teams));
             row.put("toolCount", toolCount);
+            row.put("skillCount", skillNames.size());
             row.put("unapprovedTools", unapprovedTools);
             row.put("personalAccounts", personalAccounts);
             row.put("violations", violationsBySeverity);
@@ -330,12 +341,39 @@ public class AtlasPeopleService {
             tool.category = categoryOf(c, parts);
             tool.approved = isSanctioned(c, bundle.allowlistNamesLower, remarksByServiceName);
             tool.personal = InsightUtil.isPersonalAccount(c);
+            tool.plugin = AgenticObserveUtil.getPluginName(c);
+            Set<String> skills = skillNamesOf(c);
+            if (!skills.isEmpty()) {
+                device.skillNames.addAll(skills);
+                tool.skillCount = device.skillSets.add(skills) ? skills.size() : 0;
+            }
 
             device.tools.add(tool);
+            if (tool.plugin != null) {
+                tool.category = CAT_PLUGIN;
+                continue;
+            }
             device.toolsByCategory.merge(tool.category, 1, Integer::sum);
             if (!tool.approved) device.unapprovedTools++;
             if (tool.personal) device.personalAccounts++;
         }
+    }
+
+    private static Set<String> skillNamesOf(ApiCollection c) {
+        Set<String> names = new LinkedHashSet<>();
+        if (c.getSkills() != null) {
+            for (String skill : c.getSkills()) {
+                if (skill != null && !skill.trim().isEmpty()) names.add(skill);
+            }
+        }
+        if (c.getEnvType() != null) {
+            for (CollectionTags tag : c.getEnvType()) {
+                if (tag != null && Constants.AKTO_SKILL_TAG.equals(tag.getKeyName()) && tag.getValue() != null && !tag.getValue().trim().isEmpty()) {
+                    names.add(tag.getValue());
+                }
+            }
+        }
+        return names;
     }
 
     private static String categoryOf(ApiCollection c, String[] parts) {
@@ -441,6 +479,7 @@ public class AtlasPeopleService {
                 return row;
             });
             employee.deviceNames.add(device.name);
+            employee.skillNames.addAll(device.skillNames);
             employee.toolCount += device.toolCount();
             employee.unapprovedTools += device.unapprovedTools;
             employee.personalAccounts += device.personalAccounts;

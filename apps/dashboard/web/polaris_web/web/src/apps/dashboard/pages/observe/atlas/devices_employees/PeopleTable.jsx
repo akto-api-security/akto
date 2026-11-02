@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, HorizontalStack, Tabs, Tag, Text } from "@shopify/polaris";
 import func from "@/util/func";
 import AgGridTable from "../../../../components/tables/AgGridTable";
@@ -115,8 +115,9 @@ function FilterRow({ tab, filters, onFiltersChange }) {
     );
 }
 
-function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen }) {
+function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen, selected }) {
     const isEmployees = tab === "employees";
+    const gridRef = useRef(null);
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const tabs = [
@@ -145,6 +146,13 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
             .finally(() => setLoading(false));
     }, [deviceScope, filters, isEmployees]);
 
+    const selectedId = selected?.kind === (isEmployees ? "employee" : "device") ? selected.id : null;
+    const getRowStyle = useCallback(({ data }) => {
+        const id = isEmployees ? data?.username : data?.name;
+        return { cursor: "pointer", background: selectedId && id === selectedId ? "var(--p-color-bg-primary-subdued-hover)" : undefined };
+    }, [isEmployees, selectedId]);
+    useEffect(() => { gridRef.current?.api?.redrawRows(); }, [selectedId]);
+
     const gridKey = useMemo(
         () => `${tab}-${deviceScope}-${refreshKey}-${JSON.stringify(filters)}`,
         [tab, deviceScope, refreshKey, filters]
@@ -172,7 +180,8 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 sideBar={false}
                 context={{ violationsAvailable, riskAvailable }}
                 onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.name)}
-                getRowStyle={() => ({ cursor: "pointer" })}
+                gridRef={gridRef}
+                getRowStyle={getRowStyle}
                 rowSelection={undefined}
             />
         </Box>
