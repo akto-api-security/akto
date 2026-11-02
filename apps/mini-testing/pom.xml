@@ -28,6 +28,21 @@
             <artifactId>dao</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Pinned directly (not left to transitive mediation) so mini-testing alone runs the
+             kafka-clients version parallel-consumer-core's fork was built/tested against; other
+             modules keep whatever they already declare. -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.9.2</version>
+        </dependency>
+        <!-- Community fork of io.confluent.parallelconsumer, which is no longer maintained.
+             Declared here (not in libs/utils) since mini-testing is the only consumer. -->
+        <dependency>
+            <groupId>bz.stub.parallelconsumer</groupId>
+            <artifactId>parallel-consumer-core</artifactId>
+            <version>0.6.0.0</version>
+        </dependency>
         <dependency>
             <groupId>com.akto.apps</groupId>
             <artifactId>akto-utility-server</artifactId>
@@ -69,11 +84,32 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.1</version>
+                <!-- 3.6.0+ required for <release>; the inherited default (3.1) ignores it
+                     and would silently produce Java 8 bytecode. -->
+                <version>3.13.0</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <!-- Compile to Java 17 bytecode to match the runtime image. -->
+                    <release>17</release>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java-17</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                    <message>mini-testing requires Java 17+ to build.</message>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>

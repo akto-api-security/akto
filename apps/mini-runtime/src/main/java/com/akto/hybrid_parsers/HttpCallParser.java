@@ -2,9 +2,11 @@ package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.hybrid_runtime.redaction.PayloadRedaction;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.hybrid_dependency.DependencyAnalyser;
 import com.akto.data_actor.DataActor;
@@ -27,6 +29,7 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.gen_ai.GenAiCollectionUtils;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.util.trpc.TrpcUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -43,14 +46,18 @@ import com.akto.dto.tracing.Span;
 import com.akto.tracing.ServiceGraphBuilder;
 import com.akto.tracing.TraceParseResult;
 import com.akto.tracing.copilot.CopilotActivityParser;
+import com.akto.tracing.copilot.CopilotInventoryParser;
 import com.akto.tracing.n8n.N8nTraceParser;
 import com.akto.tracing.snowflake.SnowflakeTraceParser;
+import com.akto.tracing.bedrock.BedrockAgentTraceParser;
+import com.akto.tracing.alibaba.AlibabaCloudTraceParser;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.util.Pair;
 import com.akto.util.Constants;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.google.gson.Gson;
@@ -82,13 +89,32 @@ public class HttpCallParser {
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
+    private static final String AGENTIC_COLLECTION_PREFIX = "-agentic";
+
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
+
+    /** HttpResponseParams.direction: "1" = inbound (callee side), "2" = outbound (caller side). */
+    public static final String DIRECTION_OUTBOUND = "2";
+
+    // Accounts allowed to tag a caller collection when it is seen calling an AI agent.
+    private static final List<Integer> AI_AGENT_CALLER_TAGGING_ACCOUNTS = Arrays.asList(
+            1736798101, 1718042191, 1662680463);
+
+    // Last time the ai-agent-caller tag was written, keyed by the CALLER's collection id.
+    // Separate from apiCollectionIdTagsSyncTimestampMap, which is keyed by the callee - one
+    // callee is called by many services, so a callee-keyed timer would only ever let the
+    // caller that happened to hit the window get tagged.
+    private Map<Integer, Integer> aiAgentCallerTagSyncTimestampMap = new HashMap<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
     private Map<String, String> deviceUserMapCache = new HashMap<>();
     private int deviceUserMapLastFetchTs = 0;
     private static final int DEVICE_USER_MAP_REFRESH_INTERVAL = 60 * 10;
+
+    private Map<String, Map<String, ClaudeDesktopInfo>> deviceClaudeDesktopInfoMapCache = new HashMap<>();
+    private int deviceClaudeDesktopInfoMapLastFetchTs = 0;
+    private static final int DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL = 60;
 
     // Track which hostnames have been added to each service-tag collection to avoid redundant DB calls
     // Key: collectionId, Value: Set of hostnames already added
@@ -109,14 +135,19 @@ public class HttpCallParser {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
         this.sync_threshold_time = sync_threshold_time;
+        // the constructor already builds from the DB; building again here only re-downloaded every STI and ApiInfo
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
-        apiCatalogSync.buildFromDB(false, fetchAllSTI);
+        // apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = new HashMap<>();
         apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
         serviceTagCollectionHostNamesCache = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta(true);
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+
+            if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                hostNameToIdMap.put(apiCollection.getHostName().toLowerCase().trim(), apiCollection.getId());
+            }
 
             // Initialize cache for service-tag collections with existing hostNames
             if (apiCollection.getServiceTag() != null) {
@@ -186,12 +217,21 @@ public class HttpCallParser {
     }
 
     public int createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
-        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType);
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType, false);
+        return vxlanId;
+    }
+
+    public int createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType, isLatestRagDetection);
         return vxlanId;
     }
 
 
     public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tags, String accessType)  throws Exception {
+        return createCollectionBasedOnHostName(id, host, tags, accessType, false);
+    }
+
+    public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         String vpcId = System.getenv("VPC_ID");
@@ -203,7 +243,7 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags, accessType);
+                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags, accessType, isLatestRagDetection);
                 flag = true;
                 break;
             } catch (Exception e) {
@@ -345,6 +385,8 @@ public class HttpCallParser {
                     && !source.equals(Constants.AI_AGENT_SOURCE_MICROSOFT_DEFENDER)
                     && !source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)
                     && !source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
+                    && !source.equals(Constants.AI_AGENT_SOURCE_ALIBABA_CLOUD)
                     )) {
                 // Not AI agent traffic, return base hostname
                 return baseHostname;
@@ -374,12 +416,13 @@ public class HttpCallParser {
             if (source.equals(Constants.AI_AGENT_SOURCE_ENDPOINT)) {
                 String connector = tagsMap.get(Constants.AI_AGENT_TAG_CONNECTOR);
                 String appName = tagsMap.get(Constants.AI_AGENT_APP_NAME);
-                if(Constants.AI_AGENT_CONNECTOR_SENTINEL.equals(connector)) {
+                if(Constants.AI_AGENT_CONNECTOR_SENTINEL.equals(connector) || Constants.AI_AGENT_CONNECTOR_CROWDSTRIKE.equals(connector)) {
                     return botName + "." + appName;
                 }
             }
 
-            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK)){
+            if (source.equals(Constants.AI_AGENT_SOURCE_AWS_BEDROCK) || source.equals(Constants.AI_AGENT_SOURCE_AWS_QUICK)
+                    || source.equals(Constants.AI_AGENT_SOURCE_ALIBABA_CLOUD)){
                 return botName;
             }
             // Reconstruct full hostname: bot-name.base-hostname
@@ -563,14 +606,33 @@ public class HttpCallParser {
         return Constants.AI_AGENT_SOURCE_SNOWFLAKE.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
-    private boolean isCopilotTraffic(Map<String, String> tagsMap) {
-        if (tagsMap == null) return false;
-        return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    private boolean isAlibabaCloudTraffic(Map<String, String> tagsMap) {
+        return tagsMap != null && Constants.AI_AGENT_SOURCE_ALIBABA_CLOUD.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+    }
+
+    private boolean isBedrockAgentTraffic(Map<String, String> tagsMap) {
+        if (tagsMap == null) {
+            return false;
+        }
+        return Constants.AI_AGENT_SOURCE_AWS_BEDROCK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))
+                || Constants.AI_AGENT_SOURCE_AWS_QUICK.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
     }
 
     private boolean isCopilotTrafficRaw(Map<String,String> tagsMap) {
         try {
-            return tagsMap != null && Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE));
+            if (tagsMap == null) return false;
+            return Constants.AI_AGENT_SOURCE_COPILOT_STUDIO.equals(tagsMap.get(Constants.AI_AGENT_TAG_SOURCE))
+                    || Constants.COPILOT_STUDIO_AI_AGENT_NAME.equalsIgnoreCase(tagsMap.get(Constants.AI_AGENT_APP_NAME))
+                    || Constants.COPILOT_STUDIO_AI_AGENT_NAME.equalsIgnoreCase(tagsMap.get(Constants.SAAS_AGENT_TAG_NAME));
+        } catch (Exception e) { return false; }
+    }
+
+    /** Configuration snapshots, not conversations; also satisfies isCopilotTrafficRaw, so callers must check this first. */
+    private boolean isCopilotInventory(Map<String,String> tagsMap) {
+        try {
+            if (tagsMap == null) return false;
+            return isCopilotTrafficRaw(tagsMap)
+                    && "true".equalsIgnoreCase(tagsMap.get(Constants.AKTO_COPILOT_INVENTORY_TAG));
         } catch (Exception e) { return false; }
     }
 
@@ -595,19 +657,98 @@ public class HttpCallParser {
         return null;
     }
 
-    private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
+    /** The one agent identifier Copilot Studio transcripts actually carry. */
+    private String resolveAgentIdFromTags(String tagsJson) {
         try {
-            String payload = httpResponseParam.getPayload();
-            if (payload == null || payload.isEmpty()) {
-                loggerMaker.warn("Copilot trace: payload is null or empty, skipping");
+            if (tagsJson == null || tagsJson.isEmpty()) return null;
+            @SuppressWarnings("unchecked")
+            Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+            if (tagsMap == null) return null;
+            String id = tagsMap.get(Constants.AI_AGENT_TAG_BOT_SCHEMA_NAME);
+            return id != null && !id.isEmpty() ? id : null;
+        } catch (Exception ignored) { return null; }
+    }
+
+    private void embedTracesInResponsePayload(HttpResponseParams httpResponseParam, String traces) {
+        try {
+            if (traces == null || traces.isEmpty()) {
                 return;
             }
-            if (!CopilotActivityParser.getInstance().canParse(payload)) {
+            Map<String, Object> payloadMap = JSONUtils.getMap(httpResponseParam.getPayload());
+            if (payloadMap == null) {
+                loggerMaker.warn("[Trace Embedding] response payload is not a JSON object, skipping traces embedding");
+                return;
+            }
+            Object tracesValue = JSONUtils.fromJson(traces, Object.class);
+            payloadMap.put("traces", tracesValue != null ? tracesValue : traces);
+            String updatedPayload = JSONUtils.getString(payloadMap);
+            if (updatedPayload == null) {
+                return;
+            }
+            httpResponseParam.setPayload(updatedPayload);
+            Map<String, Object> origMap = JSONUtils.getMap(httpResponseParam.getOrig());
+            if (origMap != null) {
+                origMap.put("responsePayload", updatedPayload);
+                String updatedOrig = JSONUtils.getString(origMap);
+                if (updatedOrig != null) {
+                    httpResponseParam.setOrig(updatedOrig);
+                }
+            }
+            loggerMaker.warn("[Trace Embedding] embedded traces in response payload successfully");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error embedding traces in response payload: " + e.getMessage());
+        }
+    }
+
+    /**
+     * awsMetadata is already fully captured as structured Trace/Span/service-graph data by
+     * BedrockAgentTraceParser by the time this runs — it can embed full tool-call outputs
+     * (file listings, page dumps, etc.), which routinely pushes the sample-data message this
+     * account's Kafka producer ships to database-abstractor past Kafka's default 1MB
+     * max.request.size. That failure is silent (KafkaProducer.doSend() swallows
+     * RecordTooLargeException internally and only logs via a bare, non-persisted
+     * logger.error in the producer callback), so oversized samples vanish with no trace
+     * instead of erroring — stripping it here, before it reaches httpResponseParam.getOrig()
+     * (what APICatalogSync.recordMessage() captures as the sample), avoids that outcome.
+     */
+    private void stripAwsMetadataFromSample(HttpResponseParams httpResponseParam) {
+        stripMetadataFromSample(httpResponseParam, "awsMetadata");
+    }
+
+    /** Same as stripAwsMetadataFromSample, for any connector's metadata key (e.g. alibabaMetadata). */
+    private void stripMetadataFromSample(HttpResponseParams httpResponseParam, String metadataKey) {
+        try {
+            String updatedPayload = JSONUtils.removeKey(httpResponseParam.getPayload(), metadataKey);
+            if (updatedPayload == null || updatedPayload.equals(httpResponseParam.getPayload())) {
+                return;
+            }
+            httpResponseParam.setPayload(updatedPayload);
+            Map<String, Object> origMap = JSONUtils.getMap(httpResponseParam.getOrig());
+            if (origMap != null) {
+                origMap.put("responsePayload", updatedPayload);
+                String updatedOrig = JSONUtils.getString(origMap);
+                if (updatedOrig != null) {
+                    httpResponseParam.setOrig(updatedOrig);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error stripping " + metadataKey + " from sample payload: " + e.getMessage());
+        }
+    }
+
+    private void parseCopilotTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String traces = httpResponseParam.getTraces();
+            if (traces == null || traces.isEmpty()) {
+                loggerMaker.warn("Copilot trace: traces field is null or empty, skipping");
+                return;
+            }
+            if (!CopilotActivityParser.getInstance().canParse(traces)) {
                 loggerMaker.warn("Copilot trace: canParse returned false, skipping");
                 return;
             }
             loggerMaker.warn("Copilot trace: attempting to parse activities");
-            TraceParseResult result = CopilotActivityParser.getInstance().parse(payload);
+            TraceParseResult result = CopilotActivityParser.getInstance().parse(traces);
             if (result.getTrace() != null) {
                 if (httpResponseParam.getRequestParams() != null) {
                     result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
@@ -639,7 +780,8 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans());
+                    String agentId = resolveAgentIdFromTags(httpResponseParam.getTags());
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(result.getSpans(), agentId);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
@@ -651,6 +793,62 @@ public class HttpCallParser {
                     (result.getSpans() != null ? result.getSpans().size() : 0));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing Copilot trace: " + e.getMessage());
+        }
+    }
+
+    /** Builds the agent's tool graph from an inventory sample — graph edges only, same shape as parseArcadeServiceGraph. */
+    private void parseCopilotInventory(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+            if (!CopilotInventoryParser.getInstance().canParse(payload)) {
+                loggerMaker.info("Copilot inventory: payload is not an agent row, skipping", LogDb.RUNTIME);
+                return;
+            }
+            if (httpResponseParam.getRequestParams() == null) {
+                return;
+            }
+
+            int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
+            if (apiCollectionId == -1) {
+                return;
+            }
+
+            // Fetch existing edges so the parser can merge onto a transcript-created root instead of forking a second one.
+            Map<String, ServiceGraphEdgeInfo> existingEdges = null;
+            ApiCollection existingCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+            if (existingCollection != null) {
+                existingEdges = existingCollection.getServiceGraphEdges();
+            }
+
+            Map<String, ServiceGraphEdgeInfo> edges = CopilotInventoryParser.getInstance().parse(payload, existingEdges);
+            if (edges != null && !edges.isEmpty()) {
+                // Inventory is a full snapshot every run — anything missing now was genuinely removed, so prune; scope by agentId too since two agents can share a name.
+                ServiceGraphEdgeInfo rootEdge = edges.values().stream()
+                        .filter(e -> CopilotInventoryParser.USER_NODE.equals(e.getSourceService()))
+                        .findFirst().orElse(null);
+                String agentId = rootEdge != null && rootEdge.getMetadata() != null
+                        ? (String) rootEdge.getMetadata().get(CopilotInventoryParser.AGENT_ID_KEY) : null;
+                // Above 200 connectors Microsoft returns a random subset per run, so pruning against it would churn the graph.
+                boolean truncated = rootEdge != null && rootEdge.getMetadata() != null
+                        && Boolean.TRUE.equals(rootEdge.getMetadata().get(CopilotInventoryParser.SNAPSHOT_TRUNCATED_KEY));
+                if (rootEdge != null && agentId != null && !agentId.isEmpty() && !truncated) {
+                    Map<String, String> scope = new HashMap<>();
+                    scope.put(CopilotInventoryParser.DISCOVERED_VIA_KEY, CopilotInventoryParser.DISCOVERED_VIA);
+                    scope.put(CopilotInventoryParser.AGENT_ID_KEY, agentId);
+                    ServiceGraphBuilder.getInstance().pruneAndUpdateServiceGraph(
+                            apiCollectionId, existingEdges, rootEdge.getTargetService(), scope, edges);
+                } else {
+                    // Nothing safe to prune against — no agent id, or a partial row; fall back to add-only.
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                }
+                loggerMaker.infoAndAddToDb("Copilot inventory: service graph updated with " + edges.size()
+                        + " edges for collectionId=" + apiCollectionId, LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Copilot inventory: " + e.getMessage());
         }
     }
 
@@ -705,6 +903,9 @@ public class HttpCallParser {
 
             // Parse trace using N8nTraceParser
             TraceParseResult result = N8nTraceParser.getInstance().parse(n8nTraceJson);
+            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
+                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            }
 
             // Store trace and spans using dataActor
             dataActor.storeTrace(result.getTrace());
@@ -737,6 +938,143 @@ public class HttpCallParser {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing N8N trace: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Alibaba Cloud connector (source ALIBABA_CLOUD): responsePayload.alibabaMetadata → a trace with
+     * spans (traffic only) and service-graph edges (traffic and discovery) for the collection the
+     * record was stored under. Unlike Bedrock, edges refresh their hover metadata on every record,
+     * so a gateway's current plug-ins or an agent's current RAM policies show.
+     */
+    private void parseAlibabaCloudTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = gson.fromJson(payload, Map.class);
+            Object metadata = payloadMap == null ? null : payloadMap.get(AlibabaCloudTraceParser.METADATA_KEY);
+            if (metadata == null) {
+                return;
+            }
+            String json = gson.toJson(metadata);
+            AlibabaCloudTraceParser parser = AlibabaCloudTraceParser.getInstance();
+            if (!parser.canParse(json)) {
+                loggerMaker.info("alibabaMetadata found but not parseable", LogDb.RUNTIME);
+                return;
+            }
+            String botName = resolveAgentNameFromTags(httpResponseParam.getTags());
+            int apiCollectionId = httpResponseParam.getRequestParams() != null
+                ? httpResponseParam.getRequestParams().getApiCollectionId() : -1;
+
+            // Discovery records describe inventory: graph edges only, no trace.
+            if (!parser.isDiscovery(json)) {
+                TraceParseResult result = parser.parse(json, botName);
+                if (result.getTrace() != null) {
+                    result.getTrace().setApiCollectionId(apiCollectionId);
+                    dataActor.storeTrace(result.getTrace());
+                }
+                if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                    dataActor.storeSpans(result.getSpans());
+                }
+            }
+
+            if (apiCollectionId != -1) {
+                Map<String, ServiceGraphEdgeInfo> edges = parser.extractServiceGraph(json, botName);
+                if (edges != null && !edges.isEmpty()) {
+                    ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges, true);
+                    loggerMaker.info("Updated service graph for Alibaba Cloud " + botName + " (collection "
+                        + apiCollectionId + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Alibaba Cloud metadata: " + e.getMessage());
+        }
+    }
+
+    private void parseBedrockAgentTrace(HttpResponseParams httpResponseParam) {
+        try {
+            String payload = httpResponseParam.getPayload();
+            if (payload == null || payload.isEmpty()) {
+                return;
+            }
+
+            // Parse the responsePayload JSON to extract awsMetadata
+            @SuppressWarnings("unchecked")
+            Map<String, Object> payloadMap = gson.fromJson(payload, Map.class);
+            if (payloadMap == null || !payloadMap.containsKey("awsMetadata")) {
+                // Not a Bedrock Agent trace response, skip
+                return;
+            }
+
+            // Extract the awsMetadata field
+            Object awsMetadata = payloadMap.get("awsMetadata");
+            if (awsMetadata == null) {
+                return;
+            }
+
+            // Convert metadata to JSON string for parser
+            String bedrockTraceJson = gson.toJson(awsMetadata);
+
+            // Validate if this is parseable Bedrock Agent trace data
+            boolean canParse = BedrockAgentTraceParser.getInstance().canParse(bedrockTraceJson);
+            loggerMaker.info("parseBedrockAgentTrace: BedrockAgentTraceParser.canParse() = " + canParse, LogDb.RUNTIME);
+
+            if (!canParse) {
+                loggerMaker.info("awsMetadata found but not valid Bedrock Agent trace format", LogDb.RUNTIME);
+                // Log first 500 chars for debugging
+                String tracePreview = bedrockTraceJson.length() > 500 ? bedrockTraceJson.substring(0, 500) + "..." : bedrockTraceJson;
+                loggerMaker.info("Invalid trace preview: " + tracePreview, LogDb.RUNTIME);
+                return;
+            }
+
+            loggerMaker.info("Found valid Bedrock Agent execution trace", LogDb.RUNTIME);
+
+            // awsMetadata's traceData can be empty (e.g. a plain Converse call), leaving
+            // BedrockAgentTraceParser nothing to derive a bot name from — the HTTP-level
+            // "bot-name" tag (the same one used to name the collection) covers that gap.
+            String fallbackBotName = resolveAgentNameFromTags(httpResponseParam.getTags());
+
+            // Tags map is also read by BedrockAgentTraceParser.extractServiceGraph below for
+            // optional gateway/MCP-server tags — see that method's javadoc for which keys.
+            Map<String, String> tagsMap = parseTagsMap(httpResponseParam.getTags());
+
+            // Parse trace using BedrockAgentTraceParser
+            TraceParseResult result = BedrockAgentTraceParser.getInstance().parse(bedrockTraceJson, fallbackBotName);
+            if (result.getTrace() != null && httpResponseParam.getRequestParams() != null) {
+                result.getTrace().setApiCollectionId(httpResponseParam.getRequestParams().getApiCollectionId());
+            }
+
+            // Store trace and spans using dataActor
+            dataActor.storeTrace(result.getTrace());
+            if (result.getSpans() != null && !result.getSpans().isEmpty()) {
+                dataActor.storeSpans(result.getSpans());
+                loggerMaker.info("Stored Bedrock Agent trace with " + result.getSpans().size() + " spans", LogDb.RUNTIME);
+            }
+
+            // Attach the service graph to the same collection the trace was just stored
+            // under (not a name-based lookup, unlike N8N — that breaks whenever the
+            // resolved botName doesn't match any stored collection name).
+            String botName = (String) result.getMetadata().get("botName");
+            String agentType = (String) result.getMetadata().get("agentType");
+
+            if (httpResponseParam.getRequestParams() != null) {
+                int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
+                if (apiCollectionId != -1) {
+                    Map<String, ServiceGraphEdgeInfo> edges = BedrockAgentTraceParser.getInstance().extractServiceGraph(bedrockTraceJson, fallbackBotName, tagsMap);
+                    if (edges != null && !edges.isEmpty()) {
+                        ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
+                        loggerMaker.info("Updated service graph for Bedrock Agent: " + botName
+                            + " (agentType: " + agentType + ", collection: " + apiCollectionId
+                            + ") with " + edges.size() + " edges", LogDb.RUNTIME);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing Bedrock Agent trace: " + e.getMessage());
         }
     }
 
@@ -872,7 +1210,7 @@ public class HttpCallParser {
             if (httpResponseParam.getRequestParams() != null) {
                 int apiCollectionId = httpResponseParam.getRequestParams().getApiCollectionId();
                 if (apiCollectionId != -1) {
-                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(snowflakeResult.getSpans());
+                    Map<String, ServiceGraphEdgeInfo> edges = buildServiceGraphFromSpans(snowflakeResult.getSpans(), null);
                     if (edges != null && !edges.isEmpty()) {
                         ServiceGraphBuilder.getInstance().updateServiceGraph(apiCollectionId, edges);
                     }
@@ -883,7 +1221,7 @@ public class HttpCallParser {
         }
     }
 
-    private Map<String, ServiceGraphEdgeInfo> buildServiceGraphFromSpans(List<Span> spans) {
+    private Map<String, ServiceGraphEdgeInfo> buildServiceGraphFromSpans(List<Span> spans, String agentId) {
         Map<String, ServiceGraphEdgeInfo> edges = new HashMap<>();
         if (spans == null || spans.isEmpty()) return edges;
         Map<String, Span> byId = new HashMap<>();
@@ -897,6 +1235,8 @@ public class HttpCallParser {
 
             if (span.getParentSpanId() == null) {
                 // Root (agent) span — add as a target so the UI shows it as "AI Agent"
+                // Stamped so same-named agents' transcript roots stay disambiguated, same as inventory-built roots.
+                if (agentId != null) meta.put(CopilotInventoryParser.AGENT_ID_KEY, agentId);
                 edges.put(targetService, new ServiceGraphEdgeInfo("User", targetService, meta));
             } else {
                 Span parent = byId.get(span.getParentSpanId());
@@ -907,9 +1247,10 @@ public class HttpCallParser {
         return edges;
     }
 
+    /** \p{L}/\p{N} preserves non-Latin names instead of collapsing to underscores; must stay identical to CopilotInventoryParser.sanitizeServiceName. */
     private static String sanitizeServiceName(String name) {
         if (name == null) return "unknown";
-        return name.replaceAll("[^a-zA-Z0-9_\\-]", "_");
+        return name.replaceAll("[^\\p{L}\\p{N}_\\-]", "_");
     }
 
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
@@ -917,7 +1258,7 @@ public class HttpCallParser {
         for(HttpResponseParams httpResponseParams: filteredResponseParams) {
             if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
                 if (Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterDefaultPayloads " + httpResponseParams.getRequestParams().getURL());
+                    Utils.printUrlDebugLog("Found debug url in filterDefaultPayloads " + httpResponseParams.getRequestParams().getURL());
                 }
                 continue;
             }
@@ -1043,7 +1384,20 @@ public class HttpCallParser {
      * @param httpResponseParams
      */
     public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams, String accessType) {
-        int apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
+        // The host branch below writes to createCollectionBasedOnHostName(hostNameMapKey.hashCode()),
+        // so the id read here has to be the same document or one collection's tags get written onto
+        // another. hostName is not unique - a service-tag collection also records the host it was
+        // seen on - and hostNameToIdMap keeps one id per host, so for a shared hostname it can
+        // resolve to the wrong collection, and which one wins depends on load order. Prefer the
+        // host collection's own id, falling back to the map (and leaving the NON_HOSTNAME_KEY
+        // branch, which writes by vxlanId, untouched).
+        int apiCollectionId;
+        if (!hostNameMapKey.contains(NON_HOSTNAME_KEY)
+                && apiCollectionsMap.containsKey(hostNameMapKey.hashCode())) {
+            apiCollectionId = hostNameMapKey.hashCode();
+        } else {
+            apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
+        }
         updateApiCollectionTags(apiCollectionId, httpResponseParams, hostNameMapKey, false, accessType);
     }
 
@@ -1065,15 +1419,23 @@ public class HttpCallParser {
 
         // Update the tags in-memory for the apiCollection
         if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
-            loggerMaker.infoAndAddToDb("Updating tags in-memory for apiCollectionId: " + apiCollectionId + " with hostNameMapKey: " + hostNameMapKey
+            Utils.printUrlDebugLog("Updating tags in-memory for apiCollectionId: " + apiCollectionId + " with hostNameMapKey: " + hostNameMapKey
                     + " url: " + httpResponseParams.getRequestParams().getURL() + " and tags: " + httpResponseParams.getTags());
         }
 
-        List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
-        tagsList = filterTagsForAccount(tagsList);
-        tagsList = CollectionTags.getUniqueTags(apiCollection, tagsList);
-        apiCollection.setTagsList(tagsList);
-        apiCollectionsMap.put(apiCollectionId, apiCollection);
+        List<CollectionTags> tagsList;
+        if (DIRECTION_OUTBOUND.equals(httpResponseParams.getDirection())) {
+            // On outbound traffic the pod labels describe the CALLER, not this collection, so
+            // merging them here would give the callee one tag per calling service. Keep the tags
+            // the collection already has rather than clearing them.
+            tagsList = apiCollection.getTagsList();
+        } else {
+            tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
+            tagsList = filterTagsForAccount(tagsList);
+            tagsList = CollectionTags.getUniqueTags(apiCollection, tagsList);
+            apiCollection.setTagsList(tagsList);
+            apiCollectionsMap.put(apiCollectionId, apiCollection);
+        }
         
 
         int lastSynctime = this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, 0);
@@ -1099,15 +1461,12 @@ public class HttpCallParser {
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
                 .noneMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()))) {
-            Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParams);
+            Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParams);
             if (tagsList == null) {
                 tagsList = new ArrayList<>();
             }
-            if (llmCollectionTag.getFirst()) {
-                tagsList.add(new CollectionTags(Context.now(),
-                        Constants.AKTO_GEN_AI_TAG,
-                        llmCollectionTag.getSecond(),
-                        TagSource.KUBERNETES));
+            if (genAiTagOpt.isPresent()) {
+                tagsList.add(genAiTagOpt.get());
             }
         }
 
@@ -1121,7 +1480,7 @@ public class HttpCallParser {
             String serviceTag = apiCollection.getServiceTag();
             List<String> hostNames = apiCollection.getHostNames();
             String hostName = apiCollection.getHostName();
-            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTag, hostNames, tagsList, hostName, accessType);
+            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTag, hostNames, tagsList, hostName, accessType, false);
         } else if (hostNameMapKey.contains(NON_HOSTNAME_KEY)) {
             String vpcId = System.getenv("VPC_ID");
             createCollectionSimpleForVpc(
@@ -1130,6 +1489,10 @@ public class HttpCallParser {
             try {
                 createCollectionBasedOnHostName(hostNameMapKey.hashCode(), hostNameMapKey,
                         tagsList, accessType);
+                // New browser LLM collection: audit its site, like a new MCP server.
+                if (tagsList != null && tagsList.stream().anyMatch(t -> Constants.AKTO_BROWSER_LLM_TAG.equals(t.getKeyName()))) {
+                    insertBrowserLlmAuditInfo(hostNameMapKey);
+                }
             } catch (Exception e) {
                 loggerMaker.error(
                         "Error while updating api collection tags for host: " + hostNameMapKey + " " + e.getMessage());
@@ -1139,12 +1502,39 @@ public class HttpCallParser {
         String log = "Updated tags for apiCollectionId: " + apiCollectionId + " url: " + httpResponseParams.getRequestParams().getURL() + " with tags: " + tagsList + " hostNameMapKey: " + hostNameMapKey;
         printL(log);
         if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
-            loggerMaker.warn(log);
+            Utils.printUrlDebugLog(log);
+        }
+    }
+
+    // Same grouping as the Agentic assets LLMs tab (AgenticObserveAction.extractServiceNameForGrouping), so both tabs list the same sites.
+    private static final Set<String> BROWSER_LLM_SUFFIX_TLDS = new HashSet<>(Arrays.asList(
+            "io", "com", "net", "org", "cloud", "dev", "app", "ai", "co"));
+
+    private static String browserLlmSite(String hostName) {
+        if (hostName == null || hostName.trim().isEmpty() || hostName.contains("not-attached")) return null;
+        String host = hostName.toLowerCase();
+        String[] parts = host.split("\\.");
+        if (parts.length < 3 || BROWSER_LLM_SUFFIX_TLDS.contains(parts[2])) return host;
+        return String.join(".", Arrays.copyOfRange(parts, 2, parts.length));
+    }
+
+    // One mcp_audit_info row per browser LLM site (<user>.<browser>.<site> -> site) for Audit Data -> LLMs.
+    private void insertBrowserLlmAuditInfo(String hostName) {
+        String site = browserLlmSite(hostName);
+        if (site == null) return;
+        try {
+            dataActor.insertMCPAuditDataLog(new McpAuditInfo(
+                Context.now(), "", Constants.AKTO_BROWSER_LLM_TAG, 0,
+                site, "", null, 0, null
+            ));
+        } catch (Exception e) {
+            loggerMaker.error("Error inserting browser LLM audit info for host: " + hostName + " " + e.getMessage());
         }
     }
 
     // Agoda-specific tag keys
-    private static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
+    // public: AktoPolicyNew reads the same key to attribute outbound calls to their caller.
+    public static final String SERVICE_TAG_KEY = "privatecloud.agoda.com/service";
     private static final String ENVIRONMENT_TAG_KEY = "privatecloud.agoda.com/environment";
     private static final String COMPONENT_TAG_KEY = "catalog.agoda.com/component";
 
@@ -1163,10 +1553,18 @@ public class HttpCallParser {
         int apiCollectionId;
 
         String direction = httpResponseParam.getDirection();
+        boolean isOutbound = DIRECTION_OUTBOUND.equals(direction);
 
-        // Check if service tag is present in tags - if yes, use service-tag based collection
+        // Check if service tag is present in tags - if yes, use service-tag based collection.
+        //
+        // LOAD-BEARING: the direction check is what keeps collection membership correct. On
+        // outbound traffic the mirroring daemonset resolves the labels of the pod that MADE the
+        // call, so routing by them would file the callee's endpoints under the caller. Outbound
+        // deliberately falls through to the host path, where the collection is keyed by the Host
+        // header - the actual callee. The labels are still read, but only to attribute the call
+        // to its caller in markAiAgentCaller().
         String serviceTagValue = extractServiceTag(tagsMap);
-        if (serviceTagValue != null && !serviceTagValue.isEmpty()) {
+        if (serviceTagValue != null && !serviceTagValue.isEmpty() && !isOutbound) {
             return createApiCollectionIdByServiceTag(httpResponseParam, serviceTagValue, tagsMap);
         }
 
@@ -1179,12 +1577,49 @@ public class HttpCallParser {
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
         String vpcId = System.getenv("VPC_ID");
-        List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
+        // Outbound labels identify the caller, so they must not become tags on the callee's
+        // collection. Matches the same guard in updateApiCollectionTags.
+        List<CollectionTags> tagList = isOutbound
+                ? new ArrayList<>()
+                : CollectionTags.convertTagsFormat(httpResponseParam.getTags());
         tagList = filterTagsForAccount(tagList);
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
+
+            Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
+            Optional<CollectionTags> ragTagOpt = mcpServerTagOpt.isPresent() ? Optional.empty() : getRagTag(httpResponseParam);
+            Optional<CollectionTags> genAiTagOpt = getGenAiTag(httpResponseParam);
+            boolean isAgenticEndpoint = mcpServerTagOpt.isPresent() || ragTagOpt.isPresent() || genAiTagOpt.isPresent();
+            // The three getters above discard their detection when SECURITY_TYPE_AGENTIC is not
+            // granted, so isAgenticEndpoint is always false for an unentitled account. Caller
+            // attribution must not depend on that entitlement (it adds a tag to the CALLER and
+            // never makes a collection gen-ai/mcp, so it cannot move a collection between quotas),
+            // hence the ungated re-check. Short-circuits for entitled accounts.
+            // The two checks above re-derive "is the callee an AI asset" from THIS request, so a
+            // caller is only attributed when the request it happened to make matches an LLM rule
+            // literally. A host Akto has already classified does not count - which is why a caller
+            // on /chat/completions was dropped while one on /v1/chat/completions was tagged, same
+            // gateway. Consulting the callee's stored tag covers all three agentic families, and is
+            // immune to path variation and to body redaction.
+            if (isAgenticEndpoint
+                    || calleeIsKnownAgentic(hostName)
+                    || GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParam).getFirst()) {
+                markAiAgentCaller(httpResponseParam, tagsMap, direction, hostName);
+            }
+            String contextSource = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+            boolean isEndpointSource = Constants.AI_AGENT_SOURCE_ENDPOINT.equals(contextSource);
+
+            String realHostName = hostName;
+
+            Integer realHostCollectionId = hostNameToIdMap.get(realHostName);
+            ApiCollection realHostCollection = realHostCollectionId != null ? apiCollectionsMap.get(realHostCollectionId) : null;
+
+            if (realHostCollection != null && !hasAtlasOrArgusTag(realHostCollection)
+                    && isAgenticEndpoint && !isEndpointSource) {
+                hostName = hostName + AGENTIC_COLLECTION_PREFIX;
+            }
 
             String key = hostName;
             boolean ismcpServer = false;
@@ -1197,29 +1632,31 @@ public class HttpCallParser {
             } else {
                 int id = hostName.hashCode();
 
-                Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
                 if (mcpServerTagOpt.isPresent()) {
                     if (tagList == null) {
                         tagList = new ArrayList<>();
                     }
                     tagList.add(mcpServerTagOpt.get());
                     ismcpServer = true;
-                } else {
-                    // Check for RAG if not MCP
-                    Optional<CollectionTags> ragTagOpt = getRagTag(httpResponseParam);
-                    if (ragTagOpt.isPresent()) {
-                        if (tagList == null) {
-                            tagList = new ArrayList<>();
-                        }
-                        tagList.add(ragTagOpt.get());
+                } else if (ragTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
                     }
+                    tagList.add(ragTagOpt.get());
+                }
+
+                if (genAiTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
+                    }
+                    tagList.add(genAiTagOpt.get());
                 }
                 try {
                     String accessType = getOrComputeAccessType(direction, null);
 
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList, accessType);
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList, accessType, true);
                     if(Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParam) != null)) {
-                        loggerMaker.infoAndAddToDb("Created collection: " + apiCollectionId + " with hostNameMapKey: " + hostName
+                        Utils.printUrlDebugLog("Created collection: " + apiCollectionId + " with hostNameMapKey: " + hostName
                             + " url: " + httpResponseParam.getRequestParams().getURL() + " and tags: " + httpResponseParam.getTags()
                         );
                     }
@@ -1230,7 +1667,7 @@ public class HttpCallParser {
                         try {
                             auditInfo = new McpAuditInfo(
                                 Context.now(), "", AKTO_MCP_SERVER_TAG, 0,
-                                hostName, "", null,
+                                realHostName, "", null,
                                 apiCollectionId,
                                 null
                             );
@@ -1243,7 +1680,7 @@ public class HttpCallParser {
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to create collection for host : " + hostName);
                     String accessType = getOrComputeAccessType(direction, null);
-                    createCollectionSimpleForVpc(vxlanId, vpcId, tagList, accessType);
+                    createCollectionSimpleForVpc(vxlanId, vpcId, tagList, accessType, true);
                     hostNameToIdMap.put(NON_HOSTNAME_KEY + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
@@ -1326,7 +1763,7 @@ public class HttpCallParser {
             serviceTagCollectionHostNamesCache.put(apiCollectionId, cachedHostNames);
 
             // Create collection in DB with initial fields (upsert pattern - safe if already exists)
-            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTagValue, hostNamesList, tagsList, hostName, accessType);
+            dataActor.createCollectionForServiceTag(apiCollectionId, serviceTagValue, hostNamesList, tagsList, hostName, accessType, false);
 
             loggerMaker.infoAndAddToDb("Created service-tag collection: " + serviceTagValue
                 + " (ID: " + apiCollectionId + ") for URL: " + httpResponseParam.getRequestParams().getURL());
@@ -1368,7 +1805,7 @@ public class HttpCallParser {
                     String serviceTag = apiCollection.getServiceTag();
                     List<String> hostNamesList = apiCollection.getHostNames();
                     List<CollectionTags> tagsList = apiCollection.getTagsList();
-                    dataActor.createCollectionForServiceTag(collectionId, serviceTag, hostNamesList, tagsList, hostName, accessType);
+                    dataActor.createCollectionForServiceTag(collectionId, serviceTag, hostNamesList, tagsList, hostName, accessType, false);
                 }
 
                 if (apiCollection.getServiceTag() != null) {
@@ -1428,6 +1865,36 @@ public class HttpCallParser {
         return res;
     }
 
+    /**
+     * Sends the agentic trace for this request to cyborg.
+     *
+     * Kept out of the filter loop's main body so it can also run for traffic the schema filters drop.
+     * A prompt blocked by guardrails is ingested as 4xx, and that is exactly the traffic a trace has
+     * to show - but API discovery should keep ignoring failed responses, so the message is still
+     * dropped for schema purposes.
+     */
+    private void captureAgentTrace(HttpResponseParams httpResponseParam, Map<String, String> tagsMap) {
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(), "AGENT_TRAFFIC_LOGS");
+        boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
+        if (!allowAnalysis || !isAgenticTraffic(tagsMap)
+                || httpResponseParam.getRequestParams().getUrl().contains("skill")) {
+            return;
+        }
+
+        AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
+                httpResponseParam, tagsMap, getDeviceUserMap(), getDeviceClaudeDesktopInfoMap());
+        if (record == null) {
+            return;
+        }
+
+        loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
+        String payload = httpResponseParam.getRequestParams().getPayload();
+        if (payload != null && payload.length() > 3) {
+            loggerMaker.info("Actually storing agent record" + record.getSpanId());
+            PayloadRedaction.storeAgentRecord(record, httpResponseParam, dataActor::storeAgentQueryData);
+        }
+    }
+
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
@@ -1440,32 +1907,43 @@ public class HttpCallParser {
         Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
-                TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
-                incTrafficMetrics(totalRequestsKey,1);
-            }
-
-            boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
-                cond = true;
-            }
-
-            if (!cond){
-                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
-                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+            // WebSocket traffic bypasses HTTP-specific filters (status codes, content-types, etc.)
+            // but still goes through collection ID assignment
+            boolean isWebSocket = "WEBSOCKET".equals(httpResponseParam.getType());
+            
+            if (!isWebSocket) {
+                if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+                    TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
+                    incTrafficMetrics(totalRequestsKey,1);
                 }
-                if(Utils.printDebugHostLog(httpResponseParam) != null){
-                    Utils.printDebugHostLog(" in filterHttpResponseParams invalid response code "
-                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+
+                boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
+                if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
+                    cond = true;
                 }
-                continue;
+
+                if (!cond){
+                    // A prompt blocked by guardrails is ingested as 4xx, and that is exactly the
+                    // traffic a trace needs to show. Record the trace before dropping the message, so
+                    // API discovery keeps ignoring failed responses exactly as it did before.
+                    captureAgentTrace(httpResponseParam, parseTagsMap(httpResponseParam.getTags()));
+
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams invalid response code "
+                                + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                    }
+                    if(Utils.printDebugHostLog(httpResponseParam) != null){
+                        Utils.printDebugHostLog(" in filterHttpResponseParams invalid response code "
+                                + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                    }
+                    continue;
+                }
             }
 
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null){
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams ignoreAktoFlag "
+                    Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams ignoreAktoFlag "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1475,15 +1953,18 @@ public class HttpCallParser {
                 continue;
             }
 
-            if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health")) {
+            if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health") && !TrpcUtils.isTrpcUrl(httpResponseParam.getRequestParams().getURL())) {
                 continue;
             }
+
+            // Fire and forget, no-op unless AKTO_SAAS_GUARDRAIL_ENABLED is set.
+            SaasGuardrailForwarder.offer(httpResponseParam);
 
             // check for garbage points here
             if(!redundantList.isEmpty()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(),regexPattern)){
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isRedundantEndpoint "
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams isRedundantEndpoint "
                                 + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
                     }
                     if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1499,7 +1980,7 @@ public class HttpCallParser {
                 }
                 if(isInvalidContentType(contentType)){
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isInvalidContentType "
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams isInvalidContentType "
                                 + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
                     }
                     if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1535,7 +2016,7 @@ public class HttpCallParser {
             }
 
             if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams starting advanced filters "
+                Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams starting advanced filters "
                         + httpResponseParam.getRequestParams().getURL());
             }
 
@@ -1548,7 +2029,7 @@ public class HttpCallParser {
 
             if (isAtlasTraffic(tagsMap) || isArgusTraffic(tagsMap) || shouldStoreSnowflakeAgentTrace(tagsMap) || isCopilotTrafficRaw(tagsMap)) {
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
+                    Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams skipping advanced filters for agentic traffic "
                             + httpResponseParam.getRequestParams().getURL());
                 }
                 if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1562,7 +2043,7 @@ public class HttpCallParser {
                     if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
                         loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
                         if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                            loggerMaker.infoAndAddToDb(
+                            Utils.printUrlDebugLog(
                                     "Found debug url in filterHttpResponseParams advanced filters, skipping "
                                             + httpResponseParam.getRequestParams().getURL() + " filterType "
                                             + temp.getSecond());
@@ -1577,7 +2058,7 @@ public class HttpCallParser {
                 }else{
                     httpResponseParam = param;
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
+                        Utils.printUrlDebugLog("Found debug url in filterHttpResponseParams advanced filters, adding "
                                 + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
                     }
                     if(Utils.printDebugHostLog(httpResponseParam) != null){
@@ -1589,27 +2070,24 @@ public class HttpCallParser {
             int apiCollectionId = createApiCollectionId(httpResponseParam, tagsMap);
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
-            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.getActualAccountId(),"AGENT_TRAFFIC_LOGS");
-            boolean allowAnalysis = featureAccess != null && featureAccess.getIsGranted();
-
             // if traffic is agentic, then send the data to cyborg
-            if (allowAnalysis && isAgenticTraffic(tagsMap) && (!httpResponseParam.getRequestParams().getUrl().contains("skill"))) {
-                AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(
-                        httpResponseParam, tagsMap, getDeviceUserMap());
-                if (record != null) {
-                    loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
-                    String payload = httpResponseParam.getRequestParams().getPayload();
-                    if(payload.length() > 3){
-                        loggerMaker.info("Actually storing agent record" + record.getSpanId());
-                        dataActor.storeAgentQueryData(record);
-                    }
-                    
-                }
-            }
+            captureAgentTrace(httpResponseParam, tagsMap);
 
             // Parse N8N trace metadata if this is N8N traffic
             if (isN8nTraffic(tagsMap)) {
                 parseN8nTrace(httpResponseParam);
+            }
+
+            // Parse Bedrock Agent trace metadata if this is Bedrock Agent traffic
+            if (isBedrockAgentTraffic(tagsMap)) {
+                parseBedrockAgentTrace(httpResponseParam);
+                stripAwsMetadataFromSample(httpResponseParam);
+            }
+
+            // Alibaba Cloud connector: alibabaMetadata → trace, spans, service graph
+            if (isAlibabaCloudTraffic(tagsMap)) {
+                parseAlibabaCloudTrace(httpResponseParam);
+                stripMetadataFromSample(httpResponseParam, AlibabaCloudTraceParser.METADATA_KEY);
             }
 
             // Build service graph edges for Arcade traffic
@@ -1621,12 +2099,21 @@ public class HttpCallParser {
                 storeSnowflakeAgentTrace(httpResponseParam);
             }
 
-            if (isCopilotTraffic(tagsMap)) {
+            if (isCopilotInventory(tagsMap)) {
+                parseCopilotInventory(httpResponseParam);
+                continue; // graph edges only — not a real endpoint, and fanned out to N collections per agent, so must not reach apiCatalogSync.
+            } else if (isCopilotTrafficRaw(tagsMap)) {
                 parseCopilotTrace(httpResponseParam);
+                embedTracesInResponsePayload(httpResponseParam, httpResponseParam.getTraces());
             }
 
             //TODO("Parse JSON in one place for all the parser methods like Rest/GraphQL/JsonRpc")
-            List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            // a tRPC call is split into one REST call per procedure; everything else carries on to the other parsers
+            List<HttpResponseParams> responseParamsList = TrpcUtils.parseTrpcResponseParam(httpResponseParam);
+            boolean isTrpc = !responseParamsList.isEmpty();
+            if (!isTrpc) {
+                responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
+            }
             if (responseParamsList.isEmpty()) {
                 // Check for REST method payload structure (only for account 1758525547)
                 if (Context.getActualAccountId() == 1758525547 || Context.getActualAccountId() == 1667235738) {
@@ -1646,7 +2133,7 @@ public class HttpCallParser {
                 }
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + " new " + (isTrpc ? "trpc" : "graphql") + " endpoints in inventory");
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -1734,18 +2221,221 @@ public class HttpCallParser {
         return deviceUserMapCache;
     }
 
-    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
-        if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
+    /**
+     * deviceId -> that device's Claude Desktop identity. Refreshed every 60s rather than every 10
+     * minutes like the device->user map: the org a device reports follows whichever org the user
+     * last worked in, so a stale entry attributes traffic to the wrong org.
+     */
+    private Map<String, Map<String, ClaudeDesktopInfo>> getDeviceClaudeDesktopInfoMap() {
+        if (Context.now() - deviceClaudeDesktopInfoMapLastFetchTs > DEVICE_CLAUDE_DESKTOP_INFO_MAP_REFRESH_INTERVAL) {
+            deviceClaudeDesktopInfoMapCache = dataActor.fetchDeviceClaudeDesktopInfoMap();
+            deviceClaudeDesktopInfoMapLastFetchTs = Context.now();
         }
-        return Optional.empty();
+        return deviceClaudeDesktopInfoMapCache;
+    }
+
+    private boolean hasAtlasOrArgusTag(ApiCollection collection) {
+        List<CollectionTags> existingTags = collection.getTagsList();
+        if (existingTags == null) {
+            return false;
+        }
+        for (CollectionTags tag : existingTags) {
+            if (Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName())
+                    || Constants.AKTO_GEN_AI_TAG.equals(tag.getKeyName())) {
+                return true;
+            }
+            if (Constants.AI_AGENT_TAG_SOURCE.equals(tag.getKeyName())
+                    && Constants.AI_AGENT_SOURCE_ENDPOINT.equals(tag.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isAgenticTaggingAllowed(HttpResponseParams responseParams) {
+        Map<String, String> tagsMap = parseTagsMap(responseParams.getTags());
+        String source = tagsMap == null ? null : tagsMap.get(Constants.AI_AGENT_TAG_SOURCE);
+        if (Constants.AI_AGENT_SOURCE_ENDPOINT.equals(source)) {
+            return true;
+        }
+
+        return UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "SECURITY_TYPE_AGENTIC");
+    }
+
+    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
+        if (!McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
+            return Optional.empty();
+        }
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
     }
 
     private Optional<CollectionTags> getRagTag(HttpResponseParams responseParams) {
-        if (RagDetector.isRagRequest(responseParams)) {
-            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
+        if (!RagDetector.isRagRequest(responseParams)) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_RAG_DATABASE_TAG, "RAG Database", TagSource.KUBERNETES));
+    }
+
+    private Optional<CollectionTags> getGenAiTag(HttpResponseParams responseParams) {
+        Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(responseParams);
+        if (!llmCollectionTag.getFirst()) {
+            return Optional.empty();
+        }
+        if (!isAgenticTaggingAllowed(responseParams)) {
+            loggerMaker.infoAndAddToDb("Agentic tagging not allowed for request: " + responseParams.getRequestParams().getURL());
+            return Optional.empty();
+        }
+        return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_GEN_AI_TAG, llmCollectionTag.getSecond(), TagSource.KUBERNETES));
+    }
+
+    /**
+     * True when the host being called already carries gen-ai / mcp-server / rag-database on its own
+     * collection. Purely a lookup of what Akto has already decided about the callee - it never
+     * classifies anything, so it cannot move a collection between quota buckets.
+     *
+     * Mixed hosts get split into "<host>-agentic", so check that variant too: the agentic tag can
+     * live on either document depending on which one the detection landed on.
+     */
+    private boolean calleeIsKnownAgentic(String calleeHost) {
+        if (calleeHost == null || calleeHost.isEmpty()) {
+            return false;
+        }
+        return hasAgenticTag(calleeHost) || hasAgenticTag(calleeHost + AGENTIC_COLLECTION_PREFIX);
+    }
+
+    private boolean hasAgenticTag(String hostName) {
+        // hostNameToIdMap is one id per host, but hostName is NOT unique across collections - a
+        // service-tag collection also carries the host it was seen on. On real data three
+        // collections shared one hostname and the map resolved to a service-tag one with no
+        // agentic tag, hiding the rag-database tag that sat on the host collection. The host
+        // collection is keyed by hostName.hashCode() (see createCollectionBasedOnHostName), so look
+        // that up first and keep the map only as a fallback.
+        if (isAgentic(apiCollectionsMap.get(hostName.hashCode()))) {
+            return true;
+        }
+        Integer mapped = hostNameToIdMap.get(hostName);
+        return mapped != null && isAgentic(apiCollectionsMap.get(mapped));
+    }
+
+    private boolean isAgentic(ApiCollection collection) {
+        return collection != null
+                && (collection.isGenAICollection()
+                        || collection.isMcpCollection()
+                        || collection.isRagDatabaseCollection());
+    }
+
+    /**
+     * Tags the CALLER's collection when its service is seen calling an AI agent / LLM endpoint.
+     *
+     * Only outbound traffic carries the caller's identity: the daemonset resolves the labels of
+     * the pod that made the call. The callee is identified by its Host header and tagged by the
+     * normal gen-ai / mcp-server / rag flow; this only annotates the other side of the call.
+     */
+    private void markAiAgentCaller(HttpResponseParams httpResponseParams, Map<String, String> tagsMap,
+            String direction, String calleeHost) {
+        // Every early return below logs, so a missing tag can be traced to one branch. The
+        // silent version of this method made a live failure impossible to diagnose.
+        if (!AI_AGENT_CALLER_TAGGING_ACCOUNTS.contains(Context.getActualAccountId())) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: account not enabled, skipping");
+            return;
+        }
+        // Inbound labels describe the callee, so there is no caller to attribute.
+        if (!DIRECTION_OUTBOUND.equals(direction)) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: not outbound (direction=" + direction
+                    + "), no caller to attribute");
+            return;
+        }
+        String callerService = tagsMap == null ? null : tagsMap.get(SERVICE_TAG_KEY);
+        if (callerService == null || callerService.isEmpty()) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: outbound request carries no " + SERVICE_TAG_KEY
+                    + " tag, cannot identify caller. callee=" + calleeHost);
+            return;
+        }
+
+        int callerCollectionId = ApiCollection.generateServiceTagCollectionId(callerService);
+        ApiCollection callerCollection = apiCollectionsMap.get(callerCollectionId);
+        if (callerCollection == null) {
+            // The caller has no collection of its own: createApiCollectionIdByServiceTag only runs
+            // on inbound traffic, so a service that merely CALLS things never gets one. Dropping
+            // the signal here loses the only record that this service uses AI, so create a stub
+            // instead - createCollectionForServiceTag below upserts it. Reached at most once per
+            // caller (alreadyTagged and the sync window guard the rest), and only when the callee
+            // is a confirmed AI asset, so this cannot materialise a collection per unlabelled peer.
+            loggerMaker.infoAndAddToDb("ai-agent-caller: no collection " + callerCollectionId
+                    + " for caller service " + callerService + ", creating stub. callee=" + calleeHost);
+            // hostName is what puts a collection on the HOSTNAME tab (CollectionAttrsSync derives
+            // the tab from it); with null it lands under CUSTOM and is easy to miss. We never see
+            // the caller's own host - the request's Host header is the CALLEE's - so use the service
+            // name. That also keeps the id consistent, since generateServiceTagCollectionId is the
+            // same hashCode a host collection would be keyed by. The displayed name is unaffected:
+            // for a collection with a serviceTag the table shows the name, not "<host> - <name>".
+            callerCollection = new ApiCollection(callerCollectionId, callerService, Context.now(),
+                    new HashSet<>(), callerService, 0, false, true);
+            callerCollection.setServiceTag(callerService);
+            callerCollection.setTagsList(new ArrayList<>());
+            // setOnInsert writes whatever it is handed, so hand it an empty list rather than null.
+            callerCollection.setHostNames(new ArrayList<>(Collections.singletonList(callerService)));
+        }
+
+        List<CollectionTags> existingTags = callerCollection.getTagsList();
+        boolean alreadyTagged = existingTags != null && existingTags.stream()
+                .anyMatch(t -> Constants.AKTO_AI_AGENT_CALLER_TAG.equals(t.getKeyName()));
+        if (alreadyTagged) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: collection " + callerCollectionId + " ("
+                    + callerService + ") already tagged, skipping");
+            return;
+        }
+
+        int lastSyncTime = this.aiAgentCallerTagSyncTimestampMap.getOrDefault(callerCollectionId, 0);
+        if (Context.now() - lastSyncTime < this.sync_threshold_time) {
+            loggerMaker.infoAndAddToDb("ai-agent-caller: collection " + callerCollectionId + " ("
+                    + callerService + ") written " + (Context.now() - lastSyncTime)
+                    + "s ago, inside the " + this.sync_threshold_time + "s window, skipping");
+            return;
+        }
+        this.aiAgentCallerTagSyncTimestampMap.put(callerCollectionId, Context.now());
+
+        // createCollectionForServiceTag SETS the whole tags array, so the list we send must
+        // already contain every tag the collection has - anything missing is destroyed. The
+        // in-memory copy is only refreshed on the catalog-sync cycle, so re-read the collection
+        // first and merge onto that. This runs once per caller (guarded by alreadyTagged and the
+        // sync window above), not per request.
+        List<CollectionTags> mergedTags = existingTags == null
+                ? new ArrayList<>()
+                : new ArrayList<>(existingTags);
+        mergedTags.add(new CollectionTags(Context.now(), Constants.AKTO_AI_AGENT_CALLER_TAG,
+                calleeHost, TagSource.KUBERNETES));
+
+        callerCollection.setTagsList(mergedTags);
+        apiCollectionsMap.put(callerCollectionId, callerCollection);
+
+        // serviceTag can be null when the collection was created by the host path first (its id
+        // is hashCode(hostName), which equals hashCode(serviceTag) when they are the same string,
+        // and createCollectionForServiceTag only setOnInsert's SERVICE_TAG). Fall back to the
+        // caller service name so the upsert stays coherent.
+        String serviceTagForWrite = callerCollection.getServiceTag() != null
+                ? callerCollection.getServiceTag()
+                : callerService;
+
+        loggerMaker.infoAndAddToDb("ai-agent-caller: writing tag to collection " + callerCollectionId
+                + " (" + callerService + ") callee=" + calleeHost + " serviceTag=" + serviceTagForWrite
+                + " hostName=" + callerCollection.getHostName()
+                + " tagCount=" + mergedTags.size() + " tags=" + mergedTags);
+
+        dataActor.createCollectionForServiceTag(callerCollectionId, serviceTagForWrite,
+                callerCollection.getHostNames(), mergedTags, callerCollection.getHostName(),
+                callerCollection.getAccessType(), false);
+
+        loggerMaker.infoAndAddToDb("Tagged caller collection " + callerCollectionId + " ("
+                + callerService + ") as calling AI agent host: " + calleeHost);
     }
 
     private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {

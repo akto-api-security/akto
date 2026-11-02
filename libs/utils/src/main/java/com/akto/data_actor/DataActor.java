@@ -1,11 +1,13 @@
 package com.akto.data_actor;
 
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.*;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.metrics.MetricData;
@@ -36,6 +38,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
@@ -144,6 +147,8 @@ public abstract class DataActor {
 
     public abstract void updateTestingRun(String testingRunId);
 
+    public abstract void markTestingRunFailed(String testingRunId);
+
     public abstract void updateTestRunResultSummary(String summaryId);
     public abstract void deleteTestRunResultSummary(String summaryId);
     public abstract void deleteTestingRunResults(String testingRunResultId);
@@ -156,6 +161,9 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResultSummary(TestingRunResultSummary trrs);
 
+
+    public abstract int incrementAndGetTestRateLimitUsage(int limit, String dashboardContext);
+
     public abstract void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues);
 
     public abstract void bulkWriteOverageInfo(List<Object> writesForOverageInfo);
@@ -165,6 +173,10 @@ public abstract class DataActor {
     public abstract TestSourceConfig findTestSourceConfig(String subType);
 
     public abstract void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs);
+
+    public abstract List<CustomWebhook> fetchTeamsWebhooksForTestResults();
+
+    public abstract void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors);
 
     public abstract Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId);
 
@@ -201,6 +213,8 @@ public abstract class DataActor {
 
     public abstract void insertTestingRunResults(TestingRunResult testingRunResults);
 
+    public abstract void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed);
+
     public abstract void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount);
 
     public abstract TestingRunResultSummary updateMetadataInSummary(String summaryId, Map<String, String> metadata);
@@ -234,7 +248,7 @@ public abstract class DataActor {
 
     public abstract void insertApiCollection(int apiCollectionId, String apiCollectionName);
 
-    public abstract void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType);
+    public abstract void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType, boolean isLatestRagDetection);
 
     public abstract void addHostNameToServiceTagCollection(int collectionId, String hostName);
 
@@ -281,6 +295,12 @@ public abstract class DataActor {
     public abstract DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand);
 
     public abstract void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList);
+
+    /**
+     * Adds hourly per-collection counts of sensitive data events, at most once per idempotency key.
+     * Returns false if the write failed.
+     */
+    public abstract boolean bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments);
     public abstract List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId);
 
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
@@ -289,9 +309,9 @@ public abstract class DataActor {
 
     public abstract Set<MergedUrls> fetchMergedUrls();
 
-    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType);
+    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection);
 
-    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType);
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection);
 
     public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
 
@@ -311,7 +331,7 @@ public abstract class DataActor {
 
     public abstract List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip);
 
-    public abstract long countTestingRunResultSummaries(Bson filter);
+    public abstract long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state);
 
     public abstract TestScript fetchTestScript(TestScript.Type type);
 
@@ -343,7 +363,12 @@ public abstract class DataActor {
     
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
 
-    public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
+    /**
+     * @return the stored Mongo doc ids, in the same order as conversationResults.
+     */
+    public abstract List<String> storeConversationResults(List<AgentConversationResult> conversationResults);
+
+    public abstract void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata);
 
     public abstract void bulkWriteAgentTrafficLogs(List<Object> trafficLogs);
     public abstract YamlTemplate fetchCommonWordList();
@@ -360,7 +385,17 @@ public abstract class DataActor {
 
     public abstract void writeApiSequences(List<ApiSequences> sequences);
     public abstract void storeAgentQueryData(AgentQueryRecord agentQueryRecord);
+    public abstract List<AgentQueryRecord> fetchAgentQueryRecords(String messageId);
+
+    /**
+     * LLM models saved on the dashboard's Agents configuration page, as raw JSON objects
+     * ({name, type, params}) so new model types pass through without DTO changes here.
+     * Returns null when they couldn't be fetched, to tell an outage apart from "none saved".
+     */
+    public abstract List<Map<String, Object>> fetchAgentModels();
+
     public abstract Map<String, String> fetchDeviceUserMap();
 
     public abstract String fetchWebSocketConnectionUrl(int collectionId) throws Exception;
+    public abstract Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap();
 }

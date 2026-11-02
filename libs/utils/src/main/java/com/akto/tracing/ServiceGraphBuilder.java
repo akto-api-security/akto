@@ -22,6 +22,35 @@ public class ServiceGraphBuilder {
     }
 
     public boolean updateServiceGraph(int apiCollectionId, Map<String, ServiceGraphEdgeInfo> edges) {
+        return updateServiceGraph(apiCollectionId, edges, false);
+    }
+
+    /**
+     * @param refreshMetadata false (every parser except Alibaba's): an existing edge is kept as
+     *        first stored. true: an existing edge takes the incoming edge's values (source and
+     *        metadata keys it carries, e.g. a gateway's current plug-ins or an agent's current RAM
+     *        policies), keeping metadata keys the incoming edge doesn't have.
+     */
+    public boolean updateServiceGraph(int apiCollectionId, Map<String, ServiceGraphEdgeInfo> edges, boolean refreshMetadata) {
+        if (refreshMetadata) {
+            if (edges == null || edges.isEmpty()) return true;
+            try {
+                ApiCollection collection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+                if (collection == null) {
+                    logger.error("API Collection not found: {}", apiCollectionId);
+                    return false;
+                }
+                Map<String, ServiceGraphEdgeInfo> merged = refreshMerge(collection.getServiceGraphEdges(), edges);
+                boolean success = dataActor.updateServiceGraphEdges(apiCollectionId, merged);
+                if (!success) {
+                    logger.error("Failed to update service graph edges for collection: {}", apiCollectionId);
+                }
+                return success;
+            } catch (Exception e) {
+                logger.error("Failed to update service graph: {}", e.getMessage(), e);
+                return false;
+            }
+        }
         if (edges == null || edges.isEmpty()) {
             logger.info("No service graph edges to update for collection: {}", apiCollectionId);
             return true;
@@ -42,16 +71,10 @@ public class ServiceGraphBuilder {
             }
 
             // Merge new edges with existing
-            for (Map.Entry<String, ServiceGraphEdgeInfo> entry : edges.entrySet()) {
-                String targetService = entry.getKey();
-                ServiceGraphEdgeInfo newEdge = entry.getValue();
-
-                ServiceGraphEdgeInfo edgeInfo = existingEdges.get(targetService);
-                if (edgeInfo == null) {
-                    edgeInfo = newEdge;
-                }
-
-                existingEdges.put(targetService, edgeInfo);
+            boolean edgeAdded = mergeNewEdges(existingEdges, edges);
+            if (!edgeAdded) {
+                // every edge is already stored, so writing the map back would not change anything
+                return true;
             }
 
             boolean success = dataActor.updateServiceGraphEdges(apiCollectionId, existingEdges);
@@ -67,6 +90,102 @@ public class ServiceGraphBuilder {
         } catch (Exception e) {
             logger.error("Failed to update service graph: {}", e.getMessage(), e);
             return false;
+        }
+    }
+
+    /** Same additive merge as updateServiceGraph, plus pruning: an existing edge matching sourceService+scope is dropped if freshEdges no longer has it. */
+    public boolean pruneAndUpdateServiceGraph(int apiCollectionId, Map<String, ServiceGraphEdgeInfo> existingEdges,
+                                               String sourceService, Map<String, String> scope,
+                                               Map<String, ServiceGraphEdgeInfo> freshEdges) {
+        try {
+            Map<String, ServiceGraphEdgeInfo> merged =
+                pruneAndMerge(existingEdges, sourceService, scope, freshEdges);
+
+            boolean success = dataActor.updateServiceGraphEdges(apiCollectionId, merged);
+            if (!success) {
+                logger.error("Failed to update service graph edges for collection: {}", apiCollectionId);
+                return false;
+            }
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to prune and update service graph: {}", e.getMessage(), e);
+            return false;
+        }
+    }
+
+    /** Adds the incoming edges the collection doesn't have yet and returns whether any was added; an existing edge is never replaced. */
+    static boolean mergeNewEdges(Map<String, ServiceGraphEdgeInfo> existingEdges, Map<String, ServiceGraphEdgeInfo> incomingEdges) {
+        boolean edgeAdded = false;
+        for (Map.Entry<String, ServiceGraphEdgeInfo> entry : incomingEdges.entrySet()) {
+            if (existingEdges.get(entry.getKey()) == null) {
+                existingEdges.put(entry.getKey(), entry.getValue());
+                edgeAdded = true;
+            }
+        }
+        return edgeAdded;
+    }
+
+    /** Pure prune-then-merge, split out from {@link #pruneAndUpdateServiceGraph} so it's testable without a DB. */
+    static Map<String, ServiceGraphEdgeInfo> pruneAndMerge(Map<String, ServiceGraphEdgeInfo> existingEdges,
+            String sourceService, Map<String, String> scope, Map<String, ServiceGraphEdgeInfo> freshEdges) {
+        Map<String, ServiceGraphEdgeInfo> result = existingEdges == null
+            ? new HashMap<>() : new HashMap<>(existingEdges);
+        Map<String, ServiceGraphEdgeInfo> fresh = freshEdges != null ? freshEdges : new HashMap<>();
+
+        result.entrySet().removeIf(e -> {
+            ServiceGraphEdgeInfo edge = e.getValue();
+            return edge != null && sourceService.equals(edge.getSourceService())
+                && inScope(edge, scope) && !fresh.containsKey(e.getKey());
+        });
+
+        for (Map.Entry<String, ServiceGraphEdgeInfo> entry : fresh.entrySet()) {
+            ServiceGraphEdgeInfo existing = result.get(entry.getKey());
+            if (existing == null) {
+                result.put(entry.getKey(), entry.getValue());
+            } else {
+                mergeMetadata(existing, entry.getValue());
+            }
+        }
+        return result;
+    }
+
+    /** Pure refresh merge (see {@link #updateServiceGraph(int, Map, boolean)}), split out so it's testable without a DB. */
+    static Map<String, ServiceGraphEdgeInfo> refreshMerge(Map<String, ServiceGraphEdgeInfo> existingEdges,
+            Map<String, ServiceGraphEdgeInfo> freshEdges) {
+        Map<String, ServiceGraphEdgeInfo> result = existingEdges == null ? new HashMap<>() : new HashMap<>(existingEdges);
+        if (freshEdges == null) return result;
+        for (Map.Entry<String, ServiceGraphEdgeInfo> entry : freshEdges.entrySet()) {
+            ServiceGraphEdgeInfo incoming = entry.getValue();
+            if (incoming == null) continue;
+            ServiceGraphEdgeInfo existing = result.get(entry.getKey());
+            Map<String, Object> metadata = new HashMap<>();
+            if (existing != null && existing.getMetadata() != null) metadata.putAll(existing.getMetadata());
+            if (incoming.getMetadata() != null) metadata.putAll(incoming.getMetadata());
+            result.put(entry.getKey(), new ServiceGraphEdgeInfo(incoming.getSourceService(), incoming.getTargetService(), metadata));
+        }
+        return result;
+    }
+
+    /** True only if the edge matches every scope key; an empty scope is treated as no-match, never as match-all. */
+    private static boolean inScope(ServiceGraphEdgeInfo edge, Map<String, String> scope) {
+        if (scope == null || scope.isEmpty() || edge.getMetadata() == null) return false;
+        for (Map.Entry<String, String> entry : scope.entrySet()) {
+            if (!entry.getValue().equals(edge.getMetadata().get(entry.getKey()))) return false;
+        }
+        return true;
+    }
+
+    /** Copies metadata keys the existing edge doesn't already have. Never overwrites. */
+    private static void mergeMetadata(ServiceGraphEdgeInfo existing, ServiceGraphEdgeInfo incoming) {
+        if (incoming == null || incoming.getMetadata() == null || incoming.getMetadata().isEmpty()) {
+            return;
+        }
+        if (existing.getMetadata() == null) {
+            existing.setMetadata(new HashMap<>(incoming.getMetadata()));
+            return;
+        }
+        for (Map.Entry<String, Object> entry : incoming.getMetadata().entrySet()) {
+            existing.getMetadata().putIfAbsent(entry.getKey(), entry.getValue());
         }
     }
 

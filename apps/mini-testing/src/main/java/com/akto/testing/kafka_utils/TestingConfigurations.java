@@ -28,6 +28,7 @@ public class TestingConfigurations {
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
     private boolean doNotMarkIssuesAsFixed;
     private boolean runAutomatedTests;
+    private String dashboardContext;
 
     private TestingConfigurations() {
     }
@@ -37,6 +38,10 @@ public class TestingConfigurations {
     }
 
     public synchronized void init(TestingUtil testingUtil, TestingRunConfig testingRunConfig, boolean debug, Map<String, TestConfig> testConfigMap, int maxConcurrentRequests, boolean doNotMarkIssuesAsFixed, boolean runAutomatedTests) {
+        // Scope ApiInfoMetaCache to one testing run, not the whole (long-lived) JVM - see its own
+        // class doc for why apiAccessTypes/collectionIds can't be cached across runs like
+        // ApiCollectionMetaCache's tags can.
+        com.akto.util.ApiInfoMetaCache.clear();
         this.testingUtil = testingUtil;
         this.testingRunConfig = testingRunConfig;
         this.debug = debug;
@@ -121,6 +126,14 @@ public class TestingConfigurations {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public String getDashboardContext() {
+        return dashboardContext;
+    }
+
+    public void setDashboardContext(String dashboardContext) {
+        this.dashboardContext = dashboardContext;
     }
 
 }

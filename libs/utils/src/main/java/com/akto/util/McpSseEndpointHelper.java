@@ -1,7 +1,5 @@
 package com.akto.util;
 
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.log.LoggerMaker;
@@ -18,8 +16,7 @@ import java.util.HashMap;
 public class McpSseEndpointHelper {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(McpSseEndpointHelper.class, LogDb.TESTING);
-    private static DataActor dataActor = DataActorFactory.fetchInstance();
-    
+
     /**
      * Adds SSE endpoint header for MCP collections to enable dynamic SSE endpoints
      * 
@@ -33,7 +30,7 @@ public class McpSseEndpointHelper {
 
         try {
             // Check if this is an MCP collection by looking up the ApiCollection
-            ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+            ApiCollection apiCollection = ApiCollectionMetaCache.get(apiCollectionId);
 
             if (apiCollection != null && apiCollection.getSseCallbackUrl() != null && !apiCollection.getSseCallbackUrl().isEmpty()) {
                 String sseEndpoint = apiCollection.getSseCallbackUrl();

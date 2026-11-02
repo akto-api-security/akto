@@ -1,10 +1,11 @@
-FROM amazoncorretto:8
+FROM eclipse-temurin:17-jre-resolute
 WORKDIR /app
+
+RUN apt-get update -y \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY ./target/datadog-trace-exporter-1.0-SNAPSHOT-jar-with-dependencies.jar /app/datadog-trace-exporter-1.0-SNAPSHOT-jar-with-dependencies.jar
-
-RUN yum update -y && yum install -y procps
-RUN yum install -y bind-utils
-
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 CMD ["/app/start.sh"]

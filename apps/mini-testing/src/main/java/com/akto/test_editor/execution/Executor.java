@@ -33,11 +33,11 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
-import com.akto.test_editor.utils.Utils;
+import com.akto.test_editor.Utils;
 import static com.akto.test_editor.Utils.createWebhookSiteToken;
 import static com.akto.test_editor.Utils.getSsrfWebhookServiceBase;
 import static com.akto.test_editor.Utils.sendRequestToWebhookService;
-import static com.akto.test_editor.utils.Utils.storeSsrfWebhookMapping;
+import static com.akto.test_editor.Utils.storeSsrfWebhookMapping;
 import com.akto.util.Constants;
 import com.akto.mcp.McpJsonRpcModel;
 import com.akto.mcp.McpRequestResponseUtils;
@@ -54,11 +54,12 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
-import static com.akto.test_editor.utils.Utils.bodyValuesUnchanged;
-import static com.akto.test_editor.utils.Utils.headerValuesUnchanged;
+import static com.akto.test_editor.Utils.bodyValuesUnchanged;
+import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field.Bool;
 
 public class Executor {
 
@@ -89,7 +90,6 @@ public class Executor {
         WorkflowTest workflowTest = null;
         if (node.getChildNodes().size() < 2) {
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "executor child nodes is less than 2, returning empty execution result"));
-            loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
@@ -100,7 +100,14 @@ public class Executor {
         ModifyExecutionOrderResp modifyExecutionOrderResp = executionListBuilder.modifyExecutionFlow(executorNodes, varMap);
 
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
-        Map<String, Object> resolvedWordList = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        long wordlistStart = System.nanoTime();
+        Map<String, Object> resolvedWordList;
+        try {
+            resolvedWordList = VariableResolver.resolveDynamicWordList(varMap, apiInfoKey, newSampleDataMap);
+        } finally {
+            // finally, not a bare statement after the call - see YamlTestTemplate.filter()'s comment.
+            TestPhaseTimer.addWordlist(System.nanoTime() - wordlistStart);
+        }
         varMap.clear();
         varMap.putAll(resolvedWordList);
 
@@ -132,12 +139,11 @@ public class Executor {
                 }
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
 
-                    synchronized(role) {
-                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                        if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
-                            loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
-                        }
-                    }                    
+                    // modifyAuthTokenInRawApi now locks internally, per role name - no need to wrap here.
+                    loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                    if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
+                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    }
 
                 } else {
                     loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
@@ -150,12 +156,25 @@ public class Executor {
         origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
-         // boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
-         boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests();
+        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
+        boolean onlySmartTestingAllowed = varMap.containsKey("onlySmartTestingAllowed") && Boolean.TRUE.equals(varMap.get("onlySmartTestingAllowed"));
+
+        String testingRunResultSummaryIdHex = testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null
+                ? testingRunConfig.getTestRunResultSummaryId().toHexString() : null;
+        String dashboardContext = varMap != null && varMap.get("dashboardContext") != null
+                ? varMap.get("dashboardContext").toString() : null;
+        if (TestRateLimitGuard.isDailyLimitExceededAndStop(testingRunResultSummaryIdHex, dashboardContext)) {
+            String limitMsg = "Daily test limit reached for this account; stopping test run.";
+            testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, limitMsg));
+            loggerMaker.infoAndAddToDb("Daily test limit reached, stopping run " + logId, LogDb.TESTING);
+            result.add(new TestResult(null, rawApi.getOriginalMessage(), Collections.singletonList(limitMsg), 0, false, TestResult.Confidence.HIGH, null));
+            return new YamlTestResult(result, workflowTest);
+        }
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         boolean isParallelExecution = executionType.equalsIgnoreCase("parallel");
-        if (!runAutomatedPentest && (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution)) {
+        if (!runAutomatedPentest && (executionType.equals("multiple") || executionType.equals("graph") || isParallelExecution) && !onlySmartTestingAllowed) {
             if (executionType.equals("graph")) {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
@@ -168,9 +187,16 @@ public class Executor {
             return yamlTestResult;
         }
 
-        if (!runAutomatedPentest && executionType.equals("passive")) {
+        if (!runAutomatedPentest && executionType.equals("passive") && !onlySmartTestingAllowed) {
             ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
-            TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            long validateStart = System.nanoTime();
+            TestResult res;
+            try {
+                res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            } finally {
+                // finally, not a bare statement after the call - see YamlTestTemplate.filter()'s comment.
+                TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
+            }
             if (res != null) {
                 /*
                  * Since the original message and test message are same, saving only one.
@@ -199,12 +225,18 @@ public class Executor {
         boolean requestAttempted = false;
         boolean allRequestsSkippedDueToMatch = false;
         int skippedCount = 0;
+        // Smart testing module: every attempt the template marks vulnerable is verified as it is found. A rejected
+        // one is marked not vulnerable and the remaining payloads are still sent.
+        boolean verifyFindings = TestingConfigurations.getInstance().isRunAutomatedTests();
+        String verificationSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
+        RawApi verificationBaseline = null;
 
 
         if (runAutomatedPentest) {
             String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
+            RawApi preparedForPentest = applyPreRequestScript(origRawApi, testingRunConfig);
             PentestExecutionResult pentestResult =
-                    automatedAgenticTestExecutor.executeAgenticTest(origRawApi, testSubType);
+                    automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType);
             List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
             aiSummaryTraces = pentestResult.getAiSummaryTraces();
             if (automatedAgenticResults != null && !automatedAgenticResults.isEmpty()) {
@@ -220,6 +252,9 @@ public class Executor {
             } else {
                 loggerMaker.infoAndAddToDb("AutomatedAgenticTest: no results returned for testSubType=" + testSubType);
             }
+        } else if (onlySmartTestingAllowed) {
+            // do not execute normal testing
+            loggerMaker.infoAndAddToDb("Skipping normal testing as only smart testing is allowed", LogDb.TESTING);
         } else {
             for (RawApi testReq: testRawApis) {
                 if (executorNodes.size() > 0 && testReq.equals(origRawApi)) {
@@ -237,7 +272,6 @@ public class Executor {
                     if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
                         // execute agentic test here
                         requestAttempted = true;
-                        String testingRunResultSummaryIdHex = null;
                         if (testingRunConfig != null && testingRunConfig.getTestRunResultSummaryId() != null) {
                             testingRunResultSummaryIdHex = testingRunConfig.getTestRunResultSummaryId().toHexString();
                         }
@@ -264,10 +298,46 @@ public class Executor {
                         McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
                         requestAttempted = true;
-                        testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK, apiInfoKey.getApiCollectionId());
+                        long sendStart = System.nanoTime();
+                        try {
+                            testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                        } finally {
+                            // finally, not a bare statement after the call: a send that times out or
+                            // gets interrupted (e.g. by the 300s task-timeout's future.cancel(true))
+                            // throws from ApiExecutor.common(), which previously skipped this line
+                            // entirely and silently misattributed the whole blocked duration to OTHER
+                            // instead of SEND_REQUEST (08sep customer-run finding, confirmed via jattach:
+                            // 100/100 workers blocked in ApiExecutor.common->readResponseHeaders while
+                            // SEND_REQUEST's reported average stayed near-zero).
+                            TestPhaseTimer.addSendRequest(System.nanoTime() - sendStart);
+                        }
                         requestSent = true;
                         ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                        res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                        long validateStart = System.nanoTime();
+                        try {
+                            res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                        } finally {
+                            TestPhaseTimer.addValidate(System.nanoTime() - validateStart);
+                        }
+                        if (res != null && res.getVulnerable() && verifyFindings) {
+                            if (verificationBaseline == null) {
+                                verificationBaseline = applyPreRequestScript(origRawApi, testingRunConfig);
+                            }
+                            // sendRequest already ran the pre-request script on this request
+                            RawApi vulnerableAttempt = new RawApi(testReq.getRequest(), testResponse, null);
+                            PentestExecutionResult verification = automatedAgenticTestExecutor.verifyFinding(
+                                    verificationBaseline, vulnerableAttempt, verificationSubType);
+                            List<TestResult> verdicts = verification.getTestResults();
+                            if (verdicts != null && !verdicts.isEmpty()) {
+                                boolean confirmed = verdicts.get(verdicts.size() - 1).getVulnerable();
+                                res.setVulnerable(confirmed);
+                                aiSummaryTraces = verification.getAiSummaryTraces();
+                                loggerMaker.infoAndAddToDb("SmartVerification: vulnerable=" + confirmed + " for testSubType=" + verificationSubType);
+                            } else {
+                                // couldn't judge it (down, timed out, skipped): the template's verdict stands
+                                loggerMaker.infoAndAddToDb("SmartVerification: not judged, keeping template result for testSubType=" + verificationSubType);
+                            }
+                        }
                     }
                     if (res != null && agenticResults == null) {
                         result.add(res);
@@ -326,7 +396,9 @@ public class Executor {
         try {
             String url = "";
             List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());
-            if (!originalHostHeaders.isEmpty() && testingRunConfig != null
+            // agentic samples are often absolute URLs without a host header, so allow override in that case too
+            boolean absoluteUrl = rawApi.getRequest().getUrl() != null && rawApi.getRequest().getUrl().startsWith("http");
+            if ((!originalHostHeaders.isEmpty() || absoluteUrl) && testingRunConfig != null
                 && !StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
 
                 Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
@@ -676,6 +748,18 @@ public class Executor {
         return TestError.API_REQUEST_FAILED_BEFORE_SENDING;
     }
 
+    private static RawApi applyPreRequestScript(RawApi rawApi, TestingRunConfig testingRunConfig) {
+        if (rawApi == null) {
+            return null;
+        }
+        RawApi prepared = rawApi.copy();
+        if (testingRunConfig == null || prepared.getRequest() == null) {
+            return rawApi;
+        }
+        ApiExecutorUtil.calculateHashAndAddAuth(prepared.getRequest(), true, testingRunConfig);
+        return prepared;
+    }
+
     private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey, List<CustomAuthType> customAuthTypes) {
         boolean removed = false;
         // find set of all headers and body params that didn't change
@@ -732,7 +816,16 @@ public class Executor {
         return removed;
     }
 
-    public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+    // Per-role-name lock, not a class-wide `synchronized` - a slow login flow for role X must not
+    // block token application (or role lookup) for role Y. Keyed on name rather than the TestRoles
+    // instance itself since fetchOrFindTestRole can hand out a fresh instance for the same name after
+    // a definition refresh; locking on the instance would let two such instances race on the same
+    // underlying auth mechanism. Locking INSIDE the method (rather than at each call site) also covers
+    // the call site at line ~1220 that previously had no synchronized(role) wrapper at all.
+    private static final ConcurrentHashMap<String, Object> authLocks = new ConcurrentHashMap<>();
+
+    public static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+        synchronized (authLocks.computeIfAbsent(testRole.getName(), k -> new Object())) {
         AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
 
         if (authMechanismForRole == null) {
@@ -773,37 +866,41 @@ public class Executor {
         }
 
         return ret;
+        }
     }
 
-    private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
     private static final int ROLE_FETCH_THROTTLE_SECS = 1 * 60; // 1 minute
 
     public static TestRoles fetchOrFindAttackerRole() {
         return fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
     }
 
-    public synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
-        if (roleCache == null) {
-            roleCache = new ConcurrentHashMap<>();
-        }
-        TestRoles cached = roleCache.get(name);
-        if (cached != null) {
-            int now = Context.now();
-            if (cached.getLastFetched() > 0 && (now - cached.getLastFetched()) < ROLE_FETCH_THROTTLE_SECS) {
-                return roleCache.get(name);
+    // Per-role-name single-flight via ConcurrentHashMap.compute(): concurrent calls for the SAME name
+    // serialize on just that map bin (not a class-wide lock), so a slow/refreshing role never blocks
+    // lookups for a different role. Correctness preserved exactly from the old synchronized version:
+    // - 60s throttle before refetching
+    // - serve the last-known value if a refetch fails (fresh == null)
+    // - if the refetched definition isn't newer (lastUpdatedTs), KEEP the old object rather than the
+    //   new one - the old object may carry a warm auth token (see modifyAuthTokenInRawApi) that a
+    //   same-definition refresh must not discard.
+    public static TestRoles fetchOrFindTestRole(String name, boolean isId) {
+        return roleCache.compute(name, (key, cached) -> {
+            if (cached != null && cached.getLastFetched() > 0
+                    && (Context.now() - cached.getLastFetched()) < ROLE_FETCH_THROTTLE_SECS) {
+                return cached;
             }
-        }
-        TestRoles fresh = isId ? dataActor.fetchTestRolesforId(name) : dataActor.fetchTestRole(name);
-        if (fresh == null) {
-            return roleCache.get(name);
-        }
-        if (cached != null && fresh.getLastUpdatedTs() <= cached.getLastUpdatedTs()) {
-            cached.setLastFetched(Context.now());
-            return roleCache.get(name);
-        }
-        fresh.setLastFetched(Context.now());
-        roleCache.put(name, fresh);
-        return roleCache.get(name);
+            TestRoles fresh = isId ? dataActor.fetchTestRolesforId(name) : dataActor.fetchTestRole(name);
+            if (fresh == null) {
+                return cached; // serve stale (or null) on fetch failure
+            }
+            if (cached != null && fresh.getLastUpdatedTs() <= cached.getLastUpdatedTs()) {
+                cached.setLastFetched(Context.now());
+                return cached; // keep old object - preserves any warm auth state attached to it
+            }
+            fresh.setLastFetched(Context.now());
+            return fresh;
+        });
     }
 
     public static void clearRoleCache() {
@@ -1064,10 +1161,8 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
 
-                    ExecutorSingleOperationResp insertedAuthResp = new ExecutorSingleOperationResp(true, "");
-                    synchronized (testRole) {
-                        insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
-                    }
+                    // modifyAuthTokenInRawApi now locks internally, per role name - no need to wrap here.
+                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
                     if (insertedAuthResp != null) {
                         return insertedAuthResp;
                     }

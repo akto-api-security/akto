@@ -1,10 +1,16 @@
 package com.akto.dto;
 
 import com.mongodb.BasicDBObject;
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
 public class Log {
+
+    public enum ActivityType {
+        TESTING_RUN_RESULT_SUMMARY_ACTIVITY
+    }
 
     private ObjectId id;
     public ObjectId getId() {
@@ -28,6 +34,17 @@ public class Log {
 
     public static final String TIMESTAMP = "timestamp";
     private int timestamp;
+
+    public static final String ACTIVITY_ID = "activityId";
+    public static final String ACTIVITY_TYPE = "activityType";
+
+    @Getter
+    @Setter
+    private String activityId; // activity id for the log eg test run result summary id
+
+    @Getter
+    @Setter
+    private ActivityType activityType; // activity type for the log eg TESTING_RUN_RESULT_SUMMARY_ACTIVITY
 
     public Log() {
     }
@@ -64,18 +81,27 @@ public class Log {
 
     @Override
     public String toString() {
-        return "{" +
-            " log='" + getLog() + "'" +
-            ", key='" + getKey() + "'" +
-            ", timestamp='" + getTimestamp() + "'" +
-            "}";
+        StringBuilder sb = new StringBuilder("{");
+        sb.append(" log='").append(getLog()).append("'");
+        sb.append(", key='").append(getKey()).append("'");
+        sb.append(", timestamp='").append(getTimestamp()).append("'");
+        if (getActivityId() != null) {
+            sb.append(", activityId='").append(getActivityId()).append("'");
+        }
+        if (getActivityType() != null) {
+            sb.append(", activityType='").append(getActivityType()).append("'");
+        }
+        sb.append("}");
+        return sb.toString();
     }
 
     public BasicDBObject toBasicDBObject(){
         return new BasicDBObject("_id", getId())
                 .append("log", getLog())
                 .append("key", getKey())
-                .append("timestamp", getTimestamp());
+                .append("timestamp", getTimestamp())
+                .append(ACTIVITY_ID, getActivityId())
+                .append(ACTIVITY_TYPE, getActivityType());
     }
 
 }

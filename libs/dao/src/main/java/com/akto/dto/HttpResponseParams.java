@@ -31,6 +31,9 @@ public class HttpResponseParams {
     // K8 pod tags in JSON string
     String tags;
     List<String> parentMcpToolNames;
+    String traces;
+    // Guardrail result recorded at ingestion (Gateway.recordGuardrailVerdict), as a JSON blob.
+    String guardrailVerdict;
 
     public HttpResponseParams() {}
 
@@ -261,5 +264,21 @@ public class HttpResponseParams {
 
     public void setParentMcpToolNames(List<String> parentMcpToolNames) {
         this.parentMcpToolNames = parentMcpToolNames;
+    }
+
+    public String getTraces() {
+        return traces;
+    }
+
+    public void setTraces(String traces) {
+        this.traces = traces;
+    }
+
+    public String getGuardrailVerdict() {
+        return guardrailVerdict;
+    }
+
+    public void setGuardrailVerdict(String guardrailVerdict) {
+        this.guardrailVerdict = guardrailVerdict;
     }
 }

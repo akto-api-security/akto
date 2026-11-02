@@ -53,6 +53,9 @@ public class ApiCollection {
     public static final String _DEACTIVATED = "deactivated";
     boolean deactivated;
 
+    public static final String IS_OUT_OF_TESTING_SCOPE = "isOutOfTestingScope";
+    boolean isOutOfTestingScope;
+
     public static final String AUTOMATED = "automated";
     boolean automated;
 
@@ -314,6 +317,14 @@ public class ApiCollection {
         this.deactivated = deactivated;
     }
 
+    public boolean getIsOutOfTestingScope() {
+        return isOutOfTestingScope;
+    }
+
+    public void setIsOutOfTestingScope(boolean isOutOfTestingScope) {
+        this.isOutOfTestingScope = isOutOfTestingScope;
+    }
+
     // to be used in front end
     public String getDisplayName() {
         String result;
@@ -483,6 +494,17 @@ public class ApiCollection {
     public boolean isGenAICollection() {
         if (!CollectionUtils.isEmpty(this.getTagsList())) {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
+    /**
+     * Named for the tag rather than shortened to isRagCollection, which would read as the unrelated
+     * AKTO_RAG_COLLECTION_TAG ("rag-collection").
+     */
+    public boolean isRagDatabaseCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
         }
         return false;
     }

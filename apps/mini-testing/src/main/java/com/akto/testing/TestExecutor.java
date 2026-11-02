@@ -10,6 +10,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
+import com.akto.dto.Log;
 import com.akto.dto.DependencyNode;
 import com.akto.dto.DependencyNode.ParamInfo;
 import com.akto.dto.OriginalHttpRequest;
@@ -55,8 +56,8 @@ import com.mongodb.BasicDBList;
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.Producer;
+import com.akto.testing.kafka_utils.TestingStateStore;
 import com.akto.dto.testing.info.SingleTestPayload;
-import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
@@ -72,7 +73,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.akto.testing.workflow_node_executor.Utils;
-import com.akto.agent.AgentClient;
+import com.akto.agent.AgenticUtils;
 
 public class TestExecutor {
 
@@ -89,6 +90,10 @@ public class TestExecutor {
     private static final ClientLayer clientLayer = new ClientLayer();
     private static final AtomicInteger totalTestsCount = new AtomicInteger(0);
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
+    // rollout toggle for the consolidated bulkRecordTestingRunResults flow (cyborg); default keeps the old per-call flow.
+    private static final boolean USE_BULK_RECORD_TESTING_RUN_RESULTS =
+        Boolean.parseBoolean(System.getenv().getOrDefault(
+                "USE_BULK_RECORD_TESTING_RUN_RESULTS", "true"));
     private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
     
     // Current execution fallback flag - used when Kafka fails during current test run
@@ -149,6 +154,10 @@ public class TestExecutor {
             if(sample == null || sample.isEmpty()){
                 countDownLatch(latch);
                 createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, null, testConfigMap);
+                continue;
+            }
+            if (skipIfSampleTooLarge(sample, apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, null, testConfigMap)) {
+                countDownLatch(latch);
                 continue;
             }
             if(sample.contains("originalRequestPayload")){
@@ -285,12 +294,12 @@ public class TestExecutor {
 
         BasicDBObject dbObject = new BasicDBObject();
         if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
-            dbObject.put("PRODUCER_RUNNING", true);
-            dbObject.put("CONSUMER_RUNNING", false);
-            dbObject.put("accountId", accountId);
-            dbObject.put("summaryId", summaryId.toHexString());
-            dbObject.put("testingRunId", testingRun.getId().toHexString()); 
-            writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+            dbObject.put(TestingStateStore.PRODUCER_RUNNING, true);
+            dbObject.put(TestingStateStore.CONSUMER_RUNNING, false);
+            dbObject.put(TestingStateStore.ACCOUNT_ID, accountId);
+            dbObject.put(TestingStateStore.SUMMARY_ID, summaryId.toHexString());
+            dbObject.put(TestingStateStore.TESTING_RUN_ID, testingRun.getId().toHexString());
+            TestingStateStore.update(dbObject);
         }
 
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
@@ -404,6 +413,8 @@ public class TestExecutor {
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
+        TestingConfigurations.getInstance().setDashboardContext(
+                testingRun.getDashboardContext() != null ? testingRun.getDashboardContext().toString() : null);
 
         Set<Integer> collectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
         List<ApiCollection> apiCollections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
@@ -478,7 +489,7 @@ public class TestExecutor {
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
             if(Constants.IS_NEW_TESTING_ENABLED){
                 try {
-                    Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                    Producer.createTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.getTestResultsTopicName(summaryId.toHexString()));
                 } catch (Exception e) {
                     e.printStackTrace();
                     loggerMaker.errorAndAddToDb(e, "Error in creating topic");
@@ -504,6 +515,10 @@ public class TestExecutor {
                 if(sample == null || sample.isEmpty()){
                     countDownLatch(latch);
                     createAndSaveSampleNotFoundResultForOneTestSubcategory(apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap);
+                    continue;
+                }
+                if (skipIfSampleTooLarge(sample, apiInfoKey, testingRun.getId(), summaryId, testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap)) {
+                    countDownLatch(latch);
                     continue;
                 }
                 if(sample.contains("originalRequestPayload")){
@@ -585,8 +600,8 @@ public class TestExecutor {
 
                     if (!shouldContinueTestExecution(summaryId)) {
                         loggerMaker.infoAndAddToDb("Test run time expired during Kafka production; deleting topic and skipping consumer.");
-                        Producer.deleteTestResultsTopic();
-                        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, null);
+                        Producer.deleteTestResultsTopic(summaryId.toHexString());
+                        TestingStateStore.clear();
                     } else if (unsentRecords == totalRecords.get()) {
                         // Check producer status
                         loggerMaker.infoAndAddToDb("Producer status: " + Producer.getProducerStatus());
@@ -603,11 +618,16 @@ public class TestExecutor {
                         loggerMaker.infoAndAddToDb("All records sent successfully to Kafka");
                         
                         // Normal Kafka completion - start consumer
-                        dbObject.put("PRODUCER_RUNNING", false);
-                        dbObject.put("CONSUMER_RUNNING", true);
+                        dbObject.put(TestingStateStore.PRODUCER_RUNNING, false);
+                        dbObject.put(TestingStateStore.CONSUMER_RUNNING, true);
                         dbObject.put(TestingRun.PICKED_UP_TIMESTAMP, runPickedUp);
-                        dbObject.put("testRunMaxTimeSeconds", runMaxSec);
-                        writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+                        dbObject.put(TestingStateStore.TEST_RUN_MAX_TIME_SECONDS, runMaxSec);
+                        // Successfully sent = total - still-throttled/unacked. Consumer waits for this many.
+                        int expectedRecords = Math.max(0, totalRecords.get() - unsentRecords);
+                        dbObject.put(TestingStateStore.EXPECTED_RECORDS, expectedRecords);
+                        loggerMaker.insertImportantTestingLog("Writing expectedRecords=" + expectedRecords + " for consumer completion check");
+                        TestingStateStore.update(dbObject);
+
                     }
                 }
                 
@@ -656,6 +676,34 @@ public class TestExecutor {
     private void createAndSaveSampleNotFoundResultForOneTestSubcategory(ApiInfoKey apiInfoKey, ObjectId testingRunId,
             ObjectId testingRunResultSummaryId, List<String> testingRunSubCategories,
             Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap, Map<String, TestConfig> testConfigMap) {
+        createAndSaveSkippedResultForOneTestSubcategory(apiInfoKey, testingRunId, testingRunResultSummaryId,
+                testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap,
+                Collections.singletonList(TestError.NO_PATH.getMessage()));
+    }
+
+    // Whole sample (request + response + headers) above this skips all tests on the API; 0 disables.
+    private static final int MAX_SAMPLE_PAYLOAD_KB = Integer.parseInt(System.getenv().getOrDefault("MAX_SAMPLE_PAYLOAD_KB", "75"));
+
+    private boolean skipIfSampleTooLarge(String sample, ApiInfoKey apiInfoKey, ObjectId testingRunId,
+            ObjectId testingRunResultSummaryId, List<String> testingRunSubCategories,
+            Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap, Map<String, TestConfig> testConfigMap) {
+        if (MAX_SAMPLE_PAYLOAD_KB <= 0 || sample.length() <= MAX_SAMPLE_PAYLOAD_KB * 1024L) {
+            return false;
+        }
+        String detail = "Sample payload " + (sample.length() / 1024) + " KB exceeds the " + MAX_SAMPLE_PAYLOAD_KB
+                + " KB limit (MAX_SAMPLE_PAYLOAD_KB)";
+        loggerMaker.infoAndAddToDb("Skipping tests for " + apiInfoKey + ": " + detail);
+        // the dashboard's Skipped tab matches on the first error, so it must be a known skip message
+        createAndSaveSkippedResultForOneTestSubcategory(apiInfoKey, testingRunId, testingRunResultSummaryId,
+                testingRunSubCategories, apiInfoKeySubcategoryMap, testConfigMap,
+                Arrays.asList(TestError.SKIPPING_EXECUTION_BECAUSE_FILTERS.getMessage(), detail));
+        return true;
+    }
+
+    private void createAndSaveSkippedResultForOneTestSubcategory(ApiInfoKey apiInfoKey, ObjectId testingRunId,
+            ObjectId testingRunResultSummaryId, List<String> testingRunSubCategories,
+            Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap, Map<String, TestConfig> testConfigMap,
+            List<String> errors) {
         try {
             for (String testSubCategory : testingRunSubCategories) {
                 if (apiInfoKeySubcategoryMap == null
@@ -668,7 +716,10 @@ public class TestExecutor {
                         String testSubType = testConfig.getInfo().getSubCategory();
                         TestingRunResult runResult = generateFailedRunResultForMessage(
                                 testingRunId, apiInfoKey, testSuperType, testSubType,
-                                testingRunResultSummaryId, new ArrayList<>(), TestError.NO_PATH.getMessage());
+                                testingRunResultSummaryId, new ArrayList<>(), errors.get(0));
+                        if (errors.size() > 1) {
+                            ((TestResult) runResult.getTestResults().get(0)).setErrors(errors);
+                        }
                         this.insertResultsAndMakeIssues(Collections.singletonList(runResult),
                                 testingRunResultSummaryId);
                         break;
@@ -695,21 +746,6 @@ public class TestExecutor {
         } else {
             updatedState = GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) ? State.COMPLETED : GetRunningTestsStatus.getRunningTests().getCurrentState(summaryId);
         }
-        
-
-        int skip = 0;
-        int limit = 1000;
-        boolean fetchMore = false;
-        do {
-            fetchMore = false;
-            List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResultBySummaryId(summaryId.toHexString(), limit, skip);
-            loggerMaker.infoAndAddToDb("Reading " + testingRunResults.size() + " vulnerable testingRunResults");
-            if (testingRunResults.size() == limit) {
-                skip += limit;
-                fetchMore = true;
-            }
-
-        } while (fetchMore);
 
         TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), updatedState.toString());
         if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
@@ -950,6 +986,25 @@ public class TestExecutor {
         return respMap;
     }
 
+    /**
+     * Establishes a clean activity context for a test run. Tests start from several flows that run on
+     * pooled/reused threads, so we always set explicitly when a summaryId is present and otherwise clear
+     * any stale value left behind by a previous task on the same thread.
+     */
+    public static void setTestRunActivityContext(ObjectId summaryId) {
+        if (summaryId != null) {
+            Context.activityId.set(summaryId.toHexString());
+            Context.activityType.set(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY);
+        } else {
+            clearActivityContext();
+        }
+    }
+
+    public static void clearActivityContext() {
+        Context.activityId.remove();
+        Context.activityType.remove();
+    }
+
     public Void startWithLatch(
         List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
         List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
@@ -957,6 +1012,7 @@ public class TestExecutor {
         List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
+        setTestRunActivityContext(summaryId);
         loggerMaker.warnAndAddToDb("Starting test for " + apiInfoKey);
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
@@ -972,6 +1028,8 @@ public class TestExecutor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error while running tests: " + e);
+        } finally {
+            clearActivityContext();
         }
         if(isApiInfoTested.get()){
             loggerMaker.warnAndAddToDb("API: " + apiInfoKey.toString() + " has been successfully tested");
@@ -1024,6 +1082,18 @@ public class TestExecutor {
         }
     }
 
+    private void recordTestExecutionMetrics(List<TestResult> testResults) {
+        AllMetrics.instance.setTestingTestsExecutedCount(1);
+        for (TestResult testResult : testResults) {
+            List<String> errors = testResult.getErrors();
+            if (errors == null || errors.isEmpty()) {
+                AllMetrics.instance.setTestingApiHitSuccessCount(1);
+            } else if (TestResult.isApiCallFailure(errors)) {
+                AllMetrics.instance.setTestingApiHitFailureCount(1);
+            }
+        }
+    }
+
     public void insertResultsAndMakeIssues(List<TestingRunResult> testingRunResults, ObjectId testRunResultSummaryId) {
         int resultSize = testingRunResults.size();
         if (resultSize > 0) {
@@ -1032,13 +1102,17 @@ public class TestExecutor {
             TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
             if (originalTestingRunResultForRerun != null) {
                 loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                dataActor.deleteTestingRunResults(originalTestingRunResultForRerun.getHexId());
                 /*
                  * delete from vulnerableTestResults as well.
                  * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
                  * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
                  * single entry
                  * */
+                // Under the new bulk-record flow the delete is folded into rerunDeleteIds and happens
+                // server-side, atomically with the insert + issue write - see recordViaBulkApi.
+                if (!USE_BULK_RECORD_TESTING_RUN_RESULTS) {
+                    dataActor.deleteTestingRunResults(originalTestingRunResultForRerun.getHexId());
+                }
             }
             TestingRunResult trr = testingRunResults.get(0);
             trr.setTestRunHexId(trr.getTestRunHexId());
@@ -1050,6 +1124,7 @@ public class TestExecutor {
                     list.add((TestResult) testResult);
                 }
                 trr.setSingleTestResults(list);
+                recordTestExecutionMetrics(list);
             } else {
                 List<MultiExecTestResult> list = new ArrayList<>();
                 for(GenericTestResult testResult: trr.getTestResults()){
@@ -1059,22 +1134,42 @@ public class TestExecutor {
             }
             trr.setTestResults(null);
             trr.setTestLogs(null);
-            dataActor.insertTestingRunResults(trr);
-            loggerMaker.infoAndAddToDb("Inserted testing results");
-            dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
-            loggerMaker.infoAndAddToDb("Updated count in summary");
 
-            TestingIssuesHandler handler = new TestingIssuesHandler();
-            boolean triggeredByTestEditor = false;
-            try{
-                List<GenericTestResult> list = new ArrayList<>();
-                list.add(testRes);
-                trr.setTestResults(list);
-                handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
-            } catch (Exception e){
-                loggerMaker.errorAndAddToDb(e, "Unable to create issues");
+            if (USE_BULK_RECORD_TESTING_RUN_RESULTS) {
+                recordViaBulkApi(trr, originalTestingRunResultForRerun);
+            } else {
+                recordViaLegacyFlow(trr, testRes, testingRunResults, testRunResultSummaryId, resultSize);
             }
         }
+    }
+
+    private void recordViaLegacyFlow(TestingRunResult trr, GenericTestResult testRes, List<TestingRunResult> testingRunResults,
+            ObjectId testRunResultSummaryId, int resultSize) {
+        dataActor.insertTestingRunResults(trr);
+        loggerMaker.infoAndAddToDb("Inserted testing results");
+        dataActor.updateTestResultsCountInTestSummary(testRunResultSummaryId.toHexString(), resultSize);
+        loggerMaker.infoAndAddToDb("Updated count in summary");
+
+        TestingIssuesHandler handler = new TestingIssuesHandler();
+        boolean triggeredByTestEditor = false;
+        try{
+            List<GenericTestResult> list = new ArrayList<>();
+            list.add(testRes);
+            trr.setTestResults(list);
+            handler.handleIssuesCreationFromTestingRunResults(testingRunResults, triggeredByTestEditor);
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb(e, "Unable to create issues");
+        }
+    }
+
+    private void recordViaBulkApi(TestingRunResult trr, TestingRunResult originalTestingRunResultForRerun) {
+        List<String> rerunDeleteIds = new ArrayList<>();
+        if (originalTestingRunResultForRerun != null) {
+            rerunDeleteIds.add(originalTestingRunResultForRerun.getHexId());
+        }
+        dataActor.bulkRecordTestingRunResults(Collections.singletonList(trr), rerunDeleteIds,
+                TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed());
+        loggerMaker.infoAndAddToDb("Recorded testing run result via bulk API");
     }
 
     private Void insertRecordInKafka(int accountId, String testSubCategory, ApiInfo.ApiInfoKey apiInfoKey,
@@ -1145,7 +1240,7 @@ public class TestExecutor {
     }
 
     private static final ExecutorService legacyTestTimeoutExecutor = Executors.newCachedThreadPool();
-    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = 5 * 60;
+    private static final int MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS = System.getenv("MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS") != null ? Integer.parseInt(System.getenv("MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS")) : 12 * 60;
 
     /**
      * Executes legacy testing approach (fallback mode)
@@ -1162,8 +1257,15 @@ public class TestExecutor {
             TestingRunResult testingRunResult = null;
             Future<TestingRunResult> future = legacyTestTimeoutExecutor.submit(() -> {
                 Context.accountId.set(currentAccountId);
-                return runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
-                    instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                setTestRunActivityContext(summaryId);
+                try {
+                    TestingRunResult legacyResult = runTestNew(apiInfoKey, summaryId, instance.getTestingUtil(), summaryId, testConfig,
+                        instance.getTestingRunConfig(), instance.isDebug(), testLogs, sampleMessage);
+                    persistTestLogsToDb(legacyResult != null ? legacyResult.getTestLogs() : null);
+                    return legacyResult;
+                } finally {
+                    clearActivityContext();
+                }
             });
             try {
                 testingRunResult = future.get(MAX_LEGACY_PER_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
@@ -1183,6 +1285,27 @@ public class TestExecutor {
             return testingRunResult;
         }
         return null;
+    }
+
+    /**
+     * Persists the per-test transient testLogs (which are @BsonIgnore on TestingRunResult and would
+     * otherwise be dropped) into the TESTING logs collection. The current thread's
+     * Context.activityId/activityType (TESTING_RUN_RESULT_SUMMARY_ACTIVITY) is expected to be set so each line is scoped to the run summary.
+     */
+    public void persistTestLogsToDb(List<TestingRunResult.TestLog> testLogs) {
+        if (testLogs == null || testLogs.isEmpty()) {
+            return;
+        }
+        for (TestingRunResult.TestLog testLog : testLogs) {
+            if (testLog == null || testLog.getMessage() == null) {
+                continue;
+            }
+            if (testLog.getTestLogType() == TestingRunResult.TestLogType.ERROR) {
+                loggerMaker.errorAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            } else {
+                loggerMaker.infoAndAddToDb(testLog.getMessage(), LogDb.TESTING);
+            }
+        }
     }
 
     // Track auth status per test run: if auth fails, kill all remaining tests
@@ -1227,6 +1350,7 @@ public class TestExecutor {
         String testSuperType = testConfig.getInfo().getCategory().getName();
         String testSubType = testConfig.getInfo().getSubCategory();
         Boolean agenticTestingAllowed = testConfig.getInfo().getAgenticTestingAllowed();
+        Boolean onlySmartTestingAllowed = testConfig.getInfo().getOnlySmartTestingAllowed();
 
         // Copilot Studio bots expose a /copilot/conversation endpoint that is a duplicate of the
         // actual bot endpoint we already test. Skip it to avoid redundant test results.
@@ -1237,12 +1361,31 @@ public class TestExecutor {
         if (apiCollection == null) {
             apiCollection = dataActor.fetchApiCollectionMeta(apiInfoKey.getApiCollectionId());
         }
-        if (AgentClient.isCopilotBotCollection(apiCollection) &&
+        if (AgenticUtils.isCopilotBotCollection(apiCollection) &&
                 apiInfoKey.getUrl().startsWith(Constants.AKTO_COPILOT_CONVERSATION_URL_PREFIX)) {
             loggerMaker.infoAndAddToDb("Skipping test for Copilot Studio endpoint already covered: " + apiInfoKey);
             return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
                     testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
                     TestError.SKIPPING_COPILOT_INTERNAL_ENDPOINT.getMessage());
+        }
+
+        if (apiCollection != null && apiCollection.getIsOutOfTestingScope()) {
+            loggerMaker.infoAndAddToDb("Skipping test for out of scope collection: " + apiInfoKey);
+            return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                    testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                    TestError.OUT_OF_TESTING_SCOPE_COLLECTION.getMessage());
+        }
+
+        if (testingRunConfig != null && testingRunConfig.getCleanUp()
+                && (apiInfoKey.getMethod() == Method.POST || apiInfoKey.getMethod() == Method.PUT)) {
+            List<DependencyNode> deleteDependencyNodes = dataActor.findDependencyNodes(
+                    apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), "DELETE");
+            if (deleteDependencyNodes == null || deleteDependencyNodes.isEmpty()) {
+                loggerMaker.infoAndAddToDb("Skipping test on this API, because clean up artifact is missing: " + apiInfoKey);
+                return generateFailedRunResultForMessage(testRunId, apiInfoKey, testSuperType, testSubType,
+                        testRunResultSummaryId, Collections.singletonList(rawApi.getOriginalMessage()),
+                        TestError.NO_RESPECTIVE_DELETE_API.getMessage());
+            }
         }
 
         if(shouldCallClientLayerForSampleData){
@@ -1301,6 +1444,10 @@ public class TestExecutor {
         if(testRunId != null) {
             varMap.put("testRunId", testRunId.toHexString());
         }
+        String dashboardContext = TestingConfigurations.getInstance().getDashboardContext();
+        if (dashboardContext != null) {
+            varMap.put("dashboardContext", dashboardContext);
+        }
         if(testRunResultSummaryId != null) {
             varMap.put("testRunResultSummaryId", testRunResultSummaryId.toHexString());
         }
@@ -1313,6 +1460,9 @@ public class TestExecutor {
         }
         if(agenticTestingAllowed != null) {
             varMap.put("agenticTestingAllowed", agenticTestingAllowed);
+        }
+        if(onlySmartTestingAllowed != null){
+            varMap.put("onlySmartTestingAllowed", onlySmartTestingAllowed);
         }
         if (testConfig.getContent() != null) {
             varMap.put("yaml_template_content", testConfig.getContent());
@@ -1380,11 +1530,18 @@ public class TestExecutor {
             testResults.setTestResults(res);
         }
         int endTime = Context.now();
+        boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
+        boolean runAutomatedPentest = TestingConfigurations.getInstance().isRunAutomatedTests() && templateAllowsAutomated;
 
         boolean vulnerable = false;
         for (GenericTestResult testResult: testResults.getTestResults()) {
             if (testResult == null) continue;
             vulnerable = vulnerable || testResult.isVulnerable();
+
+            // Do not override for smart testing
+            if (runAutomatedPentest) {
+                continue;
+            }
             try {
                 testResult.setConfidence(Confidence.valueOf(severity));
             } catch (Exception e){
@@ -1481,8 +1638,9 @@ public class TestExecutor {
                                             loggerMaker.infoAndAddToDb("cleanUpTestArtifacts fetching samples for cleanup endpoint");
                                             List<ApiInfoKey> keyList = new ArrayList<>();
                                             keyList.add(cleanUpApiInfoKey);
-                                            sampleMessageStore.fetchSampleMessages(keyList);
-                                            samples = sampleMessageStore.getSampleDataMap().get(cleanUpApiInfoKey);
+                                            Map<ApiInfoKey, List<String>> cleanupSampleMap =
+                                                    sampleMessageStore.fetchSampleMessagesIntoNewMap(keyList);
+                                            samples = cleanupSampleMap.get(cleanUpApiInfoKey);
                                         }
 
                                         loggerMaker.infoAndAddToDb("cleanUpTestArtifacts samples count: " + (samples != null ? samples.size() : 0));

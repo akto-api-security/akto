@@ -1,13 +1,17 @@
 package com.akto.metrics;
 
+import com.akto.config.ConfigHandler;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
+import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.util.VersionUtil;
 
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +59,19 @@ public class ModuleInfoWorker {
         scheduler.scheduleWithFixedDelay(() -> {
             try {
             moduleInfo.setLastHeartbeatReceived(Context.now());
+            Map<String, String> allowedKeys = ModuleInfoConstants.ALLOWED_ENV_KEYS_BY_MODULE.get(_this.moduleType);
+            if (allowedKeys != null) {
+                Map<String, Object> env = new HashMap<>();
+                for (String key : allowedKeys.keySet()) {
+                    String value = ConfigHandler.readEnv(key, null);
+                    if (value != null) {
+                        env.put(key, value);
+                    }
+                }
+                Map<String, Object> additionalData = new HashMap<>();
+                additionalData.put("env", env);
+                moduleInfo.setAdditionalData(additionalData);
+            }
             assert _this.dataActor != null;
             ModuleInfo moduleInfoFromService = _this.dataActor.updateModuleInfo(moduleInfo);
             loggerMaker.info("Sent heartbeat at : " + moduleInfoFromService.getLastHeartbeatReceived() + " for module: "

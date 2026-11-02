@@ -17,6 +17,7 @@ public class OriginalHttpResponse {
     private String body;
     private Map<String, List<String>> headers;
     private int statusCode;
+    private List<String> streamingChunks;
 
     public OriginalHttpResponse() { }
 
@@ -158,5 +159,13 @@ public class OriginalHttpResponse {
 
     public String getJsonResponseBody() {
         return HttpRequestResponseUtils.rawToJsonString(body, headers);
+    }
+
+    public List<String> getStreamingChunks() {
+        return streamingChunks;
+    }
+
+    public void setStreamingChunks(List<String> streamingChunks) {
+        this.streamingChunks = streamingChunks;
     }
 }

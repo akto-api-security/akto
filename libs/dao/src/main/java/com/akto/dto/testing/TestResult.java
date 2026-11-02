@@ -3,9 +3,18 @@ package com.akto.dto.testing;
 import com.akto.dto.testing.info.TestInfo;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
+// Cancels the custom @JsonDeserialize inherited from GenericTestResult - without this, deserializing
+// this concrete class re-enters GenericTestResultDeserializer and recurses infinitely.
+@JsonDeserialize(using = JsonDeserializer.None.class)
 public class TestResult extends GenericTestResult {
 
     public static final String _MESSAGE = "message";
@@ -68,10 +77,12 @@ public class TestResult extends GenericTestResult {
         SKIPPING_EXECUTION_BECAUSE_AUTH("Request API failed authentication check, skipping execution", true),
         SKIPPING_EXECUTION_BECAUSE_FILTERS("Request API failed to satisfy api_selection_filters block, skipping execution", true),
         DEACTIVATED_ENDPOINT("This is a deactivated endpoint", true),
+        OUT_OF_TESTING_SCOPE_COLLECTION("This API falls under a collection that is marked as \"out of testing scope\"", true),
         USAGE_EXCEEDED("You have exceeded the limit of this feature, skipping execution", true),
         ROLE_NOT_FOUND("config doesn't exist, skipping execution", false),
         TEST_TIMED_OUT("Test took too long for execution, exited out", true),
-        SKIPPING_COPILOT_INTERNAL_ENDPOINT("Copilot Studio- Skipping test as it is already covered", true);
+        SKIPPING_COPILOT_INTERNAL_ENDPOINT("Copilot Studio- Skipping test as it is already covered", true),
+        NO_RESPECTIVE_DELETE_API("Skipping test on this API, because clean up artifact is missing", true);
         private final String message;
         private final boolean skipTest;
 
@@ -96,6 +107,35 @@ public class TestResult extends GenericTestResult {
             }
             return ret;
         }
+    }
+
+    /*
+     * Error messages that indicate an actual API/network call was attempted but did not
+     * complete successfully, as opposed to errors that mean the test was skipped before
+     * any real API call was made (e.g. NO_PATH, USAGE_EXCEEDED).
+     */
+    private static final Set<String> API_CALL_FAILURE_MESSAGES = new HashSet<>(Arrays.asList(
+        TestError.API_REQUEST_FAILED.getMessage(),
+        TestError.API_REQUEST_FAILED_BEFORE_SENDING.getMessage(),
+        TestError.API_CONNECTION_TIMEOUT.getMessage(),
+        TestError.API_HOST_UNREACHABLE.getMessage(),
+        TestError.API_CONNECTION_REFUSED.getMessage(),
+        TestError.API_SSL_HANDSHAKE_FAILED.getMessage(),
+        TestError.API_RESPONSE_BODY_NULL.getMessage(),
+        TestError.API_RESPONSE_PARSE_FAILED.getMessage(),
+        TestError.SOMETHING_WENT_WRONG.getMessage()
+    ));
+
+    public static boolean isApiCallFailure(List<String> errors) {
+        if (errors == null) {
+            return false;
+        }
+        for (String error : errors) {
+            if (API_CALL_FAILURE_MESSAGES.contains(error)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public TestResult(String message, String originalMessage, List<String> errors, double percentageMatch, boolean isVulnerable,

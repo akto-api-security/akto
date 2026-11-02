@@ -2,13 +2,11 @@ package com.akto.testing.kafka_utils;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -20,7 +18,9 @@ import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.info.SingleTestPayload;
 import com.akto.kafka.Kafka;
+import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
+import com.akto.metrics.AllMetrics;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.TestExecutor;
@@ -29,14 +29,14 @@ import com.akto.util.Constants;
 public class Producer {
 
     public static final Kafka producer = Constants.IS_NEW_TESTING_ENABLED
-            ? new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3)
+            ? new Kafka(Constants.LOCAL_KAFKA_BROKER_URL, Constants.LINGER_MS_KAFKA, 100, Constants.MAX_REQUEST_TIMEOUT, 3,
+                    KafkaConfig.getKafkaUsername(), KafkaConfig.getKafkaPassword(), KafkaConfig.isKafkaAuthenticationEnabled())
             : null;
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(Producer.class, LogDb.TESTING);
 
     public static Void pushMessagesToKafka(List<SingleTestPayload> messages, AtomicInteger totalRecords, AtomicInteger throttleNumber) throws Exception{
         // logging to show exactly what Kafka URL is being used
-        loggerMaker.infoAndAddToDb("Environment LOCAL_KAFKA_BROKER_URL = " + (Constants.LOCAL_KAFKA_BROKER_URL != null ? Constants.LOCAL_KAFKA_BROKER_URL : "NOT SET"));
         int currentAccountId = Context.accountId.get();
         if (currentAccountId == 1764738582) {
             loggerMaker.infoAndAddToDb("[DEBUG-KAFKA-1764738582] pushMessagesToKafka called."
@@ -63,26 +63,28 @@ public class Producer {
 
             // Check if producer is ready before sending
             if (producer == null) {
+                AllMetrics.instance.setTestingKafkaSendFailureCount(1);
                 loggerMaker.infoAndAddToDb("Kafka producer is null! Cannot send message. Triggering fallback mode.");
                 throw new Exception("Kafka producer is null - fallback to legacy testing required");
             }
 
             if (!producer.producerReady) {
+                AllMetrics.instance.setTestingKafkaSendFailureCount(1);
                 loggerMaker.infoAndAddToDb("Kafka producer not ready! Cannot send message. Triggering fallback mode.");
                 throw new Exception("Kafka producer not ready - fallback to legacy testing required");
             }
 
-            producer.sendWithCounter(messageString, Constants.TEST_RESULTS_TOPIC_NAME, throttleNumber);
+            producer.sendWithCounter(messageString, Constants.getTestResultsTopicName(singleTestPayload.getTestingRunResultSummaryId().toHexString()), throttleNumber);
         }
         return null;
     }
 
-    public static void deleteTestResultsTopic() {
+    public static void deleteTestResultsTopic(String runIdentifier) {
         if (!Constants.IS_NEW_TESTING_ENABLED || Constants.LOCAL_KAFKA_BROKER_URL == null) {
             return;
         }
         try {
-            deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+            deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.getTestResultsTopicName(runIdentifier));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Failed to delete test results topic: " + e.getMessage());
         }
@@ -142,12 +144,15 @@ public class Producer {
         throw new RuntimeException("Failed to create topic '" + topicName + "' after " + maxRetries + " retries.");
     }
 
-    private static void deleteTopic(String bootstrapServers, String topicName) 
+    private static void deleteTopic(String bootstrapServers, String topicName)
             throws ExecutionException, InterruptedException {
 
-        Properties adminProps = new Properties();
-        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        try (AdminClient adminClient = AdminClient.create(adminProps)) {
+        AdminClient adminClient = KafkaAdminClient.get();
+        if (adminClient == null) {
+            loggerMaker.errorAndAddToDb("No shared Kafka AdminClient available; skipping topic deletion for " + topicName);
+            return;
+        }
+        try {
             try {
                 ListTopicsResult listTopicsResult = adminClient.listTopics();
                 if (!listTopicsResult.names().get(10, java.util.concurrent.TimeUnit.SECONDS).contains(topicName)) {
@@ -208,14 +213,16 @@ public class Producer {
         }
     }
 
-    public static void createTopic(String bootstrapServers, String topicName) 
+    public static void createTopic(String bootstrapServers, String topicName)
         throws ExecutionException, InterruptedException, java.util.concurrent.TimeoutException {
-        Properties adminProps = new Properties();
-        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        AdminClient adminClient = KafkaAdminClient.get();
+        if (adminClient == null) {
+            throw new ExecutionException("No shared Kafka AdminClient available", new IllegalStateException());
+        }
 
-        try (AdminClient adminClient = AdminClient.create(adminProps)) {
-            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1); 
-            
+        try {
+            NewTopic newTopic = new NewTopic(topicName, 1, (short) 1);
+
             try {
                 adminClient.createTopics(Collections.singletonList(newTopic)).all().get(10, java.util.concurrent.TimeUnit.SECONDS);
                 loggerMaker.infoAndAddToDb("Topic \"" + topicName + "\" creation initiated.");
@@ -263,16 +270,10 @@ public class Producer {
     }
 
     public void initProducer(TestingRun testingRun, ObjectId summaryId, boolean doInitOnly, SyncLimit syncLimit){
-        loggerMaker.infoAndAddToDb("[DEBUG-KAFKA] initProducer called."
-            + " IS_NEW_TESTING_ENABLED: " + Constants.IS_NEW_TESTING_ENABLED
-            + " | brokerUrl: " + Constants.LOCAL_KAFKA_BROKER_URL
-            + " | producerStatus: " + getProducerStatus()
-            + " | doInitOnly: " + doInitOnly
-            + " | summaryId: " + summaryId);
         TestExecutor executor = new TestExecutor();
         if(!doInitOnly){
             try {
-                deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.TEST_RESULTS_TOPIC_NAME);
+                deleteTopicWithRetries(Constants.LOCAL_KAFKA_BROKER_URL, Constants.getTestResultsTopicName(summaryId.toHexString()));
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error deleting topic: " + e.getMessage());
                 e.printStackTrace();

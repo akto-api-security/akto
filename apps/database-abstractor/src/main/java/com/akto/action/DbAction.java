@@ -148,6 +148,7 @@ public class DbAction extends ActionSupport {
     List<TestingRunResultSummary> currentlyRunningTests;
     String state;
     Bson filter;
+    int sinceTimestamp;
 
     String operator;
 
@@ -228,6 +229,10 @@ public class DbAction extends ActionSupport {
     @lombok.Getter
     @lombok.Setter
     String accessType;
+
+    @lombok.Getter
+    @lombok.Setter
+    boolean isLatestRagDetection;
 
     String metricType;
 
@@ -1564,6 +1569,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String incrementTestRateLimitUsage() {
+        try {
+            count = DbLayer.incrementAndGetTestRateLimitUsage(limit);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateAccessMatrixInfo() {
         try {
             DbLayer.updateAccessMatrixInfo(taskId, frequencyInSeconds);        
@@ -1796,7 +1810,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionSimpleForVpc() {
         try {
             System.out.println("called1 vpcId" + vpcId);
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList, accessType);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList, accessType, isLatestRagDetection);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1806,7 +1820,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             System.out.println("called2 vpcId" + vpcId);
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList, accessType);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList, accessType, isLatestRagDetection);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1857,7 +1871,7 @@ public class DbAction extends ActionSupport {
     }
     
     public String countTestingRunResultSummaries() {
-        count = DbLayer.countTestingRunResultSummaries(filter);
+        count = DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, TestingRun.State.valueOf(state));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -2844,6 +2858,14 @@ public class DbAction extends ActionSupport {
 
     public void setFilter(Bson filter) {
         this.filter = filter;
+    }
+
+    public int getSinceTimestamp() {
+        return sinceTimestamp;
+    }
+
+    public void setSinceTimestamp(int sinceTimestamp) {
+        this.sinceTimestamp = sinceTimestamp;
     }
 
     public String getOperator() {

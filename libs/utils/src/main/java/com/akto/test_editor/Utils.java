@@ -5,6 +5,7 @@ import com.akto.util.HttpRequestResponseUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -20,6 +21,7 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.TestingRunWebhook;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
@@ -74,8 +76,28 @@ public class Utils {
             .build();
     }
     
+    // Compile-once cache for checkIfContainsMatch's `keyword` regex. Confirmed (07sep diagnostic,
+    // real single-API run) this keyword is called ~4.8M times per API pass across only ~428 distinct
+    // patterns - ~11,000x average reuse, one pattern alone (a user-id-field alternation) accounting
+    // for 85.7% of all calls. Called from two independent hot paths that both funnel through here:
+    // VariableResolver's wordlist-matching chain (findAllValues -> checkIfMatches) and
+    // FilterAction/RegexFilter's api-selection/validation filter evaluation - this fix benefits both.
+    // Unbounded by design: the keyword set is test-template-defined config, not user input - bounded
+    // by however many distinct wordlist/filter regexes exist across all templates for the account,
+    // not by traffic volume. `Pattern` is immutable and thread-safe to share across threads once
+    // compiled, so no synchronization needed beyond what ConcurrentHashMap already provides.
+    private static final java.util.concurrent.ConcurrentHashMap<String, Pattern> PATTERN_CACHE = new java.util.concurrent.ConcurrentHashMap<>();
+
     public static Boolean checkIfContainsMatch(String text, String keyword) {
-        Pattern pattern = Pattern.compile(keyword);
+        // Fast path: ".*" is a structural "match any" placeholder (the key-filter of a for_one/for_all
+        // loop whose real predicate is on value). Under find() it always matches - including empty text -
+        // so return true without compiling/scanning. Measured (08sep) to be 41.6% of ALL match calls,
+        // driven up by for_one evaluating it once per payload key. Only the exact literal ".*" is
+        // always-true; anything else (".+", "graphql.*", etc.) is NOT and must fall through to the engine.
+        if (".*".equals(keyword)) {
+            return true;
+        }
+        Pattern pattern = PATTERN_CACHE.computeIfAbsent(keyword, Pattern::compile);
         Matcher matcher = pattern.matcher(text);
         String match = null;
         if (matcher.find()) {
@@ -450,6 +472,52 @@ public class Utils {
             }
         }
 
+    }
+
+    // Flatten-once variant of findAllValuesForKey/findAllValues: parses the payload and walks it
+    // exactly the same way, but records EVERY (fieldName, value) pair unconditionally instead of
+    // matching a single pattern inline. Lets a caller parse+walk a payload once and check it against
+    // many patterns afterward (VariableResolver.resolveWordList checks the same cached sample against
+    // every wordlist across ~887 templates) instead of re-parsing/re-walking once per pattern.
+    public static List<Map.Entry<String, String>> flattenAllValues(String payload) {
+        List<Map.Entry<String, String>> entries = new ArrayList<>();
+        JsonParser jp = null;
+        JsonNode node;
+        try {
+            jp = factory.createParser(payload);
+            node = mapper.readTree(jp);
+        } catch (IOException e) {
+            return entries;
+        }
+        if (node == null) {
+            return entries;
+        }
+        flattenAllValues(node, entries);
+        return entries;
+    }
+
+    private static void flattenAllValues(JsonNode node, List<Map.Entry<String, String>> entries) {
+        if (node.isArray()) {
+            ArrayNode arrayNode = (ArrayNode) node;
+            for (int i = 0; i < arrayNode.size(); i++) {
+                flattenAllValues(arrayNode.get(i), entries);
+            }
+        } else {
+            Iterator<String> fieldNames = node.fieldNames();
+            while (fieldNames.hasNext()) {
+                String fieldName = fieldNames.next();
+                JsonNode fieldValue = node.get(fieldName);
+                String val;
+                try {
+                    TextNode n = (TextNode) fieldValue;
+                    val = n.asText();
+                } catch (Exception e) {
+                    val = fieldValue.toString();
+                }
+                entries.add(new AbstractMap.SimpleEntry<>(fieldName, val));
+                flattenAllValues(fieldValue, entries);
+            }
+        }
     }
 
     public static boolean checkIfMatches(String data, String query, boolean isRegex) {
@@ -922,6 +990,38 @@ public class Utils {
 
     public static ExecutorSingleOperationResp sendRequestToSsrfServer(String requestUrl, String redirectUrl, String tokenVal) {
         return sendRequestToWebhookService(requestUrl, redirectUrl, tokenVal);
+    }
+
+    /**
+     * Persist webhook UUID → test run context for dashboard correlation.
+     * Uses DataActor so the insert goes through the configured layer (e.g. HTTP to backend or local TestingRunWebhookDao).
+     */
+    public static void storeSsrfWebhookMapping(String uuid, Map<String, Object> varMap) {
+        try {
+            Integer accountId = (Integer) varMap.get("accountId");
+            String apiInfoKeyStr = (String) varMap.get("apiInfoKey");
+            String testSubType = (String) varMap.get("testSubType");
+            if (accountId == null || apiInfoKeyStr == null || testSubType == null) {
+                return;
+            }
+            String testRunIdStr = (String) varMap.get("testRunId");
+            String testRunResultSummaryIdStr = (String) varMap.get("testRunResultSummaryId");
+            ObjectId runId = (testRunIdStr != null && !testRunIdStr.isEmpty() && ObjectId.isValid(testRunIdStr))
+                    ? new ObjectId(testRunIdStr) : null;
+            ObjectId summaryId = (testRunResultSummaryIdStr != null && !testRunResultSummaryIdStr.isEmpty() && ObjectId.isValid(testRunResultSummaryIdStr))
+                    ? new ObjectId(testRunResultSummaryIdStr) : null;
+            TestingRunWebhook mapping = new TestingRunWebhook(
+                    uuid,
+                    accountId,
+                    runId,
+                    summaryId,
+                    apiInfoKeyStr,
+                    testSubType,
+                    Context.now()
+            );
+            DataActorFactory.fetchInstance().storeTestingRunWebhook(mapping);
+        } catch (Exception ignored) {
+        }
     }
 
     public static ApiAccessType getApiAccessTypeFromString(String apiAccessType){

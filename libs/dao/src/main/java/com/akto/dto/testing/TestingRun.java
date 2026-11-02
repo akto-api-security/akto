@@ -34,6 +34,11 @@ public class TestingRun {
     @Setter
     private boolean sendSlackAlert = false;
 
+    public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
+    @Getter
+    @Setter
+    private boolean sendMsTeamsAlert = false;
+
     public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
     @Getter
     @Setter
@@ -58,6 +63,13 @@ public class TestingRun {
     public enum TestingRunType{
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
     }
+
+    public enum DashboardContext {
+        API, MCP, GEN_AI, AGENTIC, DAST, ENDPOINT
+    }
+
+    public static final String DASHBOARD_CONTEXT = "dashboardContext";
+    private DashboardContext dashboardContext;
 
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
@@ -198,7 +210,8 @@ public class TestingRun {
     }
 
     public String getHexId() {
-        return this.id.toHexString();
+        if (hexId == null) return this.id.toHexString();
+        return this.hexId;
     }
 
     public String getName() {
@@ -247,6 +260,14 @@ public class TestingRun {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public DashboardContext getDashboardContext() {
+        return dashboardContext;
+    }
+
+    public void setDashboardContext(DashboardContext dashboardContext) {
+        this.dashboardContext = dashboardContext;
     }
 
 

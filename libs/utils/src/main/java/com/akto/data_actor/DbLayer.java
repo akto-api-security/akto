@@ -5,6 +5,7 @@ import static com.akto.util.Constants.ID;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +17,8 @@ import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
@@ -24,9 +27,13 @@ import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertManyResult;
+import org.bson.BsonValue;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -83,6 +90,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
@@ -422,9 +430,10 @@ public class DbLayer {
         );
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
+public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
+
 
         Bson updates = Updates.combine(
             Updates.set(ApiCollection.VXLAN_ID, vxlanId),
@@ -460,10 +469,11 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
-    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
+
 
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
@@ -484,9 +494,10 @@ public class DbLayer {
     }
 
     // Similar to createCollectionForHostAndVpc but for service-tag based collections
-    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
+    public static void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType, boolean isLatestRagDetection) {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
+
 
         Bson updates = Updates.combine(
             Updates.setOnInsert(Constants.ID, id),
@@ -677,6 +688,13 @@ public class DbLayer {
             Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
     }
 
+    public static void markTestingRunFailed(String testingRunId) {
+        ObjectId testingRunObjId = new ObjectId(testingRunId);
+        TestingRunDao.instance.getMCollection().findOneAndUpdate(
+            Filters.eq(Constants.ID, testingRunObjId),
+            Updates.set(TestingRun.STATE, TestingRun.State.FAILED));
+    }
+
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
         ObjectId testingRunObjId = new ObjectId(testingRunId);
         return TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRunObjId));
@@ -713,6 +731,53 @@ public class DbLayer {
         TestingRunResultSummariesDao.instance.insertOne(trrs);
     }
 
+    public static int incrementAndGetTestRateLimitUsage(int limit) {
+        return incrementAndGetTestRateLimitUsage(limit, null);
+    }
+
+    public static int incrementAndGetTestRateLimitUsage(int limit, String dashboardContext) {
+        boolean agentic = "AGENTIC".equalsIgnoreCase(dashboardContext);
+        String dayField = agentic ? AccountSettings.AGENTIC_TEST_RATE_LIMIT_USAGE_DAY : AccountSettings.TEST_RATE_LIMIT_USAGE_DAY;
+        String countField = agentic ? AccountSettings.AGENTIC_TEST_RATE_LIMIT_USAGE_COUNT : AccountSettings.TEST_RATE_LIMIT_USAGE_COUNT;
+
+        int today = Context.today();
+
+        Bson sameDayUnderLimitFilter = Filters.and(
+                AccountSettingsDao.generateFilter(),
+                Filters.eq(dayField, today),
+                Filters.lt(countField, limit)
+        );
+        AccountSettings updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                sameDayUnderLimitFilter,
+                Updates.inc(countField, 1),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        if (updated != null) {
+            return agentic ? updated.getAgenticTestRateLimitUsageCount() : updated.getTestRateLimitUsageCount();
+        }
+
+        AccountSettings current = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        int currentDay = agentic ? (current != null ? current.getAgenticTestRateLimitUsageDay() : 0) : (current != null ? current.getTestRateLimitUsageDay() : 0);
+        if (current != null && currentDay == today) {
+            // Same day, already at/over the limit - don't increment further, just signal "exceeded".
+            return limit + 1;
+        }
+
+        // First increment of a new day (or first ever) - (re)initialize the counter for today.
+        updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                AccountSettingsDao.generateFilter(),
+                Updates.combine(
+                        Updates.set(dayField, today),
+                        Updates.set(countField, 1)
+                ),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+        );
+        if (updated == null) {
+            return 1;
+        }
+        return agentic ? updated.getAgenticTestRateLimitUsageCount() : updated.getTestRateLimitUsageCount();
+    }
+
     public static void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTimestamp) {
         Bson completedUpdate = Updates.combine(
             Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
@@ -729,6 +794,19 @@ public class DbLayer {
         TestingRunDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq("_id", id),  completedUpdate
         );
+    }
+
+    public static List<CustomWebhook> fetchTeamsWebhooksForTestResults() {
+        return CustomWebhooksDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.MICROSOFT_TEAMS.name()),
+                        Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS, CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS.name())));
+    }
+
+    public static void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors) {
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", webhookId), Updates.set("lastSentTimestamp", timestamp));
+        CustomWebhookResult webhookResult = new CustomWebhookResult(webhookId, userEmail, timestamp, message, errors);
+        CustomWebhooksResultDao.instance.insertOne(webhookResult);
     }
 
     public static List<TestingRunIssues> fetchOpenIssues(String summaryId) {
@@ -1152,6 +1230,10 @@ public class DbLayer {
         DependencyAnalyserUtils.syncWithDb(dependencyNodeList);
     }
 
+    public static void bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments) {
+        SensitiveDataCountDao.instance.bulkInc(idempotencyKey, increments);
+    }
+
     public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
         return SingleTypeInfoDao.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
     }
@@ -1267,7 +1349,13 @@ public class DbLayer {
                 NODE_LIMIT);
     }
 
-    public static long countTestingRunResultSummaries(Bson filter){
+    public static long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state){
+        ObjectId testingRunId = new ObjectId(testingRunHexId);
+        Bson filter = Filters.and(
+                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, sinceTimestamp),
+                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+                Filters.eq(TestingRunResultSummary.STATE, state)
+        );
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 
@@ -1468,8 +1556,20 @@ public class DbLayer {
         McpReconResultDao.instance.insertMany(serverDataList);
     }
 
-    public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
-        AgentConversationResultDao.instance.insertMany(conversationResults);
+    public static List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
+        InsertManyResult result = AgentConversationResultDao.instance.insertMany(conversationResults);
+        String[] docIds = new String[conversationResults.size()];
+        for (Map.Entry<Integer, BsonValue> entry : result.getInsertedIds().entrySet()) {
+            docIds[entry.getKey()] = entry.getValue().asObjectId().getValue().toHexString();
+        }
+        return Arrays.asList(docIds);
+    }
+
+    public static void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata) {
+        AgentConversationResultDao.instance.updateOneNoUpsert(
+                Filters.eq(ID, new ObjectId(docId)),
+                Updates.set(AgentConversationResult.TOOLS_METADATA, toolsMetadata)
+        );
     }
 
     public static void bulkWriteAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {

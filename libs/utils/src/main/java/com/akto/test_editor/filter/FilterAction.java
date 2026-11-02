@@ -34,6 +34,8 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
+import com.akto.util.ApiCollectionMetaCache;
+import com.akto.util.ApiInfoMetaCache;
 import com.akto.util.JSONUtils;
 import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBList;
@@ -270,7 +272,7 @@ public final class FilterAction {
         }
 
         // Also check API_GROUPs (and any other collections) this API belongs to
-        ApiInfo apiInfo = dataActor.fetchApiInfo(filterActionRequest.getApiInfoKey());
+        ApiInfo apiInfo = ApiInfoMetaCache.get(filterActionRequest.getApiInfoKey());
         if (apiInfo != null && apiInfo.getCollectionIds() != null) {
             for (Integer collectionId : apiInfo.getCollectionIds()) {
                 if (collectionId == null || collectionId == primaryCollectionId) {
@@ -286,7 +288,7 @@ public final class FilterAction {
     }
 
     private boolean isAgenticCollection(int apiCollectionId) {
-        ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+        ApiCollection apiCollection = ApiCollectionMetaCache.get(apiCollectionId);
         if (apiCollection == null) {
             return false;
         }
@@ -1305,7 +1307,7 @@ public final class FilterAction {
     private DataOperandsFilterResponse applyFilterOnAccessType(FilterActionRequest filterActionRequest){
         List<String> querySet = (List<String>) filterActionRequest.getQuerySet();
         ApiInfo.ApiInfoKey apiInfoKey = filterActionRequest.getApiInfoKey();
-        ApiInfo apiInfo = dataActor.fetchApiInfo(apiInfoKey);
+        ApiInfo apiInfo = ApiInfoMetaCache.get(apiInfoKey);
         Set<ApiAccessType> apiAccessTypes = apiInfo.getApiAccessTypes();
         boolean res = false;
         if(apiInfo != null && !querySet.isEmpty() && apiAccessTypes.size() > 0){

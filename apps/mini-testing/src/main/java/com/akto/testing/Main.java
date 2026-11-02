@@ -29,8 +29,10 @@ import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
+import com.akto.testing.kafka_utils.KafkaAdminClient;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
+import com.akto.testing.kafka_utils.TestingStateStore;
 import com.akto.utility.UtilityServer;
 import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
@@ -41,10 +43,8 @@ import com.akto.util.DashboardMode;
 import org.apache.commons.io.FileUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,6 +57,10 @@ import java.util.concurrent.TimeUnit;
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
+    static {
+        DataActorFactory.setModuleType("MINI_TESTING");
+    }
+
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
@@ -67,7 +71,8 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
-    
+    private static final String TEST_RUNS_OVERAGE_ERROR = "Test runs overage detected";
+    private static final String OUT_OF_TESTING_SCOPE_ERROR = "All target collections are marked as out of testing scope";
     private static final String customMiniTestingServiceName;
     static {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
@@ -322,17 +327,17 @@ public class Main {
         // this will return true if consumer is running and this the latest summary of the testing run
         // and also the summary should be in running state
         try {
-            BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
+            BasicDBObject currentTestInfo = TestingStateStore.read();
             if(currentTestInfo == null){
                 return null;
             }
-            if(!currentTestInfo.getBoolean("CONSUMER_RUNNING", false)){
+            if(!currentTestInfo.getBoolean(TestingStateStore.CONSUMER_RUNNING, false)){
                 return null;
             }
-            String testingRunId = currentTestInfo.getString("testingRunId");
-            String testingRunSummaryId = currentTestInfo.getString("summaryId");
+            String testingRunId = currentTestInfo.getString(TestingStateStore.TESTING_RUN_ID);
+            String testingRunSummaryId = currentTestInfo.getString(TestingStateStore.SUMMARY_ID);
 
-            int accountID = currentTestInfo.getInt("accountId");
+            int accountID = currentTestInfo.getInt(TestingStateStore.ACCOUNT_ID);
             Context.accountId.set(accountID);
 
             TestingRunResultSummary testingRunResultSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
@@ -445,10 +450,18 @@ public class Main {
                         loggerMaker.errorAndAddToDb("Module found busy while shutdown hook was triggered for mini-testing: " + customMiniTestingServiceName);
                     }
                     loggerMaker.infoAndAddToDb("Shutdown hook triggered for mini-testing: " + customMiniTestingServiceName);
-                    shutdown();
+                    // Cleanup only - never System.exit() here. The JVM is already mid-shutdown by
+                    // the time any hook runs, and a hook calling exit() again deadlocks: confirmed
+                    // live, the second call blocks forever trying to re-enter the same shutdown
+                    // sequence the first call is still holding open waiting for this hook to finish.
+                    cleanupResources();
                 }
             });
             runModule();
+        } catch (Throwable t) {
+            loggerMaker.errorAndAddToDb("Fatal error in mini-testing runModule for "
+                    + customMiniTestingServiceName + ": " + t.getMessage());
+            throw t;
         } finally {
             if (PrometheusMetricsHandler.isModuleBusy()) {
                 loggerMaker.errorAndAddToDb("Module found busy while shutting down mini-testing: " + customMiniTestingServiceName);
@@ -458,7 +471,17 @@ public class Main {
         }
     }
 
+    /** The only place that actually calls System.exit() - reached from main()'s own non-hook
+     *  finally block (runModule() returned or threw), never from the shutdown hook itself. */
     private static void shutdown() {
+        cleanupResources();
+        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
+        System.exit(0);
+    }
+
+    /** No System.exit() here - safe to call from the shutdown hook's own thread, where the JVM is
+     *  already exiting and calling exit() again would deadlock (see the hook's own comment). */
+    private static void cleanupResources() {
         try {
             UtilityServer.stop();
         } catch (Exception e) {
@@ -469,9 +492,8 @@ public class Main {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Exception while performing shutdown tasks");
         }
-
-        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
-        System.exit(0);
+        // the one shared AdminClient outlives every caller (Producer, ConsumerUtil) - close it here, once
+        KafkaAdminClient.close();
     }
 
     private static void runModule() throws InterruptedException, IOException {
@@ -540,14 +562,14 @@ public class Main {
         
         AllMetrics.instance.init(LogDb.TESTING, false, dataActor, Context.getActualAccountId(), customMiniTestingServiceName, ModuleInfo.ModuleType.MINI_TESTING.name());
 
-        if(currentTestInfo != null){
+        if(currentTestInfo != null && OrchestratorControl.markResuming()){
             try {
                 loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId);
                 Organization organization = OrgUtils.getOrganizationCached(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-                String testingRunSummaryId = currentTestInfo.getString("summaryId");
-                String testingRunId = currentTestInfo.getString("testingRunId");
+                String testingRunSummaryId = currentTestInfo.getString(TestingStateStore.SUMMARY_ID);
+                String testingRunId = currentTestInfo.getString(TestingStateStore.TESTING_RUN_ID);
                 //check if currently running testrun is part of rerun
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
 
@@ -578,6 +600,12 @@ public class Main {
         singleTypeInfoInit(accountId);
 
         while (true) {
+            if (!OrchestratorControl.tryStartPolling()) {
+                // drained by mini-testing-orchestrator ahead of a scale-down: claim nothing
+                PrometheusMetricsHandler.markModuleIdle();
+                Thread.sleep(1000);
+                continue;
+            }
             TestExecutor testExecutor = new TestExecutor();
             // Reset current execution fallback flag for new test cycle
             testExecutor.resetCurrentExecutionFallback();
@@ -608,6 +636,7 @@ public class Main {
             }
 
             if (testingRun == null) {
+                OrchestratorControl.markPollIdle();
                 Thread.sleep(1000);
                 continue;
             }
@@ -619,14 +648,17 @@ public class Main {
                         .filter(Objects::nonNull)
                         .anyMatch(name -> name.equalsIgnoreCase(customMiniTestingServiceName));
                 if (!eligible) {
+                    OrchestratorControl.markPollIdle();
                     Thread.sleep(1000);
                     continue;
                 }
             } else if (testingRun.getMiniTestingServiceName() != null
                     && !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName)) {
+                OrchestratorControl.markPollIdle();
                 Thread.sleep(1000);
                 continue;
             }
+            OrchestratorControl.markRunClaimed();
 
             if (handleRerunTestingRunResult(trrs)) {
                 continue;
@@ -655,22 +687,20 @@ public class Main {
             boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
             if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                if (isTestingRunResultRerunCase) {
-                    // For TRR-rerun case, delete the rerun summary and clean up configurations
-                    dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
-                    config.setTestingRunResultList(null);
-                    config.setRerunTestingRunResultSummary(null);
-                    loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
-                } else {
-                    int lastSent = logSentMap.getOrDefault(accountId, 0);
-                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                        logSentMap.put(accountId, start);
-                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                                + " . Failing test run : " + start, LogDb.TESTING);
-                    }
-                    dataActor.updateTestingRun(testingRun.getId().toHexString());
-                    dataActor.updateTestRunResultSummary(summaryId.toHexString());
+                String errorMessage = TEST_RUNS_OVERAGE_ERROR;
+                int lastSent = logSentMap.getOrDefault(accountId, 0);
+                if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                    logSentMap.put(accountId, start);
+                    loggerMaker.infoAndAddToDb(errorMessage + " . Failing test run : " + start, LogDb.TESTING);
                 }
+                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage);
+                continue;
+            }
+
+            if (isEntirelyOutOfTestingScope(testingRun.getTestingEndpoints())) {
+                String errorMessage = OUT_OF_TESTING_SCOPE_ERROR;
+                loggerMaker.infoAndAddToDb(errorMessage + " for testing run: " + testingRun.getId(), LogDb.TESTING);
+                failTestingRun(testingRun, summaryId, trrs, isTestingRunResultRerunCase, config, start, errorMessage);
                 continue;
             }
 
@@ -720,13 +750,10 @@ public class Main {
                                         + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
                                         + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                                Bson filterQ = Filters.and(
-                                    Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
-                                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                                    Filters.eq(TestingRunResultSummary.STATE, State.FAILED)
-                                );
+                                int sinceTimestamp = Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime);
 
-                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(filterQ);
+                                int countFailedSummaries = (int) dataActor.countTestingRunResultSummaries(
+                                        testingRun.getHexId(), sinceTimestamp, State.FAILED);
                                 TestingRunResultSummary runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 TestingRunResultSummary summary;
                                 if(countFailedSummaries >= (MAX_RETRIES_FOR_FAILED_SUMMARIES - 1)){
@@ -742,7 +769,8 @@ public class Main {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     continue;
                                 }
-                                GithubUtils.publishGithubComments(runResultSummary);
+                                // TODO: Delete completely, disabled feature not used anymore
+                                // GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
                             loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
@@ -794,7 +822,8 @@ public class Main {
                 if (trrs.getState() == State.SCHEDULED) {
                     if (trrs.getMetadata()!= null && trrs.getMetadata().containsKey("pull_request_id") && trrs.getMetadata().containsKey("commit_sha_head") ) {
                         //case of github status push
-                        GithubUtils.publishGithubStatus(trrs);
+                        // TODO: Delete completely, disabled feature not used anymore
+                        // GithubUtils.publishGithubStatus(trrs);
 
                     }
                 }
@@ -824,6 +853,51 @@ public class Main {
             testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
 
             Thread.sleep(1000);
+        }
+    }
+
+    private static boolean isEntirelyOutOfTestingScope(TestingEndpoints testingEndpoints) {
+        Set<Integer> collectionIds = extractCollectionIds(testingEndpoints);
+        if (collectionIds.isEmpty()) return false;
+        List<ApiCollection> collections = dataActor.fetchApiCollectionsByIds(new ArrayList<>(collectionIds), LogDb.TESTING);
+        if (collections == null || collections.size() != collectionIds.size()) return false; // missing/deleted -> don't block
+        return collections.stream().allMatch(ApiCollection::getIsOutOfTestingScope);
+    }
+
+    private static Set<Integer> extractCollectionIds(TestingEndpoints testingEndpoints) {
+        Set<Integer> ids = new HashSet<>();
+        if (testingEndpoints instanceof CollectionWiseTestingEndpoints) {
+            ids.add(((CollectionWiseTestingEndpoints) testingEndpoints).getApiCollectionId());
+        } else if (testingEndpoints instanceof CustomTestingEndpoints) {
+            List<ApiInfo.ApiInfoKey> apisList = ((CustomTestingEndpoints) testingEndpoints).getApisList();
+            if (apisList != null) {
+                for (ApiInfo.ApiInfoKey key : apisList) ids.add(key.getApiCollectionId());
+            }
+        }
+        // WORKFLOW / unknown types: no collection id to check, returns empty set, gate never fires
+        return ids;
+    }
+
+    private static void failTestingRun(TestingRun testingRun, ObjectId summaryId, TestingRunResultSummary trrs,
+            boolean isTestingRunResultRerunCase, TestingConfigurations config, int start, String errorMessage) {
+        if (summaryId == null) {
+            // Fresh run, first pickup - no TestingRunResultSummary created yet, same fallback used elsewhere in this loop.
+            trrs = dataActor.createTRRSummaryIfAbsent(testingRun.getHexId(), start);
+            summaryId = trrs.getId();
+        }
+
+        dataActor.markTestingRunFailed(testingRun.getId().toHexString());
+
+        if (isTestingRunResultRerunCase) {
+            dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
+            config.setTestingRunResultList(null);
+            config.setRerunTestingRunResultSummary(null);
+            loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
+        } else {
+            Map<String, String> metadata = new HashMap<>();
+            metadata.put("error", errorMessage);
+            dataActor.markTestRunResultSummaryFailed(summaryId.toHexString());
+            dataActor.updateMetadataInSummary(summaryId.toHexString(), metadata);
         }
     }
 

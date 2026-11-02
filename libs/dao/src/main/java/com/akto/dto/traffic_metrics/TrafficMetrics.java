@@ -118,7 +118,8 @@ public class TrafficMetrics {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Key key = (Key) o;
-            return vxlanID == key.vxlanID && bucketStartEpoch == key.bucketStartEpoch && bucketEndEpoch == key.bucketEndEpoch && ip.equals(key.ip) && Objects.equals(host, key.host) && name == key.name;
+            // ip is null for sources that don't report one; hashCode already treats it as nullable.
+            return vxlanID == key.vxlanID && bucketStartEpoch == key.bucketStartEpoch && bucketEndEpoch == key.bucketEndEpoch && Objects.equals(ip, key.ip) && Objects.equals(host, key.host) && name == key.name;
         }
 
         @Override

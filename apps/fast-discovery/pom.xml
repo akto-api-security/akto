@@ -63,7 +63,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>32.0.1-jre</version> <!-- Updated to fix CVE-2023-2976 -->
+            <version>33.7.2-jre</version> <!-- 33.7.2 fixes GHSA-xxph-c9ww-hj94 -->
         </dependency>
 
         <!-- MongoDB (read-only for duplicate checking) -->

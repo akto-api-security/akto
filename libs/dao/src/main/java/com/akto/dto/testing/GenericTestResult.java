@@ -3,7 +3,9 @@ package com.akto.dto.testing;
 import java.util.List;
 
 import com.akto.dto.testing.TestResult.Confidence;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
+@JsonDeserialize(using = GenericTestResultDeserializer.class)
 public abstract class GenericTestResult {
 
     private boolean vulnerable;

@@ -91,6 +91,7 @@ public class ApiNodeExecutor extends NodeExecutor {
                 String statusKey =   nodeId + "." + "response" + "." + "status_code";
                 valuesMap.put(statusKey, statusCode);
                 Utils.populateValuesMap(valuesMap, response.getBody(), nodeId, response.getHeaders(), false, null);
+                Utils.populateRegexValues(valuesMap, response.getBody(), nodeId, workflowNodeDetails.getOtpRegex());
                 loggerMaker.warnAndAddToDb("VALUES_MAP_AFTER_POPULATE: " + valuesMap.toString());
                 if (!allowAllStatusCodes && (statusCode >= 400)) {
                     testErrors.add("process node failed with status code " + statusCode);

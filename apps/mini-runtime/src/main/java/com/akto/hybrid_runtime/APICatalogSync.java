@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 import com.akto.PayloadEncodeUtil;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.detection.SensitiveDataEvents;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -45,7 +46,6 @@ import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.types.CappedSet;
 import com.akto.util.Pair;
 import com.akto.util.filter.DictionaryFilter;
-import com.akto.util.filter.HeaderFilter;
 import com.akto.utils.RedactSampleData;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
@@ -55,6 +55,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
 
+import com.akto.hybrid_runtime.redaction.OrigRedactor;
+import com.akto.hybrid_runtime.redaction.PayloadRedaction;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 import org.bson.json.JsonParseException;
@@ -80,22 +82,17 @@ public class APICatalogSync {
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls = new HashSet<>();
     private static final ClientLayer clientLayer = new ClientLayer();
-    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
+    /*
+     * Set per deployment. When true, redacted samples still go to Mongo with their akto_uuid, but the
+     * encrypted unredacted copy is never built or sent to the testing DB layer (Postgres).
+     */
+    public static final boolean skipPostgresSampleIngestion = System.getenv()
+            .getOrDefault("SKIP_POSTGRES_SAMPLE_INGESTION", "false").equalsIgnoreCase("true");
+    private static RSAPublicKey publicKey = skipPostgresSampleIngestion ? null : PayloadEncodeUtil.getPublicKey();
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
 
-    /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
-        The apiCollectionId - -1 has nothing to do with this.
-        Since we do not know the collectionId for MCP Server, we have set it to -1.
-     */
-    private static final Set<MergedUrls> MERGED_URLS_FOR_MCP = new HashSet<>(Arrays.asList(
-        new MergedUrls("tools/call/STRING", "POST", -1),
-        new MergedUrls("tools/call/INTEGER", "POST", -1),
-        new MergedUrls("tools/call/FLOAT", "POST", -1),
-        new MergedUrls("tools/call/OBJECT_ID", "POST", -1),
-        new MergedUrls("tools/call/VERSIONED", "POST", -1)
-    ));
 
     private boolean mergeUrlsOnVersions;
 
@@ -128,6 +125,18 @@ public class APICatalogSync {
     }
 
     public void processResponse(RequestTemplate requestTemplate, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
+        // Detection records each tracked type it sees, with the collection it was seen in; one message
+        // counts once per type, however many values of that type it carries.
+        try {
+            processResponseParams(requestTemplate, responseParams, deletedInfo);
+        } finally {
+            for (Map.Entry<Integer, Set<String>> seen : SensitiveDataEvents.drain().entrySet()) {
+                SensitiveDataCounter.instance.record(seen.getKey(), seen.getValue(), responseParams.getTimeOrNow());
+            }
+        }
+    }
+
+    private void processResponseParams(RequestTemplate requestTemplate, HttpResponseParams responseParams, List<SingleTypeInfo> deletedInfo) {
         int timestamp = responseParams.getTimeOrNow();
         HttpRequestParams requestParams = responseParams.getRequestParams();
         String urlWithParams = requestParams.getURL();
@@ -1431,6 +1440,7 @@ public class APICatalogSync {
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit,
         SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI);
+        this.origRedactor = PayloadRedaction.newOrigRedactor();
         List<Object> writesForParams = new ArrayList<>();
         List<Object> writesForSensitiveSampleData = new ArrayList<>();
         List<Object> writesForTraffic = new ArrayList<>();
@@ -1603,6 +1613,7 @@ public class APICatalogSync {
             dataActor.bulkWriteSensitiveParamInfo(writesForSensitiveParamInfo);
         }
 
+        this.origRedactor = null;
         refreshDbState(fetchAllSTI);
     }
 
@@ -1619,6 +1630,9 @@ public class APICatalogSync {
 
     private static final Gson gson = new Gson();
     private static final String AKTO_UUID = "akto_uuid";
+
+    // Per-sync guardrails redactor (null when disabled); recreated each syncWithDB so its memo is bounded.
+    private volatile OrigRedactor origRedactor;
 
     public List<BulkUpdates> getDBUpdatesForSampleDataHybrid(int apiCollectionId, APICatalog currentDelta, APICatalog dbCatalog, boolean forceUpdate, boolean accountLevelRedact, boolean apiCollectionLevelRedact) {
         List<SampleData> sampleData = new ArrayList<>();
@@ -1649,7 +1663,14 @@ public class APICatalogSync {
 
         loggerMaker.debug("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
 
-        if (accountLevelRedact || apiCollectionLevelRedact) {
+        if ((accountLevelRedact || apiCollectionLevelRedact) && !skipPostgresSampleIngestion) {
+            if (publicKey == null) {
+                loggerMaker.errorAndAddToDb("acc: " + Context.accountId.get() + ", apiCollectionId: "
+                        + apiCollectionId + ", redaction is enabled but the public key is unavailable, "
+                        + "so samples are not stored in postgres rather than stored unencrypted. "
+                        + "Check PUBLIC_KEY / PUBLIC_KEY_FILE, then restart the pod: the key is read "
+                        + "once at startup.");
+            }
             try {
                 long start = System.currentTimeMillis();
                 List<SampleDataAlt> samplesBatch = new ArrayList<>();
@@ -1695,6 +1716,15 @@ public class APICatalogSync {
         for (int i = 0; i < sampleData.size(); i += batchSize) {
             int end = Math.min(i + batchSize, sampleData.size());
             List<SampleData> batch = sampleData.subList(i, end);
+            // Outside runWithTimeout: redaction has its own budget. Skipped under full redaction.
+            OrigRedactor redactor = origRedactor;
+            if (redactor != null && !accountLevelRedact && !apiCollectionLevelRedact) {
+                List<String> origs = new ArrayList<>();
+                for (SampleData sd : batch) {
+                    origs.addAll(sd.getSamples());
+                }
+                redactor.prepare(origs);
+            }
             int accId = Context.accountId.get();
             List<SampleData> lastExecutedBatch = new ArrayList<>();
             try {
@@ -1712,10 +1742,12 @@ public class APICatalogSync {
 
     private void processSampleBatch(List<SampleData> batch, boolean accountLevelRedact, boolean apiCollectionLevelRedact,
             List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples, List<SampleData> lastExecutedBatch) {
+        int skippedSamples = 0; // not stored because guardrail redaction was unavailable (skip-on-unavailable)
         for (SampleData sample: batch) {
             if (sample.getSamples().size() == 0) {
                 continue;
             }
+            int skippedInSample = 0;
             List<String> finalSamples = new ArrayList<>();
             List<String> sampleIds = new ArrayList<>();
             ArrayList<String> updates = new ArrayList<>();
@@ -1723,27 +1755,45 @@ public class APICatalogSync {
                 try {
                     lastExecutedBatch.clear();
                     lastExecutedBatch.add(sample);
-                    String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
+                    OrigRedactor.Result masked = (origRedactor != null && !accountLevelRedact && !apiCollectionLevelRedact)
+                            ? origRedactor.lookup(s) : null;
+                    String redactedSample = RedactSampleData.redactIfRequired(masked != null ? masked.orig : s,
+                            accountLevelRedact, apiCollectionLevelRedact);
+                    if (masked != null && masked.skip) {
+                        skippedInSample++;
+                        continue;
+                    }
+                    if (masked != null && masked.marker != null) {
+                        redactedSample = OrigRedactor.withMarker(redactedSample, masked.marker);
+                    }
                     if (accountLevelRedact || apiCollectionLevelRedact) {
                         Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
                         UUID uuid = UUID.randomUUID();
                         json.put(AKTO_UUID, uuid);
                         redactedSample = gson.toJson(json);
-                        int now = Context.now();
-                        Key id = sample.getId();
-                        int accountId = Context.accountId.get();
-                        String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
-                        if (publicKey != null) {
-                            try {
-                                piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);                                
-                            } catch (Exception e) {
-                                loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
+                        if (!skipPostgresSampleIngestion) {
+                            int now = Context.now();
+                            Key id = sample.getId();
+                            int accountId = Context.accountId.get();
+                            String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
+                            // This copy is protected by encryption alone - redactIfRequired is
+                            // called with both flags false above - so if the key is missing or
+                            // encryption fails, the sample must be dropped rather than stored in
+                            // clear. Failing closed here keeps unencrypted payloads out of the
+                            // database when PUBLIC_KEY / PUBLIC_KEY_FILE is misconfigured.
+                            boolean encrypted = false;
+                            if (publicKey != null) {
+                                try {
+                                    piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);
+                                    encrypted = true;
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
+                                }
                             }
-                        }
-                        SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
-                                id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
-                        if (sample.getId().getApiCollectionId() != 0) {
-                            unfilteredSamples.add(sampleDataAlt);
+                            if (encrypted && sample.getId().getApiCollectionId() != 0) {
+                                unfilteredSamples.add(new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
+                                        id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId));
+                            }
                         }
                         sampleIds.add(uuid.toString());
 
@@ -1752,6 +1802,10 @@ public class APICatalogSync {
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e,"Error while redacting data" );
                 }
+            }
+            skippedSamples += skippedInSample;
+            if (finalSamples.isEmpty() && skippedInSample > 0) {
+                continue; // every sample was skipped as unredacted: write nothing rather than an empty endpoint
             }
             UpdatePayload updatePayload = new UpdatePayload("samples", finalSamples, "pushEach");
             updates.add(updatePayload.toString());
@@ -1768,6 +1822,10 @@ public class APICatalogSync {
             filterMap.put("_id", sample.getId());
             bulkUpdates.add(new BulkUpdates(filterMap, updates));
         }
+        if (skippedSamples > 0) {
+            loggerMaker.errorAndAddToDb("Guardrail redaction unavailable; " + skippedSamples
+                    + " sample(s) not stored in this batch (skip-on-unavailable is on)");
+        }
     }
 
     public DbUpdateReturnHybrid getDBUpdatesForParamsHybrid(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {
@@ -1777,6 +1835,23 @@ public class APICatalogSync {
         ArrayList<BulkUpdates> bulkUpdates = new ArrayList<>();
         ArrayList<BulkUpdates> bulkUpdatesForSampleData = new ArrayList<>();
         int now = Context.now();
+
+        OrigRedactor redactor = origRedactor;
+        if (redactor != null && !(redactSampleData || collectionLevelRedact)) {
+            List<String> examples = new ArrayList<>();
+            for (SingleTypeInfo info : deltaInfoMap.values()) {
+                if (info != null && info.getExamples() != null) {
+                    for (Object example : info.getExamples()) {
+                        if (example instanceof String) {
+                            examples.add((String) example);
+                        }
+                    }
+                }
+            }
+            redactor.prepare(examples);
+        }
+        int skippedExamples = 0; // not stored because guardrail redaction was unavailable (skip-on-unavailable)
+
         for(String key: deltaInfoMap.keySet()) {
             ArrayList<String> updates = new ArrayList<>();
 
@@ -1837,28 +1912,39 @@ public class APICatalogSync {
 
             if (!(redactSampleData || collectionLevelRedact) && deltaInfo.getExamples() != null && !deltaInfo.getExamples().isEmpty()) {
                 Set<Object> updatedSampleData = new HashSet<>();
+                int skippedBefore = skippedExamples;
                 for (Object example : deltaInfo.getExamples()) {
                     try{
                         String exampleStr = (String) example;
-                        String s = RedactSampleData.redactDataTypes(exampleStr);
+                        OrigRedactor.Result masked = redactor != null ? redactor.lookup(exampleStr) : null;
+                        if (masked != null && masked.skip) {
+                            skippedExamples++;
+                            continue;
+                        }
+                        String s = RedactSampleData.redactDataTypes(masked != null ? masked.orig : exampleStr);
+                        if (masked != null && masked.marker != null) {
+                            s = OrigRedactor.withMarker(s, masked.marker);
+                        }
                         updatedSampleData.add(s);
                     } catch (Exception e) {
                         ;
                     }
                 }
                 deltaInfo.setExamples(updatedSampleData);
-                ArrayList<String> sampleDataUpdates = new ArrayList<>();
-                updatePayload = new UpdatePayload(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), "pushEach");
-                AllMetrics.instance.setCyborgApiPayloadSize(updatePayload.getSize());
-                sampleDataUpdates.add(updatePayload.toString());
-                updatePayload = new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()), "setOnInsert");
-                sampleDataUpdates.add(updatePayload.toString());
-                bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
+                if (!(updatedSampleData.isEmpty() && skippedExamples > skippedBefore)) {
+                    ArrayList<String> sampleDataUpdates = new ArrayList<>();
+                    updatePayload = new UpdatePayload(SensitiveSampleData.SAMPLE_DATA, Arrays.asList(deltaInfo.getExamples().toArray()), "pushEach");
+                    AllMetrics.instance.setCyborgApiPayloadSize(updatePayload.getSize());
+                    sampleDataUpdates.add(updatePayload.toString());
+                    updatePayload = new UpdatePayload(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId()), "setOnInsert");
+                    sampleDataUpdates.add(updatePayload.toString());
+                    bulkUpdatesForSampleData.add(new BulkUpdates(SensitiveSampleDataDao.getFiltersMap(deltaInfo), sampleDataUpdates));
+                }
             }
 
             boolean isEligible = true;
             try {
-                isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), "update");
+                isEligible = FilterUpdates.isEligibleForUpdate(deltaInfo.getApiCollectionId(), deltaInfo.getUrl(), deltaInfo.getMethod(), deltaInfo.getParam(), deltaInfo.getResponseCode(), deltaInfo.getSubType().getName(), "update");
                 // if (!isEligible) {
                 //     loggerMaker.infoAndAddToDb("param already found " + deltaInfo.getParam() + " " + deltaInfo.getUrl());
                 // }
@@ -1873,6 +1959,11 @@ public class APICatalogSync {
 
         }
 
+        if (skippedExamples > 0) {
+            loggerMaker.errorAndAddToDb("Guardrail redaction unavailable; " + skippedExamples
+                    + " sensitive example(s) not stored in this sync (skip-on-unavailable is on)");
+        }
+
         for(SingleTypeInfo deleted: currentDelta.getDeletedInfo()) {
             ArrayList<String> updates = new ArrayList<>();
             UpdatePayload updatePayload = new UpdatePayload(null, null, "delete");
@@ -1881,7 +1972,7 @@ public class APICatalogSync {
 
             boolean isEligible = true;
             try {
-                isEligible = FilterUpdates.isEligibleForUpdate(deleted.getApiCollectionId(), deleted.getUrl(), deleted.getMethod(), deleted.getParam(), deleted.getResponseCode(), "delete");
+                isEligible = FilterUpdates.isEligibleForUpdate(deleted.getApiCollectionId(), deleted.getUrl(), deleted.getMethod(), deleted.getParam(), deleted.getResponseCode(), deleted.getSubType().getName(), "delete");
                 // if (!isEligible) {
                 //     loggerMaker.infoAndAddToDb("param already found for delete update " + deleted.getParam() + " " + deleted.getUrl());
                 // }

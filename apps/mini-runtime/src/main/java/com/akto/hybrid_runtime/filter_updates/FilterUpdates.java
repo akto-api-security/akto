@@ -44,7 +44,7 @@ public class FilterUpdates {
         }
     }
 
-    public static boolean isEligibleForUpdate(int apiCollectionId, String url, String method, String param, int responseCode, String operation) {
+    public static boolean isEligibleForUpdate(int apiCollectionId, String url, String method, String param, int responseCode, String subType, String operation) {
         // If reset is in progress, allow the update to proceed (conservative approach)
         if (currentlyCleaning) {
             return true;
@@ -55,7 +55,7 @@ public class FilterUpdates {
         boolean found = false;
         // assigns correct filter. Creates a new filter if filter at that index is not present
         assignFilterForOperation();
-        String key = buildKey(apiCollectionId, url, method, param, responseCode, operation);
+        String key = buildKey(apiCollectionId, url, method, param, responseCode, subType, operation);
         if(key == null) {
             return true;
         }
@@ -80,8 +80,8 @@ public class FilterUpdates {
         filters.get(filterId).put(key);
     }
 
-    public static String buildKey(int apiCollectionId, String url, String method, String param, int responseCode, String operation) {
-        return apiCollectionId + "$" + url + "$" + method + "$" + param +  "$" + responseCode + "$" + operation;
+    public static String buildKey(int apiCollectionId, String url, String method, String param, int responseCode, String subType, String operation) {
+        return apiCollectionId + "$" + url + "$" + method + "$" + param +  "$" + responseCode + "$" + subType + "$" + operation;
     }
 
     public static synchronized void resetAllFilters() {

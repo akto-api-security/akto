@@ -4,9 +4,15 @@ LOG_FILE="/var/log/app/runtime.log"
 MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
 CHECK_INTERVAL=60                        # Check interval in seconds
 MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
+ENABLE_LOGS=${ENABLE_LOGS:-true}         # Set to "false" to keep logs out of container stdout/stderr
 
 # Ensure log directory exists before first use
 mkdir -p /var/log/app
+
+# With ENABLE_LOGS=false nothing reaches the container logs; everything still goes to $LOG_FILE
+if [ "$ENABLE_LOGS" = "false" ]; then
+    exec > /dev/null 2>> "$LOG_FILE"
+fi
 
 # 1. Detect and read cgroup memory limits
 if [ -f /sys/fs/cgroup/memory.max ]; then
@@ -95,7 +101,14 @@ start_java() {
     TEE_PID=$!
 
     # Start Java (stdout+stderr → FIFO)
-    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar > "$FIFO" 2>&1 &
+    # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
+    # (MongoDB POJO codec, etc.). Single-token "=" form.
+    java -XX:+ExitOnOutOfMemoryError -Xmx${XMX_MEM}m \
+        --add-opens=java.base/java.lang=ALL-UNNAMED \
+        --add-opens=java.base/java.util=ALL-UNNAMED \
+        --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+        --add-opens=java.base/java.time=ALL-UNNAMED \
+        -jar /app/mini-runtime-1.0-SNAPSHOT-jar-with-dependencies.jar > "$FIFO" 2>&1 &
     JAVA_PID=$!
 
     echo "Started Java PID=$JAVA_PID, tee PID=$TEE_PID" | tee -a "$LOG_FILE"

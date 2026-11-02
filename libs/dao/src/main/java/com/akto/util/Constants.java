@@ -26,17 +26,57 @@ public class Constants {
     public static final String AKTO_NODE_ID = "x-akto-node";
     public static final String AKTO_REMOVE_AUTH= "x-akto-remove-auth";
     public static final String AKTO_AGENT_CONVERSATIONS= "x-agent-conversations";
+    public static final String AKTO_MESSAGE_ID_HEADER = "x-akto-message-id";
+    public static final String AKTO_SOURCE_HEADER = "x-akto-source";
+    public static final String AKTO_SOURCE_RED_TEAMING = "red-teaming";
 
     public static final String LOCAL_KAFKA_BROKER_URL = System.getenv("KAFKA_BROKER_URL") != null ? System.getenv("KAFKA_BROKER_URL") : "localhost:29092"; // run kafka process with name kafka1 in docker
-    public static final String TEST_RESULTS_TOPIC_NAME = "akto.test.messages";
-    public static final String AKTO_KAFKA_GROUP_ID_CONFIG =  "testing-group";
+    // Optional per-instance namespace so multiple mini-testing instances can share one Kafka
+    // broker, each with its own topic + consumer group. Unset/empty => legacy names (backwards compatible).
+    public static final String AKTO_TOPIC_PREFIX = System.getenv("AKTO_TOPIC_PREFIX");
+    private static String withTopicPrefix(String base) {
+        return (AKTO_TOPIC_PREFIX != null && !AKTO_TOPIC_PREFIX.isEmpty())
+                ? AKTO_TOPIC_PREFIX + "." + base
+                : base;
+    }
+    public static final String TEST_RESULTS_TOPIC_NAME = withTopicPrefix("akto.test.messages");
+    public static final String AKTO_KAFKA_GROUP_ID_CONFIG = withTopicPrefix("testing-group");
+
+    public static final boolean CONCURRENT_TESTING = (StringUtils.hasLength(System.getenv("CONCURRENT_TESTING")) && System.getenv("CONCURRENT_TESTING").equals("true"));
+
+    public static String getTestResultsTopicName(String runIdentifier) {
+        if (CONCURRENT_TESTING && runIdentifier != null && !runIdentifier.isEmpty()) {
+            return withTopicPrefix(runIdentifier + ".akto.test.messages");
+        }
+        return TEST_RESULTS_TOPIC_NAME;
+    }
+
+    public static String getKafkaGroupIdConfig(String runIdentifier) {
+        if (CONCURRENT_TESTING && runIdentifier != null && !runIdentifier.isEmpty()) {
+            return withTopicPrefix(runIdentifier + ".testing-group");
+        }
+        return AKTO_KAFKA_GROUP_ID_CONFIG;
+    }
     public static final int AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG = 1; // read one message at a time
     public static final String TESTING_STATE_FOLDER_PATH = System.getenv("TESTING_STATE_FOLDER_PATH") != null ? System.getenv("TESTING_STATE_FOLDER_PATH") : "testing-info";
     public static final String TESTING_STATE_FILE_NAME = "testing-state.json";
     public static final boolean IS_NEW_TESTING_ENABLED = (StringUtils.hasLength(System.getenv("NEW_TESTING_ENABLED")) && System.getenv("NEW_TESTING_ENABLED").equals("true"));
     public static final boolean KAFKA_DEBUG_MODE = (StringUtils.hasLength(System.getenv("KAFKA_DEBUG_MODE")) && System.getenv("KAFKA_DEBUG_MODE").equals("true"));
+    // RCA flag: when true, mini-testing skips the insertResultsAndMakeIssues() DB write entirely (result + issue
+    // creation are not persisted) so the per-test cost/throughput of everything BUT that I/O can be isolated.
+    public static final boolean SKIP_INSERT_TEST_RESULTS = (StringUtils.hasLength(System.getenv("SKIP_INSERT_TEST_RESULTS")) && System.getenv("SKIP_INSERT_TEST_RESULTS").equals("true"));
     public static final int MAX_REQUEST_TIMEOUT = StringUtils.hasLength(System.getenv("MAX_REQUEST_TIMEOUT")) ? Integer.parseInt(System.getenv("MAX_REQUEST_TIMEOUT")) : 15000;
+    // Read/call timeout (seconds) used only when replaying the target application request in agentic testing
+    // (utility-server ExecuteApiHandler). Scoped so slow chat/tool endpoints don't force a longer timeout on
+    // Akto's own control-plane calls, which keep the default 60s.
+    public static final int TESTING_TARGET_READ_TIMEOUT_SECONDS = StringUtils.hasLength(System.getenv("AKTO_TESTING_TARGET_READ_TIMEOUT_SECONDS")) ? Integer.parseInt(System.getenv("AKTO_TESTING_TARGET_READ_TIMEOUT_SECONDS")) : 180;
+    // Wall-clock cap for a single Kafka test task (agentic runs can span multiple slow target replays).
+    public static final int MINI_TESTING_TASK_TIMEOUT_SECONDS = StringUtils.hasLength(System.getenv("MINI_TESTING_TASK_TIMEOUT_SECONDS")) ? Integer.parseInt(System.getenv("MINI_TESTING_TASK_TIMEOUT_SECONDS")) : 300;
+    // Wall-clock cap for mini-testing → agent module POST /chat (must cover full orchestration + utility polls).
+    public static final int AGENT_CHAT_READ_TIMEOUT_SECONDS = StringUtils.hasLength(System.getenv("AGENT_CHAT_READ_TIMEOUT_SECONDS")) ? Integer.parseInt(System.getenv("AGENT_CHAT_READ_TIMEOUT_SECONDS")) : 600;
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 5000;
+    // Must exceed MINI_TESTING_TASK_TIMEOUT_SECONDS or the consumer can be evicted mid-test.
+    public static final int MAX_POLL_INTERVAL_MS = StringUtils.hasLength(System.getenv("MAX_POLL_INTERVAL_MS")) ? Integer.parseInt(System.getenv("MAX_POLL_INTERVAL_MS")) : 300000;
     public static final int MAX_WAIT_FOR_SLEEP = StringUtils.hasLength(System.getenv("MAX_WAIT_FOR_SLEEP")) ? Integer.parseInt(System.getenv("MAX_WAIT_FOR_SLEEP")) : 60 ;
     public static final boolean sendLogsForTesting = (StringUtils.hasLength(System.getenv("SEND_LOGS_FOR_TESTING")) && System.getenv("SEND_LOGS_FOR_TESTING").equals("true"));
     public static final String UNDERSCORE = "_";
@@ -44,10 +84,25 @@ public class Constants {
     public static final String AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AGENT_BASE_URL")) ? System.getenv("AGENT_BASE_URL") : "http://localhost:5500";
     public static final String AUTOMATED_AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AUTOMATED_AGENT_BASE_URL")) ? System.getenv("AUTOMATED_AGENT_BASE_URL") : "http://localhost:8000";
 
+    public static final String AGENT_QUERY_LOGS_SERVICE_URL = StringUtils.hasLength(System.getenv("AGENT_QUERY_LOGS_SERVICE_URL")) ? System.getenv("AGENT_QUERY_LOGS_SERVICE_URL") : "https://observer.akto.io";
+
 
     public final static String _AKTO = "AKTO";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    // The actual MCP server host behind a Gateway — distinct from "gateway-name" (the
+    // gateway's own host), needed because a Gateway-fronted MCP server node otherwise has
+    // no name of its own to fall back on besides the generic bot-name/"Bedrock Agent" default.
+    public static final String AKTO_MCP_SERVER_HOST_TAG = "mcp-server-host";
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    /**
+     * Marks a collection whose service was seen CALLING an AI agent / LLM endpoint.
+     * The value is the agent host that was called.
+     *
+     * Deliberately not AI_AGENT_APP_NAME ("ai-agent"): that key carries a collector-supplied
+     * app name for the agent itself, which is the opposite side of the call.
+     */
+    public static final String AKTO_AI_AGENT_CALLER_TAG = "ai-agent-caller";
+    public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
     public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
@@ -57,7 +112,8 @@ public class Constants {
     public static final String STDIO_TRANSPORT = "STDIO";
     public static final String HTTP_TRANSPORT = "HTTP";
 
-    // RAG and Vector Database Tags
+    // Protocol types
+    public static final String WEBSOCKET_PROTOCOL = "WEBSOCKET";
     public static final String AKTO_RAG_DATABASE_TAG = "rag-database";
     public static final String AKTO_VECTOR_SEARCH_TAG = "vector-search";
     public static final String AKTO_EMBEDDING_TAG = "embedding";
@@ -74,13 +130,26 @@ public class Constants {
     public static final String AI_AGENT_SOURCE_ARCADE_DEV = "ARCADE_DEV";
     public static final String AI_AGENT_SOURCE_MICROSOFT_DEFENDER = "DEFENDER";
     public static final String AI_AGENT_SOURCE_AWS_BEDROCK="AWS_BEDROCK";
+    public static final String AI_AGENT_SOURCE_AWS_QUICK="AWS_QUICK";
+    // AKTO Alibaba Cloud connector (AI Gateway, Model Studio, AgentRun); metadata in responsePayload.alibabaMetadata.
+    public static final String AI_AGENT_SOURCE_ALIBABA_CLOUD="ALIBABA_CLOUD";
     public static final String AI_AGENT_SOURCE_ENDPOINT = "ENDPOINT";
     public static final String AI_AGENT_TAG_BOT_NAME = "bot-name";
+    public static final String AI_AGENT_TAG_BOT_SCHEMA_NAME = "bot-schemaname";
+    public static final String AI_AGENT_TAG_GATEWAY_NAME = "gateway-name";
+    // No literal "gateway-role" tag is ever sent — AWS breaks it into "gateway-role-*"
+    // sub-fields (services, actions, resources, etc). Of those, "-resources" is the one
+    // that actually identifies what the gateway's role can act on.
+    public static final String AI_AGENT_TAG_GATEWAY_ROLE = "gateway-role-resources";
     public static final String AI_AGENT_TAG_SOURCE = "source";
     public static final String AI_AGENT_TAG_CONNECTOR = "connector";
     public static final String AI_AGENT_CONNECTOR_MICROSOFT_DEFENDER = "MICROSOFT_DEFENDER";
     public static final String AI_AGENT_CONNECTOR_SENTINEL = "SENTINELONE";
+    public static final String AI_AGENT_CONNECTOR_CROWDSTRIKE = "CROWDSTRIKE";
     public static final String AI_AGENT_APP_NAME = "ai-agent";
+    public static final String COPILOT_STUDIO_AI_AGENT_NAME = "copilot-studio";
+    public static final String SAAS_AGENT_TAG_NAME = "saas-agent";
+
 
     public static final String AKTO_ENDPOINT_SOURCE_TAG = "source";
     public static final String AKTO_COPILOT_SOURCE_VALUE = "COPILOT_STUDIO";
@@ -88,6 +157,7 @@ public class Constants {
     public static final String AKTO_COPILOT_BOT_SCHEMA_TAG = "bot-schemaname";
     public static final String AKTO_COPILOT_BOT_ENVIRONMENT_TAG = "bot-environment-id";
     public static final String AKTO_COPILOT_CONVERSATION_URL_PREFIX = "/copilot/conversation";
+    public static final String AKTO_COPILOT_INVENTORY_TAG = "copilot-inventory";
 
     public static final String STATUS_PENDING = "Pending";
     public static final String STATUS_IN_PROGRESS = "In Progress";

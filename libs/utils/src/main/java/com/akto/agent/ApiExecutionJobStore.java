@@ -9,6 +9,7 @@ import lombok.Getter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -64,6 +65,8 @@ public class ApiExecutionJobStore {
 
     private final Map<String, JobEntry> store = new ConcurrentHashMap<>();
     private final Map<String, List<String>> conversationToJobIds = new ConcurrentHashMap<>();
+    private final Set<String> liteLLMConversationIds = ConcurrentHashMap.newKeySet();
+    private final Map<String, String> jobIdToConversationResultDocId = new ConcurrentHashMap<>();
     private final int maxSize;
     private final long ttlMs;
 
@@ -110,6 +113,25 @@ public class ApiExecutionJobStore {
     public List<String> getJobIdsByConversationId(String conversationId) {
         List<String> list = conversationToJobIds.get(conversationId);
         return list != null ? new ArrayList<>(list) : new ArrayList<>();
+    }
+
+    public void markLiteLLMConversation(String conversationId) {
+        if (conversationId != null && !conversationId.isEmpty()) {
+            liteLLMConversationIds.add(conversationId);
+        }
+    }
+
+    public boolean isLiteLLMConversation(String conversationId) {
+        return conversationId != null && liteLLMConversationIds.contains(conversationId);
+    }
+    public void putConversationResultDocId(String jobId, String docId) {
+        if (jobId != null && !jobId.isEmpty() && docId != null && !docId.isEmpty()) {
+            jobIdToConversationResultDocId.put(jobId, docId);
+        }
+    }
+
+    public String getConversationResultDocId(String jobId) {
+        return jobId != null ? jobIdToConversationResultDocId.get(jobId) : null;
     }
 
     private void evictOldest() {

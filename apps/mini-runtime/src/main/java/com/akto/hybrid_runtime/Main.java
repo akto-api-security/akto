@@ -2,7 +2,6 @@ package com.akto.hybrid_runtime;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -13,6 +12,8 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.detection.DetectionCorrectorInstaller;
+import com.akto.detection.SensitiveDataEvents;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
@@ -45,9 +46,11 @@ import com.akto.ingest.TrafficIngestQueue;
 import com.akto.utility.UtilityServer;
 import com.akto.util.DashboardMode;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.hybrid_runtime.redaction.PayloadRedaction;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.google.gson.Gson;
+import com.alibaba.fastjson2.JSON;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -68,6 +71,10 @@ public class Main {
     public static final String ACCOUNT_ID = "account_id";
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.RUNTIME);
 
+    static {
+        DataActorFactory.setModuleType("MINI_RUNTIME");
+    }
+
     public static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ClientLayer clientLayer = new ClientLayer();
 
@@ -77,6 +84,12 @@ public class Main {
     public static final String kafkaUsername = KafkaConfig.getKafkaUsername();
     public static final String kafkaPassword = KafkaConfig.getKafkaPassword();
     public static final boolean isSendToThreatEnabled = System.getenv("SEND_TO_THREAT_ENABLED") != null && System.getenv("SEND_TO_THREAT_ENABLED").equalsIgnoreCase("true");
+
+    /**
+     * Counting of custom sensitive data events per collection and hour, sent to the central store for
+     * threshold alerts. Off unless set to "true": nothing is tracked and nothing is sent.
+     */
+    public static final boolean isSensitiveDataCountsEnabled = "true".equalsIgnoreCase(System.getenv("SENSITIVE_DATA_COUNTS_ENABLED"));
 
     private static int debugPrintCounter = 20;
     private static void printL(Object o) {
@@ -362,6 +375,10 @@ public class Main {
 
         DataControlFetcher.init(dataActor);
 
+        // Where Kafka is, for the detection corrector's async mode. Everything else it needs comes
+        // from account settings; this one is deployment topology, so it is handed over here.
+        DetectionCorrectorInstaller.setKafkaBrokerUrl(brokerUrlFinal);
+
         aSettings = dataActor.fetchAccountSettings();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_RUNTIME, dataActor, customMiniRuntimeServiceName);
         LoggerMaker.setModuleId(customMiniRuntimeServiceName);
@@ -373,6 +390,10 @@ public class Main {
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
         initializeRuntime();
+        if (isSensitiveDataCountsEnabled) {
+            SensitiveDataCounter.instance.start(dataActor::bulkIncSensitiveDataCounts);
+            loggerMaker.infoAndAddToDb("sensitive data counts enabled");
+        }
 
         // Fast-Discovery Integration (optional) - Run as separate process from embedded classes
         if (isFastDiscoveryEnabled()) {
@@ -512,6 +533,9 @@ public class Main {
                     loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage());
                 }
                 
+                // The consumer has stopped, so nothing more will be counted: write what is pending.
+                SensitiveDataCounter.instance.flush();
+
                 // Close protobuf producer
                 if (protobufKafkaProducer != null) {
                     protobufKafkaProducer.close();
@@ -562,7 +586,7 @@ public class Main {
                     }
                 }
 
-                if (checkPg) {
+                if (checkPg && !APICatalogSync.skipPostgresSampleIngestion) {
                     long dbSizeInMb = clientLayer.fetchTotalSize();
                     AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
                     loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB");
@@ -614,6 +638,8 @@ public class Main {
 
                                         if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("ERROR")) {
                                             loggerMaker.errorAndAddToDb(message);
+                                        } else if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("WARN")) {
+                                            loggerMaker.warnAndAddToDb(message);
                                         } else if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("DEBUG")) {
                                             loggerMaker.debug(message);
                                         } else {
@@ -719,6 +745,7 @@ public class Main {
                         long start = System.currentTimeMillis();
                         Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                         lastSyncOffset = bulkParseTrafficToResponseParams(lastSyncOffset, batch, responseParamsToAccountMap);
+                        captureRedTeamingAgentQueryRecords(responseParamsToAccountMap);
                         handleResponseParams(responseParamsToAccountMap, accountInfoMap, fIsDashboardInstance,
                                 httpCallParserMap, sessionAnalyzerMap, fApiConfig, fFetchAllSTI,
                                 fSyncImmediately, fCentralKafkaTopicName);
@@ -785,6 +812,7 @@ public class Main {
                     // TODO: what happens if exception
                     Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
                     lastSyncOffset = bulkParseTrafficToResponseParams(lastSyncOffset, records, responseParamsToAccountMap);
+                    captureRedTeamingAgentQueryRecords(responseParamsToAccountMap);
 
                     handleResponseParams(responseParamsToAccountMap,
                         accountInfoMap,
@@ -816,11 +844,98 @@ public class Main {
         }
     }
 
-    private static int LOG_DEBUG_RECORDS = 10; 
+    private static int LOG_DEBUG_RECORDS = 10;
+
+    /**
+     * Traffic generated by Akto's own agentic (red-teaming) test executor carries these 2 headers
+     * on the outbound request (added in ExecuteApiHandler). Capture it as an AgentQueryRecord here,
+     * independent of the tag-based Atlas/gen-ai detection already done in HttpCallParser, and strip
+     * it out of responseParamsToAccountMap so it isn't also run through normal handleResponseParams
+     * processing.
+     */
+    private static void captureRedTeamingAgentQueryRecords(Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
+        for (Map.Entry<String, List<HttpResponseParams>> entry : responseParamsToAccountMap.entrySet()) {
+            List<HttpResponseParams> remaining = new ArrayList<>();
+            for (HttpResponseParams httpResponseParam : entry.getValue()) {
+                Map<String, List<String>> reqHeaders = httpResponseParam.getRequestParams().getHeaders();
+                String messageId = HttpRequestResponseUtils.getHeaderValue(reqHeaders, Constants.AKTO_MESSAGE_ID_HEADER);
+                String source = HttpRequestResponseUtils.getHeaderValue(reqHeaders, Constants.AKTO_SOURCE_HEADER);
+                if (messageId == null || messageId.isEmpty() || !Constants.AKTO_SOURCE_RED_TEAMING.equals(source)) {
+                    remaining.add(httpResponseParam);
+                    continue;
+                }
+                loggerMaker.info("Found red teaming request with messageId: " + messageId);
+                Map<String, String> tagsMap = HttpCallParser.parseTagsMap(httpResponseParam.getTags());
+                AgentQueryRecord record = AgentQueryRecord.fromHttpResponseParams(httpResponseParam, tagsMap, null);
+                if (record != null) {
+                    loggerMaker.infoAndAddToDb("Storing agent query data " + record.toString());
+                    String payload = httpResponseParam.getRequestParams().getPayload();
+                    if (payload.length() > 3) {
+                        loggerMaker.info("Actually storing agent record" + record.getSpanId());
+                        PayloadRedaction.storeAgentRecord(record, httpResponseParam, dataActor::storeAgentQueryData);
+                    }
+                }
+            }
+            entry.setValue(remaining);
+        }
+    }
+
+    private static void addResponseParamToMap(HttpResponseParams httpResponseParams,
+            Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
+        if (httpResponseParams != null) {
+            String accountId = httpResponseParams.getAccountId();
+            if (!responseParamsToAccountMap.containsKey(accountId)) {
+                responseParamsToAccountMap.put(accountId, new ArrayList<>());
+            }
+            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+        }
+    }
+    
+    private static List<HttpResponseParams> parseMessageToResponseParams(String messageValue) throws Exception {
+        List<HttpResponseParams> result = new ArrayList<>();
+        
+        try {
+            Map<String, Object> jsonMap = JSON.parseObject(messageValue);
+            
+            if (WebSocketMessageParser.isWebSocketMessage(jsonMap)) {
+                try {
+                    List<HttpResponseParams> wsParams = WebSocketEventProcessor.processWebSocketMessage(jsonMap);
+                    result.addAll(wsParams);
+                    
+                    if (wsParams.isEmpty()) {
+                        loggerMaker.infoAndAddToDb("WebSocket message processed but no valid events extracted (likely control frames like PING/PONG)");
+                    }
+                } catch (Exception wsException) {
+                    loggerMaker.warn("Error in WebSocket processing: " + wsException.getMessage() + ", attempting HTTP fallback");
+                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
+                    if (httpResponseParams != null) {
+                        result.add(httpResponseParams);
+                    }
+                }
+            } else {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
+                if (httpResponseParams != null) {
+                    result.add(httpResponseParams);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.warn("Exception parsing as WebSocket/HTTP: " + e.getMessage());
+            try {
+                HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageValue);
+                if (httpResponseParams != null) {
+                    result.add(httpResponseParams);
+                }
+            } catch (Exception httpException) {
+                loggerMaker.warn("Failed to parse as both WebSocket and HTTP: " + httpException.getMessage());
+            }
+        }
+        
+        return result;
+    }
+    
     private static long bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (ConsumerRecord<String,String> r: records) {
-            HttpResponseParams httpResponseParams;
             try {
                  
                 printL(r.value());
@@ -852,36 +967,34 @@ public class Main {
                     continue;
                 }
 
-                httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                if (httpResponseParams == null) {
-                    loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
+                List<HttpResponseParams> responseParamsList = parseMessageToResponseParams(r.value());
+                if (responseParamsList.isEmpty()) {
+                    loggerMaker.error("No response params parsed from message");
                     continue;
                 }
 
-                if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
-                    continue;
-                }
-                if(Utils.printDebugHostLog(httpResponseParams) != null){
-                    Utils.printDebugHostLog("Post processing sample message from kafka: " + httpResponseParams.getOrig());
-                }
-                if (Context.getActualAccountId() == 1759692400) {
-                    String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
-                    if (debugHeader != null && !debugHeader.isEmpty()) {
-                        String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
-                        loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                                + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
-                                + " statusCode: " + httpResponseParams.getStatusCode());
+                for (HttpResponseParams httpResponseParams : responseParamsList) {
+                    if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
+                        continue;
                     }
+                    if(Utils.printDebugHostLog(httpResponseParams) != null){
+                        Utils.printDebugHostLog("Post processing sample message from kafka: " + httpResponseParams.getOrig());
+                    }
+                    if (Context.getActualAccountId() == 1759692400) {
+                        String debugHeader = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "x-debug-trace");
+                        if (debugHeader != null && !debugHeader.isEmpty()) {
+                            String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                            loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
+                                    + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
+                                    + " statusCode: " + httpResponseParams.getStatusCode());
+                        }
+                    }
+                    addResponseParamToMap(httpResponseParams, responseParamsToAccountMap);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
                 continue;
             }
-            String accountId = httpResponseParams.getAccountId();
-            if (!responseParamsToAccountMap.containsKey(accountId)) {
-                responseParamsToAccountMap.put(accountId, new ArrayList<>());
-            }
-            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
         }
     return lastSyncOffset;
     }
@@ -889,7 +1002,6 @@ public class Main {
     private static long bulkParseTrafficToResponseParams(long lastSyncOffset, List<String> messages,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (String value : messages) {
-            HttpResponseParams httpResponseParams;
             try {
                 printL(value);
                 AllMetrics.instance.setRuntimeKafkaRecordCount(1);
@@ -904,24 +1016,24 @@ public class Main {
                 }
                 if (Context.getActualAccountId() != 1759692400 && tryForCollectionName(value)) continue;
                 if (isNonApiContentTypeFilterEnabled && HttpRequestResponseUtils.isNonApiContentType(value)) continue;
-                httpResponseParams = HttpCallParser.parseKafkaMessage(value);
-                if (httpResponseParams == null) {
+                
+                List<HttpResponseParams> responseParamsList = parseMessageToResponseParams(value);
+                if (responseParamsList.isEmpty()) {
                     loggerMaker.error("HttpResponse params was skipped due to invalid json requestBody");
                     continue;
                 }
-                if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) continue;
-                if (Utils.printDebugHostLog(httpResponseParams) != null) {
-                    Utils.printDebugHostLog("Post processing sample message: " + httpResponseParams.getOrig());
+                
+                for (HttpResponseParams httpResponseParams : responseParamsList) {
+                    if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) continue;
+                    if (Utils.printDebugHostLog(httpResponseParams) != null) {
+                        Utils.printDebugHostLog("Post processing sample message: " + httpResponseParams.getOrig());
+                    }
+                    addResponseParamToMap(httpResponseParams, responseParamsToAccountMap);
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while parsing message: " + value + e);
                 continue;
             }
-            String accountId = httpResponseParams.getAccountId();
-            if (!responseParamsToAccountMap.containsKey(accountId)) {
-                responseParamsToAccountMap.put(accountId, new ArrayList<>());
-            }
-            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
         }
         return lastSyncOffset;
     }
@@ -1116,7 +1228,7 @@ public class Main {
                     }
 
                     if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
-                        loggerMaker.infoAndAddToDb("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
+                        Utils.printUrlDebugLog("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
                     }
                     if(Utils.printDebugHostLog(accWiseResponseEntry) != null){
                         Utils.printDebugHostLog(" in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
@@ -1152,7 +1264,7 @@ public class Main {
                                         reqHeaders.put("host", Collections.singletonList(newValue));
 
                                         if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
-                                            loggerMaker.infoAndAddToDb("Found debug url in changeTargetCollection " + accWiseResponseEntry.getRequestParams().getURL() + " newValue: " + newValue + " reqHeaderValue: " + reqHeaderValue);
+                                            Utils.printUrlDebugLog("Found debug url in changeTargetCollection " + accWiseResponseEntry.getRequestParams().getURL() + " newValue: " + newValue + " reqHeaderValue: " + reqHeaderValue);
                                         }
                                     }
                                 } catch (Exception e) {
@@ -1201,6 +1313,13 @@ public class Main {
                 List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
                 SingleTypeInfo.fetchCustomDataTypes(accountId, customDataTypes, aktoDataTypes);
                 SingleTypeInfo.fetchCustomAuthTypes(accountId, customAuthTypes);
+                if (isSensitiveDataCountsEnabled) {
+                    SensitiveDataEvents.setTrackedTypes(SensitiveDataEvents.customSensitiveTypeNames(customDataTypes));
+                }
+
+                // Refreshed alongside data types on purpose: the corrector may only return labels
+                // that already exist as data types, so the two must not drift apart.
+                DetectionCorrectorInstaller.refresh(dataActor.fetchAccountSettings());
             }
         }, 0, 5, TimeUnit.MINUTES);
     }
@@ -1385,10 +1504,10 @@ public class Main {
                HttpRequestParams requestParams = payload.getRequestParams();
                String debugHost = Utils.printDebugHostLog(payload);
                if (debugHost != null) {
-                   loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                   Utils.printUrlDebugLog("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
                }
                if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                   loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                   Utils.printUrlDebugLog("Found debug url: " + requestParams.getURL());
                }
            } catch (Exception e) {
                String payloadStr = payload != null ? payload.toString() : "null";

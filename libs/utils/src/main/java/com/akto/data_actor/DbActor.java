@@ -3,12 +3,14 @@ package com.akto.data_actor;
 import com.akto.dao.ApiSequencesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.claude_identity.ClaudeDesktopInfo;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
@@ -40,6 +42,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -474,8 +477,8 @@ public class DbActor extends DataActor {
         DbLayer.insertApiCollection(apiCollectionId, apiCollectionName);
     }
 
-    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType) {
-        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName, accessType);
+    public void createCollectionForServiceTag(int id, String serviceTagValue, List<String> hostNames, List<CollectionTags> tags, String hostName, String accessType, boolean isLatestRagDetection) {
+        DbLayer.createCollectionForServiceTag(id, serviceTagValue, hostNames, tags, hostName, accessType, isLatestRagDetection);
     }
 
     public void addHostNameToServiceTagCollection(int collectionId, String hostName) {
@@ -486,8 +489,18 @@ public class DbActor extends DataActor {
         DbLayer.insertTestingRunResultSummary(trrs);
     }
 
+    @Override
+    public int incrementAndGetTestRateLimitUsage(int limit, String dashboardContext) {
+        return DbLayer.incrementAndGetTestRateLimitUsage(limit, dashboardContext);
+    }
+
     public void insertTestingRunResults(TestingRunResult testingRunResults) {
         DbLayer.insertTestingRunResults(testingRunResults);
+    }
+
+    // mini-testing always talks to DB via cyborg (ClientActor); direct-Mongo path intentionally unimplemented.
+    public void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+        throw new UnsupportedOperationException("bulkRecordTestingRunResults is not supported via DbActor");
     }
 
     public void insertWorkflowTestResult(WorkflowTestResult workflowTestResult) {
@@ -578,8 +591,20 @@ public class DbActor extends DataActor {
         DbLayer.updateTestingRun(testingRunId);
     }
 
+    public void markTestingRunFailed(String testingRunId) {
+        DbLayer.markTestingRunFailed(testingRunId);
+    }
+
     public void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs) {
         DbLayer.updateTestingRunAndMarkCompleted(testingRunId, scheduleTs);
+    }
+
+    public List<CustomWebhook> fetchTeamsWebhooksForTestResults() {
+        return DbLayer.fetchTeamsWebhooksForTestResults();
+    }
+
+    public void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors) {
+        DbLayer.recordWebhookSendResult(webhookId, userEmail, timestamp, message, errors);
     }
 
     public void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
@@ -606,6 +631,11 @@ public class DbActor extends DataActor {
         DbLayer.bulkWriteDependencyNodes(dependencyNodeList);
     }
 
+    public boolean bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments) {
+        DbLayer.bulkIncSensitiveDataCounts(idempotencyKey, increments);
+        return true;
+    }
+
     public List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
         return DbLayer.fetchLatestEndpointsForTesting(startTimestamp, endTimestamp, apiCollectionId);
     }
@@ -622,12 +652,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType) {
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType);
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags, accessType, isLatestRagDetection);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType) {
-        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType);
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags, String accessType, boolean isLatestRagDetection) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags, accessType, isLatestRagDetection);
     }
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
@@ -666,8 +696,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchNodesForCollectionIds(apiCollectionsIds, removeZeroLevel, skip);
     }
 
-    public long countTestingRunResultSummaries(Bson filter){
-        return DbLayer.countTestingRunResultSummaries(filter);
+    public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state){
+        return DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, state);
     }
 
     public TestScript fetchTestScript(TestScript.Type type){
@@ -747,8 +777,13 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
-        DbLayer.storeConversationResults(conversationResults);
+    public List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
+        return DbLayer.storeConversationResults(conversationResults);
+    }
+
+    @Override
+    public void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata) {
+        DbLayer.updateAgentConversationToolsMetadata(docId, toolsMetadata);
     }
 
     @Override
@@ -832,6 +867,16 @@ public class DbActor extends DataActor {
         // no-op: agent query records are sent to ES via ClientActor; DbActor has no local store
     }
 
+    public List<AgentQueryRecord> fetchAgentQueryRecords(String messageId) {
+        // no-op: agent query records live in ES via ClientActor; DbActor has no local store
+        return new ArrayList<>();
+    }
+
+    public List<Map<String, Object>> fetchAgentModels() {
+        // no-op: agent models are served by the database-abstractor (ClientActor); no local DAO here
+        return new ArrayList<>();
+    }
+
     public Map<String, String> fetchDeviceUserMap() {
         return new HashMap<>();
     }
@@ -883,5 +928,9 @@ public class DbActor extends DataActor {
         }
         
         return protocol + cleanHostName + path;
+    }
+    
+    public Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap() {
+        return new HashMap<>();
     }
 }

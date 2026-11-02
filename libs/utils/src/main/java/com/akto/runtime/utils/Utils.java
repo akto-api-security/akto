@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
+import com.akto.config.ConfigHandler;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
@@ -41,14 +42,14 @@ public class Utils {
         if( o == null ){
             return;
         }
-        logger.infoAndAddToDb(o.toString());
+        logger.warnAndAddToDb(o.toString());
     }
 
     public static void printDebugHostLog(Object o){
         if( o == null ){
             return;
         }
-        logger.infoAndAddToDb("Found debug host: " + o.toString());
+        logger.warnAndAddToDb("Found debug host: " + o.toString());
     }
 
 
@@ -176,10 +177,12 @@ public class Utils {
                         if (lastFileUrls == null || !lastFileUrls.equals(fileUrls)) {
                             DEBUG_URLS_SET = fileUrls;
                             DEBUG_HOSTS_SET = fileUrls;
-                            logger.infoAndAddToDb("DEBUG_URLS updated from file: " + DEBUG_URLS_SET.toString());
+                            logger.warnAndAddToDb("DEBUG_URLS updated from file: " + DEBUG_URLS_SET.toString());
                             lastFileUrls = new HashSet<>(fileUrls);
                         }
                     }
+                    logger.debug("DEBUG_URLS_SET: " + DEBUG_URLS_SET.toString());
+                    logger.debug("DEBUG_HOSTS_SET: " + DEBUG_HOSTS_SET.toString());
                 } catch (Exception e) {
                     logger.errorAndAddToDb(e, "Failed to read debug URLs from file: " + e.getMessage());
                 }
@@ -208,7 +211,7 @@ public class Utils {
     }
 
     private static Set<String> initializeDebugHostsSet() {
-        String debugHosts = System.getenv("DEBUG_HOSTS");
+        String debugHosts = ConfigHandler.readEnv("DEBUG_HOSTS", null);
         if (debugHosts == null || debugHosts.isEmpty()) {
             return new HashSet<>();
         }
@@ -216,7 +219,7 @@ public class Utils {
     }
 
     public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
-       
+       DEBUG_HOSTS_SET = initializeDebugHostsSet();
         if (DEBUG_HOSTS_SET.isEmpty() || httpResponseParams == null || httpResponseParams.getRequestParams() == null) return null;
         String host = RuntimeUtil.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
         return DEBUG_HOSTS_SET.contains(host) ? host : null;
@@ -225,17 +228,18 @@ public class Utils {
     private static Set<String> initializeDebugUrlsSet() {
         Set<String> ret = new HashSet<>();
 
-        String debugUrls = System.getenv("DEBUG_URLS");
+        String debugUrls = ConfigHandler.readEnv("DEBUG_URLS", null);
         if (debugUrls == null || debugUrls.isEmpty()) {
             ret = new HashSet<>();
         } else {
             ret = new HashSet<>(Arrays.asList(debugUrls.split(",")));
         }
-        logger.info("DEBUG_URLS initialized with: " + ret.toString());
+        logger.warn("DEBUG_URLS initialized with: " + ret.toString());
         return ret;
     }
 
     public static boolean printDebugUrlLog(String url) {
+        DEBUG_URLS_SET = initializeDebugUrlsSet();
         if (DEBUG_URLS_SET.isEmpty())
             return false;
         if (url == null || url.isEmpty())

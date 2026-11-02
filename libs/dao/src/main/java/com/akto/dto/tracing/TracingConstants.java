@@ -9,10 +9,13 @@ public final class TracingConstants {
     public static final class SpanKind {
         public static final String WORKFLOW = "workflow";
         public static final String AGENT = "agent";
+        public static final String GATEWAY = "gateway";
         public static final String LLM = "llm";
         /** Snowflake / agent observability: a discrete planning or reasoning step (e.g. {@code agent.planning.*}). */
         public static final String PLANNING = "planning";
         public static final String TOOL = "tool";
+        /** A tool call routed through an MCP server (e.g. AgentCore Gateway), as opposed to a generic agent tool. */
+        public static final String MCP_TOOL = "mcp_tool";
         public static final String MCP_SERVER = "mcp_server";
         public static final String RAG = "rag";
         public static final String VECTOR_DB = "vector_db";

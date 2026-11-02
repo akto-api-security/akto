@@ -1,0 +1,478 @@
+package com.akto.testing.kafka_utils;
+
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
+
+import com.akto.dao.context.Context;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.AllMetrics;
+
+/**
+ * All observability for a single testing-run consumer pass: outcome counters, per-test timing,
+ * the in-flight task registry, and every WARN-level {@code TESTRUN …} lifecycle line.
+ * <p>
+ * One instance per run (constructed in {@link ConsumerUtil#init(int)}), so "reset" is just a fresh
+ * object. Counters/timing/registry are thread-safe (touched by every worker thread); the scheduling
+ * fields used by {@link #tick(int, long)} are only ever read/written from the single drain-loop thread.
+ * <p>
+ * Keeping this out of {@link ConsumerUtil} leaves that class to the Kafka / threadpool / completion
+ * business logic, and keeps all log formatting in exactly one place so it can never drift.
+ */
+public class TestRunMetrics {
+
+    /** Why a consumer pass ended, reported as {@code reason=} on the TESTRUN END/RESTART lines. */
+    public enum StopReason {
+        /** Loop never reached a terminal branch (shouldn't happen in practice). */
+        UNKNOWN,
+        /** Test run was marked stopped by the user / dashboard. */
+        STOPPED,
+        /** effectiveMaxRunTime elapsed. */
+        MAX_RUNTIME,
+        /** All expected records processed and the queue drained. */
+        ALL_PROCESSED,
+        /** Queue drained but records still missing after the idle grace -> consumer restarted from last commit. */
+        IDLE_RESTART,
+        /** Queue drained, idle grace elapsed, nothing left to recover -> completed. */
+        IDLE_COMPLETE,
+        /** Polling/processing threw. */
+        ERROR,
+        /** parallel-consumer engine reported itself closed/failed independent of any exception reaching the drain loop. */
+        CONSUMER_FAILED,
+        /** No record has finished processing for STALL_TIMEOUT_SECONDS while work remains. */
+        STALLED
+    }
+
+    /**
+     * Pipeline stages timed per test. LOOKUP is config/sample resolution; RUN_TEST is the full
+     * {@code runTestNew} wall; SEND_REQUEST is the slice of it spent hitting the API under test;
+     * INSERT_RESULTS is the ultron result-write round-trip. FILTER/WORDLIST/VALIDATE are slices of
+     * RUN_TEST's previously-undivided OTHER bucket, timed at the exact call sites confirmed against
+     * captured flamegraphs: FILTER wraps TestPlugin.validateFilter (YamlTestTemplate.filter()),
+     * WORDLIST wraps VariableResolver.resolveDynamicWordList (Executor.execute(), once per call),
+     * VALIDATE wraps Executor.validate() (once per attack-payload iteration, right after SEND_REQUEST).
+     * Whatever's left of RUN_TEST after subtracting all of these is the real, now much smaller, OTHER.
+     */
+    public enum Stage { LOOKUP, RUN_TEST, SEND_REQUEST, INSERT_RESULTS, FILTER, WORDLIST, VALIDATE }
+
+    /** WARN-level progress + cost heartbeat cadence. */
+    private static final long HEARTBEAT_INTERVAL_MS = 60_000L;
+    /** No increase in processed records for this long (while work is still in-flight) => log a stall dump. */
+    private static final long STALL_THRESHOLD_MS = 60_000L;
+    /** Don't spam stall dumps more often than this. */
+    private static final long STALL_LOG_INTERVAL_MS = 30_000L;
+    /** Max number of oldest in-flight tasks to list in a stall dump. */
+    private static final int STALL_DUMP_LIMIT = 15;
+    /** A slot is "stuck" if a single task has held it at least this long (live capacity-waste signal). */
+    private static final long STUCK_AGE_MS = 60_000L;
+    /**
+     * slotsClogged fires once at least 1/STALL_CLOGGED_DIVISOR of the pool is stuck. Was 2 (half the pool) —
+     * too high to catch chronic partial degradation (observed stuckSlots plateauing around 35-40% of pool
+     * while still limping forward, never freezing and never reaching 50%, so STALL never fired). Lowered to 3.
+     */
+    private static final int STALL_CLOGGED_DIVISOR = 3;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestRunMetrics.class, LogDb.TESTING);
+
+    private static final class InflightTask {
+        final String label;      // recordId (topic-partition-offset)
+        final long startMs;
+        final String callerThreadName; // the pc-pool thread that submitted this task - always just
+                                        // blocked on future.get(), never the one doing the actual work.
+        // Set once the task actually starts running, from INSIDE runTestFromMessage on the real
+        // mini-test-worker thread - this is the name a stall dump needs to jstack, not callerThreadName.
+        volatile String workerThreadName;
+        InflightTask(String label, long startMs, String callerThreadName) {
+            this.label = label;
+            this.startMs = startMs;
+            this.callerThreadName = callerThreadName;
+        }
+    }
+
+    // Run identity/context.
+    private final String summaryId;
+    private final int startTime;        // Context epoch seconds - lifetime, from the ORIGINAL
+                                         // pickedUpTimestamp, unchanged across a resume.
+    private final int expectedRecords;
+    // This process's own init() - resets on every resume, unlike startTime above. Used for the
+    // rate calculation so both sides of the division stay in sync across a resume (processed
+    // also resets to zero on every init()) - otherwise rate was reporting ~1/s on a healthy
+    // resumed run, since processed-since-resume was being divided by lifetime elapsed.
+    private final int sessionStartTime = Context.now();
+    private final ExecutorService executor;
+
+    // Outcome counters.
+    private final AtomicInteger polled = new AtomicInteger(0);
+    private final AtomicInteger passed = new AtomicInteger(0);
+    private final AtomicInteger vulnerable = new AtomicInteger(0);
+    private final AtomicInteger skipped = new AtomicInteger(0);
+    private final AtomicInteger timedOut = new AtomicInteger(0);
+    private final AtomicInteger rejected = new AtomicInteger(0);
+    private final AtomicInteger errored = new AtomicInteger(0);
+
+    // Per-test timing aggregates (submit -> finish, includes queue wait).
+    private final AtomicInteger durationSamples = new AtomicInteger(0);
+    private final AtomicLong totalDurationMs = new AtomicLong(0);
+    private final AtomicLong maxDurationMs = new AtomicLong(0);
+    private volatile String slowestLabel = "";
+
+    // Per-stage wall-time bill (nanos summed across all worker threads) + call counts + worst single call.
+    private final EnumMap<Stage, LongAdder> stageNanos = newStageAdders();
+    private final EnumMap<Stage, LongAdder> stageCount = newStageAdders();
+    private final EnumMap<Stage, AtomicLong> stageMaxNanos = newStageMax();
+    /** CPU time (not wall) attributed to RUN_TEST, to separate compute from I/O wait. */
+    private final LongAdder runTestCpuNanos = new LongAdder();
+
+    // Per-test payload size (the raw sample string's length, in bytes) - avg/max reported in KB.
+    private final LongAdder totalPayloadBytes = new LongAdder();
+    private final LongAdder payloadSamples = new LongAdder();
+    private final AtomicLong maxPayloadBytes = new AtomicLong(0);
+
+    private static EnumMap<Stage, LongAdder> newStageAdders() {
+        EnumMap<Stage, LongAdder> m = new EnumMap<>(Stage.class);
+        for (Stage s : Stage.values()) m.put(s, new LongAdder());
+        return m;
+    }
+
+    private static EnumMap<Stage, AtomicLong> newStageMax() {
+        EnumMap<Stage, AtomicLong> m = new EnumMap<>(Stage.class);
+        for (Stage s : Stage.values()) m.put(s, new AtomicLong(0));
+        return m;
+    }
+
+    /** recordId -> what is currently running, so a stall can name the stuck (api, test) cells and threads. */
+    private final ConcurrentHashMap<String, InflightTask> inflightTasks = new ConcurrentHashMap<>();
+
+    // Scheduling state for tick() — only touched by the drain-loop thread.
+    private long lastHeartbeatMs = 0L;
+    private long lastProgressMs = System.currentTimeMillis();
+    private long lastStallLogMs = 0L;
+    private int lastProcessedSeen = -1;
+
+    public TestRunMetrics(String summaryId, int startTime, int expectedRecords, ExecutorService executor) {
+        this.summaryId = summaryId;
+        this.startTime = startTime;
+        this.expectedRecords = expectedRecords;
+        this.executor = executor;
+    }
+
+    // ----- task lifecycle (called from the poll callback / runTestFromMessage on worker threads) -----
+
+    /** A record was pulled off the topic (counted even if we later skip submitting it). */
+    public void onPolled() {
+        polled.incrementAndGet();
+    }
+
+    /** A task was submitted to the executor; start tracking it as in-flight. */
+    public void onSubmit(String recordId, String threadName) {
+        inflightTasks.put(recordId, new InflightTask(recordId, System.currentTimeMillis(), threadName));
+    }
+
+    /**
+     * Called from INSIDE runTestFromMessage, on the actual mini-test-worker thread executing this
+     * recordId - records the REAL worker name so a stall dump can jstack the thread that's really
+     * stuck, instead of the pc-pool caller (which only ever shows future.get(), never the real work).
+     * A no-op if the task already finished by the time this runs (rare race, harmless either way).
+     */
+    public void onWorkerStart(String recordId, String workerThreadName) {
+        InflightTask t = inflightTasks.get(recordId);
+        if (t != null) {
+            t.workerThreadName = workerThreadName;
+        }
+    }
+
+    /** A task finished (any outcome); stop tracking it and fold its wall-clock into the timing aggregates. */
+    public void onComplete(String recordId) {
+        InflightTask task = inflightTasks.remove(recordId);
+        if (task == null) {
+            return;
+        }
+        long dur = System.currentTimeMillis() - task.startMs;
+        totalDurationMs.addAndGet(dur);
+        durationSamples.incrementAndGet();
+        long prevMax;
+        while (dur > (prevMax = maxDurationMs.get())) {
+            if (maxDurationMs.compareAndSet(prevMax, dur)) {
+                slowestLabel = task.label; // best-effort; paired with the max we just set
+                break;
+            }
+        }
+    }
+
+    public void markPassed()     { passed.incrementAndGet(); }
+    public void markVulnerable() { vulnerable.incrementAndGet(); }
+    public void markSkipped()    { skipped.incrementAndGet(); }
+    public void markTimedOut()   { timedOut.incrementAndGet(); }
+    public void markRejected()   { rejected.incrementAndGet(); }
+    public void markErrored()    { errored.incrementAndGet(); }
+
+    public int polled() { return polled.get(); }
+
+    /** Fold one stage's wall-clock (nanos) for one test into the run-wide bill. Thread-safe. */
+    public void recordStage(Stage stage, long nanos) {
+        if (nanos < 0) return;
+        stageNanos.get(stage).add(nanos);
+        stageCount.get(stage).increment();
+        AtomicLong max = stageMaxNanos.get(stage);
+        long prev;
+        while (nanos > (prev = max.get()) && !max.compareAndSet(prev, nanos)) { /* retry */ }
+    }
+
+    /** Fold the CPU time (nanos) a single {@code runTestNew} burned, to split compute from I/O wait. */
+    public void recordRunTestCpu(long nanos) {
+        if (nanos > 0) runTestCpuNanos.add(nanos);
+    }
+
+    /** Fold one test's raw sample payload size (bytes) into the avg/max tracked for the run. */
+    public void recordPayloadSize(long bytes) {
+        if (bytes < 0) return;
+        totalPayloadBytes.add(bytes);
+        payloadSamples.increment();
+        long prev;
+        while (bytes > (prev = maxPayloadBytes.get()) && !maxPayloadBytes.compareAndSet(prev, bytes)) { /* retry */ }
+    }
+
+    // ----- lifecycle banners -----
+
+    public void logStart(int accountId, int apiCount, int testCount, int poolSize,
+                         int perTestTimeoutSec, int maxRunTimeSec) {
+        long totalCells = (apiCount > 0 && testCount > 0) ? (long) apiCount * testCount : -1L;
+        loggerMaker.warnAndAddToDb("TESTRUN START summaryId=" + summaryId
+                + " account=" + accountId
+                + " apis(M)=" + apiCount + " tests(N)=" + testCount + " totalCells(MxN)=" + totalCells
+                + " expectedRecords=" + expectedRecords
+                + " executorPoolSize=" + poolSize
+                + " pcMaxConcurrency=" + poolSize
+                + " perTestTimeout=" + perTestTimeoutSec + "s"
+                + " maxRunTime=" + maxRunTimeSec + "s");
+    }
+
+    public void logConsumerUp(int attempt) {
+        loggerMaker.warnAndAddToDb("TESTRUN CONSUMER-UP summaryId=" + summaryId + " attempt=" + attempt);
+    }
+
+    public void logRestart(long idleMs, int processed, long workRemaining) {
+        loggerMaker.warnAndAddToDb("TESTRUN RESTART summaryId=" + summaryId
+                + " reason=idle_incomplete idleMs=" + idleMs + " "
+                + runStats(processed, workRemaining));
+    }
+
+    public void logEnd(StopReason reason, boolean failed, int processed) {
+        int accountedFor = passed.get() + vulnerable.get() + skipped.get()
+                + timedOut.get() + rejected.get() + errored.get();
+        loggerMaker.warnAndAddToDb("TESTRUN END summaryId=" + summaryId
+                + " reason=" + reason
+                + " durationSec=" + (Context.now() - startTime)
+                + " failed=" + failed
+                + " " + runStats(processed, -1)
+                + " accountedFor=" + accountedFor
+                + " slowest=\"" + slowestLabel + "\"");
+        logCostBreakdown();
+    }
+
+    // ----- periodic tick from the drain loop (decides internally when to emit) -----
+
+    /** Call once per drain-loop iteration. Publishes the queue gauge and emits heartbeat/stall on cadence. */
+    public void tick(int processed, long workRemaining) {
+        tick(processed, workRemaining, null);
+    }
+
+    /**
+     * @param lagSupplier cumulative, resume-safe "records still outstanding" (Kafka lag) - only
+     *                    invoked right here, at the heartbeat's own cadence, not once per tick,
+     *                    so this doesn't add an AdminClient call to the loop's ~100ms cadence.
+     *                    Null is fine (remaining/eta just report -1).
+     */
+    public void tick(int processed, long workRemaining, java.util.function.LongSupplier lagSupplier) {
+        AllMetrics.instance.setTestingKafkaQueuePending(workRemaining);
+        long nowMs = System.currentTimeMillis();
+
+        if (processed > lastProcessedSeen) {
+            lastProcessedSeen = processed;
+            lastProgressMs = nowMs;
+        }
+
+        if (nowMs - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
+            lastHeartbeatMs = nowMs;
+            long lag = -1;
+            if (lagSupplier != null) {
+                try {
+                    lag = lagSupplier.getAsLong();
+                } catch (Exception e) {
+                    // best-effort - remaining/eta just fall back to -1 below
+                }
+            }
+            logProgressHeartbeat(processed, workRemaining, lag);
+            logCostBreakdown();
+        }
+
+        // Two independent stall triggers, sharing the spam guard + dump:
+        //   1. progress frozen  -> aggregate processed hasn't moved for STALL_THRESHOLD_MS (total hang)
+        //   2. slots clogged    -> STALL_CLOGGED_FRACTION+ of the pool is tied up in tasks older than STUCK_AGE_MS (partial starvation)
+        int pool = poolSize();
+        long stuck = inflightAgeStats()[0];
+        boolean progressFrozen = !inflightTasks.isEmpty() && (nowMs - lastProgressMs) >= STALL_THRESHOLD_MS;
+        boolean slotsClogged = pool > 0 && stuck * STALL_CLOGGED_DIVISOR >= pool;
+        if ((progressFrozen || slotsClogged) && (nowMs - lastStallLogMs) >= STALL_LOG_INTERVAL_MS) {
+            lastStallLogMs = nowMs;
+            String reason = progressFrozen
+                    ? "progress_frozen_" + ((nowMs - lastProgressMs) / 1000) + "s"
+                    : "slots_clogged_" + stuck + "/" + pool;
+            logStall(reason, processed, workRemaining);
+        }
+    }
+
+    // ----- formatting (single source of truth) -----
+
+    /** Single source of truth for thread-pool saturation: active/pool + queued + completed. */
+    private String executorStats() {
+        if (executor instanceof ThreadPoolExecutor) {
+            ThreadPoolExecutor tpe = (ThreadPoolExecutor) executor;
+            return "active=" + tpe.getActiveCount() + "/" + tpe.getPoolSize()
+                    + " queued=" + tpe.getQueue().size()
+                    + " completed=" + tpe.getCompletedTaskCount();
+        }
+        return "n/a";
+    }
+
+    /** Configured max thread-pool size, or -1 if the executor isn't a ThreadPoolExecutor. */
+    private int poolSize() {
+        return (executor instanceof ThreadPoolExecutor) ? ((ThreadPoolExecutor) executor).getMaximumPoolSize() : -1;
+    }
+
+    /**
+     * Single pass over the in-flight registry: [count of slots held >= STUCK_AGE_MS, oldest age in ms].
+     * This is the live capacity-waste signal — how much of the pool is tied up in slow/hung tests right now.
+     */
+    private long[] inflightAgeStats() {
+        long now = System.currentTimeMillis();
+        long stuck = 0, oldest = 0;
+        for (InflightTask t : inflightTasks.values()) {
+            long age = now - t.startMs;
+            if (age >= STUCK_AGE_MS) stuck++;
+            if (age > oldest) oldest = age;
+        }
+        return new long[]{stuck, oldest};
+    }
+
+    /** Canonical run snapshot rendered by every TESTRUN lifecycle line (PROGRESS/STALL/RESTART/END). */
+    private String runStats(int processed, long workRemaining) {
+        int pct = expectedRecords > 0 ? (int) ((processed * 100L) / expectedRecords) : -1;
+        long[] age = inflightAgeStats();
+        return "done=" + processed + "/" + expectedRecords + (pct >= 0 ? " (" + pct + "%)" : "")
+                + " pass=" + passed.get() + " vuln=" + vulnerable.get()
+                + " skip=" + skipped.get() + " timeout=" + timedOut.get()
+                + " rejected=" + rejected.get() + " err=" + errored.get()
+                + " polled=" + polled.get()
+                + " workRemaining=" + workRemaining
+                + " inflight=" + inflightTasks.size()
+                + " stuckSlots=" + age[0]
+                + " oldestInflightMs=" + age[1]
+                + " avgTestMs=" + (durationSamples.get() > 0 ? (totalDurationMs.get() / durationSamples.get()) : -1)
+                + " maxTestMs=" + maxDurationMs.get()
+                + " avgPayloadKb=" + (payloadSamples.sum() > 0 ? String.format("%.1f", (totalPayloadBytes.sum() / (double) payloadSamples.sum()) / 1024.0) : "-1")
+                + " maxPayloadKb=" + String.format("%.1f", maxPayloadBytes.get() / 1024.0)
+                + " executor[" + executorStats() + "]";
+    }
+
+    /** WARN-level run-wide progress line: how far along the M*N matrix is, throughput, ETA and pool saturation. */
+    private void logProgressHeartbeat(int processed, long workRemaining, long lag) {
+        int elapsed = Math.max(1, Context.now() - startTime);
+        // rate's own denominator: this session's elapsed, not the run's lifetime elapsed above -
+        // processed resets to zero on every init() same as sessionStartTime does, so both sides
+        // of this division stay in sync across a resume.
+        int sessionElapsed = Math.max(1, Context.now() - sessionStartTime);
+        double rate = processed / (double) sessionElapsed;
+        // Kafka lag, not expectedRecords - processed: processed is per-session (resets on every
+        // resume) while expectedRecords is the whole topic's total, so that subtraction
+        // overstates remaining by however much prior sessions already did. Lag is already
+        // cumulative and resume-safe - it's the same number the completion check itself uses.
+        int remaining = lag >= 0 ? (int) lag : -1;
+        long eta = (remaining >= 0 && rate > 0.01) ? (long) (remaining / rate) : -1;
+
+        loggerMaker.warnAndAddToDb("TESTRUN PROGRESS summaryId=" + summaryId
+                + " elapsed=" + elapsed + "s"
+                + " rate=" + String.format("%.1f", rate) + "/s"
+                + (eta >= 0 ? " eta~" + eta + "s" : "")
+                + " " + runStats(processed, workRemaining));
+    }
+
+    /**
+     * WARN-level per-test wall-time breakdown, plus per-test CPU (the one non-wall field) so compute can
+     * be told apart from I/O wait. Stage wall times are summed across worker threads and divided by n, so
+     * these are per-test averages, not run wall-clock (tests overlap across threads).
+     */
+    private void logCostBreakdown() {
+        long n = stageCount.get(Stage.RUN_TEST).sum();
+        if (n <= 0) return; // nothing measured yet
+
+        long lookup   = stageNanos.get(Stage.LOOKUP).sum();
+        long runTest  = stageNanos.get(Stage.RUN_TEST).sum();
+        long sendReq  = stageNanos.get(Stage.SEND_REQUEST).sum();
+        long insertRt = stageNanos.get(Stage.INSERT_RESULTS).sum();
+        long filter   = stageNanos.get(Stage.FILTER).sum();
+        long wordlist = stageNanos.get(Stage.WORDLIST).sum();
+        long validate = stageNanos.get(Stage.VALIDATE).sum();
+        long runCpu   = runTestCpuNanos.sum();
+        // RUN_TEST minus everything now explicitly named = whatever's left unaccounted for.
+        long other    = Math.max(0, runTest - sendReq - filter - wordlist - validate);
+        long billed   = lookup + runTest + insertRt;
+
+        long avgWallMs = ms(runTest + lookup + insertRt) / n;
+        loggerMaker.warnAndAddToDb("TESTRUN COST summaryId=" + summaryId
+                + " n=" + n
+                + " avgPerTestMs=" + avgWallMs
+                + " cpuPerTestMs=" + msPer(runCpu, n)
+                + " | RUN_TEST=" + msPer(runTest, n) + "ms (" + pctOf(runTest, billed) + " of billed)"
+                + " [SEND_REQUEST=" + msPer(sendReq, n) + "ms/" + pctOf(sendReq, runTest)
+                + " | FILTER=" + msPer(filter, n) + "ms/" + pctOf(filter, runTest)
+                + " | WORDLIST=" + msPer(wordlist, n) + "ms/" + pctOf(wordlist, runTest)
+                + " | VALIDATE=" + msPer(validate, n) + "ms/" + pctOf(validate, runTest)
+                + " | OTHER=" + msPer(other, n) + "ms/" + pctOf(other, runTest) + "]"
+                + " LOOKUP=" + msPer(lookup, n) + "ms"
+                + " INSERT_RESULTS=" + msPer(insertRt, n) + "ms/" + pctOf(insertRt, billed) + " of billed");
+    }
+
+    private static long ms(long nanos) { return nanos / 1_000_000L; }
+    private static long msPer(long nanos, long n) { return n > 0 ? (nanos / n) / 1_000_000L : 0; }
+    private static String pctOf(long part, long whole) {
+        return whole > 0 ? (part * 100L / whole) + "%" : "0%";
+    }
+
+    /** WARN-level dump of the oldest in-flight tasks, fired when the run stalls or the pool clogs. */
+    private void logStall(String reason, int processed, long workRemaining) {
+        List<InflightTask> tasks = new ArrayList<>(inflightTasks.values());
+        tasks.sort((a, b) -> Long.compare(a.startMs, b.startMs)); // oldest first
+        long nowMs = System.currentTimeMillis();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("TESTRUN STALL summaryId=").append(summaryId)
+                .append(" reason=").append(reason).append(" ")
+                .append(runStats(processed, workRemaining))
+                .append(" oldestTasks=[");
+
+        int limit = Math.min(STALL_DUMP_LIMIT, tasks.size());
+        for (int i = 0; i < limit; i++) {
+            InflightTask t = tasks.get(i);
+            // worker=<name> is the one to jstack - it's the thread actually doing the work.
+            // caller=<name> is the pc-pool thread that submitted it - always just future.get(), not
+            // useful to jstack, kept only for cross-checking against the "picked up record" log line.
+            String worker = t.workerThreadName != null ? t.workerThreadName : "not-started-yet";
+            sb.append("{age=").append((nowMs - t.startMs) / 1000).append("s ")
+                    .append(t.label).append(" worker=").append(worker)
+                    .append(" caller=").append(t.callerThreadName).append("}");
+            if (i < limit - 1) sb.append(", ");
+        }
+        sb.append("]");
+        if (tasks.size() > limit) sb.append(" (+").append(tasks.size() - limit).append(" more)");
+
+        loggerMaker.warnAndAddToDb(sb.toString());
+    }
+}

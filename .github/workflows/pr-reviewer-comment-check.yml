@@ -1,0 +1,53 @@
+name: PR reviewer comment check
+
+on:
+  # Deliberately no `pull_request:` trigger. That would run (and fail) the instant a PR
+  # opens, before any review exists - and since that trigger type never refires on its own,
+  # the resulting failed check-run can never be superseded by itself, only worked around by
+  # manually re-running it (see #6579, #6609). Evaluating only on review activity means the
+  # check simply doesn't exist until a review happens - GitHub shows that as "waiting on
+  # status", not a stuck failure - and the native required-approving-review rule already
+  # forces a review to happen before merge regardless.
+  pull_request_review:
+    types: [ submitted, edited, dismissed ]
+  pull_request_review_comment:
+    types: [ created, edited ]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  reviewer-comment-check:
+    # pull_request_review / pull_request_review_comment payloads don't carry base.ref,
+    # so filter by target branch explicitly instead of the `branches:` trigger filter.
+    if: github.event.pull_request.base.ref == 'feature/mini-runtime-release'
+    runs-on: ubuntu-latest
+    # No checkout, no build - reads straight from the GitHub API, runs in a few seconds.
+    steps:
+      - name: Require at least one real reviewer comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+
+          reviews_json=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate)
+          comments_json=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/comments" --paginate)
+
+          COUNT=$(echo "$reviews_json" "$comments_json" | jq -s \
+            --arg author "$PR_AUTHOR" '
+            (.[0] // []) as $reviews
+            | (.[1] // []) as $comments
+            | ([$reviews[] | select(.user.login != $author and (.user.type // "") != "Bot" and ((.body // "") | gsub("\\s"; "") | length) > 0)]
+               + [$comments[] | select(.user.login != $author and (.user.type // "") != "Bot" and ((.body // "") | gsub("\\s"; "") | length) > 0)])
+            | length
+          ')
+
+          echo "Real reviewer comments (excluding author/bots, non-empty): $COUNT"
+
+          if [ "$COUNT" -lt 1 ]; then
+            echo "::error::No reviewer has left an actual comment on this PR yet. An approval/request-changes with no comment text does not count."
+            exit 1
+          fi

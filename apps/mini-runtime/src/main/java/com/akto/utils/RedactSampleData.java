@@ -50,6 +50,20 @@ public class RedactSampleData {
 
     private static final String HOST = "host";
 
+    /*
+     * Headers kept in the clear under full redaction because they carry SERVICE IDENTITY, not user
+     * data. Without them an on-prem deployment that redacts everything has no way to attribute a
+     * call to its caller: pod labels are absent for traffic that entered through a gateway or from
+     * outside the mesh, and these headers are the only remaining signal.
+     *
+     * Deliberately names only. IPs, fingerprints, certs, auth and user-agent stay redacted - they
+     * are the data redaction exists to protect, and none of them identify a service.
+     */
+    private static final Set<String> SERVICE_IDENTITY_HEADERS = new HashSet<>(Arrays.asList(
+            "apc-source-service-name",
+            "source_service_name",
+            "destination_service_name"));
+
     public static String redactCookie(Map<String, List<String>> headers, String header) {
         String cookie = "";
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
@@ -98,6 +112,9 @@ public class RedactSampleData {
         if(redactAll){
             for (String header : responseHeaders.keySet()) {
                 if(header.equals(HOST)){
+                    continue;
+                }
+                if (SERVICE_IDENTITY_HEADERS.contains(header.toLowerCase())) {
                     continue;
                 }
                 if (header.equalsIgnoreCase(AuthPolicy.COOKIE_NAME)) {
@@ -397,7 +414,59 @@ public class RedactSampleData {
         m.put("direction", httpResponseParams.getDirection());
         m.put("is_pending", httpResponseParams.getIsPending() + "");
         m.put("source", httpResponseParams.getSource());
+        enrichWebSocketFieldsFromOrig(m, httpResponseParams);
         return m;
+    }
+
+    private static void enrichWebSocketFieldsFromOrig(Map<String, Object> m, HttpResponseParams httpResponseParams) {
+        if (!"WEBSOCKET".equalsIgnoreCase(String.valueOf(m.get("type")))) {
+            return;
+        }
+
+        String orig = httpResponseParams.getOrig();
+        if (orig == null || orig.isEmpty()) {
+            return;
+        }
+
+        try {
+            JSONObject jsonObject = JSON.parseObject(orig);
+            if (jsonObject.containsKey("events")) {
+                m.put("events", jsonObject.get("events"));
+            }
+
+            if (isBlankHeaderValue(m.get("requestHeaders"))) {
+                if (jsonObject.containsKey("requestHeaders") && !isBlankHeaderValue(jsonObject.get("requestHeaders"))) {
+                    m.put("requestHeaders", jsonObject.get("requestHeaders"));
+                } else if (jsonObject.containsKey("headers")) {
+                    m.put("requestHeaders", jsonObject.get("headers"));
+                }
+            }
+
+            if (isBlankPayloadValue(m.get("responsePayload")) && jsonObject.containsKey("responsePayload")) {
+                Object responsePayload = jsonObject.get("responsePayload");
+                if (!isBlankPayloadValue(responsePayload)) {
+                    m.put("responsePayload", responsePayload);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "unable to enrich WebSocket sample from orig");
+        }
+    }
+
+    private static boolean isBlankHeaderValue(Object value) {
+        if (value == null) {
+            return true;
+        }
+        String str = value.toString().trim();
+        return str.isEmpty() || "{}".equals(str);
+    }
+
+    private static boolean isBlankPayloadValue(Object value) {
+        if (value == null) {
+            return true;
+        }
+        String str = value.toString().trim();
+        return str.isEmpty() || "{}".equals(str);
     }
 
     public static String convertHttpRespToOriginalString(HttpResponseParams httpResponseParams) throws JsonProcessingException {

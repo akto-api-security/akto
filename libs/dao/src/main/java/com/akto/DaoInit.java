@@ -332,7 +332,8 @@ public class DaoInit {
                 new EnumCodec<>(FileUploadLog.UploadLogStatus.class),
                 new EnumCodec<>(TestCollectionProperty.Id.class),
                 new EnumCodec<>(CustomAuthType.TypeOfToken.class),
-                new EnumCodec<>(TLSAuthParam.CertificateType.class)
+                new EnumCodec<>(TLSAuthParam.CertificateType.class),
+                new EnumCodec<>(Log.ActivityType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -367,6 +368,7 @@ public class DaoInit {
         UsageMetricsDao.createIndexIfAbsent();
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         TrafficMetricsDao.instance.createIndicesIfAbsent();
+        SensitiveDataCountDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
         UsersDao.instance.createIndicesIfAbsent();
         AccountsDao.instance.createIndexIfAbsent();
