@@ -76,7 +76,7 @@ public class AtlasDeviceStatsService {
                 unapprovedDevices.size(), distinctTeams(bundle, unapprovedEmployees).size());
     }
 
-    private Map<String, String> loadServerRemarks() {
+    public Map<String, String> loadServerRemarks() {
         Bson filter = Filters.and(
                 Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
                 Filters.in(McpAuditInfo.REMARKS, Arrays.asList(McpAuditInfo.REMARKS_APPROVED, McpAuditInfo.REMARKS_REJECTED)),
@@ -101,7 +101,7 @@ public class AtlasDeviceStatsService {
                 Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
     }
 
-    private static boolean isSanctioned(ApiCollection c, Set<String> allowlistNamesLower, Map<String, String> remarksByServiceName) {
+    public static boolean isSanctioned(ApiCollection c, Set<String> allowlistNamesLower, Map<String, String> remarksByServiceName) {
         GovernanceBucket bucket = InsightUtil.governanceBucket(c, allowlistNamesLower, remarksByServiceName);
         if (bucket == GovernanceBucket.SANCTIONED) return true;
         if (bucket != GovernanceBucket.LOCAL) return false;
@@ -111,13 +111,16 @@ public class AtlasDeviceStatsService {
                 || (serviceName != null && McpAuditInfo.REMARKS_APPROVED.equals(remarksByServiceName.get(serviceName.toLowerCase(Locale.ROOT))));
     }
 
+    public static boolean isRealUsername(String username) {
+        return username != null && !username.trim().isEmpty()
+                && !UNKNOWN_USERNAME_PLACEHOLDER.equalsIgnoreCase(username.trim());
+    }
+
     private static Set<String> distinctUsernames(Map<String, String> deviceUsernames, Set<String> devices) {
         Set<String> usernames = new HashSet<>();
         for (String device : devices) {
             String username = deviceUsernames.get(device);
-            if (username == null || username.trim().isEmpty()) continue;
-            if (UNKNOWN_USERNAME_PLACEHOLDER.equalsIgnoreCase(username.trim())) continue;
-            usernames.add(username);
+            if (isRealUsername(username)) usernames.add(username);
         }
         return usernames;
     }
@@ -158,7 +161,7 @@ public class AtlasDeviceStatsService {
         return monitorOnly;
     }
 
-    private static boolean seenInWindow(Integer lastSeen, int startTs, int endTs) {
+    public static boolean seenInWindow(Integer lastSeen, int startTs, int endTs) {
         if (lastSeen == null) return false;
         if (startTs > 0 && lastSeen < startTs) return false;
         return endTs <= 0 || lastSeen <= endTs;

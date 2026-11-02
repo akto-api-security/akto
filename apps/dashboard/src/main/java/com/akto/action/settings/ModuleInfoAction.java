@@ -5,7 +5,9 @@ import com.akto.action.AgenticObserveAction;
 import com.akto.action.UserAction;
 import com.akto.dao.AgentUsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.InstalledAppVulnerability;
@@ -15,6 +17,7 @@ import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.atlas.AtlasDeviceStatsService;
+import com.akto.service.atlas.AtlasPeopleService;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
@@ -99,6 +102,20 @@ public class ModuleInfoAction extends UserAction {
     private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
     private final InsightService insightService = new InsightService();
     private final AtlasDeviceStatsService atlasDeviceStatsService = new AtlasDeviceStatsService();
+    private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
+    @Setter private String atlasQuery;
+    @Setter private List<String> atlasOs;
+    @Setter private List<String> toolCategories;
+    @Setter private List<String> healthStates;
+    @Setter private boolean hasUnapproved;
+    @Setter private boolean usesPersonal;
+    @Setter private boolean agentIssues;
+    @Setter private boolean monitorMode;
+    @Setter private int riskMin;
+    @Setter private int riskMax = 100;
+    @Getter private Map<String, Object> atlasOverview;
+    @Getter private List<Map<String, Object>> atlasRows;
+    @Getter private long atlasTotal;
 
     @Override
     public String execute() {
@@ -109,6 +126,7 @@ public class ModuleInfoAction extends UserAction {
     private static final String AD_USERNAME = ModuleInfo.ADDITIONAL_DATA + ".username";
     private static final String AD_OS = ModuleInfo.ADDITIONAL_DATA + ".os";
     private static final String AD_BROWSER_NAME = ModuleInfo.ADDITIONAL_DATA + ".browserName";
+    private static final String AD_PLATFORM = ModuleInfo.ADDITIONAL_DATA + ".platform";
     private static final String AD_PROVIDER = ModuleInfo.ADDITIONAL_DATA + ".provider";
     private static final String AD_CURRENT_STATUS = ModuleInfo.ADDITIONAL_DATA + ".currentStatus";
     // "Last deployed" = start of the latest deployment attempt (installStartedTs, written by
@@ -348,8 +366,133 @@ public class ModuleInfoAction extends UserAction {
 
     private InsightContext buildInsightContext() {
         Integer userId = Context.userId.get();
+        int windowEnd = Context.now() / 300 * 300;
         return new InsightContext(Context.accountId.get(), userId == null ? 0 : userId,
-                Context.contextSource.get(), startTimestamp, endTimestamp);
+                Context.contextSource.get(), windowEnd - AtlasPeopleService.VIOLATION_WINDOW_SECONDS, windowEnd);
+    }
+
+    private List<Document> loadEndpointShieldDeviceRows(int now) {
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope))),
+                Aggregates.project(Projections.include(
+                        ModuleInfo.NAME,
+                        ModuleInfo.STARTED_TS,
+                        ModuleInfo.LAST_HEARTBEAT_RECEIVED,
+                        ModuleInfo.CURRENT_VERSION,
+                        AD_INSTALL_STARTED_TS,
+                        AD_INSTALL_OUTCOME,
+                        AD_USERNAME,
+                        AD_OS,
+                        AD_PLATFORM,
+                        AD_BROWSER_NAME,
+                        ModuleInfo.ADDITIONAL_DATA + ".installStatus")),
+                Aggregates.addFields(new Field<>(DEDUP_TS_FIELD, endpointShieldLastDeployedExpr())),
+                Aggregates.sort(Sorts.orderBy(
+                        Sorts.descending(DEDUP_TS_FIELD),
+                        Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED))),
+                Aggregates.group("$" + ModuleInfo.NAME,
+                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
+                        Accumulators.first("moduleId", "$" + ModuleInfoDao.ID),
+                        Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
+                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA)),
+                Aggregates.addFields(new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(now))),
+                Aggregates.project(Projections.fields(
+                        Projections.include(ModuleInfo.LAST_HEARTBEAT_RECEIVED, "moduleId", ModuleInfo.CURRENT_VERSION),
+                        Projections.computed("status", "$" + AD_CURRENT_STATUS),
+                        Projections.computed("username", "$" + AD_USERNAME),
+                        Projections.computed("os", "$" + AD_OS),
+                        Projections.computed("platform", "$" + AD_PLATFORM),
+                        Projections.computed("browserName", "$" + AD_BROWSER_NAME)))
+        );
+        List<Document> rows = new ArrayList<>();
+        try (MongoCursor<Document> cursor = ModuleInfoDao.instance.getMCollection()
+                .aggregate(pipeline, Document.class).allowDiskUse(true).cursor()) {
+            while (cursor.hasNext()) rows.add(cursor.next());
+        }
+        return rows;
+    }
+
+    private Map<String, String> loadLatestVersionByOs() {
+        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        return AtlasPeopleService.latestVersionByOs(settings == null ? null : settings.getEndpointShieldSettings());
+    }
+
+    private AtlasPeopleService.Snapshot loadAtlasSnapshot() {
+        int now = Context.now();
+        InsightContext ctx = buildInsightContext();
+        String cacheKey = ctx.bundleCacheKey() + "_" + deviceScope + "_" + startTimestamp + "_" + endTimestamp;
+        return atlasPeopleService.getOrBuild(cacheKey, () -> {
+            List<Document> rows = loadEndpointShieldDeviceRows(now);
+            InsightDataBundle bundle = null;
+            try {
+                bundle = insightService.getOrLoadBundle(ctx);
+            } catch (Exception e) {
+                statsLogger.error("atlas snapshot insights bundle failed: " + e.getMessage());
+            }
+            return atlasPeopleService.build(rows, bundle, atlasDeviceStatsService, loadLatestVersionByOs(), now, startTimestamp, endTimestamp);
+        });
+    }
+
+    private AtlasPeopleService.PeopleQuery buildPeopleQuery() {
+        AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
+        query.text = atlasQuery;
+        query.osList = atlasOs;
+        query.categories = toolCategories;
+        query.healthStates = healthStates;
+        query.hasUnapproved = hasUnapproved;
+        query.usesPersonal = usesPersonal;
+        query.agentIssues = agentIssues;
+        query.monitorMode = monitorMode;
+        query.riskMin = riskMin;
+        query.riskMax = riskMax;
+        query.sortKey = sortKey;
+        query.sortOrder = sortOrder == 0 ? -1 : sortOrder;
+        query.skip = skip;
+        query.limit = limit <= 0 ? 50 : limit;
+        return query;
+    }
+
+    public String fetchAtlasOverview() {
+        atlasOverview = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            atlasOverview = atlasPeopleService.overview(loadAtlasSnapshot());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasOverview failed: " + e.getMessage());
+            addActionError("Unable to load the Atlas overview");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchAtlasEmployees() {
+        atlasRows = new ArrayList<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            long[] total = new long[1];
+            atlasRows = atlasPeopleService.pageEmployees(loadAtlasSnapshot(), buildPeopleQuery(), total);
+            atlasTotal = total[0];
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasEmployees failed: " + e.getMessage());
+            addActionError("Unable to load employees");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchAtlasDevices() {
+        atlasRows = new ArrayList<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            long[] total = new long[1];
+            atlasRows = atlasPeopleService.pageDevices(loadAtlasSnapshot(), buildPeopleQuery(), total);
+            atlasTotal = total[0];
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasDevices failed: " + e.getMessage());
+            addActionError("Unable to load devices");
+            return ERROR.toUpperCase();
+        }
     }
 
     public String fetchEndpointShieldStats() {
@@ -370,44 +513,16 @@ public class ModuleInfoAction extends UserAction {
         Map<String, String> scopeDeviceUsernames = new HashMap<>();
 
         try {
-            List<Bson> pipeline = Arrays.asList(
-                    Aggregates.match(Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope))),
-                    Aggregates.project(Projections.include(
-                            ModuleInfo.NAME,
-                            ModuleInfo.STARTED_TS,
-                            ModuleInfo.LAST_HEARTBEAT_RECEIVED,
-                            AD_INSTALL_STARTED_TS,
-                            AD_INSTALL_OUTCOME,
-                            AD_USERNAME,
-                            ModuleInfo.ADDITIONAL_DATA + ".installStatus")),
-                    Aggregates.addFields(new Field<>(DEDUP_TS_FIELD, endpointShieldLastDeployedExpr())),
-                    Aggregates.sort(Sorts.orderBy(
-                            Sorts.descending(DEDUP_TS_FIELD),
-                            Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED))),
-                    Aggregates.group("$" + ModuleInfo.NAME,
-                            Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
-                            Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA)),
-                    Aggregates.addFields(new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(now))),
-                    Aggregates.project(Projections.fields(
-                            Projections.include(ModuleInfo.LAST_HEARTBEAT_RECEIVED),
-                            Projections.computed("status", "$" + AD_CURRENT_STATUS),
-                            Projections.computed("username", "$" + AD_USERNAME)))
-            );
-
             long managedDevices = 0;
             long agentActive = 0;
             long offlineSevenDays = 0;
-            try (MongoCursor<Document> cursor = ModuleInfoDao.instance.getMCollection()
-                    .aggregate(pipeline, Document.class).allowDiskUse(true).cursor()) {
-                while (cursor.hasNext()) {
-                    Document device = cursor.next();
-                    managedDevices++;
-                    if (STATUS_ACTIVE.equals(device.getString("status"))) agentActive++;
-                    Number heartbeat = (Number) device.get(ModuleInfo.LAST_HEARTBEAT_RECEIVED);
-                    if (heartbeat != null && heartbeat.intValue() > 0 && heartbeat.intValue() < offlineCutoff) offlineSevenDays++;
-                    String username = device.getString("username");
-                    scopeDeviceUsernames.put(String.valueOf(device.get("_id")), username == null ? "" : username);
-                }
+            for (Document device : loadEndpointShieldDeviceRows(now)) {
+                managedDevices++;
+                if (STATUS_ACTIVE.equals(device.getString("status"))) agentActive++;
+                Number heartbeat = (Number) device.get(ModuleInfo.LAST_HEARTBEAT_RECEIVED);
+                if (heartbeat != null && heartbeat.intValue() > 0 && heartbeat.intValue() < offlineCutoff) offlineSevenDays++;
+                String username = device.getString("username");
+                scopeDeviceUsernames.put(String.valueOf(device.get("_id")), username == null ? "" : username);
             }
             deviceStats.put("managedDevices", managedDevices);
             deviceStats.put("agentActive", agentActive);

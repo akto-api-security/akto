@@ -1,6 +1,18 @@
+const ALL_CATEGORIES = ["agents", "ide", "mcp", "browser"];
+
+const STAT_CARD_TARGETS = {
+    managedDevices: { tab: "devices", filters: {} },
+    agentActive: { tab: "devices", filters: {} },
+    devicesWithAiTools: { tab: "devices", filters: { categories: ALL_CATEGORIES } },
+    employeesUsingAi: { tab: "employees", filters: {} },
+    devicesWithUnapprovedTools: { tab: "devices", filters: { hasUnapproved: true } },
+    monitorOnlyDevices: { tab: "devices", filters: { monitorMode: true } },
+};
+
 const formatCount = (count) => count.toLocaleString("en-US");
 
 const transform = {
+    statCardTarget: (id) => STAT_CARD_TARGETS[id],
     buildStatCards: (deviceStats) => {
         if (!deviceStats) return null;
         const {

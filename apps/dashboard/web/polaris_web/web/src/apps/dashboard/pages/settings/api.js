@@ -912,6 +912,27 @@ const settingRequests = {
             data: { deviceScope, startTimestamp, endTimestamp }
         })
     },
+    async fetchAtlasOverview({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasOverview',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasEmployees(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasEmployees',
+            method: 'post',
+            data: params
+        })
+    },
+    async fetchAtlasDevices(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasDevices',
+            method: 'post',
+            data: params
+        })
+    },
     async fetchEndpointShieldFilterOptions() {
         return await request({
             url: '/api/fetchEndpointShieldFilterOptions',
