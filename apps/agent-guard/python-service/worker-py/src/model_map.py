@@ -145,6 +145,10 @@ class ModelMapScanner:
         if eager:
             logger.info(f"[ModelMap] parallelExecution=true → {_ROLE_ARBITER} fired alongside tiers")
 
+        if not tier1 and not tier2:
+            # An arbiter-only cascade, e.g. the Qwen tier stripped for a Gemma-only scan: nothing to wait on. (The
+            # "both empty" error in _cascade is for configured tiers that produced no result.)
+            return self._shape_result(await self._run_arbiters(arbiters, arb))
         winner = await self._cascade(t1, t2, arbiters, arb)
         return self._shape_result(winner)
 

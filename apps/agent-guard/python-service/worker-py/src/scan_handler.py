@@ -140,7 +140,12 @@ async def scan_payload(
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
         if scanner_name in SINGLE_MODEL_SCANNERS:
             config = {**config, "modelConfigs": single_model_config()}
-        elif scanner_name in GEMMA_ONLY_SCANNERS:
+        elif scanner_name in GEMMA_ONLY_SCANNERS or (
+            # Atlas PromptInjection goes straight to the arbiter, which judges it with the Atlas prompt. Qwen3Guard
+            # applies its own safety policy, calls most agent and tool-call attacks safe, and its confident "safe"
+            # would allow them before the arbiter ever saw them.
+            scanner_name == "PromptInjection" and str(config.get("contextSource", "")).strip().upper() == "ENDPOINT"
+        ):
             config = {**config, "modelConfigs": strip_qwen_tier(config.get("modelConfigs"))}
         config = {**config, "modelConfigs": apply_scanner_response_format(config.get("modelConfigs"))}
         store_fn = None
