@@ -18,6 +18,7 @@ import CreateNewCollectionModal from "./CreateNewCollectionModal"
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
+import { CollectionTagsHeading } from "./component/CollectionTagsList"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
@@ -177,7 +178,7 @@ const headers = [
     },
     {
         text: 'Collection tags',
-        title: 'Collection tags',
+        title: <CollectionTagsHeading title="Collection tags" />,
         value: 'envTypeComp',
         filterKey: "envType",
         showFilter: true,
@@ -1171,7 +1172,7 @@ function ApiCollections(props) {
             data[key].length > 0 && data[key].forEach((c) => {
                 const list = dataMap[c?.id]?.map(func.formatCollectionType);
                 c['envType'] = list
-                c['envTypeComp'] = transform.getCollectionTypeList(list, 1, false)
+                c['envTypeComp'] = transform.getCollectionTypeList(list, 1, false, true)
             })
         })
         setData(copyObj)
