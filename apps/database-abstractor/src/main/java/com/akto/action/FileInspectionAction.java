@@ -46,6 +46,9 @@ public class FileInspectionAction extends ActionSupport {
     @Setter private boolean existenceOnly;
     @Setter private int maxDepth;
     @Setter private String addedBy;
+    @Setter private String agent;
+    @Setter private String os;
+    @Setter private String role;
 
     @Setter private long sinceExecutedAt;
     @Setter private int limit;
@@ -136,6 +139,9 @@ public class FileInspectionAction extends ActionSupport {
             if (existing != null) {
                 existing.setExistenceOnly(existenceOnly);
                 existing.setMaxDepth(maxDepth);
+                if (StringUtils.isNotBlank(agent)) existing.setAgent(agent.trim());
+                if (StringUtils.isNotBlank(os)) existing.setOs(os.trim());
+                if (StringUtils.isNotBlank(role)) existing.setRole(role.trim());
                 existing.setUpdatedTs(now);
                 FileInspectionRuleDao.getInstance().replaceOne(filter, existing);
                 this.rule = existing;
@@ -147,6 +153,9 @@ public class FileInspectionAction extends ActionSupport {
                 r.setExistenceOnly(existenceOnly);
                 r.setMaxDepth(maxDepth);
                 r.setAddedBy(StringUtils.isBlank(addedBy) ? "system" : addedBy);
+                r.setAgent(StringUtils.trimToNull(agent));
+                r.setOs(StringUtils.trimToNull(os));
+                r.setRole(StringUtils.trimToNull(role));
                 r.setCreatedTs(now);
                 r.setUpdatedTs(now);
                 FileInspectionRuleDao.getInstance().insertOne(r);

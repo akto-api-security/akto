@@ -26,6 +26,9 @@ public class FileInspectionRule {
     public static final String ADDED_BY = "addedBy";
     public static final String CREATED_TS = "createdTs";
     public static final String UPDATED_TS = "updatedTs";
+    public static final String AGENT = "agent";
+    public static final String OS = "os";
+    public static final String ROLE = "role";
 
     @BsonId
     private ObjectId id;
@@ -39,4 +42,7 @@ public class FileInspectionRule {
     private String addedBy;
     private int createdTs;
     private int updatedTs;
+    private String agent; // e.g. "Claude Code"; null = custom rule
+    private String os;    // darwin | linux | windows; null = all OS
+    private String role;  // login | credentials | mcp_config
 }
