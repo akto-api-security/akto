@@ -5,6 +5,7 @@ import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 import guardrailApi from "../../api";
 import { CUSTOM_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
+import { PREDEFINED_CUSTOM_PROMPTS } from "../predefinedCustomPrompts";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -50,8 +51,14 @@ export const CustomGuardrailsConfig = {
         };
     },
 
-    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url, enableLlmRedaction, redactionRules }) => {
+    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url, enableLlmRedaction, redactionRules, selectedTemplateIds }) => {
         const summaries = [];
+        const selected = PREDEFINED_CUSTOM_PROMPTS.filter((t) => (selectedTemplateIds || []).includes(t.id));
+        if (selected.length === 1) {
+            summaries.push(selected[0].label);
+        } else if (selected.length > 1) {
+            summaries.push(`${selected.length} templates selected`);
+        }
         if (enableLlmPrompt && llmPrompt) {
             summaries.push(`LLM: ${llmPrompt.substring(0, 20)}${llmPrompt.length > 20 ? '...' : ''}`);
         }
@@ -78,6 +85,8 @@ const CustomGuardrailsStep = ({
     setEnableLlmPrompt,
     llmRule,
     setLlmRule,
+    selectedTemplateIds = [],
+    onToggleTemplate,
     // LLM rule compliance (controlled by parent)
     llmCompliance,
     setLlmCompliance,
@@ -294,6 +303,20 @@ const CustomGuardrailsStep = ({
                     {enableLlmPrompt && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <FormLayout>
+                                <VerticalStack gap="2">
+                                    <Text variant="bodyMd" fontWeight="medium">Predefined prompts</Text>
+                                    <Text variant="bodySm" tone="subdued">
+                                        Select templates to add to the detection instruction. You can edit the full text below.
+                                    </Text>
+                                    {PREDEFINED_CUSTOM_PROMPTS.map((template) => (
+                                        <Checkbox
+                                            key={template.id}
+                                            label={template.label}
+                                            checked={(selectedTemplateIds || []).includes(template.id)}
+                                            onChange={() => onToggleTemplate?.(template.id)}
+                                        />
+                                    ))}
+                                </VerticalStack>
                                 <TextField
                                     label="Detection instruction"
                                     value={llmRule}

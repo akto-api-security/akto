@@ -25,8 +25,6 @@ import {
     SensitiveInfoConfig,
     CodeDetectionStep,
     CodeDetectionConfig,
-    PredefinedCustomPromptsStep,
-    PredefinedCustomPromptsConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
     UsageGuardrailsStep,
@@ -252,12 +250,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: CodeDetectionConfig.title,
                 summary: CodeDetectionConfig.getSummary(storedStateData),
                 ...CodeDetectionConfig.validate(storedStateData)
-            },
-            {
-                number: PredefinedCustomPromptsConfig.number,
-                title: PredefinedCustomPromptsConfig.title,
-                summary: PredefinedCustomPromptsConfig.getSummary(storedStateData),
-                ...PredefinedCustomPromptsConfig.validate(storedStateData)
             },
             {
                 number: CustomGuardrailsConfig.number,
@@ -928,13 +920,6 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setBanCodeConfidenceScore={setBanCodeConfidenceScore}
                     />
                 );
-            case 14:
-                return (
-                    <PredefinedCustomPromptsStep
-                        selectedTemplateIds={selectedTemplateIds}
-                        onToggleTemplate={togglePredefinedTemplate}
-                    />
-                );
             case 6:
                 return (
                     <CustomGuardrailsStep
@@ -942,6 +927,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
                         setLlmRule={setLlmPrompt}
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
                         enableExternalModel={enableExternalModel}

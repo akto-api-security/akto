@@ -4,7 +4,6 @@ export { default as ContentPolicyStep, ContentPolicyConfig } from './ContentPoli
 export { default as LanguageSafetyStep, LanguageSafetyConfig } from './LanguageSafetyStep';
 export { default as SensitiveInfoStep, SensitiveInfoConfig } from './SensitiveInfoStep';
 export { default as CodeDetectionStep, CodeDetectionConfig } from './CodeDetectionStep';
-export { default as PredefinedCustomPromptsStep, PredefinedCustomPromptsConfig } from './PredefinedCustomPromptsStep';
 export { default as CustomGuardrailsStep, CustomGuardrailsConfig } from './CustomGuardrailsStep';
 export { default as UsageGuardrailsStep, UsageGuardrailsConfig } from './UsageGuardrailsStep';
 export { default as AnomalyDetectionStep, AnomalyDetectionConfig } from './AnomalyDetectionStep';

@@ -48,8 +48,6 @@ import {
     SensitiveInfoConfig,
     CodeDetectionStep,
     CodeDetectionConfig,
-    PredefinedCustomPromptsStep,
-    PredefinedCustomPromptsConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
     UsageGuardrailsStep,
@@ -443,12 +441,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: CodeDetectionConfig.title,
                 summary: CodeDetectionConfig.getSummary(storedStateData),
                 ...CodeDetectionConfig.validate(storedStateData)
-            },
-            {
-                number: PredefinedCustomPromptsConfig.number,
-                title: PredefinedCustomPromptsConfig.title,
-                summary: PredefinedCustomPromptsConfig.getSummary(storedStateData),
-                ...PredefinedCustomPromptsConfig.validate(storedStateData)
             },
             {
                 number: CustomGuardrailsConfig.number,
@@ -1182,13 +1174,6 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableBanCode={setEnableBanCode}
                     />
                 );
-            case 14:
-                return (
-                    <PredefinedCustomPromptsStep
-                        selectedTemplateIds={selectedTemplateIds}
-                        onToggleTemplate={togglePredefinedTemplate}
-                    />
-                );
             case 6:
                 return (
                     <CustomGuardrailsStep
@@ -1197,6 +1182,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
                         setLlmRule={setLlmPrompt}
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
                         enableLlmRedaction={enableLlmRedaction}

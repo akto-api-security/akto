@@ -145,8 +145,15 @@ const typeLabel = (typeOptions, type) => (typeOptions.find(o => o.value === type
     .replace(/\s*\(Beta\)/i, '')
     .trim();
 
+// Exact custom Scope values only — wildcards are rejected (no matcher support).
+const validateScopeCustomCreate = (trimmed) => {
+    if (!trimmed || trimmed === ALL_VALUES_SENTINEL) return 'Enter a value';
+    if (trimmed.includes('*')) return 'Wildcards are not supported';
+    return null;
+};
+
 // orTypes (e.g. USER) match as an alternative to the other rows, so they're shown last and labelled "Or".
-export const ConditionRows = ({ conditions, typeOptions, dispatch, operator = 'OR', showError = false, getNegationProps = null, getOptionsForType, orTypes = [] }) => {
+export const ConditionRows = ({ conditions, typeOptions, dispatch, operator = 'OR', showError = false, getNegationProps = null, getOptionsForType, orTypes = [], allowCustomValues = false }) => {
     const isOrType = (condition) => orTypes.includes(condition.type);
     // Display order only; `index` stays the condition's position for dispatch.
     const displayed = conditions.map((condition, index) => ({ condition, index }))
@@ -235,7 +242,9 @@ export const ConditionRows = ({ conditions, typeOptions, dispatch, operator = 'O
                                     allowMultiple={true}
                                     negated={negated}
                                     onToggleNegated={negationProps?.onToggle}
-                                    disabled={getOptionsForType(condition.type).length === 0}
+                                    disabled={!allowCustomValues && getOptionsForType(condition.type).length === 0}
+                                    allowCreateCustom={allowCustomValues}
+                                    validateCreate={allowCustomValues ? validateScopeCustomCreate : undefined}
                                     value={negated
                                         ? ((condition.values || []).length > 0 ? `All except ${condition.values.length}` : 'All selected')
                                         : ((condition.values || []).length === 1 && condition.values[0] === ALL_VALUES_SENTINEL ? 'All selected'
