@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Box, Button, HorizontalStack, Icon, Tabs, Tag, Text, TextField, VerticalStack } from "@shopify/polaris";
-import { SearchMinor } from "@shopify/polaris-icons";
+import { Box, Button, HorizontalStack, Tabs, Tag, Text } from "@shopify/polaris";
 import func from "@/util/func";
 import AgGridTable from "../../../../components/tables/AgGridTable";
 import Pressable from "../../../dashboard/ask/components/Pressable";
@@ -10,8 +9,9 @@ import {
     LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, RISK_MAX,
+    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, PEOPLE_TABLE_HEIGHT, RISK_MAX, SEARCH_HINTS,
 } from "./peopleConstants";
+import transform from "./transform";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: false, filter: false, suppressHeaderMenuButton: true, cellStyle: { display: "flex", alignItems: "center" } };
 const ROW_HEIGHT = 48;
@@ -23,7 +23,7 @@ const EMPLOYEE_COLUMNS = [
     { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
     { field: "personalAccounts", headerName: "Personal accounts", width: 150, cellRenderer: CountCellRenderer },
     { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
-    { field: "riskScore", headerName: "Risk score (0-5)", width: 200, cellRenderer: RiskCellRenderer },
+    { field: "riskScore", headerName: "Risk (0-5)", width: 110, cellRenderer: RiskCellRenderer },
     { field: "lastActive", headerName: "Last active", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
 
@@ -35,6 +35,8 @@ const DEVICE_COLUMNS = [
     { field: "guardrailMode", headerName: "Guardrail mode", width: 150, cellRenderer: GuardrailModeCellRenderer },
     { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
     { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
+    { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
+    { field: "riskScore", headerName: "Risk", width: 90, cellRenderer: RiskCellRenderer },
     { field: "lastHeartbeat", headerName: "Last check-in", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
 
@@ -98,37 +100,22 @@ function FilterChip({ label, active, onClick }) {
     );
 }
 
-function SearchRow({ value, onChange, placeholder, tab, filters, onFiltersChange }) {
+function FilterRow({ tab, filters, onFiltersChange }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
     const tags = appliedTags(filters);
     return (
-        <Box padding="3">
-            <VerticalStack gap="3">
-                <TextField
-                    label={placeholder}
-                    labelHidden
-                    autoComplete="off"
-                    prefix={<Icon source={SearchMinor} />}
-                    placeholder={placeholder}
-                    value={value}
-                    onChange={onChange}
-                    clearButton
-                    onClearButtonClick={() => onChange("")}
-                />
-                <HorizontalStack gap="2" blockAlign="center">
-                    {chips.map((chip) => (
-                        <FilterChip key={chip.key} label={chip.label} active={isChipActive(chip.key, filters)}
-                            onClick={() => toggleChip(chip.key, filters, onFiltersChange)} />
-                    ))}
-                    {tags.map((tag) => <Tag key={tag.key} onRemove={() => onFiltersChange(tag.clear)}>{tag.label}</Tag>)}
-                    {tags.length > 0 && <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>}
-                </HorizontalStack>
-            </VerticalStack>
-        </Box>
+        <HorizontalStack gap="2" blockAlign="center">
+            {chips.map((chip) => (
+                <FilterChip key={chip.key} label={chip.label} active={isChipActive(chip.key, filters)}
+                    onClick={() => toggleChip(chip.key, filters, onFiltersChange)} />
+            ))}
+            {tags.map((tag) => <Tag key={tag.key} onRemove={() => onFiltersChange(tag.clear)}>{tag.label}</Tag>)}
+            {tags.length > 0 && <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>}
+        </HorizontalStack>
     );
 }
 
-function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable }) {
+function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen }) {
     const isEmployees = tab === "employees";
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -139,10 +126,8 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
 
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         const params = {
-            deviceScope, skip, limit, sortKey, sortOrder: sortOrder === -1 ? 1 : -1, atlasQuery: searchString,
-            atlasOs: filters.osList, toolCategories: filters.categories, healthStates: filters.healthStates,
-            hasUnapproved: filters.hasUnapproved, usesPersonal: filters.usesPersonal, agentIssues: filters.agentIssues,
-            guardrailModes: filters.guardrailModes, riskMin: filters.riskMin, riskMax: filters.riskMax,
+            ...transform.peopleParams(deviceScope, filters, searchString),
+            skip, limit, sortKey, sortOrder: sortOrder === -1 ? 1 : -1,
         };
         const request = isEmployees ? settingRequests.fetchAtlasEmployees(params) : settingRequests.fetchAtlasDevices(params);
         setLoading(true);
@@ -178,21 +163,16 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 filterStateUrl={`/dashboard/observe/devices-employees/${tab}`}
                 searchValue={search}
                 onSearchChange={onSearchChange}
-                renderSearch={({ value, onChange }) => (
-                    <SearchRow
-                        value={value}
-                        onChange={onChange}
-                        placeholder={isEmployees ? "Search employees or their devices" : "Search devices, owners or OS"}
-                        tab={tab}
-                        filters={filters}
-                        onFiltersChange={onFiltersChange}
-                    />
-                )}
+                searchPlaceholder={SEARCH_HINTS[tab]}
+                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} />}
+                height={PEOPLE_TABLE_HEIGHT}
+                domLayout="normal"
                 rowHeight={ROW_HEIGHT}
                 noOuterBorder
                 sideBar={false}
                 context={{ violationsAvailable, riskAvailable }}
-                getRowStyle={() => ({ cursor: "default" })}
+                onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.name)}
+                getRowStyle={() => ({ cursor: "pointer" })}
                 rowSelection={undefined}
             />
         </Box>

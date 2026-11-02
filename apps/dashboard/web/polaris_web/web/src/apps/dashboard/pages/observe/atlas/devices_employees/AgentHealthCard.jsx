@@ -2,28 +2,24 @@ import { Box, Button, Divider, HorizontalStack, Text, VerticalStack } from "@sho
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import Pressable from "../../../dashboard/ask/components/Pressable";
+import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
-import InsightCard from "./InsightCard";
 import SegmentedBar from "./SegmentedBar";
-import { HEALTH_BACKGROUNDS, HEALTH_LABELS, MODE_BACKGROUNDS, MODE_LABELS, tokenVar } from "./peopleConstants";
+import { HEALTH_BACKGROUNDS, HEALTH_LABELS, HEALTH_ORDER, MODE_BACKGROUNDS, MODE_LABELS, MODE_ORDER, tokenVar } from "./peopleConstants";
+import transform from "./transform";
 
-const HEALTH_ORDER = ["healthy", "outdated", "offline"];
-const MODE_ORDER = ["enforce", "monitor", "none"];
+const HEALTH_TOOLTIP = "Offline: no heartbeat for 7+ days. Outdated: older than the latest release for the device's OS.";
 
 function LegendRow({ color, label, count, active, onClick }) {
-    const row = (
-        <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
-            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <LegendDot color={color} />
-                <Text as="span">{label}</Text>
-            </HorizontalStack>
-            <Text as="span" fontWeight="semibold">{count.toLocaleString("en-US")}</Text>
-        </HorizontalStack>
-    );
-    if (!onClick) return row;
     return (
         <Pressable onClick={onClick} accessibilityLabel={label} background={active ? "bg-primary-subdued-hover" : undefined} hoverBackground="bg-subdued" borderRadius="2" padding="1">
-            {row}
+            <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
+                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                    <LegendDot color={color} />
+                    <Text as="span">{label}</Text>
+                </HorizontalStack>
+                <Text as="span" fontWeight="semibold">{count.toLocaleString("en-US")}</Text>
+            </HorizontalStack>
         </Pressable>
     );
 }
@@ -55,12 +51,9 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
         key, label: MODE_LABELS[key], count: modes[key] || 0, background: MODE_BACKGROUNDS[key], lightText: key === "enforce",
     }));
 
-    return (
-        <InsightCard
-            title="Atlas agent health"
-            subtitle={`${(overview?.deviceCount || 0).toLocaleString("en-US")} managed devices`}
-            status={status}
-        >
+    const body = (
+        <VerticalStack gap="4">
+            <Text as="p" color="subdued">{`${(overview?.deviceCount || 0).toLocaleString("en-US")} managed devices`}</Text>
             <VerticalStack gap="3">
                 <SegmentedBar segments={healthSegments} onSelect={onSelectHealth} activeKey={activeHealth} thin />
                 <VerticalStack gap="1">
@@ -95,8 +88,10 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
                     <Button onClick={updateOutdated}>{`Update ${outdatedCount} outdated agent${outdatedCount > 1 ? "s" : ""}`}</Button>
                 </Box>
             )}
-        </InsightCard>
+        </VerticalStack>
     );
+
+    return <InfoCard title="Atlas agent health" titleToolTip={HEALTH_TOOLTIP} component={transform.cardBody(status, body)} />;
 }
 
 export default AgentHealthCard;

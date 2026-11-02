@@ -1,3 +1,26 @@
+export const DEVICE_SCOPES = [
+    { value: "all", label: "All devices" },
+    { value: "desktop", label: "Desktop agents" },
+    { value: "browser", label: "Browser extensions" },
+];
+
+export const STAT_CARDS = [
+    { id: "managedDevices", label: "Managed devices" },
+    { id: "agentActive", label: "Atlas agent active" },
+    { id: "devicesWithAiTools", label: "Devices with AI tools" },
+    { id: "employeesUsingAi", label: "Employees using AI" },
+    { id: "devicesWithUnapprovedTools", label: "Devices with unapproved tools" },
+    { id: "monitorOnlyDevices", label: "Monitor-only devices" },
+];
+
+export const STAT_EMPTY_VALUE = "\u2014";
+
+export const OS_ICON_KEYS = { macos: "mac", windows: "windows", linux: "linux" };
+
+export const HEALTH_ORDER = ["healthy", "outdated", "offline"];
+export const MODE_ORDER = ["enforce", "monitor", "none"];
+export const CATEGORY_ORDER = ["agents", "ide", "mcp", "browser"];
+
 export const OS_LABELS = {
     macos: "macOS",
     windows: "Windows",
@@ -70,6 +93,19 @@ export const DEVICE_CHIPS = [
     { key: "monitorMode", label: "Monitor mode" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
 ];
+
+export const SEARCH_HINTS = {
+    employees: "Search employees, devices, teams or tools. Narrow with user:, device:, team:, tool:",
+    devices: "Search devices, owners, OS or tools. Narrow with owner:, os:, health:, mode:, version:, tool:",
+};
+
+export const FLYOUT_GRAPH_LIMIT = 8;
+
+export const PEOPLE_TABLE_HEIGHT = 500;
+
+export const MIN_SEARCH_LENGTH = 3;
+export const EXPORT_PAGE_SIZE = 500;
+export const EXPORT_ROW_LIMIT = 10000;
 
 export const EMPTY_PEOPLE_FILTERS = {
     osList: [],

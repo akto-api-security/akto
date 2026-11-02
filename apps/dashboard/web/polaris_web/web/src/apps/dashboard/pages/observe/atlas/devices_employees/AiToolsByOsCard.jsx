@@ -1,19 +1,20 @@
 import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import Pressable from "../../../dashboard/ask/components/Pressable";
+import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
-import InsightCard from "./InsightCard";
 import SegmentedBar from "./SegmentedBar";
-import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, OS_LABELS, tokenVar } from "./peopleConstants";
+import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, CATEGORY_ORDER, OS_LABELS, tokenVar } from "./peopleConstants";
+import transform from "./transform";
 
-const CATEGORY_ORDER = ["agents", "ide", "mcp", "browser"];
 const DARK_CATEGORIES = ["agents"];
 
 function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectCategory }) {
     const rows = (overview?.osMatrix || []).filter((row) => row.os !== "unknown");
     const toolsAvailable = overview?.toolsAvailable !== false;
 
-    return (
-        <InsightCard title="AI tools per device" subtitle="By operating system" status={status}>
+    const body = (
+        <VerticalStack gap="4">
+            <Text as="p" color="subdued">By operating system</Text>
             {!toolsAvailable && <Text as="p" color="subdued">Tool data is unavailable right now.</Text>}
             {toolsAvailable && rows.length === 0 && <Text as="p" color="subdued">No managed devices in this scope.</Text>}
             {toolsAvailable && rows.map((row) => (
@@ -50,12 +51,22 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectC
                     >
                         <HorizontalStack gap="1" blockAlign="center" wrap={false}>
                             <LegendDot color={tokenVar(CATEGORY_BACKGROUNDS[category])} />
-                            <Text as="span" variant="bodySm" color={activeCategory === category ? undefined : "subdued"}>{CATEGORY_LABELS[category]}</Text>
+                            <Text as="span" variant="bodySm" color={activeCategory === category ? undefined : "subdued"}>
+                                {CATEGORY_LABELS[category]} · {(overview?.categoryTotals?.[category] || 0).toLocaleString("en-US")}
+                            </Text>
                         </HorizontalStack>
                     </Pressable>
                 ))}
             </HorizontalStack>
-        </InsightCard>
+        </VerticalStack>
+    );
+
+    return (
+        <InfoCard
+            title="AI tools per device"
+            titleToolTip="Share of AI tools on each operating system, by tool category. Click a segment or a category to filter the table."
+            component={transform.cardBody(status, body)}
+        />
     );
 }
 

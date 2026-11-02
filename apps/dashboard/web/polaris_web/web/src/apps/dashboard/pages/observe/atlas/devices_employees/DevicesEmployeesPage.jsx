@@ -5,18 +5,21 @@ import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards";
 import AskBar from "../../../../components/shared/AskBar";
+import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
+import OperatorDropdown from "../../../../components/layouts/OperatorDropdown";
 import AgentHealthCard from "./AgentHealthCard";
 import AiToolsByOsCard from "./AiToolsByOsCard";
 import PeopleTable from "./PeopleTable";
 import RiskHistogramCard from "./RiskHistogramCard";
-import StatsRow from "./StatsRow";
-import DeviceScopeDropdown, { DEVICE_SCOPES } from "./DeviceScopeDropdown";
+import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
-import { EMPTY_PEOPLE_FILTERS, HIGH_RISK_THRESHOLD, RISK_BUCKET_WIDTH } from "./peopleConstants";
+import {
+    DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH, RISK_BUCKET_WIDTH,
+} from "./peopleConstants";
 import transform from "./transform";
 
 function DevicesEmployeesPage() {
-    const [deviceScope, setDeviceScope] = useState(DEVICE_SCOPES[0].id);
+    const [deviceScope, setDeviceScope] = useState(DEVICE_SCOPES[0].value);
     const [stats, setStats] = useState(null);
     const [overview, setOverview] = useState(null);
     const [overviewStatus, setOverviewStatus] = useState("loading");
@@ -24,12 +27,14 @@ function DevicesEmployeesPage() {
     const [filters, setFilters] = useState(EMPTY_PEOPLE_FILTERS);
     const [search, setSearch] = useState("");
     const [refreshKey, setRefreshKey] = useState(0);
+    const [openTarget, setOpenTarget] = useState(null);
+    const [exporting, setExporting] = useState(false);
 
     useEffect(() => {
         let ignore = false;
         settingRequests.fetchEndpointShieldStats({ deviceScope })
             .then((res) => {
-                if (!ignore) setStats(transform.buildStatCards(res?.deviceStats));
+                if (!ignore) setStats(res?.deviceStats || null);
             })
             .catch(() => {
                 if (!ignore) func.setToast(true, true, "Failed to load device stats");
@@ -68,6 +73,28 @@ function DevicesEmployeesPage() {
     const activeMode = onDevicesTab && filters.guardrailModes.length === 1 ? filters.guardrailModes[0] : null;
     const activeCategory = onDevicesTab && filters.osList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
 
+    const openPerson = useCallback((kind, id) => setOpenTarget({ kind, id }), []);
+
+    const exportTable = async () => {
+        const requestName = tab === "employees" ? "fetchAtlasEmployees" : "fetchAtlasDevices";
+        const params = transform.peopleParams(deviceScope, filters, search.length >= MIN_SEARCH_LENGTH ? search : "");
+        setExporting(true);
+        try {
+            const rows = [];
+            for (let skip = 0; skip < EXPORT_ROW_LIMIT; skip += EXPORT_PAGE_SIZE) {
+                const response = await settingRequests[requestName]({ ...params, skip, limit: EXPORT_PAGE_SIZE });
+                const page = response?.atlasRows || [];
+                rows.push(...page);
+                if (page.length < EXPORT_PAGE_SIZE || rows.length >= (response?.atlasTotal || 0)) break;
+            }
+            func.saveCsv(transform.toCsvLines(tab, rows), `atlas-${tab}`);
+        } catch (error) {
+            func.setToast(true, true, `Failed to export ${tab}`);
+        } finally {
+            setExporting(false);
+        }
+    };
+
     const onSelectStat = (id) => {
         const target = transform.statCardTarget(id);
         if (target) toggleView(target.tab, target.filters);
@@ -85,8 +112,13 @@ function DevicesEmployeesPage() {
             isFirstPage
             secondaryActions={
                 <>
-                    <DeviceScopeDropdown value={deviceScope} onChange={setDeviceScope} />
-                    <Button icon={ExportMinor} disabled>Export</Button>
+                    <OperatorDropdown
+                        label={(DEVICE_SCOPES.find((scope) => scope.value === deviceScope) || DEVICE_SCOPES[0]).label}
+                        items={DEVICE_SCOPES}
+                        selected={setDeviceScope}
+                        designer
+                    />
+                    <Button icon={ExportMinor} onClick={exportTable} loading={exporting}>Export</Button>
                 </>
             }
             components={[
@@ -97,7 +129,7 @@ function DevicesEmployeesPage() {
                     suggestions={ASK_ATLAS_SUGGESTIONS}
                     chatScope={ATLAS_CHAT_SCOPE}
                 />,
-                <StatsRow key="stats-row" stats={stats} onSelect={onSelectStat} />,
+                <SummaryCardInfo key="stats-row" summaryItems={transform.buildStatItems(stats, onSelectStat)} />,
                 <HorizontalGrid key="overview-cards" columns={{ xs: 1, md: 3 }} gap="4">
                     <AgentHealthCard
                         overview={overview}
@@ -135,6 +167,15 @@ function DevicesEmployeesPage() {
                     onSearchChange={setSearch}
                     violationsAvailable={overview?.violationsAvailable}
                     riskAvailable={overview?.riskAvailable}
+                    onOpen={openPerson}
+                />,
+                <PeopleFlyout
+                    key="people-flyout"
+                    target={openTarget}
+                    deviceScope={deviceScope}
+                    onClose={() => setOpenTarget(null)}
+                    onOpen={openPerson}
+                    onUpdated={refreshAll}
                 />,
             ]}
         />

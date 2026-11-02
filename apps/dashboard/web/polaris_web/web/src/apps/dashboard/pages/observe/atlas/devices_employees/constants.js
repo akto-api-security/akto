@@ -1,5 +1,11 @@
 export const ATLAS_CHAT_SCOPE = "atlas_devices_employees";
 
+export const ATLAS_DEVICE_CHAT_SCOPE = "device";
+
+export const GUARDRAIL_VIOLATIONS_PATH = "/dashboard/guardrails/violations";
+
+export const ACTION_UNAVAILABLE_TOOLTIP = "Atlas has no backend for this action yet";
+
 export const ASK_ATLAS_PLACEHOLDER = "Ask about AI agents, MCP servers, skills, models or browser AI on your devices";
 
 export const ASK_ATLAS_SUGGESTIONS = [

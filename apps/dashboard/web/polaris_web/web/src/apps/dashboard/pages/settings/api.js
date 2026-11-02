@@ -926,6 +926,13 @@ const settingRequests = {
             data: params
         })
     },
+    async fetchAtlasPersonDetail({ deviceScope = "all", atlasKind, atlasId }) {
+        return await request({
+            url: '/api/fetchAtlasPersonDetail',
+            method: 'post',
+            data: { deviceScope, atlasKind, atlasId }
+        })
+    },
     async fetchAtlasDevices(params = {}) {
         return await request({
             url: '/api/fetchAtlasDevices',

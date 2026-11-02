@@ -16,7 +16,6 @@ import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.service.atlas.AtlasDeviceStatsService;
 import com.akto.service.atlas.AtlasPeopleService;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
@@ -101,7 +100,6 @@ public class ModuleInfoAction extends UserAction {
     @Setter private String deviceScope;
     private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
     private final InsightService insightService = new InsightService();
-    private final AtlasDeviceStatsService atlasDeviceStatsService = new AtlasDeviceStatsService();
     private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
     @Setter private String atlasQuery;
     @Setter private List<String> atlasOs;
@@ -116,6 +114,9 @@ public class ModuleInfoAction extends UserAction {
     @Getter private Map<String, Object> atlasOverview;
     @Getter private List<Map<String, Object>> atlasRows;
     @Getter private long atlasTotal;
+    @Setter private String atlasKind;
+    @Setter private String atlasId;
+    @Getter private Map<String, Object> atlasDetail;
 
     @Override
     public String execute() {
@@ -195,7 +196,6 @@ public class ModuleInfoAction extends UserAction {
 
     private static final int ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS = 4 * 60 * 60;
     private static final int ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS = 2 * 24 * 60 * 60;
-    private static final int ENDPOINT_SHIELD_OFFLINE_THRESHOLD_SECONDS = 7 * 24 * 60 * 60;
     private static final String STATUS_FAILED = "failed";
     private static final String STATUS_ACTIVE = "active";
     private static final String STATUS_INACTIVE = "inactive";
@@ -429,9 +429,11 @@ public class ModuleInfoAction extends UserAction {
             } catch (Exception e) {
                 statsLogger.error("atlas snapshot insights bundle failed: " + e.getMessage());
             }
-            return atlasPeopleService.build(rows, bundle, atlasDeviceStatsService, loadLatestVersionByOs(), now, startTimestamp, endTimestamp);
+            return atlasPeopleService.build(rows, bundle, loadLatestVersionByOs(), now, startTimestamp, endTimestamp);
         });
     }
+
+    private static final int ATLAS_MAX_PAGE_SIZE = 500;
 
     private AtlasPeopleService.PeopleQuery buildPeopleQuery() {
         AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
@@ -448,7 +450,7 @@ public class ModuleInfoAction extends UserAction {
         query.sortKey = sortKey;
         query.sortOrder = sortOrder == 0 ? -1 : sortOrder;
         query.skip = skip;
-        query.limit = limit <= 0 ? 50 : limit;
+        query.limit = limit <= 0 ? 50 : Math.min(limit, ATLAS_MAX_PAGE_SIZE);
         return query;
     }
 
@@ -497,61 +499,33 @@ public class ModuleInfoAction extends UserAction {
 
     public String fetchEndpointShieldStats() {
         deviceStats = new HashMap<>();
-        for (String card : Arrays.asList("managedDevices", "agentActive", "offlineSevenDays", "devicesWithAiTools",
-                "devicesWithAiToolsPercent", "employeesUsingAi", "totalEmployees", "devicesWithUnapprovedTools",
-                "unapprovedTeams", "monitorOnlyDevices")) {
-            deviceStats.put(card, null);
-        }
-        List<String> unavailableSources = new ArrayList<>();
-        deviceStats.put("unavailableSources", unavailableSources);
-        if (ArgusCollectionScope.isLimited(getSUser())) {
-            return SUCCESS.toUpperCase();
-        }
-
-        int now = Context.now();
-        int offlineCutoff = now - ENDPOINT_SHIELD_OFFLINE_THRESHOLD_SECONDS;
-        Map<String, String> scopeDeviceUsernames = new HashMap<>();
-
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
         try {
-            long managedDevices = 0;
-            long agentActive = 0;
-            long offlineSevenDays = 0;
-            for (Document device : loadEndpointShieldDeviceRows(now)) {
-                managedDevices++;
-                if (STATUS_ACTIVE.equals(device.getString("status"))) agentActive++;
-                Number heartbeat = (Number) device.get(ModuleInfo.LAST_HEARTBEAT_RECEIVED);
-                if (heartbeat != null && heartbeat.intValue() > 0 && heartbeat.intValue() < offlineCutoff) offlineSevenDays++;
-                String username = device.getString("username");
-                scopeDeviceUsernames.put(String.valueOf(device.get("_id")), username == null ? "" : username);
+            deviceStats = atlasPeopleService.stats(loadAtlasSnapshot());
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchEndpointShieldStats failed: " + e.getMessage());
+            addActionError("Unable to load device stats");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchAtlasPersonDetail() {
+        atlasDetail = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            Map<String, Object> detail = atlasPeopleService.detail(loadAtlasSnapshot(), atlasKind, atlasId);
+            if (detail == null) {
+                addActionError("Not found");
+                return ERROR.toUpperCase();
             }
-            deviceStats.put("managedDevices", managedDevices);
-            deviceStats.put("agentActive", agentActive);
-            deviceStats.put("offlineSevenDays", offlineSevenDays);
-        } catch (Exception e) {
-            statsLogger.error("fetchEndpointShieldStats module_info failed: " + e.getMessage());
-            unavailableSources.add("moduleInfo");
+            atlasDetail = detail;
             return SUCCESS.toUpperCase();
-        }
-
-        try {
-            InsightDataBundle bundle = insightService.getOrLoadBundle(buildInsightContext());
-            AtlasDeviceStatsService.AiToolStats aiToolStats =
-                    atlasDeviceStatsService.computeAiToolStats(bundle, scopeDeviceUsernames, startTimestamp, endTimestamp);
-            long managedDevices = (Long) deviceStats.get("managedDevices");
-            deviceStats.put("devicesWithAiTools", aiToolStats.devicesWithAiTools);
-            deviceStats.put("devicesWithAiToolsPercent",
-                    managedDevices > 0 ? Math.round(100.0 * aiToolStats.devicesWithAiTools / managedDevices) : 0L);
-            deviceStats.put("employeesUsingAi", aiToolStats.employeesUsingAi);
-            deviceStats.put("totalEmployees", aiToolStats.totalEmployees);
-            deviceStats.put("devicesWithUnapprovedTools", aiToolStats.devicesWithUnapprovedTools);
-            deviceStats.put("unapprovedTeams", aiToolStats.unapprovedTeams);
-            deviceStats.put("monitorOnlyDevices",
-                    atlasDeviceStatsService.countMonitorOnlyDevices(bundle, scopeDeviceUsernames.keySet()));
         } catch (Exception e) {
-            statsLogger.error("fetchEndpointShieldStats insights bundle failed: " + e.getMessage());
-            unavailableSources.add("insightsBundle");
+            statsLogger.error("fetchAtlasPersonDetail failed: " + e.getMessage());
+            addActionError("Unable to load details");
+            return ERROR.toUpperCase();
         }
-        return SUCCESS.toUpperCase();
     }
 
     /** Distinct filter-dropdown values across ALL endpoint-shield agents (for the paginated table). */

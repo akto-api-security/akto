@@ -1,8 +1,8 @@
-import { Button, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
-import { InfoMinor } from "@shopify/polaris-icons";
+import { Box, Button, Text, VerticalStack } from "@shopify/polaris";
 import BarGraph from "../../../../components/charts/BarGraph";
-import InsightCard from "./InsightCard";
+import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD, RISK_BUCKET_WIDTH, RISK_COLORS, RISK_EXPLANATION } from "./peopleConstants";
+import transform from "./transform";
 
 const BAR_WIDTH = 36;
 const CHART_OPTIONS = {
@@ -26,30 +26,28 @@ function RiskHistogramCard({ overview, status, onSelectBucket, onSelectHighRisk 
     const lastPopulated = counts.reduce((last, count, index) => (count > 0 ? index : last), 0);
     const data = counts.slice(0, lastPopulated + 1).map((count, index) => ({ text: bucketLabel(index), value: count, color: bucketColor(index), id: index }));
 
-    return (
-        <InsightCard title="Employee risk scores" subtitle="Highest API risk score (0 to 5) across each employee's AI tools" status={status}>
-            <VerticalStack gap="2">
-                {overview?.riskAvailable === false && (
-                    <Text as="p" variant="bodySm" color="critical">Risk scores are unavailable right now.</Text>
-                )}
-                <BarGraph
-                    data={data}
-                    height="280px"
-                    barWidth={BAR_WIDTH}
-                    showYAxis={false}
-                    showDataLabels
-                    defaultChartOptions={CHART_OPTIONS}
-                    onBarClick={(name, custom) => onSelectBucket(custom.id)}
-                />
-                <HorizontalStack align="space-between" blockAlign="center">
-                    <Button plain onClick={onSelectHighRisk}>{`${highRisk} employee${highRisk === 1 ? "" : "s"} score ${HIGH_RISK_THRESHOLD} or higher`}</Button>
-                    <Tooltip content={RISK_EXPLANATION} width="wide">
-                        <Icon source={InfoMinor} color="subdued" />
-                    </Tooltip>
-                </HorizontalStack>
-            </VerticalStack>
-        </InsightCard>
+    const body = (
+        <VerticalStack gap="2">
+            <Text as="p" color="subdued">Highest API risk score (0 to 5) across each employee's AI tools</Text>
+            {overview?.riskAvailable === false && (
+                <Text as="p" variant="bodySm" color="critical">Risk scores are unavailable right now.</Text>
+            )}
+            <BarGraph
+                data={data}
+                height="280px"
+                barWidth={BAR_WIDTH}
+                showYAxis={false}
+                showDataLabels
+                defaultChartOptions={CHART_OPTIONS}
+                onBarClick={(name, custom) => onSelectBucket(custom.id)}
+            />
+            <Box>
+                <Button plain onClick={onSelectHighRisk}>{`${highRisk} employee${highRisk === 1 ? "" : "s"} score ${HIGH_RISK_THRESHOLD} or higher`}</Button>
+            </Box>
+        </VerticalStack>
     );
+
+    return <InfoCard title="Employee risk scores" titleToolTip={RISK_EXPLANATION} component={transform.cardBody(status, body)} />;
 }
 
 export default RiskHistogramCard;
