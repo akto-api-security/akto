@@ -9,6 +9,8 @@ import com.akto.dto.endpoint_shield.FileInspectionRule;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.blob.AzureBlobClient;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Sorts;
 import com.opensymphony.xwork2.Action;
@@ -17,6 +19,7 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -32,6 +35,8 @@ public class FileInspectionRuleAction extends UserAction {
     private static final int MAX_AGENT_LENGTH = 100;
     private static final Set<String> VALID_OS = new HashSet<>(Arrays.asList("darwin", "linux", "windows"));
     private static final Set<String> VALID_ROLES = new HashSet<>(Arrays.asList("login", "credentials", "mcp_config"));
+    private static final String DEFAULTS_RESOURCE = "/file_inspection_agent_defaults.json";
+    private static final String DEFAULTS_ADDED_BY = "akto-default";
 
     @Setter private String path;
     @Setter private boolean existenceOnly;
@@ -48,6 +53,8 @@ public class FileInspectionRuleAction extends UserAction {
     @Getter private List<FileInspectionRule> rules;
     @Getter private List<FileInspectionResult> recentResults;
     @Getter private String blobContent;
+    @Getter private int createdCount;
+    @Getter private int updatedCount;
 
     /**
      * Adds a new path-rule, or updates the existenceOnly flag if the same path
@@ -140,6 +147,55 @@ public class FileInspectionRuleAction extends UserAction {
         } catch (Exception e) {
             logger.errorAndAddToDb(e, "updateFileInspectionRule failed: " + e.getMessage());
             addActionError("Failed to update rule");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    public String restoreFileInspectionDefaults() {
+        try {
+            FileInspectionRuleDao.instance.createIndicesIfAbsent();
+            JsonNode agents;
+            try (InputStream in = FileInspectionRuleAction.class.getResourceAsStream(DEFAULTS_RESOURCE)) {
+                agents = new ObjectMapper().readTree(in);
+            }
+            int now = Context.now();
+            for (JsonNode a : agents) {
+                String agentName = a.path("agent").asText();
+                for (JsonNode f : a.path("files")) {
+                    String p = f.path("path").asText();
+                    String o = normalize(f.path("os").asText());
+                    String r = normalize(f.path("role").asText());
+                    Bson filter = Filters.eq(FileInspectionRule.PATH, p);
+                    FileInspectionRule existing = FileInspectionRuleDao.instance.findOne(filter);
+                    if (existing != null) {
+                        existing.setAgent(agentName);
+                        existing.setOs(o);
+                        existing.setRole(r);
+                        existing.setUpdatedTs(now);
+                        FileInspectionRuleDao.instance.replaceOne(filter, existing);
+                        updatedCount++;
+                    } else {
+                        FileInspectionRule rule = new FileInspectionRule();
+                        rule.setId(new ObjectId());
+                        rule.setAccountId(Context.accountId.get());
+                        rule.setPath(p);
+                        rule.setExistenceOnly(false);
+                        rule.setMaxDepth(0);
+                        rule.setAddedBy(DEFAULTS_ADDED_BY);
+                        rule.setAgent(agentName);
+                        rule.setOs(o);
+                        rule.setRole(r);
+                        rule.setCreatedTs(now);
+                        rule.setUpdatedTs(now);
+                        FileInspectionRuleDao.instance.insertOne(rule);
+                        createdCount++;
+                    }
+                }
+            }
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "restoreFileInspectionDefaults failed: " + e.getMessage());
+            addActionError("Failed to restore defaults");
             return Action.ERROR.toUpperCase();
         }
     }

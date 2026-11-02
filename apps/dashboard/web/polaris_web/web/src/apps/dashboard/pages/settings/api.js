@@ -1304,6 +1304,9 @@ const settingRequests = {
             data: { ruleId, path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent: agent || '', os: os || '', role: role || '' }
         })
     },
+    restoreFileInspectionDefaults() {
+        return request({ url: '/api/restoreFileInspectionDefaults', method: 'post', data: {} })
+    },
     deleteFileInspectionRule(path) {
         return request({
             url: '/api/deleteFileInspectionRule',
