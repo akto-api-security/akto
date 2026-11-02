@@ -14,12 +14,14 @@ const GROUP_GAP = 60;   // horizontal gap between groups
 
 export default function IdentityOverviewGraph({ tableData, totalCount, onIdentityClick }) {
     const { nodes, edges } = useMemo(() => {
-        // Group ALL identities by agent, preserving insertion order
+        // Group ALL identities by agent + device (the same agent on two machines holds separate
+        // credentials), preserving insertion order
         const agentOrder = [];
         const groups = {};
         tableData.forEach(row => {
-            if (!groups[row.agent]) { groups[row.agent] = []; agentOrder.push(row.agent); }
-            groups[row.agent].push(row);
+            const key = row.device ? `${row.agent} · ${row.device}` : row.agent;
+            if (!groups[key]) { groups[key] = { agent: row.agent, rows: [] }; agentOrder.push(key); }
+            groups[key].rows.push(row);
         });
 
         const nodes = [];
@@ -27,7 +29,7 @@ export default function IdentityOverviewGraph({ tableData, totalCount, onIdentit
         let groupX = 0;
 
         agentOrder.forEach((agentName) => {
-            const identities = groups[agentName];
+            const identities = groups[agentName].rows;
             const n = identities.length;
             const totalH = (n - 1) * IDENT_SEP;
             const centerY = totalH / 2;
@@ -42,7 +44,7 @@ export default function IdentityOverviewGraph({ tableData, totalCount, onIdentit
                     component: {
                         id: `a-${agentName}`,
                         label: agentName,
-                        type: getAgentType(agentName),
+                        type: getAgentType(groups[agentName].agent),
                         category: "agent",
                         description: `${n} identities`,
                         status: "active",
