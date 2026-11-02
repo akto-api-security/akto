@@ -12,7 +12,7 @@ import time
 from typing import Any
 
 from prompts import build_scan_prompt, resolve_response_format
-from providers import LLMProvider, Qwen3GuardOutput, parse_qwen3guard_result
+from providers import LLMProvider, Qwen3GuardOutput, TripwireProvider, parse_qwen3guard_result, parse_tripwire_result
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +187,10 @@ class LLMScanner:
             raw, logprobs = await self.provider.complete_with_logprobs(text)
             logger.debug(f"[LLMScanner] {scanner_name} qwen3guard raw response: {raw!r}")
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
+        elif isinstance(self.provider, TripwireProvider):
+            if scanner_name != "PromptInjection":
+                raise ValueError(f"Tripwire judges PromptInjection only, not {scanner_name}")
+            result = parse_tripwire_result(await self.provider.detect(text))
         else:
             prompt = build_scan_prompt(
                 scanner_name,
