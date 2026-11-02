@@ -12,7 +12,9 @@ import (
 
 // newAccountTestService returns a Service with the given org email domains.
 func newAccountTestService(domains []string) *Service {
-	return &Service{logger: zap.NewNop(), orgEmailDomains: domains}
+	s := &Service{logger: zap.NewNop()}
+	s.orgEmailDomains.Store(&domains)
+	return s
 }
 
 // openAIToken builds an unsigned ChatGPT-style bearer token.

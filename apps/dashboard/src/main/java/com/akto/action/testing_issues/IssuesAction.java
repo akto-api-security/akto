@@ -185,6 +185,22 @@ public class IssuesAction extends UserAction {
     long ignoredIssuesCount;
     String sortKey;
     int sortOrder;
+
+    static final String AI_CONFIDENCE_SORT = "aiConfidence";
+
+    /**
+     * Sorts by Verify with AI's confidence in its verdict. Combine with the AI verdict filter to rank
+     * false positives (or true positives) by how sure the AI is. Unverified issues come last either way.
+     */
+    private static List<Bson> aiConfidenceSortStages(int sortOrder) {
+        Bson addVerified = Aggregates.addFields(new Field<>("aiVerified", new BasicDBObject("$cond",
+                Arrays.asList(new BasicDBObject("$ifNull", Arrays.asList("$" + TestingRunIssues.AI_CONFIDENCE, false)), 1, 0))));
+        Bson sort = Aggregates.sort(Sorts.orderBy(Sorts.descending("aiVerified"), sortOrder == 1
+                ? Sorts.ascending(TestingRunIssues.AI_CONFIDENCE, TestingRunIssues.CREATION_TIME)
+                : Sorts.descending(TestingRunIssues.AI_CONFIDENCE, TestingRunIssues.CREATION_TIME)));
+        return Arrays.asList(addVerified, sort);
+    }
+
     public String fetchAllIssues() {
         Bson filters = createFilters(true);
         
@@ -216,6 +232,8 @@ public class IssuesAction extends UserAction {
                     Aggregates.sort(Sorts.ascending(TestingRunIssues.CREATION_TIME)) :
                     Aggregates.sort(Sorts.descending(TestingRunIssues.CREATION_TIME));
             pipeline.add(sortStage);
+        } else if (AI_CONFIDENCE_SORT.equals(sortKey)) {
+            pipeline.addAll(aiConfidenceSortStages(sortOrder));
         }
 
         pipeline.add(Aggregates.skip(skip));
@@ -289,6 +307,8 @@ public class IssuesAction extends UserAction {
                 pipeline.add(Aggregates.sort(sortOrder == 1
                         ? Sorts.ascending(TestingRunIssues.CREATION_TIME)
                         : Sorts.descending(TestingRunIssues.CREATION_TIME)));
+            } else if (AI_CONFIDENCE_SORT.equals(sortKey)) {
+                pipeline.addAll(aiConfidenceSortStages(sortOrder));
             }
             pipeline.add(Aggregates.skip(skip));
             pipeline.add(Aggregates.limit(limit));
@@ -811,14 +831,17 @@ public class IssuesAction extends UserAction {
     }
 
     /**
-     * An issue that leaves Ignored is no longer a false positive, so the reason Verify with AI wrote
-     * when it ignored the issue is removed. Descriptions written by users are left as they are.
+     * An issue that leaves Ignored is no longer a false positive, so the verdict and the reason Verify
+     * with AI wrote are removed. Descriptions written by users are left as they are.
      */
     private static void clearAiVerifiedDescription(Bson issuesFilter) {
         String prefix = AiVerificationAction.DESCRIPTION_PREFIX.replace("[", "\\[").replace("]", "\\]");
         TestingRunIssuesDao.instance.getMCollection().updateMany(
             Filters.and(issuesFilter, Filters.regex(TestingRunIssues.DESCRIPTION, "^" + prefix)),
             Updates.unset(TestingRunIssues.DESCRIPTION));
+        TestingRunIssuesDao.instance.getMCollection().updateMany(
+            Filters.and(issuesFilter, Filters.exists(TestingRunIssues.AI_VERDICT)),
+            Updates.combine(Updates.unset(TestingRunIssues.AI_VERDICT), Updates.unset(TestingRunIssues.AI_CONFIDENCE)));
     }
 
     public String updateIssueStatus () {

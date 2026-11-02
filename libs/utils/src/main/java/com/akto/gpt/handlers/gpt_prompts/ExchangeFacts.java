@@ -9,9 +9,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * Exact differences between the baseline exchange and an attack exchange, computed in code so the
@@ -22,7 +24,9 @@ final class ExchangeFacts {
     // Akto's own marker and transport headers that change on every request.
     private static final Set<String> IGNORED_HEADERS = new HashSet<>(Arrays.asList(
         "x-akto-ignore", "content-length", "connection", "accept-encoding", "postman-token", "date",
-        "x-request-id", "request-id", "x-envoy-upstream-service-time", "debug-id", "eagleid", "via"));
+        "x-request-id", "request-id", "x-envoy-upstream-service-time", "debug-id", "eagleid", "via",
+        ":status", "content-encoding", "transfer-encoding", "alt-svc", "vary", "timing-allow-origin",
+        "x-site-cache-status", "server-timing", "age"));
     private static final Set<String> CREDENTIAL_HEADERS = new HashSet<>(Arrays.asList(
         "authorization", "cookie", "x-api-key", "api-key", "x-access-token", "access-token"));
     // Server-generated values that differ on every call.
@@ -36,6 +40,7 @@ final class ExchangeFacts {
     private static final int MAX_LISTED = 20;
     private static final int MAX_VALUE = 60;
     private static final int MAX_FIELDS = 3000;
+    private static final int MARKER_CONTEXT = 50;
 
     private ExchangeFacts() {}
 
@@ -89,7 +94,7 @@ final class ExchangeFacts {
           .append(", ").append(attack.status.equals(base.status) ? "same" : "different").append(")\n");
         List<String> headerChanges = new ArrayList<>();
         for (String name : union(base.responseHeaders.keySet(), attack.responseHeaders.keySet())) {
-            if (IGNORED_HEADERS.contains(name)) continue;
+            if (isNoiseHeader(name)) continue;
             boolean inBase = base.responseHeaders.containsKey(name);
             boolean inAttack = attack.responseHeaders.containsKey(name);
             if (inBase && !inAttack) headerChanges.add(name + " removed");
@@ -129,6 +134,115 @@ final class ExchangeFacts {
         return sb.toString();
     }
 
+    /**
+     * Which of the template's validate markers (response_payload contains_either / contains_all / regex)
+     * the attack response matched, matched the way the scanner does (trimmed, case-insensitive for
+     * contains), with the text around each match and whether the original response has it too. A
+     * marker already in the original response is not something the attack caused. "" when the
+     * template has no such markers.
+     */
+    static String validateMarkers(String template, String baselineMessage, String attackMessage) {
+        List<String> contains = new ArrayList<>();
+        List<String> regexes = new ArrayList<>();
+        try {
+            Object parsed = template == null ? null : new Yaml().load(template);
+            if (parsed instanceof Map) collectMarkers(((Map<?, ?>) parsed).get("validate"), false, contains, regexes);
+        } catch (Exception e) {
+            return "";
+        }
+        if (contains.isEmpty() && regexes.isEmpty()) return "";
+        Exchange attack = Exchange.parse(attackMessage);
+        if (attack == null) return "";
+        Exchange base = Exchange.parse(baselineMessage);
+        String body = String.valueOf(attack.responseBody).trim();
+        String baseBody = base == null ? null : String.valueOf(base.responseBody).trim();
+
+        List<String> found = new ArrayList<>();
+        int inOriginal = 0;
+        for (String marker : contains) {
+            int at = body.toLowerCase().indexOf(marker.toLowerCase());
+            if (at < 0) continue;
+            boolean original = baseBody != null && baseBody.toLowerCase().contains(marker.toLowerCase());
+            if (original) inOriginal++;
+            found.add(describeMatch(marker, body, at, marker.length(), original, baseBody != null));
+        }
+        for (String regex : regexes) {
+            try {
+                Matcher m = Pattern.compile(regex).matcher(body);
+                if (!m.find()) continue;
+                boolean original = baseBody != null && Pattern.compile(regex).matcher(baseBody).find();
+                if (original) inOriginal++;
+                found.add(describeMatch("regex " + regex, body, m.start(), m.end() - m.start(), original, baseBody != null));
+            } catch (Exception e) {
+                // not a valid Java regex; the scanner could not have matched it either
+            }
+        }
+        if (found.isEmpty()) {
+            return "- Validate markers: none of the template's " + (contains.size() + regexes.size())
+                + " response markers appear in this attack response body\n";
+        }
+        StringBuilder sb = new StringBuilder("- Validate markers matched in the attack response body (what the scanner flagged):\n");
+        for (String line : found.subList(0, Math.min(found.size(), MAX_LISTED))) sb.append("  ").append(line).append("\n");
+        if (baseBody != null && inOriginal == found.size()) {
+            sb.append("  Every matched marker is also in the original response, so the attack did not cause the match.\n");
+        }
+        return sb.toString();
+    }
+
+    private static String describeMatch(String marker, String body, int at, int length, boolean inOriginal, boolean haveOriginal) {
+        int from = Math.max(0, at - MARKER_CONTEXT);
+        int to = Math.min(body.length(), at + length + MARKER_CONTEXT);
+        String context = (from > 0 ? "..." : "") + body.substring(from, to).replace("\n", " ") + (to < body.length() ? "..." : "");
+        return "\"" + marker + "\" in: " + context
+            + (haveOriginal ? (inOriginal ? " (also in the original response)" : " (NOT in the original response)") : "");
+    }
+
+    // Markers under response_payload, at any depth of validate (and/or blocks included).
+    private static void collectMarkers(Object node, boolean inResponsePayload, List<String> contains, List<String> regexes) {
+        if (node instanceof Map) {
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) node).entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                boolean inPayload = inResponsePayload || "response_payload".equals(key);
+                if (inPayload && ("contains_either".equals(key) || "contains_all".equals(key))) {
+                    addStrings(entry.getValue(), contains);
+                } else if (inPayload && "regex".equals(key)) {
+                    addStrings(entry.getValue(), regexes);
+                } else {
+                    collectMarkers(entry.getValue(), inPayload, contains, regexes);
+                }
+            }
+        } else if (node instanceof List) {
+            for (Object item : (List<?>) node) collectMarkers(item, inResponsePayload, contains, regexes);
+        }
+    }
+
+    // Plain strings only; ${...} values are filled in per request and cannot be checked here.
+    private static void addStrings(Object value, List<String> out) {
+        List<?> values = value instanceof List ? (List<?>) value : java.util.Collections.singletonList(value);
+        for (Object v : values) {
+            if (!(v instanceof String)) continue;
+            String marker = ((String) v).trim();
+            if (!marker.isEmpty() && !marker.contains("${")) out.add(marker);
+        }
+    }
+
+    /** The request headers of a stored exchange (keys lower-cased), or null if it does not parse. */
+    static Map<String, String> requestHeaders(String message) {
+        Exchange ex = Exchange.parse(message);
+        return ex == null ? null : ex.headers;
+    }
+
+    /** Header map of a stored headers field (a JSON object or its string form), keys lower-cased. */
+    static Map<String, String> headers(Object headers) {
+        return Exchange.headerMap(headers);
+    }
+
+    /** Status and body with server-generated values masked: equal for attempts that got the same response. */
+    static String responseSignature(String message) {
+        Exchange ex = Exchange.parse(message);
+        return ex == null ? null : ex.status + "|" + mask(String.valueOf(ex.responseBody));
+    }
+
     private static boolean onlyEchoes(List<String> differing, List<String> sentValues) {
         if (differing.isEmpty()) return false;
         for (String value : differing) {
@@ -147,13 +261,18 @@ final class ExchangeFacts {
             return;
         }
         for (String key : union(base.keySet(), attack.keySet())) {
-            if ("header".equals(label) && IGNORED_HEADERS.contains(key)) continue;
+            if ("header".equals(label) && isNoiseHeader(key)) continue;
             String b = base.get(key);
             String a = attack.get(key);
             if (b == null) { out.add(label + " added: " + key + "=" + clip(a)); sentValues.add(a); }
             else if (a == null) out.add(label + " removed: " + key);
             else if (!b.equals(a)) { out.add(label + " changed: " + key + " (" + clip(b) + " -> " + clip(a) + ")"); sentValues.add(a); }
         }
+    }
+
+    /** Akto's own and transport headers (date, via, rate limits...) that differ on every call and carry no evidence. */
+    static boolean isNoiseHeader(String name) {
+        return IGNORED_HEADERS.contains(name) || name.startsWith("ratelimit-") || name.startsWith("x-ratelimit-");
     }
 
     private static Map<String, String> withoutCredentials(Map<String, String> headers) {
@@ -282,7 +401,7 @@ final class ExchangeFacts {
             }
         }
 
-        private static Map<String, String> headerMap(Object headers) {
+        static Map<String, String> headerMap(Object headers) {
             Map<String, String> out = new TreeMap<>();
             JSONObject obj = null;
             if (headers instanceof JSONObject) obj = (JSONObject) headers;

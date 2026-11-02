@@ -86,6 +86,11 @@ final class FalsePositiveProofRules {
                     + "- Template injection: the evaluated result (e.g. 49 for {{7*7}}).\n"
                     + "- CRLF: the injected header appearing as a real response header.\n"
                     + "FALSE_POSITIVE when:\n"
+                    + "- every validate marker the scanner matched is also in the original response (see the facts), or\n"
+                    + "  the matched text is ordinary data, e.g. a URL parameter like ?lang=en or a word in a label,\n"
+                    + "  rather than file contents, command output or an error the payload caused;\n"
+                    + "- the only difference from the original is in business values (a balance, amount, name or id):\n"
+                    + "  Akto's test credentials often belong to another user, so such changes are never execution;\n"
                     + "- the payload only appears echoed back (e.g. ../etc/passwd as a string in a field, an error\n"
                     + "  message, the URL); echo is not execution;\n"
                     + "- the response is the API's normal business response with no execution output, e.g. the same\n"
@@ -99,7 +104,8 @@ final class FalsePositiveProofRules {
                     + "is not in the baseline.\n"
                     + "FALSE_POSITIVE when the injected URL only appears echoed (in a field, link, error or Location),\n"
                     + "the body is the normal business response or an empty result, the request was rejected with a\n"
-                    + "4xx validation error, or a fetch error is the same for any host.\n";
+                    + "4xx validation error, a fetch error is the same for any host, or every validate marker the\n"
+                    + "scanner matched is also in the original response.\n";
             case AUTH_BOLA:
                 return "Proof rules - broken authentication / BOLA / IDOR (credentials removed or replaced, or the\n"
                     + "object id changed):\n"
@@ -163,7 +169,8 @@ final class FalsePositiveProofRules {
                     + "never a reason for FALSE_POSITIVE.\n"
                     + "TRUE_POSITIVE when the request or response shown really meets the template's validate condition\n"
                     + "on headers, e.g. the security headers it lists really are missing, or the version header really\n"
-                    + "is present (compare header names case-insensitively).\n"
+                    + "is present (compare header names case-insensitively). In validate, `not_contains` / `not_exists`\n"
+                    + "on headers means the test flags the header being ABSENT: a missing header is the finding.\n"
                     + "FALSE_POSITIVE only when the header is actually present (e.g. under different casing), or the\n"
                     + "response is an error, not-found or login page where validate needs a normal response.\n";
             case ACCEPTANCE:
@@ -179,7 +186,9 @@ final class FalsePositiveProofRules {
                     + "TRUE_POSITIVE when the response contains what the template's validate looks for: a stack trace,\n"
                     + "internal error details, a version string, or the configuration/file content itself.\n"
                     + "FALSE_POSITIVE when the response is a generic error without internals, an HTML fallback, SPA\n"
-                    + "index, not-found or login page, or the matched text only echoes the request.\n";
+                    + "index, not-found or login page, the matched text only echoes the request, or every validate\n"
+                    + "marker the scanner matched is also in the original response or is ordinary data (a URL\n"
+                    + "parameter, a word in a label) rather than the exposed content.\n";
             default:
                 return "Proof rules - infer from the template:\n"
                     + "Use execute (what was changed) and validate (what the scanner checked). TRUE_POSITIVE when the\n"

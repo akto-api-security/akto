@@ -1118,6 +1118,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                             ApiCollection.SKILLS, ApiCollection.START_TS, ApiCollection.BASE_RISK_SCORE,
                             ApiCollection.BASE_RISK_SCORE_REASON, "deactivated", ApiCollection.IS_OUT_OF_TESTING_SCOPE)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             // Computed here, scoped to just this asset's own `ids` — unlike every other agentic
             // endpoint on this page, which reads trafficMap/riskScoreMap/sensitiveMap off the
@@ -1413,6 +1414,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Filters.in(Constants.ID, ids),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.SKILLS, ApiCollection.TAGS_STRING)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             Set<String> skillNamesFromCollections = new LinkedHashSet<>();
             Set<String> mcpHostNames = new HashSet<>();
@@ -1915,6 +1917,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS,
                             ApiCollection.BASE_RISK_SCORE, ApiCollection.BASE_RISK_SCORE_REASON, ApiCollection._DEACTIVATED,ApiCollection.DESCRIPTION)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
             long tFindAll = System.currentTimeMillis();
             Map<String, GroupSummary> groups = classifyAllGroups(collections, traffic, risk, sensitive);
             long tClassify = System.currentTimeMillis();
@@ -3308,6 +3311,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             Map<String, HostGroupSummary> groups = classifyHostGroupedRows(collections, groupBy, traffic, risk, sensitive, usernames, null, null, false, tagsByUser);
             List<HostGroupSummary> all = new ArrayList<>(groups.values());
@@ -3384,6 +3388,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             Map<String, HostGroupSummary> userGroups = classifyHostGroupedRows(collections, "user", traffic, risk,
                     Collections.emptyMap(), usernames, null, null, false, tagsByUser);
@@ -3628,6 +3633,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     Filters.empty(),
                     Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME, ApiCollection.TAGS_STRING, ApiCollection.SKILLS, ApiCollection.START_TS)
             );
+            AgenticObserveUtil.retainSkillsWithApiInfo(collections);
 
             if (StringUtils.isNotBlank(parentDeviceId)) {
                 BasicDBObject childrenResp = buildDeviceChildren(parentDeviceId, collections, traffic, risk, violations);
