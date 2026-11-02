@@ -9,7 +9,7 @@ import observeApi from "../api";
 import SampleData from "../../../components/shared/SampleData";
 import { parseAktoPayload } from "../../guardrails/violations/violationsData";
 import ApiIssuesTab from "../api_collections/ApiIssuesTab";
-import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import SkillMarkdownViewer from "./SkillEvidenceView";
 import { fetchSkillMarkdownFromCollections, getOwningPluginNameForCollection } from "./SkillComponentsView";
 
 // ── Shared detail panel helpers ───────────────────────────────────────────────
@@ -149,41 +149,43 @@ const SKILL_VALUE_EMPTY = <Box padding="8"><VerticalStack gap="1" inlineAlign="c
 // the skill's own apiCollectionId when the caller doesn't have the full collection set on hand.
 function useSkillMarkdown(skill, collectionIds, fetchMarkdown = fetchSkillMarkdownFromCollections) {
     const [markdown, setMarkdown] = useState(null);
+    const [evidence, setEvidence] = useState(null);
     const [owningPluginName, setOwningPluginName] = useState(null);
     const [loading, setLoading] = useState(true);
     const ids = collectionIds?.length ? collectionIds : [skill?.apiCollectionId].filter(Boolean);
     useEffect(() => {
-        if (!ids.length) { setMarkdown(""); setLoading(false); return; }
+        if (!ids.length) { setMarkdown(""); setEvidence(null); setLoading(false); return; }
         let cancelled = false;
         setLoading(true);
         fetchMarkdown(ids, skill?.rawName || skill?.name)
-            .then(({ markdown: found, collectionId }) => {
+            .then(({ markdown: found, collectionId, evidence: foundEvidence }) => {
                 if (cancelled) return;
                 setMarkdown(found || "");
+                setEvidence(foundEvidence || null);
                 setOwningPluginName(getOwningPluginNameForCollection(collectionId));
             })
-            .catch(() => { if (!cancelled) { setMarkdown(""); setOwningPluginName(null); } })
+            .catch(() => { if (!cancelled) { setMarkdown(""); setEvidence(null); setOwningPluginName(null); } })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [skill?.name, skill?.rawName, ids.join(","), fetchMarkdown]);
-    return { markdown, owningPluginName, loading };
+    return { markdown, evidence, owningPluginName, loading };
 }
 
-function SkillValueView({ markdown, loading }) {
+function SkillValueView({ markdown, evidence, loading }) {
     if (loading) return SKILL_VALUE_LOADING;
     if (!markdown) return SKILL_VALUE_EMPTY;
     return (
         <Box className="agentic-flex-fill">
             <Box paddingBlockStart="5" paddingBlockEnd="5" paddingInlineStart="5" paddingInlineEnd="5">
-                <MarkdownViewer markdown={markdown} inertLinks />
+                <SkillMarkdownViewer markdown={markdown} evidence={evidence} />
             </Box>
         </Box>
     );
 }
 
 export function SkillDetailPanel({ skill, collectionIds, hideOwningPlugin, fetchMarkdown, entityLabel = "skill" }) {
-    const { markdown, owningPluginName, loading } = useSkillMarkdown(skill, collectionIds, fetchMarkdown);
+    const { markdown, evidence, owningPluginName, loading } = useSkillMarkdown(skill, collectionIds, fetchMarkdown);
     const [selectedTab, setSelectedTab] = useState(0);
     const isThreatEnabled = skill?.isThreatEnabled || false;
 
@@ -214,7 +216,7 @@ export function SkillDetailPanel({ skill, collectionIds, hideOwningPlugin, fetch
                 </Box>
             )}
             {activeTab === 0 ? (
-                <SkillValueView markdown={markdown} loading={loading} />
+                <SkillValueView markdown={markdown} evidence={evidence} loading={loading} />
             ) : (
                 <div style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", padding: "16px" }}>
                     <ApiIssuesTab
