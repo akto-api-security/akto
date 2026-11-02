@@ -10,6 +10,16 @@ import AgenticThinkingBox from "../../pages/agentic/components/AgenticThinkingBo
 import { sendQuery } from "../../pages/agentic/services/agenticService";
 import { buildAgenticObserveChatMetadata } from "../../pages/observe/agentic/agenticObserveApi";
 
+/*
+ * Shared "Ask" card: input, suggestion chips and chat answers.
+ *
+ * <AskBar
+ *     label="Ask Atlas"
+ *     placeholder={ASK_ATLAS_PLACEHOLDER}
+ *     suggestions={ASK_ATLAS_SUGGESTIONS}
+ *     chatScope={ATLAS_CHAT_SCOPE}
+ * />
+ */
 function AskBar({
     label = "Ask Akto",
     placeholder,
