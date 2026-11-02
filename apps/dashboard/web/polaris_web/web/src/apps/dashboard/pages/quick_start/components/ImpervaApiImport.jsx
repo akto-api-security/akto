@@ -1,11 +1,10 @@
-import { Button, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
-import IntegrationsLayout from "./IntegrationsLayout"
+import { Button, ButtonGroup, Text, TextField, VerticalStack } from "@shopify/polaris"
 import PasswordTextField from "@/apps/dashboard/components/layouts/PasswordTextField"
 import { useEffect, useState } from "react"
-import settingRequests from "../api"
+import settingRequests from "../../settings/api"
 import func from "@/util/func"
 
-function Imperva() {
+function ImpervaApiImport() {
 
     const [apiId, setApiId] = useState('')
     const [apiKey, setApiKey] = useState('')
@@ -59,36 +58,25 @@ function Imperva() {
         STOPPED: `Last import stopped at ${func.epochToDateTime(importJob?.lastUpdatedAt)}.`,
     }[importJob?.jobStatus] || "No import has run yet."
 
-    const impervaCard = (
-        <LegacyCard primaryFooterAction={{content: 'Save', onAction: saveImpervaIntegration, disabled: !apiId?.trim() || !apiKey?.trim()}}>
-            <LegacyCard.Section title="Imperva API credentials">
-                <VerticalStack gap={"4"}>
-                    <TextField label="API ID" value={apiId} onChange={setApiId} requiredIndicator />
-                    <PasswordTextField label="API Key" field={apiKey} setField={setApiKey} onFunc={true} requiredIndicator />
-                </VerticalStack>
-            </LegacyCard.Section>
-            {integration && (
-                <LegacyCard.Section title="Import">
-                    <VerticalStack gap={"2"} inlineAlign="start">
-                        <Text tone="subdued">{importStatus}</Text>
-                        {importActive ?
-                            <Button onClick={stopImpervaImport}>Stop import</Button> :
-                            <Button onClick={triggerImpervaImport}>Import APIs</Button>
-                        }
-                    </VerticalStack>
-                </LegacyCard.Section>
-            )}
-        </LegacyCard>
-    )
-
     return (
-        <IntegrationsLayout
-            title="Imperva"
-            cardContent="Import your API inventory from Imperva API Security into Akto. Saving your Imperva API credentials starts the import; use Import APIs to pull the latest inventory again."
-            component={impervaCard}
-            docsUrl="https://docs.akto.io/traffic-connector/manual/imperva"
-        />
+        <div className='card-items'>
+            <Text variant='bodyMd'>
+                Connect your Imperva API Security account to import your API inventory into Akto. Saving the credentials starts the import; use Import APIs to pull the latest inventory again.
+            </Text>
+            <VerticalStack gap="3">
+                <TextField label="API ID" value={apiId} onChange={setApiId} requiredIndicator />
+                <PasswordTextField label="API Key" field={apiKey} setField={setApiKey} onFunc={true} requiredIndicator />
+                {integration && <Text color="subdued">{importStatus}</Text>}
+                <ButtonGroup>
+                    <Button primary onClick={saveImpervaIntegration} disabled={!apiId?.trim() || !apiKey?.trim()}>Save and import</Button>
+                    {integration && (importActive ?
+                        <Button onClick={stopImpervaImport}>Stop import</Button> :
+                        <Button onClick={triggerImpervaImport}>Import APIs</Button>
+                    )}
+                </ButtonGroup>
+            </VerticalStack>
+        </div>
     )
 }
 
-export default Imperva
+export default ImpervaApiImport
