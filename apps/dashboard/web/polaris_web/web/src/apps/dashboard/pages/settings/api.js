@@ -1209,6 +1209,21 @@ const settingRequests = {
             data: {moduleIds, envData}
         })
     },
+    // Akto users only: validates the agents' stored skills again in a dashboard job
+    triggerSkillRevalidation(agentIds) {
+        return request({
+            url: '/api/triggerSkillRevalidation',
+            method: 'post',
+            data: {agentIds}
+        })
+    },
+    fetchSkillRevalidationJob() {
+        return request({
+            url: '/api/fetchSkillRevalidationJob',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchFilterYamlTemplate() {
         return request({
             url: '/api/fetchFilterYamlTemplate',
