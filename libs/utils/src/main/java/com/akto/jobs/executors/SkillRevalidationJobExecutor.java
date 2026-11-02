@@ -62,6 +62,11 @@ public class SkillRevalidationJobExecutor extends JobExecutor<SkillRevalidationJ
     private static final String CYBORG_URL = System.getenv().getOrDefault("SKILL_REVALIDATION_CYBORG_URL", ClientActor.CYBORG_URL)
         .replaceAll("/+$", "");
 
+    // Each call is a synchronous LLM call in cyborg; back to back they trip the provider's rate limit.
+    // Same spacing as the endpoint-shield agent's skill validation worker (skillValidationInterval).
+    private static final long CALL_INTERVAL_MILLIS = TimeUnit.SECONDS.toMillis(
+        Long.parseLong(System.getenv().getOrDefault("SKILL_REVALIDATION_INTERVAL_SECONDS", "5")));
+
     private static final MediaType JSON = MediaType.parse("application/json");
 
     // one LLM call per skill, so allow for a slow reply
@@ -93,7 +98,9 @@ public class SkillRevalidationJobExecutor extends JobExecutor<SkillRevalidationJ
         claims.put("accountId", Context.accountId.get());
         String token = JwtAuthenticator.createJWT(claims, "Akto", "invite_user", Calendar.DATE, 1);
 
-        for (SampleData skill : skills) {
+        for (int i = 0; i < skills.size(); i++) {
+            SampleData skill = skills.get(i);
+            if (i > 0) Thread.sleep(CALL_INTERVAL_MILLIS);
             if (!isStillRunning(job)) {
                 logger.infoAndAddToDb("Skill revalidation job " + job.getId() + " was stopped");
                 return;
