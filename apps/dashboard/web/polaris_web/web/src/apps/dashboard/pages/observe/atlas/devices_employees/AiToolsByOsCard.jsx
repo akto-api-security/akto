@@ -8,7 +8,7 @@ const CATEGORY_ORDER = ["agents", "ide", "mcp", "browser"];
 const DARK_CATEGORIES = ["agents"];
 
 function AiToolsByOsCard({ overview, status, onSelect }) {
-    const rows = overview?.osMatrix || [];
+    const rows = (overview?.osMatrix || []).filter((row) => row.os !== "unknown");
     const toolsAvailable = overview?.toolsAvailable !== false;
 
     return (

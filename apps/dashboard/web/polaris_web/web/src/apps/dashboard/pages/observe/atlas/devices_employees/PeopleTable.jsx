@@ -12,7 +12,8 @@ import {
     CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, OS_LABELS,
 } from "./peopleConstants";
 
-const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false, cellStyle: { display: "flex", alignItems: "center" } };
+const DEFAULT_COL_DEF = { sortable: true, resizable: false, filter: false, suppressHeaderMenuButton: true, cellStyle: { display: "flex", alignItems: "center" } };
+const ROW_HEIGHT = 56;
 
 const EMPLOYEE_COLUMNS = [
     { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer },
@@ -58,45 +59,57 @@ function appliedTags(filters) {
     return tags;
 }
 
-function FilterBar({ tab, filters, onFiltersChange }) {
+function ChipRow({ tab, filters, onFiltersChange }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
+    return (
+        <Box paddingInlineStart="2" paddingInlineEnd="3">
+            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                {chips.map((chip) => {
+                    const active = isChipActive(chip.key, filters);
+                    return (
+                        <Pressable
+                            key={chip.key}
+                            accessibilityLabel={chip.label}
+                            onClick={() => toggleChip(chip.key, filters, onFiltersChange)}
+                            background={active ? "bg-primary-subdued-hover" : "bg"}
+                            hoverBackground="bg-primary-subdued-hover"
+                            borderWidth="1"
+                            borderColor={active ? "border-magic" : "border"}
+                            borderRadius="2"
+                            paddingBlockStart="1"
+                            paddingBlockEnd="1"
+                            paddingInlineStart="3"
+                            paddingInlineEnd="3"
+                        >
+                            <Box as="span" color={active ? "text-ask-magic" : undefined}>
+                                <Text as="span" variant="bodySm" fontWeight={active ? "semibold" : "regular"}>{chip.label}</Text>
+                            </Box>
+                        </Pressable>
+                    );
+                })}
+            </HorizontalStack>
+        </Box>
+    );
+}
+
+function AppliedTags({ filters, onFiltersChange }) {
     const tags = appliedTags(filters);
     return (
         <HorizontalStack gap="2" blockAlign="center">
-            {chips.map((chip) => {
-                const active = isChipActive(chip.key, filters);
-                return (
-                    <Pressable
-                        key={chip.key}
-                        accessibilityLabel={chip.label}
-                        onClick={() => toggleChip(chip.key, filters, onFiltersChange)}
-                        background={active ? "bg-primary-subdued-hover" : "bg"}
-                        hoverBackground="bg-primary-subdued-hover"
-                        borderWidth="1"
-                        borderColor={active ? "border-magic" : "border"}
-                        borderRadius="2"
-                        paddingBlockStart="1"
-                        paddingBlockEnd="1"
-                        paddingInlineStart="3"
-                        paddingInlineEnd="3"
-                    >
-                        <Box as="span" color={active ? "text-ask-magic" : undefined}><Text as="span" variant="bodySm" fontWeight={active ? "semibold" : "regular"}>{chip.label}</Text></Box>
-                    </Pressable>
-                );
-            })}
             {tags.map((tag) => <Tag key={tag.key} onRemove={() => onFiltersChange(tag.clear)}>{tag.label}</Tag>)}
-            {tags.length > 0 && <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>}
+            <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>
         </HorizontalStack>
     );
 }
 
 function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable }) {
     const isEmployees = tab === "employees";
+    const hasAppliedFilters = appliedTags(filters).length > 0;
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
     const tabs = [
-        { id: "employees", content: `Employees (${counts.employees ?? "—"})` },
-        { id: "devices", content: `Devices (${counts.devices ?? "—"})` },
+        { id: "employees", content: "Employees", badge: counts.employees != null ? counts.employees.toLocaleString("en-US") : undefined },
+        { id: "devices", content: "Devices", badge: counts.devices != null ? counts.devices.toLocaleString("en-US") : undefined },
     ];
 
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
@@ -141,7 +154,9 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 searchPlaceholder={isEmployees ? "Search employees or their devices" : "Search devices, owners or OS"}
                 searchValue={search}
                 onSearchChange={onSearchChange}
-                searchBelow={<FilterBar tab={tab} filters={filters} onFiltersChange={onFiltersChange} />}
+                searchAccessory={<ChipRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} />}
+                searchBelow={hasAppliedFilters ? <AppliedTags filters={filters} onFiltersChange={onFiltersChange} /> : null}
+                rowHeight={ROW_HEIGHT}
                 noOuterBorder
                 sideBar={false}
                 context={{ violationsAvailable }}

@@ -53,7 +53,7 @@ export function RiskCellRenderer({ data }) {
     return (
         <Tooltip content={content} width="wide">
             <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <Box width="90px"><ProgressBar progress={data.risk} size="small" color={data.risk >= HIGH_RISK_THRESHOLD ? "critical" : "primary"} /></Box>
+                <Box width="100%"><ProgressBar progress={data.risk} size="small" color={data.risk >= HIGH_RISK_THRESHOLD ? "critical" : "primary"} /></Box>
                 <Text as="span" fontWeight="semibold">{data.risk}</Text>
             </HorizontalStack>
         </Tooltip>

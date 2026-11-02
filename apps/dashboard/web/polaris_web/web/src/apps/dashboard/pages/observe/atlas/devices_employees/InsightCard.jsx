@@ -7,8 +7,8 @@ function InsightCard({ title, subtitle, status, children }) {
     if (status === "error") body = <Text as="p" color="subdued">This card could not be loaded. The other cards are unaffected.</Text>;
 
     return (
-        <Card>
-            <Box padding="4">
+        <Card padding="0">
+            <Box padding="5">
                 <VerticalStack gap="4">
                     <VerticalStack gap="1">
                         <Text as="h3" variant="headingMd">{title}</Text>

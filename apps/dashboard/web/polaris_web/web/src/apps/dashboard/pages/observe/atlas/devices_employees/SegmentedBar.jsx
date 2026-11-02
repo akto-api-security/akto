@@ -24,8 +24,8 @@ function SegmentedBar({ segments, onSelect }) {
                         width: `${percent}%`,
                         background: segment.background,
                         color: segment.lightText ? "text-on-color" : undefined,
-                        paddingBlockStart: "2",
-                        paddingBlockEnd: "2",
+                        paddingBlockStart: "3",
+                        paddingBlockEnd: "3",
                         title: segment.tooltip || `${segment.label}: ${segment.count}`,
                     };
                     return onSelect ? (
