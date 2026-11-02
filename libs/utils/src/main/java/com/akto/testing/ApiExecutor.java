@@ -21,6 +21,7 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
 import com.akto.util.trpc.TrpcUtils;
+import com.mongodb.BasicDBObject;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -314,27 +315,55 @@ public class ApiExecutor {
         }
         removeAktoInternalHeaders(request);
 
+        // where to connect: the connection endpoint itself, else the collection's connection (null when
+        // none was captured - the pre-request script can supply it)
+        String wsUrl = request.isConnectionString() ? buildWebSocketUrl(request) : getWebSocketConnectionUrl(collectionId);
+        wsUrl = overrideWebSocketHost(wsUrl, testingRunConfig);
+
+        // type and requestId go in before the script, so a script that signs the frame signs what is sent
+        String requestId = null;
+        if (!request.isConnectionString() && !StringUtils.isEmpty(request.getBody())) {
+            String body = WebSocketExecutor.enrichMessageWithUrl(request.getBody(), request.getUrl());
+            if (Constants.IS_NEW_TESTING_ENABLED) {
+                requestId = UUID.randomUUID().toString();
+                body = WebSocketExecutor.enrichMessageWithRequestId(body, requestId);
+            }
+            request.setBody(body);
+        }
+
+        ApiExecutorUtil.WebSocketAttempt attempt = ApiExecutorUtil.prepareWebSocketAttempt(request, wsUrl, testingRunConfig);
+        if (StringUtils.isEmpty(attempt.connectionUrl)) {
+            String error = "No WebSocket connection URL: capture the connection endpoint or set connectionUrl in the pre-request script";
+            loggerMaker.errorAndAddToDb(error + " (apiCollectionId " + collectionId + ", " + request.getUrl() + ")", LogDb.TESTING);
+            return new OriginalHttpResponse(new BasicDBObject("error", error).toJson(), new HashMap<>(), 500);
+        }
+        request.setHeaders(attempt.headers);
+        request.setBody(attempt.payload);
+        String connectionUrl = attempt.connectionUrl;
+
+        // mark the handshake as test traffic, as the HTTP path does, so traffic capture skips it
+        Map<String, List<String>> headers = request.getHeaders();
+        if (!headers.containsKey(Constants.AKTO_COVERAGE_FLAG)) {
+            headers.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
+        }
+
         long timeoutMs = 30000;  // Default 30 second timeout for WebSocket messages
 
         // For Kafka parallel execution (new testing mode), use direct (non-pooled) connections
         // to avoid message mixing between concurrent tasks
         if (Constants.IS_NEW_TESTING_ENABLED) {
-            String wsUrl = request.isConnectionString() ? buildWebSocketUrl(request) : getWebSocketConnectionUrl(collectionId);
-            String requestId = UUID.randomUUID().toString();
-            return WebSocketExecutor.sendMessageDirect(request, wsUrl, request.getHeaders(), timeoutMs, requestId);
+            return WebSocketExecutor.sendMessageDirect(request, connectionUrl, headers, timeoutMs, requestId);
         }
 
         // Connection-string endpoints: open a fresh WS connection, capture the initial server
         // message, close immediately, and return 200. No pool, no message to send.
         if (request.isConnectionString()) {
-            String wsUrl = buildWebSocketUrl(request);
-            return WebSocketExecutor.connectAndGetInitialMessage(wsUrl, request.getHeaders(), timeoutMs);
+            return WebSocketExecutor.connectAndGetInitialMessage(connectionUrl, headers, timeoutMs);
         }
 
-        String connectionUrl = getWebSocketConnectionUrl(collectionId);
-        String subcategoryId = testingRunConfig != null && testingRunConfig.getConversationId() != null ? 
+        String subcategoryId = testingRunConfig != null && testingRunConfig.getConversationId() != null ?
             testingRunConfig.getConversationId() : "default";
-        
+
         try {
             return WebSocketExecutor.sendMessage(request, connectionUrl, subcategoryId, timeoutMs);
         } catch (Exception e) {
@@ -1136,7 +1165,9 @@ public class ApiExecutor {
 
     private static String buildWebSocketUrl(OriginalHttpRequest request) {
         String path = request.getUrl();
-        
+        // the sample's query was split off into queryParams; a WS handshake often carries its token there
+        String query = request.getQueryParams();
+
         // Extract host from headers
         String host = null;
         if (request.getHeaders() != null) {
@@ -1145,16 +1176,36 @@ public class ApiExecutor {
                 host = hostValues.get(0);
             }
         }
-        
+
         // If no host header, return path as-is (fallback, unlikely)
         if (host == null || host.isEmpty()) {
-            return path.startsWith("ws") ? path : "wss://" + path;
+            return OriginalHttpRequest.getFullUrlWithParams(path.startsWith("ws") ? path : "wss://" + path, query);
         }
-        
+
         // Use wss:// everywhere; fall back to ws:// only for localhost
         String scheme = host.toLowerCase().contains("localhost") ? "ws://" : "wss://";
-        
+
         // Build full URL: scheme + host + path
-        return scheme + host + path;
+        return OriginalHttpRequest.getFullUrlWithParams(scheme + host + path, query);
+    }
+
+    // the override test-app URL applies to the WS connection as it does to HTTP, keeping the WS scheme
+    private static String overrideWebSocketHost(String wsUrl, TestingRunConfig testingRunConfig) {
+        if (wsUrl == null || testingRunConfig == null || StringUtils.isEmpty(testingRunConfig.getOverriddenTestAppUrl())) {
+            return wsUrl;
+        }
+        try {
+            String url = replaceHostFromConfig(wsUrl, testingRunConfig);
+            if (url.startsWith("https://")) {
+                return "wss://" + url.substring("https://".length());
+            }
+            if (url.startsWith("http://")) {
+                return "ws://" + url.substring("http://".length());
+            }
+            return url;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Failed to apply override URL to WebSocket connection " + wsUrl + ": " + e.getMessage(), LogDb.TESTING);
+            return wsUrl;
+        }
     }
 }

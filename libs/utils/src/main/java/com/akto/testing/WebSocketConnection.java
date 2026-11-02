@@ -31,10 +31,13 @@ public class WebSocketConnection {
     /** Wall-clock time of the most recent sendMessage call; responses received before this are ignored. */
     private volatile long lastSentAt = 0;
     private final Object lock = new Object();
-    private boolean isConnected = false;
-    private boolean isClosed = false;
-    private String closeReason;
-    private int closeCode;
+    private volatile boolean isConnected = false;
+    private volatile boolean isClosed = false;
+    private volatile String closeReason;
+    private volatile int closeCode;
+    /** HTTP status of a refused handshake; 0 when the handshake succeeded or never got a response. */
+    private volatile int handshakeStatus;
+    private volatile String failureMessage;
 
     public WebSocketConnection(String url, Map<String, List<String>> headers, String subcategoryId) {
         this.url = url;
@@ -68,81 +71,69 @@ public class WebSocketConnection {
         loggerMaker.infoAndAddToDb("WebSocket message sent: " + payload.substring(0, Math.min(100, payload.length())), LogDb.TESTING);
     }
 
-    public String getNextResponse(long timeoutMs) throws TimeoutException, InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        TimestampedMessage resultMsg = null;
-        
-        while (System.currentTimeMillis() < deadline) {
-            // Find the most recent valid message after send
-            TimestampedMessage msg = null;
-            Iterator<TimestampedMessage> iter = receivedMessages.iterator();
-            while (iter.hasNext()) {
-                TimestampedMessage candidate = iter.next();
-                if (candidate.receivedAt >= lastSentAt && !isPingPong(candidate.content)) {
-                    msg = candidate;  // Keep updating to get the most recent
-                }
-            }
-            
-            if (msg != null) {
-                resultMsg = msg;
-                break;  // Found it, exit the timeout loop
-            }
-            Thread.sleep(10);
+    /** Thrown when the server closed (or refused) the connection before replying. */
+    public static class ClosedException extends Exception {
+        public ClosedException(String message) {
+            super(message);
         }
-        
-        // Clear all messages (whether we found one or timed out)
-        receivedMessages.clear();
-        
-        if (resultMsg != null) {
-            loggerMaker.infoAndAddToDb("WebSocket response received: " + resultMsg.content.substring(0, Math.min(100, resultMsg.content.length())), LogDb.TESTING);
-            return resultMsg.content;
-        }
-        throw new TimeoutException("No response received within " + timeoutMs + "ms");
     }
 
-    public String getNextResponse(long timeoutMs, String requestId) throws TimeoutException, InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        TimestampedMessage resultMsg = null;
-        
-        while (System.currentTimeMillis() < deadline) {
-            TimestampedMessage requestIdMatch = null;
+    // after the first reply frame, how long to wait for a later one (e.g. an ack followed by the real reply)
+    private static final long SETTLE_MS = 300;
 
-            Iterator<TimestampedMessage> iter = receivedMessages.iterator();
-            while (iter.hasNext()) {
-                TimestampedMessage candidate = iter.next();
-                if (candidate.receivedAt >= lastSentAt && !isPingPong(candidate.content)) {
-                    if (messageContainsRequestId(candidate.content, requestId)) {
-                        requestIdMatch = candidate;  // Keep updating to get most recent match
+    public String getNextResponse(long timeoutMs) throws TimeoutException, InterruptedException, ClosedException {
+        return getNextResponse(timeoutMs, null);
+    }
+
+    /**
+     * The server's reply to the last sent message: the frame echoing requestId if the server echoes it,
+     * else the latest frame received within SETTLE_MS of the first one. Stops waiting as soon as the
+     * server closes the connection.
+     */
+    public String getNextResponse(long timeoutMs, String requestId) throws TimeoutException, InterruptedException, ClosedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        long settleUntil = -1;
+        TimestampedMessage resultMsg = null;
+        try {
+            while (true) {
+                TimestampedMessage requestIdMatch = null;
+                TimestampedMessage latest = null;
+                for (TimestampedMessage candidate : receivedMessages) {
+                    if (candidate.receivedAt >= lastSentAt && !isPingPong(candidate.content)) {
+                        latest = candidate;
+                        if (messageContainsRequestId(candidate.content, requestId)) {
+                            requestIdMatch = candidate;
+                        }
                     }
                 }
-            }
-            
-            if (requestIdMatch != null) {
-                resultMsg = requestIdMatch;
-                break;
-            }
-            Thread.sleep(10);
-        }
-        
-        // If no requestId match found after timeout, fall back to most recent valid message
-        if (resultMsg == null) {
-            Iterator<TimestampedMessage> iter = receivedMessages.iterator();
-            while (iter.hasNext()) {
-                TimestampedMessage candidate = iter.next();
-                if (candidate.receivedAt >= lastSentAt && !isPingPong(candidate.content)) {
-                    resultMsg = candidate;
+
+                long now = System.currentTimeMillis();
+                if (requestIdMatch != null) {
+                    resultMsg = requestIdMatch;
+                    break;
                 }
+                if (latest != null) {
+                    if (settleUntil < 0) {
+                        settleUntil = now + SETTLE_MS;
+                    }
+                    if (now >= settleUntil || now >= deadline || isClosed) {
+                        resultMsg = latest;
+                        break;
+                    }
+                } else if (isClosed) {
+                    throw new ClosedException("Connection closed before a reply (code " + closeCode + ")");
+                } else if (now >= deadline) {
+                    throw new TimeoutException("No response received within " + timeoutMs + "ms");
+                }
+                Thread.sleep(10);
             }
+        } finally {
+            receivedMessages.clear();
         }
 
-        // Clear all messages (whether we found one or timed out)
-        receivedMessages.clear();
-        
-        if (resultMsg != null) {
-            loggerMaker.infoAndAddToDb("WebSocket response received (requestId=" + requestId + "): " + resultMsg.content.substring(0, Math.min(100, resultMsg.content.length())), LogDb.TESTING);
-            return resultMsg.content;
-        }
-        throw new TimeoutException("No response received within " + timeoutMs + "ms");
+        loggerMaker.infoAndAddToDb("WebSocket response received" + (requestId != null ? " (requestId=" + requestId + ")" : "") + ": "
+                + resultMsg.content.substring(0, Math.min(100, resultMsg.content.length())), LogDb.TESTING);
+        return resultMsg.content;
     }
 
     public void onMessage(String text) {
@@ -182,6 +173,11 @@ public class WebSocketConnection {
 
     public void onFailure(WebSocket webSocket, Throwable t, okhttp3.Response response) {
         synchronized (lock) {
+            // a refused handshake comes back as a plain HTTP response (e.g. 401/403) instead of 101
+            if (response != null && response.code() != 101) {
+                this.handshakeStatus = response.code();
+            }
+            this.failureMessage = t != null ? t.getMessage() : null;
             this.isClosed = true;
             lock.notifyAll();
         }
@@ -250,16 +246,30 @@ public class WebSocketConnection {
         return closeReason;
     }
 
-    public void waitForConnection(long timeoutMs) throws TimeoutException, InterruptedException {
+    public int getHandshakeStatus() {
+        return handshakeStatus;
+    }
+
+    public String getFailureMessage() {
+        return failureMessage;
+    }
+
+    public void waitForConnection(long timeoutMs) throws TimeoutException, InterruptedException, ClosedException {
         long deadline = System.currentTimeMillis() + timeoutMs;
         synchronized (lock) {
-            while (!isConnected && System.currentTimeMillis() < deadline) {
+            // a failed handshake closes the connection: stop waiting instead of running out the timeout
+            while (!isConnected && !isClosed && System.currentTimeMillis() < deadline) {
                 long waitTime = deadline - System.currentTimeMillis();
                 if (waitTime > 0) {
                     lock.wait(waitTime);
                 }
             }
             if (!isConnected) {
+                if (isClosed) {
+                    throw new ClosedException("WebSocket connection refused"
+                            + (handshakeStatus > 0 ? " (HTTP " + handshakeStatus + ")" : "")
+                            + (failureMessage != null ? ": " + failureMessage : ""));
+                }
                 throw new TimeoutException("WebSocket connection not established within " + timeoutMs + "ms");
             }
         }

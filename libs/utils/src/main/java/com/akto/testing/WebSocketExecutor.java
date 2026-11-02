@@ -31,14 +31,11 @@ public class WebSocketExecutor {
             WebSocketConnectionPool.createDirectConnection(connectionUrl, filteredHeaders, conn);
             conn.waitForConnection(timeoutMs);
 
+            // sent as prepared by ApiExecutor: type injected, then the pre-request script
             String requestBody = request.getBody();
             if (requestBody == null || requestBody.isEmpty()) {
                 throw new IllegalArgumentException("WebSocket message body cannot be empty");
             }
-
-            // Inject the URL into the request body as the "type" field
-            requestBody = enrichMessageWithUrl(requestBody, request.getUrl());
-            request.setBody(requestBody);
 
             // Drain any pending messages before sending to avoid response mismatch
             conn.drainPendingMessages();
@@ -53,20 +50,15 @@ public class WebSocketExecutor {
                 200
             );
 
+        } catch (WebSocketConnection.ClosedException e) {
+            loggerMaker.errorAndAddToDb("WebSocket closed: " + e.getMessage(), LogDb.TESTING);
+            return closedResponse(conn, e.getMessage());
         } catch (TimeoutException e) {
             loggerMaker.errorAndAddToDb("WebSocket timeout: " + e.getMessage(), LogDb.TESTING);
-            return new OriginalHttpResponse(
-                "{\"error\": \"timeout\"}",
-                new HashMap<>(),
-                504
-            );
+            return errorResponse("timeout", 504);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("WebSocket execution failed: " + e.getMessage(), LogDb.TESTING);
-            return new OriginalHttpResponse(
-                "{\"error\": \"" + e.getMessage() + "\"}",
-                new HashMap<>(),
-                500
-            );
+            return errorResponse(e.getMessage(), 500);
         } finally {
             conn.close();
         }
@@ -109,19 +101,69 @@ public class WebSocketExecutor {
         try {
             WebSocketConnectionPool.createDirectConnection(wsUrl, filteredHeaders, conn);
             conn.waitForConnection(timeoutMs);
-            String responseBody;
-            try {
-                responseBody = conn.getNextResponse(timeoutMs);
-            } catch (java.util.concurrent.TimeoutException e) {
-                responseBody = "{}";
-            }
-            return new OriginalHttpResponse(responseBody, new HashMap<>(), 200);
+            return initialMessageResponse(conn);
+        } catch (WebSocketConnection.ClosedException e) {
+            loggerMaker.errorAndAddToDb("WS connection string closed: " + e.getMessage(), LogDb.TESTING);
+            return closedResponse(conn, e.getMessage());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("WS connection string connect failed: " + e.getMessage(), LogDb.TESTING);
-            return new OriginalHttpResponse("{\"error\": \"" + e.getMessage() + "\"}", new HashMap<>(), 500);
+            return errorResponse(e.getMessage(), 500);
         } finally {
             conn.close();
         }
+    }
+
+    // a server that sends a greeting does so right after the handshake; one that doesn't must not cost the full timeout
+    private static final long INITIAL_MESSAGE_WAIT_MS = 3000;
+
+    /** A connection-string endpoint is tested by connecting: its greeting, if any, is the response. */
+    private static OriginalHttpResponse initialMessageResponse(WebSocketConnection conn)
+            throws InterruptedException, WebSocketConnection.ClosedException {
+        String responseBody;
+        try {
+            responseBody = conn.getNextResponse(INITIAL_MESSAGE_WAIT_MS);
+        } catch (TimeoutException e) {
+            responseBody = "{}";
+        }
+        return new OriginalHttpResponse(responseBody, new HashMap<>(), 200);
+    }
+
+    /**
+     * WebSocket has no status line, so a rejection is mapped to the HTTP status templates check:
+     * the refused handshake's own status, else the server's close code.
+     */
+    static int statusForClosedConnection(int handshakeStatus, int closeCode) {
+        if (handshakeStatus > 0) {
+            return handshakeStatus;
+        }
+        // application close codes often carry an HTTP status: 4401 -> 401, 4403 -> 403
+        if (closeCode >= 4400 && closeCode <= 4599) {
+            return closeCode - 4000;
+        }
+        switch (closeCode) {
+            case 0:
+                return 500; // no handshake response and no close frame: the connection itself failed
+            case 1008:
+                return 403; // policy violation, the usual way servers reject credentials
+            case 1011:
+                return 500; // server error
+            default:
+                return 400; // closed without replying: the message was not accepted
+        }
+    }
+
+    private static OriginalHttpResponse closedResponse(WebSocketConnection conn, String message) {
+        BasicDBObject body = new BasicDBObject("error", message);
+        if (conn.getCloseCode() > 0) {
+            body.put("closeCode", conn.getCloseCode());
+            body.put("closeReason", conn.getCloseReason());
+        }
+        return new OriginalHttpResponse(body.toJson(), new HashMap<>(),
+                statusForClosedConnection(conn.getHandshakeStatus(), conn.getCloseCode()));
+    }
+
+    private static OriginalHttpResponse errorResponse(String message, int status) {
+        return new OriginalHttpResponse(new BasicDBObject("error", message).toJson(), new HashMap<>(), status);
     }
 
     /**
@@ -129,7 +171,7 @@ public class WebSocketExecutor {
      * Parses the body as JSON, sets type to the URL, and returns the modified JSON.
      * If parsing fails, returns the original body unchanged.
      */
-    private static String enrichMessageWithUrl(String requestBody, String url) {
+    static String enrichMessageWithUrl(String requestBody, String url) {
         try {
             // Remove leading slash if present
             String cleanUrl = url;
@@ -146,7 +188,7 @@ public class WebSocketExecutor {
         }
     }
 
-    private static String enrichMessageWithRequestId(String requestBody, String requestId) {
+    static String enrichMessageWithRequestId(String requestBody, String requestId) {
         if (requestId == null) {
             return requestBody;
         }
@@ -175,33 +217,35 @@ public class WebSocketExecutor {
             WebSocketConnectionPool.createDirectConnection(wsUrl, filteredHeaders, conn);
             conn.waitForConnection(timeoutMs);
             
-            // Send message
+            // a connection-string endpoint has no message to send
+            if (request.isConnectionString()) {
+                return initialMessageResponse(conn);
+            }
+
+            // sent as prepared by ApiExecutor: type and requestId injected, then the pre-request script
             String requestBody = request.getBody();
             if (requestBody == null || requestBody.isEmpty()) {
                 throw new IllegalArgumentException("WebSocket message body cannot be empty");
             }
-            // Inject URL into request body as "type" field and requestId for correlation
-            if(!request.isConnectionString()){
-                requestBody = enrichMessageWithUrl(requestBody, request.getUrl());
-                requestBody = enrichMessageWithRequestId(requestBody, requestId);
-                request.setBody(requestBody);
-                
-                // Drain any pending messages before sending to avoid response mismatch
-                conn.drainPendingMessages();
-                
-                conn.sendMessage(requestBody);
-            }
-            
-            // Get response with request ID matching
+
+            // Drain any pending messages before sending to avoid response mismatch
+            conn.drainPendingMessages();
+
+            conn.sendMessage(requestBody);
+
+            // the frame echoing requestId when the server echoes it, else the first reply
             String response = conn.getNextResponse(timeoutMs, requestId);
-            
+
             return new OriginalHttpResponse(response, new HashMap<>(), 200);
+        } catch (WebSocketConnection.ClosedException e) {
+            loggerMaker.errorAndAddToDb("Kafka WS closed: " + e.getMessage(), LogDb.TESTING);
+            return closedResponse(conn, e.getMessage());
         } catch (java.util.concurrent.TimeoutException e) {
             loggerMaker.errorAndAddToDb("Kafka WS timeout: " + e.getMessage(), LogDb.TESTING);
-            return new OriginalHttpResponse("{\"error\": \"timeout\"}", new HashMap<>(), 504);
+            return errorResponse("timeout", 504);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Kafka WS direct execution failed: " + e.getMessage(), LogDb.TESTING);
-            return new OriginalHttpResponse("{\"error\": \"" + e.getMessage() + "\"}", new HashMap<>(), 500);
+            return errorResponse(e.getMessage(), 500);
         } finally {
             conn.close();
         }

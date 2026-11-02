@@ -226,6 +226,8 @@ public class StatusCodeAnalyser {
         if (filteredMessages.isEmpty()) return false;
 
         RawApi rawApi = filteredMessages.get(0);
+        // learns HTTP error-status patterns; a WebSocket reply has none
+        if (rawApi.getRequest().getProtocolType() == OriginalHttpRequest.ProtocolType.WEBSOCKET) return false;
         new Executor().overrideTestUrl(rawApi, testingRunConfig);
 
         OriginalHttpRequest request = rawApi.getRequest();
