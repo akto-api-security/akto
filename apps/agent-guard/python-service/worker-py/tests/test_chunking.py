@@ -1,5 +1,6 @@
 """A scan whose prompt is longer than the model's context window is split into chunks (network mocked)."""
 
+import asyncio
 import json
 import math
 import random
@@ -132,26 +133,37 @@ async def test_past_the_cap_the_head_and_the_last_chunk_are_scanned():
 
 
 async def test_password_reports_the_secrets_of_every_chunk():
-    secrets = ["pwd=Hunter2024#", "AKIA5XYZ12ABCD34EFGH"]
-    text = f"{secrets[0]} " + _words(60_000) + f" {secrets[1]}"
-    model = _Model(budget=20_000, answer=lambda p: json.dumps({"values": [s for s in secrets if s in p]}))
+    # Plain markers, not secret-shaped strings: the fake model reports whichever are in its chunk.
+    found = ["first-chunk-marker", "last-chunk-marker"]
+    text = f"{found[0]} " + _words(60_000) + f" {found[1]}"
+    model = _Model(budget=20_000, answer=lambda p: json.dumps({"values": [s for s in found if s in p]}))
     result = await _scan(model, text, scanner="Password", response_format="values")
     assert result["is_valid"] is False
-    assert result["details"]["values"] == secrets
+    assert result["details"]["values"] == found
+
+
+def test_a_break_right_after_the_start_does_not_shred_the_text():
+    # Each search window holds only the line break at its own start. Cutting there would make a piece of one new
+    # character every other step; the cut must leave at least half the window as new text.
+    text = ("\n" + "y" * 600) * 50
+    pieces = _split(text, lambda piece: True, 600)
+    assert len(pieces) <= math.ceil(len(text) / 600) + 1
 
 
 # ── context budget from the endpoint ──────────────────────────────────────────
 
 
 class _Models:
-    """Stand-in http client: GET /models answers with `max_model_len`, or raises."""
+    """Stand-in http client: GET /models answers with `max_model_len` after `delay` seconds, or raises."""
 
     def __init__(self, max_model_len):
         self.max_model_len = max_model_len
         self.gets = 0
+        self.delay = 0.0
 
     async def get(self, url, headers=None, timeout=None):
         self.gets += 1
+        await asyncio.sleep(self.delay)
         if isinstance(self.max_model_len, Exception):
             raise self.max_model_len
         data = [{"id": "other", "max_model_len": 1}, {"id": "gemma", "max_model_len": self.max_model_len}]
@@ -161,37 +173,87 @@ class _Models:
 @pytest.fixture
 def endpoint(monkeypatch):
     monkeypatch.setattr(providers, "_MODEL_LEN", {})
+    monkeypatch.setattr(providers, "_MODEL_LEN_FETCH", {})
     client = _Models(32768)
     monkeypatch.setattr(providers.http_client, "get_client", lambda: client)
     return client
 
 
-async def test_budget_is_the_reported_context_minus_the_reply(endpoint, monkeypatch):
+def _budget(max_model_len: int) -> int:
+    return max_model_len - 256 - providers._CHAT_TEMPLATE_TOKENS
+
+
+def _expire():
+    """Age every cached limit past its expiry, as if the TTL had run out."""
+    for key, (value, _) in list(providers._MODEL_LEN.items()):
+        providers._MODEL_LEN[key] = (value, 0.0)
+
+
+async def _refreshed():
+    """Let the background /models reads that stale lookups started finish."""
+    await asyncio.gather(*providers._MODEL_LEN_FETCH.values(), return_exceptions=True)
+
+
+async def test_budget_is_the_reported_context_minus_the_reply(endpoint):
     model = OpenAIProvider("key", "gemma", base_url="http://vllm:80/v1")
-    assert await model.prompt_budget_bytes() == 32768 - 256 - providers._CHAT_TEMPLATE_TOKENS
+    assert await model.prompt_budget_bytes() == _budget(32768)
     await model.prompt_budget_bytes()
     assert endpoint.gets == 1  # cached
 
     endpoint.max_model_len = 65536  # server restarted with a longer context: picked up once the cache expires
-    now = providers.time.monotonic()
-    monkeypatch.setattr(providers.time, "monotonic", lambda: now + providers._MODEL_LEN_TTL_S + 1)
-    assert await model.prompt_budget_bytes() == 65536 - 256 - providers._CHAT_TEMPLATE_TOKENS
+    _expire()
+    assert await model.prompt_budget_bytes() == _budget(32768)  # the expired value, at once
+    await _refreshed()
+    assert await model.prompt_budget_bytes() == _budget(65536)
+    assert endpoint.gets == 2
 
 
-async def test_unreadable_limit_keeps_the_last_known_value(endpoint, monkeypatch):
+async def test_unreadable_limit_keeps_the_last_known_value(endpoint):
     model = OpenAIProvider("key", "gemma", base_url="http://vllm:80/v1")
     endpoint.max_model_len = httpx.ConnectError("refused")
     assert await model.prompt_budget_bytes() is None  # never known: send unsplit, as before
 
     endpoint.max_model_len = 32768
-    now = providers.time.monotonic()
-    monkeypatch.setattr(providers.time, "monotonic", lambda: now + providers._MODEL_LEN_RETRY_S + 1)
+    _expire()
+    await model.prompt_budget_bytes()
+    await _refreshed()
     known = await model.prompt_budget_bytes()
+    assert known == _budget(32768)
+
     endpoint.max_model_len = httpx.ConnectError("refused")
-    monkeypatch.setattr(providers.time, "monotonic", lambda: now + 2 * providers._MODEL_LEN_TTL_S)
+    _expire()
     assert await model.prompt_budget_bytes() == known
+    await _refreshed()
+    assert await model.prompt_budget_bytes() == known  # the failed refresh kept it
 
 
-async def test_fallback_is_sized_for_its_primary(monkeypatch):
+async def test_concurrent_first_lookups_share_one_read(endpoint):
+    endpoint.delay = 0.05
+    model = OpenAIProvider("key", "gemma", base_url="http://vllm:80/v1")
+    budgets = await asyncio.gather(*(model.prompt_budget_bytes() for _ in range(10)))
+    assert budgets == [_budget(32768)] * 10
+    assert endpoint.gets == 1
+
+
+async def test_an_expired_limit_is_served_without_waiting_on_the_refresh(endpoint):
+    model = OpenAIProvider("key", "gemma", base_url="http://vllm:80/v1")
+    await model.prompt_budget_bytes()
+    endpoint.delay = 5.0  # /models has turned slow: scans must not wait on it
+    _expire()
+    assert await asyncio.wait_for(model.prompt_budget_bytes(), 0.5) == _budget(32768)
+    for fetch in providers._MODEL_LEN_FETCH.values():
+        fetch.cancel()
+    await _refreshed()
+
+
+async def test_fallback_backup_without_a_limit_leaves_the_primarys(monkeypatch):
+    monkeypatch.setattr(providers, "build_provider_from_config", lambda entry: _Model(budget=None))
     fb = FallbackProvider(_Model(budget=12_345), {"provider": "anthropic"})
     assert await fb.prompt_budget_bytes() == 12_345
+
+
+async def test_fallback_is_sized_for_the_smaller_window(monkeypatch):
+    # After failover the backup serves the same chunks, so they must fit it too.
+    monkeypatch.setattr(providers, "build_provider_from_config", lambda entry: _Model(budget=8_000))
+    fb = FallbackProvider(_Model(budget=12_345), {"provider": "gemma_fast"})
+    assert await fb.prompt_budget_bytes() == 8_000

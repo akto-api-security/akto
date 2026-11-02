@@ -180,7 +180,9 @@ def _split(text: str, fits: Callable[[str], bool], size: int) -> list[str]:
     while start < len(text):
         end = min(start + size, len(text))
         if end < len(text):  # end on a line break or space near the limit, not mid-word
-            lo = max(start, end - _CHUNK_OVERLAP_CHARS)
+            # Search only the back half of the window, so a break right after `start` (say a "\n" when `size` is
+            # small) can't cut a piece down to a character or two and flood the chunk cap.
+            lo = max(start + size // 2, end - _CHUNK_OVERLAP_CHARS)
             cut = text.rfind("\n", lo, end)
             if cut == -1:
                 cut = text.rfind(" ", lo, end)
@@ -285,7 +287,9 @@ class LLMScanner:
             logger.warning(f"[LLMScanner] {scanner_name} prompt template alone nearly fills {budget} bytes, unsplit")
             return await self._complete(scanner_name, scanner_type, prompt)
 
-        fits = lambda piece: _nbytes(self._build(scanner_name, scanner_type, config, piece)) <= budget
+        def fits(piece: str) -> bool:
+            return _nbytes(self._build(scanner_name, scanner_type, config, piece)) <= budget
+
         pieces = _split(text, fits, int(room))
         skipped = max(0, len(pieces) - _MAX_CHUNKS)
         if skipped:

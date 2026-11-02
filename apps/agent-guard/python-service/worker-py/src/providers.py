@@ -161,16 +161,15 @@ _MODEL_LEN_TTL_S = 600.0
 _MODEL_LEN_RETRY_S = 60.0
 _MODEL_LEN_TIMEOUT_S = 2.0
 _MODEL_LEN: dict[tuple[str, str], tuple[int | None, float]] = {}
+# The one in-flight /models read per (base_url, model), shared by every scan that needs it.
+_MODEL_LEN_FETCH: dict[tuple[str, str], asyncio.Task] = {}
 # Tokens the chat template wraps around the user message (BOS, turn markers), with room to spare.
 _CHAT_TEMPLATE_TOKENS = 64
 
 
-async def _max_model_len(base_url: str, model: str, api_key: str) -> int | None:
+async def _fetch_max_model_len(base_url: str, model: str, api_key: str) -> None:
     key = (base_url, model)
-    value, expires_at = _MODEL_LEN.get(key, (None, 0.0))
-    now = time.monotonic()
-    if now < expires_at:
-        return value
+    value = _MODEL_LEN.get(key, (None, 0.0))[0]  # an unreadable /models keeps the last known value
     headers = dict(_IDENTITY, **({"Authorization": f"Bearer {api_key}"} if api_key else {}))
     try:
         resp = await http_client.get_client().get(f"{base_url}/models", headers=headers, timeout=_MODEL_LEN_TIMEOUT_S)
@@ -180,8 +179,25 @@ async def _max_model_len(base_url: str, model: str, api_key: str) -> int | None:
     except Exception as exc:
         logger.warning(f"[Providers] could not read max_model_len from {base_url}/models: {exc!r}")
         ttl = _MODEL_LEN_RETRY_S
-    _MODEL_LEN[key] = (value, now + ttl)
-    return value
+    _MODEL_LEN[key] = (value, time.monotonic() + ttl)
+
+
+async def _max_model_len(base_url: str, model: str, api_key: str) -> int | None:
+    """Cached max_model_len. A scan never waits on a refresh: an expired value is returned as is while one
+    background read, shared by concurrent scans, updates it. Only the first lookup in a process waits, on that
+    same shared read (bounded by _MODEL_LEN_TIMEOUT_S)."""
+    key = (base_url, model)
+    cached = _MODEL_LEN.get(key)
+    if cached is not None and time.monotonic() < cached[1]:
+        return cached[0]
+    fetch = _MODEL_LEN_FETCH.get(key)
+    if fetch is None or fetch.done() or fetch.get_loop() is not asyncio.get_running_loop():
+        fetch = asyncio.ensure_future(_fetch_max_model_len(base_url, model, api_key))
+        _MODEL_LEN_FETCH[key] = fetch
+    if cached is not None:
+        return cached[0]
+    await asyncio.shield(fetch)
+    return _MODEL_LEN[key][0]
 
 
 class LLMProvider(ABC):
@@ -1196,6 +1212,8 @@ class FallbackProvider(LLMProvider):
         # Hung primary must raise TimeoutError, not the caller's CancelledError, or the backup never runs.
         self.primary_timeout_s = primary_timeout_s
         self.backup_timeout_s = backup_timeout_s  # extra time the caller allows for the backup after the primary
+        self._budget_backup: LLMProvider | None = None  # built on first budget lookup, not per scan
+        self._budget_backup_built = False
 
     async def complete(self, prompt: str) -> str:
         if self.health_url:
@@ -1210,7 +1228,17 @@ class FallbackProvider(LLMProvider):
             return await self._complete_on_backup(prompt, repr(exc), exc)
 
     async def prompt_budget_bytes(self) -> int | None:
-        return await self.primary.prompt_budget_bytes()  # sized for the primary, which serves while it is up
+        """Chunks must fit whichever model serves them: the primary, or the backup after failover. So the budget is
+        the smaller of the two limits that are known. Backups that report none (Anthropic, Bedrock) leave the
+        primary's limit."""
+        if not self._budget_backup_built:
+            self._budget_backup = build_provider_from_config(self.backup_entry)
+            self._budget_backup_built = True
+        limits = [await self.primary.prompt_budget_bytes()]
+        if self._budget_backup is not None:
+            limits.append(await self._budget_backup.prompt_budget_bytes())
+        known = [limit for limit in limits if limit is not None]
+        return min(known) if known else None
 
     async def _complete_on_backup(self, prompt: str, why: str, exc: Exception | None = None) -> str:
         backup = build_provider_from_config(self.backup_entry)
