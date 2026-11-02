@@ -1,797 +1,224 @@
 [
-  {
-    "agent": "Claude Code",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.claude.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.claude/settings.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.claude/config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Claude/settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "/Library/Application Support/ClaudeCode/managed-mcp.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "/Library/Application Support/ClaudeCode/managed-settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "/etc/claude-code/managed-mcp.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "/etc/claude-code/managed-settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "C:/ProgramData/ClaudeCode/managed-mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "C:/ProgramData/ClaudeCode/managed-settings.json"
-      },
-      {
-        "os": "",
-        "role": "login",
-        "path": "~/.claude/auth.json"
-      },
-      {
-        "os": "",
-        "role": "credentials",
-        "path": "~/.claude/.credentials.json"
-      },
-      {
-        "os": "",
-        "role": "credentials",
-        "path": "~/.claude/credentials.json"
-      },
-      {
-        "os": "darwin",
-        "role": "credentials",
-        "path": "keychain:Claude Code-credentials"
-      }
-    ]
-  },
-  {
-    "agent": "Claude Desktop",
-    "files": [
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Claude/claude_desktop_config.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Claude/claude_desktop_config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Claude/claude_desktop_config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/AnthropicClaude/claude_desktop_config.json"
-      },
-      {
-        "os": "darwin",
-        "role": "login",
-        "path": "~/Library/Application Support/Claude/config.json"
-      },
-      {
-        "os": "linux",
-        "role": "login",
-        "path": "~/.config/Claude/config.json"
-      },
-      {
-        "os": "windows",
-        "role": "login",
-        "path": "~/AppData/Roaming/Claude/config.json"
-      },
-      {
-        "os": "windows",
-        "role": "login",
-        "path": "~/AppData/Local/Claude/config.json"
-      }
-    ]
-  },
-  {
-    "agent": "Cursor",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.cursor/mcp.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Cursor/User/mcp.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Cursor/User/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Cursor/User/mcp.json"
-      },
-      {
-        "os": "darwin",
-        "role": "login",
-        "path": "~/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
-      },
-      {
-        "os": "linux",
-        "role": "login",
-        "path": "~/.config/Cursor/User/globalStorage/state.vscdb"
-      },
-      {
-        "os": "windows",
-        "role": "login",
-        "path": "~/AppData/Roaming/Cursor/User/globalStorage/state.vscdb"
-      },
-      {
-        "os": "windows",
-        "role": "login",
-        "path": "~/AppData/Local/Cursor/User/globalStorage/state.vscdb"
-      }
-    ]
-  },
-  {
-    "agent": "Windsurf",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.codeium/windsurf/mcp_config.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Windsurf/User/globalStorage/codeium.windsurf/mcp.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Windsurf/User/settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Windsurf/User/mcp.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Windsurf/User/globalStorage/codeium.windsurf/mcp.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Windsurf/User/settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Windsurf/User/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Windsurf/User/globalStorage/codeium.windsurf/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Windsurf/User/settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Windsurf/User/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/Programs/windsurf/mcp_config.json"
-      },
-      {
-        "os": "",
-        "role": "login",
-        "path": "~/.codeium/config/config.json"
-      },
-      {
-        "os": "",
-        "role": "login",
-        "path": "~/.codeium/auth.json"
-      }
-    ]
-  },
-  {
-    "agent": "Antigravity",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.gemini/antigravity/mcp_config.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Antigravity/mcp_config.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/antigravity/mcp_config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Antigravity/mcp_config.json"
-      },
-      {
-        "os": "darwin",
-        "role": "login",
-        "path": "~/Library/Application Support/Antigravity/User/globalStorage/state.vscdb"
-      },
-      {
-        "os": "linux",
-        "role": "login",
-        "path": "~/.config/Antigravity/User/globalStorage/state.vscdb"
-      },
-      {
-        "os": "windows",
-        "role": "login",
-        "path": "~/AppData/Roaming/Antigravity/User/globalStorage/state.vscdb"
-      },
-      {
-        "os": "windows",
-        "role": "login",
-        "path": "~/AppData/Local/Antigravity/User/globalStorage/state.vscdb"
-      }
-    ]
-  },
-  {
-    "agent": "OpenCode",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/opencode/config.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/opencode/opencode.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/opencode/opencode.jsonc"
-      }
-    ]
-  },
-  {
-    "agent": "VS Code",
-    "files": [
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code/User/mcp.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code - Insiders/User/mcp.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code/User/mcp.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code - Insiders/User/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code/User/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code - Insiders/User/mcp.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.vscode/mcp.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code - Insiders/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code - Insiders/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code - Insiders/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code/User/globalStorage/github.copilot-chat/mcp_servers.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/github.copilot-chat/mcp_servers.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code/User/globalStorage/github.copilot-chat/mcp_servers.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code - Insiders/User/globalStorage/github.copilot-chat/mcp_servers.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code/User/globalStorage/github.copilot-chat/mcp_servers.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/github.copilot-chat/mcp_servers.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code - Insiders/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code/User/globalStorage/augment.vscode-augment/mcp_settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/augment.vscode-augment/mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code/User/globalStorage/augment.vscode-augment/mcp_settings.json"
-      },
-      {
-        "os": "linux",
-        "role": "mcp_config",
-        "path": "~/.config/Code - Insiders/User/globalStorage/augment.vscode-augment/mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code/User/globalStorage/augment.vscode-augment/mcp_settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/augment.vscode-augment/mcp_settings.json"
-      },
-      {
-        "os": "",
-        "role": "login",
-        "path": "~/.vscode/User/globalStorage/storage.json"
-      }
-    ]
-  },
-  {
-    "agent": "GitHub Copilot",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/gh/config.yml"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/gh/mcp.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/gh/mcp-settings.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/gh/mcp-config.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.copilot/config.yml"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.copilot/mcp.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.copilot/mcp-settings.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.copilot/mcp-config.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/github-copilot/config.yml"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/github-copilot/mcp.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/github-copilot/mcp-settings.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.config/github-copilot/mcp-config.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.github-copilot-workspace/config.yml"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.github-copilot-workspace/mcp.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.github-copilot-workspace/mcp-settings.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.github-copilot-workspace/mcp-config.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/github-copilot/config.yml"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/github-copilot/mcp.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/github-copilot/mcp-settings.json"
-      },
-      {
-        "os": "darwin",
-        "role": "mcp_config",
-        "path": "~/Library/Application Support/github-copilot/mcp-config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/GitHub CLI/config.yml"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/GitHub CLI/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/GitHub CLI/mcp-settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/GitHub CLI/mcp-config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/github-copilot/config.yml"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/github-copilot/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/github-copilot/mcp-settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/github-copilot/mcp-config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/GitHub CLI/config.yml"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/GitHub CLI/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/GitHub CLI/mcp-settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/GitHub CLI/mcp-config.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/github-copilot/config.yml"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/github-copilot/mcp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/github-copilot/mcp-settings.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Local/github-copilot/mcp-config.json"
-      },
-      {
-        "os": "",
-        "role": "login",
-        "path": "~/.config/gh/hosts.yml"
-      },
-      {
-        "os": "",
-        "role": "credentials",
-        "path": "~/.config/github-copilot/hosts.json"
-      },
-      {
-        "os": "",
-        "role": "credentials",
-        "path": "~/.config/github-copilot/apps.json"
-      },
-      {
-        "os": "windows",
-        "role": "credentials",
-        "path": "~/AppData/Roaming/github-copilot/hosts.json"
-      },
-      {
-        "os": "windows",
-        "role": "credentials",
-        "path": "~/AppData/Roaming/github-copilot/apps.json"
-      }
-    ]
-  },
-  {
-    "agent": "Codex",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.codex/config.toml"
-      },
-      {
-        "os": "",
-        "role": "credentials",
-        "path": "~/.codex/auth.json"
-      }
-    ]
-  },
-  {
-    "agent": "Kiro",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.kiro/settings/mcp.json"
-      },
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.kiro/agents/*.json"
-      },
-      {
-        "os": "",
-        "role": "credentials",
-        "path": "~/.aws/sso/cache/kiro-auth-token.json"
-      }
-    ]
-  },
-  {
-    "agent": "Visual Studio",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.mcp.json"
-      }
-    ]
-  },
-  {
-    "agent": "JetBrains",
-    "files": [
-      {
-        "os": "",
-        "role": "mcp_config",
-        "path": "~/.jetbrains/acp.json"
-      },
-      {
-        "os": "windows",
-        "role": "mcp_config",
-        "path": "~/AppData/Roaming/JetBrains/acp.json"
-      }
-    ]
-  }
+  {"agent": "Claude Code", "os": "darwin", "role": "mcp_config", "path": "~/.claude.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "login", "path": "~/.claude.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "mcp_config", "path": "~/.claude.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "login", "path": "~/.claude.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "mcp_config", "path": "~/.claude.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "login", "path": "~/.claude.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "mcp_config", "path": "~/.claude/settings.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "mcp_config", "path": "~/.claude/settings.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "mcp_config", "path": "~/.claude/settings.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "mcp_config", "path": "~/.claude/config.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "mcp_config", "path": "~/.claude/config.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "mcp_config", "path": "~/.claude/config.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Claude/settings.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "mcp_config", "path": "/Library/Application Support/ClaudeCode/managed-mcp.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "mcp_config", "path": "/Library/Application Support/ClaudeCode/managed-settings.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "mcp_config", "path": "/etc/claude-code/managed-mcp.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "mcp_config", "path": "/etc/claude-code/managed-settings.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "mcp_config", "path": "C:/ProgramData/ClaudeCode/managed-mcp.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "mcp_config", "path": "C:/ProgramData/ClaudeCode/managed-settings.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "login", "path": "~/.claude/auth.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "login", "path": "~/.claude/auth.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "login", "path": "~/.claude/auth.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "credentials", "path": "~/.claude/.credentials.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "credentials", "path": "~/.claude/.credentials.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "credentials", "path": "~/.claude/credentials.json"},
+  {"agent": "Claude Code", "os": "linux", "role": "credentials", "path": "~/.claude/credentials.json"},
+  {"agent": "Claude Code", "os": "windows", "role": "credentials", "path": "~/.claude/credentials.json"},
+  {"agent": "Claude Code", "os": "darwin", "role": "credentials", "path": "keychain:Claude Code-credentials"},
+  {"agent": "Claude Desktop", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Claude/claude_desktop_config.json"},
+  {"agent": "Claude Desktop", "os": "linux", "role": "mcp_config", "path": "~/.config/Claude/claude_desktop_config.json"},
+  {"agent": "Claude Desktop", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Claude/claude_desktop_config.json"},
+  {"agent": "Claude Desktop", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/AnthropicClaude/claude_desktop_config.json"},
+  {"agent": "Claude Desktop", "os": "darwin", "role": "login", "path": "~/Library/Application Support/Claude/config.json"},
+  {"agent": "Claude Desktop", "os": "linux", "role": "login", "path": "~/.config/Claude/config.json"},
+  {"agent": "Claude Desktop", "os": "windows", "role": "login", "path": "~/AppData/Roaming/Claude/config.json"},
+  {"agent": "Claude Desktop", "os": "windows", "role": "login", "path": "~/AppData/Local/Claude/config.json"},
+  {"agent": "Cursor", "os": "darwin", "role": "mcp_config", "path": "~/.cursor/mcp.json"},
+  {"agent": "Cursor", "os": "linux", "role": "mcp_config", "path": "~/.cursor/mcp.json"},
+  {"agent": "Cursor", "os": "windows", "role": "mcp_config", "path": "~/.cursor/mcp.json"},
+  {"agent": "Cursor", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Cursor/User/mcp.json"},
+  {"agent": "Cursor", "os": "linux", "role": "mcp_config", "path": "~/.config/Cursor/User/mcp.json"},
+  {"agent": "Cursor", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Cursor/User/mcp.json"},
+  {"agent": "Cursor", "os": "darwin", "role": "login", "path": "~/Library/Application Support/Cursor/User/globalStorage/state.vscdb"},
+  {"agent": "Cursor", "os": "linux", "role": "login", "path": "~/.config/Cursor/User/globalStorage/state.vscdb"},
+  {"agent": "Cursor", "os": "windows", "role": "login", "path": "~/AppData/Roaming/Cursor/User/globalStorage/state.vscdb"},
+  {"agent": "Cursor", "os": "windows", "role": "login", "path": "~/AppData/Local/Cursor/User/globalStorage/state.vscdb"},
+  {"agent": "Windsurf", "os": "darwin", "role": "mcp_config", "path": "~/.codeium/windsurf/mcp_config.json"},
+  {"agent": "Windsurf", "os": "linux", "role": "mcp_config", "path": "~/.codeium/windsurf/mcp_config.json"},
+  {"agent": "Windsurf", "os": "windows", "role": "mcp_config", "path": "~/.codeium/windsurf/mcp_config.json"},
+  {"agent": "Windsurf", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Windsurf/User/globalStorage/codeium.windsurf/mcp.json"},
+  {"agent": "Windsurf", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Windsurf/User/settings.json"},
+  {"agent": "Windsurf", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Windsurf/User/mcp.json"},
+  {"agent": "Windsurf", "os": "linux", "role": "mcp_config", "path": "~/.config/Windsurf/User/globalStorage/codeium.windsurf/mcp.json"},
+  {"agent": "Windsurf", "os": "linux", "role": "mcp_config", "path": "~/.config/Windsurf/User/settings.json"},
+  {"agent": "Windsurf", "os": "linux", "role": "mcp_config", "path": "~/.config/Windsurf/User/mcp.json"},
+  {"agent": "Windsurf", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Windsurf/User/globalStorage/codeium.windsurf/mcp.json"},
+  {"agent": "Windsurf", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Windsurf/User/settings.json"},
+  {"agent": "Windsurf", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Windsurf/User/mcp.json"},
+  {"agent": "Windsurf", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/Programs/windsurf/mcp_config.json"},
+  {"agent": "Windsurf", "os": "darwin", "role": "login", "path": "~/.codeium/config/config.json"},
+  {"agent": "Windsurf", "os": "linux", "role": "login", "path": "~/.codeium/config/config.json"},
+  {"agent": "Windsurf", "os": "windows", "role": "login", "path": "~/.codeium/config/config.json"},
+  {"agent": "Windsurf", "os": "darwin", "role": "login", "path": "~/.codeium/auth.json"},
+  {"agent": "Windsurf", "os": "linux", "role": "login", "path": "~/.codeium/auth.json"},
+  {"agent": "Windsurf", "os": "windows", "role": "login", "path": "~/.codeium/auth.json"},
+  {"agent": "Antigravity", "os": "darwin", "role": "mcp_config", "path": "~/.gemini/antigravity/mcp_config.json"},
+  {"agent": "Antigravity", "os": "linux", "role": "mcp_config", "path": "~/.gemini/antigravity/mcp_config.json"},
+  {"agent": "Antigravity", "os": "windows", "role": "mcp_config", "path": "~/.gemini/antigravity/mcp_config.json"},
+  {"agent": "Antigravity", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Antigravity/mcp_config.json"},
+  {"agent": "Antigravity", "os": "linux", "role": "mcp_config", "path": "~/.config/antigravity/mcp_config.json"},
+  {"agent": "Antigravity", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Antigravity/mcp_config.json"},
+  {"agent": "Antigravity", "os": "darwin", "role": "login", "path": "~/Library/Application Support/Antigravity/User/globalStorage/state.vscdb"},
+  {"agent": "Antigravity", "os": "linux", "role": "login", "path": "~/.config/Antigravity/User/globalStorage/state.vscdb"},
+  {"agent": "Antigravity", "os": "windows", "role": "login", "path": "~/AppData/Roaming/Antigravity/User/globalStorage/state.vscdb"},
+  {"agent": "Antigravity", "os": "windows", "role": "login", "path": "~/AppData/Local/Antigravity/User/globalStorage/state.vscdb"},
+  {"agent": "OpenCode", "os": "darwin", "role": "mcp_config", "path": "~/.config/opencode/config.json"},
+  {"agent": "OpenCode", "os": "linux", "role": "mcp_config", "path": "~/.config/opencode/config.json"},
+  {"agent": "OpenCode", "os": "windows", "role": "mcp_config", "path": "~/.config/opencode/config.json"},
+  {"agent": "OpenCode", "os": "darwin", "role": "mcp_config", "path": "~/.config/opencode/opencode.json"},
+  {"agent": "OpenCode", "os": "linux", "role": "mcp_config", "path": "~/.config/opencode/opencode.json"},
+  {"agent": "OpenCode", "os": "windows", "role": "mcp_config", "path": "~/.config/opencode/opencode.json"},
+  {"agent": "OpenCode", "os": "darwin", "role": "mcp_config", "path": "~/.config/opencode/opencode.jsonc"},
+  {"agent": "OpenCode", "os": "linux", "role": "mcp_config", "path": "~/.config/opencode/opencode.jsonc"},
+  {"agent": "OpenCode", "os": "windows", "role": "mcp_config", "path": "~/.config/opencode/opencode.jsonc"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code/User/mcp.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code - Insiders/User/mcp.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code/User/mcp.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code - Insiders/User/mcp.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code/User/mcp.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code - Insiders/User/mcp.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/.vscode/mcp.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.vscode/mcp.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/.vscode/mcp.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code - Insiders/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code - Insiders/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code - Insiders/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/kilocode.kilo-code/settings/cline_mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code/User/globalStorage/github.copilot-chat/mcp_servers.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/github.copilot-chat/mcp_servers.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code/User/globalStorage/github.copilot-chat/mcp_servers.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code - Insiders/User/globalStorage/github.copilot-chat/mcp_servers.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code/User/globalStorage/github.copilot-chat/mcp_servers.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/github.copilot-chat/mcp_servers.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code - Insiders/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/sourcegraph.cody-ai/mcp_servers.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code/User/globalStorage/augment.vscode-augment/mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/Code - Insiders/User/globalStorage/augment.vscode-augment/mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code/User/globalStorage/augment.vscode-augment/mcp_settings.json"},
+  {"agent": "VS Code", "os": "linux", "role": "mcp_config", "path": "~/.config/Code - Insiders/User/globalStorage/augment.vscode-augment/mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code/User/globalStorage/augment.vscode-augment/mcp_settings.json"},
+  {"agent": "VS Code", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/Code - Insiders/User/globalStorage/augment.vscode-augment/mcp_settings.json"},
+  {"agent": "VS Code", "os": "darwin", "role": "login", "path": "~/.vscode/User/globalStorage/storage.json"},
+  {"agent": "VS Code", "os": "linux", "role": "login", "path": "~/.vscode/User/globalStorage/storage.json"},
+  {"agent": "VS Code", "os": "windows", "role": "login", "path": "~/.vscode/User/globalStorage/storage.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.config/gh/config.yml"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/gh/config.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/gh/config.yml"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.config/gh/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/gh/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/gh/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.config/gh/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/gh/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/gh/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.config/gh/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/gh/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/gh/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/github-copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/github-copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/github-copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/github-copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/github-copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/github-copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.config/github-copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/.config/github-copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.github-copilot-workspace/config.yml"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.github-copilot-workspace/config.yml"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.github-copilot-workspace/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.github-copilot-workspace/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.github-copilot-workspace/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.github-copilot-workspace/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/.github-copilot-workspace/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "mcp_config", "path": "~/.github-copilot-workspace/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/github-copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/github-copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/github-copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "mcp_config", "path": "~/Library/Application Support/github-copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/GitHub CLI/config.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/GitHub CLI/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/GitHub CLI/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/GitHub CLI/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/github-copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/github-copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/github-copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/github-copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/GitHub CLI/config.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/GitHub CLI/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/GitHub CLI/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/GitHub CLI/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/github-copilot/config.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/github-copilot/mcp.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/github-copilot/mcp-settings.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "mcp_config", "path": "~/AppData/Local/github-copilot/mcp-config.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "login", "path": "~/.config/gh/hosts.yml"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "login", "path": "~/.config/gh/hosts.yml"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "login", "path": "~/.config/gh/hosts.yml"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "credentials", "path": "~/.config/github-copilot/hosts.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "credentials", "path": "~/.config/github-copilot/hosts.json"},
+  {"agent": "GitHub Copilot", "os": "darwin", "role": "credentials", "path": "~/.config/github-copilot/apps.json"},
+  {"agent": "GitHub Copilot", "os": "linux", "role": "credentials", "path": "~/.config/github-copilot/apps.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "credentials", "path": "~/AppData/Roaming/github-copilot/hosts.json"},
+  {"agent": "GitHub Copilot", "os": "windows", "role": "credentials", "path": "~/AppData/Roaming/github-copilot/apps.json"},
+  {"agent": "Codex", "os": "darwin", "role": "mcp_config", "path": "~/.codex/config.toml"},
+  {"agent": "Codex", "os": "linux", "role": "mcp_config", "path": "~/.codex/config.toml"},
+  {"agent": "Codex", "os": "windows", "role": "mcp_config", "path": "~/.codex/config.toml"},
+  {"agent": "Codex", "os": "darwin", "role": "credentials", "path": "~/.codex/auth.json"},
+  {"agent": "Codex", "os": "linux", "role": "credentials", "path": "~/.codex/auth.json"},
+  {"agent": "Codex", "os": "windows", "role": "credentials", "path": "~/.codex/auth.json"},
+  {"agent": "Kiro", "os": "darwin", "role": "mcp_config", "path": "~/.kiro/settings/mcp.json"},
+  {"agent": "Kiro", "os": "linux", "role": "mcp_config", "path": "~/.kiro/settings/mcp.json"},
+  {"agent": "Kiro", "os": "windows", "role": "mcp_config", "path": "~/.kiro/settings/mcp.json"},
+  {"agent": "Kiro", "os": "darwin", "role": "mcp_config", "path": "~/.kiro/agents/*.json"},
+  {"agent": "Kiro", "os": "linux", "role": "mcp_config", "path": "~/.kiro/agents/*.json"},
+  {"agent": "Kiro", "os": "windows", "role": "mcp_config", "path": "~/.kiro/agents/*.json"},
+  {"agent": "Kiro", "os": "darwin", "role": "credentials", "path": "~/.aws/sso/cache/kiro-auth-token.json"},
+  {"agent": "Kiro", "os": "linux", "role": "credentials", "path": "~/.aws/sso/cache/kiro-auth-token.json"},
+  {"agent": "Kiro", "os": "windows", "role": "credentials", "path": "~/.aws/sso/cache/kiro-auth-token.json"},
+  {"agent": "Visual Studio", "os": "darwin", "role": "mcp_config", "path": "~/.mcp.json"},
+  {"agent": "Visual Studio", "os": "linux", "role": "mcp_config", "path": "~/.mcp.json"},
+  {"agent": "Visual Studio", "os": "windows", "role": "mcp_config", "path": "~/.mcp.json"},
+  {"agent": "JetBrains", "os": "darwin", "role": "mcp_config", "path": "~/.jetbrains/acp.json"},
+  {"agent": "JetBrains", "os": "linux", "role": "mcp_config", "path": "~/.jetbrains/acp.json"},
+  {"agent": "JetBrains", "os": "windows", "role": "mcp_config", "path": "~/AppData/Roaming/JetBrains/acp.json"}
 ]

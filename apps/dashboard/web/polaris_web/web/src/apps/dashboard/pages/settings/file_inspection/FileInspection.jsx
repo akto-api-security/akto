@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Autocomplete, Banner, Card, Checkbox, Text, VerticalStack, HorizontalStack, HorizontalGrid, Spinner, Badge, Button, Box, Divider, Icon, Modal, ResourceItem, ResourceList, Select, Tabs, TextField } from '@shopify/polaris'
 import { ChevronRightMinor } from '@shopify/polaris-icons'
 import PatternSettingsPage from '../components/PatternSettingsPage'
@@ -13,6 +13,8 @@ import { AgentIcon } from '../../nhi_governance/nhiViolationsData'
 
 const resourceName = { singular: 'rule', plural: 'rules' }
 
+const AGENT_FILE_CONFIG_ADDED_BY = 'agent-file-config'
+
 const DEFAULT_AGENTS = ['Claude Code', 'Cursor', 'Codex', 'GitHub Copilot']
 
 const OS_TABS = [
@@ -21,33 +23,22 @@ const OS_TABS = [
     { label: 'Windows', value: 'windows' },
 ]
 
-const OS_OPTIONS = [{ label: 'All OS', value: '' }, ...OS_TABS]
-
 const ROLE_LABELS = { login: 'Login', credentials: 'Credentials', mcp_config: 'MCP config' }
 
-const ROLE_ORDER = ['mcp_config', 'login', 'credentials', '']
+const ROLE_ORDER = ['mcp_config', 'login', 'credentials']
 
-const ROLE_OPTIONS = [
-    { label: 'None', value: '' },
-    ...Object.entries(ROLE_LABELS).map(([value, label]) => ({ label, value })),
-]
-
-function osMatches(rule, os) {
-    return !rule.os || rule.os === os
-}
+const ROLE_OPTIONS = ROLE_ORDER.map(value => ({ label: ROLE_LABELS[value], value }))
 
 function rulesArrayToMap(rules) {
     if (!Array.isArray(rules)) return {}
     const map = {}
     for (const r of rules) {
-        if (!r || !r.path || r.agent) continue
+        if (!r || !r.path || r.addedBy === AGENT_FILE_CONFIG_ADDED_BY) continue
         map[r.path] = {
             path: r.path,
             idHex: r.idHex,
             existenceOnly: !!r.existenceOnly,
             maxDepth: r.maxDepth ?? 0,
-            os: r.os,
-            role: r.role,
             addedBy: r.addedBy,
             updatedTs: r.updatedTs,
         }
@@ -144,7 +135,7 @@ function RuleExecutions({ path, ruleId }) {
     )
 }
 
-function AgentPicker({ value, onChange, options, error, requireAgent }) {
+function AgentPicker({ value, onChange, options, error }) {
     const filtered = useMemo(() => {
         const q = value.trim().toLowerCase()
         return options
@@ -165,48 +156,43 @@ function AgentPicker({ value, onChange, options, error, requireAgent }) {
                     error={error || undefined}
                     autoComplete="off"
                     placeholder="e.g. Claude Code"
-                    helpText={requireAgent ? 'Pick an existing agent or type a new name.' : 'Pick an existing agent or type a new name. Leave empty for a custom path.'}
+                    helpText="Pick an existing agent or type a new name."
                 />
             }
         />
     )
 }
 
-function AgentRuleRow({ rule, onOpen, onEdit, onDelete, canUpdate, canDelete }) {
+function AgentFileRow({ config, onOpen, onEdit, onDelete, canUpdate, canDelete }) {
     const shortcutActions = [
-        { content: 'Edit', onAction: () => onEdit(rule), disabled: !canUpdate },
-        { content: 'Delete', destructive: true, onAction: () => onDelete(rule), disabled: !canDelete },
+        { content: 'Edit', onAction: () => onEdit(config), disabled: !canUpdate },
+        { content: 'Delete', destructive: true, onAction: () => onDelete(config), disabled: !canDelete },
     ]
     return (
         <ResourceItem
-            id={rule.idHex || rule.path}
-            onClick={() => onOpen(rule)}
+            id={config.idHex}
+            onClick={() => onOpen(config)}
             shortcutActions={shortcutActions}
             persistActions
-            accessibilityLabel={`View results for ${rule.path}`}
+            accessibilityLabel={`View results for ${config.path}`}
         >
-            <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                <Text variant="bodyMd" breakWord>{rule.path}</Text>
-                {!rule.os && <Badge>All OS</Badge>}
-                {rule.maxDepth === -1 && <Badge>Recursive</Badge>}
-                {rule.existenceOnly && <Badge>Existence only</Badge>}
-            </HorizontalStack>
+            <Text variant="bodyMd" breakWord>{config.path}</Text>
         </ResourceItem>
     )
 }
 
-function AgentsCard({ rules, onOpenAgent }) {
+function AgentsCard({ configs, onOpenAgent }) {
     const agents = useMemo(() => {
         const byAgent = {}
-        for (const r of rules) {
-            if (!byAgent[r.agent]) byAgent[r.agent] = []
-            byAgent[r.agent].push(r)
+        for (const c of configs) {
+            if (!byAgent[c.agent]) byAgent[c.agent] = []
+            byAgent[c.agent].push(c)
         }
         return Object.keys(byAgent).sort().map(agent => ({
             agent,
-            counts: OS_TABS.map(t => byAgent[agent].filter(r => osMatches(r, t.value)).length),
+            counts: OS_TABS.map(t => byAgent[agent].filter(c => c.os === t.value).length),
         }))
-    }, [rules])
+    }, [configs])
 
     return (
         <Card>
@@ -249,21 +235,21 @@ function AgentsCard({ rules, onOpenAgent }) {
     )
 }
 
-function AgentDetail({ agent, rules, selectedOs, onSelectOs, onAdd, onOpen, onEdit, onDelete }) {
+function AgentDetail({ agent, configs, selectedOs, onSelectOs, onAdd, onOpen, onEdit, onDelete }) {
     const { canCall } = usePermissions()
-    const canAdd = canCall('api/addFileInspectionRule')
-    const canUpdate = canCall('api/updateFileInspectionRule')
-    const canDelete = canCall('api/deleteFileInspectionRule')
+    const canAdd = canCall('api/addAgentFileConfig')
+    const canUpdate = canCall('api/updateAgentFileConfig')
+    const canDelete = canCall('api/deleteAgentFileConfig')
 
     const tabs = OS_TABS.map(t => ({
         id: `fi-os-${t.value}`,
-        content: `${t.label} (${rules.filter(r => osMatches(r, t.value)).length})`,
+        content: `${t.label} (${configs.filter(c => c.os === t.value).length})`,
     }))
     const selectedIndex = Math.max(0, OS_TABS.findIndex(t => t.value === selectedOs))
 
     const groups = useMemo(() => ROLE_ORDER
-        .map(role => ({ role, rules: rules.filter(r => osMatches(r, selectedOs) && (r.role || '') === role) }))
-        .filter(g => g.rules.length > 0), [rules, selectedOs])
+        .map(role => ({ role, configs: configs.filter(c => c.os === selectedOs && c.role === role) }))
+        .filter(g => g.configs.length > 0), [configs, selectedOs])
 
     return (
         <Box padding="4">
@@ -275,18 +261,18 @@ function AgentDetail({ agent, rules, selectedOs, onSelectOs, onAdd, onOpen, onEd
                 {groups.length === 0 ? (
                     <Text color="subdued">No files for this OS yet.</Text>
                 ) : groups.map((g, i) => (
-                    <VerticalStack gap="2" key={g.role || 'none'}>
+                    <VerticalStack gap="2" key={g.role}>
                         {i > 0 && <Divider />}
                         <HorizontalStack>
-                            <Badge status="info">{ROLE_LABELS[g.role] || 'No role'}</Badge>
+                            <Badge status="info">{ROLE_LABELS[g.role]}</Badge>
                         </HorizontalStack>
                         <ResourceList
-                            resourceName={resourceName}
-                            items={g.rules}
-                            renderItem={rule => (
-                                <AgentRuleRow
-                                    key={rule.idHex || rule.path}
-                                    rule={rule}
+                            resourceName={{ singular: 'file', plural: 'files' }}
+                            items={g.configs}
+                            renderItem={c => (
+                                <AgentFileRow
+                                    key={c.idHex}
+                                    config={c}
                                     onOpen={onOpen}
                                     onEdit={onEdit}
                                     onDelete={onDelete}
@@ -302,7 +288,9 @@ function AgentDetail({ agent, rules, selectedOs, onSelectOs, onAdd, onOpen, onEd
     )
 }
 
-const EMPTY_FORM = { ruleId: null, title: 'Add file', agent: '', os: '', role: '', path: '', existenceOnly: false, recursive: false, requireAgent: false }
+const EMPTY_AGENT_FORM = { configId: null, title: 'Add file', agent: '', os: 'darwin', role: 'mcp_config', path: '' }
+
+const EMPTY_RULE_FORM = { ruleId: null, path: '', existenceOnly: false, recursive: false }
 
 function FileInspection() {
     const [existenceOnly, setExistenceOnly] = useState(false)
@@ -313,21 +301,29 @@ function FileInspection() {
     const [restoring, setRestoring] = useState(false)
     const { canCall } = usePermissions()
 
+    const [agentModal, setAgentModal] = useState(false)
+    const [agentForm, setAgentForm] = useState(EMPTY_AGENT_FORM)
     const [ruleModal, setRuleModal] = useState(false)
-    const [form, setForm] = useState(EMPTY_FORM)
+    const [ruleForm, setRuleForm] = useState(EMPTY_RULE_FORM)
     const [formSaving, setFormSaving] = useState(false)
     const [formErrors, setFormErrors] = useState({})
 
     const [latestMap, setLatestMap] = useState({})
     const [allRules, setAllRules] = useState([])
+    const [configs, setConfigs] = useState([])
     const [selectedOs, setSelectedOs] = useState('darwin')
     const [refreshKey, setRefreshKey] = useState(0)
     const [globTrigger, setGlobTrigger] = useState(null)
 
-    const agentRules = useMemo(() => allRules.filter(r => r && r.path && r.agent), [allRules])
+    useEffect(() => {
+        settingRequests.fetchAgentFileConfig()
+            .then(res => setConfigs((res?.configs || []).filter(c => c && c.path && c.agent)))
+            .catch(() => func.setToast(true, true, 'Failed to load agent files'))
+    }, [refreshKey])
+
     const agentOptions = useMemo(
-        () => Array.from(new Set([...DEFAULT_AGENTS, ...agentRules.map(r => r.agent)])).sort(),
-        [agentRules]
+        () => Array.from(new Set([...DEFAULT_AGENTS, ...configs.map(c => c.agent)])).sort(),
+        [configs]
     )
 
     async function onFetch() {
@@ -359,13 +355,18 @@ function FileInspection() {
         setShowFly(true)
     }
 
+    function openAgentFileResults(config) {
+        const rule = allRules.find(r => r && r.path === config.path)
+        openResults(config.path, rule?.idHex, config.agent)
+    }
+
     async function restoreDefaults() {
         setRestoring(true)
         try {
-            const res = await settingRequests.restoreFileInspectionDefaults()
+            const res = await settingRequests.restoreAgentFileConfigDefaults()
             setRefreshKey(k => k + 1)
             setRestoreModal(false)
-            func.setToast(true, false, `Defaults restored: ${res?.createdCount ?? 0} added, ${res?.updatedCount ?? 0} updated`)
+            func.setToast(true, false, `Defaults restored: ${res?.createdCount ?? 0} added, ${res?.existingCount ?? 0} already present`)
         } catch {
             func.setToast(true, true, 'Failed to restore defaults')
         } finally {
@@ -373,66 +374,89 @@ function FileInspection() {
         }
     }
 
-    function updateForm(field, value) {
-        setForm(f => ({ ...f, [field]: value }))
+    function updateAgentForm(field, value) {
+        setAgentForm(f => ({ ...f, [field]: value }))
+        setFormErrors(e => ({ ...e, [field]: '' }))
+    }
+
+    function updateRuleForm(field, value) {
+        setRuleForm(f => ({ ...f, [field]: value }))
         setFormErrors(e => ({ ...e, [field]: '' }))
     }
 
     function openAddAgentFile(agent) {
-        setForm({ ...EMPTY_FORM, title: agent ? 'Add file' : 'Add agent', agent: agent || '', os: agent ? selectedOs : '', requireAgent: true })
+        setAgentForm({ ...EMPTY_AGENT_FORM, title: agent ? 'Add file' : 'Add agent', agent: agent || '', os: selectedOs })
         setFormErrors({})
-        setRuleModal(true)
+        setAgentModal(true)
     }
 
-    function openEditRule(rule) {
-        setForm({
-            ruleId: rule.idHex,
-            title: 'Edit rule',
-            agent: rule.agent || '',
-            os: rule.os || '',
-            role: rule.role || '',
-            path: rule.path || '',
-            existenceOnly: !!rule.existenceOnly,
-            recursive: rule.maxDepth === -1,
-            requireAgent: false,
-        })
+    function openEditAgentFile(config) {
+        setAgentForm({ configId: config.idHex, title: 'Edit file', agent: config.agent, os: config.os, role: config.role, path: config.path })
         setFormErrors({})
-        setRuleModal(true)
+        setAgentModal(true)
     }
 
-    function deleteAgentRule(rule) {
-        func.showConfirmationModal(`Delete ${rule.path}?`, 'Delete', async () => {
+    function deleteAgentFile(config) {
+        func.showConfirmationModal(`Delete ${config.path} from ${config.agent}?`, 'Delete', async () => {
             try {
-                await settingRequests.deleteFileInspectionRule(rule.path)
+                await settingRequests.deleteAgentFileConfig(config.idHex)
                 setRefreshKey(k => k + 1)
-                func.setToast(true, false, 'Rule deleted')
+                func.setToast(true, false, 'File deleted')
             } catch {
-                func.setToast(true, true, 'Failed to delete rule')
+                func.setToast(true, true, 'Failed to delete file')
             }
         })
     }
 
-    async function saveRule() {
-        const path = form.path.trim()
-        const agent = form.agent.trim()
+    function validatePath(path) {
+        if (!path) return 'Path is required'
+        if (path === '/') return "Path cannot be the root '/'"
+        return ''
+    }
+
+    async function saveAgentFile() {
+        const path = agentForm.path.trim()
+        const agent = agentForm.agent.trim()
         const errors = {}
-        if (!path) errors.path = 'Path is required'
-        else if (path === '/') errors.path = "Path cannot be the root '/'"
-        if (form.requireAgent && !agent) errors.agent = 'Agent is required'
+        const pathError = validatePath(path)
+        if (pathError) errors.path = pathError
+        if (!agent) errors.agent = 'Agent is required'
         if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
         setFormSaving(true)
         try {
-            const maxDepth = form.recursive ? -1 : 0
-            if (form.ruleId) {
-                await settingRequests.updateFileInspectionRule(form.ruleId, path, form.existenceOnly, maxDepth, agent, form.os, form.role)
+            if (agentForm.configId) {
+                await settingRequests.updateAgentFileConfig(agentForm.configId, agent, agentForm.os, agentForm.role, path)
             } else {
-                await settingRequests.addFileInspectionRule(path, form.existenceOnly, maxDepth, agent, form.os, form.role)
+                await settingRequests.addAgentFileConfig(agent, agentForm.os, agentForm.role, path)
             }
             setRefreshKey(k => k + 1)
-            setRuleModal(false)
-            func.setToast(true, false, form.ruleId ? 'Rule updated' : 'Rule added')
+            setAgentModal(false)
+            func.setToast(true, false, agentForm.configId ? 'File updated' : 'File added')
         } catch {
-            func.setToast(true, true, form.ruleId ? 'Failed to update rule' : 'Failed to add rule')
+            func.setToast(true, true, agentForm.configId ? 'Failed to update file' : 'Failed to add file')
+        } finally {
+            setFormSaving(false)
+        }
+    }
+
+    function openEditRule(rule) {
+        setRuleForm({ ruleId: rule.idHex, path: rule.path || '', existenceOnly: !!rule.existenceOnly, recursive: rule.maxDepth === -1 })
+        setFormErrors({})
+        setRuleModal(true)
+    }
+
+    async function saveRule() {
+        const path = ruleForm.path.trim()
+        const pathError = validatePath(path)
+        if (pathError) { setFormErrors({ path: pathError }); return }
+        setFormSaving(true)
+        try {
+            await settingRequests.updateFileInspectionRule(ruleForm.ruleId, path, ruleForm.existenceOnly, ruleForm.recursive ? -1 : 0)
+            setRefreshKey(k => k + 1)
+            setRuleModal(false)
+            func.setToast(true, false, 'Rule updated')
+        } catch {
+            func.setToast(true, true, 'Failed to update rule')
         } finally {
             setFormSaving(false)
         }
@@ -455,7 +479,7 @@ function FileInspection() {
         openResults(row.patternValue, latestMap[row.patternValue]?.idHex)
     }
 
-    const flyAgentRules = flyView?.type === 'agent' ? agentRules.filter(r => r.agent === flyView.agent) : []
+    const flyAgentConfigs = flyView?.type === 'agent' ? configs.filter(c => c.agent === flyView.agent) : []
 
     const titleComp = flyView?.type === 'agent' ? (
         <Box width="90%">
@@ -484,13 +508,13 @@ function FileInspection() {
             <AgentDetail
                 key={`agent-${flyView.agent}`}
                 agent={flyView.agent}
-                rules={flyAgentRules}
+                configs={flyAgentConfigs}
                 selectedOs={selectedOs}
                 onSelectOs={setSelectedOs}
                 onAdd={openAddAgentFile}
-                onOpen={rule => openResults(rule.path, rule.idHex, rule.agent)}
-                onEdit={openEditRule}
-                onDelete={deleteAgentRule}
+                onOpen={openAgentFileResults}
+                onEdit={openEditAgentFile}
+                onDelete={deleteAgentFile}
             />
         ]
     } else if (showFly && flyView?.type === 'results') {
@@ -518,7 +542,7 @@ function FileInspection() {
     )
 
     const agentsCard = (
-        <AgentsCard key="fi-agents" rules={agentRules} onOpenAgent={openAgent} />
+        <AgentsCard key="fi-agents" configs={configs} onOpenAgent={openAgent} />
     )
 
     const customPathsHeader = (
@@ -528,7 +552,7 @@ function FileInspection() {
         </VerticalStack>
     )
 
-    const saveRequires = form.ruleId ? ['api/updateFileInspectionRule'] : ['api/addFileInspectionRule']
+    const agentSaveRequires = agentForm.configId ? ['api/updateAgentFileConfig'] : ['api/addAgentFileConfig']
 
     return (
         <>
@@ -558,8 +582,8 @@ function FileInspection() {
                 leadingCards={[agentsCard, customPathsHeader]}
                 secondaryActions={
                     <>
-                        <Button onClick={() => setRestoreModal(true)} disabled={!canCall('api/restoreFileInspectionDefaults')}>Restore defaults</Button>
-                        <Button onClick={() => openAddAgentFile('')} disabled={!canCall('api/addFileInspectionRule')}>Add agent</Button>
+                        <Button onClick={() => setRestoreModal(true)} disabled={!canCall('api/restoreAgentFileConfigDefaults')}>Restore defaults</Button>
+                        <Button onClick={() => openAddAgentFile('')} disabled={!canCall('api/addAgentFileConfig')}>Add agent</Button>
                         <GlobHelper onUse={v => setGlobTrigger({ value: v, id: Date.now() })} />
                     </>
                 }
@@ -569,64 +593,84 @@ function FileInspection() {
                 open={restoreModal}
                 onClose={() => setRestoreModal(false)}
                 title="Restore defaults"
-                primaryAction={withPermissions({ content: 'Restore defaults', onAction: restoreDefaults, loading: restoring, requires: ['api/restoreFileInspectionDefaults'] })}
+                primaryAction={withPermissions({ content: 'Restore defaults', onAction: restoreDefaults, loading: restoring, requires: ['api/restoreAgentFileConfigDefaults'] })}
                 secondaryActions={[{ content: 'Cancel', onAction: () => setRestoreModal(false) }]}
             >
                 <Modal.Section>
                     <Text variant="bodyMd">
-                        Adds the default login, credential and MCP config files for each known AI agent. Rules that already exist for these paths get the default agent, OS and role. Nothing is deleted.
+                        Adds any missing default login, credential and MCP config files for each known AI agent. Nothing is deleted.
                     </Text>
+                </Modal.Section>
+            </Modal>
+
+            <Modal
+                open={agentModal}
+                onClose={() => setAgentModal(false)}
+                title={agentForm.title}
+                primaryAction={withPermissions({ content: 'Save', onAction: saveAgentFile, loading: formSaving, requires: agentSaveRequires })}
+                secondaryActions={[{ content: 'Cancel', onAction: () => setAgentModal(false) }]}
+            >
+                <Modal.Section>
+                    <VerticalStack gap="4">
+                        <AgentPicker
+                            value={agentForm.agent}
+                            onChange={v => updateAgentForm('agent', v)}
+                            options={agentOptions}
+                            error={formErrors.agent}
+                        />
+                        <HorizontalGrid columns={2} gap="4">
+                            <Select
+                                label="OS"
+                                options={OS_TABS}
+                                value={agentForm.os}
+                                onChange={v => updateAgentForm('os', v)}
+                            />
+                            <Select
+                                label="Role"
+                                options={ROLE_OPTIONS}
+                                value={agentForm.role}
+                                onChange={v => updateAgentForm('role', v)}
+                            />
+                        </HorizontalGrid>
+                        <TextField
+                            label="Path"
+                            value={agentForm.path}
+                            onChange={v => updateAgentForm('path', v)}
+                            error={formErrors.path || undefined}
+                            autoComplete="off"
+                            placeholder="e.g. ~/.claude.json"
+                            helpText="File path, directory path, or any pattern the agent should inspect."
+                        />
+                    </VerticalStack>
                 </Modal.Section>
             </Modal>
 
             <Modal
                 open={ruleModal}
                 onClose={() => setRuleModal(false)}
-                title={form.title}
-                primaryAction={withPermissions({ content: 'Save', onAction: saveRule, loading: formSaving, requires: saveRequires })}
+                title="Edit rule"
+                primaryAction={withPermissions({ content: 'Save', onAction: saveRule, loading: formSaving, requires: ['api/updateFileInspectionRule'] })}
                 secondaryActions={[{ content: 'Cancel', onAction: () => setRuleModal(false) }]}
             >
                 <Modal.Section>
                     <VerticalStack gap="4">
-                        <AgentPicker
-                            value={form.agent}
-                            onChange={v => updateForm('agent', v)}
-                            options={agentOptions}
-                            error={formErrors.agent}
-                            requireAgent={form.requireAgent}
-                        />
-                        <HorizontalGrid columns={2} gap="4">
-                            <Select
-                                label="OS"
-                                options={OS_OPTIONS}
-                                value={form.os}
-                                onChange={v => updateForm('os', v)}
-                            />
-                            <Select
-                                label="Role"
-                                options={ROLE_OPTIONS}
-                                value={form.role}
-                                onChange={v => updateForm('role', v)}
-                            />
-                        </HorizontalGrid>
                         <TextField
                             label="Path"
-                            value={form.path}
-                            onChange={v => updateForm('path', v)}
+                            value={ruleForm.path}
+                            onChange={v => updateRuleForm('path', v)}
                             error={formErrors.path || undefined}
                             autoComplete="off"
-                            placeholder="e.g. ~/.claude.json"
                             helpText="File path, directory path, or any pattern the agent should inspect."
                         />
                         <Checkbox
                             label="Recursive - descend into all subdirectories"
-                            checked={form.recursive}
-                            onChange={v => updateForm('recursive', v)}
+                            checked={ruleForm.recursive}
+                            onChange={v => updateRuleForm('recursive', v)}
                         />
                         <Checkbox
                             label="Existence only - record metadata without reading file contents"
-                            checked={form.existenceOnly}
-                            onChange={v => updateForm('existenceOnly', v)}
+                            checked={ruleForm.existenceOnly}
+                            onChange={v => updateRuleForm('existenceOnly', v)}
                         />
                     </VerticalStack>
                 </Modal.Section>

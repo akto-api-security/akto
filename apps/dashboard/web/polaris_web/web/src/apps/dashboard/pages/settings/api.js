@@ -1290,22 +1290,34 @@ const settingRequests = {
     fetchFileInspectionRules() {
         return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
     },
-    addFileInspectionRule(path, existenceOnly, maxDepth, agent, os, role) {
+    addFileInspectionRule(path, existenceOnly, maxDepth) {
         return request({
             url: '/api/addFileInspectionRule',
             method: 'post',
-            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent: agent || '', os: os || '', role: role || '' }
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
         })
     },
-    updateFileInspectionRule(ruleId, path, existenceOnly, maxDepth, agent, os, role) {
+    updateFileInspectionRule(ruleId, path, existenceOnly, maxDepth) {
         return request({
             url: '/api/updateFileInspectionRule',
             method: 'post',
-            data: { ruleId, path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent: agent || '', os: os || '', role: role || '' }
+            data: { ruleId, path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
         })
     },
-    restoreFileInspectionDefaults() {
-        return request({ url: '/api/restoreFileInspectionDefaults', method: 'post', data: {} })
+    fetchAgentFileConfig() {
+        return request({ url: '/api/fetchAgentFileConfig', method: 'post', data: {} })
+    },
+    addAgentFileConfig(agent, os, role, path) {
+        return request({ url: '/api/addAgentFileConfig', method: 'post', data: { agent, os, role, path } })
+    },
+    updateAgentFileConfig(configId, agent, os, role, path) {
+        return request({ url: '/api/updateAgentFileConfig', method: 'post', data: { configId, agent, os, role, path } })
+    },
+    deleteAgentFileConfig(configId) {
+        return request({ url: '/api/deleteAgentFileConfig', method: 'post', data: { configId } })
+    },
+    restoreAgentFileConfigDefaults() {
+        return request({ url: '/api/restoreAgentFileConfigDefaults', method: 'post', data: {} })
     },
     deleteFileInspectionRule(path) {
         return request({
