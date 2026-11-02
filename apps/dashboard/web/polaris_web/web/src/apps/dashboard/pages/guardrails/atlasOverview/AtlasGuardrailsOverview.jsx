@@ -7,7 +7,6 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import { openViolationInGuardrailViolations } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import func from "@/util/func";
-import values from "@/util/values";
 import KpiStrip from "./KpiStrip";
 import AttentionCard from "./AttentionCard";
 import TriageStatusCard from "./TriageStatusCard";
@@ -18,12 +17,20 @@ import TopEmployeesCard from "./TopEmployeesCard";
 import TopAssetsCard from "./TopAssetsCard";
 import guardrailOverviewMock from "./guardrailOverviewMock";
 import guardrailsApi from "../api";
+import { formatDurationMs } from "../../observe/llm/constants";
 
 const POLICIES_PATH = "/dashboard/guardrails/policies";
 const EMPTY_VALUE = "—";
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : Number(n).toLocaleString();
+}
+
+function formatTriageDuration(seconds) {
+    const days = Math.floor(seconds / 86400);
+    if (days === 0) return formatDurationMs(seconds * 1000);
+    const rest = seconds % 86400;
+    return rest >= 60 ? `${days}d ${formatDurationMs(rest * 1000)}` : `${days}d`;
 }
 
 function buildKpis(kpis, openActivity) {
@@ -38,15 +45,15 @@ function buildKpis(kpis, openActivity) {
         {
             label: "Open violations",
             value: formatCount(open.count),
-            sub: open.changePct !== undefined && open.changePct !== null
-                ? `${open.changePct > 0 ? "+" : ""}${open.changePct}% vs previous ${days} ${days === 1 ? "day" : "days"}`
+            sub: open.change !== undefined && open.change !== null
+                ? `${open.change > 0 ? "+" : ""}${formatCount(open.change)} vs previous ${days} ${days === 1 ? "day" : "days"}`
                 : "",
             onClick: openActivity,
         },
         {
             label: "Critical, unassigned",
             value: formatCount(critical.count),
-            sub: critical.oldestAgeHours !== undefined && critical.oldestAgeHours !== null ? `Oldest ${critical.oldestAgeHours}h ago` : "",
+            sub: critical.oldestAgeSeconds !== undefined && critical.oldestAgeSeconds !== null ? `Oldest ${func.prettifyEpochDuration(Math.max(1, critical.oldestAgeSeconds))} ago` : "",
             critical: true,
             onClick: openActivity,
         },
@@ -59,12 +66,16 @@ function buildKpis(kpis, openActivity) {
         {
             label: "Employees involved",
             value: formatCount(employees.count),
-            sub: `On ${formatCount(employees.devices)} of ${formatCount(k.managedDevices)} devices`,
+            sub: employees.devices === undefined || employees.devices === null
+                ? ""
+                : k.managedDevices >= employees.devices
+                    ? `On ${formatCount(employees.devices)} of ${formatCount(k.managedDevices)} ${k.managedDevices === 1 ? "device" : "devices"}`
+                    : `On ${formatCount(employees.devices)} ${employees.devices === 1 ? "device" : "devices"}`,
         },
         {
             label: "Median time to triage",
-            value: triage.hours !== undefined && triage.hours !== null ? `${triage.hours}h` : EMPTY_VALUE,
-            sub: triage.targetHours ? `Target is ${triage.targetHours}h` : "",
+            value: triage.seconds !== undefined && triage.seconds !== null ? formatTriageDuration(triage.seconds) : EMPTY_VALUE,
+            sub: triage.targetHours ? `Target is ${formatTriageDuration(triage.targetHours * 3600)}` : "",
         },
     ];
 }
@@ -73,9 +84,10 @@ function AtlasGuardrailsOverview() {
     const navigate = useNavigate();
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        values.ranges[2],
+        func.getLast30DaysRange(),
     );
     const [kpis, setKpis] = useState(null);
+    const [triage, setTriage] = useState(null);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -83,9 +95,13 @@ function AtlasGuardrailsOverview() {
     useEffect(() => {
         let cancelled = false;
         setKpis(null);
+        setTriage(null);
         guardrailsApi.fetchAtlasGuardrailsOverviewKpis(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setKpis(resp); })
             .catch(() => { if (!cancelled) setKpis(null); });
+        guardrailsApi.fetchAtlasGuardrailsOverviewTriage(startTimestamp, endTimestamp)
+            .then((resp) => { if (!cancelled) setTriage(resp); })
+            .catch(() => { if (!cancelled) setTriage(null); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -97,7 +113,7 @@ function AtlasGuardrailsOverview() {
         <KpiStrip key="kpis" items={buildKpis(kpis, openActivity)} />,
         <HorizontalGrid key="attention" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
             <AttentionCard rows={data.attention} onReview={openActivity} onViewAll={openActivity} />
-            <TriageStatusCard triage={data.triage} periodDays={data.periodDays} onStatusClick={openActivity} onAssign={openActivity} />
+            <TriageStatusCard triage={{ statuses: triage?.statuses || [], staleCriticalUnassigned: triage?.staleCriticalUnassigned || 0, staleAfterHours: triage?.staleAfterHours }} periodDays={triage?.periodDays} onStatusClick={openActivity} onAssign={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
             <DecisionsTrendCard decisions={data.decisions} />

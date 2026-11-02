@@ -101,7 +101,7 @@ const PAGE_REQUIRES = {
     '/dashboard/protection/threat-activity': 'api/fetchSuspectSampleData',
     '/dashboard/protection/threat-api': 'api/fetchThreatApis',
     '/dashboard/protection/threat-policy': 'api/fetchThreatComplianceInfos',
-    '/dashboard/guardrails/overview': 'api/fetchSuspectSampleData',
+    '/dashboard/guardrails/atlas-overview': 'api/fetchAtlasGuardrailsOverviewKpis',
     '/dashboard/guardrails/activity': 'api/fetchSuspectSampleData',
     '/dashboard/guardrails/policies': 'api/fetchGuardrailPolicies',
     '/dashboard/guardrails/misconfigurations': 'api/fetchConfigFieldPolicies',

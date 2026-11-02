@@ -577,13 +577,13 @@ export default function LeftNav() {
                     subNavigationItems: [
                         ...(dashboardCategory === "Endpoint Security" ? [{
                             label: "Overview",
-                            requires: pageRequires("/dashboard/guardrails/overview"),
+                            requires: pageRequires("/dashboard/guardrails/atlas-overview"),
                             onClick: () => {
-                                navigate("/dashboard/guardrails/overview");
-                                handleSelect("dashboard_guardrails_overview");
+                                navigate("/dashboard/guardrails/atlas-overview");
+                                handleSelect("dashboard_atlas_guardrails_overview");
                                 setActive("active");
                             },
-                            selected: leftNavSelected === "dashboard_guardrails_overview",
+                            selected: leftNavSelected === "dashboard_atlas_guardrails_overview",
                         }] : []),
                         ...((dashboardCategory === "API Security" || dashboardCategory === "Endpoint Security") ? [{
                             label: "Dashboard",

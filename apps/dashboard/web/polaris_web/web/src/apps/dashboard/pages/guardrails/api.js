@@ -179,6 +179,24 @@ export default {
         return resp
     },
 
+    async fetchAtlasGuardrailsOverviewKpis(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchAtlasGuardrailsOverviewKpis',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchAtlasGuardrailsOverviewTriage(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchAtlasGuardrailsOverviewTriage',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
     async suggestGuardrailCompliance(inputType, payload) {
         const resp = await request({
             url: '/api/ask_ai',

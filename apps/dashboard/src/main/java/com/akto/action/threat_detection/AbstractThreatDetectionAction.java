@@ -293,6 +293,9 @@ public class AbstractThreatDetectionAction extends UserAction {
               );
               event.setRemediation(smr.getRemediation());
               event.setHumanResponse(smr.getHumanResponse());
+              event.setCaseOwner(smr.getCaseOwner());
+              event.setBehaviour(smr.getBehaviour());
+              event.setFirstTriagedAt(smr.getFirstTriagedAt());
               return event;
             })
             .collect(Collectors.toList())

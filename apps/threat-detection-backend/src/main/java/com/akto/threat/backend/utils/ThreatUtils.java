@@ -264,19 +264,28 @@ public class ThreatUtils {
     }
 
     public static String fetchMetadataString(String metadataStr) {
+        return metadataJson(parseMetadata(metadataStr));
+    }
+
+    public static Metadata parseMetadata(String metadataStr) {
         if (metadataStr == null || metadataStr.isEmpty()) {
-            return "";
+            return null;
         }
 
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         try {
             TextFormat.getParser().merge(metadataStr, metadataBuilder);
         } catch (Exception e) {
+            return null;
+        }
+        return metadataBuilder.build();
+    }
+
+    public static String metadataJson(Metadata metadataProto) {
+        if (metadataProto == null) {
             return "";
         }
-        Metadata metadataProto = metadataBuilder.build();
-        metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
-        return metadataStr;
+        return ProtoMessageUtils.toString(metadataProto).orElse("");
     }
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
