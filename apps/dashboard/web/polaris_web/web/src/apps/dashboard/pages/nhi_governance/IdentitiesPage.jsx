@@ -68,7 +68,7 @@ const transformIdentityForUI = (apiIdentity) => {
         type: apiIdentity.identityType,
         access: apiIdentity.accessLevel,
         owner: apiIdentity.owner?.email || apiIdentity.owner?.name || "N/A",
-        device: apiIdentity.deviceLabel || apiIdentity.owner?.name || "",
+        device: apiIdentity.deviceLabel || "",
         lastUsed: formatRelativeTime(apiIdentity.lastUsedAt),
         expiryStatus: formatExpiryStatus(apiIdentity.expiryDate),
         targetResource: apiIdentity.targetResource,
