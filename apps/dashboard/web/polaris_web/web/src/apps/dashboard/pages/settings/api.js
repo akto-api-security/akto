@@ -905,6 +905,13 @@ const settingRequests = {
             data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, browserNames, agentVersions, statuses, providers, queryValue, startTimestamp, endTimestamp }
         })
     },
+    async fetchEndpointShieldStats({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchEndpointShieldStats',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
     async fetchEndpointShieldFilterOptions() {
         return await request({
             url: '/api/fetchEndpointShieldFilterOptions',

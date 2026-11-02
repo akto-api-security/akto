@@ -12,6 +12,12 @@ import com.akto.dto.monitoring.InstalledAppVulnerability;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.akto.dto.monitoring.ModuleInfoConstants;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.atlas.AtlasDeviceStatsService;
+import com.akto.service.insights.InsightContext;
+import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightService;
 import com.akto.utils.vulnerability.InstalledAppVulnerabilityAnalysis;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -88,6 +94,11 @@ public class ModuleInfoAction extends UserAction {
     @Setter private int endTimestamp;
     @Getter private long total;
     @Getter private Map<String, Object> filterOptions;
+    @Getter private Map<String, Object> deviceStats;
+    @Setter private String deviceScope;
+    private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
+    private final InsightService insightService = new InsightService();
+    private final AtlasDeviceStatsService atlasDeviceStatsService = new AtlasDeviceStatsService();
 
     @Override
     public String execute() {
@@ -166,6 +177,7 @@ public class ModuleInfoAction extends UserAction {
 
     private static final int ENDPOINT_SHIELD_ACTIVE_THRESHOLD_SECONDS = 4 * 60 * 60;
     private static final int ENDPOINT_SHIELD_INACTIVE_THRESHOLD_SECONDS = 2 * 24 * 60 * 60;
+    private static final int ENDPOINT_SHIELD_OFFLINE_THRESHOLD_SECONDS = 7 * 24 * 60 * 60;
     private static final String STATUS_FAILED = "failed";
     private static final String STATUS_ACTIVE = "active";
     private static final String STATUS_INACTIVE = "inactive";
@@ -319,6 +331,111 @@ public class ModuleInfoAction extends UserAction {
 
         filterEnvironmentVariables(moduleInfos);
         allowedEnvFields = computeAllowedEnvFields();
+        return SUCCESS.toUpperCase();
+    }
+
+    private static final String SCOPE_DESKTOP = "desktop";
+    private static final String SCOPE_BROWSER = "browser";
+
+    private static Bson endpointShieldScopeFilter(String scope) {
+        Bson isExtension = Filters.or(
+                Filters.exists(AD_BROWSER_NAME, true),
+                Filters.regex(ModuleInfo.CURRENT_VERSION, "extension"));
+        if (SCOPE_DESKTOP.equals(scope)) return Filters.nor(isExtension);
+        if (SCOPE_BROWSER.equals(scope)) return isExtension;
+        return new Document();
+    }
+
+    private InsightContext buildInsightContext() {
+        Integer userId = Context.userId.get();
+        return new InsightContext(Context.accountId.get(), userId == null ? 0 : userId,
+                Context.contextSource.get(), startTimestamp, endTimestamp);
+    }
+
+    public String fetchEndpointShieldStats() {
+        deviceStats = new HashMap<>();
+        for (String card : Arrays.asList("managedDevices", "agentActive", "offlineSevenDays", "devicesWithAiTools",
+                "devicesWithAiToolsPercent", "employeesUsingAi", "totalEmployees", "devicesWithUnapprovedTools",
+                "unapprovedTeams", "monitorOnlyDevices")) {
+            deviceStats.put(card, null);
+        }
+        List<String> unavailableSources = new ArrayList<>();
+        deviceStats.put("unavailableSources", unavailableSources);
+        if (ArgusCollectionScope.isLimited(getSUser())) {
+            return SUCCESS.toUpperCase();
+        }
+
+        int now = Context.now();
+        int offlineCutoff = now - ENDPOINT_SHIELD_OFFLINE_THRESHOLD_SECONDS;
+        Map<String, String> scopeDeviceUsernames = new HashMap<>();
+
+        try {
+            List<Bson> pipeline = Arrays.asList(
+                    Aggregates.match(Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope))),
+                    Aggregates.project(Projections.include(
+                            ModuleInfo.NAME,
+                            ModuleInfo.STARTED_TS,
+                            ModuleInfo.LAST_HEARTBEAT_RECEIVED,
+                            AD_INSTALL_STARTED_TS,
+                            AD_INSTALL_OUTCOME,
+                            AD_USERNAME,
+                            ModuleInfo.ADDITIONAL_DATA + ".installStatus")),
+                    Aggregates.addFields(new Field<>(DEDUP_TS_FIELD, endpointShieldLastDeployedExpr())),
+                    Aggregates.sort(Sorts.orderBy(
+                            Sorts.descending(DEDUP_TS_FIELD),
+                            Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED))),
+                    Aggregates.group("$" + ModuleInfo.NAME,
+                            Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
+                            Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA)),
+                    Aggregates.addFields(new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(now))),
+                    Aggregates.project(Projections.fields(
+                            Projections.include(ModuleInfo.LAST_HEARTBEAT_RECEIVED),
+                            Projections.computed("status", "$" + AD_CURRENT_STATUS),
+                            Projections.computed("username", "$" + AD_USERNAME)))
+            );
+
+            long managedDevices = 0;
+            long agentActive = 0;
+            long offlineSevenDays = 0;
+            try (MongoCursor<Document> cursor = ModuleInfoDao.instance.getMCollection()
+                    .aggregate(pipeline, Document.class).allowDiskUse(true).cursor()) {
+                while (cursor.hasNext()) {
+                    Document device = cursor.next();
+                    managedDevices++;
+                    if (STATUS_ACTIVE.equals(device.getString("status"))) agentActive++;
+                    Number heartbeat = (Number) device.get(ModuleInfo.LAST_HEARTBEAT_RECEIVED);
+                    if (heartbeat != null && heartbeat.intValue() > 0 && heartbeat.intValue() < offlineCutoff) offlineSevenDays++;
+                    String username = device.getString("username");
+                    scopeDeviceUsernames.put(String.valueOf(device.get("_id")), username == null ? "" : username);
+                }
+            }
+            deviceStats.put("managedDevices", managedDevices);
+            deviceStats.put("agentActive", agentActive);
+            deviceStats.put("offlineSevenDays", offlineSevenDays);
+        } catch (Exception e) {
+            statsLogger.error("fetchEndpointShieldStats module_info failed: " + e.getMessage());
+            unavailableSources.add("moduleInfo");
+            return SUCCESS.toUpperCase();
+        }
+
+        try {
+            InsightDataBundle bundle = insightService.getOrLoadBundle(buildInsightContext());
+            AtlasDeviceStatsService.AiToolStats aiToolStats =
+                    atlasDeviceStatsService.computeAiToolStats(bundle, scopeDeviceUsernames, startTimestamp, endTimestamp);
+            long managedDevices = (Long) deviceStats.get("managedDevices");
+            deviceStats.put("devicesWithAiTools", aiToolStats.devicesWithAiTools);
+            deviceStats.put("devicesWithAiToolsPercent",
+                    managedDevices > 0 ? Math.round(100.0 * aiToolStats.devicesWithAiTools / managedDevices) : 0L);
+            deviceStats.put("employeesUsingAi", aiToolStats.employeesUsingAi);
+            deviceStats.put("totalEmployees", aiToolStats.totalEmployees);
+            deviceStats.put("devicesWithUnapprovedTools", aiToolStats.devicesWithUnapprovedTools);
+            deviceStats.put("unapprovedTeams", aiToolStats.unapprovedTeams);
+            deviceStats.put("monitorOnlyDevices",
+                    atlasDeviceStatsService.countMonitorOnlyDevices(bundle, scopeDeviceUsernames.keySet()));
+        } catch (Exception e) {
+            statsLogger.error("fetchEndpointShieldStats insights bundle failed: " + e.getMessage());
+            unavailableSources.add("insightsBundle");
+        }
         return SUCCESS.toUpperCase();
     }
 

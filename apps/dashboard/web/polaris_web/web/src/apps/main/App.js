@@ -121,6 +121,7 @@ import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
 import EndpointShieldMetadata from "../dashboard/pages/observe/atlas/EndpointShieldMetadata";
+import DevicesEmployeesPage from "../dashboard/pages/observe/atlas/devices_employees/DevicesEmployeesPage";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
@@ -263,6 +264,10 @@ const router = createBrowserRouter([
                             {
                                 path: "endpoints",
                                 element: <DeviceEndpoints/>
+                            },
+                            {
+                                path: "devices-employees",
+                                element: <DevicesEmployeesPage/>
                             },
                             {
                                 path: "llm-observability",
