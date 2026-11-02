@@ -54,6 +54,7 @@ public class AtlasPeopleService {
     public static final String CAT_MCP = "mcp";
     public static final String CAT_BROWSER = "browser";
     public static final String CAT_PLUGIN = "plugin";
+    public static final int MAX_SKILLS_PER_TOOL = 1000;
     public static final List<String> CATEGORIES = Arrays.asList(CAT_AGENTS, CAT_IDE, CAT_MCP, CAT_BROWSER);
 
     public static final String OS_MAC = "macos";
@@ -101,11 +102,13 @@ public class AtlasPeopleService {
         public double riskScore;
         public String plugin;
         public int skillCount;
+        public List<String> skills = new ArrayList<>();
 
         public Map<String, Object> toMap() {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("plugin", plugin);
             row.put("skillCount", skillCount);
+            row.put("skills", skills);
             row.put("collectionId", collectionId);
             row.put("hostName", hostName);
             row.put("name", name);
@@ -346,6 +349,7 @@ public class AtlasPeopleService {
             if (!skills.isEmpty()) {
                 device.skillNames.addAll(skills);
                 tool.skillCount = device.skillSets.add(skills) ? skills.size() : 0;
+                if (tool.skillCount > 0) tool.skills = new ArrayList<>(skills).subList(0, Math.min(skills.size(), MAX_SKILLS_PER_TOOL));
             }
 
             device.tools.add(tool);

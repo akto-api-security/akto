@@ -128,7 +128,7 @@ function footprintModel(root, devices, heads) {
             mcpNodes.push({ id: `plugin-${tool.collectionId}`, category: "plugin", label: tool.plugin, sub: toolSub(tool), status: "neutral", parent: parentOf(tool) });
         });
         agents.filter((tool) => tool.skillCount > 0).forEach((tool) => {
-            mcpNodes.push({ id: `skills-${tool.collectionId}`, category: "skill", label: plural(tool.skillCount, "skill"), sub: "Skills", status: "neutral", parent: `tool-${tool.collectionId}` });
+            mcpNodes.push({ id: `skills-${tool.collectionId}`, category: "skill", label: plural(tool.skillCount, "skill"), sub: "Skills · select to list", status: "neutral", parent: `tool-${tool.collectionId}` });
         });
     });
     if (hiddenDevices > 0) deviceNodes.push({ id: "device-more", category: "external", label: `+${hiddenDevices} more devices`, sub: "", status: "neutral" });
@@ -228,6 +228,16 @@ const transform = {
     employeeAiToolCount: (employee) => (employee.deviceDetails || []).reduce(
         (total, device) => total + device.toolCount - (device.toolsByCategory?.mcp || 0), 0),
     pluginCount: (tools) => tools.filter((tool) => tool.plugin).length,
+    allTools: (kind, detail) => (kind === "device"
+        ? detail.tools || []
+        : (detail.deviceDetails || []).flatMap((device) => device.tools || [])),
+    skillSource: (kind, detail, nodeId) => {
+        const match = /^(skills|plugin)-(\d+)$/.exec(nodeId || "");
+        if (!match) return null;
+        const tool = transform.allTools(kind, detail).find((row) => String(row.collectionId) === match[2]);
+        if (!tool || !tool.skills?.length) return null;
+        return { title: `Skills in ${match[1] === "plugin" ? `plugin ${tool.plugin}` : tool.name}`, skills: tool.skills, total: tool.skillCount };
+    },
     peopleParams: (deviceScope, filters, searchString) => ({
         deviceScope,
         atlasQuery: searchString,

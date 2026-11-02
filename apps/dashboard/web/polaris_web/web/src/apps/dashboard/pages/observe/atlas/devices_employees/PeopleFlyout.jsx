@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Box, Button, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Scrollable, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
@@ -18,6 +18,7 @@ import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHO
 import transform from "./transform";
 
 const FLYOUT_WIDTH = 760;
+const SKILL_LIST_LIMIT = 100;
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 const viewViolations = (username) => () => openViolationInGuardrailViolations({ actor: username });
@@ -128,6 +129,32 @@ function EmployeeActions({ employee }) {
     );
 }
 
+function SkillList({ source }) {
+    const [query, setQuery] = useState("");
+    const matching = useMemo(() => {
+        const term = query.trim().toLowerCase();
+        return term ? source.skills.filter((skill) => skill.toLowerCase().includes(term)) : source.skills;
+    }, [source, query]);
+    const shown = matching.slice(0, SKILL_LIST_LIMIT);
+    return (
+        <Box background="bg-subdued" borderRadius="2" padding="3">
+            <VerticalStack gap="2">
+                <Text as="h4" variant="headingSm">{`${source.title} (${source.total})`}</Text>
+                <TextField label="Filter skills" labelHidden autoComplete="off" placeholder="Filter skills" value={query} onChange={setQuery} clearButton onClearButtonClick={() => setQuery("")} />
+                <Scrollable shadow style={{ height: "200px" }}>
+                    <VerticalStack gap="1">
+                        {shown.map((skill) => <Text key={skill} as="p" variant="bodySm">{skill}</Text>)}
+                        {shown.length === 0 && <Text as="p" variant="bodySm" color="subdued">No skills match.</Text>}
+                    </VerticalStack>
+                </Scrollable>
+                {matching.length > shown.length && (
+                    <Text as="p" variant="bodySm" color="subdued">{`Showing ${shown.length} of ${matching.length}. Filter to narrow the list.`}</Text>
+                )}
+            </VerticalStack>
+        </Box>
+    );
+}
+
 function Footprint({ kind, detail }) {
     const [highlight, setHighlight] = useState(null);
     const model = useMemo(() => transform.footprintGraph(kind, detail), [kind, detail]);
@@ -137,6 +164,7 @@ function Footprint({ kind, detail }) {
         setHighlight((current) => (current === node.id ? null : node.id));
     }, []);
     const clearHighlight = useCallback(() => setHighlight(null), []);
+    const skillSource = useMemo(() => transform.skillSource(kind, detail, highlight), [kind, detail, highlight]);
     return (
         <VerticalStack gap="2">
             <HorizontalStack align="space-between" blockAlign="baseline">
@@ -162,6 +190,7 @@ function Footprint({ kind, detail }) {
                             </HorizontalStack>
                         ))}
                     </HorizontalStack>
+                    {skillSource && <SkillList key={highlight} source={skillSource} />}
                 </VerticalStack>
             ) : <Text as="p" color="subdued">No AI tools were seen in the last 7 days.</Text>}
         </VerticalStack>
