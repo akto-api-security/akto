@@ -38,9 +38,10 @@ public class TestOptimizedTemplateToStaticMatch {
                 if (tParts.length < 2) continue;
                 String tEndpoint = tParts[1];
                 if (tEndpoint.contains("//") || tEndpoint.isEmpty()) continue;
-                com.akto.dto.type.URLTemplate urlTemplate = MergingLogic.createUrlTemplate(tEndpoint,
-                        com.akto.dto.type.URLMethods.Method.fromString(tParts[0]));
-                if (urlTemplate.match(endpoint, method)) {
+                com.akto.dto.type.URLMethods.Method tMethod = com.akto.dto.type.URLMethods.Method.fromString(tParts[0]);
+                if (MergingLogic.isSameUrl(tMethod, tEndpoint, method, endpoint)) continue;
+                com.akto.dto.type.URLTemplate urlTemplate = MergingLogic.createUrlTemplate(tEndpoint, tMethod);
+                if (MergingLogic.matchesTemplate(urlTemplate, endpoint, method)) {
                     matched.add(staticURL);
                     break;
                 }
@@ -268,18 +269,16 @@ public class TestOptimizedTemplateToStaticMatch {
         // A template URL string that is also a valid static URL (e.g., /health)
         List<String> templates = Arrays.asList("GET /health");
         Map<String, Set<String>> statics = toStaticMap("GET /health");
-        // /health has no wildcard tokens, so createUrlTemplate produces all-fixed tokens
-        // match() does exact string comparison first
-        assertMatchesBruteForce(templates, statics, 1);
+        // A URL is never matched against its own entry, or it would delete itself
+        assertMatchesBruteForce(templates, statics, 0);
     }
 
     @Test
     public void testExactMatchTemplateStringInStatic() {
-        // Static URL literally contains "INTEGER" as a path token
+        // Templates without STRING (e.g. /api/users/INTEGER) are also merge candidates; they must not absorb themselves
         List<String> templates = Arrays.asList("GET /api/users/INTEGER");
         Map<String, Set<String>> statics = toStaticMap("GET /api/users/INTEGER");
-        // URLTemplate.match does exact string comparison: url == templateString → true
-        assertMatchesBruteForce(templates, statics, 1);
+        assertMatchesBruteForce(templates, statics, 0);
     }
 
     // ==================== URL NORMALIZATION EDGE CASES ====================
@@ -505,9 +504,9 @@ public class TestOptimizedTemplateToStaticMatch {
         List<String> templates = Arrays.asList("GET /api/users/OBJECT_ID");
         Map<String, Set<String>> statics = toStaticMap(
                 "GET /api/users/507f1f77bcf86cd799439011",
-                "GET /api/users/OBJECT_ID"  // exact literal match
+                "GET /api/users/OBJECT_ID"  // same URL as the template: never self-matched
         );
-        assertMatchesBruteForce(templates, statics, 1);
+        assertMatchesBruteForce(templates, statics, 0);
     }
 
     @Test
@@ -515,9 +514,9 @@ public class TestOptimizedTemplateToStaticMatch {
         List<String> templates = Arrays.asList("GET /api/users/UUID");
         Map<String, Set<String>> statics = toStaticMap(
                 "GET /api/users/550e8400-e29b-41d4-a716-446655440000",
-                "GET /api/users/UUID"  // exact literal match
+                "GET /api/users/UUID"  // same URL as the template: never self-matched
         );
-        assertMatchesBruteForce(templates, statics, 1);
+        assertMatchesBruteForce(templates, statics, 0);
     }
 
     @Test
@@ -527,7 +526,7 @@ public class TestOptimizedTemplateToStaticMatch {
                 "GET /api/users/1.5",
                 "GET /api/users/FLOAT"
         );
-        assertMatchesBruteForce(templates, statics, 1);
+        assertMatchesBruteForce(templates, statics, 0);
     }
 
     @Test
@@ -537,7 +536,7 @@ public class TestOptimizedTemplateToStaticMatch {
                 "GET /api/users/v2",
                 "GET /api/users/VERSIONED"
         );
-        assertMatchesBruteForce(templates, statics, 1);
+        assertMatchesBruteForce(templates, statics, 0);
     }
 
     // ==================== MIXED MATCH AND NO-MATCH ====================
@@ -554,14 +553,14 @@ public class TestOptimizedTemplateToStaticMatch {
                 "GET /api/users/42",               // match
                 "GET /api/users/42/posts/7",        // match
                 "POST /v1/myservice/config",        // match
-                "GET /health",                      // match (exact)
+                "GET /health",                      // no match (same URL as the template)
                 "GET /api/users/42/comments",       // no match (no template)
                 "DELETE /api/users/42",             // no match (method)
                 "GET /api/products/42",             // no match (different prefix)
                 "GET /api/users",                   // no match (token count)
                 "GET /api/users/42/posts"           // no match (token count)
         );
-        assertMatchesBruteForce(templates, statics, 4);
+        assertMatchesBruteForce(templates, statics, 3);
     }
 
     // ==================== SCALE / MANY TEMPLATES ====================
@@ -704,10 +703,10 @@ public class TestOptimizedTemplateToStaticMatch {
         // also recognizes it, so let's use a truly fixed template
         List<String> templates = Arrays.asList("GET /api/health/check");
         Map<String, Set<String>> statics = toStaticMap(
-                "GET /api/health/check",    // exact match
+                "GET /api/health/check",    // same URL as the template: never self-matched
                 "GET /api/health/other"     // no match
         );
-        assertMatchesBruteForce(templates, statics, 1);
+        assertMatchesBruteForce(templates, statics, 0);
     }
 
     // ==================== CONSISTENCY: ORDERING INDEPENDENCE ====================

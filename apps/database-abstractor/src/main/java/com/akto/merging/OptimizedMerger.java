@@ -42,6 +42,7 @@ class OptimizedMerger {
      * Priority mirrors tryMergeUrls: English > numeric > UUID > version > locale > alphanumeric > opaque.
      */
     static TokenTag classifyToken(String token, boolean allowStringMerging, boolean allowMergingOnVersions) {
+        if (MergingLogic.TEMPLATE_PLACEHOLDERS.contains(token)) return null;
         if (DictionaryFilter.isEnglishWord(token)) return null;
         if (NumberUtils.isParsable(token)) return TokenTag.INT;
         if (allowStringMerging && UUID_PATTERN.matcher(token).matches()) return TokenTag.UUID;
