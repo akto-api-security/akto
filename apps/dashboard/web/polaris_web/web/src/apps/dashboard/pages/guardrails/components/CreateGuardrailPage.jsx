@@ -48,6 +48,8 @@ import {
     SensitiveInfoConfig,
     CodeDetectionStep,
     CodeDetectionConfig,
+    PredefinedCustomPromptsStep,
+    PredefinedCustomPromptsConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
     UsageGuardrailsStep,
@@ -65,6 +67,12 @@ import {
     ExceptionsStep,
     ExceptionsConfig
 } from './steps';
+import {
+    PREDEFINED_CUSTOM_PROMPTS,
+    appendTemplatePrompt,
+    removeTemplatePrompt,
+    selectedTemplateIdsFromPrompt
+} from './predefinedCustomPrompts';
 import "./createGuardrailPage.css";
 
 // Store service keys so new devices are covered automatically via service-key matching in enforcement.
@@ -212,6 +220,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
 
+    // Predefined custom prompts (left-nav step before Custom Guardrails)
+    const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
+
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
@@ -334,6 +345,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         codeFilterLevel,
         enableBanCode,
         banCodeConfidenceScore,
+        // Predefined custom prompts
+        selectedTemplateIds,
         // Step 6
         enableLlmPrompt,
         llmPrompt,
@@ -430,6 +443,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                 title: CodeDetectionConfig.title,
                 summary: CodeDetectionConfig.getSummary(storedStateData),
                 ...CodeDetectionConfig.validate(storedStateData)
+            },
+            {
+                number: PredefinedCustomPromptsConfig.number,
+                title: PredefinedCustomPromptsConfig.title,
+                summary: PredefinedCustomPromptsConfig.getSummary(storedStateData),
+                ...PredefinedCustomPromptsConfig.validate(storedStateData)
             },
             {
                 number: CustomGuardrailsConfig.number,
@@ -651,6 +670,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setCodeFilterLevel("high");
         setEnableBanCode(false);
         setBanCodeConfidenceScore(0.7);
+        setSelectedTemplateIds([]);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
@@ -770,10 +790,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
+        const savedLlmPrompt = policy.llmRule?.userPrompt || "";
         setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
-        setLlmPrompt(policy.llmRule?.userPrompt || "");
+        setLlmPrompt(savedLlmPrompt);
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
         setLlmCompliance(policy.llmRule?.compliance || {});
+        setSelectedTemplateIds(selectedTemplateIdsFromPrompt(savedLlmPrompt));
 
         // LLM redaction. Must be hydrated here or editing an existing policy saves
         // an empty list back over the stored rules.
@@ -1059,6 +1081,21 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setCurrentStep(stepNumber);
     };
 
+    const togglePredefinedTemplate = (id) => {
+        const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
+        if (!template) return;
+
+        const isSelected = selectedTemplateIds.includes(id);
+        if (isSelected) {
+            setSelectedTemplateIds(selectedTemplateIds.filter((t) => t !== id));
+            setLlmPrompt(removeTemplatePrompt(llmPrompt, template));
+        } else {
+            setSelectedTemplateIds([...selectedTemplateIds, id]);
+            setLlmPrompt(appendTemplatePrompt(llmPrompt, template));
+            setEnableLlmPrompt(true);
+        }
+    };
+
     const renderStepContent = (stepNumber) => {
         switch (stepNumber) {
             case 1:
@@ -1143,6 +1180,13 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableCodeFilter={setEnableCodeFilter}
                         enableBanCode={enableBanCode}
                         setEnableBanCode={setEnableBanCode}
+                    />
+                );
+            case 14:
+                return (
+                    <PredefinedCustomPromptsStep
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
                     />
                 );
             case 6:

@@ -25,6 +25,8 @@ import {
     SensitiveInfoConfig,
     CodeDetectionStep,
     CodeDetectionConfig,
+    PredefinedCustomPromptsStep,
+    PredefinedCustomPromptsConfig,
     CustomGuardrailsStep,
     CustomGuardrailsConfig,
     UsageGuardrailsStep,
@@ -45,6 +47,12 @@ import {
 } from '../utils';
 import func from "@/util/func";
 import { withPermissions } from "@/util/permissions";
+import {
+    PREDEFINED_CUSTOM_PROMPTS,
+    appendTemplatePrompt,
+    removeTemplatePrompt,
+    selectedTemplateIdsFromPrompt
+} from './predefinedCustomPrompts';
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
     // Step management
@@ -103,6 +111,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [codeFilterLevel, setCodeFilterLevel] = useState("high");
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
+
+    // Predefined custom prompts (left-nav step before Custom Guardrails)
+    const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
 
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
@@ -177,6 +188,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         codeFilterLevel,
         enableBanCode,
         banCodeConfidenceScore,
+        // Predefined custom prompts
+        selectedTemplateIds,
         // Step 6
         enableLlmPrompt,
         llmPrompt,
@@ -239,6 +252,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                 title: CodeDetectionConfig.title,
                 summary: CodeDetectionConfig.getSummary(storedStateData),
                 ...CodeDetectionConfig.validate(storedStateData)
+            },
+            {
+                number: PredefinedCustomPromptsConfig.number,
+                title: PredefinedCustomPromptsConfig.title,
+                summary: PredefinedCustomPromptsConfig.getSummary(storedStateData),
+                ...PredefinedCustomPromptsConfig.validate(storedStateData)
             },
             {
                 number: CustomGuardrailsConfig.number,
@@ -386,6 +405,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setCodeFilterLevel("high");
         setEnableBanCode(false);
         setBanCodeConfidenceScore(0.7);
+        setSelectedTemplateIds([]);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
         setLlmConfidenceScore(0.5);
@@ -478,13 +498,16 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
 
         // LLM prompt
         if (policy.llmRule) {
+            const savedLlmPrompt = policy.llmRule.userPrompt || "";
             setEnableLlmPrompt(policy.llmRule.enabled || !!policy.llmRule.userPrompt);
-            setLlmPrompt(policy.llmRule.userPrompt || "");
+            setLlmPrompt(savedLlmPrompt);
             setLlmConfidenceScore(policy.llmRule.confidenceScore !== undefined ? policy.llmRule.confidenceScore : 0.5);
+            setSelectedTemplateIds(selectedTemplateIdsFromPrompt(savedLlmPrompt));
         } else {
             setEnableLlmPrompt(false);
             setLlmPrompt("");
             setLlmConfidenceScore(0.5);
+            setSelectedTemplateIds([]);
         }
 
         // Base Prompt Based Validation (AI Agents)
@@ -703,6 +726,21 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         }
     }, [currentStep]);
 
+    const togglePredefinedTemplate = (id) => {
+        const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
+        if (!template) return;
+
+        const isSelected = selectedTemplateIds.includes(id);
+        if (isSelected) {
+            setSelectedTemplateIds(selectedTemplateIds.filter((t) => t !== id));
+            setLlmPrompt(removeTemplatePrompt(llmPrompt, template));
+        } else {
+            setSelectedTemplateIds([...selectedTemplateIds, id]);
+            setLlmPrompt(appendTemplatePrompt(llmPrompt, template));
+            setEnableLlmPrompt(true);
+        }
+    };
+
     const handleStepClick = (stepNumber) => {
         if (stepNumber === currentStep) {
             setCurrentStep(null);
@@ -888,6 +926,13 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setEnableBanCode={setEnableBanCode}
                         banCodeConfidenceScore={banCodeConfidenceScore}
                         setBanCodeConfidenceScore={setBanCodeConfidenceScore}
+                    />
+                );
+            case 14:
+                return (
+                    <PredefinedCustomPromptsStep
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
                     />
                 );
             case 6:
