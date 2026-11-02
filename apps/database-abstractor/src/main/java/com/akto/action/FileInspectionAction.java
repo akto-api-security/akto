@@ -61,16 +61,24 @@ public class FileInspectionAction extends ActionSupport {
     @Getter private String blobContent;
 
     public String fetchFileInspectionRules() {
+        return fetchRules(Filters.eq(FileInspectionRule.AGENT, null), "fetchFileInspectionRules");
+    }
+
+    public String fetchFileInspectionRulesV2() {
+        return fetchRules(Filters.empty(), "fetchFileInspectionRulesV2");
+    }
+
+    private String fetchRules(Bson kindFilter, String name) {
         try {
             FileInspectionRuleDao.getInstance().createIndicesIfAbsent();
-            Bson filter = Filters.gt(FileInspectionRule.UPDATED_TS, (int) updatedAfter);
+            Bson filter = Filters.and(Filters.gt(FileInspectionRule.UPDATED_TS, (int) updatedAfter), kindFilter);
             this.rules = FileInspectionRuleDao.getInstance().findAll(
                 filter, 0, 500,
                 Sorts.descending(FileInspectionRule.UPDATED_TS)
             );
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("fetchFileInspectionRules failed: " + e.getMessage(), LogDb.DB_ABS);
+            loggerMaker.errorAndAddToDb(name + " failed: " + e.getMessage(), LogDb.DB_ABS);
             addActionError("Failed to fetch rules");
             return ERROR.toUpperCase();
         }
@@ -117,7 +125,7 @@ public class FileInspectionAction extends ActionSupport {
     }
 
     /**
-     * Idempotent rule create/update keyed by path. Mirrors
+     * Idempotent rule create/update keyed by (path, agent, os, role). Mirrors
      * dashboard's FileInspectionRuleAction#addFileInspectionRule so other
      * akto services (guardrails-service) can seed rules without going
      * through the dashboard.
@@ -132,16 +140,21 @@ public class FileInspectionAction extends ActionSupport {
                 return ERROR.toUpperCase();
             }
             String trimmed = path.trim();
+            String a = StringUtils.trimToNull(agent);
+            String o = StringUtils.trimToNull(os);
+            String ro = StringUtils.trimToNull(role);
             int now = Context.now();
 
-            Bson filter = Filters.eq(FileInspectionRule.PATH, trimmed);
+            Bson filter = Filters.and(
+                Filters.eq(FileInspectionRule.PATH, trimmed),
+                Filters.eq(FileInspectionRule.AGENT, a),
+                Filters.eq(FileInspectionRule.OS, o),
+                Filters.eq(FileInspectionRule.ROLE, ro)
+            );
             FileInspectionRule existing = FileInspectionRuleDao.getInstance().findOne(filter);
             if (existing != null) {
                 existing.setExistenceOnly(existenceOnly);
                 existing.setMaxDepth(maxDepth);
-                if (StringUtils.isNotBlank(agent)) existing.setAgent(agent.trim());
-                if (StringUtils.isNotBlank(os)) existing.setOs(os.trim());
-                if (StringUtils.isNotBlank(role)) existing.setRole(role.trim());
                 existing.setUpdatedTs(now);
                 FileInspectionRuleDao.getInstance().replaceOne(filter, existing);
                 this.rule = existing;
@@ -153,9 +166,9 @@ public class FileInspectionAction extends ActionSupport {
                 r.setExistenceOnly(existenceOnly);
                 r.setMaxDepth(maxDepth);
                 r.setAddedBy(StringUtils.isBlank(addedBy) ? "system" : addedBy);
-                r.setAgent(StringUtils.trimToNull(agent));
-                r.setOs(StringUtils.trimToNull(os));
-                r.setRole(StringUtils.trimToNull(role));
+                r.setAgent(a);
+                r.setOs(o);
+                r.setRole(ro);
                 r.setCreatedTs(now);
                 r.setUpdatedTs(now);
                 FileInspectionRuleDao.getInstance().insertOne(r);

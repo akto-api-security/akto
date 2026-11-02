@@ -23,6 +23,7 @@ public class FileInspectionRule {
     public static final String ACCOUNT_ID = "accountId";
     public static final String PATH = "path";
     public static final String EXISTENCE_ONLY = "existenceOnly";
+    public static final String MAX_DEPTH = "maxDepth";
     public static final String ADDED_BY = "addedBy";
     public static final String CREATED_TS = "createdTs";
     public static final String UPDATED_TS = "updatedTs";
@@ -42,7 +43,7 @@ public class FileInspectionRule {
     private String addedBy;
     private int createdTs;
     private int updatedTs;
-    private String agent; // e.g. "Claude Code"; null = custom rule
-    private String os;    // darwin | linux | windows; null = all OS
+    private String agent; // null = custom rule
+    private String os;    // darwin | linux | windows
     private String role;  // login | credentials | mcp_config
 }
