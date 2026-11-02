@@ -11,7 +11,7 @@ import { current } from 'immer';
 import homeFunctions from '../apps/dashboard/pages/home/module';
 import { tokens } from "@shopify/polaris-tokens" 
 import PersistStore from '../apps/main/PersistStore';
-import { categoryToShortName, getDashboardCategory, isAgenticSecurityCategory, isMCPSecurityCategory } from '../apps/main/labelHelper';
+import { categoryToShortName, getDashboardCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isMCPSecurityCategory } from '../apps/main/labelHelper';
 
 import { circle_cancel, circle_tick_minor, car_icon } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
@@ -2604,6 +2604,13 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     const until = new Date(new Date().setHours(23, 59, 59, 999));
     const since = new Date(new Date(new Date().setDate(until.getDate() - 30)).setHours(0, 0, 0, 0));
     return { title: "Last 30 days", alias: "last30days", period: { since, until } };
+  },
+  // Atlas (Endpoint Security) and Argus (Agentic Security) default to 30 days; every other product keeps `fallback`.
+  // Heavy accounts keep `fallback` too (their data volume makes a 30-day default slow).
+  getDefaultDateRange(fallback){
+    const accs = [1745303931, 1768175789];
+    if (accs.includes(Number(window.ACTIVE_ACCOUNT))) return fallback;
+    return (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? this.getLast30DaysRange() : fallback;
   },
 
   isDemoAccount(){

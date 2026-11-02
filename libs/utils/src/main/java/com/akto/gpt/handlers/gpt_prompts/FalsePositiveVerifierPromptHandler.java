@@ -4,9 +4,16 @@ import com.akto.dao.agents.LlmServiceConfigDao;
 import com.akto.dto.agents.LlmServiceConfig;
 import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.validation.ValidationException;
 import org.json.JSONObject;
+import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.Yaml;
 
 /**
  * Asks the LLM whether a test result that Akto flagged as vulnerable is actually a false positive.
@@ -25,8 +32,18 @@ public class FalsePositiveVerifierPromptHandler extends AzureOpenAIPromptHandler
     static final int MAX_REQUEST_CHARS = 20_000;
     static final int MAX_RESPONSE_CHARS = 40_000;
     static final int MAX_TEMPLATE_CHARS = 30_000;
-    static final int MAX_DESCRIPTION_CHARS = 1000;
     static final int MAX_REASON_CHARS = 500;
+
+    // Prompt trimming: long template strings and lists (payload word lists, not_contains lists) are cut,
+    // and long header values (tokens) are shortened, since the facts already say what changed.
+    static final int MAX_TEMPLATE_STRING = 120;
+    // The description says in one or two sentences what the test flags, which is how validate reads.
+    static final int MAX_TEMPLATE_DESCRIPTION = 400;
+    static final int MAX_TEMPLATE_LIST = 10;
+    static final int MAX_HEADER_VALUE = 200;
+    private static final Set<String> TEMPLATE_INFO_KEPT = new HashSet<>(Arrays.asList("name", "description", "category", "subCategory", "severity"));
+    // The markers the scanner matched on decide the verdict, so these lists are kept whole.
+    private static final Set<String> TEMPLATE_LISTS_KEPT = new HashSet<>(Arrays.asList("contains_either", "contains_all", "regex"));
 
     static final String SERVICE_KEY = "false-positive-verification";
 
@@ -118,11 +135,10 @@ public class FalsePositiveVerifierPromptHandler extends AzureOpenAIPromptHandler
      *
      * @param testId          the test's id (sub category)
      * @param template        the test template YAML; its info block carries the name and description
-     * @param validationReason why the scanner flagged the result, if recorded
      * @param originalMessage the baseline request/response the attack was derived from
      * @param attemptMessages the attack request/responses to judge (the vulnerable ones), in order
      */
-    public static String buildPrompt(String testId, String template, String validationReason, String originalMessage,
+    public static String buildPrompt(String testId, String template, String originalMessage,
                                      List<String> attemptMessages) {
         String proofClass = FalsePositiveProofRules.detectClass(template);
         StringBuilder sb = new StringBuilder();
@@ -152,24 +168,39 @@ public class FalsePositiveVerifierPromptHandler extends AzureOpenAIPromptHandler
           .append("4. Apply the proof rules. FALSE_POSITIVE only if one of its FALSE_POSITIVE cases clearly applies.\n\n");
 
         sb.append("Test id: ").append(nullToEmpty(testId)).append("\n");
-        if (validationReason != null && !validationReason.trim().isEmpty()) {
-            sb.append("Why the scanner flagged it: ").append(truncate(validationReason, MAX_DESCRIPTION_CHARS)).append("\n");
-        }
-        sb.append("\nTest template (YAML):\n```yaml\n")
-          .append(isBlank(template) ? "(not available)" : truncate(template, MAX_TEMPLATE_CHARS))
+        sb.append("\nTest template (YAML, long payload lists shortened):\n```yaml\n")
+          .append(isBlank(template) ? "(not available)" : truncate(compactTemplate(template), MAX_TEMPLATE_CHARS))
           .append("\n```\n");
+
+        // Tokens are the evidence in JWT tests, and headers in header and CORS tests, so those keep them whole.
+        boolean shortenValues = !FalsePositiveProofRules.JWT.equals(proofClass);
+        boolean dropNoise = !FalsePositiveProofRules.HEADERS.equals(proofClass) && !FalsePositiveProofRules.CORS.equals(proofClass);
+        Map<String, String> originalHeaders = ExchangeFacts.requestHeaders(originalMessage);
 
         sb.append("\n<<<EVIDENCE\n")
           .append("Baseline (original) request/response:\n")
-          .append(formatExchange(originalMessage)).append("\n");
+          .append(formatExchange(originalMessage, null, shortenValues, dropNoise)).append("\n");
         List<String> attempts = attemptMessages == null ? new ArrayList<>() : attemptMessages;
         if (attempts.isEmpty()) {
             sb.append("\nAttack request/response:\n(not available)\n");
         }
+        // Attempts that got the same response as one already shown (only the payload differed) are not repeated.
+        Set<String> shownResponses = new HashSet<>();
+        int repeated = 0;
         for (int i = 0; i < attempts.size(); i++) {
+            String signature = ExchangeFacts.responseSignature(attempts.get(i));
+            if (signature != null && !shownResponses.add(signature)) {
+                repeated++;
+                continue;
+            }
             sb.append("\nAttack attempt ").append(i + 1).append(" of ").append(attempts.size())
-              .append(" (flagged vulnerable):\n").append(formatExchange(attempts.get(i))).append("\n")
-              .append(ExchangeFacts.describe(originalMessage, attempts.get(i)));
+              .append(" (flagged vulnerable):\n")
+              .append(formatExchange(attempts.get(i), originalHeaders, shortenValues, dropNoise)).append("\n")
+              .append(facts(template, originalMessage, attempts.get(i)));
+        }
+        if (repeated > 0) {
+            sb.append("\n").append(repeated).append(" more flagged attempt").append(repeated == 1 ? "" : "s")
+              .append(" got the same status and body as an attempt above (only the payload differed); not repeated.\n");
         }
         sb.append("EVIDENCE>>>\n\n")
           .append("Respond with only this JSON object:\n")
@@ -179,13 +210,26 @@ public class FalsePositiveVerifierPromptHandler extends AzureOpenAIPromptHandler
         return sb.toString();
     }
 
+    /** The computed facts for one attempt: its differences from the original and the validate markers it matched. */
+    static String facts(String template, String originalMessage, String attemptMessage) {
+        String diff = ExchangeFacts.describe(originalMessage, attemptMessage);
+        String markers = ExchangeFacts.validateMarkers(template, originalMessage, attemptMessage);
+        if (markers.isEmpty()) return diff;
+        return (diff.isEmpty() ? "Facts computed by Akto (exact):\n" : diff) + markers;
+    }
+
     /**
      * Renders one stored request/response with the request and response truncated separately, so a
      * large request can never push the response (usually the evidence) out of the prompt. Accepts the
      * test result format ({"request": {...}, "response": {...}}) and the sample data format
      * (method/path/requestPayload/responsePayload/...); anything else is included as raw text.
+     *
+     * @param originalRequestHeaders when set, only request headers that differ from these are shown
+     * @param shortenValues          header values over MAX_HEADER_VALUE chars are cut
+     * @param dropNoise              transport response headers (date, via, rate limits...) are left out
      */
-    static String formatExchange(String message) {
+    static String formatExchange(String message, Map<String, String> originalRequestHeaders,
+                                 boolean shortenValues, boolean dropNoise) {
         if (isBlank(message)) return "(not available)";
         JSONObject msg;
         try {
@@ -202,25 +246,131 @@ public class FalsePositiveVerifierPromptHandler extends AzureOpenAIPromptHandler
             if (req != null) {
                 request.append(req.optString("method", "")).append(' ').append(req.optString("url", ""));
                 appendField(request, "Query params", req.opt("queryParams"));
-                appendField(request, "Headers", req.opt("headers"));
+                appendRequestHeaders(request, req.opt("headers"), originalRequestHeaders, shortenValues);
                 appendField(request, "Body", req.opt("body"));
             }
             if (resp != null) {
                 response.append("Status: ").append(resp.opt("statusCode"));
-                appendField(response, "Headers", resp.opt("headers"));
+                appendResponseHeaders(response, resp.opt("headers"), shortenValues, dropNoise);
                 appendField(response, "Body", resp.opt("body"));
             }
         } else {
             request.append(msg.optString("method", "")).append(' ').append(msg.optString("path", ""));
-            appendField(request, "Headers", msg.opt("requestHeaders"));
+            appendRequestHeaders(request, msg.opt("requestHeaders"), originalRequestHeaders, shortenValues);
             appendField(request, "Body", msg.opt("requestPayload"));
             response.append("Status: ").append(msg.opt("statusCode"));
-            appendField(response, "Headers", msg.opt("responseHeaders"));
+            appendResponseHeaders(response, msg.opt("responseHeaders"), shortenValues, dropNoise);
             appendField(response, "Body", msg.opt("responsePayload"));
         }
 
         return "REQUEST:\n" + truncate(request.toString().trim(), MAX_REQUEST_CHARS)
             + "\nRESPONSE:\n" + truncate(response.toString().trim(), MAX_RESPONSE_CHARS);
+    }
+
+    private static void appendRequestHeaders(StringBuilder sb, Object headers, Map<String, String> original, boolean shortenValues) {
+        Map<String, String> all = ExchangeFacts.headers(headers);
+        if (original == null) {
+            appendHeaders(sb, "Headers", all, shortenValues);
+            return;
+        }
+        Map<String, String> changed = new LinkedHashMap<>();
+        List<String> removed = new ArrayList<>();
+        for (Map.Entry<String, String> header : all.entrySet()) {
+            if ("x-akto-ignore".equals(header.getKey())) continue;
+            if (!header.getValue().equals(original.get(header.getKey()))) changed.put(header.getKey(), header.getValue());
+        }
+        for (String name : original.keySet()) {
+            if (!all.containsKey(name)) removed.add(name);
+        }
+        if (changed.isEmpty() && removed.isEmpty()) {
+            sb.append("\nHeaders: same as the original request");
+            return;
+        }
+        appendHeaders(sb, "Headers changed from the original", changed, shortenValues);
+        if (!removed.isEmpty()) sb.append("\nHeaders removed: ").append(String.join(", ", removed));
+        sb.append("\n(other headers same as the original request)");
+    }
+
+    private static void appendResponseHeaders(StringBuilder sb, Object headers, boolean shortenValues, boolean dropNoise) {
+        Map<String, String> kept = new LinkedHashMap<>();
+        for (Map.Entry<String, String> header : ExchangeFacts.headers(headers).entrySet()) {
+            String name = header.getKey();
+            if (dropNoise && ExchangeFacts.isNoiseHeader(name)) continue;
+            kept.put(name, header.getValue());
+        }
+        appendHeaders(sb, "Headers", kept, shortenValues);
+    }
+
+    private static void appendHeaders(StringBuilder sb, String label, Map<String, String> headers, boolean shortenValues) {
+        if (headers.isEmpty()) return;
+        Map<String, String> rendered = new LinkedHashMap<>();
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            rendered.put(header.getKey(), shortenValues ? shorten(header.getValue(), MAX_HEADER_VALUE) : header.getValue());
+        }
+        sb.append('\n').append(label).append(": ").append(new JSONObject(rendered));
+    }
+
+    private static String shorten(String value, int max) {
+        if (value == null || value.length() <= max) return value;
+        return value.substring(0, 60) + "...(" + value.length() + " chars)";
+    }
+
+
+    static String compactTemplate(String template) {
+        try {
+            Object parsed = new Yaml().load(template);
+            if (!(parsed instanceof Map)) return template;
+            Map<?, ?> root = (Map<?, ?>) parsed;
+            Map<String, Object> compact = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : root.entrySet()) {
+                String key = String.valueOf(entry.getKey());
+                if ("attributes".equals(key)) continue;
+                Object value = entry.getValue();
+                if ("info".equals(key) && value instanceof Map) {
+                    Map<String, Object> info = new LinkedHashMap<>();
+                    for (Map.Entry<?, ?> field : ((Map<?, ?>) value).entrySet()) {
+                        if (TEMPLATE_INFO_KEPT.contains(String.valueOf(field.getKey()))) info.put(String.valueOf(field.getKey()), field.getValue());
+                    }
+                    value = info;
+                }
+                compact.put(key, compactValue(key, value, "execute".equals(key)));
+            }
+            DumperOptions options = new DumperOptions();
+            options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+            options.setWidth(Integer.MAX_VALUE);
+            options.setSplitLines(false);
+            return new Yaml(options).dump(compact).trim();
+        } catch (Exception e) {
+            return template;
+        }
+    }
+
+    // execute steps are never cut, since they say what the test changed.
+    private static Object compactValue(String key, Object value, boolean inExecute) {
+        if (value instanceof String) {
+            String text = (String) value;
+            if ("description".equals(key)) return truncate(text.trim(), MAX_TEMPLATE_DESCRIPTION);
+            return !inExecute && text.length() > MAX_TEMPLATE_STRING
+                ? text.substring(0, 40) + "... (" + text.length() + " chars)" : text;
+        }
+        if (value instanceof Map) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                String childKey = String.valueOf(entry.getKey());
+                out.put(childKey, compactValue(childKey, entry.getValue(), inExecute));
+            }
+            return out;
+        }
+        if (value instanceof List) {
+            List<?> list = (List<?>) value;
+            boolean keepAll = inExecute || TEMPLATE_LISTS_KEPT.contains(key);
+            int limit = keepAll ? list.size() : Math.min(list.size(), MAX_TEMPLATE_LIST);
+            List<Object> out = new ArrayList<>();
+            for (int i = 0; i < limit; i++) out.add(compactValue(key, list.get(i), inExecute));
+            if (list.size() > limit) out.add("... (+" + (list.size() - limit) + " more)");
+            return out;
+        }
+        return value;
     }
 
     private static void appendField(StringBuilder sb, String label, Object value) {

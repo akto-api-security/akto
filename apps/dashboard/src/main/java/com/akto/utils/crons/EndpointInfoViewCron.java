@@ -1,6 +1,5 @@
 package com.akto.utils.crons;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dto.*;
@@ -9,9 +8,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.AccountTask;
-import com.mongodb.ConnectionString;
-import com.mongodb.ReadPreference;
-import com.mongodb.WriteConcern;
 import com.mongodb.client.model.*;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -52,18 +48,19 @@ public class EndpointInfoViewCron {
 
     public static void refreshView() {
         AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        if (settings == null || !settings.isEnableEndpointInfoView()) return;
+        // if (settings == null || !settings.isEnableEndpointInfoView()) return;
 
-        int configuredThreshold = settings.getViewRefreshThresholdSeconds();
-        int threshold = configuredThreshold > 0 ? configuredThreshold
-                : (isAccountActiveRecently() ? ACTIVE_THRESHOLD : INACTIVE_THRESHOLD);
-        if (!tryAcquire(threshold)) return;
+        // int configuredThreshold = settings.getViewRefreshThresholdSeconds();
+        // int threshold = configuredThreshold > 0 ? configuredThreshold
+        //         : (isAccountActiveRecently() ? ACTIVE_THRESHOLD : INACTIVE_THRESHOLD);
+        // if (!tryAcquire(threshold)) return;
 
-        try {
-            doRefresh();
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Error refreshing view for account " + Context.accountId.get());
-        }
+        // try {
+        //     doRefresh();
+        // } catch (Exception e) {
+        //     logger.errorAndAddToDb(e, "Error refreshing view for account " + Context.accountId.get());
+        // }
+        return;
     }
 
     private static void doRefresh() {
