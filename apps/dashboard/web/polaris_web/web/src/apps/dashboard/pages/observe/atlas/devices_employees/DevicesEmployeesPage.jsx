@@ -73,7 +73,11 @@ function DevicesEmployeesPage() {
     const activeMode = onDevicesTab && filters.guardrailModes.length === 1 ? filters.guardrailModes[0] : null;
     const activeCategory = onDevicesTab && filters.osList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
 
-    const openPerson = useCallback((kind, id) => setOpenTarget({ kind, id }), []);
+    const openPerson = useCallback((kind, id) => {
+        const nextTab = kind === "employee" ? "employees" : "devices";
+        if (nextTab !== tab) showTable(nextTab);
+        setOpenTarget({ kind, id });
+    }, [tab, showTable]);
     const closePerson = useCallback(() => setOpenTarget(null), []);
 
     const exportTable = async () => {

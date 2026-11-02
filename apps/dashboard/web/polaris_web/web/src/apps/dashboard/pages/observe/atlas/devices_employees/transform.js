@@ -76,9 +76,33 @@ function statValue(value, subtext, onClick, label) {
 }
 
 function capped(items) {
-    if (items.length <= FLYOUT_GRAPH_LIMIT) return { shown: items, hidden: 0 };
-    return { shown: items.slice(0, FLYOUT_GRAPH_LIMIT - 1), hidden: items.length - FLYOUT_GRAPH_LIMIT + 1 };
+    if (items.length <= FLYOUT_GRAPH_LIMIT) return { shown: items, hidden: 0, rest: [] };
+    const shown = items.slice(0, FLYOUT_GRAPH_LIMIT - 1);
+    return { shown, hidden: items.length - shown.length, rest: items.slice(shown.length) };
 }
+
+function balanced(groups, limit) {
+    const total = groups.reduce((sum, group) => sum + group.length, 0);
+    if (total <= limit) return { shown: groups.flat(), hidden: 0, rest: [] };
+    const taken = groups.map(() => 0);
+    let room = limit - 1;
+    while (room > 0) {
+        let progressed = false;
+        groups.forEach((group, index) => {
+            if (room > 0 && taken[index] < group.length) {
+                taken[index] += 1;
+                room -= 1;
+                progressed = true;
+            }
+        });
+        if (!progressed) break;
+    }
+    const shown = groups.flatMap((group, index) => group.slice(0, taken[index]));
+    const rest = groups.flatMap((group, index) => group.slice(taken[index]));
+    return { shown, hidden: rest.length, rest };
+}
+
+const MORE_TITLES = { "device-more": "More devices", "tool-more": "More AI tools", "mcp-more": "More MCP servers, plugins and skills" };
 
 function toolStatus(tool) {
     return !tool.approved || tool.personal ? "bad" : "ok";
@@ -103,9 +127,11 @@ function footprintModel(root, devices, heads) {
     const deviceNodes = [];
     const agentNodes = [];
     const mcpNodes = [];
+    const pluginNodes = [];
+    const skillNodes = [];
     const link = (source, target, status) => edges.push({ source, target, risky: status === "bad" });
 
-    const { shown: shownDevices, hidden: hiddenDevices } = capped(devices);
+    const { shown: shownDevices, hidden: hiddenDevices, rest: restDevices } = capped(devices);
     shownDevices.forEach((device, deviceIndex) => {
         const deviceId = withDevices ? `device-${deviceIndex}` : "root";
         if (withDevices) {
@@ -125,16 +151,22 @@ function footprintModel(root, devices, heads) {
             mcpNodes.push({ id: `tool-${tool.collectionId}`, category: "mcp", label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: parentOf(tool) });
         });
         tools.filter((tool) => tool.plugin).forEach((tool) => {
-            mcpNodes.push({ id: `plugin-${tool.collectionId}`, category: "plugin", label: tool.plugin, sub: toolSub(tool), status: "neutral", parent: parentOf(tool) });
+            pluginNodes.push({ id: `plugin-${tool.collectionId}`, category: "plugin", label: tool.plugin, sub: toolSub(tool), status: "neutral", parent: parentOf(tool) });
         });
         agents.filter((tool) => tool.skillCount > 0).forEach((tool) => {
-            mcpNodes.push({ id: `skills-${tool.collectionId}`, category: "skill", label: plural(tool.skillCount, "skill"), sub: "Skills · select to list", status: "neutral", parent: `tool-${tool.collectionId}` });
+            skillNodes.push({ id: `skills-${tool.collectionId}`, category: "skill", label: plural(tool.skillCount, "skill"), sub: "Skills · select to list", status: "neutral", parent: `tool-${tool.collectionId}` });
         });
     });
     if (hiddenDevices > 0) deviceNodes.push({ id: "device-more", category: "external", label: `+${hiddenDevices} more devices`, sub: "", status: "neutral" });
 
+    const hiddenItems = {};
+    if (hiddenDevices > 0) {
+        hiddenItems["device-more"] = restDevices.map((device) => ({ label: device.name, sub: `${OS_LABELS[device.os] || device.os} · ${HEALTH_LABELS[device.health] || device.health}` }));
+    }
     const visibleAgents = capped(agentNodes);
-    const visibleMcps = capped(mcpNodes);
+    const visibleMcps = balanced([mcpNodes, pluginNodes, skillNodes], FLYOUT_GRAPH_LIMIT);
+    if (visibleAgents.hidden > 0) hiddenItems["tool-more"] = visibleAgents.rest.map((node) => ({ label: node.label, sub: node.sub }));
+    if (visibleMcps.hidden > 0) hiddenItems["mcp-more"] = visibleMcps.rest.map((node) => ({ label: node.label, sub: node.sub }));
     if (visibleAgents.hidden > 0) visibleAgents.shown.push({ id: "tool-more", category: "agent", label: `+${visibleAgents.hidden} more AI tools`, sub: "", status: "neutral" });
     if (visibleMcps.hidden > 0) visibleMcps.shown.push({ id: "mcp-more", category: "mcp", label: `+${visibleMcps.hidden} more MCP servers`, sub: "", status: "neutral" });
 
@@ -144,9 +176,11 @@ function footprintModel(root, devices, heads) {
     columns.push(visibleAgents.shown, visibleMcps.shown);
     columns.flat().forEach((node) => statusById.set(node.id, node.status));
     visibleAgents.shown.concat(visibleMcps.shown).forEach((node) => {
-        if (node.parent && statusById.has(node.parent)) link(node.parent, node.id, node.status);
+        if (!node.parent || node.id.endsWith("-more")) return;
+        const parent = statusById.has(node.parent) ? node.parent : statusById.has("tool-more") && node.category !== "agent" ? "tool-more" : null;
+        if (parent) link(parent, node.id, node.status);
     });
-    return { heads, columns, edges };
+    return { heads, columns, edges, hiddenItems };
 }
 
 function connectedIds(edges, start) {
@@ -185,7 +219,7 @@ function footprintLayout(model, highlight) {
                 draggable: false,
                 position: { x, y: layout.headHeight + (rowIndex + offset) * layout.rowHeight },
                 style: lit && !lit.has(node.id) ? { opacity: layout.dimmedOpacity } : undefined,
-                data: { component: { category: node.category, type: node.sub || "More", label: node.label, status: node.status, selected: highlight === node.id } },
+                data: { component: { category: node.category, type: node.sub || "Select to list", label: node.label, status: node.status, selected: highlight === node.id } },
             });
         });
     });
@@ -231,12 +265,18 @@ const transform = {
     allTools: (kind, detail) => (kind === "device"
         ? detail.tools || []
         : (detail.deviceDetails || []).flatMap((device) => device.tools || [])),
-    skillSource: (kind, detail, nodeId) => {
+    nodeList: (model, kind, detail, nodeId) => {
+        const hidden = model.hiddenItems?.[nodeId];
+        if (hidden) return { title: `${MORE_TITLES[nodeId]} (${hidden.length})`, items: hidden };
         const match = /^(skills|plugin)-(\d+)$/.exec(nodeId || "");
         if (!match) return null;
         const tool = transform.allTools(kind, detail).find((row) => String(row.collectionId) === match[2]);
-        if (!tool || !tool.skills?.length) return null;
-        return { title: `Skills in ${match[1] === "plugin" ? `plugin ${tool.plugin}` : tool.name}`, skills: tool.skills, total: tool.skillCount };
+        if (!tool || !tool.skillCount) return null;
+        return {
+            title: `Skills in ${match[1] === "plugin" ? `plugin ${tool.plugin}` : tool.name} (${tool.skillCount})`,
+            items: (tool.skills || []).map((skill) => ({ label: skill })),
+            empty: "The server did not return skill names for this item.",
+        };
     },
     peopleParams: (deviceScope, filters, searchString) => ({
         deviceScope,
