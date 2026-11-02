@@ -1,10 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react'
-import { Autocomplete, Banner, Card, Checkbox, Text, VerticalStack, HorizontalStack, HorizontalGrid, Spinner, Badge, Button, Box, Divider, Icon, Modal, ResourceItem, ResourceList, Select, Tabs, TextField } from '@shopify/polaris'
+import React, { useState, useMemo } from 'react'
+import { Autocomplete, Banner, Card, Checkbox, Text, VerticalStack, HorizontalStack, HorizontalGrid, Spinner, Badge, Button, Box, Divider, Icon, Modal, ResourceItem, ResourceList, Tabs, TextField } from '@shopify/polaris'
 import { ChevronRightMinor } from '@shopify/polaris-icons'
 import PatternSettingsPage from '../components/PatternSettingsPage'
 import GlobHelper from './GlobHelper'
 import MatchTree from './MatchTree'
 import FlyLayout from '../../../components/layouts/FlyLayout'
+import Dropdown from '../../../components/layouts/Dropdown'
 import settingRequests from '../api'
 import { CellType } from '../../../components/tables/rows/GithubRow'
 import func from '@/util/func'
@@ -12,8 +13,6 @@ import { withPermissions, usePermissions } from '@/util/permissions'
 import { AgentIcon } from '../../nhi_governance/nhiViolationsData'
 
 const resourceName = { singular: 'rule', plural: 'rules' }
-
-const AGENT_FILE_CONFIG_ADDED_BY = 'agent-file-config'
 
 const DEFAULT_AGENTS = ['Claude Code', 'Cursor', 'Codex', 'GitHub Copilot']
 
@@ -33,7 +32,7 @@ function rulesArrayToMap(rules) {
     if (!Array.isArray(rules)) return {}
     const map = {}
     for (const r of rules) {
-        if (!r || !r.path || r.addedBy === AGENT_FILE_CONFIG_ADDED_BY) continue
+        if (!r || !r.path || r.agent) continue
         map[r.path] = {
             path: r.path,
             idHex: r.idHex,
@@ -237,9 +236,9 @@ function AgentsCard({ configs, onOpenAgent }) {
 
 function AgentDetail({ agent, configs, selectedOs, onSelectOs, onAdd, onOpen, onEdit, onDelete }) {
     const { canCall } = usePermissions()
-    const canAdd = canCall('api/addAgentFileConfig')
-    const canUpdate = canCall('api/updateAgentFileConfig')
-    const canDelete = canCall('api/deleteAgentFileConfig')
+    const canAdd = canCall('api/addFileInspectionRule')
+    const canUpdate = canCall('api/updateFileInspectionRule')
+    const canDelete = canCall('api/deleteFileInspectionRule')
 
     const tabs = OS_TABS.map(t => ({
         id: `fi-os-${t.value}`,
@@ -288,7 +287,7 @@ function AgentDetail({ agent, configs, selectedOs, onSelectOs, onAdd, onOpen, on
     )
 }
 
-const EMPTY_AGENT_FORM = { configId: null, title: 'Add file', agent: '', os: 'darwin', role: 'mcp_config', path: '' }
+const EMPTY_AGENT_FORM = { ruleId: null, title: 'Add file', agent: '', os: 'darwin', role: 'mcp_config', path: '', existenceOnly: false, maxDepth: 0 }
 
 const EMPTY_RULE_FORM = { ruleId: null, path: '', existenceOnly: false, recursive: false }
 
@@ -309,17 +308,10 @@ function FileInspection() {
     const [formErrors, setFormErrors] = useState({})
 
     const [latestMap, setLatestMap] = useState({})
-    const [allRules, setAllRules] = useState([])
     const [configs, setConfigs] = useState([])
     const [selectedOs, setSelectedOs] = useState('darwin')
     const [refreshKey, setRefreshKey] = useState(0)
     const [globTrigger, setGlobTrigger] = useState(null)
-
-    useEffect(() => {
-        settingRequests.fetchAgentFileConfig()
-            .then(res => setConfigs((res?.configs || []).filter(c => c && c.path && c.agent)))
-            .catch(() => func.setToast(true, true, 'Failed to load agent files'))
-    }, [refreshKey])
 
     const agentOptions = useMemo(
         () => Array.from(new Set([...DEFAULT_AGENTS, ...configs.map(c => c.agent)])).sort(),
@@ -329,7 +321,7 @@ function FileInspection() {
     async function onFetch() {
         const res = await settingRequests.fetchFileInspectionRules()
         const rules = res?.rules || []
-        setAllRules(rules)
+        setConfigs(rules.filter(r => r && r.path && r.agent))
         const map = rulesArrayToMap(rules)
         setLatestMap(map)
         return map
@@ -341,7 +333,7 @@ function FileInspection() {
     }
 
     async function onDelete(path) {
-        await settingRequests.deleteFileInspectionRule(path)
+        await settingRequests.deleteFileInspectionRule(latestMap[path]?.idHex)
         return onFetch()
     }
 
@@ -356,14 +348,13 @@ function FileInspection() {
     }
 
     function openAgentFileResults(config) {
-        const rule = allRules.find(r => r && r.path === config.path)
-        openResults(config.path, rule?.idHex, config.agent)
+        openResults(config.path, config.idHex, config.agent)
     }
 
     async function restoreDefaults() {
         setRestoring(true)
         try {
-            const res = await settingRequests.restoreAgentFileConfigDefaults()
+            const res = await settingRequests.restoreFileInspectionDefaults()
             setRefreshKey(k => k + 1)
             setRestoreModal(false)
             func.setToast(true, false, `Defaults restored: ${res?.createdCount ?? 0} added, ${res?.existingCount ?? 0} already present`)
@@ -391,7 +382,7 @@ function FileInspection() {
     }
 
     function openEditAgentFile(config) {
-        setAgentForm({ configId: config.idHex, title: 'Edit file', agent: config.agent, os: config.os, role: config.role, path: config.path })
+        setAgentForm({ ruleId: config.idHex, title: 'Edit file', agent: config.agent, os: config.os, role: config.role, path: config.path, existenceOnly: !!config.existenceOnly, maxDepth: config.maxDepth ?? 0 })
         setFormErrors({})
         setAgentModal(true)
     }
@@ -399,7 +390,7 @@ function FileInspection() {
     function deleteAgentFile(config) {
         func.showConfirmationModal(`Delete ${config.path} from ${config.agent}?`, 'Delete', async () => {
             try {
-                await settingRequests.deleteAgentFileConfig(config.idHex)
+                await settingRequests.deleteFileInspectionRule(config.idHex)
                 setRefreshKey(k => k + 1)
                 func.setToast(true, false, 'File deleted')
             } catch {
@@ -424,16 +415,16 @@ function FileInspection() {
         if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
         setFormSaving(true)
         try {
-            if (agentForm.configId) {
-                await settingRequests.updateAgentFileConfig(agentForm.configId, agent, agentForm.os, agentForm.role, path)
+            if (agentForm.ruleId) {
+                await settingRequests.updateFileInspectionRule(agentForm.ruleId, path, agentForm.existenceOnly, agentForm.maxDepth, agent, agentForm.os, agentForm.role)
             } else {
-                await settingRequests.addAgentFileConfig(agent, agentForm.os, agentForm.role, path)
+                await settingRequests.addFileInspectionRule(path, agentForm.existenceOnly, agentForm.maxDepth, agent, agentForm.os, agentForm.role)
             }
             setRefreshKey(k => k + 1)
             setAgentModal(false)
-            func.setToast(true, false, agentForm.configId ? 'File updated' : 'File added')
+            func.setToast(true, false, agentForm.ruleId ? 'File updated' : 'File added')
         } catch {
-            func.setToast(true, true, agentForm.configId ? 'Failed to update file' : 'Failed to add file')
+            func.setToast(true, true, agentForm.ruleId ? 'Failed to update file' : 'Failed to add file')
         } finally {
             setFormSaving(false)
         }
@@ -552,7 +543,7 @@ function FileInspection() {
         </VerticalStack>
     )
 
-    const agentSaveRequires = agentForm.configId ? ['api/updateAgentFileConfig'] : ['api/addAgentFileConfig']
+    const agentSaveRequires = agentForm.ruleId ? ['api/updateFileInspectionRule'] : ['api/addFileInspectionRule']
 
     return (
         <>
@@ -582,8 +573,8 @@ function FileInspection() {
                 leadingCards={[agentsCard, customPathsHeader]}
                 secondaryActions={
                     <>
-                        <Button onClick={() => setRestoreModal(true)} disabled={!canCall('api/restoreAgentFileConfigDefaults')}>Restore defaults</Button>
-                        <Button onClick={() => openAddAgentFile('')} disabled={!canCall('api/addAgentFileConfig')}>Add agent</Button>
+                        <Button onClick={() => setRestoreModal(true)} disabled={!canCall('api/restoreFileInspectionDefaults')}>Restore defaults</Button>
+                        <Button onClick={() => openAddAgentFile('')} disabled={!canCall('api/addFileInspectionRule')}>Add agent</Button>
                         <GlobHelper onUse={v => setGlobTrigger({ value: v, id: Date.now() })} />
                     </>
                 }
@@ -593,7 +584,7 @@ function FileInspection() {
                 open={restoreModal}
                 onClose={() => setRestoreModal(false)}
                 title="Restore defaults"
-                primaryAction={withPermissions({ content: 'Restore defaults', onAction: restoreDefaults, loading: restoring, requires: ['api/restoreAgentFileConfigDefaults'] })}
+                primaryAction={withPermissions({ content: 'Restore defaults', onAction: restoreDefaults, loading: restoring, requires: ['api/restoreFileInspectionDefaults'] })}
                 secondaryActions={[{ content: 'Cancel', onAction: () => setRestoreModal(false) }]}
             >
                 <Modal.Section>
@@ -619,17 +610,19 @@ function FileInspection() {
                             error={formErrors.agent}
                         />
                         <HorizontalGrid columns={2} gap="4">
-                            <Select
+                            <Dropdown
+                                id="agent-file-os"
                                 label="OS"
-                                options={OS_TABS}
-                                value={agentForm.os}
-                                onChange={v => updateAgentForm('os', v)}
+                                menuItems={OS_TABS}
+                                initial={agentForm.os}
+                                selected={v => updateAgentForm('os', v)}
                             />
-                            <Select
+                            <Dropdown
+                                id="agent-file-role"
                                 label="Role"
-                                options={ROLE_OPTIONS}
-                                value={agentForm.role}
-                                onChange={v => updateAgentForm('role', v)}
+                                menuItems={ROLE_OPTIONS}
+                                initial={agentForm.role}
+                                selected={v => updateAgentForm('role', v)}
                             />
                         </HorizontalGrid>
                         <TextField
