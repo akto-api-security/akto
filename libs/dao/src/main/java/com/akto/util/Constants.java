@@ -39,10 +39,16 @@ public class Constants {
     public static final List<String> MERGING_ALLOWED_TAG_VALUES = Arrays.asList("agoda-routing");
     public static final List<String> MERGING_ALLOWED_TAG_SUBSTRINGS = Arrays.asList("proxy", "gateway");
     public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    public static final String AKTO_RAG_DATABASE_TAG = "rag-database";
+    public static final String AKTO_BROWSER_LLM_TAG = "browser-llm";
 
     public static final String AKTO_GUARDRAIL_MODE = "mode";
     public static final String AKTO_GUARDRAIL_MODE_INLINE = "inline";
     public static final String AKTO_GUARDRAIL_MODE_OBSERVE = "observe";
+
+    public static final String AKTO_COLLECTION_CONTEXT_TAG_KEY = "source";
+
+    public static final String AKTO_AGENT_EMAIL_TAG = "ai-agent-email";
 
     public static boolean SHOULD_SAVE_TAGS = System.getenv("SHOULD_SAVE_TAGS") == null || System.getenv("SHOULD_SAVE_TAGS").equalsIgnoreCase("true");
 

@@ -11,16 +11,23 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
+import com.akto.dao.BrowserExtensionConfigCommonDao;
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
+import com.akto.metrics.CyborgMetricsConfig;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.EndpointRemoteCommandCleanupCron;
+import com.akto.utils.SkillWatchCron;
 import com.akto.utils.TagMismatchCron;
 import com.akto.utils.TokenBlocklistCron;
 import com.mongodb.ConnectionString;
+import io.micrometer.core.instrument.binder.mongodb.MongoMetricsConnectionPoolListener;
+
+import java.util.Collections;
 
 
 public class InitializerListener implements ServletContextListener {
@@ -43,8 +50,24 @@ public class InitializerListener implements ServletContextListener {
                 do {
                     try {
                         if (!calledOnce) {
-                            DaoInit.init(new ConnectionString(mongoURI));
+                            // Attach Micrometer Mongo connection-pool metrics ONLY when the metrics
+                            // feature is enabled — a deployment that doesn't want metrics gets a plain
+                            // Mongo client with no extra listeners. Listener implements the Mongo driver
+                            // interface, so libs/dao stays metrics-agnostic.
+                            // NOTE: the command listener is intentionally NOT attached — Micrometer
+                            // 1.17's MongoMetricsCommandListener calls CommandEvent.getDatabaseName(),
+                            // which this project's older Mongo driver lacks (NoSuchMethodError).
+                            if (CyborgMetricsConfig.isEnabled()) {
+                                DaoInit.init(new ConnectionString(mongoURI),
+                                        null,
+                                        Collections.singletonList(
+                                                new MongoMetricsConnectionPoolListener(InfraMetricsListener.registry)));
+                            } else {
+                                DaoInit.init(new ConnectionString(mongoURI));
+                            }
                             TestingRunWebhookDao.instance.createIndicesIfAbsent();
+                            ModuleInfoDao.instance.createIndicesIfAbsent();
+                            BrowserExtensionConfigCommonDao.instance.createIndicesIfAbsent();
                             calledOnce = true;
                         }
                         checkMongoConnection();
@@ -65,6 +88,12 @@ public class InitializerListener implements ServletContextListener {
                             logger.info("triggering endpoint remote command cleanup cron for db abstractor " + Context.now());
                             endpointRemoteCommandCleanupCron.runCron();
                         }
+                        // Disabled for now — uncomment to re-enable. Deliberately outside the
+                        // TRIGGER_MERGING_CRON gate above (must run regardless of that flag's
+                        // value on this instance) when it IS enabled.
+                        // SkillWatchCron skillWatchCron = new SkillWatchCron();
+                        // logger.info("triggering skill watch cron for db abstractor " + Context.now());
+                        // skillWatchCron.runCron();
                         AllMetrics.instance.ingestTcMetrics();
                     } catch (Exception e) {
                         logger.error("error running initializer method for db abstractor", e);
@@ -88,7 +117,20 @@ public class InitializerListener implements ServletContextListener {
 
         if (kafkaUtils.isReadEnabled()) {
             logger.info("init kafka consumer");
-            kafkaUtils.initKafkaConsumer();
+            // Run the (blocking) poll loop on its own thread so contextInitialized can return and
+            // Jetty finishes starting (serving /metrics, health, /api, etc.) while the consumer
+            // polls in the background. Same pattern startFastDiscoveryConsumer() already uses.
+            // initKafkaConsumer() keeps its own shutdown hook (consumer.wakeup() + join) for a
+            // graceful stop, and calls System.exit() on a fatal Exception.
+            Thread mainConsumerThread = new Thread(kafkaUtils::initKafkaConsumer, "kafka-main-consumer");
+            mainConsumerThread.setDaemon(false);
+            // A fatal Error that escapes the loop must not leave a silently-dead consumer inside a
+            // live JVM — take the process down so the container restarts (restart: always).
+            mainConsumerThread.setUncaughtExceptionHandler((t, e) -> {
+                logger.error("fatal error in {}, exiting JVM for restart", t.getName(), e);
+                System.exit(1);
+            });
+            mainConsumerThread.start();
         }
 
         // Start fast-discovery consumer in background thread (if enabled)
@@ -99,7 +141,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     private static void checkMongoConnection() throws Exception {
-        AccountsDao.instance.getStats();
+        // ping (privilege-free) instead of getStats/serverStatus, which DocumentDB rejects
+        // with "Authorization failure" for non-admin users. Works on MongoDB and DocumentDB.
+        AccountsDao.instance.pingDb();
         connectedToMongo = true;
     }
 

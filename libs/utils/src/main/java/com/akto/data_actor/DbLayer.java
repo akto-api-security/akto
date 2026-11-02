@@ -22,13 +22,18 @@ import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.mongodb.WriteConcern;
 import com.akto.dao.*;
+import com.akto.dao.agent_classifiers.AgentGuardCorpusDao;
+import com.akto.dao.agent_classifiers.AgentGuardCorpusQueueDao;
 import com.akto.dao.agentic_sessions.AgentQueryDataDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
@@ -40,11 +45,16 @@ import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
+import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.agentic_sessions.SessionDocument;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertManyResult;
+
 import org.apache.commons.lang3.StringUtils;
+import org.bson.BsonValue;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -52,6 +62,10 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
+import com.akto.dao.nhi_governance.NhiIdentityDao;
+import com.akto.dto.nhi_governance.NhiIdentity;
+import com.akto.dao.config_field_policy.ConfigFieldPolicyDao;
+import com.akto.dto.config_field_policy.ConfigFieldPolicy;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
@@ -79,13 +93,17 @@ import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.agentic_sessions.AgentQueryData;
+import com.akto.dto.agent_classifiers.AgentGuardCorpusEntry;
+import com.akto.dto.agent_classifiers.AgentGuardCorpusQueueEntry;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.files.File;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.util.enums.GlobalEnums.Severity;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
@@ -101,16 +119,24 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.bulk_updates.BulkUpdates;
+import com.akto.dto.bulk_updates.UpdatePayload;
+import com.google.gson.Gson;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.CopilotOAuthAuthParam;
+import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
@@ -139,6 +165,7 @@ import com.mongodb.client.MongoCursor;
 public class DbLayer {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLayer.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final Gson gson = new Gson();
     public static final String DEFAULT_MINI_TESTING_NAME = "Default_";
 
     private static final ConcurrentHashMap<Integer, Integer> lastUpdatedTsMap = new ConcurrentHashMap<>();
@@ -247,10 +274,19 @@ public class DbLayer {
         updateList.add(Updates.setOnInsert("_t", moduleInfo.getClass().getName()));
         updateList.add(Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()));
         updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
+        updateList.add(Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
-        updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
-        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getAdditionalData()));
+        updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
+        // lastHeartbeatReceived is a primitive int, so a payload that omits it arrives as 0 —
+        // skip the update in that case instead of wiping the stored timestamp.
+        if (moduleInfo.getLastHeartbeatReceived() != 0) {
+            updateList.add(Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()));
+        } else {
+            // no stored value to preserve on a brand-new doc, and keeping the field present means
+            // queries on it (eg. the V2 stale-heartbeat cleanup) still see this document.
+            updateList.add(Updates.setOnInsert(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0));
+        }
+        updateList.addAll(buildAdditionalDataUpdates(moduleInfo.getModuleType(), moduleInfo.getAdditionalData()));
 
         ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(ModuleInfoDao.ID, moduleInfo.getId()),
@@ -262,34 +298,275 @@ public class DbLayer {
         return result;
     }
 
-    private static List<Bson> buildAdditionalDataUpdates(Map<String, Object> additionalData) {
+    private static List<Bson> buildAdditionalDataUpdates(ModuleInfo.ModuleType moduleType, Map<String, Object> additionalData) {
         List<Bson> updates = new ArrayList<>();
         if (additionalData == null || additionalData.isEmpty()) {
             return updates;
         }
-        for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
-            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+        if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
+            for (Map.Entry<String, Object> entry : additionalData.entrySet()) {
+                updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA + "." + entry.getKey(), entry.getValue()));
+            }
+        } else {
+            updates.add(Updates.set(ModuleInfo.ADDITIONAL_DATA, additionalData));
         }
         return updates;
     }
+
+    private static final String AGENT_LOGINS_KEY = "agentLogins";
+    private static final String CLAUDE_DESKTOP_AGENT_TYPE = "claude-desktop";
+    // The CLI reports itself once per config scope it found a login in
+    // (claude-cli-user/project/local/enterprise); only the user scope is read.
+    private static final String CLAUDE_CLI_USER_AGENT_TYPE = "claude-cli-user";
+    private static final Set<String> CLAUDE_AGENT_LOGIN_TYPES =
+            new HashSet<>(Arrays.asList(CLAUDE_DESKTOP_AGENT_TYPE, CLAUDE_CLI_USER_AGENT_TYPE));
+    private static final String CLAUDE_AGENT_LOGIN_SOURCE = "claude-agent-login";
+    // Rollout gate: only these accounts create agent users from Claude logins for now.
+    private static final Set<Integer> CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS =
+            new HashSet<>(Arrays.asList(1726615470, 1785654409, 1760639774));
+
+    // Stamped on each org row: the agent the org was learned from, not the config scope key
+    // ("claude-cli-user") the CLI reports itself under.
+    private static final String CLAUDE_CLI_AGENT_TYPE = "claude-cli";
+
+    private static final String ORGANIZATION_UUID_KEY = "organizationUuid";
+    private static final String ORGANIZATION_NAME_KEY = "organizationName";
+    private static final String ORGANIZATION_TYPE_KEY = "organizationType";
+    // Agents that predate organizationType report the same plan string as accountType.
+    private static final String ACCOUNT_TYPE_KEY = "accountType";
 
     private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null) {
             return;
         }
         Map<String, Object> additionalData = moduleInfo.getAdditionalData();
-        if (additionalData == null || !additionalData.containsKey("username")) {
+        if (additionalData == null) {
+            return;
+        }
+        // Independent of the username/tag sync below — a device reports its Claude logins whether
+        // or not it reports an OS username, and one path failing must not skip the other.
+        try {
+            syncClaudeAgentUsersFromModuleInfo(moduleInfo);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing claude agent users from module info: " + e.getMessage(), LogDb.DB_ABS);
+        }
+        // Isolated for the same reason: an org write failing must not cost us the agent user
+        // sync, or the heartbeat itself.
+        try {
+            syncEndpointAgentOrganizationsFromModuleInfo(moduleInfo);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing endpoint agent organizations from module info: " + e.getMessage(), LogDb.DB_ABS);
+        }
+        if (!additionalData.containsKey("username")) {
             return;
         }
         try {
             String userName = String.valueOf(additionalData.get("username"));
-            String teamName = additionalData.containsKey("team") ? String.valueOf(additionalData.get("team")) : null;
-            String userRole = additionalData.containsKey("userRole") ? String.valueOf(additionalData.get("userRole")) : null;
-            String device = moduleInfo.getName();
-            AgentUsersDao.instance.upsertAgentUser(userName, teamName, userRole, device, Context.now());
+
+            // additionalData's wire keys ("team"/"userRole") are the device's own self-reported
+            // field names, unrelated to (and unchanged by) AgenticUsers' deviceTags redesign —
+            // each one just becomes a single-value deviceTags entry under its tag key ("team"/"role").
+            Map<String, List<String>> deviceTagUpdates = new HashMap<>();
+            putIfPresent(deviceTagUpdates, "team", additionalData.get("team"));
+            putIfPresent(deviceTagUpdates, "role", additionalData.get("userRole"));
+            if (deviceTagUpdates.isEmpty()) return;
+
+            // mergeDeviceTags only updates an existing doc (no upsert) — ensureDashboardIdentity
+            // creates one on the first check-in from a brand-new device-reported user, matching the
+            // dashboard's own AgentUsersDao.ensureDashboardIdentity + mergeDeviceTags call order.
+            AgentUsersDao.instance.ensureDashboardIdentity(userName, null, "device");
+            AgentUsersDao.instance.mergeDeviceTags(userName, "device", deviceTagUpdates, "device");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error syncing agent user from module info: " + e.getMessage(), LogDb.DB_ABS);
         }
+    }
+
+    /**
+     * Creates/refreshes an agent user for each Claude login the device reports under
+     * additionalData.agentLogins — only the "claude-desktop" and "claude-cli-user" entries.
+     *
+     * Identity is (email, organizationUuid): the same email under a different Claude org is a
+     * different user, so it gets its own row. Personal accounts report no organizationUuid and
+     * key on the email alone, which is the same userId the "ai-agent-email" collection tag
+     * already writes (see upsertFromEmailTag) — so those converge onto one row instead of
+     * duplicating. Re-reporting a known pair only updates it; an unseen one inserts.
+     *
+     * organizationName/organizationType are recorded only for identities that actually carry an
+     * organizationUuid — a personal account has no org to name — and are read from the
+     * "claude-cli-user" login alone, the same source the org table is built from.
+     *
+     * Gated to CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS while this rolls out — every other account
+     * heartbeats through here untouched.
+     */
+    private static void syncClaudeAgentUsersFromModuleInfo(ModuleInfo moduleInfo) {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || !CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS.contains(accountId)) {
+            return;
+        }
+        Object agentLoginsObj = moduleInfo.getAdditionalData().get(AGENT_LOGINS_KEY);
+        if (!(agentLoginsObj instanceof Map)) {
+            return;
+        }
+        String deviceId = StringUtils.trimToNull(moduleInfo.getName());
+
+        // Resolved once, outside the loop: whichever login produced a given identity, the org it
+        // belongs to is taken from the CLI's block only.
+        Object cliLoginObj = ((Map<?, ?>) agentLoginsObj).get(CLAUDE_CLI_USER_AGENT_TYPE);
+        Map<?, ?> cliLogin = cliLoginObj instanceof Map ? (Map<?, ?>) cliLoginObj : null;
+        String organizationName = cliLogin == null ? "" : claudeLoginField(cliLogin, ORGANIZATION_NAME_KEY);
+        String organizationType = cliLogin == null ? "" : claudeOrganizationType(cliLogin);
+
+        // Both keys are read out of the same ~/.claude.json, so one heartbeat usually carries the
+        // same identity twice — collapse before writing.
+        Set<String> syncedUserIds = new HashSet<>();
+        for (String agentType : CLAUDE_AGENT_LOGIN_TYPES) {
+            Object loginObj = ((Map<?, ?>) agentLoginsObj).get(agentType);
+            if (!(loginObj instanceof Map)) continue;
+            Map<?, ?> login = (Map<?, ?>) loginObj;
+
+            // A logged-out agent reports a blank email and has no identity to create.
+            String email = StringUtils.trimToEmpty(stringValueOf(login.get("email")));
+            if (email.isEmpty()) continue;
+
+            String organizationUuid = StringUtils.trimToEmpty(stringValueOf(login.get("organizationUuid")));
+            String userId = organizationUuid.isEmpty() ? email : email + "_" + organizationUuid;
+            if (!syncedUserIds.add(userId)) continue;
+
+            // No org uuid means a personal account: leave both org fields unset.
+            boolean hasOrg = !organizationUuid.isEmpty();
+            AgentUsersDao.instance.upsertAgentUserIdentity(userId, AgentUsersDao.deriveUsernameFromEmail(email),
+                    email, deviceId, CLAUDE_AGENT_LOGIN_SOURCE,
+                    hasOrg ? organizationName : null, hasOrg ? organizationType : null);
+        }
+    }
+
+    /**
+     * Records the org a device reports as organizationUuid -> "name__type", eg
+     * "e68d326b-...": "cburns@vetpartners.com's Organization__claude_max", stamped with the
+     * agent that reported it.
+     *
+     * Reads the "claude-cli-user" login only. Desktop reports the same ~/.claude.json identity,
+     * but only one source is needed to learn the org and the CLI is the one we're mapping —
+     * other agent types get their own entry here when they're added.
+     *
+     * Insert-only: an org we have already stored is left exactly as it was, so a later rename
+     * on Claude's side doesn't rewrite the row. Personal accounts report no organizationUuid
+     * and are skipped.
+     *
+     * Gated to CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS alongside the agent user sync.
+     */
+    private static void syncEndpointAgentOrganizationsFromModuleInfo(ModuleInfo moduleInfo) {
+        Integer accountId = Context.accountId.get();
+        if (accountId == null || !CLAUDE_AGENT_LOGIN_SYNC_ACCOUNT_IDS.contains(accountId)) {
+            return;
+        }
+        Object agentLoginsObj = moduleInfo.getAdditionalData().get(AGENT_LOGINS_KEY);
+        if (!(agentLoginsObj instanceof Map)) {
+            return;
+        }
+        Object loginObj = ((Map<?, ?>) agentLoginsObj).get(CLAUDE_CLI_USER_AGENT_TYPE);
+        if (!(loginObj instanceof Map)) {
+            return;
+        }
+        Map<?, ?> login = (Map<?, ?>) loginObj;
+
+        String organizationUuid = StringUtils.trimToEmpty(stringValueOf(login.get(ORGANIZATION_UUID_KEY)));
+        if (organizationUuid.isEmpty()) {
+            return;
+        }
+
+        EndpointAgentOrganizationDao.instance.insertIfAbsent(organizationUuid,
+                buildOrganizationInfo(login), CLAUDE_CLI_AGENT_TYPE);
+    }
+
+    private static String buildOrganizationInfo(Map<?, ?> login) {
+        return claudeLoginField(login, ORGANIZATION_NAME_KEY)
+                + EndpointAgentOrganization.SEPARATOR
+                + claudeOrganizationType(login);
+    }
+
+    private static String claudeOrganizationType(Map<?, ?> login) {
+        String type = claudeLoginField(login, ORGANIZATION_TYPE_KEY);
+        return type.isEmpty() ? claudeLoginField(login, ACCOUNT_TYPE_KEY) : type;
+    }
+
+    private static String claudeLoginField(Map<?, ?> login, String key) {
+        return decodeJsonEscapes(StringUtils.trimToEmpty(stringValueOf(login.get(key))));
+    }
+
+    /**
+     * The agent forwards ~/.claude.json values without decoding their JSON escapes, so an org name
+     * reaches us as the literal six characters "\\u0027" where an apostrophe belongs
+     * ("cburns@vetpartners.com\\u0027s Organization"). Decode them once here, on the way in, so the
+     * stored value and every reader of it see real characters.
+     *
+     * Single pass rather than chained replaces, so a decoded backslash can't be re-read as the
+     * start of another escape. Anything that isn't a valid escape is left untouched.
+     */
+    static String decodeJsonEscapes(String value) {
+        if (value == null || value.indexOf('\\') < 0) return value;
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c != '\\' || i + 1 >= value.length()) {
+                out.append(c);
+                continue;
+            }
+            char escape = value.charAt(++i);
+            switch (escape) {
+                case 'u':
+                    // \\uXXXX needs 4 hex digits; a malformed tail stays as written
+                    if (i + 5 <= value.length()) {
+                        try {
+                            out.append((char) Integer.parseInt(value.substring(i + 1, i + 5), 16));
+                            i += 4;
+                        } catch (NumberFormatException e) {
+                            out.append('\\').append(escape);
+                        }
+                    } else {
+                        out.append('\\').append(escape);
+                    }
+                    break;
+                case '\'': case '"': case '\\': case '/': out.append(escape); break;
+                case 'n': out.append('\n'); break;
+                case 't': out.append('\t'); break;
+                case 'r': out.append('\r'); break;
+                case 'b': out.append('\b'); break;
+                case 'f': out.append('\f'); break;
+                default: out.append('\\').append(escape);
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * organizationUuid -> "<organizationName>__<organizationType>" for the orgs endpoint agents
+     * have reported so far. A blank agentType returns every agent's orgs; otherwise only the ones
+     * that agent reported.
+     */
+    public static Map<String, String> fetchEndpointAgentOrganizations(String agentType) {
+        Map<String, String> result = new HashMap<>();
+        String trimmedAgentType = StringUtils.trimToEmpty(agentType);
+        Bson filter = trimmedAgentType.isEmpty()
+                ? new BasicDBObject()
+                : Filters.eq(EndpointAgentOrganization.AGENT_TYPE, trimmedAgentType);
+        List<EndpointAgentOrganization> organizations = EndpointAgentOrganizationDao.instance.findAll(filter);
+        if (organizations == null) return result;
+        for (EndpointAgentOrganization organization : organizations) {
+            if (organization.getOrganizationUuid() == null) continue;
+            result.put(organization.getOrganizationUuid(),
+                    StringUtils.trimToEmpty(organization.getOrganizationInfo()));
+        }
+        return result;
+    }
+
+    private static String stringValueOf(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static void putIfPresent(Map<String, List<String>> deviceTagUpdates, String tagKey, Object rawValue) {
+        String value = rawValue == null ? null : StringUtils.trimToNull(rawValue.toString());
+        if (value != null) deviceTagUpdates.put(tagKey, Collections.singletonList(value));
     }
 
     public static void bulkUpdateModuleInfo(List<ModuleInfo> moduleInfoList) {
@@ -312,6 +589,7 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
+                    Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
@@ -395,7 +673,7 @@ public class DbLayer {
             Filters.eq(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType())
         );
 
-        return ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
+        ModuleInfo result = ModuleInfoDao.instance.getMCollection().findOneAndUpdate(filter,
                 Updates.combine(
                         //putting class name because findOneAndUpdate doesn't put class name by default
                         Updates.setOnInsert("_t", moduleInfo.getClass().getName()),
@@ -407,6 +685,12 @@ public class DbLayer {
                         Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
+
+        // Same agent user sync updateModuleInfo/bulkUpdateModuleInfo do — a device heartbeating
+        // through V2 reports the same agentLogins and must produce the same identities.
+        syncAgentUserFromModuleInfo(moduleInfo);
+
+        return result;
     }
 
     public static void updateDeviceDomainListDelta(String deviceId, String domainKey,
@@ -438,6 +722,98 @@ public class DbLayer {
 
     public static DeviceDomainConfig fetchDeviceDomainConfig(String deviceId) {
         return DeviceDomainConfigDao.instance.findOne(Filters.eq("_id", deviceId));
+    }
+
+    // ---------------------------------------------------------------------------
+    // Endpoint CA — the two-tier PKI behind mitmproxy's TLS interception.
+    // One root per account signs a per-device intermediate; the device keeps its own
+    // private key and only ever sends a CSR. See com.akto.ca.CertificateAuthority.
+    // ---------------------------------------------------------------------------
+
+    public static EndpointCaRoot fetchEndpointCaRoot(int accountId) {
+        return EndpointCaRootDao.instance.findOne(Filters.eq("_id", accountId));
+    }
+
+    /**
+     * Returns the account's root, creating it on first use.
+     *
+     * Uses an upsert that only sets fields on insert, so two devices enrolling at the same
+     * moment cannot end up with different roots: whichever write lands second is a no-op
+     * and both read back the same certificate. Generating the root before the race means a
+     * discarded keypair in the loser's case, which costs nothing — the alternative, locking
+     * around generation, would hold a lock across an RSA-4096 keygen.
+     */
+    public static EndpointCaRoot fetchOrCreateEndpointCaRoot(int accountId) throws Exception {
+        EndpointCaRoot existing = fetchEndpointCaRoot(accountId);
+        if (existing != null) {
+            return existing;
+        }
+
+        // The expensive, failure-prone step: an RSA-4096 keygen through BouncyCastle, run
+        // exactly once per account. Bracketed with logs because a failure here leaves no
+        // trace otherwise — the collection is never created, so afterwards the database
+        // looks identical to an account that simply never enrolled.
+        loggerMaker.infoAndAddToDb("endpoint CA: generating root for account " + accountId
+                + " (RSA-4096, first enrolment)", LogDb.DB_ABS);
+        com.akto.ca.CertificateAuthority.GeneratedRoot generated =
+                com.akto.ca.CertificateAuthority.generateRoot(accountId);
+        loggerMaker.infoAndAddToDb("endpoint CA: generated root " + generated.fingerprintSha256
+                + " for account " + accountId + ", persisting", LogDb.DB_ABS);
+
+        EndpointCaRootDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", accountId),
+                Updates.combine(
+                        Updates.setOnInsert(EndpointCaRoot.CERT_PEM, generated.certPem),
+                        Updates.setOnInsert(EndpointCaRoot.PRIVATE_KEY_PEM, generated.privateKeyPem),
+                        Updates.setOnInsert(EndpointCaRoot.FINGERPRINT_SHA256, generated.fingerprintSha256),
+                        Updates.setOnInsert(EndpointCaRoot.SUBJECT, generated.subject),
+                        Updates.setOnInsert(EndpointCaRoot.NOT_AFTER, generated.notAfterEpoch),
+                        Updates.setOnInsert(EndpointCaRoot.CREATED_AT, Context.now())),
+                new com.mongodb.client.model.UpdateOptions().upsert(true));
+
+        EndpointCaRoot stored = fetchEndpointCaRoot(accountId);
+        if (stored == null) {
+            // Written but not readable back: the upsert reported success yet the decode
+            // returned nothing, which points at the collection or codec rather than at the
+            // certificate. Distinguishing that from "generation failed" matters, because
+            // the fixes are unrelated.
+            loggerMaker.errorAndAddToDb("endpoint CA: root persisted for account " + accountId
+                    + " but could not be read back", LogDb.DB_ABS);
+        }
+        return stored;
+    }
+
+    public static void insertEndpointDeviceCa(EndpointDeviceCa deviceCa) {
+        EndpointDeviceCaDao.instance.insertOne(deviceCa);
+    }
+
+    /** Most recent issuance for a device, used to answer renewal and status queries. */
+    public static EndpointDeviceCa fetchLatestEndpointDeviceCa(String deviceId) {
+        List<EndpointDeviceCa> rows = EndpointDeviceCaDao.instance.findAll(
+                Filters.eq(EndpointDeviceCa.DEVICE_ID, deviceId),
+                0, 1,
+                com.mongodb.client.model.Sorts.descending(EndpointDeviceCa.ISSUED_AT));
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /**
+     * Issuances for a device since an epoch second. Backs the per-device quota — this
+     * endpoint mints CAs, so an unbounded caller is the difference between "one device was
+     * compromised" and "the attacker has as many fleet-trusted CAs as they want".
+     */
+    public static long countEndpointDeviceCaIssuedSince(String deviceId, int sinceEpoch) {
+        return EndpointDeviceCaDao.instance.count(
+                Filters.and(
+                        Filters.eq(EndpointDeviceCa.DEVICE_ID, deviceId),
+                        Filters.gte(EndpointDeviceCa.ISSUED_AT, sinceEpoch)));
+    }
+
+    public static void revokeEndpointDeviceCa(String serial) {
+        EndpointDeviceCaDao.instance.getMCollection().updateOne(
+                Filters.eq("_id", serial),
+                Updates.combine(
+                        Updates.set(EndpointDeviceCa.STATUS, EndpointDeviceCa.STATUS_REVOKED),
+                        Updates.set(EndpointDeviceCa.REVOKED_AT, Context.now())));
     }
 
     public static void updateAccountDomainsDelta(String domainKey, List<String> toAdd, List<String> toRemove) {
@@ -678,31 +1054,33 @@ public class DbLayer {
 
     public static void bulkWriteApiInfo(List<ApiInfo> apiInfoList) {
         List<WriteModel<ApiInfo>> writesForApiInfo = ApiInfoBulkUpdate.getUpdatesForApiInfo(apiInfoList);
-        ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo);
+        ApiInfoDao.instance.getMCollection().bulkWrite(writesForApiInfo, new BulkWriteOptions().ordered(false));
     }
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
-        BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
+        BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo,
+                new BulkWriteOptions().ordered(false));
         System.out.println("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
     }
 
     public static void bulkWriteSampleData(List<WriteModel<SampleData>> writesForSampleData) {
-        SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData);
+        SampleDataDao.instance.getMCollection().bulkWrite(writesForSampleData, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteSensitiveSampleData(List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData) {
-        SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData);
+        SensitiveSampleDataDao.instance.getMCollection().bulkWrite(writesForSensitiveSampleData,
+                new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteTrafficInfo(List<WriteModel<TrafficInfo>> writesForTrafficInfo) {
-        TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTrafficInfo);
+        TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTrafficInfo, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteTrafficMetrics(List<WriteModel<TrafficMetrics>> writesForTrafficMetrics) {
-        TrafficMetricsDao.instance.getMCollection().bulkWrite(writesForTrafficMetrics);
+        TrafficMetricsDao.instance.getMCollection().bulkWrite(writesForTrafficMetrics, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteSensitiveParamInfo(List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo) {
-        SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo);
+        SensitiveParamInfoDao.instance.getMCollection().bulkWrite(writesForSensitiveParamInfo, new BulkWriteOptions().ordered(false));
     }
 
     public static void bulkWriteTestingRunIssues(List<WriteModel<TestingRunIssues>> writeModelList) {
@@ -711,6 +1089,93 @@ public class DbLayer {
         loggerMaker.infoAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
+    }
+
+    /**
+     * Extracted, unchanged, from DbAction.bulkWriteTestingRunIssues's per-item loop body (that action method
+     * now just calls this per BulkUpdates). Single source of truth for turning a TestingRunIssues update
+     * intent into the actual Mongo write - both that HTTP-facing endpoint and
+     * recordIssuesForTestingRunResults (which builds the same BulkUpdates shape in-process, see
+     * buildIssueBulkUpdate) go through this one place, instead of each re-deriving the field-by-field
+     * set/setOnInsert/override rules independently.
+     */
+    public static WriteModel<TestingRunIssues> convertBulkUpdateToTestingRunIssuesWrite(BulkUpdates bulkUpdate) {
+        Object filterObj = bulkUpdate.getFilters().get("_id");
+        HashMap<String, Object> filterMap = (HashMap) filterObj;
+        HashMap<String, Object> keyMap = (HashMap) filterMap.get("apiInfoKey");
+        int apiCollectionId = 0;
+        try {
+            apiCollectionId = (int)(long) keyMap.get("apiCollectionId");
+        } catch(Exception f){
+            apiCollectionId = (int) keyMap.get("apiCollectionId");
+        }
+        ApiInfoKey key = new ApiInfoKey(apiCollectionId, (String)keyMap.get("url"), Method.valueOf((String)keyMap.get("method")));
+        TestingIssuesId idd = new TestingIssuesId(key, TestErrorSource.valueOf((String)filterMap.get("testErrorSource")), (String)filterMap.get("testSubCategory"));
+        Bson filters = Filters.eq("_id", idd);
+        List<String> updatePayloadList = bulkUpdate.getUpdates();
+
+        List<Bson> updates = new ArrayList<>();
+        for (String payload: updatePayloadList) {
+            Map<String, Object> json = gson.fromJson(payload, Map.class);
+
+            String field = (String) json.get("field");
+            if (field.equals(TestingRunIssues.COLLECTION_IDS)) {
+                List<Double> dVal = (List) json.get("val");
+                List<Integer> val = new ArrayList<>();
+                for (int i = 0; i < dVal.size(); i++) {
+                    val.add(dVal.get(i).intValue());
+                }
+                updates.add(Updates.setOnInsert(field, val));
+            }else if(field.equals(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID)){
+                String val = (String)json.get("val");
+                ObjectId id = new ObjectId(val);
+                updates.add(Updates.set(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, id));
+            } else if(field.equals(TestingRunIssues.UNREAD)){
+                boolean dVal = (boolean) json.get("val");
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else if (field.equals(TestingRunIssues.LAST_UPDATED) ||
+                    field.equals(TestingRunIssues.LAST_SEEN) ||
+                    field.equals(TestingRunIssues.CREATION_TIME)) {
+                Double val = (double) json.get("val");
+                int dVal = val.intValue();
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else if (field.equals(TestingRunIssues.KEY_SEVERITY)) {
+
+                /*
+                 * Fixing severity temp. here,
+                 * cause the info. from mini-testing always contains HIGH.
+                 * To be fixed in mini-testing.
+                 */
+                /*
+                 * Severity from info. fixed,
+                 * so taking for dynamic_severity,
+                 * since rest would be same and for old deployments.
+                 */
+                String testSubCategory = idd.getTestSubCategory();
+                YamlTemplate template = YamlTemplateDao.instance
+                        .findOne(Filters.eq(Constants.ID, testSubCategory));
+                String dVal = (String) json.get("val");
+
+                if (template != null) {
+                    String severity = template.getInfo().getSeverity();
+                    if (severity != null && !"dynamic_severity".equals(severity)) {
+                        dVal = severity;
+                    }
+                }
+
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal,
+                        (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            } else {
+                String dVal = (String) json.get("val");
+                UpdatePayload updatePayload = new UpdatePayload((String) json.get("field"), dVal, (String) json.get("op"));
+                updates.add(Updates.set(updatePayload.getField(), dVal));
+            }
+        }
+
+        return new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true));
     }
 
     public static void bulkWriteOverageInfo(List<WriteModel<UningestedApiOverage>> writeModelList) {
@@ -745,6 +1210,11 @@ public class DbLayer {
 //    }
 
     public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId) {
+        return fetchStiBasedOnHostHeaders(objectId, 0);
+    }
+
+    /** lastSeenGte > 0 limits the result to host-header STIs seen at or after that timestamp; 0 means all of them. */
+    public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId, int lastSeenGte) {
         List<SingleTypeInfo> results = new ArrayList<>();
         ObjectId currentObjectId = objectId;
         Set<Integer> routingCollectionIds = null;
@@ -762,6 +1232,9 @@ public class DbLayer {
         // Keep fetching until we get a non-empty list or exhaust documents
         while (results.isEmpty()) {
             Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1, false);
+            if (lastSeenGte > 0) {
+                filterForHostHeader = Filters.and(filterForHostHeader, Filters.gte(SingleTypeInfo.LAST_SEEN, lastSeenGte));
+            }
             Bson filterForSkip = currentObjectId == null ? null : Filters.gt("_id", currentObjectId);
             Bson finalFilter = filterForSkip == null ? filterForHostHeader : Filters.and(filterForHostHeader, filterForSkip);
 
@@ -816,6 +1289,18 @@ public class DbLayer {
         }
 
         return results;
+    }
+
+    /**
+     * How many STIs a full walk of fetchStiBasedOnHostHeaders returns, or -1 if that can't be known cheaply.
+     * For the accounts whose results are filtered in Java after the query the DB count would overstate it.
+     */
+    public static long countStiBasedOnHostHeaders() {
+        Integer accountId = Context.accountId.get();
+        if (accountId != null && (accountId == Constants.ROUTING_SKIP_ACCOUNT_ID || accountId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID)) {
+            return -1;
+        }
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(SingleTypeInfoDao.filterForHostHeader(-1, false));
     }
 
     private static Set<Integer> getRoutingCollectionIds() {
@@ -1134,6 +1619,7 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
+
     public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags, String accessType) {
         createCollectionForHostAndVpc(host, id, vpcId, tags, accessType, null);
     }
@@ -1198,6 +1684,23 @@ public class DbLayer {
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+
+        syncAgentUserFromCollectionTags(tags);
+    }
+
+    private static void syncAgentUserFromCollectionTags(List<CollectionTags> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return;
+        }
+        try {
+            for (CollectionTags tag : tags) {
+                if (tag != null && Constants.AKTO_AGENT_EMAIL_TAG.equals(tag.getKeyName())) {
+                    AgentUsersDao.instance.upsertFromEmailTag(tag.getValue(), "host-vpc-tag");
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error syncing agent user from collection tags: " + e.getMessage(), LogDb.DB_ABS);
+        }
     }
 
     // Atomic operation to add hostname to service tag collection
@@ -1349,7 +1852,21 @@ public class DbLayer {
     }
 
     public static void insertEndpointShieldLog(LogsEndpointShield log) {
-        LogsEndpointShieldDao.instance.insertOne(log);
+        // Logs are high-volume and non-critical: use w:1 so inserts return as soon as the
+        // primary has written, instead of blocking on majority acknowledgement from
+        // (possibly lagging) secondaries. Avoids waitForWriteConcern stalls under load.
+        // In the Kafka producer/consumer setup this runs on the consumer side, off the
+        // API request hot path, so Mongo write pressure is decoupled from the caller.
+        LogsEndpointShieldDao.instance.insertOne(log, WriteConcern.W1);
+    }
+
+    public static void insertEndpointShieldLogs(List<LogsEndpointShield> logs) {
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
+        // Batched, unordered, w:1 insert — one Mongo round trip per Kafka poll instead of
+        // one insertOne per log. ordered(false) so a single bad doc doesn't abort the batch.
+        LogsEndpointShieldDao.instance.insertMany(logs, WriteConcern.W1, new InsertManyOptions().ordered(false));
     }
 
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
@@ -1385,21 +1902,49 @@ public class DbLayer {
     // testing queries
 
     public static TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
+        return createTRRSummaryIfAbsent(testingRunHexId, start, null, 0);
+    }
+
+    /**
+     * This upsert is the "no summary exists yet" first-pickup path - the common case for a plain
+     * UI-triggered run, since StartTestAction only pre-creates a summary for rerun/CI-CD callers
+     * who need the id in hand before mini-testing ever runs.
+     *
+     * Unlike claimTestingRunResultSummary's claim of an EXISTING document, this filter can match
+     * zero documents (nothing has been created for this testingRunId yet), and Mongo's own upsert
+     * semantics do not make that branch exclusive on their own: two concurrent callers with an
+     * identical filter that both match nothing can each independently reach the insert path and
+     * both succeed, since there is no unique index on testingRunId to make the second one collide
+     * (nor should there be - a TestingRun legitimately accumulates many summaries across retries).
+     * A stamped lease does not close that race by itself, but it does mean whichever attempt(s)
+     * result are each safely owned rather than silently unfenced, and it is the same primitive
+     * every other claim in this file now uses, so a caller downstream (renewal, producerDone,
+     * terminal state) that plumbed a token through gets real protection instead of a silent no-op.
+     */
+    public static TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start, String leaseToken, int leaseSeconds) {
         ObjectId testingRunId = new ObjectId(testingRunHexId);
 
         // since the extra field is not used in mini-testing explicitly, we can just update the summary here
         // it is only used in dashboard for querying data from new collection
+
+        Bson update = Updates.combine(
+                Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
+                Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
+        );
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+            update = Updates.combine(update,
+                    Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                    Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now() + ttl));
+        }
 
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.and(
                         Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
                         Filters.eq(TestingRunResultSummary.STATE,TestingRun.State.SCHEDULED)
                 ),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
-                        Updates.setOnInsert(TestingRunResultSummary.START_TIMESTAMP, start),
-                        Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
-                ),
+                update,
                 new FindOneAndUpdateOptions().upsert(true).returnDocument(ReturnDocument.AFTER)
         );
     }
@@ -1559,7 +2104,9 @@ public class DbLayer {
     private static TestingRunResultSummary findPendingTestingRunResultSummaryBasedOnPriority(Bson filter, String miniTestingName) {
 
         Bson testingRunsProjections = Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, TestingRun.ALLOWED_MINI_TESTING_SERVICE_NAMES, ID);
-        Bson trrsProjections = Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID, TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID);
+        Bson trrsProjections = Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID,
+                TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID, TestingRunResultSummary.PRODUCER_DONE,
+                TestingRunResultSummary.LEASE_EXPIRY_TS, TestingRunResultSummary.LEASE_TOKEN);
         List<TestingRun> testingRuns = TestingRunDao.instance.findAll(
                 Filters.or(
                     Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
@@ -1602,7 +2149,92 @@ public class DbLayer {
         return trrs;
     }
 
+    private static final int DEFAULT_LEASE_SECONDS = 90;
+
+    /**
+     * Claim/reclaim-shaped fencing only. Three clauses, OR'd together exactly as below:
+     *   - leaseExpiryTs is absent (never leased)
+     *   - leaseExpiryTs < now (lease expired)
+     *   - leaseToken matches what's currently stored (caller already owns it)
+     * The first two are separate Mongo clauses only because a range operator never matches a
+     * missing field - a single "missing or expired" condition isn't expressible as one clause.
+     * Semantically they're one idea ("no valid current owner right now"); the third is the other.
+     * An empty leaseToken means an unfenced legacy caller and returns a no-op (matches-everything)
+     * filter.
+     *
+     * Do NOT reuse this for periodic renewal-shaped writes made repeatedly by a pod that believes
+     * it's still actively working (updateTestResultsCountInTestSummary's per-result increments,
+     * markProducerDone, lease extension) - those must match the current owner exactly. An expired
+     * lease there means self-fence, not "free to act", because the caller is asserting ongoing
+     * ownership, not finalizing an attempt it may have discovered already abandoned.
+     *
+     * updateIssueCountInSummaryFenced and markTestRunResultSummaryFailed correctly DO use this
+     * filter despite superficially being "count"/state writes too - both are one-time terminal
+     * writes reachable from the lease-blind discovery fallback (trrs==null, no prior claim this
+     * iteration), where the caller may be legitimately finalizing an attempt nobody currently
+     * owns, not renewing one it already holds. That's claim-shaped, not renewal-shaped, regardless
+     * of the field being written.
+     */
+    private static Bson claimableOrOwnedByFilter(String leaseToken) {
+        if (StringUtils.isEmpty(leaseToken)) {
+            return new BasicDBObject();
+        }
+        return Filters.or(
+                Filters.exists(TestingRunResultSummary.LEASE_EXPIRY_TS, false),
+                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now()),
+                Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken));
+    }
+
+    /**
+     * Claims a summary for the caller. When leaseToken is null the caller is an older mini-testing
+     * that does not participate in leasing, so this stays exactly what it has always been: an
+     * unconditional state flip returning the pre-update document.
+     *
+     * With a token, the lease itself provides exclusivity - two pods racing here both match on
+     * state, but only the first to stamp leaseExpiryTs leaves the other's filter unsatisfied.
+     * The pre-update document is still what's returned, because callers branch on the state the
+     * summary had before the claim (see the SCHEDULED github-status branch in mini-testing's Main).
+     * The lease fields are attached to that pre-image afterwards so the caller learns its token.
+     */
+    private static TestingRunResultSummary claimTestingRunResultSummary(ObjectId summaryId, String leaseToken, int leaseSeconds) {
+        Bson stateGuard = Filters.in(TestingRunResultSummary.STATE,
+                TestingRun.State.SCHEDULED, TestingRun.State.RUNNING);
+
+        if (StringUtils.isEmpty(leaseToken)) {
+            return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                    Filters.and(Filters.eq(ID, summaryId), stateGuard),
+                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING));
+        }
+
+        int now = Context.now();
+        int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+        int expiry = now + ttl;
+
+        TestingRunResultSummary claimed = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(
+                        Filters.eq(ID, summaryId),
+                        stateGuard,
+                        Filters.or(
+                                Filters.exists(TestingRunResultSummary.LEASE_EXPIRY_TS, false),
+                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now))),
+                Updates.combine(
+                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
+                        Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                        Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, expiry)));
+
+        if (claimed != null) {
+            claimed.setLeaseToken(leaseToken);
+            claimed.setLeaseExpiryTs(expiry);
+        }
+        return claimed;
+    }
+
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
+        return findPendingTestingRunResultSummary(now, delta, miniTestingName, null, 0);
+    }
+
+    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName,
+            String leaseToken, int leaseSeconds) {
         try {
 
             Bson filter = Filters.or(
@@ -1628,10 +2260,21 @@ public class DbLayer {
             TestingRunResultSummary trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterScheduled, miniTestingName);
 
             if (trrs == null) {
+                /*
+                 * Two ways a RUNNING summary becomes reclaimable, and the wall-clock one has to stay:
+                 * older mini-testing modules never stamp a lease, so their summaries have no
+                 * leaseExpiryTs field at all - and a mongo range predicate does not match a missing
+                 * field, which would make every pre-existing summary permanently invisible here.
+                 * The lease branch is therefore additive, and unlike the window it has no upper age
+                 * bound, so an abandoned attempt stays reclaimable however long it has been stuck.
+                 */
                 Bson filterRunning = Filters.and(
                         Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
-                        Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+                        Filters.or(
+                                Filters.and(
+                                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
+                                        Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)),
+                                Filters.lt(TestingRunResultSummary.LEASE_EXPIRY_TS, now))
                 );
 
                 trrs = findPendingTestingRunResultSummaryBasedOnPriority(filterRunning, miniTestingName);
@@ -1650,11 +2293,7 @@ public class DbLayer {
             if (StringUtils.isEmpty(miniTestingName)) {
                 List<String> allowedListLegacy = testingRun.getAllowedMiniTestingServiceNames();
                 if (StringUtils.isEmpty(testingRun.getMiniTestingServiceName()) && (allowedListLegacy == null || allowedListLegacy.isEmpty())) {
-                    return TestingRunResultSummariesDao.instance.getMCollection()
-                            .findOneAndUpdate(
-                                    Filters.eq(ID, trrs.getId()),
-                                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-                            );
+                    return claimTestingRunResultSummary(trrs.getId(), leaseToken, leaseSeconds);
                 } else {
                     return null;
                 }
@@ -1672,11 +2311,7 @@ public class DbLayer {
                     Filters.eq(ID, trrs.getTestingRunId()),
                     Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName)
                 );
-                return TestingRunResultSummariesDao.instance.getMCollection()
-                    .findOneAndUpdate(
-                        Filters.eq(ID, trrs.getId()),
-                        Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-                    );
+                return claimTestingRunResultSummary(trrs.getId(), leaseToken, leaseSeconds);
             }
 
             // Backward compat: old runs with only single miniTestingServiceName field
@@ -1705,11 +2340,7 @@ public class DbLayer {
                 }
             }
 
-            return TestingRunResultSummariesDao.instance.getMCollection()
-                .findOneAndUpdate(
-                    Filters.eq(ID, trrs.getId()),
-                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
-                );
+            return claimTestingRunResultSummary(trrs.getId(), leaseToken, leaseSeconds);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in findPendingTestingRunResultSummary: " + e.getMessage());
             return null;
@@ -1742,8 +2373,36 @@ public class DbLayer {
     }
 
     public static void updateStartTsTestRunResultSummary(String summaryId) {
-        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)),
-                Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()));
+        updateStartTsTestRunResultSummary(summaryId, null);
+    }
+
+    /**
+     * Also called for the rerun case, where summaryId is the ORIGINAL (already-COMPLETED) summary
+     * being reopened for a fresh, narrow drain of just the selected result(s) - not the throwaway
+     * summary the caller's own claim/lease was minted against. Without stamping that same lease
+     * here too, every write during the drain (renewal, result recording) CAS-fails against
+     * whatever stale/absent leaseToken this document still carries, and the pod self-fences almost
+     * immediately with LEASE_LOST. Confirmed live: a rerun's original summary kept the leaseToken
+     * from its *original* run, 18+ hours stale, completely unrelated to the fresh token the rerun
+     * attempt had just adopted.
+     *
+     * leaseToken nullable for backward compatibility with a not-yet-upgraded mini-testing client
+     * that still calls the old 1-arg form - in that case this is exactly the old unconditional
+     * timestamp bump, no state/lease change.
+     */
+    public static void updateStartTsTestRunResultSummary(String summaryId, String leaseToken) {
+        Bson update;
+        if (StringUtils.isNotEmpty(leaseToken)) {
+            update = Updates.combine(
+                    Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()),
+                    Updates.set(TestingRunResultSummary.STATE, TestingRun.State.RUNNING),
+                    Updates.set(TestingRunResultSummary.LEASE_TOKEN, leaseToken),
+                    Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, Context.now() + DEFAULT_LEASE_SECONDS));
+        } else {
+            update = Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now());
+        }
+        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)), update);
     }
 
     public static void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
@@ -1799,6 +2458,13 @@ public class DbLayer {
         }else {
             loggerMaker.infoAndAddToDb("Invalid testingRunId " + testingRunId , LogDb.CYBORG);
         }
+    }
+
+    public static void markTestingRunFailed(String testingRunId) {
+        ObjectId testingRunObjId = new ObjectId(testingRunId);
+        TestingRunDao.instance.updateOneNoUpsert(
+                Filters.eq(Constants.ID, testingRunObjId),
+                Updates.set(TestingRun.STATE, State.FAILED));
     }
 
     public static Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
@@ -1858,11 +2524,23 @@ public class DbLayer {
 
 
     public static TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId) {
+        return markTestRunResultSummaryFailed(testingRunResultSummaryId, null);
+    }
+
+    /**
+     * With a leaseToken, only proceeds if the document has no valid current owner (never leased,
+     * or lease expired) or the token matches the current owner - closes the gap where a
+     * stale/superseded caller (e.g. one that arrived via the lease-blind discovery fallback) could
+     * mark a different, currently-active owner's attempt FAILED. See claimableOrOwnedByFilter.
+     * No token means the old unconditional behaviour, unchanged, for backward compatibility.
+     */
+    public static TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
                 Filters.and(
                         Filters.eq(TestingRunResultSummary.ID, summaryObjectId),
-                        Filters.eq(TestingRunResultSummary.STATE, State.RUNNING)
+                        Filters.eq(TestingRunResultSummary.STATE, State.RUNNING),
+                        claimableOrOwnedByFilter(leaseToken)
                 ),
                 Updates.set(TestingRunResultSummary.STATE, State.FAILED)
         );
@@ -1889,6 +2567,19 @@ public class DbLayer {
         TestingRunDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq("_id", id),  completedUpdate
         );
+    }
+
+    public static List<CustomWebhook> fetchTeamsWebhooksForTestResults() {
+        return CustomWebhooksDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.MICROSOFT_TEAMS.name()),
+                        Filters.in(CustomWebhook.SELECTED_WEBHOOK_OPTIONS, CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS.name())));
+    }
+
+    public static void recordWebhookSendResult(int webhookId, String userEmail, int timestamp, String message, List<String> errors) {
+        CustomWebhooksDao.instance.updateOne(Filters.eq("_id", webhookId), Updates.set("lastSentTimestamp", timestamp));
+        CustomWebhookResult webhookResult = new CustomWebhookResult(webhookId, userEmail, timestamp, message, errors);
+        CustomWebhooksResultDao.instance.insertOne(webhookResult);
     }
 
     public static List<TestingRunIssues> fetchOpenIssues(String summaryId) {
@@ -1971,9 +2662,63 @@ public class DbLayer {
     }
 
     public static void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
+        updateTestResultsCountInTestSummary(summaryId, testResultsCount, null, 0);
+    }
+
+    /**
+     * Also renews the caller's lease when it supplies a token, which is why leasing needs no
+     * separate heartbeat: this already runs once per result, on both the legacy path and the
+     * batched one (bulkRecordTestingRunResults loops through here per summary).
+     *
+     * A negative leaseSeconds is a voluntary release, not a renewal: the caller already knows for
+     * certain it is done (e.g. its consumer engine reported closed/failed) and would rather hand
+     * the summary back immediately than have whoever reclaims it wait out the remaining TTL.
+     * Old clients never send a negative value, so this is purely additive.
+     *
+     * Returns whether the write applied. With a token that is the answer to "do I still own this
+     * attempt" - false means another pod has taken over and the caller must stop. Without a token
+     * it is simply whether the summary still exists.
+     */
+    public static boolean updateTestResultsCountInTestSummary(String summaryId, int testResultsCount,
+            String leaseToken, int leaseSeconds) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
-        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryObjectId),
-            Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount));
+
+        if (StringUtils.isEmpty(leaseToken)) {
+            return TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryObjectId),
+                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount)) != null;
+        }
+
+        int newExpiry;
+        if (leaseSeconds < 0) {
+            newExpiry = Context.now() - 1;
+        } else {
+            int ttl = leaseSeconds > 0 ? leaseSeconds : DEFAULT_LEASE_SECONDS;
+            newExpiry = Context.now() + ttl;
+        }
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+            Filters.and(
+                Filters.eq(Constants.ID, summaryObjectId),
+                Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken)),
+            Updates.combine(
+                Updates.inc(TestingRunResultSummary.TEST_RESULTS_COUNT, testResultsCount),
+                Updates.set(TestingRunResultSummary.LEASE_EXPIRY_TS, newExpiry))) != null;
+    }
+
+    /**
+     * Marks the attempt's message set complete in Kafka. Until this is set a summary picked up by
+     * any pod has to re-produce from scratch, because a partial topic cannot be told apart from a
+     * complete one. Fenced on the lease so a superseded pod cannot mark it for the new owner.
+     */
+    public static boolean markProducerDone(String summaryId, String leaseToken) {
+        ObjectId summaryObjectId = new ObjectId(summaryId);
+        Bson filter = StringUtils.isEmpty(leaseToken)
+                ? Filters.eq(Constants.ID, summaryObjectId)
+                : Filters.and(
+                        Filters.eq(Constants.ID, summaryObjectId),
+                        Filters.eq(TestingRunResultSummary.LEASE_TOKEN, leaseToken));
+
+        return TestingRunResultSummariesDao.instance.updateOneNoUpsert(filter,
+            Updates.set(TestingRunResultSummary.PRODUCER_DONE, true)) != null;
     }
 
     public static void updateLastTestedField(int apiCollectionId, String url, String method) {
@@ -1992,6 +2737,276 @@ public class DbLayer {
         if(testingRunResult.isVulnerable()){
             VulnerableTestingRunResultDao.instance.insertOne(testingRunResult);
         }
+    }
+
+    public static void bulkWriteTestingRunResults(List<TestingRunResult> testingRunResults) {
+        List<WriteModel<TestingRunResult>> mainWrites = new ArrayList<>();
+        List<WriteModel<TestingRunResult>> vulnerableWrites = new ArrayList<>();
+        for (TestingRunResult trr : testingRunResults) {
+            mainWrites.add(new InsertOneModel<>(trr));
+            // from now store vulnerable results in separate collection also
+            if (trr.isVulnerable()) {
+                vulnerableWrites.add(new InsertOneModel<>(trr));
+            }
+        }
+        if (!mainWrites.isEmpty()) {
+            TestingRunResultDao.instance.bulkWrite(mainWrites, new BulkWriteOptions().ordered(false));
+        }
+        if (!vulnerableWrites.isEmpty()) {
+            VulnerableTestingRunResultDao.instance.bulkWrite(vulnerableWrites, new BulkWriteOptions().ordered(false));
+        }
+    }
+
+    /**
+     * Consolidated bulk endpoint support: does the work that previously required up to 7 separate calls per
+     * result (deleteTestingRunResults[rerun] + insert result + updateTestResultsCountInTestSummary +
+     * findTestSourceConfig + fetchIssuesByIds + bulkWriteTestingRunIssues + updateIssueCountInSummary), as one
+     * call batched across N results - so the caller pays one network round trip instead of up to 7 per result.
+     * All sub-operations already exist as local, direct-Mongo DbLayer methods; this only adds the batched
+     * orchestration and the issue-write-model computation (ported from apps/mini-testing's TestingIssuesHandler,
+     * see recordIssuesForTestingRunResults below).
+     *
+     * @param testingRunResults the batch of results to persist
+     * @param rerunDeleteIds hex ids of prior results being replaced by a rerun (client-computed - this decision
+     *                       depends on mini-testing's in-memory TestingConfigurations cache, not something the
+     *                       server can derive)
+     * @param doNotMarkIssuesAsFixed mirrors TestingConfigurations.getInstance().getDoNotMarkIssuesAsFixed(),
+     *                               also client/run config the server doesn't otherwise have
+     */
+    public static void bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds, boolean doNotMarkIssuesAsFixed) {
+        bulkRecordTestingRunResults(testingRunResults, rerunDeleteIds, doNotMarkIssuesAsFixed, null, 0);
+    }
+
+    /**
+     * @return whether the caller still holds the lease, i.e. the same signal
+     *         updateTestResultsCountInTestSummary returns - the count update below is the renewal.
+     *         Always true when no token is supplied.
+     */
+    public static boolean bulkRecordTestingRunResults(List<TestingRunResult> testingRunResults, List<String> rerunDeleteIds,
+            boolean doNotMarkIssuesAsFixed, String leaseToken, int leaseSeconds) {
+        if (rerunDeleteIds != null) {
+            for (String id : rerunDeleteIds) {
+                deleteTestingRunResults(id);
+            }
+        }
+
+        if (testingRunResults == null || testingRunResults.isEmpty()) {
+            return true;
+        }
+
+        bulkWriteTestingRunResults(testingRunResults);
+
+        Map<ObjectId, Integer> countBySummary = new HashMap<>();
+        for (TestingRunResult trr : testingRunResults) {
+            countBySummary.merge(trr.getTestRunResultSummaryId(), 1, Integer::sum);
+        }
+        boolean leaseHeld = true;
+        for (Map.Entry<ObjectId, Integer> entry : countBySummary.entrySet()) {
+            leaseHeld &= updateTestResultsCountInTestSummary(entry.getKey().toHexString(), entry.getValue(),
+                    leaseToken, leaseSeconds);
+        }
+
+        recordIssuesForTestingRunResults(testingRunResults, doNotMarkIssuesAsFixed);
+        return leaseHeld;
+    }
+
+    private static final String SET_OPERATION = "set";
+
+    /**
+     * Builds the same BulkUpdates shape TestingIssuesHandler (mini-testing) builds client-side - a filter Map
+     * mirroring what the JSON interceptor would decode a TestingIssuesId into, and UpdatePayload.toString()
+     * (a real gson round trip, same as production) for each update. This lets both this in-process caller and
+     * the HTTP-facing bulkWriteTestingRunIssues endpoint hand off to the exact same conversion
+     * (convertBulkUpdateToTestingRunIssuesWrite) instead of each independently deciding how a field should be
+     * written - that duplication is what caused the upsert/setOnInsert/severity-override/summary-id bugs this
+     * replaced.
+     */
+    private static BulkUpdates buildIssueBulkUpdate(TestingIssuesId issuesId, List<UpdatePayload> payloads) {
+        Map<String, Object> apiInfoKeyMap = new HashMap<>();
+        apiInfoKeyMap.put("apiCollectionId", (long) issuesId.getApiInfoKey().getApiCollectionId());
+        apiInfoKeyMap.put("url", issuesId.getApiInfoKey().getUrl());
+        apiInfoKeyMap.put("method", issuesId.getApiInfoKey().getMethod().name());
+        Map<String, Object> filterMap = new HashMap<>();
+        filterMap.put("apiInfoKey", apiInfoKeyMap);
+        filterMap.put(TestingIssuesId.TEST_ERROR_SOURCE, issuesId.getTestErrorSource().name());
+        filterMap.put(TestingIssuesId.TEST_SUB_CATEGORY, issuesId.getTestSubCategory());
+        Map<String, Object> filters = new HashMap<>();
+        filters.put("_id", filterMap);
+
+        ArrayList<String> updateStrings = new ArrayList<>();
+        for (UpdatePayload payload : payloads) {
+            updateStrings.add(payload.toString());
+        }
+        return new BulkUpdates(filters, updateStrings);
+    }
+
+    /**
+     * Ported from apps/mini-testing's TestingIssuesHandler (listOfIssuesIdsFromTestingRunResults +
+     * writeUpdateQueryIntoWriteModel + insertVulnerableTestsIntoIssuesCollection), batched across the whole
+     * result list instead of one result at a time: dedup ids -> one fetchIssuesByIds -> build writes ->
+     * one bulkWriteTestingRunIssues. Each per-field write decision goes through
+     * convertBulkUpdateToTestingRunIssuesWrite, the same conversion the HTTP-facing bulkWriteTestingRunIssues
+     * endpoint uses (so both paths make identical field/write decisions).
+     */
+    private static void recordIssuesForTestingRunResults(List<TestingRunResult> testingRunResults, boolean doNotMarkIssuesAsFixed) {
+        Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = listOfIssuesIdsFromTestingRunResults(testingRunResults);
+        if (testingIssuesIdsMap.isEmpty()) {
+            return;
+        }
+
+        List<TestingRunIssues> existingIssues = fetchIssuesByIds(testingIssuesIdsMap.keySet());
+
+        List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
+        writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, existingIssues, doNotMarkIssuesAsFixed);
+        insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, existingIssues);
+
+        if (!writeModelList.isEmpty()) {
+            bulkWriteTestingRunIssues(writeModelList);
+        }
+    }
+
+    /**
+     * Mirrors TestingIssuesHandler.listOfIssuesIdsFromTestingRunResults: dedups the batch down to distinct
+     * issue ids, first-seen wins, for the isAutomatedTesting=true / triggeredByTestEditor=false call site.
+     *
+     * Dedup + later lookups use a linear scan (getIssuesIdFromMap over keySet), same as the original, because
+     * TestingIssuesId's equals() compares testSubCategory case-insensitively but its hashCode() does not - so
+     * a plain map.get(id) can miss. sourceConfigCache dedupes the per-custom-template findTestSourceConfig
+     * lookup (only reached for http-prefixed subtypes; distinct such subtypes still cost one lookup each).
+     */
+    private static Map<TestingIssuesId, TestingRunResult> listOfIssuesIdsFromTestingRunResults(List<TestingRunResult> testingRunResults) {
+        Map<TestingIssuesId, TestingRunResult> map = new HashMap<>();
+        Map<String, TestSourceConfig> sourceConfigCache = new HashMap<>();
+        for (TestingRunResult runResult : testingRunResults) {
+            String subCategory = runResult.getTestSubType();
+            TestSourceConfig config = null;
+            if (subCategory != null && subCategory.startsWith("http")) {
+                config = sourceConfigCache.computeIfAbsent(subCategory, DbLayer::findTestSourceConfig);
+            }
+            TestingIssuesId issueId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+                    subCategory, config != null ? config.getId() : null);
+            if (getIssuesIdFromMap(issueId, map) == null) {
+                map.put(issueId, runResult);
+            }
+        }
+        return map;
+    }
+
+    /** Linear-scan lookup of the map's canonical key equal to issuesId - see
+     *  listOfIssuesIdsFromTestingRunResults for why map.get() can't be used directly. */
+    private static TestingIssuesId getIssuesIdFromMap(TestingIssuesId issuesId, Map<TestingIssuesId, TestingRunResult> map) {
+        for (TestingIssuesId candidate : map.keySet()) {
+            if (candidate.equals(issuesId)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** Mirrors TestingIssuesHandler.writeUpdateQueryIntoWriteModel: update-existing-issue writes, only touches
+     *  issues already in the DB (iterates existingIssues, not the whole batch). */
+    private static void writeUpdateQueryIntoWriteModel(List<WriteModel<TestingRunIssues>> writeModelList,
+            Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap, List<TestingRunIssues> existingIssues,
+            boolean doNotMarkIssuesAsFixed) {
+        int lastSeen = Context.now();
+        for (TestingRunIssues testingRunIssues : existingIssues) {
+            TestingIssuesId issuesId = testingRunIssues.getId();
+            TestingRunResult runResult = testingIssuesIdsMap.get(getIssuesIdFromMap(issuesId, testingIssuesIdsMap));
+            if (runResult == null) {
+                continue;
+            }
+            List<UpdatePayload> payloads = new ArrayList<>();
+            TestRunIssueStatus status = testingRunIssues.getTestRunIssueStatus();
+            if (runResult.isVulnerable()) {
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS,
+                        (status == TestRunIssueStatus.IGNORED ? TestRunIssueStatus.IGNORED : TestRunIssueStatus.OPEN).name(), SET_OPERATION));
+            } else if (!doNotMarkIssuesAsFixed) {
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.FIXED.name(), SET_OPERATION));
+            }
+            // When doNotMarkIssuesAsFixed is true we intentionally avoid touching the status for non-vulnerable results
+            payloads.add(new UpdatePayload(TestingRunIssues.KEY_SEVERITY, getSeverityFromTestingRunResult(runResult).name(), SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_SEEN, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION));
+            writeModelList.add(convertBulkUpdateToTestingRunIssuesWrite(buildIssueBulkUpdate(issuesId, payloads)));
+        }
+    }
+
+    /** Mirrors TestingIssuesHandler.insertVulnerableTestsIntoIssuesCollection: vulnerable-result writes plus
+     *  the severity-count tally, ending in a single updateIssueCountInSummary (after the loop - one call per
+     *  batch, not a query in a loop). Gated on summaryId != null only, matching the original exactly. */
+    private static void insertVulnerableTestsIntoIssuesCollection(List<WriteModel<TestingRunIssues>> writeModelList,
+            Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap, List<TestingRunIssues> existingIssues) {
+        int lastSeen = Context.now();
+        Map<String, Integer> countIssuesMap = new HashMap<>();
+        countIssuesMap.put(Severity.CRITICAL.toString(), 0);
+        countIssuesMap.put(Severity.HIGH.toString(), 0);
+        countIssuesMap.put(Severity.MEDIUM.toString(), 0);
+        countIssuesMap.put(Severity.LOW.toString(), 0);
+        ObjectId summaryId = null;
+
+        for (TestingIssuesId testingIssuesId : testingIssuesIdsMap.keySet()) {
+            TestingRunResult runResult = testingIssuesIdsMap.get(testingIssuesId);
+            if (!runResult.isVulnerable()) {
+                continue;
+            }
+            if (summaryId == null) {
+                summaryId = runResult.getTestRunResultSummaryId();
+            }
+            boolean doesExist = false;
+            boolean shouldCountIssue = false;
+            for (TestingRunIssues testingRunIssues : existingIssues) {
+                if (testingRunIssues.getId().equals(testingIssuesId)) {
+                    doesExist = true;
+                    if (testingRunIssues.getTestRunIssueStatus() == TestRunIssueStatus.OPEN) {
+                        shouldCountIssue = true;
+                    }
+                    break;
+                }
+            }
+            // Sent as-is, same as the original client - the KEY_SEVERITY conversion branch (shared, see
+            // convertBulkUpdateToTestingRunIssuesWrite) may override this with a configured template severity
+            // before it's written; countIssuesMap below intentionally tallies the pre-override value, matching
+            // the original's independent client-side count computation.
+            Severity severity = getSeverityFromTestingRunResult(runResult);
+            List<UpdatePayload> payloads = new ArrayList<>();
+            payloads.add(new UpdatePayload(TestingRunIssues.KEY_SEVERITY, severity.name(), SET_OPERATION));
+            if (!doesExist || shouldCountIssue) {
+                payloads.add(new UpdatePayload(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name(), SET_OPERATION));
+                int count = countIssuesMap.getOrDefault(severity.name(), 0);
+                countIssuesMap.put(severity.name(), count + 1);
+            }
+            payloads.add(new UpdatePayload(TestingRunIssues.CREATION_TIME, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_SEEN, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LAST_UPDATED, lastSeen, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.UNREAD, true, SET_OPERATION));
+            payloads.add(new UpdatePayload(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_HEX_ID, runResult.getTestRunResultSummaryId().toHexString(), SET_OPERATION));
+            if (testingIssuesId.getApiInfoKey() != null) {
+                payloads.add(new UpdatePayload(TestingRunIssues.COLLECTION_IDS,
+                        Collections.singletonList(testingIssuesId.getApiInfoKey().getApiCollectionId()), SET_OPERATION));
+            }
+            writeModelList.add(convertBulkUpdateToTestingRunIssuesWrite(buildIssueBulkUpdate(testingIssuesId, payloads)));
+        }
+
+        if (summaryId != null) {
+            updateIssueCountInSummary(summaryId.toHexString(), countIssuesMap, "increment");
+        }
+    }
+
+    /**
+     * Ported from apps/mini-testing's TestExecutor.getSeverityFromTestingRunResult - same default/fallback
+     * behavior. This is the value sent as KEY_SEVERITY's update payload (and used for count tallying) -
+     * whether it's what actually gets written is decided by convertBulkUpdateToTestingRunIssuesWrite's shared
+     * template-override logic, same as it always was for the existing HTTP-facing flow.
+     */
+    private static Severity getSeverityFromTestingRunResult(TestingRunResult testingRunResult) {
+        Severity severity = Severity.HIGH;
+        try {
+            Confidence confidence = testingRunResult.getTestResults().get(0).getConfidence();
+            severity = Severity.valueOf(confidence.toString());
+        } catch (Exception e) {
+            // keep default HIGH - matches the original's catch-all fallback
+        }
+        return severity;
     }
 
     public static void updateTotalApiCountInTestSummary(String summaryId, int totalApiCount) {
@@ -2033,11 +3048,27 @@ public class DbLayer {
     }
 
     public static TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues) {
+        return updateIssueCountInSummaryFenced(summaryId, totalCountIssues, null);
+    }
+
+    /**
+     * Terminal (COMPLETED) form, fenced. Same reasoning and same filter shape as
+     * markTestRunResultSummaryFailed(id, leaseToken): a stale caller arriving via the lease-blind
+     * fallback must not be able to complete an attempt a different, currently-active owner still
+     * holds. No token means the old unconditional behaviour, unchanged.
+     *
+     * Named distinctly from the existing (summaryId, totalCountIssues, operator) overload above -
+     * both are (String, Map, String), and Java can't distinguish two such overloads by parameter
+     * name alone.
+     */
+    public static TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq(Constants.ID, summaryObjectId),
+                Filters.and(
+                        Filters.eq(Constants.ID, summaryObjectId),
+                        claimableOrOwnedByFilter(leaseToken)),
                 Updates.combine(
                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
@@ -2141,6 +3172,25 @@ public class DbLayer {
 
     public static TestRoles fetchTestRolesforId(String roleId) {
         return TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(roleId)));
+    }
+
+    public static void updateCopilotRefreshToken(String roleId, String newRefreshToken) {
+        TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(roleId)));
+        if (role == null || role.getAuthWithCondList() == null) return;
+        for (AuthWithCond authWithCond : role.getAuthWithCondList()) {
+            if (authWithCond.getAuthMechanism() == null) continue;
+            List<AuthParam> params = authWithCond.getAuthMechanism().getAuthParams();
+            if (params == null) continue;
+            for (AuthParam param : params) {
+                if (param instanceof CopilotOAuthAuthParam) {
+                    ((CopilotOAuthAuthParam) param).setRefreshToken(newRefreshToken);
+                }
+            }
+        }
+        TestRolesDao.instance.updateOneNoUpsert(
+            Filters.eq("_id", new ObjectId(roleId)),
+            Updates.set(TestRoles.AUTH_WITH_COND_LIST, role.getAuthWithCondList())
+        );
     }
 
     public static Tokens fetchToken(String organizationId, int accountId) {
@@ -2363,6 +3413,20 @@ public class DbLayer {
                 loggerMaker.errorAndAddToDb(e, "Error submitting OT metrics task: " + e.getMessage(), LogDb.DB_ABS);
             }
         }
+
+        // Forward to Akto's own collector (independent of the customer
+        // OpenTelemetryIntegration). Gated for gradual rollout by the overall
+        // flag + account allowlist (see OpenTelemetryUtils.shouldForwardToAktoInfra).
+        if (OpenTelemetryUtils.shouldForwardToAktoInfra(accountId)) {
+            try {
+                telemetryForwardingExecutorService.submit(() -> {
+                    Context.accountId.set(accountId);
+                    OpenTelemetryUtils.forwardMetricsToAktoInfra(metricData);
+                });
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error submitting Akto infra metrics task: " + e.getMessage(), LogDb.DB_ABS);
+            }
+        }
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();
@@ -2378,6 +3442,10 @@ public class DbLayer {
 
     public static void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DependencyAnalyserUtils.syncWithDb(dependencyNodeList);
+    }
+
+    public static void bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments) {
+        SensitiveDataCountDao.instance.bulkInc(idempotencyKey, increments);
     }
 
     public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {
@@ -2538,7 +3606,21 @@ public class DbLayer {
                 NODE_LIMIT);
     }
 
-    public static long countTestingRunResultSummaries(Bson filter){
+    /**
+     * Was Bson filter - never actually worked for any caller. The client crashes trying to
+     * serialize a raw Bson query-builder object into an HTTP request body (no codec exists for
+     * Filters$AndFilter etc.), and the server side had no way to deserialize an interface type from
+     * JSON either. Since nothing has ever depended on the old signature actually working, this is a
+     * clean replacement, not an additive overload - primitives round-trip over JSON with no codec
+     * involved on either side.
+     */
+    public static long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state) {
+        ObjectId testingRunId = new ObjectId(testingRunHexId);
+        Bson filter = Filters.and(
+                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, sinceTimestamp),
+                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRunId),
+                Filters.eq(TestingRunResultSummary.STATE, state)
+        );
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 
@@ -2852,6 +3934,13 @@ public class DbLayer {
             if (!Constants.AKTO_MCP_TOOLS_TAG.equals(auditInfo.getType())) {
                 updateList.add(Updates.set(McpAuditInfo.BLOCK_ALL, true));
             }
+            // Inherit who the block applies to, so a new device's record doesn't block everyone.
+            updateList.add(Updates.set(McpAuditInfo.TARGET_TAGS, blockedEntry.getTargetTags()));
+            updateList.add(Updates.set(McpAuditInfo.NEGATED_TARGET_TAGS, blockedEntry.getNegatedTargetTags()));
+            updateList.add(Updates.set(McpAuditInfo.TARGET_DEVICE_IDS, blockedEntry.getTargetDeviceIds()));
+            updateList.add(Updates.set(McpAuditInfo.NEGATED_TARGET_DEVICE_IDS, blockedEntry.isNegatedTargetDeviceIds()));
+            updateList.add(Updates.set(McpAuditInfo.USER_METADATA, blockedEntry.getUserMetadata()));
+            updateList.add(Updates.set(McpAuditInfo.NEGATED_TARGET_USER_NAMES, blockedEntry.isNegatedTargetUserNames()));
         }
 
         Bson updates = Updates.combine(updateList.toArray(new Bson[0]));
@@ -3053,8 +4142,75 @@ public class DbLayer {
         }
     }
 
-    public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
-        AgentConversationResultDao.instance.insertMany(conversationResults);
+    // Distinct email domains of this account's users; throws on error so callers keep their old list.
+    public static List<String> fetchOrgEmailDomains() {
+        Set<String> domains = new HashSet<>();
+        List<User> users = UsersDao.instance.findAll(Filters.exists("accounts." + Context.accountId.get()), Projections.include(User.LOGIN));
+        for (User user : users) {
+            String login = user.getLogin();
+            if (login == null || !login.contains("@")) {
+                continue;
+            }
+            String domain = login.substring(login.lastIndexOf('@') + 1).trim().toLowerCase();
+            if (!domain.isEmpty()) {
+                domains.add(domain);
+            }
+        }
+        return new ArrayList<>(domains);
+    }
+
+    public static List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
+                                                    List<String> deviceIds, boolean negatedDeviceIds) {
+        try {
+            return AgentUsersDao.instance.findDeviceIdsByTags(tagFilters, negatedTagFilters, deviceIds, negatedDeviceIds);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findDeviceIdsByTags: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public static List<String> findUserEmailsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters) {
+        try {
+            return AgentUsersDao.instance.findUserEmailsByTags(tagFilters, negatedTagFilters);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in findUserEmailsByTags: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    // --- Config Field Policy (Misconfigurations) ---
+
+    public static List<ConfigFieldPolicy> fetchActiveConfigFieldPolicies(String toolName) {
+        try {
+            Bson filter = Filters.and(
+                    Filters.eq(ConfigFieldPolicy.STATUS, "ACTIVE"),
+                    Filters.eq(ConfigFieldPolicy.TOOL_NAME, toolName));
+            return ConfigFieldPolicyDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchActiveConfigFieldPolicies: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public static List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
+        InsertManyResult result = AgentConversationResultDao.instance.insertMany(conversationResults);
+        String[] docIds = new String[conversationResults.size()];
+        for (Map.Entry<Integer, BsonValue> entry : result.getInsertedIds().entrySet()) {
+            docIds[entry.getKey()] = entry.getValue().asObjectId().getValue().toHexString();
+        }
+        return Arrays.asList(docIds);
+    }
+
+    public static void updateAgentConversationToolsMetadata(String docId, Map<String, Object> toolsMetadata){
+        try {
+            ObjectId objectId = new ObjectId(docId);
+            AgentConversationResultDao.instance.updateOneNoUpsert(
+                Filters.eq(Constants.ID, objectId),
+                Updates.set("toolsMetaData", toolsMetadata)
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public static void bulkWriteAgentTrafficLogs(List<AgentTrafficLog> agentTrafficLogs) {
@@ -3137,6 +4293,49 @@ public class DbLayer {
             if (usernameObj instanceof String && !((String) usernameObj).isEmpty()) {
                 result.put(m.getName(), (String) usernameObj);
             }
+        }
+        return result;
+    }
+
+    /**
+     * device name -> agent type -> that agent's login block from additionalData.agentLogins
+     * (email, emailCategory, accountType, accountUuid, organizationUuid, organizationName,
+     * loggedIn, source, ...).
+     *
+     * Only the "claude-desktop" and "claude-cli-user" entries. The CLI reports itself once per
+     * config scope it found a login in (claude-cli-user/project/local/enterprise) — only the
+     * user scope is returned here; the rest, and claude-plugin, are ignored.
+     * Devices that reported neither are left out; a reported entry is returned as-is, logged in
+     * or not.
+     */
+    public static Map<String, Map<String, Map<String, Object>>> fetchDeviceClaudeInfoMap() {
+        List<ModuleInfo> modules = ModuleInfoDao.instance.findAll(
+            Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.name()),
+            Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA + "." + AGENT_LOGINS_KEY)
+        );
+        Map<String, Map<String, Map<String, Object>>> result = new HashMap<>();
+        if (modules == null) return result;
+        for (ModuleInfo m : modules) {
+            if (m.getName() == null || m.getAdditionalData() == null) continue;
+            Object agentLoginsObj = m.getAdditionalData().get(AGENT_LOGINS_KEY);
+            if (!(agentLoginsObj instanceof Map)) continue;
+
+            Map<String, Map<String, Object>> claudeLogins = new HashMap<>();
+            for (Map.Entry<?, ?> login : ((Map<?, ?>) agentLoginsObj).entrySet()) {
+                if (login.getKey() == null || !(login.getValue() instanceof Map)) continue;
+                String agentType = String.valueOf(login.getKey());
+                if (!CLAUDE_DESKTOP_AGENT_TYPE.equals(agentType) && !CLAUDE_CLI_USER_AGENT_TYPE.equals(agentType)) continue;
+
+                Map<String, Object> info = new HashMap<>();
+                for (Map.Entry<?, ?> field : ((Map<?, ?>) login.getValue()).entrySet()) {
+                    if (field.getKey() == null) continue;
+                    info.put(String.valueOf(field.getKey()), field.getValue());
+                }
+                if (info.isEmpty()) continue;
+                claudeLogins.put(agentType, info);
+            }
+            if (claudeLogins.isEmpty()) continue;
+            result.put(m.getName(), claudeLogins);
         }
         return result;
     }
@@ -3261,14 +4460,8 @@ public class DbLayer {
             if (exec == null) return false;
 
             final int maxBytes = 512 * 1024;
-            if (stdout != null && stdout.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBytes) {
-                stdout = new String(stdout.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, maxBytes,
-                        java.nio.charset.StandardCharsets.UTF_8) + "\n[truncated by server]";
-            }
-            if (stderr != null && stderr.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > maxBytes) {
-                stderr = new String(stderr.getBytes(java.nio.charset.StandardCharsets.UTF_8), 0, maxBytes,
-                        java.nio.charset.StandardCharsets.UTF_8) + "\n[truncated by server]";
-            }
+            stdout = com.akto.util.Util.truncateUtf8(stdout, maxBytes);
+            stderr = com.akto.util.Util.truncateUtf8(stderr, maxBytes);
 
             EndpointRemoteCommandExecutionDao.instance.getMCollection().updateOne(
                     Filters.and(
@@ -3288,6 +4481,36 @@ public class DbLayer {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateEndpointRemoteCommandResult: " + e.getMessage());
             return false;
+        }
+    }
+
+    /** Store one endpoint-shield diagnostic report. */
+    public static void insertEndpointShieldDiagnostic(EndpointShieldDiagnostic diagnostic) {
+        EndpointShieldDiagnosticDao.instance.insertOne(diagnostic);
+    }
+
+    /**
+     * Delete a device's diagnostic reports beyond the newest {@code keep}. _id breaks
+     * createdAt ties (whole seconds), so a report inserted in the same second as others
+     * is never the one trimmed.
+     */
+    public static void trimEndpointShieldDiagnostics(String deviceId, int keep) {
+        List<EndpointShieldDiagnostic> older = EndpointShieldDiagnosticDao.instance.findAll(
+                Filters.eq(EndpointShieldDiagnostic.DEVICE_ID, deviceId),
+                keep, 1000,
+                Sorts.orderBy(Sorts.descending(EndpointShieldDiagnostic.CREATED_AT), Sorts.descending("_id")),
+                Projections.include("_id"));
+        if (older == null || older.isEmpty()) {
+            return;
+        }
+        List<ObjectId> ids = new ArrayList<>(older.size());
+        for (EndpointShieldDiagnostic o : older) {
+            if (o.getId() != null) {
+                ids.add(o.getId());
+            }
+        }
+        if (!ids.isEmpty()) {
+            EndpointShieldDiagnosticDao.instance.deleteAll(Filters.in("_id", ids));
         }
     }
 
@@ -3426,4 +4649,204 @@ public class DbLayer {
             return false;
         }
     }
+
+    /**
+     * Upsert one NHI identity record. Natural key: (deviceId, source, identityName).
+     *
+     * Behavior:
+     *   - first time we see this (device, file, secret-name): inserts a new doc
+     *     with firstSeenAt/createdAt/lastRotatedAt = now, status=ACTIVE, and the
+     *     incoming hash.
+     *   - same hash as last seen: just bumps lastSeenAt + updatedAt + display fields
+     *     (prefix/suffix/risk/etc.) — does NOT touch lastRotatedAt or previousHash.
+     *   - hash changed: rotation. Stores the prior hash in previousHash and updates
+     *     lastRotatedAt; this is what the dashboard surfaces as "rotated".
+     *
+     * Compatibility notes (dashboard ↔ cyborg co-write the same collection):
+     *   - status is ONLY written on insert. Dashboard's disableNhiIdentity sets
+     *     status="INACTIVE"; the scanner must not silently re-enable on next scan.
+     *   - createdBy is setOnInsert only; updatedBy is refreshed every scan so the
+     *     dashboard can tell user-edits apart from automated scans.
+     *   - lastRotatedAt matches the dashboard's field name (same semantics).
+     *
+     * The raw secret is never written; only the redaction tuple (prefix, suffix, hash).
+     */
+    public static void upsertNhiIdentity(NhiIdentity identity) {
+        if (identity == null
+            || StringUtils.isBlank(identity.getIdentityName())
+            || StringUtils.isBlank(identity.getDeviceId())
+            || StringUtils.isBlank(identity.getSource())
+            || StringUtils.isBlank(identity.getHash())) {
+            loggerMaker.errorAndAddToDb("upsertNhiIdentity: missing required field, dropping record");
+            return;
+        }
+        NhiIdentityDao.instance.createIndicesIfAbsent();
+        int now = Context.now();
+        final String scannerActor = "endpoint-shield-scanner";
+
+        Bson filter = Filters.and(
+            Filters.eq(NhiIdentity.DEVICE_ID, identity.getDeviceId()),
+            Filters.eq(NhiIdentity.SOURCE, identity.getSource()),
+            Filters.eq(NhiIdentity.IDENTITY_NAME, identity.getIdentityName())
+        );
+
+        NhiIdentity existing = NhiIdentityDao.instance.findOne(filter);
+        boolean rotated = existing != null
+            && existing.getHash() != null
+            && !existing.getHash().equals(identity.getHash());
+
+        List<Bson> updates = new ArrayList<>();
+        // immutable on insert
+        updates.add(Updates.setOnInsert(NhiIdentity.IDENTITY_NAME, identity.getIdentityName()));
+        updates.add(Updates.setOnInsert(NhiIdentity.DEVICE_ID, identity.getDeviceId()));
+        updates.add(Updates.setOnInsert(NhiIdentity.SOURCE, identity.getSource()));
+        updates.add(Updates.setOnInsert(NhiIdentity.FIRST_SEEN_AT, now));
+        updates.add(Updates.setOnInsert(NhiIdentity.CREATED_AT, now));
+        updates.add(Updates.setOnInsert(NhiIdentity.CREATED_BY, scannerActor));
+        // status is ONLY set on insert — never overwrite dashboard's "INACTIVE".
+        updates.add(Updates.setOnInsert(NhiIdentity.STATUS, "ACTIVE"));
+
+        // always refreshed
+        updates.add(Updates.set(NhiIdentity.LAST_SEEN_AT, now));
+        updates.add(Updates.set(NhiIdentity.UPDATED_AT, now));
+        updates.add(Updates.set(NhiIdentity.UPDATED_BY, scannerActor));
+        updates.add(Updates.set(NhiIdentity.HASH, identity.getHash()));
+        if (StringUtils.isNotBlank(identity.getPrefix())) {
+            updates.add(Updates.set(NhiIdentity.PREFIX, identity.getPrefix()));
+        }
+        if (StringUtils.isNotBlank(identity.getSuffix())) {
+            updates.add(Updates.set(NhiIdentity.SUFFIX, identity.getSuffix()));
+        }
+        if (StringUtils.isNotBlank(identity.getIdentityType())) {
+            updates.add(Updates.set(NhiIdentity.IDENTITY_TYPE, identity.getIdentityType()));
+        }
+        if (StringUtils.isNotBlank(identity.getContextSource())) {
+            updates.add(Updates.set(NhiIdentity.CONTEXT_SOURCE, identity.getContextSource()));
+        }
+        if (StringUtils.isNotBlank(identity.getAgentName())) {
+            updates.add(Updates.set(NhiIdentity.AGENT_NAME, identity.getAgentName()));
+        }
+        if (StringUtils.isNotBlank(identity.getAgentType())) {
+            updates.add(Updates.set(NhiIdentity.AGENT_TYPE, identity.getAgentType()));
+        }
+        if (StringUtils.isNotBlank(identity.getRiskLevel())) {
+            updates.add(Updates.set(NhiIdentity.RISK_LEVEL, identity.getRiskLevel()));
+        }
+        if (StringUtils.isNotBlank(identity.getSourceType())) {
+            updates.add(Updates.set(NhiIdentity.SOURCE_TYPE, identity.getSourceType()));
+        }
+        if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
+            updates.add(Updates.set(NhiIdentity.DEVICE_LABEL, identity.getDeviceLabel()));
+        }
+        if (identity.getMetadata() != null && !identity.getMetadata().isEmpty()) {
+            updates.add(Updates.set(NhiIdentity.METADATA, identity.getMetadata()));
+        }
+
+        if (rotated) {
+            updates.add(Updates.set(NhiIdentity.PREVIOUS_HASH, existing.getHash()));
+            updates.add(Updates.set(NhiIdentity.LAST_ROTATED_AT, now));
+        } else if (existing == null) {
+            updates.add(Updates.setOnInsert(NhiIdentity.LAST_ROTATED_AT, now));
+        }
+
+        // Owner: inferred from deviceLabel. Set on insert; backfill for older records
+        // that were created before this field was populated (owner == null).
+        if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
+            if (existing == null) {
+                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                o.setName(identity.getDeviceLabel());
+                updates.add(Updates.setOnInsert(NhiIdentity.OWNER, o));
+            } else if (existing.getOwner() == null) {
+                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                o.setName(identity.getDeviceLabel());
+                updates.add(Updates.set(NhiIdentity.OWNER, o));
+            }
+        }
+
+        // Always mirror the scanner's expiryDate: positive means the scanner extracted
+        // a real exp claim (JWT); 0 means opaque token with no known expiry.
+        // Using set (not setOnInsert) so stale fake values written by older code are cleared.
+        updates.add(Updates.set(NhiIdentity.EXPIRY_DATE, identity.getExpiryDate()));
+
+        NhiIdentityDao.instance.updateOne(filter, Updates.combine(updates));
+
+        // Evaluate policies inline so violations appear immediately after each upsert.
+        try {
+            com.akto.dto.nhi_governance.NhiIdentity evaled =
+                    NhiIdentityDao.instance.findOne(filter);
+            if (evaled != null) {
+                com.akto.utils.nhi_governance.NhiPolicyEvaluator.evaluate(evaled);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "upsertNhiIdentity: policy eval failed: " + e.getMessage());
+        }
+    }
+
+    public static List<BasicDBObject> getAgentCorpus(String hostName) {
+        return AgentGuardCorpusDao.instance.findBucketsByAgentHost(hostName);
+    }
+    
+    public static void bulkSaveCorpusEntries(List<AgentGuardCorpusQueueEntry> corpusEntries) {
+        AgentGuardCorpusQueueDao.instance.insertMany(corpusEntries);
+    }
+
+    public static int incrementAndGetTestRateLimitUsage(int globalRateLimit, String dashboardContext) {
+        int today = Context.today();
+        FindOneAndUpdateOptions options = new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER);
+        boolean agentic = dashboardContext != null && "AGENTIC".equalsIgnoreCase(dashboardContext.trim());
+        String dayField = agentic
+                ? AccountSettings.TEST_RATE_LIMIT_USAGE_DAY_AGENTIC
+                : AccountSettings.TEST_RATE_LIMIT_USAGE_DAY;
+        String countField = agentic
+                ? AccountSettings.TEST_RATE_LIMIT_USAGE_COUNT_AGENTIC
+                : AccountSettings.TEST_RATE_LIMIT_USAGE_COUNT;
+
+        List<Bson> sameDayFilters = new ArrayList<>();
+        sameDayFilters.add(AccountSettingsDao.generateFilter());
+        sameDayFilters.add(Filters.eq(dayField, today));
+        // Limit applicable only when > 0; otherwise always allow increment.
+        if (globalRateLimit > 0) {
+            sameDayFilters.add(Filters.lt(countField, globalRateLimit));
+        }
+
+        AccountSettings updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                Filters.and(sameDayFilters),
+                Updates.inc(countField, 1),
+                options
+        );
+        if (updated != null) {
+            return agentic ? updated.getTestRateLimitUsageCountAgentic() : updated.getTestRateLimitUsageCount();
+        }
+
+        // Same day but already at/over limit — do not increment; return limit+1 so caller can detect overage.
+        AccountSettings current = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (current != null) {
+            int currentDay = agentic ? current.getTestRateLimitUsageDayAgentic() : current.getTestRateLimitUsageDay();
+            if (currentDay == today) {
+                if (globalRateLimit > 0) {
+                    return globalRateLimit + 1;
+                }
+                return agentic ? current.getTestRateLimitUsageCountAgentic() : current.getTestRateLimitUsageCount();
+            }
+        }
+
+        // New day (or first ever) for this context only — reset that counter to 1.
+        updated = AccountSettingsDao.instance.getMCollection().findOneAndUpdate(
+                AccountSettingsDao.generateFilter(),
+                Updates.combine(
+                        Updates.set(dayField, today),
+                        Updates.set(countField, 1)
+                ),
+                options
+        );
+        if (updated == null) {
+            return 1;
+        }
+        return agentic ? updated.getTestRateLimitUsageCountAgentic() : updated.getTestRateLimitUsageCount();
+    }
+
+    public static void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        SequenceModelDao.instance.writeSequenceCounts(sequenceCounts);
+    }
+
 }

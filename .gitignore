@@ -24,4 +24,7 @@ https:
 **/data-zoo-logs
 run-cyborg.sh
 run-cyborg-consumer.sh
+run-cyborg-producer.sh
+cyborg-local-common.env
+docker-compose-cyborg.yml
 .github/hooks

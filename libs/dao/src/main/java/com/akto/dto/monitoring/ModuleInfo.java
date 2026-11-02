@@ -1,5 +1,6 @@
 package com.akto.dto.monitoring;
 
+import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,6 +33,9 @@ public class ModuleInfo {
     @Getter @Setter
     private boolean deleteTopicAndReboot;
     public static final String DELETE_TOPIC_AND_REBOOT = "deleteTopicAndReboot";
+
+    public static final String EXPIRES_AT = "expiresAt";
+    private Date expiresAt;
 
     public ModuleType getModuleType() {
         return moduleType;
@@ -92,6 +96,14 @@ public class ModuleInfo {
         this.additionalData = additionalData;
     }
 
+    public Date getExpiresAt() {
+        return expiresAt;
+    }
+
+    public void setExpiresAt(Date expiresAt) {
+        this.expiresAt = expiresAt;
+    }
+
     public enum ModuleType {
         MINI_RUNTIME,
         MINI_TESTING,
@@ -103,7 +115,12 @@ public class ModuleInfo {
         TRAFFIC_COLLECTOR,
         AKTO_AGENT_GATEWAY,
         DAST,
-        AGENTIC_TESTING
+        AGENTIC_TESTING,
+        GUARDRAIL,
+        SMART_TESTING,
+        ACCOUNT_JOB_EXECUTOR,
+        // autoscaler for MINI_TESTING pods; heartbeats from mini-testing-orchestrator
+        MINI_TESTING_ORCHESTRATOR
     }
 
 }

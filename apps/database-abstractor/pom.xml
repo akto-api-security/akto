@@ -29,7 +29,7 @@
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-core</artifactId>
-            <version>2.5.33</version>
+            <version>6.10.0</version>
         </dependency>
 
         <dependency>
@@ -59,24 +59,47 @@
             <groupId>com.akto.apps.mini-testing</groupId>
             <artifactId>mini-testing</artifactId>
             <version>${project.version}</version>
+            <exclusions>
+                <!-- bcprov-jdk16:1.46 (2011) declares the same classes as the
+                     bcprov-jdk18on this module needs for com.akto.ca.CertificateAuthority,
+                     including org.bouncycastle.jce.provider.BouncyCastleProvider. With both
+                     in WEB-INF/lib, whichever the classloader reaches first registers as
+                     "BC" — and when the old one wins, bcpkix 1.78 is left calling a
+                     provider that predates it, so certificate generation throws while
+                     everything still loads. That failed only in the packaged WAR, never
+                     from the Maven classpath, which is what made it look environmental. -->
+                <exclusion>
+                    <groupId>org.bouncycastle</groupId>
+                    <artifactId>bcprov-jdk16</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         
         <dependency>
             <groupId>org.apache.struts</groupId>
             <artifactId>struts2-json-plugin</artifactId>
-            <version>2.5.33</version>
+            <version>6.10.0</version>
         </dependency>
 
+        <!-- Jetty 12 EE8 servlets (javax.servlet line). Matches the Jetty 12 server (no skew). -->
         <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlets</artifactId>
-            <version>9.4.57.v20241219</version>
+            <groupId>org.eclipse.jetty.ee8</groupId>
+            <artifactId>jetty-ee8-servlets</artifactId>
+            <version>12.0.37</version>
         </dependency>
 
         <dependency>
             <groupId>com.azure</groupId>
             <artifactId>azure-storage-blob</artifactId>
             <version>12.25.1</version>
+        </dependency>
+
+        <!-- Prometheus metrics (latest stable). Micrometer >=1.13 moved the registry package to
+             io.micrometer.prometheusmetrics.* (see InfraMetricsListener imports). -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <version>1.17.1</version>
         </dependency>
 
     </dependencies>
@@ -101,33 +124,60 @@
         </resources>
         <plugins>
             <plugin>
+                <!-- 3.x required: war-plugin 2.3 can't run on the JDK 17 build JVM
+                     (old xstream/plexus reflection blocked by JPMS). Config unchanged;
+                     failOnMissingWebXml=false already set (db-abstractor has no web.xml). -->
                 <artifactId>maven-war-plugin</artifactId>
-                <version>2.3</version>
+                <version>3.4.0</version>
                 <configuration>
                     <attachClasses>true</attachClasses>
                     <warSourceDirectory>web</warSourceDirectory>
                     <failOnMissingWebXml>false</failOnMissingWebXml>
+                    <packagingExcludes>WEB-INF/lib/spring-*.jar</packagingExcludes>
                 </configuration>
             </plugin>
             <plugin>
-                <groupId>org.eclipse.jetty</groupId>
-                <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.36.v20210114</version>
+                <groupId>org.eclipse.jetty.ee8</groupId>
+                <artifactId>jetty-ee8-maven-plugin</artifactId>
+                <!-- Jetty 12 EE8 maven plugin for local `jetty:run` of the javax webapp. -->
+                <version>12.0.37</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>
                         <contextPath>/</contextPath>
-                        <descriptor>WEB-INF/web.xml</descriptor>
                     </webApp>
                 </configuration>
             </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <groupId>org.apache.maven.plugins</groupId>
+                <!-- 3.6.0+ required for <release>; the inherited default (3.1) ignores it
+                     and would silently produce Java 8 bytecode. -->
+                <version>3.13.0</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <!-- Compile to Java 17 bytecode (class file v61). A JVM < 17 cannot
+                         load these classes and fails with UnsupportedClassVersionError. -->
+                    <release>17</release>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.4.1</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java-17</id>
+                        <goals><goal>enforce</goal></goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                    <message>database-abstractor requires Java 17+ to build.</message>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <finalName>${project.artifactId}</finalName>

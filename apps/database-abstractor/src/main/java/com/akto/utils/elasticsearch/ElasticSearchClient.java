@@ -14,9 +14,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
  * ES REST client for agentic query records.
@@ -31,7 +31,7 @@ public class ElasticSearchClient {
     private static final String ES_API_KEY = System.getenv("ES_API_KEY");
     private static final String ES_INDEX = System.getenv("ES_INDEX_AGENT_QUERY");
 
-    private static final String SCROLL_KEEP_ALIVE = "2m";
+    private static final int MAX_QUERY_RESULTS = 500;
     private static final MediaType JSON_MEDIA = MediaType.parse("application/json");
     private static final MediaType NDJSON_MEDIA = MediaType.parse("application/x-ndjson");
 
@@ -59,7 +59,13 @@ public class ElasticSearchClient {
      */
     public void bulkIndexAgentQueryRecords(List<AgentQueryRecord> records) {
         logger.info("Bulk indexing agent query records: " + records.size());
-        if (!isConfigured() || records == null || records.isEmpty()) return;
+        if (!isConfigured()) {
+            logger.error("ElasticSearchClient not configured, skipping bulk index. ES_HOST set: "
+                + (ES_HOST != null && !ES_HOST.isEmpty()) + ", ES_INDEX_AGENT_QUERY set: "
+                + (ES_INDEX != null && !ES_INDEX.isEmpty()));
+            return;
+        }
+        if (records == null || records.isEmpty()) return;
 
         StringBuilder ndjson = new StringBuilder();
         for (AgentQueryRecord r : records) {
@@ -75,7 +81,24 @@ public class ElasticSearchClient {
                     .put("responsePayload",   r.getResponsePayload())
                     .put("timestamp",         r.getTimeStampMs())
                     .put("inputTokens",       r.getInputTokens())
-                    .put("outputTokens",      r.getOutputTokens());
+                    .put("outputTokens",      r.getOutputTokens())
+                    .put("isAtlasTraffic",    r.isAtlasTraffic())
+                    .put("traceId",           r.getTraceId())
+                    .put("spanId",            r.getSpanId())
+                    .put("topicProcessed",    false);
+
+                // Guardrail result: whether a policy was hit, which policy and rule, what was done
+                // about it, and why. Saved on the trace so an investigation does not have to look up
+                // the threat event separately. Written only when guardrails actually ran - otherwise
+                // the trace would claim a clean result for a prompt that was never checked.
+                if (r.getGuardrailViolated() != null) {
+                    doc.put("guardrailViolated", r.getGuardrailViolated())
+                       .put("guardrailAction",   emptyIfNull(r.getGuardrailAction()))
+                       .put("guardrailPolicy",   emptyIfNull(r.getGuardrailPolicy()))
+                       .put("guardrailRule",     emptyIfNull(r.getGuardrailRule()))
+                       .put("guardrailReason",   emptyIfNull(r.getGuardrailReason()))
+                       .put("guardrailSeverity", emptyIfNull(r.getGuardrailSeverity()));
+                }
                 ndjson.append(doc).append("\n");
             } catch (JSONException e) {
                 logger.error("Failed to serialize AgentQueryRecord: " + e.getMessage());
@@ -83,6 +106,7 @@ public class ElasticSearchClient {
         }
 
         String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_bulk";
+        logger.info("ES bulk index request: url=" + url + ", docs=" + records.size());
         Request.Builder rb = new Request.Builder()
             .url(url)
             .method("POST", RequestBody.create(ndjson.toString(), NDJSON_MEDIA))
@@ -90,76 +114,64 @@ public class ElasticSearchClient {
         addAuthHeader(rb);
 
         try (Response resp = http.newCall(rb.build()).execute()) {
+            ResponseBody respBody = resp.body();
+            String bodyText = respBody != null ? respBody.string() : "";
+
             if (!resp.isSuccessful()) {
-                logger.error("ES bulk index failed (" + resp.code() + ") for " + url);
+                logger.error("ES bulk index failed (" + resp.code() + ") for " + url + ": " + bodyText);
+                return;
             }
-            logger.info("ES bulk index successful for " + url);
-        } catch (Exception e) {
-            logger.error("ES bulk index error: " + e.getMessage());
-        }
-    }
 
-    /**
-     * Scrolls ES for agentic query records in [startTsMs, endTsMs) for the given accountId.
-     * Invokes handler for each hit up to maxRecords. Always releases the scroll cursor on exit.
-     */
-    public void scrollQueryData(int accountId, long startTsMs, long endTsMs, int pageSize,
-                                int maxRecords, Consumer<AgentQueryRecord> handler) {
-        if (!isConfigured()) return;
-
-        String scrollId = null;
-        int delivered = 0;
-        try {
-            String initialBody = buildInitialQuery(accountId, startTsMs, endTsMs, pageSize).toString();
-            String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search?scroll=" + SCROLL_KEEP_ALIVE;
-            JSONObject response = httpPost(url, initialBody);
-            if (response == null) return;
-
-            scrollId = response.optString("_scroll_id", null);
-            JSONArray hits = extractHits(response);
-
-            while (hits != null && hits.length() > 0 && delivered < maxRecords) {
-                for (int i = 0; i < hits.length() && delivered < maxRecords; i++) {
-                    AgentQueryRecord rec = parseHit(hits.getJSONObject(i));
-                    if (rec != null) {
-                        handler.accept(rec);
-                        delivered++;
-                    }
+            try {
+                JSONObject bulkResponse = new JSONObject(bodyText);
+                if (bulkResponse.optBoolean("errors", false)) {
+                    logger.error("ES bulk index had per-item errors for " + url + ": " + bodyText);
+                } else {
+                    logger.info("ES bulk index successful for " + url + ", took=" + bulkResponse.optInt("took", -1) + "ms");
                 }
-                if (delivered >= maxRecords || scrollId == null) break;
-
-                JSONObject scrollBody = new JSONObject()
-                    .put("scroll", SCROLL_KEEP_ALIVE)
-                    .put("scroll_id", scrollId);
-                String scrollUrl = trimTrailingSlash(ES_HOST) + "/_search/scroll";
-                response = httpPost(scrollUrl, scrollBody.toString());
-                if (response == null) break;
-                scrollId = response.optString("_scroll_id", scrollId);
-                hits = extractHits(response);
+            } catch (JSONException e) {
+                logger.error("ES bulk index response was not valid JSON for " + url + ": " + bodyText);
             }
         } catch (Exception e) {
-            logger.error("Error scrolling ES for accountId " + accountId + ": " + e.getMessage());
-        } finally {
-            if (scrollId != null) {
-                releaseScroll(scrollId);
-            }
+            logger.error("ES bulk index error for " + url + ": " + e, e);
         }
     }
 
-    private JSONObject buildInitialQuery(int accountId, long startTsMs, long endTsMs, int pageSize) throws JSONException {
-        JSONObject range = new JSONObject()
-            .put("timestamp", new JSONObject().put("gte", startTsMs).put("lt", endTsMs));
-        JSONObject term = new JSONObject().put("accountId", accountId);
+    public List<AgentQueryRecord> scrollQueryData(int accountId, String spanId) {
+        List<AgentQueryRecord> res = new ArrayList<>();
+        if (!isConfigured() || spanId == null || spanId.isEmpty()) return res;
 
+        try {
+            String body = buildQuery(accountId, spanId).toString();
+            String url = trimTrailingSlash(ES_HOST) + "/" + ES_INDEX + "/_search";
+            JSONObject response = httpPost(url, body);
+            if (response == null) return res;
+
+            JSONArray hits = extractHits(response);
+            if (hits == null) return res;
+
+            for (int i = 0; i < hits.length(); i++) {
+                AgentQueryRecord rec = parseHit(hits.getJSONObject(i));
+                if (rec != null) {
+                    res.add(rec);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error querying ES for accountId " + accountId + ", spanId " + spanId + ": " + e.getMessage());
+        }
+        return res;
+    }
+
+    private JSONObject buildQuery(int accountId, String spanId) throws JSONException {
         JSONArray must = new JSONArray()
-            .put(new JSONObject().put("range", range))
-            .put(new JSONObject().put("term", term));
+            .put(new JSONObject().put("term", new JSONObject().put("accountId", accountId)))
+            .put(new JSONObject().put("term", new JSONObject().put("spanId.keyword", spanId)));
 
         JSONObject query = new JSONObject().put("bool", new JSONObject().put("must", must));
 
         return new JSONObject()
-            .put("size", pageSize)
-            .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "asc"))))
+            .put("size", MAX_QUERY_RESULTS)
+            .put("sort", new JSONArray().put(new JSONObject().put("timestamp", new JSONObject().put("order", "desc"))))
             .put("query", query);
     }
 
@@ -187,7 +199,17 @@ public class ElasticSearchClient {
             source.optString("responsePayload", ""),
             source.optLong("timestamp", 0L),
             source.optInt("inputTokens", 0),
-            source.optInt("outputTokens", 0)
+            source.optInt("outputTokens", 0),
+            source.optString("traceId", ""),
+            source.optString("spanId", ""),
+            source.optBoolean("isAtlasTraffic", false),
+            source.optBoolean("topicProcessed", false),
+            source.has("guardrailViolated") ? source.optBoolean("guardrailViolated") : null,
+            source.optString("guardrailAction", ""),
+            source.optString("guardrailPolicy", ""),
+            source.optString("guardrailRule", ""),
+            source.optString("guardrailReason", ""),
+            source.optString("guardrailSeverity", "")
         );
     }
 
@@ -212,22 +234,6 @@ public class ElasticSearchClient {
         }
     }
 
-    private void releaseScroll(String scrollId) {
-        try {
-            String url = trimTrailingSlash(ES_HOST) + "/_search/scroll";
-            JSONObject body = new JSONObject().put("scroll_id", scrollId);
-            Request.Builder rb = new Request.Builder()
-                .url(url)
-                .method("DELETE", RequestBody.create(body.toString(), JSON_MEDIA))
-                .addHeader("Content-Type", "application/json");
-            addAuthHeader(rb);
-            try (Response resp = http.newCall(rb.build()).execute()) {
-                // best-effort cleanup; ignore status
-            }
-        } catch (Exception ignored) {
-        }
-    }
-
     private void addAuthHeader(Request.Builder rb) {
         if (ES_API_KEY != null && !ES_API_KEY.isEmpty()) {
             rb.addHeader("Authorization", "ApiKey " + ES_API_KEY);
@@ -237,5 +243,10 @@ public class ElasticSearchClient {
     private static String trimTrailingSlash(String s) {
         if (s == null) return "";
         return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
+    }
+
+    // org.json throws on a null value, so missing guardrail fields have to be saved as "".
+    private static String emptyIfNull(String s) {
+        return s == null ? "" : s;
     }
 }

@@ -1,8 +1,11 @@
 package com.akto;
 
+import com.akto.listener.InfraMetricsListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.CyborgMetricsConfig;
 import com.akto.utils.KafkaUtils;
+import io.micrometer.core.instrument.binder.kafka.KafkaClientMetrics;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -53,6 +56,15 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
 
         this.consumer = new KafkaConsumer<>(props);
 
+        // Bind Kafka consumer metrics (lag, consume-rate, offsets) — only when metrics are enabled.
+        if (CyborgMetricsConfig.isEnabled()) {
+            try {
+                new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error binding fast-discovery Kafka metrics", LogDb.DB_ABS);
+            }
+        }
+
         loggerMaker.infoAndAddToDb("FastDiscoveryKafkaConsumer initialized: topic=" + topicName +
             ", group=" + groupId + ", broker=" + brokerUrl, LogDb.DB_ABS);
     }
@@ -65,6 +77,12 @@ public class FastDiscoveryKafkaConsumer implements Runnable {
         // Start consumer thread
         Thread consumerThread = new Thread(this, "fast-discovery-consumer");
         consumerThread.setDaemon(false);
+        // A fatal Error that escapes the loop must not leave a silently-dead consumer inside a
+        // live JVM — take the process down so the container restarts (restart: always).
+        consumerThread.setUncaughtExceptionHandler((t, e) -> {
+            loggerMaker.errorAndAddToDb("fatal error in " + t.getName() + ", exiting JVM for restart: " + e, LogDb.DB_ABS);
+            System.exit(1);
+        });
         consumerThread.start();
 
         loggerMaker.infoAndAddToDb("FastDiscoveryKafkaConsumer thread started", LogDb.DB_ABS);

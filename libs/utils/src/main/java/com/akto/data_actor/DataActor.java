@@ -141,6 +141,8 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId);
 
+    public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken);
+
     public abstract void insertTestingRunResultSummary(TestingRunResultSummary trrs);
 
     public abstract void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues);
@@ -193,6 +195,8 @@ public abstract class DataActor {
     public abstract void insertActivity(int count);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues);
+
+    public abstract TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken);
 
     public abstract TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues, String operator);
 
@@ -301,7 +305,7 @@ public abstract class DataActor {
 
     public abstract List<Node> fetchNodesForCollectionIds(List<Integer> apiCollectionsIds, boolean removeZeroLevel, int skip);
 
-    public abstract long countTestingRunResultSummaries(Bson filter);
+    public abstract long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state);
 
     public abstract TestScript fetchTestScript();
 
@@ -400,12 +404,16 @@ public abstract class DataActor {
 
     public abstract void updateMcpAuditInfo(String type, String resourceName, String mcpHost, ComponentRiskAnalysis componentRiskAnalysis);
 
-    public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
+    public abstract List<String> storeConversationResults(List<AgentConversationResult> conversationResults);
 
     public abstract void storeTrace(Trace trace);
 
     public abstract void storeSpans(List<Span> spans);
 
     public abstract void storeTestingRunWebhook(TestingRunWebhook testingRunWebhook);
+
+    public abstract int incrementAndGetTestRateLimitUsage(int globalRateLimit, String dashboardContext);
+
+    public abstract void writeSequenceCounts(List<SequenceCount> sequenceCounts);
 
 }

@@ -2,6 +2,9 @@ package com.akto.dto.testing;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+
 import java.util.List;
 
 import lombok.Getter;
@@ -57,11 +60,17 @@ public class TestingRun {
     public static final String SEND_SLACK_ALERT = "sendSlackAlert";
     private boolean sendSlackAlert = false;
 
+    public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
+    private boolean sendMsTeamsAlert = false;
+
     public static final String DO_NOT_MARK_ISSUES_AS_FIXED = "doNotMarkIssuesAsFixed";
     private boolean doNotMarkIssuesAsFixed = false;
 
     public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
     private boolean runAutomatedTests = false;
+
+    public static final String DASHBOARD_CONTEXT = "dashboardContext";
+    private CONTEXT_SOURCE dashboardContext;
 
 
     public TestingRun() { }
@@ -199,7 +208,8 @@ public class TestingRun {
     }
 
     public String getHexId() {
-        return this.id.toHexString();
+        if (hexId == null) return this.id.toHexString();
+        return this.hexId;
     }
 
     public String getName() {
@@ -228,6 +238,18 @@ public class TestingRun {
 
     public void setSendSlackAlert(boolean sendSlackAlert) {
         this.sendSlackAlert = sendSlackAlert;
+    }
+
+    public boolean isSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public boolean getSendMsTeamsAlert() {
+        return sendMsTeamsAlert;
+    }
+
+    public void setSendMsTeamsAlert(boolean sendMsTeamsAlert) {
+        this.sendMsTeamsAlert = sendMsTeamsAlert;
     }
 
     public String getMiniTestingServiceName() {
@@ -260,6 +282,14 @@ public class TestingRun {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public CONTEXT_SOURCE getDashboardContext() {
+        return dashboardContext;
+    }
+
+    public void setDashboardContext(CONTEXT_SOURCE dashboardContext) {
+        this.dashboardContext = dashboardContext;
     }
 
 

@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -22,11 +23,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.action.DbAction;
+import com.akto.action.ESClientAction;
 import com.akto.dao.context.Context;
+import com.akto.listener.InfraMetricsListener;
+import com.akto.metrics.CyborgMetricsConfig;
+import io.micrometer.core.instrument.binder.kafka.KafkaClientMetrics;
+import com.akto.data_actor.DbLayer;
+import com.akto.dto.LogsEndpointShield;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.elasticsearch.AgentQueryRecord;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -130,6 +138,16 @@ public class KafkaUtils {
 
         Properties properties = configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         this.consumer = new KafkaConsumer<>(properties);
+
+        // Bind Kafka consumer metrics (lag, consume-rate, offsets) — only when metrics are enabled.
+        if (CyborgMetricsConfig.isEnabled()) {
+            try {
+                new KafkaClientMetrics(this.consumer).bindTo(InfraMetricsListener.registry);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error binding main Kafka consumer metrics: " + e.toString());
+            }
+        }
+
         final Thread mainThread = Thread.currentThread();
         final AtomicBoolean exceptionOnCommitSync = new AtomicBoolean(false);
 
@@ -153,6 +171,9 @@ public class KafkaUtils {
         try {
             this.consumer.subscribe(Arrays.asList(topicName));
             loggerMaker.infoAndAddToDb("Kafka Consumer subscribed");
+            // Reused across polls; accumulates endpoint-shield logs within a single poll and
+            // is flushed as one batched insertMany per account at the end of each poll.
+            Map<Integer, List<LogsEndpointShield>> shieldLogBuffer = new HashMap<>();
             while (true) {
                 ConsumerRecords<String, String> records = this.consumer.poll(Duration.ofMillis(10000));
                 try {
@@ -160,20 +181,22 @@ public class KafkaUtils {
                 } catch (Exception e) {
                     throw e;
                 }
-                
+
+                shieldLogBuffer.clear();
                 for (ConsumerRecord<String,String> r: records) {
-                    try {                         
+                    try {
                         lastSyncOffset++;
                         if (lastSyncOffset % 100 == 0) {
                             logger.info("Committing offset at position: " + lastSyncOffset);
                         }
 
-                        parseAndTriggerWrites(r.value());
+                        parseAndTriggerWrites(r.value(), shieldLogBuffer);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error in parseAndTriggerWrites " + e);
                         continue;
                     }
                 }
+                flushEndpointShieldLogs(shieldLogBuffer);
             }
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
@@ -197,21 +220,54 @@ public class KafkaUtils {
 
 
     public static void parseAndTriggerWrites(String message) throws Exception {
+        parseAndTriggerWrites(message, null);
+    }
+
+    public static void parseAndTriggerWrites(String message, Map<Integer, List<LogsEndpointShield>> shieldLogBuffer) throws Exception {
         DbAction dbAction = new DbAction();
+        ESClientAction esClientAction = new ESClientAction();
         Map<String, Object> json = gson.fromJson(message, Map.class);
         String triggerMethod = (String) json.get("triggerMethod");
         String payload = (String) json.get("payload");
         Double accIdDouble = (Double) json.get("accountId");
         int accountId = accIdDouble.intValue();
         Context.accountId.set(accountId);
+
+        // Non-BulkUpdates payloads: handle before the List<BulkUpdates> parse below.
+        // Endpoint-shield logs are shipped as a single LogsEndpointShield POJO. When a buffer
+        // is supplied (main consumer loop) we accumulate per-account and flush one batched
+        // insertMany per poll; otherwise (e.g. fast-discovery consumer) fall back to a single
+        // w:1 insert. Either way this runs consumer-side, off the API request hot path.
+        if ("insertEndpointShieldLog".equals(triggerMethod)) {
+            LogsEndpointShield esLog = mapper.readValue(payload, LogsEndpointShield.class);
+            if (shieldLogBuffer != null) {
+                shieldLogBuffer.computeIfAbsent(accountId, k -> new ArrayList<>()).add(esLog);
+            } else {
+                DbLayer.insertEndpointShieldLog(esLog);
+            }
+            return;
+        }
+
+        if ("storeAgentQueryRecords".equals(triggerMethod)) {
+            List<AgentQueryRecord> agentQueryRecords = mapper.readValue(payload, new TypeReference<List<AgentQueryRecord>>(){});
+            esClientAction.setAgentQueryRecords(agentQueryRecords);
+            esClientAction.storeAgentQueryRecords();
+            return;
+        }
+
+        // TestingRunResult writes are raw-document inserts, not BulkUpdates filter+diff pairs, so
+        // they carry their own payload shape too. Reuse DbAction's conversion logic (workflow node
+        // remap, aiSummaryTraces placement, id conversions) by driving it through the same action
+        // methods the live HTTP endpoints call, instead of re-parsing straight into TestingRunResult.
+        if ("insertTestingRunResults".equals(triggerMethod)) {
+            BasicDBObject raw = gson.fromJson(payload, BasicDBObject.class);
+            dbAction.setTestingRunResult(raw);
+            dbAction.insertTestingRunResults();
+            return;
+        }
+
         List<BulkUpdates> bulkWrites = mapper.readValue(payload, new TypeReference<List<BulkUpdates>>(){});
 
-        // logger.info("Account id: " + accountId + " trigger method: " + triggerMethod);
-        // logger.info(" bulkWrites: \n");
-        // for(BulkUpdates update: bulkWrites){
-        //     logger.info(update.getFilters().toString() + " " + update.getUpdates().toString());
-        // }
-        // logger.info("\n");
 
         switch (triggerMethod) {
             case "bulkWriteSti":
@@ -264,6 +320,26 @@ public class KafkaUtils {
             default:
                 break;
         }
+    }
+
+    /**
+     * Flush the per-poll endpoint-shield log buffer: one batched, unordered, w:1 insertMany
+     * per account. Called once at the end of each consumer poll so a poll's worth of logs
+     * costs a single Mongo round trip instead of one insert per log.
+     */
+    public static void flushEndpointShieldLogs(Map<Integer, List<LogsEndpointShield>> shieldLogBuffer) {
+        if (shieldLogBuffer == null || shieldLogBuffer.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<Integer, List<LogsEndpointShield>> entry : shieldLogBuffer.entrySet()) {
+            try {
+                Context.accountId.set(entry.getKey());
+                DbLayer.insertEndpointShieldLogs(entry.getValue());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error flushing endpoint shield logs for account " + entry.getKey() + ": " + e);
+            }
+        }
+        shieldLogBuffer.clear();
     }
 
     /**
@@ -446,6 +522,26 @@ public class KafkaUtils {
         }
 
         insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertData");
+    }
+
+    /**
+     * Ship a single endpoint-shield log to Kafka (producer side) instead of writing to Mongo
+     * synchronously on the API request. The consumer service picks it up via
+     * parseAndTriggerWrites() and writes it to Mongo asynchronously, decoupling log volume
+     * from the request hot path and from Mongo write pressure. Routes to the same topic the
+     * main consumer reads (per-account topic when configured, else AKTO_KAFKA_TOPIC_NAME).
+     */
+    public void insertEndpointShieldLog(LogsEndpointShield log, int accountId) {
+        try {
+            if (accountIdSet != null && accountIdSet.contains(String.valueOf(accountId))) {
+                String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+                insertDataCore(log, "insertEndpointShieldLog", accountId, "", topicName, "kafka insertEndpointShieldLog (custom topic)");
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertEndpointShieldLog: " + e.toString());
+        }
+        insertDataCore(log, "insertEndpointShieldLog", accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertEndpointShieldLog");
     }
 
     public void insertDataSecondary(Object writes, String triggerMethod, int accountId) {

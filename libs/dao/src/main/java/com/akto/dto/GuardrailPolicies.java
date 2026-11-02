@@ -17,6 +17,7 @@ import com.mongodb.client.model.Projections;
 
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -45,6 +46,7 @@ public class GuardrailPolicies {
     
     // Step 3: Denied Topics
     private List<DeniedTopic> deniedTopics;
+    private List<String> enterpriseLicenseComplianceCategories;
     
     // Step 4: PII Detection
     private List<PiiType> piiTypes;
@@ -59,6 +61,8 @@ public class GuardrailPolicies {
     private Map<String, Object> contentFiltering;
 
     private LLMRule llmRule;
+    
+    private List<RedactionRule> redactionRules;
 
     // Step 7: Base Prompt Rule
     private BasePromptRule basePromptRule;
@@ -66,24 +70,34 @@ public class GuardrailPolicies {
     // Step 7.5: Gibberish Detection - ML-based detection of nonsensical text
     private GibberishDetection gibberishDetection;
     // Step 8.5: Token Limit - enforce token limits on user inputs
-    private TokenLimit tokenLimit;
+    private TokenLimitDetection tokenLimitDetection;
 
     // Step 7: Server and application settings (old format - backward compatibility)
     private List<String> selectedMcpServers;
     private List<String> selectedAgentServers;
     
-    // Step 6: Enhanced Server settings (new format with ID and name)
+    // Step 6: Enhanced Server settings. selectedAgentServersV2 = agents only; LLM entries live in selectedLlmServersV2 (split for independent matching/negation).
     private List<SelectedServer> selectedMcpServersV2;
     private List<SelectedServer> selectedAgentServersV2;
+    private List<SelectedServer> selectedLlmServersV2;
     private boolean applyOnResponse;
     private boolean applyOnRequest;
+
+    // Include/Exclude toggle per server list, independently matched by type; empty+negated matches everything, including future assets.
+    private boolean negatedAgentServers;
+    private boolean negatedMcpServers;
+    private boolean negatedLlmServers;
     
     // Step 7: URL and Confidence Score
     private String url;
     private double confidenceScore;
     
-    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, or {@code "alert"}. */
+    /** Policy-wide rule behaviour: {@code "block"}, {@code "warn"}, {@code "alert"}, or {@code "approval"}. */
     private String behaviour;
+
+    // Servers explicitly approved to bypass this policy's "approval" behaviour.
+    // Keyed logically by serverId (the request Host the enforcement layer matches on).
+    private List<ApprovedServer> approvedServers;
 
     // Step 8: Review and Finish
     private boolean active;
@@ -91,17 +105,73 @@ public class GuardrailPolicies {
     private CONTEXT_SOURCE contextSource;
 
     private SecretsDetection secretsDetection;
+    private BanCodeDetection banCodeDetection;
     private boolean applyToAllServers;
+
+    // applyToDeviceIds is resolved at fetch time (not stored) by the dashboard before serving to the enforcement layer.
+    // null  => no device/tag targeting configured => apply to all devices.
+    // list (even empty) => targeting configured; apply ONLY to these device ids.
+    //          An empty list here means 0 devices currently match the selected deviceIds/tags
+    //          (or resolution failed) => apply to none, NOT apply to all.
+    // Explicitly-picked device IDs (dashboard UI shows them labeled by username, but the stored
+    // value here is the device ID itself — usernames aren't a reliable unique identity).
+    private List<String> targetDeviceIds;
+
+    // Generic key-value targeting (team, role, department, arbitrary tags, ...), ported from the
+    // dashboard's DeviceTag redesign. Resolved the same way as targetDeviceIds above, via
+    // AgentUsersDao.findDeviceIdsByTags, and unioned with that result at fetch time.
+    private Map<String, List<String>> targetTags;
+
+    // Per-tag-key Include/Exclude, keyed like targetTags — per-key because keys AND together, so
+    // one flag could only negate the whole conjunction.
+    private Map<String, Boolean> negatedTargetTags;
+
+    // Include/Exclude for targetDeviceIds. Only one Device row can exist per policy, so unlike
+    // negatedTargetTags this doesn't need to be keyed.
+    private boolean negatedTargetDeviceIds;
+
+    @BsonIgnore
+    private List<String> applyToDeviceIds;
+
+    private List<AgenticUsers> userMetadata;
+
+    // Include/Exclude for userMetadata above. This branch predates targetUserNames (the dashboard
+    // never persists that field — @BsonIgnore there too, inbound-only), so there's no
+    // targetUserNames field here to pair it with; userMetadata is the only durable record. Without
+    // this field, the dashboard's negatedTargetUserNames=true was silently dropped when this DTO
+    // read the same Mongo doc — a policy configured as "exclude these 3" was enforced as "include
+    // only these 3" instead, since NegatedTargetUserNames never reached the Go validator.
+    private boolean negatedTargetUserNames;
+
 
     // Blocked host/path list — block-only glob patterns matched against the request host+path.
     // Object-shaped so it can be extended later without a data migration.
     private List<BlockedHostEntry> blockedHosts;
 
+    // When true, blockedHosts is an allow-list: hosts matching none of the entries are blocked.
+    private boolean blockedHostsAllowOnly;
+
+    // Exception phrases — stripped from the text (for evaluation only, never forwarded
+    // downstream) before every detector in this policy runs, to avoid false positives on
+    // known-safe strings (e.g. sample data, internal keywords). Applied as a union across
+    // all policies active for a given request; see guardrails-service validator for the
+    // actual redact/restore logic.
+    private List<IgnorePhrase> ignorePhrases;
+
     // Block personal / consumer accounts (non-enterprise email-type users).
     private boolean blockPersonalAccounts;
 
+    // Block public sharing of chats/artifacts
+    private boolean blockPublicShare;
+
+    // Anomaly detection configuration (tool-call rate limiting, error storm detection).
+    private AnomalyDetection anomalyDetection;
+
     // Modal config
     private ArrayList<ModelConfig> modelConfigs;
+
+    // Skip this policy for enterprise (work email) accounts.
+    private boolean skipEnterpriseAccounts;
 
     public String getHexId() {
         if (this.id != null) {
@@ -133,37 +203,67 @@ public class GuardrailPolicies {
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        if (applyToAllServers && "block".equals(this.behaviour)) {
-            return fetchApplicableServersByTag(Constants.AKTO_MCP_SERVER_TAG);
-        }
         return new ArrayList<>();
+        // if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+        //     return new ArrayList<>();
+        // }
+        // if (!applyToAllServers) {
+        //     return new ArrayList<>();
+        // }
+        // return fetchApplicableServersByContext(Constants.AKTO_MCP_SERVER_TAG);
     }
 
     public List<SelectedServer> getEffectiveSelectedAgentServers() {
         if (selectedAgentServersV2 != null && !selectedAgentServersV2.isEmpty()) {
             return selectedAgentServersV2;
         }
+
+        if (selectedLlmServersV2 != null) {
+            return new ArrayList<>();
+        }
         if (selectedAgentServers != null && !selectedAgentServers.isEmpty()) {
             return selectedAgentServers.stream()
                     .map(serverId -> new SelectedServer(serverId, serverId))
                     .collect(java.util.stream.Collectors.toList());
         }
-        if (applyToAllServers && "block".equals(this.behaviour)) {
-            return fetchApplicableServersByTag(Constants.AKTO_GEN_AI_TAG);
+        return new ArrayList<>();
+        // if (contextSource != null && contextSource != CONTEXT_SOURCE.AGENTIC) {
+        //     return new ArrayList<>();
+        // }
+        // if (!applyToAllServers) {
+        //     return new ArrayList<>();
+        // }
+        // return fetchApplicableServersByContext(Constants.AKTO_GEN_AI_TAG);
+    }
+
+    // No legacy fallback — this list is new, there's no old-format data to fall back to.
+    public List<SelectedServer> getEffectiveSelectedLlmServers() {
+        if (selectedLlmServersV2 != null) {
+            return selectedLlmServersV2;
         }
         return new ArrayList<>();
     }
 
-    // called only when applyToAllServers + block mode: returns inline-mode servers of the given type
-    private List<SelectedServer> fetchApplicableServersByTag(String serverTypeTag) {
+    // filters collections by the policy's contextSource tag (key="source", value=contextSource.name())
+    // excludes Atlas/endpoint collections (source=ENDPOINT); returns inline-only when behaviour is "block"
+    private List<SelectedServer> fetchApplicableServersByContext(String serverTypeTag) {
+        if (contextSource == null) return new ArrayList<>();
+        boolean isBlock = "block".equals(this.behaviour);
         Bson filter = Filters.and(
-                Filters.elemMatch(ApiCollection.TAGS_STRING,
-                        Filters.eq(CollectionTags.KEY_NAME, serverTypeTag)),
-                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
-                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
-                        Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_INLINE)
-                ))
+                (Filters.elemMatch(ApiCollection.TAGS_STRING, 
+                    Filters.eq(CollectionTags.KEY_NAME, serverTypeTag))
+                ),
+                Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                        Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_COLLECTION_CONTEXT_TAG_KEY),
+                        Filters.eq(CollectionTags.VALUE, CONTEXT_SOURCE.ENDPOINT.name())
+                )))
         );
+        if (isBlock) {
+            filter = Filters.and(filter, Filters.not(Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.and(
+                    Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GUARDRAIL_MODE),
+                    Filters.eq(CollectionTags.VALUE, Constants.AKTO_GUARDRAIL_MODE_OBSERVE)
+            ))));
+        }
         return ApiCollectionsDao.instance.findAll(filter, Projections.include(ApiCollection.ID, "name"))
                 .stream()
                 .map(c -> new SelectedServer(String.valueOf(c.getId()), c.getName()))
@@ -174,7 +274,7 @@ public class GuardrailPolicies {
                            int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection,
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
                            List<String> regexPatterns, List<RegexPattern> regexPatternsV2, Map<String, Object> contentFiltering,
-                           LLMRule llmRule, GibberishDetection gibberishDetection, TokenLimit tokenLimit,
+                           LLMRule llmRule, GibberishDetection gibberishDetection, TokenLimitDetection tokenLimitDetection,
                            List<String> selectedMcpServers, List<String> selectedAgentServers,
                            List<SelectedServer> selectedMcpServersV2, List<SelectedServer> selectedAgentServersV2,
                            boolean applyOnResponse, boolean applyOnRequest, String url, double confidenceScore, boolean active) {
@@ -195,7 +295,7 @@ public class GuardrailPolicies {
         this.contentFiltering = contentFiltering;
         this.llmRule = llmRule;
         this.gibberishDetection = gibberishDetection;
-        this.tokenLimit = tokenLimit;
+        this.tokenLimitDetection = tokenLimitDetection;
         this.selectedMcpServers = selectedMcpServers;
         this.selectedAgentServers = selectedAgentServers;
         this.selectedMcpServersV2 = selectedMcpServersV2;
@@ -214,11 +314,13 @@ public class GuardrailPolicies {
         private String topic;
         private String description;
         private List<String> samplePhrases;
+        private String origin;
 
-        public DeniedTopic(String topic, String description, List<String> samplePhrases) {
+        public DeniedTopic(String topic, String description, List<String> samplePhrases, String origin) {
             this.topic = topic;
             this.description = description;
             this.samplePhrases = samplePhrases;
+            this.origin = origin;
         }
     }
 
@@ -264,6 +366,39 @@ public class GuardrailPolicies {
         }
     }
 
+    /** How long an approved server is allowed to bypass an "approval" behaviour. */
+    public enum ApprovalMode {
+        ALWAYS,   // never expires
+        COUNT,    // allowed for a fixed number of future violations (expiredAfter); Phase 2
+        DURATION  // allowed until a wall-clock time (expiredAt)
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class ApprovedServer {
+        private String serverId;        // the request Host (matches enforcement-layer server matching)
+        private String serverName;      // display only
+        // Stored as the ApprovalMode name ("ALWAYS"/"DURATION"/"COUNT"). Kept as a String, NOT the
+        // enum, because the Mongo driver has no codec for a bare enum value.
+        private String mode;
+        private int expiredAfter;       // COUNT mode: remaining allowed violations
+        private long expiredAt;         // DURATION mode: epoch seconds; valid while now < expiredAt
+        private long approvedAt;
+        private String approvedBy;
+
+        public ApprovedServer(String serverId, String serverName, String mode,
+                              int expiredAfter, long expiredAt, long approvedAt, String approvedBy) {
+            this.serverId = serverId;
+            this.serverName = serverName;
+            this.mode = mode;
+            this.expiredAfter = expiredAfter;
+            this.expiredAt = expiredAt;
+            this.approvedAt = approvedAt;
+            this.approvedBy = approvedBy;
+        }
+    }
+
     /**
      * A single blocked host entry (block-only). {@code pattern} is a glob matched against the
      * request's {@code host + path}, where {@code *} matches any sequence (e.g. "chatgpt.com/*",
@@ -280,6 +415,42 @@ public class GuardrailPolicies {
         }
     }
 
+    /**
+     * A single exception phrase for this policy. Matched occurrences are stripped from the
+     * text before any detector in this policy evaluates it; the original text is always
+     * restored before anything is forwarded downstream (see guardrails-service validator).
+     */
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class IgnorePhrase {
+        private String phrase;
+        // Lombok's boolean accessor rules would generate isRegex()/setRegex() for a field
+        // named "isRegex" — java.beans.Introspector (used by struts2-json-plugin) then infers
+        // the bean property name as "regex", not "isRegex", so JSON {"isRegex": true} silently
+        // fails to bind and this field stays false. Same fix as ApiInfo.isSensitive: exclude
+        // from Lombok and hand-write getIsRegex()/setIsRegex() so the property name matches
+        // the "isRegex" JSON key used by the dashboard and guardrails-service.
+        @Getter(AccessLevel.NONE)
+        @Setter(AccessLevel.NONE)
+        private boolean isRegex;       // false = literal substring match
+        private boolean caseSensitive; // default false
+
+        public IgnorePhrase(String phrase, boolean isRegex, boolean caseSensitive) {
+            this.phrase = phrase;
+            this.isRegex = isRegex;
+            this.caseSensitive = caseSensitive;
+        }
+
+        public boolean getIsRegex() {
+            return isRegex;
+        }
+
+        public void setIsRegex(boolean isRegex) {
+            this.isRegex = isRegex;
+        }
+    }
+
     @Getter
     @Setter
     @NoArgsConstructor
@@ -289,6 +460,21 @@ public class GuardrailPolicies {
         private double confidenceScore;
 
         public LLMRule(boolean enabled, String userPrompt, double confidenceScore) {
+            this.enabled = enabled;
+            this.userPrompt = userPrompt;
+            this.confidenceScore = confidenceScore;
+        }
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    public static class RedactionRule {
+        private boolean enabled;
+        private String userPrompt;
+        private double confidenceScore;
+
+        public RedactionRule(boolean enabled, String userPrompt, double confidenceScore) {
             this.enabled = enabled;
             this.userPrompt = userPrompt;
             this.confidenceScore = confidenceScore;
@@ -325,24 +511,24 @@ public class GuardrailPolicies {
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class TokenLimit {
+    public static class SecretsDetection {
         private boolean enabled;
-        private int threshold;
+        private double confidenceScore;
 
-        public TokenLimit(boolean enabled, int threshold) {
+        public SecretsDetection(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
-            this.threshold = threshold;
+            this.confidenceScore = confidenceScore;
         }
     }
 
     @Getter
     @Setter
     @NoArgsConstructor
-    public static class SecretsDetection {
+    public static class BanCodeDetection {
         private boolean enabled;
         private double confidenceScore;
 
-        public SecretsDetection(boolean enabled, double confidenceScore) {
+        public BanCodeDetection(boolean enabled, double confidenceScore) {
             this.enabled = enabled;
             this.confidenceScore = confidenceScore;
         }
@@ -364,14 +550,10 @@ public class GuardrailPolicies {
     @Getter
     @Setter
     @NoArgsConstructor
+    @AllArgsConstructor
     public static class TokenLimitDetection {
         private boolean enabled;
-        private double confidenceScore;
-
-        public TokenLimitDetection(boolean enabled, double confidenceScore) {
-            this.enabled = enabled;
-            this.confidenceScore = confidenceScore;
-        }
+        private int threshold;
     }
 
     public enum ModelRole {
@@ -393,6 +575,16 @@ public class GuardrailPolicies {
         private ModelRole modelRole;
         private String attackType;
         private double safeDecisionThreshold;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AnomalyDetection {
+        private boolean enabled;
+        private int toolCallLimit;        // total tool calls per session before triggering
+        private int errorLimit;           // total errors per session before triggering
     }
 
 }

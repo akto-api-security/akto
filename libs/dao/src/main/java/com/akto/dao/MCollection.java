@@ -1,6 +1,7 @@
 package com.akto.dao;
 
 import com.mongodb.BasicDBObject;
+import com.mongodb.WriteConcern;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.*;
 import com.mongodb.client.model.*;
@@ -37,6 +38,14 @@ public abstract class MCollection<T> {
     public Document getStats() {
         MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
         return mongoDatabase.runCommand(new Document("serverStatus",1));
+    }
+
+    // Lightweight connectivity check. Unlike serverStatus (a privileged admin command that
+    // Amazon DocumentDB rejects with "Authorization failure" for non-admin users), {ping:1}
+    // requires no privileges and is supported by both MongoDB and DocumentDB.
+    public Document pingDb() {
+        MongoDatabase mongoDatabase = clients[0].getDatabase(getDBName());
+        return mongoDatabase.runCommand(new Document("ping", 1));
     }
 
     public boolean isCapped() {
@@ -222,9 +231,24 @@ public abstract class MCollection<T> {
         return getMCollection().insertOne(elem);
     }
 
+    // Overload allowing a per-call write concern. Use a relaxed concern (e.g. WriteConcern.W1)
+    // for high-volume, non-critical writes such as logs so inserts don't block waiting for
+    // majority acknowledgement from lagging secondaries.
+    public InsertOneResult insertOne(T elem, WriteConcern writeConcern) {
+        return getMCollection().withWriteConcern(writeConcern).insertOne(elem);
+    }
+
     public InsertManyResult insertMany(List<T> elems) {
 
         return getMCollection().insertMany(elems);
+    }
+
+    public InsertManyResult insertMany(List<T> elems, WriteConcern writeConcern) {
+        return getMCollection().withWriteConcern(writeConcern).insertMany(elems);
+    }
+
+    public InsertManyResult insertMany(List<T> elems, WriteConcern writeConcern, InsertManyOptions options) {
+        return getMCollection().withWriteConcern(writeConcern).insertMany(elems, options);
     }
 
 

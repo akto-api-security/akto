@@ -75,6 +75,41 @@ public class CrawlerRun {
     public static final String SELECTED_MINI_TESTING_SERVICE = "selectedMiniTestingService";
     private String selectedMiniTestingService;
 
+    public static final String TEST_ROLE_HEX_ID = "testRoleHexId";
+    private String testRoleHexId;
+
+    public static final String USER_PROMPT = "userPrompt";
+    private String userPrompt;
+
+    public static final String ENABLE_AI_JS_DISCOVERY = "enableAiJsDiscovery";
+    private boolean enableAiJsDiscovery;
+
+    public static final String CRAWL_MODE = "crawlMode";
+    private String crawlMode;
+
+    public static final String RESPECT_ROBOTS = "respectRobots";
+    private Boolean respectRobots;
+
+    public static final String AI_PRIORITIZE = "aiPrioritize";
+    private Boolean aiPrioritize;
+
+    public static final String SCREENCAST_ENABLED = "screencastEnabled";
+    private Boolean screencastEnabled;
+
+    public static final String STRICT_HOST_SCOPE = "strictHostScope";
+    private Boolean strictHostScope;
+
+    // Set to true when the configured test role could not authenticate before the crawl.
+    public static final String TEST_ROLE_FAILED = "testRoleFailed";
+    private boolean testRoleFailed;
+
+    public static final String TEST_ROLE_ERROR = "testRoleError";
+    private String testRoleError;
+
+    // Mermaid flowchart source of the page-to-page navigation graph, uploaded at end of crawl.
+    public static final String NAVIGATION_GRAPH = "navigationGraph";
+    private String navigationGraph;
+
     public CrawlerRun() {
     }
 
@@ -89,7 +124,7 @@ public class CrawlerRun {
     }
 
     public enum CrawlerRunStatus {
-        PENDING, RUNNING, COMPLETED, FAILED
+        PENDING, RUNNING, COMPLETED, FAILED, STOP_REQUESTED, STOPPED
     }
 
     @Override
@@ -101,7 +136,7 @@ public class CrawlerRun {
                 ", crawlId='" + crawlId + '\'' +
                 ", hostname='" + hostname + '\'' +
                 ", outScopeUrls=" + outScopeUrls +
-                ", status='" + status.name() + '\'' +
+                ", status='" + (status != null ? status.name() : "null") + '\'' +
                 ", moduleName='" + moduleName + '\'' +
                 ", runTestAfterCrawling='" + runTestAfterCrawling + '\'' +
                 '}';

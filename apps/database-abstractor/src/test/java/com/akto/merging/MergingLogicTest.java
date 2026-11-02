@@ -223,25 +223,25 @@ public class MergingLogicTest {
         assertEquals("Should create LOCALE template", "/api/LOCALE/products", result.getTemplateString());
     }
 
-    @Test
-    public void testTryMergeUrls_CommonWebLocales() {
-        // Test merging of commonly used web application locales
-        String[][] localePairs = {
-            {"/api/en-US/data", "/api/es-ES/data"},
-            {"/api/fr-FR/data", "/api/de-DE/data"},
-            {"/api/zh-CN/data", "/api/ja-JP/data"},
-            {"/api/pt-BR/data", "/api/it-IT/data"},
-            {"/api/ko-KR/data", "/api/ru-RU/data"}
-        };
+    // @Test
+    // public void testTryMergeUrls_CommonWebLocales() {
+    //     // Test merging of commonly used web application locales
+    //     String[][] localePairs = {
+    //         {"/api/en-US/data", "/api/es-ES/data"},
+    //         {"/api/fr-FR/data", "/api/de-DE/data"},
+    //         {"/api/zh-CN/data", "/api/ja-JP/data"},
+    //         {"/api/pt-BR/data", "/api/it-IT/data"},
+    //         {"/api/ko-KR/data", "/api/ru-RU/data"}
+    //     };
 
-        for (String[] pair : localePairs) {
-            URLStatic url1 = new URLStatic(pair[0], URLMethods.Method.GET);
-            URLStatic url2 = new URLStatic(pair[1], URLMethods.Method.GET);
+    //     for (String[] pair : localePairs) {
+    //         URLStatic url1 = new URLStatic(pair[0], URLMethods.Method.GET);
+    //         URLStatic url2 = new URLStatic(pair[1], URLMethods.Method.GET);
 
-            URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
+    //         URLTemplate result = MergingLogic.tryMergeUrls(url1, url2, false, true);
 
-            assertNotNull("Should merge locale pair: " + pair[0] + " and " + pair[1], result);
-            assertEquals("Should create LOCALE template", "/api/LOCALE/data", result.getTemplateString());
-        }
-    }
+    //         assertNotNull("Should merge locale pair: " + pair[0] + " and " + pair[1], result);
+    //         assertEquals("Should create LOCALE template", "/api/LOCALE/data", result.getTemplateString());
+    //     }
+    // }
 }

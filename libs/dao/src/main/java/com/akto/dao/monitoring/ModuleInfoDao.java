@@ -1,10 +1,20 @@
 package com.akto.dao.monitoring;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.monitoring.ModuleInfo.ModuleType;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Projections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.bson.conversions.Bson;
 
 public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     @Override
@@ -18,6 +28,8 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     }
 
     private static final int INACTIVE_THRESHOLD = 5 * 60; // 5 minutes
+    
+    public static final long MODULE_INFO_TTL_MS = 4 * 24 * 60 * 60 * 1000;
 
     public boolean checkIsModuleActiveUsingName(ModuleType moduleType, String moduleName) {
         ModuleInfo moduleInfo = instance.findOne(Filters.and(
@@ -27,8 +39,53 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
         return moduleInfo != null;
     }
 
+    public void createIndicesIfAbsent() {
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { ModuleInfo.MODULE_TYPE, ModuleInfo._REBOOT, ModuleInfo.MINI_RUNTIME_NAME }, false);
+        
+        Bson ttlIndex = Indexes.ascending(ModuleInfo.EXPIRES_AT);
+        IndexOptions ttlOptions = new IndexOptions()
+                .name("expiresAt_ttl")
+                .expireAfter(0L, java.util.concurrent.TimeUnit.SECONDS);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), ttlIndex, ttlOptions);
+    }
+
     @Override
     public Class<ModuleInfo> getClassT() {
         return ModuleInfo.class;
+    }
+
+    // Ported from the dashboard's AgentUsersDao.findDeviceIdsByTags live-device join — module_info
+    // is updated on every heartbeat, unlike AgenticUsers.devices which is only ever backfilled
+    // once, so guardrail tag-targeting resolves against this instead of the stored field.
+    public Map<String, Set<String>> fetchUsernameToDeviceIdsForEndpointShield() {
+        List<ModuleInfo> modules = findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD),
+            Projections.include(ModuleInfo.NAME, ModuleInfo.ADDITIONAL_DATA));
+        Map<String, Set<String>> result = new HashMap<>();
+        for (ModuleInfo m : modules) {
+            Map<String, Object> ad = m.getAdditionalData();
+            if (ad == null || ad.get("username") == null) continue;
+            String username = String.valueOf(ad.get("username")).trim();
+            String deviceId = m.getName() == null ? "" : m.getName().trim();
+            if (username.isEmpty() || deviceId.isEmpty()) continue;
+            result.computeIfAbsent(username, k -> new HashSet<>()).add(deviceId);
+        }
+        return result;
+    }
+
+    // Ported from the dashboard: each username's reported email.
+    public Map<String, String> fetchUsernameToEmailForEndpointShield() {
+        List<ModuleInfo> modules = findAll(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleType.MCP_ENDPOINT_SHIELD),
+            Projections.include(ModuleInfo.ADDITIONAL_DATA));
+        Map<String, String> result = new HashMap<>();
+        for (ModuleInfo m : modules) {
+            Map<String, Object> ad = m.getAdditionalData();
+            if (ad == null || ad.get("username") == null || ad.get("email") == null) continue;
+            String username = String.valueOf(ad.get("username")).trim();
+            String email = String.valueOf(ad.get("email")).trim();
+            if (username.isEmpty() || email.isEmpty()) continue;
+            result.putIfAbsent(username, email);
+        }
+        return result;
     }
 }

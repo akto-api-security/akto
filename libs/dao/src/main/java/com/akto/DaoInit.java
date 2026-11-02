@@ -4,6 +4,7 @@ import com.akto.dao.*;
 import com.akto.dao.agentic_sessions.SessionDocumentDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.JobsDao;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -65,6 +66,7 @@ import com.akto.util.EnumCodec;
 import com.akto.util.LastCronRunInfo;
 import com.akto.dto.agents.Model;
 import com.akto.dto.agents.ModelType;
+import com.akto.dto.agents.LlmServiceConfig;
 import com.akto.dto.Attempt.AttemptResult;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.DependencyNode.ParamInfo;
@@ -169,6 +171,7 @@ public class DaoInit {
                 .enableDiscriminator(true).build();
         ClassModel<LoginRequestAuthParam> loginReqAuthParamClassModel = ClassModel.builder(LoginRequestAuthParam.class)
                 .enableDiscriminator(true).build();
+        ClassModel<CopilotOAuthAuthParam> copilotOAuthAuthParamClassModel = ClassModel.builder(CopilotOAuthAuthParam.class).enableDiscriminator(true).build();
         ClassModel<TestingEndpoints> testingEndpointsClassModel = ClassModel.builder(TestingEndpoints.class)
                 .enableDiscriminator(true).build();
         ClassModel<CustomTestingEndpoints> customTestingEndpointsClassModel = ClassModel
@@ -289,6 +292,8 @@ public class DaoInit {
         ClassModel<ApiSequences> apiSequencesClassModel = ClassModel.builder(ApiSequences.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
         ClassModel<DeviceDomainConfig> deviceDomainConfigClassModel = ClassModel.builder(DeviceDomainConfig.class).enableDiscriminator(true).build();
+        ClassModel<EndpointCaRoot> endpointCaRootClassModel = ClassModel.builder(EndpointCaRoot.class).enableDiscriminator(true).build();
+        ClassModel<EndpointDeviceCa> endpointDeviceCaClassModel = ClassModel.builder(EndpointDeviceCa.class).enableDiscriminator(true).build();
         ClassModel<NewRelicIntegration> newRelicIntegrationClassModel = ClassModel.builder(NewRelicIntegration.class).enableDiscriminator(true).build();
         ClassModel<OpenTelemetryIntegration> openTelemetryIntegrationClassModel = ClassModel.builder(OpenTelemetryIntegration.class).enableDiscriminator(true).build();
         ClassModel<EndpointShieldSettings> endpointShieldSettingsClassModel = ClassModel.builder(EndpointShieldSettings.class).enableDiscriminator(true).build();
@@ -298,6 +303,10 @@ public class DaoInit {
         ClassModel<BlockedToken> blockedTokenClassModel = ClassModel.builder(BlockedToken.class).enableDiscriminator(true).build();
         ClassModel<EndpointRemoteCommand> endpointRemoteCommandClassModel = ClassModel.builder(EndpointRemoteCommand.class).enableDiscriminator(true).build();
         ClassModel<EndpointRemoteCommandExecution> endpointRemoteCommandExecutionClassModel = ClassModel.builder(EndpointRemoteCommandExecution.class).enableDiscriminator(true).build();
+        ClassModel<CopilotStudioIntegration> copilotStudioIntegrationClassModel = ClassModel.builder(CopilotStudioIntegration.class).enableDiscriminator(true).build();
+        ClassModel<EndpointAgentOrganization> endpointAgentOrganizationClassModel = ClassModel.builder(EndpointAgentOrganization.class).enableDiscriminator(true).build();
+        ClassModel<EndpointShieldDiagnostic> endpointShieldDiagnosticClassModel = ClassModel.builder(EndpointShieldDiagnostic.class).enableDiscriminator(true).build();
+        ClassModel<LlmServiceConfig> llmServiceConfigClassModel = ClassModel.builder(LlmServiceConfig.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -310,7 +319,7 @@ public class DaoInit {
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
                 testingRunResultClassModel, testResultClassModel, genericTestResultClassModel,
-                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel, sampleDataAuthParamClassModel,
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel, sampleDataAuthParamClassModel, copilotOAuthAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, multiCollectionTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
@@ -329,9 +338,9 @@ public class DaoInit {
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
                 riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, sensitiveDataEndpointsClassModel, unauthenticatedEndpointsClassModel, allApisGroupClassModel,
                 RuntimeMetricsClassModel, jobsParam, ModuleInfoClassModel,fileClassModel, tlsAuthClassModel, apiHitCountInfoClassModel, collectionTagsModel, hostRegexTestingEndpointsClassModel, tagsTestingEndpointsClassModel
-                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel
+                , authTypeTestingEndpointsClassModel, accessTypeTestingEndpointsClassModel, logsEndpointShieldClassModel, proxyPatternInfoClassModel, apiSequencesClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel, endpointCaRootClassModel, endpointDeviceCaClassModel
                 , newRelicIntegrationClassModel, openTelemetryIntegrationClassModel, endpointShieldSettingsClassModel, platformShieldConfigClassModel, modelConfigClassModel, blockedTokenClassModel, agentModelClassModel
-                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel).automatic(true).build());
+                , endpointRemoteCommandClassModel, endpointRemoteCommandExecutionClassModel, copilotStudioIntegrationClassModel, endpointAgentOrganizationClassModel, endpointShieldDiagnosticClassModel, llmServiceConfigClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),
@@ -382,7 +391,9 @@ public class DaoInit {
                 new EnumCodec<>(GuardrailPolicies.ModelRole.class),
                 new EnumCodec<>(EndpointRemoteCommand.Status.class),
                 new EnumCodec<>(EndpointRemoteCommand.TargetType.class),
-                new EnumCodec<>(EndpointRemoteCommandExecution.Status.class)
+                new EnumCodec<>(EndpointRemoteCommandExecution.Status.class),
+                new EnumCodec<>(Log.ActivityType.class),
+                new EnumCodec<>(CopilotStudioIntegration.Status.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -390,20 +401,55 @@ public class DaoInit {
     }
 
     public static void init(ConnectionString connectionString, ReadPreference readPreference) {
+        init(connectionString, readPreference, null, null);
+    }
+
+    /**
+     * Same as {@link #init(ConnectionString, ReadPreference)} but lets the caller attach Mongo driver
+     * listeners (e.g. Micrometer's MongoMetricsCommandListener / MongoMetricsConnectionPoolListener)
+     * for metrics. Listener types are the Mongo driver interfaces, so libs/dao stays free of any
+     * metrics dependency — the caller (which has Micrometer) constructs them.
+     */
+    public static void init(ConnectionString connectionString, ReadPreference readPreference,
+                            java.util.List<com.mongodb.event.CommandListener> commandListeners,
+                            java.util.List<com.mongodb.event.ConnectionPoolListener> connectionPoolListeners) {
         DbMode.refreshDbType(connectionString.getConnectionString());
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
-        MongoClientSettings clientSettings = MongoClientSettings.builder()
+        MongoClientSettings.Builder builder = MongoClientSettings.builder()
                 .readPreference(readPreference)
                 .applyConnectionString(connectionString)
-                .codecRegistry(codecRegistry)
-                .build();
+                .codecRegistry(codecRegistry);
 
-        clients[0] = MongoClients.create(clientSettings);
+        if (commandListeners != null) {
+            for (com.mongodb.event.CommandListener listener : commandListeners) {
+                builder.addCommandListener(listener);
+            }
+        }
+        if (connectionPoolListeners != null && !connectionPoolListeners.isEmpty()) {
+            builder.applyToConnectionPoolSettings(s -> {
+                for (com.mongodb.event.ConnectionPoolListener listener : connectionPoolListeners) {
+                    s.addConnectionPoolListener(listener);
+                }
+            });
+        }
+
+        clients[0] = com.akto.util.DbNames.wrap(MongoClients.create(builder.build()));
     }
+
     public static void init(ConnectionString connectionString) {
         init(connectionString, ReadPreference.secondary());
+    }
+
+    /**
+     * Convenience for callers that want the default ReadPreference (secondary) but still attach
+     * Mongo driver listeners (e.g. Micrometer metrics). Mirrors {@link #init(ConnectionString)}.
+     */
+    public static void init(ConnectionString connectionString,
+                            java.util.List<com.mongodb.event.CommandListener> commandListeners,
+                            java.util.List<com.mongodb.event.ConnectionPoolListener> connectionPoolListeners) {
+        init(connectionString, ReadPreference.secondary(), commandListeners, connectionPoolListeners);
     }
 
     public static void createIndices() {
@@ -425,7 +471,10 @@ public class DaoInit {
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         RuntimePersistentLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
+        DastLogsDao.instance.createIndicesIfAbsent();
+        MiniTestingOrchestratorLogsDao.instance.createIndicesIfAbsent();
         AgenticTestingLogsDao.instance.createIndicesIfAbsent();
+        SmartTestingLogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
@@ -451,8 +500,12 @@ public class DaoInit {
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
         TestingRunWebhookDao.instance.createIndicesIfAbsent();
         ApiSequencesDao.instance.createIndicesIfAbsent();
+        SequenceCountDao.instance.createIndicesIfAbsent();
+        SequenceModelDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
+        EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
+        ModuleInfoDao.instance.createIndicesIfAbsent();
     }
 
 }

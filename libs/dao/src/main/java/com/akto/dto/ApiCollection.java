@@ -72,6 +72,9 @@ public class ApiCollection {
     @Setter
     private String description;
 
+    public static final String IS_OUT_OF_TESTING_SCOPE = "isOutOfTestingScope";
+    private boolean isOutOfTestingScope;
+
     public enum AccessType {
         INTERNAL("Internal"),
         THIRD_PARTY("Third party"),
@@ -529,4 +532,11 @@ public class ApiCollection {
         this.serviceGraphEdges = serviceGraphEdges;
     }
 
+    public boolean getIsOutOfTestingScope() {
+        return isOutOfTestingScope;
+    }
+
+    public void setIsOutOfTestingScope(boolean isOutOfTestingScope) {
+        this.isOutOfTestingScope = isOutOfTestingScope;
+    }
 }

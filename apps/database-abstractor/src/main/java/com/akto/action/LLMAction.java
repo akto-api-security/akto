@@ -1,8 +1,7 @@
 package com.akto.action;
 
-import com.akto.dao.agents.AgentModelDao;
-import com.akto.dto.agents.Model;
-import com.akto.dto.agents.ModelType;
+import com.akto.llm.ModelTier;
+import com.akto.llm.ServiceKey;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -11,12 +10,10 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.Getter;
 import lombok.Setter;
-import okhttp3.Headers;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -40,14 +37,6 @@ public class LLMAction extends ActionSupport {
         .build();
     private static final String OLLAMA_SERVER_ENDPOINT = buildLlmServerUrl();
 
-    // Azure Open AI urls
-    private static final String AZURE_API_ENDPOINT = "%s/openai/deployments/%s/chat/completions?api-version=%s";
-    private static final String AZURE_OPENAI_HOST = System.getenv().getOrDefault("AZURE_OPENAI_HOST", "");
-    private static final String AZURE_OPENAI_DEPLOYMENT = System.getenv().getOrDefault("AZURE_OPENAI_DEPLOYMENT", "");
-    private static final String AZURE_OPENAI_API_KEY = System.getenv().getOrDefault("AZURE_OPENAI_API_KEY", "");
-    private static final String AZURE_OPENAI_API_VERSION = System.getenv().getOrDefault("AZURE_OPENAI_API_VERSION", "");
-
-
     private static String buildLlmServerUrl() {
         String serverEndpoint = JARVIS_ENDPOINT;
         String userServerEndpoint = System.getenv("OLLAMA_SERVER_ENDPOINT");
@@ -66,33 +55,78 @@ public class LLMAction extends ActionSupport {
 
     Map<String, Object> llmResponsePayload;
 
+    // V2: optional, falls back to the legacy default chain. V3: required, see getLLMResponseV3.
+    // See ServiceKey.externallySelectable.
+    String serviceKey;
+
+    // V3 only
+    String prompt;
+    String content;
+
     public String getLLMResponse() {
         return executeLLMRequest(OLLAMA_SERVER_ENDPOINT, null, null);
     }
 
     public String getLLMResponseV2() {
-        Map<String, String> headers = new HashMap<>();
-
-        Model model = AgentModelDao.instance.findOne(AgentModelDao.instance.filterByType(ModelType.MISTRAL_AI));
-        String endpoint = "";
-        try {
-            endpoint = buildAzureOpenAIUrl();
-        } catch (Exception e) { logger.error(e.getMessage()); }
-        String apiKey = AZURE_OPENAI_API_KEY;
-        String modelNameFinal = "";
-        if(model != null) {
-            endpoint = model.getParams().getOrDefault("azureOpenAIEndpoint", "");
-            apiKey = model.getParams().getOrDefault("apiKey", "");
-            headers.put("authorization", apiKey);
-            String modelName = model.getParams().getOrDefault("model", "");
-            if(modelName != null && !modelName.isEmpty()){
-                modelNameFinal = modelName;
-            }
+        if (llmPayload == null || llmPayload.isEmpty()) {
+            logger.error("LLM payload is empty or null");
+            return Action.ERROR.toUpperCase();
         }
 
-        headers.put("api-key", apiKey);
+        try {
+            llmResponsePayload = LLMService.callLLM(llmPayload, resolveServiceKey(), ModelTier.GPT_4O_MINI);
+            if (llmResponsePayload == null) {
+                logger.error("Empty LLM response");
+                return Action.ERROR.toUpperCase();
+            }
+            logger.debug("LLM Response: {}", llmResponsePayload);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error while executing request: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
 
-        return executeLLMRequest(endpoint, headers, modelNameFinal);
+    /**
+     * V3: a plain prompt in, plain content out (response: {@code {"content": "..."}}). Unlike V2,
+     * serviceKey is required here — V3 has no legacy caller to be backward-compatible with, so there's
+     * no reason to silently fall back to the default chain for a missing/unrecognized one.
+     */
+    public String getLLMResponseV3() {
+        if (prompt == null || prompt.trim().isEmpty()) {
+            addActionError("prompt is required");
+            logger.error("prompt is empty or null");
+            return Action.ERROR.toUpperCase();
+        }
+
+        ServiceKey requested = ServiceKey.fromKey(serviceKey);
+        if (requested == null || !requested.isExternallySelectable()) {
+            addActionError("serviceKey is required and must be a valid, externally-selectable key");
+            logger.error("Invalid or missing serviceKey: " + serviceKey);
+            return Action.ERROR.toUpperCase();
+        }
+
+        try {
+            content = LLMService.callLLMSimple(prompt, requested, ModelTier.GPT_4O_MINI);
+            if (content == null) {
+                logger.error("Empty LLM response");
+                return Action.ERROR.toUpperCase();
+            }
+            logger.debug("LLM Response: {}", content);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error while executing request: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    // package-private (not private) so LLMActionTest can exercise it directly
+    ServiceKey resolveServiceKey() {
+        ServiceKey requested = ServiceKey.fromKey(serviceKey);
+        if (requested != null && requested.isExternallySelectable()) {
+            return requested;
+        }
+        return ServiceKey.DEFAULT;
     }
 
     private String executeLLMRequest(String endpoint, Map<String, String> additionalHeaders, String modelName) {
@@ -147,26 +181,5 @@ public class LLMAction extends ActionSupport {
             logger.error("Error while executing request: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
-    }
-
-    private static String buildAzureOpenAIUrl() {
-        if (AZURE_OPENAI_HOST == null || AZURE_OPENAI_HOST.isEmpty()) {
-            throw new RuntimeException("AZURE_OPENAI_HOST environment variable is not set");
-        }
-        if (AZURE_OPENAI_DEPLOYMENT == null || AZURE_OPENAI_DEPLOYMENT.isEmpty()) {
-            throw new RuntimeException("AZURE_OPENAI_DEPLOYMENT environment variable is not set");
-        }
-        if (AZURE_OPENAI_API_KEY == null || AZURE_OPENAI_API_KEY.isEmpty()) {
-            throw new RuntimeException("AZURE_OPENAI_API_KEY environment variable is not set");
-        }
-
-        String apiVersion = AZURE_OPENAI_API_VERSION != null && !AZURE_OPENAI_API_VERSION.isEmpty()
-            ? AZURE_OPENAI_API_VERSION
-            : "2024-04-01-preview";
-
-        String endpoint = String.format(AZURE_API_ENDPOINT, AZURE_OPENAI_HOST, AZURE_OPENAI_DEPLOYMENT, apiVersion);
-
-        logger.debug("Azure OpenAI endpoint: " + endpoint);
-        return endpoint;
     }
 }

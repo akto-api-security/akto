@@ -13,8 +13,8 @@ public class FileInspectionResultDao extends AccountsContextDao<FileInspectionRe
     public static final FileInspectionResultDao instance = new FileInspectionResultDao();
     public static final String COLLECTION_NAME = "file_inspection_results";
 
-    private static final int maxDocuments = 200_000;
-    private static final long sizeInBytes = 200_000_000L;
+    public static final int maxDocuments = 200_000;
+    public static final long sizeInBytes = 200_000_000L;
 
     public void createIndicesIfAbsent() {
         boolean exists = false;
@@ -37,6 +37,7 @@ public class FileInspectionResultDao extends AccountsContextDao<FileInspectionRe
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.RULE_ID, FileInspectionResult.EXECUTED_AT}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.EXECUTED_AT}, false);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionResult.DEVICE_ID, FileInspectionResult.RULE_ID}, false);
     }
 
     @Override

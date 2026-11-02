@@ -103,4 +103,15 @@ public class AzureBlobClient {
         BlobClient blob = container.getBlobClient(blobName);
         blob.upload(new java.io.ByteArrayInputStream(data), data.length, true);
     }
+
+    /**
+     * Download blob content as raw bytes. Returns null when the blob does not exist.
+     * Used by services that need to re-read content the agent previously uploaded
+     * (e.g. NHI extraction in guardrails-service).
+     */
+    public byte[] download(String blobName) {
+        BlobClient blob = container.getBlobClient(blobName);
+        if (!blob.exists()) return null;
+        return blob.downloadContent().toBytes();
+    }
 }

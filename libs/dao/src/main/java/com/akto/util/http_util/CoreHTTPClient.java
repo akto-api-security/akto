@@ -9,6 +9,8 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URL;
 import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
@@ -17,6 +19,7 @@ import java.util.List;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +32,7 @@ import inet.ipaddr.IPAddressString;
 import okhttp3.Authenticator;
 import okhttp3.Credentials;
 
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -36,8 +40,88 @@ import okhttp3.Route;
 
 public class CoreHTTPClient {
 
-    public static OkHttpClient client = new OkHttpClient.Builder().build();
     private static final Logger logger = LoggerFactory.getLogger(CoreHTTPClient.class);
+
+    /*
+     * OkHttp's own implicit default SSLSocketFactory builds its SSLContext with a
+     * hard-coded null KeyManager array, so it never presents a client certificate -
+     * regardless of -Djavax.net.ssl.keyStore (https://github.com/square/okhttp/issues/5090).
+     * Every other JSSE-based client in this JVM (the Mongo driver included) goes through
+     * SSLContext.getDefault() instead, which DOES load a client cert from that system
+     * property when one is configured, and is a no-op (no client cert, standard CA trust)
+     * when it is not - i.e. identical to OkHttp's previous behavior for every deployment
+     * that isn't doing certificate auth. Building OkHttp's SSLSocketFactory/TrustManager
+     * from that same default puts it on equal footing, with no change to the API-key/
+     * username/password logic that already runs on top of this client.
+     */
+    private static final SSLSocketFactory defaultSslSocketFactory;
+    private static final X509TrustManager defaultTrustManager;
+    static {
+        try {
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory
+                    .getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init((KeyStore) null);
+            X509TrustManager trustManager = null;
+            for (TrustManager tm : trustManagerFactory.getTrustManagers()) {
+                if (tm instanceof X509TrustManager) {
+                    trustManager = (X509TrustManager) tm;
+                    break;
+                }
+            }
+            if (trustManager == null) {
+                throw new IllegalStateException("Default TrustManagerFactory returned no X509TrustManager");
+            }
+            defaultTrustManager = trustManager;
+            defaultSslSocketFactory = SSLContext.getDefault().getSocketFactory();
+        } catch (NoSuchAlgorithmException | KeyStoreException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Optional hook to record outbound HTTP metrics. Implemented by the app that wants metrics
+     * (e.g. cyborg's Micrometer recorder) and registered via {@link #setOutboundMetricsRecorder}.
+     * libs/dao stays metrics-agnostic; when no recorder is set the interceptor is a no-op.
+     */
+    public interface OutboundHttpMetricsRecorder {
+        void record(String host, String path, String method, int statusCode, long durationMs);
+    }
+
+    private static volatile OutboundHttpMetricsRecorder metricsRecorder;
+
+    public static void setOutboundMetricsRecorder(OutboundHttpMetricsRecorder recorder) {
+        metricsRecorder = recorder;
+    }
+
+    // Times every outbound call and reports it to the registered recorder (if any). Tags are host +
+    // path only — never the query string, which can carry API keys/tokens.
+    private static Interceptor outboundMetricsInterceptor() {
+        return chain -> {
+            Request request = chain.request();
+            OutboundHttpMetricsRecorder recorder = metricsRecorder;
+            if (recorder == null) {
+                return chain.proceed(request);
+            }
+            long start = System.currentTimeMillis();
+            int code = 0;
+            try {
+                Response response = chain.proceed(request);
+                code = response.code();
+                return response;
+            } finally {
+                try {
+                    recorder.record(request.url().host(), request.url().encodedPath(),
+                            request.method(), code, System.currentTimeMillis() - start);
+                } catch (Exception ignored) {
+                }
+            }
+        };
+    }
+
+    public static OkHttpClient client = new OkHttpClient.Builder()
+            .sslSocketFactory(defaultSslSocketFactory, defaultTrustManager)
+            .addInterceptor(outboundMetricsInterceptor())
+            .build();
 
     /*
      * The implementation is based on proxy API and not jvm system properties

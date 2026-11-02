@@ -93,10 +93,12 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
+    private static final int sequenceCountBatchLimit = 1000;
     private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
     private static final int maxConcurrentBatchWrites = 150;
@@ -1794,9 +1796,16 @@ public class ClientActor extends DataActor {
     }
 
     public TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId) {
+        return markTestRunResultSummaryFailed(testingRunResultSummaryId, null);
+    }
+
+    public TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId, String leaseToken) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        if (leaseToken != null && !leaseToken.isEmpty()) {
+            obj.put("leaseToken", leaseToken);
+        }
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/markTestRunResultSummaryFailed", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -2251,12 +2260,19 @@ public class ClientActor extends DataActor {
     }
 
     private  TestingRunResultSummary getUpdatedSummaryAfterCount(String summaryId, Map<String, Integer> totalCountIssues, String operator){
+        return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, operator, null);
+    }
+
+    private  TestingRunResultSummary getUpdatedSummaryAfterCount(String summaryId, Map<String, Integer> totalCountIssues, String operator, String leaseToken){
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("summaryId", summaryId);
         obj.put("totalCountIssues", totalCountIssues);
         if(operator != null && !operator.isEmpty()){
             obj.put("operator", operator);
+        }
+        if (leaseToken != null && !leaseToken.isEmpty()) {
+            obj.put("leaseToken", leaseToken);
         }
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateIssueCountInSummary", "", "POST", obj.toString(), headers, "");
         try {
@@ -2291,6 +2307,10 @@ public class ClientActor extends DataActor {
 
     public TestingRunResultSummary updateIssueCountInSummary(String summaryId, Map<String, Integer> totalCountIssues) {
         return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, null);
+    }
+
+    public TestingRunResultSummary updateIssueCountInSummaryFenced(String summaryId, Map<String, Integer> totalCountIssues, String leaseToken) {
+        return getUpdatedSummaryAfterCount(summaryId, totalCountIssues, null, leaseToken);
     }
 
     public TestingRunResultSummary updateIssueCountAndStateInSummary(String summaryId, Map<String, Integer> totalCountIssues, String state) {
@@ -3870,12 +3890,14 @@ public class ClientActor extends DataActor {
         return nodeList;
     }
 
-    public long countTestingRunResultSummaries(Bson filter) {
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("filter", filter);
-        Map<String, List<String>> headers = buildHeaders();
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
+    public long countTestingRunResultSummaries(String testingRunHexId, int sinceTimestamp, TestingRun.State state) {
         try {
+            BasicDBObject obj = new BasicDBObject();
+            obj.put("testingRunHexId", testingRunHexId);
+            obj.put("sinceTimestamp", sinceTimestamp);
+            obj.put("state", state.toString());
+            Map<String, List<String>> headers = buildHeaders();
+            OriginalHttpRequest request = new OriginalHttpRequest(url + "/countTestingRunResultSummaries", "", "POST",  obj.toString(), headers, "");
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
@@ -4416,21 +4438,26 @@ public class ClientActor extends DataActor {
     }
 
     @Override
-    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
+    public List<String> storeConversationResults(List<AgentConversationResult> conversationResults) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("conversationResults", conversationResults);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", obj.toString(), headers, "");
+        String jsonBody = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in storeConversationResults", LoggerMaker.LogDb.RUNTIME);
-                return;
+                return new ArrayList<>();
             }
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            Object docIdsArr = payloadObj.get("docIds");
+            List<String> docIds = gson.fromJson(gson.toJson(docIdsArr), new TypeToken<List<String>>(){}.getType());
+            return docIds != null ? docIds : new ArrayList<>();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in storeConversationResults" + e, LoggerMaker.LogDb.RUNTIME);
-            return;
+            return new ArrayList<>();
         }
     }
 
@@ -4486,6 +4513,67 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in storeTestingRunWebhook" + e, LoggerMaker.LogDb.RUNTIME);
             return;
+        }
+    }
+
+    @Override
+    public int incrementAndGetTestRateLimitUsage(int globalRateLimit, String dashboardContext) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("globalRateLimit", globalRateLimit);
+        obj.put("contextSource", dashboardContext);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/incrementAndGetTestRateLimitUsage", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in incrementAndGetTestRateLimitUsage", LoggerMaker.LogDb.RUNTIME);
+                return 0;
+            }
+            try {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                return Integer.parseInt(payloadObj.get("testRateLimitUsageCount").toString());
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error parsing incrementAndGetTestRateLimitUsage response" + e, LoggerMaker.LogDb.RUNTIME);
+                return 0;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in incrementAndGetTestRateLimitUsage" + e, LoggerMaker.LogDb.RUNTIME);
+            return 0;
+        }
+    }
+
+    @Override
+    public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+        if (sequenceCounts == null || sequenceCounts.isEmpty()) return;
+        List<SequenceCount> batch = new ArrayList<>();
+        for (SequenceCount sequenceCount : sequenceCounts) {
+            batch.add(sequenceCount);
+            if (batch.size() % sequenceCountBatchLimit == 0) {
+                List<SequenceCount> finalBatch = batch;
+                threadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+                batch = new ArrayList<>();
+            }
+        }
+        if (!batch.isEmpty()) {
+            List<SequenceCount> finalBatch = batch;
+            threadPool.submit(() -> writeSequenceCountsBatch(finalBatch));
+        }
+    }
+
+    private void writeSequenceCountsBatch(List<SequenceCount> sequenceCounts) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("sequenceCounts", sequenceCounts);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/writeSequenceCounts", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in writeSequenceCounts", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in writeSequenceCounts: " + e, LoggerMaker.LogDb.RUNTIME);
         }
     }
 
