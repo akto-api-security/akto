@@ -1,15 +1,22 @@
 name: Agent Guard Prompt Accuracy
 
 # Scores the scanner prompts a PR changes on the guardrails-prompt-dataset, with master's prompts and with the PR's,
-# and posts the comparison as a PR comment (updated in place on every push). Report only: it never fails the PR on
-# accuracy. Needs repo secrets AGENT_GUARD_EVAL_VLLM_BASE_URL, AGENT_GUARD_EVAL_VLLM_API_KEY and
-# GUARDRAILS_DATASET_TOKEN (read access to akto-api-security/guardrails-prompt-dataset).
+# and posts the comparison as a PR comment (updated in place on every push). Report only: it never fails the PR.
+# Every step after the scanner pick may fail without turning the check red (endpoint down, missing secret, master's
+# code unable to run this script); the comment then says the run failed instead of showing numbers.
+# Needs repo secrets AGENT_GUARD_EVAL_VLLM_BASE_URL, AGENT_GUARD_EVAL_VLLM_API_KEY and GUARDRAILS_DATASET_TOKEN
+# (read access to akto-api-security/guardrails-prompt-dataset).
 
 on:
   pull_request:
-    paths:
-      - "apps/agent-guard/python-service/worker-py/src/prompts/**"
+    paths:  # exactly SCANNER_FILES and SHARED in scripts/eval_accuracy.py
+      - "apps/agent-guard/python-service/worker-py/src/prompts/toxicity.py"
+      - "apps/agent-guard/python-service/worker-py/src/prompts/prompt_injection.py"
+      - "apps/agent-guard/python-service/worker-py/src/prompts/__init__.py"
+      - "apps/agent-guard/python-service/worker-py/src/prompts/_abcd.py"
       - "apps/agent-guard/python-service/worker-py/src/llm_scanner.py"
+      - "apps/agent-guard/python-service/worker-py/src/providers.py"
+      - "apps/agent-guard/python-service/worker-py/src/settings.py"
       - "apps/agent-guard/python-service/worker-py/scripts/eval_accuracy.py"
       - ".github/workflows/akto-agent-guard-accuracy.yml"
 
@@ -31,45 +38,59 @@ jobs:
     defaults:
       run:
         working-directory: apps/agent-guard/python-service/worker-py
-    env:
-      VLLM_BASE_URL: ${{ secrets.AGENT_GUARD_EVAL_VLLM_BASE_URL }}
-      VLLM_API_KEY: ${{ secrets.AGENT_GUARD_EVAL_VLLM_API_KEY }}
-      VLLM_MODEL: gemma-4-26b-a4b-it
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      # Standard library only, so it runs before any setup: a PR that changes no scored file costs nothing more.
+      - name: Pick the scanners this PR affects
+        id: pick
+        run: |
+          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}")
+          echo "scanners=$(python3 scripts/eval_accuracy.py scanners $files)" >> "$GITHUB_OUTPUT"
 
       - name: Check out master's version for comparison
+        if: steps.pick.outputs.scanners != ''
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: base
+          persist-credentials: false
 
       - name: Check out the dataset
+        if: steps.pick.outputs.scanners != ''
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           repository: akto-api-security/guardrails-prompt-dataset
           token: ${{ secrets.GUARDRAILS_DATASET_TOKEN }}
           path: dataset
+          persist-credentials: false  # keep the token out of dataset/.git/config, where later steps could read it
 
       - uses: astral-sh/setup-uv@v3
+        if: steps.pick.outputs.scanners != ''
+        continue-on-error: true
         with:
           python-version: "3.12"
           enable-cache: true
           cache-dependency-glob: "apps/agent-guard/python-service/worker-py/pyproject.toml"
 
       - name: Install dependencies
+        if: steps.pick.outputs.scanners != ''
+        continue-on-error: true
         run: uv sync --locked
 
-      - name: Pick the scanners this PR affects
-        id: pick
-        run: |
-          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}")
-          echo "scanners=$(uv run python scripts/eval_accuracy.py scanners $files)" >> "$GITHUB_OUTPUT"
-
+      # Only the scoring steps get the model endpoint and key, not setup or the report.
       - name: Score master's prompts
         if: steps.pick.outputs.scanners != ''
+        continue-on-error: true
+        env:
+          VLLM_BASE_URL: ${{ secrets.AGENT_GUARD_EVAL_VLLM_BASE_URL }}
+          VLLM_API_KEY: ${{ secrets.AGENT_GUARD_EVAL_VLLM_API_KEY }}
+          VLLM_MODEL: gemma-4-26b-a4b-it
         run: >-
           uv run python scripts/eval_accuracy.py run --scanners "${{ steps.pick.outputs.scanners }}"
           --src "$GITHUB_WORKSPACE/base/apps/agent-guard/python-service/worker-py/src"
@@ -77,17 +98,25 @@ jobs:
 
       - name: Score this PR's prompts
         if: steps.pick.outputs.scanners != ''
+        continue-on-error: true
+        env:
+          VLLM_BASE_URL: ${{ secrets.AGENT_GUARD_EVAL_VLLM_BASE_URL }}
+          VLLM_API_KEY: ${{ secrets.AGENT_GUARD_EVAL_VLLM_API_KEY }}
+          VLLM_MODEL: gemma-4-26b-a4b-it
         run: >-
           uv run python scripts/eval_accuracy.py run --scanners "${{ steps.pick.outputs.scanners }}"
           --src src --dataset "$GITHUB_WORKSPACE/dataset" --out "$RUNNER_TEMP/head.json"
 
+      # Runs even when scoring failed: the report then says the run failed. Plain python, so a failed
+      # `uv sync` doesn't stop it.
       - name: Post the report
-        if: steps.pick.outputs.scanners != ''
+        if: always() && steps.pick.outputs.scanners != ''
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          uv run python scripts/eval_accuracy.py report "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/head.json" > "$RUNNER_TEMP/report.md"
+          python3 scripts/eval_accuracy.py report "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/head.json" > "$RUNNER_TEMP/report.md"
           cat "$RUNNER_TEMP/report.md" >> "$GITHUB_STEP_SUMMARY"
           id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
                  --jq '.[] | select(.body | startswith("<!-- agent-guard-accuracy -->")) | .id' | head -1)

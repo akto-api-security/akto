@@ -8,13 +8,21 @@
     python scripts/eval_accuracy.py run --scanners Toxicity,PromptInjection --src src \\
         --dataset <guardrails-prompt-dataset checkout> --out head.json
 
-    # markdown comparison of two runs (master vs this PR) for the PR comment
+    # markdown comparison of two runs (master vs this PR) for the PR comment; a missing or unreadable run file
+    # gives a comment saying the run failed
     python scripts/eval_accuracy.py report base.json head.json
 
+`scanners` and `report` use only the standard library, so the workflow runs them with plain python, before any
+dependencies are installed and even when installing them failed.
+
 Each row goes through the production single-model path: LLMScanner(OpenAIProvider(...)).scan(), i.e. the same
-prompt builder, request settings and parser agent-guard runs. Requests go out in batches of --batch (the next batch
-waits for every result), at most --rps per second; 20 failed scans in a row abort the run. Only aggregate numbers are
-printed or written: the dataset is private and the report lands on a public PR.
+prompt builder, request settings and parser agent-guard runs. A reply that isn't a verdict is scored as a block, as
+production's cascade counts a scanner exception as unsafe, and counted separately; it is not retried. A network or
+HTTP failure is retried and, if it persists, leaves the row unscored. The report scores only the rows that both
+runs scored, so master and the PR are always compared on the same rows. Requests go out in batches of --batch (the
+next batch waits for every result), at most --rps per second; 20 failed scans in a row abort the run. Run files hold
+per-row outcomes and stay on the runner; the report carries only aggregate numbers, because the dataset is private
+and the report lands on a public PR.
 """
 
 import argparse
@@ -28,6 +36,7 @@ from collections import defaultdict
 from pathlib import Path
 
 MARKER = "<!-- agent-guard-accuracy -->"
+TITLE = "### Agent Guard prompt accuracy"
 TOXICITY_CATEGORIES = ("hate", "insults", "sexual", "violence", "misconduct")
 PI_FILES = (  # guardrails-prompt-dataset files whose prompts PromptInjection should block
     "prompt_injection",
@@ -37,46 +46,67 @@ PI_FILES = (  # guardrails-prompt-dataset files whose prompts PromptInjection sh
     "social_engineering",
     "model_extraction_poisoning",
 )
-# A change to one of these files re-scores the scanner; a change to a SHARED file re-scores every scanner.
+WORKER = "apps/agent-guard/python-service/worker-py/"
+# A change to one of these repo paths re-scores the scanner; a change to a SHARED path re-scores every scanner.
+# Keep the workflow's `paths:` trigger in step with both.
 SCANNER_FILES = {
-    "Toxicity": ("src/prompts/toxicity.py",),
-    "PromptInjection": ("src/prompts/prompt_injection.py",),
+    "Toxicity": (WORKER + "src/prompts/toxicity.py",),
+    "PromptInjection": (WORKER + "src/prompts/prompt_injection.py",),
 }
 SHARED = (
-    "src/prompts/__init__.py",
-    "src/prompts/_abcd.py",
-    "src/llm_scanner.py",
-    "scripts/eval_accuracy.py",
+    WORKER + "src/prompts/__init__.py",
+    WORKER + "src/prompts/_abcd.py",
+    WORKER + "src/llm_scanner.py",
+    WORKER + "src/providers.py",  # temperature and max_tokens change verdicts
+    WORKER + "src/settings.py",
+    WORKER + "scripts/eval_accuracy.py",
     ".github/workflows/akto-agent-guard-accuracy.yml",
 )
 CONFIG = {
     "Toxicity": {"harmfulCategories": {c: "MEDIUM" for c in TOXICITY_CATEGORIES}},
     "PromptInjection": {},
 }
+BLOCK, ALLOW, UNPARSED = "block", "allow", "unparsed"  # per-row outcomes; None = the scan kept failing
+
+
+def _warn(msg: str) -> None:
+    print(f"warning: {msg}", file=sys.stderr)
 
 
 def scanners_for(changed: list[str]) -> list[str]:
-    if any(f.endswith(s) for f in changed for s in SHARED):
+    changed_set = set(changed)
+    if changed_set & set(SHARED):
         return list(SCANNER_FILES)
-    return [name for name, files in SCANNER_FILES.items() if any(f.endswith(s) for f in changed for s in files)]
+    return [name for name, files in SCANNER_FILES.items() if changed_set & set(files)]
 
 
 def load_rows(scanner: str, dataset: Path, per_class: int, seed: int) -> list[tuple[str, str]]:
-    """(text, class) pairs; class 'safe' or the unsafe category/file. At most per_class per unsafe class, and as many
-    safe rows as unsafe ones in total, so the false-alarm rate is measured on a comparable sample."""
+    """(text, class) pairs; class 'safe' or the unsafe category/file. Only test-split rows (rows without a split
+    field are all test rows). At most per_class per unsafe class, and as many safe rows as unsafe ones in total, so
+    the false-alarm rate is measured on a comparable sample. Rows missing a required field are skipped with a
+    warning rather than failing the run."""
     by: dict[str, list[str]] = defaultdict(list)
     if scanner == "Toxicity":
         for f in sorted((dataset / "toxicity" / "data").glob("*.jsonl")):
-            for line in open(f, encoding="utf-8"):
-                r = json.loads(line)
-                # MEDIUM sensitivity: 'borderline' rows are only toxic at HIGH, so they are not scored here
-                if r["split"] == "test" and r.get("severity") != "borderline":
-                    by[r["category"] or "safe"].append(r["prompt"])
+            with open(f, encoding="utf-8") as fh:
+                for n, line in enumerate(fh, 1):
+                    r = json.loads(line)
+                    if not {"prompt", "split", "category"} <= r.keys():
+                        _warn(f"{f.name}:{n} lacks prompt, split or category; skipped")
+                        continue
+                    # MEDIUM sensitivity: 'borderline' rows are only toxic at HIGH, so they are not scored here
+                    if r["split"] == "test" and r.get("severity") != "borderline":
+                        by[r["category"] or "safe"].append(r["prompt"])
     elif scanner == "PromptInjection":
         for name in (*PI_FILES, "legitimate"):
             f = dataset / f"{name}.json"
-            if f.exists():
-                by["safe" if name == "legitimate" else name] += [x["prompt"] for x in json.load(open(f))]
+            if not f.exists():
+                continue
+            for n, r in enumerate(json.loads(f.read_text(encoding="utf-8"))):
+                if "prompt" not in r:
+                    _warn(f"{f.name}[{n}] has no prompt; skipped")
+                elif r.get("split", "test") == "test":
+                    by["safe" if name == "legitimate" else name].append(r["prompt"])
     rng = random.Random(seed)
     rows: list[tuple[str, str]] = []
     for cls in sorted(c for c in by if c != "safe"):
@@ -86,54 +116,60 @@ def load_rows(scanner: str, dataset: Path, per_class: int, seed: int) -> list[tu
     return rows
 
 
-async def _scan_all(scan, rows, batch: int, rps: float) -> list[bool | None]:
-    """True = blocked, False = allowed, None = the scan failed three times."""
-    out: list[bool | None] = [None] * len(rows)
+async def _scan_all(scan, rows, batch: int, rps: float) -> list[str | None]:
+    """Per row: BLOCK, ALLOW, UNPARSED (the model replied, but not with a verdict), or None (the scan kept failing)."""
+    out: list[str | None] = [None] * len(rows)
     gap, next_slot, fails_in_row = 1.02 / rps, [0.0], [0]
 
-    async def one(i: int) -> tuple[int, bool | None]:
+    async def one(i: int) -> tuple[int, str | None]:
         for attempt in range(3):
             now = time.monotonic()
             start = max(now, next_slot[0])  # request starts (retries included) spaced >= gap apart
             next_slot[0] = start + gap
             await asyncio.sleep(start - now)
             try:
-                blocked = not (await scan(rows[i][0]))["is_valid"]
+                result = await scan(rows[i][0])
+            except ValueError:  # the parsers raise on a reply that isn't a verdict; asking again won't fix that
                 fails_in_row[0] = 0
-                return i, blocked
-            except Exception:  # noqa: BLE001 - network, HTTP and parse errors all count as a failed scan
+                return i, UNPARSED
+            except Exception:  # noqa: BLE001 - network and HTTP errors
                 if attempt < 2:
                     await asyncio.sleep((5, 15)[attempt])
+                continue
+            fails_in_row[0] = 0
+            return i, ALLOW if result["is_valid"] else BLOCK
         fails_in_row[0] += 1
         return i, None
 
     for k in range(0, len(rows), batch):  # one batch, wait for every result, then the next
-        for i, blocked in await asyncio.gather(*(one(i) for i in range(k, min(k + batch, len(rows))))):
-            out[i] = blocked
+        for i, outcome in await asyncio.gather(*(one(i) for i in range(k, min(k + batch, len(rows))))):
+            out[i] = outcome
         if fails_in_row[0] >= 20:
             raise SystemExit("20 scans failed in a row: the model endpoint looks down")
     return out
 
 
-def metrics(rows: list[tuple[str, str]], blocked: list[bool | None]) -> dict:
+def metrics(classes: list[str], outcomes: list[str | None]) -> dict:
+    """Scores one run. An UNPARSED reply counts as a block, as in production; None (failed) rows are not scored."""
     tp = fp = tn = fn = 0
     per_class: dict[str, list[int]] = defaultdict(lambda: [0, 0])  # class -> [correct, scored]
-    for (_, cls), b in zip(rows, blocked):
-        if b is None:
+    for cls, outcome in zip(classes, outcomes):
+        if outcome is None:
             continue
-        unsafe = cls != "safe"
-        tp += unsafe and b
-        fn += unsafe and not b
-        fp += not unsafe and b
-        tn += not unsafe and not b
-        per_class[cls][0] += b == unsafe
+        unsafe, blocked = cls != "safe", outcome != ALLOW
+        tp += unsafe and blocked
+        fn += unsafe and not blocked
+        fp += not unsafe and blocked
+        tn += not unsafe and not blocked
+        per_class[cls][0] += blocked == unsafe
         per_class[cls][1] += 1
     n = tp + fp + tn + fn
     precision = tp / (tp + fp) if tp + fp else 0.0
     recall = tp / (tp + fn) if tp + fn else 0.0
     return {
-        "rows": len(rows),
-        "errors": sum(b is None for b in blocked),
+        "rows": len(classes),
+        "errors": sum(o is None for o in outcomes),
+        "unparseable": sum(o == UNPARSED for o in outcomes),
         "accuracy": (tp + tn) / n if n else 0.0,
         "detection_rate": recall,
         "false_alarm_rate": fp / (fp + tn) if fp + tn else 0.0,
@@ -144,7 +180,10 @@ def metrics(rows: list[tuple[str, str]], blocked: list[bool | None]) -> dict:
 
 
 async def run(args) -> None:
-    sys.path.insert(0, str(Path(args.src).resolve()))  # this checkout's prompts, not the runner's
+    # Imported here, after putting --src first on sys.path, so one copy of this script can score two checkouts:
+    # master's src for the base run and the PR's for the head run. Top-level imports would also stop `scanners`
+    # and `report` from running with plain python before the dependencies are installed.
+    sys.path.insert(0, str(Path(args.src).resolve()))
     from llm_scanner import LLMScanner
     from providers import OpenAIProvider
     from settings import settings
@@ -156,14 +195,15 @@ async def run(args) -> None:
     result = {"model": model, "format": args.format or "json", "scanners": {}}
     for name in [s for s in args.scanners.split(",") if s]:
         rows = load_rows(name, Path(args.dataset), args.per_class, args.seed)
-        if not rows:
-            result["scanners"][name] = {"rows": 0}
-            continue
-        blocked = await _scan_all(
-            lambda text, n=name: scanner.scan(n, "prompt", text, CONFIG[n]), rows, args.batch, args.rps
+        classes = [cls for _, cls in rows]
+        outcomes = (
+            await _scan_all(lambda text, n=name: scanner.scan(n, "prompt", text, CONFIG[n]), rows, args.batch, args.rps)
+            if rows
+            else []
         )
-        result["scanners"][name] = metrics(rows, blocked)
-        print(f"{name}: {json.dumps({k: v for k, v in result['scanners'][name].items() if k != 'per_class'})}")
+        result["scanners"][name] = {"classes": classes, "outcomes": outcomes}
+        summary = {k: v for k, v in metrics(classes, outcomes).items() if k != "per_class"}
+        print(f"{name}: {json.dumps(summary)}")
     Path(args.out).write_text(json.dumps(result, indent=1))
 
 
@@ -179,13 +219,21 @@ def _delta(base: float, head: float, higher_is_better: bool = True) -> str:
     return f"{d:+.1f}" + (" ⚠️" if worse and abs(d) >= 2 else "")
 
 
+def failure_report(missing: list[str]) -> str:
+    return (
+        f"{MARKER}\n{TITLE}\n⚠️ The accuracy run failed: no scores for {' and '.join(missing)}. "
+        "Nothing about this PR's accuracy is known from this run; see the workflow logs.\n"
+    )
+
+
 def report(base: dict, head: dict) -> str:
     lines = [
         MARKER,
-        "### Agent Guard prompt accuracy",
-        f"Model `{head['model']}` · answer format `{head['format']}` · the same rows are scored with master's and this "
-        "PR's prompts. ⚠️ marks a change of 2+ points in the wrong direction; differences under ~2-3 points are "
-        "within run-to-run noise at these sample sizes.",
+        TITLE,
+        f"Model `{head['model']}` · answer format `{head['format']}` · master's and this PR's prompts are scored on "
+        "the same rows: a row that failed in either run is left out of both. A reply that isn't a verdict counts as "
+        "a block, as in production. ⚠️ marks a change of 2+ points in the wrong direction; differences under ~2-3 "
+        "points are within run-to-run noise at these sample sizes.",
     ]
     rows_spec = [
         ("Accuracy", "accuracy", True),
@@ -195,24 +243,47 @@ def report(base: dict, head: dict) -> str:
         ("F1", "f1", True),
     ]
     for name, h in head["scanners"].items():
-        b = base["scanners"].get(name, {})
+        b = base["scanners"].get(name)
         lines += ["", f"#### {name}"]
-        if not h.get("rows"):
+        if not h["classes"]:
             lines.append("_No dataset rows found for this scanner._")
             continue
+        if b is None or b["classes"] != h["classes"]:
+            lines.append("_master and this PR did not score the same rows, so they can't be compared._")
+            continue
+        both = [i for i, (bo, ho) in enumerate(zip(b["outcomes"], h["outcomes"])) if bo is not None and ho is not None]
+
+        def scored(run_: dict, keep: list[int] = both) -> list[str | None]:
+            return [run_["outcomes"][i] for i in keep]
+
+        classes = [h["classes"][i] for i in both]
+        bm, hm = metrics(classes, scored(b)), metrics(classes, scored(h))
+        unparsed = f"master {bm['unparseable']}, this PR {hm['unparseable']}"
+        if hm["unparseable"] > bm["unparseable"]:
+            unparsed += " ⚠️"
         lines += [
-            f"{h['rows']} rows ({h['errors']} failed scans this PR, {b.get('errors', 0)} on master)",
+            f"{len(both)} of {len(h['classes'])} rows scored in both runs (failed: master "
+            f"{sum(o is None for o in b['outcomes'])}, this PR {sum(o is None for o in h['outcomes'])}). "
+            f"Replies that weren't a verdict, scored as blocks: {unparsed}.",
             "",
             "| | master | this PR | change |",
             "|---|---:|---:|---:|",
         ]
         for label, key, better in rows_spec:
-            lines.append(f"| {label} | {_pct(b[key])} | {_pct(h[key])} | {_delta(b[key], h[key], better)} |")
+            lines.append(f"| {label} | {_pct(bm[key])} | {_pct(hm[key])} | {_delta(bm[key], hm[key], better)} |")
         lines += ["", "| Class (share scored correctly) | master | this PR | change |", "|---|---:|---:|---:|"]
-        for cls, v in h["per_class"].items():
-            bv = b.get("per_class", {}).get(cls, 0.0)
+        for cls, v in hm["per_class"].items():
+            bv = bm["per_class"].get(cls, 0.0)
             lines.append(f"| {cls} | {_pct(bv)} | {_pct(v)} | {_delta(bv, v)} |")
     return "\n".join(lines) + "\n"
+
+
+def _load_run(path: str) -> dict | None:
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        _warn(f"cannot read run file {path}: {exc}")
+        return None
 
 
 def main() -> None:
@@ -239,7 +310,9 @@ def main() -> None:
     elif args.cmd == "run":
         asyncio.run(run(args))
     else:
-        print(report(json.load(open(args.base)), json.load(open(args.head))), end="")
+        base, head = _load_run(args.base), _load_run(args.head)
+        missing = [label for label, r in (("master", base), ("this PR", head)) if r is None]
+        print(failure_report(missing) if missing else report(base, head), end="")
 
 
 if __name__ == "__main__":
