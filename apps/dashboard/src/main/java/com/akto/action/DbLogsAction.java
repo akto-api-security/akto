@@ -55,7 +55,13 @@ public class DbLogsAction extends UserAction {
             addActionError("Invalid log collection");
             return ERROR.toUpperCase();
         }
-        logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb, logKeys);
+        try {
+            logs = loggerMaker.fetchLogRecords(startTime, endTime, logDb, logKeys);
+        } catch (Exception e) {
+            // e.g. logs Mongo (LOG_MONGO_CONN) unreachable; message not echoed (may contain connection details)
+            addActionError("Error fetching logs");
+            return ERROR.toUpperCase();
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -65,7 +71,12 @@ public class DbLogsAction extends UserAction {
             addActionError("Invalid testing run result summary id");
             return ERROR.toUpperCase();
         }
-        logs = loggerMaker.fetchTestingLogRecordsByActivity(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY, testingRunResultSummaryId, logKeys);
+        try {
+            logs = loggerMaker.fetchTestingLogRecordsByActivity(Log.ActivityType.TESTING_RUN_RESULT_SUMMARY_ACTIVITY, testingRunResultSummaryId, logKeys);
+        } catch (Exception e) {
+            addActionError("Error fetching logs");
+            return ERROR.toUpperCase();
+        }
 
         return SUCCESS.toUpperCase();
     }

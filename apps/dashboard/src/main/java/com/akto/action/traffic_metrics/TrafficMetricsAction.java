@@ -96,7 +96,14 @@ public class TrafficMetricsAction extends UserAction {
                 Accumulators.sum("sum", "$countMap.v")
         ));
 
-        MongoCursor<BasicDBObject> endpointsCursor = TrafficMetricsDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        MongoCursor<BasicDBObject> endpointsCursor;
+        try {
+            endpointsCursor = TrafficMetricsDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        } catch (Exception e) {
+            // e.g. logs Mongo (LOG_MONGO_CONN) unreachable; message not echoed
+            addActionError("Error fetching traffic metrics");
+            return ERROR.toUpperCase();
+        }
         while(endpointsCursor.hasNext()) {
             try {
                 BasicDBObject basicDBObject = endpointsCursor.next();

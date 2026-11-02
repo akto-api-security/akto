@@ -2826,6 +2826,8 @@ public class InitializerListener implements ServletContextListener {
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
         try {
+            // logs/metrics collections live in the separate logs Mongo (LOG_MONGO_CONN); not trimmed from here
+            if (LogsMongo.isRouted(mCollection)) return;
             /*
              * If capped collections are allowed (mongoDB) and
              * the collection is actually capped, only then skip.
