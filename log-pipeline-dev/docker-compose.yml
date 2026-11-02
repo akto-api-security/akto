@@ -1,0 +1,113 @@
+# Local dev environment for the cyborg log pipeline: Kafka -> consumer -> NEW logs MongoDB.
+# Cyborg (the API) is NOT in here: run it on the host with ../start-cyborg.sh (see cyborg.env.example).
+# Cyborg keeps using your existing local mongod as its main DB; this compose only holds the log side.
+#
+# Default start:   docker compose up -d            (kafka, kafka-init, mongo-logs, log-consumer)
+# Optional main DB: docker compose --profile main-db up -d mongo-main   (only if you have no local mongod)
+#
+# Host ports (chosen to avoid a local mongod on 27017 and another kafka on 9092; override via env):
+#   KAFKA_HOST_PORT (9192), MONGO_LOGS_PORT (27018), MONGO_MAIN_PORT (27117, main-db profile only)
+
+name: log-pipeline-dev
+
+x-mongo-healthcheck: &mongo-healthcheck
+  test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+  interval: 5s
+  timeout: 5s
+  retries: 20
+
+services:
+  kafka:
+    image: apache/kafka:4.4.0
+    hostname: kafka
+    ports:
+      - "${KAFKA_HOST_PORT:-9192}:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # CONTAINER = kafka:19092 (other containers), HOST = localhost:9092 (cyborg on the host)
+      KAFKA_LISTENERS: CONTAINER://:19092,HOST://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: CONTAINER://kafka:19092,HOST://localhost:${KAFKA_HOST_PORT:-9192}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTAINER:PLAINTEXT,HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: CONTAINER
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  kafka-init:
+    image: apache/kafka:4.4.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        BS=kafka:19092
+        for t in akto.logs akto.metrics; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BS --create --if-not-exists \
+            --topic $$t --partitions 10 --replication-factor 1 \
+            --config retention.ms=21600000 --config compression.type=producer
+        done
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BS --describe --topic akto.logs
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server $$BS --describe --topic akto.metrics
+
+  # Optional: only needed if you have no local mongod for cyborg's main DB.
+  mongo-main:
+    profiles: ["main-db"]
+    image: ${MONGO_IMAGE:-mongo:8.0}
+    ports:
+      - "${MONGO_MAIN_PORT:-27117}:27017"
+    volumes:
+      - mongo-main-data:/data/db
+    healthcheck: *mongo-healthcheck
+
+  mongo-logs:
+    image: ${MONGO_IMAGE:-mongo:8.0}   # MongoDB 8.0 (cyborg main DB stays on your local mongod)
+    ports:
+      - "${MONGO_LOGS_PORT:-27018}:27017"
+    volumes:
+      - mongo-logs-data:/data/db
+    healthcheck: *mongo-healthcheck
+
+  # Runs the consumer straight from the mounted checkout (no code baked into an image).
+  # Scale with: docker compose up -d --scale log-consumer=3
+  log-consumer:
+    image: maven:3.9-eclipse-temurin-17   # repo builds with JDK 17 (<release>17</release>, CI java-version 17)
+    working_dir: /workspace
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      mongo-logs:
+        condition: service_healthy
+    volumes:
+      - /Users/rahulkumar/work/backend/cyborg:/workspace
+      - m2-cache:/root/.m2
+      - ./consumer-entrypoint.sh:/consumer-entrypoint.sh:ro
+    entrypoint: ["/bin/bash", "/consumer-entrypoint.sh"]
+    # All consumer settings live in consumer.env (edit there, not here).
+    env_file:
+      - consumer.env
+    environment:
+      SKIP_BUILD: ${SKIP_BUILD:-false}
+    restart: "no"
+
+volumes:
+  kafka-data:
+  mongo-main-data:
+  mongo-logs-data:
+  m2-cache:

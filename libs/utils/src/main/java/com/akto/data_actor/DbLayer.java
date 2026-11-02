@@ -3379,13 +3379,38 @@ public class DbLayer {
 
 
     public static void ingestMetricsData(List<MetricData> metricData) {
+        storeMetricsData(metricData);
+        forwardMetricsData(metricData);
+    }
+
+    /**
+     * Optional storage override, installed once at startup by the cyborg web app when the log pipeline is on
+     * (LOG_KAFKA_ENABLED=true): metrics are then published to Kafka and the consumer persists them in the logs DB.
+     * Null (the default) = legacy behaviour: write to this process's own Mongo. Covers every in-process caller,
+     * e.g. the scheduled traffic-collector metrics job in AllMetrics, not only the HTTP handler.
+     */
+    public static volatile java.util.function.Consumer<List<MetricData>> metricsStoreOverride = null;
+
+    /** Persist only (cleanup + insert). The log pipeline consumer does the equivalent against the logs DB. */
+    public static void storeMetricsData(List<MetricData> metricData) {
+        java.util.function.Consumer<List<MetricData>> override = metricsStoreOverride;
+        if (override != null) {
+            override.accept(metricData);
+            return;
+        }
         // First check if cleanup should be performed
         if (MetricDataDao.instance.shouldPerformCleanup()) {
             long deletedCount = MetricDataDao.instance.deleteOldMetrics();
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
         MetricDataDao.instance.insertMany(metricData);
+    }
 
+    /**
+     * Forward only (New Relic / OpenTelemetry / Akto infra). Reads the integration settings from the MAIN db,
+     * so it must keep running in the API request path even when storage goes through the log pipeline.
+     */
+    public static void forwardMetricsData(List<MetricData> metricData) {
         int accountId = Context.accountId.get();
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
         boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;

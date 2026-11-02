@@ -41,6 +41,12 @@ public class InitializerListener implements ServletContextListener {
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         DictionaryFilter.readDictionaryBinary();
 
+        if (com.akto.logpipeline.LogPipeline.isEnabled()) {
+            // log pipeline on: metrics_data is persisted via Kafka -> logs DB (see DbLayer.metricsStoreOverride)
+            com.akto.data_actor.DbLayer.metricsStoreOverride =
+                    m -> com.akto.logpipeline.LogPipeline.publishMetricsData(com.akto.dao.context.Context.accountId.get(), m);
+        }
+
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         String triggerMergingCron = System.getenv("TRIGGER_MERGING_CRON");
 
