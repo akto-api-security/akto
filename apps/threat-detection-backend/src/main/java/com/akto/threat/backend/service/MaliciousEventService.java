@@ -587,8 +587,7 @@ public class MaliciousEventService {
     }
 
     boolean hasPayloadRegex = filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty();
-    boolean hasSearchText = filter.hasSearchText() && !filter.getSearchText().isEmpty();
-    long regexMaxTimeMs = hasPayloadRegex || hasSearchText ? REGEX_MAX_TIME_MS : 0;
+    long payloadRegexMaxTimeMs = hasPayloadRegex ? REGEX_MAX_TIME_MS : 0;
     if (hasPayloadRegex) {
       query.append("latestApiOrig", new Document("$regex", ThreatUtils.anchorLookaheadRegex(filter.getLatestApiOrigRegex())));
     }
@@ -693,7 +692,7 @@ public class MaliciousEventService {
     long total;
     MongoCursor<MaliciousEventDto> cursor;
     ActivityRows activityRows = groupActivities
-        ? listActivityRows(accountId, query, sort, sortBySeverity, sortByRiskScore, riskScoreDir, excludedFields, skip, limit, regexMaxTimeMs)
+        ? listActivityRows(accountId, query, sort, sortBySeverity, sortByRiskScore, riskScoreDir, excludedFields, skip, limit)
         : null;
     // $unset rejects an empty field list, so only add it when minimalFields populated excludedFields.
     List<Document> matchStages = new ArrayList<>();
@@ -706,7 +705,7 @@ public class MaliciousEventService {
           new Document("$match", query),
           new Document("$group", new Document("_id", dedupeGroupKey)),
           new Document("$count", "total")
-      )).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      )).cursor();
       total = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
       countCursor.close();
 
@@ -724,12 +723,12 @@ public class MaliciousEventService {
       }
       pipeline.add(new Document("$skip", skip));
       pipeline.add(new Document("$limit", limit));
-      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else if (activityRows != null) {
       total = activityRows.total;
       cursor = activityRows.cursor;
     } else if (sortBySeverity) {
-      total = maliciousEventDao.countDocuments(accountId, query, regexMaxTimeMs);
+      total = maliciousEventDao.countDocuments(accountId, query, payloadRegexMaxTimeMs);
       // Use aggregation pipeline for custom severity sorting
       List<Document> pipeline = new ArrayList<>(matchStages);
       pipeline.addAll(Arrays.asList(
@@ -738,9 +737,9 @@ public class MaliciousEventService {
               new Document("$skip", skip),
               new Document("$limit", limit)
           ));
-      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else if (sortByRiskScore) {
-      total = maliciousEventDao.countDocuments(accountId, query, regexMaxTimeMs);
+      total = maliciousEventDao.countDocuments(accountId, query, payloadRegexMaxTimeMs);
       List<Document> pipeline = new ArrayList<>(matchStages);
       pipeline.addAll(Arrays.asList(
               new Document("$addFields", riskScoreSortAddFields()),
@@ -748,12 +747,12 @@ public class MaliciousEventService {
               new Document("$skip", skip),
               new Document("$limit", limit)
           ));
-      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else {
-      total = maliciousEventDao.countDocuments(accountId, query, regexMaxTimeMs);
+      total = maliciousEventDao.countDocuments(accountId, query, payloadRegexMaxTimeMs);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
-          .maxTime(regexMaxTimeMs, TimeUnit.MILLISECONDS)
+          .maxTime(payloadRegexMaxTimeMs, TimeUnit.MILLISECONDS)
           .projection(Projections.exclude(excludedFields))
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
           .skip(skip)
@@ -994,7 +993,7 @@ public class MaliciousEventService {
   // Rows for an account that groups activities. Null if the grouped query fails, so the caller lists
   // events one per row as it always has instead of showing nothing.
   private ActivityRows listActivityRows(String accountId, Document query, Map<String, Integer> sort, boolean sortBySeverity,
-      boolean sortByRiskScore, int riskScoreDir, List<String> excludedFields, int skip, int limit, long maxTimeMs) {
+      boolean sortByRiskScore, int riskScoreDir, List<String> excludedFields, int skip, int limit) {
     try {
       // Keyed events are folded into activity rows; the rest stay one row each and come straight off
       // the indexes. Each side is cut to the page window before the two are merged and paged.
@@ -1009,12 +1008,12 @@ public class MaliciousEventService {
       List<Document> countPipeline = new ArrayList<>(rowStages);
       countPipeline.add(new Document("$count", "total"));
       MongoCursor<Document> countCursor = events
-          .aggregate(countPipeline, Document.class).hint(keyedIndex).allowDiskUse(true).maxTime(maxTimeMs, TimeUnit.MILLISECONDS).cursor();
+          .aggregate(countPipeline, Document.class).hint(keyedIndex).allowDiskUse(true).cursor();
       long keyedRows = countCursor.hasNext() ? ((Number) countCursor.next().get("total")).longValue() : 0;
       countCursor.close();
       // "No groupKey" can't use an index; all events minus keyed events can.
-      long keyedEvents = events.countDocuments(keyed, new CountOptions().hint(keyedIndex).maxTime(maxTimeMs, TimeUnit.MILLISECONDS));
-      long total = keyedRows + maliciousEventDao.countDocuments(accountId, query, maxTimeMs) - keyedEvents;
+      long keyedEvents = events.countDocuments(keyed, new CountOptions().hint(keyedIndex));
+      long total = keyedRows + maliciousEventDao.countDocuments(accountId, query) - keyedEvents;
 
       List<Document> sortStages = new ArrayList<>();
       if (sortBySeverity) {
@@ -1050,7 +1049,7 @@ public class MaliciousEventService {
       pipeline.addAll(sortStages);
       pipeline.add(new Document("$skip", skip));
       pipeline.add(new Document("$limit", limit));
-      MongoCursor<MaliciousEventDto> cursor = events.aggregate(pipeline).hint(keyedIndex).allowDiskUse(true).maxTime(maxTimeMs, TimeUnit.MILLISECONDS).cursor();
+      MongoCursor<MaliciousEventDto> cursor = events.aggregate(pipeline).hint(keyedIndex).allowDiskUse(true).cursor();
       return new ActivityRows(total, cursor);
     } catch (Exception e) {
       logger.error("listActivityRows failed for accountId=" + accountId + ", listing ungrouped: " + e.getMessage());

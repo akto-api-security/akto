@@ -272,12 +272,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = ThreatsUtils.readResponseBody(resp.getEntity());
 
-      int statusCode = resp.getStatusLine().getStatusCode();
-      if (statusCode == 429 || statusCode == 504) {
-        addActionError(responseBody);
-        return ERROR.toUpperCase();
-      }
-
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
           ListMaliciousRequestsResponse.class, responseBody)
           .ifPresent(
