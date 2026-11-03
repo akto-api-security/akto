@@ -14,7 +14,7 @@ import { AgentIcon } from '../../nhi_governance/nhiViolationsData'
 
 const resourceName = { singular: 'rule', plural: 'rules' }
 
-const DEFAULT_AGENTS = ['Claude Code', 'Cursor', 'Codex', 'GitHub Copilot']
+const DEFAULT_AGENTS = ['Claude Code', 'Codex', 'Cursor CLI']
 
 const OS_TABS = [
     { label: 'macOS', value: 'darwin' },
