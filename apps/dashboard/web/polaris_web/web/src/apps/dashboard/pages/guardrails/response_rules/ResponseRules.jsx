@@ -12,7 +12,7 @@ import ResponseRuleModal from "./ResponseRuleModal";
 import { PAGE_SIZE } from "./constants";
 import transform from "./transform";
 
-const HEADINGS = [{ title: "Active" }, { title: "Rule" }, { title: "Runs" }, { title: "Last run" }, { title: "" }];
+const HEADINGS = [{ title: "Active" }, { title: "Rule" }, { title: "Created by" }, { title: "Runs" }, { title: "Last run" }, { title: "" }];
 
 function RuleMenu({ onEdit, onDuplicate, onDelete }) {
     const [open, setOpen] = useState(false);
@@ -55,6 +55,7 @@ function RuleRow({ rule, index, onToggle, onEdit, onDuplicate, onDelete }) {
                     </VerticalStack>
                 </Box>
             </IndexTable.Cell>
+            <IndexTable.Cell><Text as="span" color="subdued">{rule.createdBy || "-"}</Text></IndexTable.Cell>
             <IndexTable.Cell>{transform.runsText(rule)}</IndexTable.Cell>
             <IndexTable.Cell><Text as="span" color="subdued">{transform.lastRunText(rule)}</Text></IndexTable.Cell>
             <IndexTable.Cell>
@@ -108,7 +109,14 @@ function ResponseRules() {
         load(page);
     };
 
-    const onToggle = async (rule, active) => {
+    const onToggle = (rule, active) => {
+        const message = active
+            ? `Turn on "${rule.name}"? It will run on every new violation that matches.`
+            : `Turn off "${rule.name}"? New violations will no longer trigger it.`;
+        func.showConfirmationModal(message, active ? "Turn on" : "Turn off", () => applyToggle(rule, active));
+    };
+
+    const applyToggle = async (rule, active) => {
         setRules((current) => current.map((entry) => (entry.hexId === rule.hexId ? { ...entry, active } : entry)));
         try {
             await api.toggleGuardrailResponseRule(rule.hexId, active);
