@@ -183,7 +183,7 @@ public class DashboardRouter implements ARouter {
                 ProtoMessageUtils.toString(
                     dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode, humanResponseFilter)
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            }, false);
+            });
 
         router
             .post("/list_guardrail_violation_payloads")

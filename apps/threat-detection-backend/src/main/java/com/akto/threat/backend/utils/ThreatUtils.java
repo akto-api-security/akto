@@ -30,6 +30,10 @@ public class ThreatUtils {
    * Events of the given hosts, matched the same way as the activity list: exact host, loose "device service"
    * key, or claude-config events by device id. Null when nothing is given.
    */
+  public static final long REGEX_MAX_TIME_MS = Long.parseLong(
+      System.getenv().getOrDefault("LATEST_API_ORIG_REGEX_MAX_TIME_MS", "60000")
+  );
+
   public static String anchorLookaheadRegex(String regex) {
     if (regex != null && regex.startsWith("(?i)(?=")) {
       return "(?is)^" + regex.substring(4);
