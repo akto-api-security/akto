@@ -2033,7 +2033,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    /** Creates the group if it does not exist yet. Called at the start of updateCustomCollections, which then fills it and keeps it up to date. */
+    /** Creates the group if it does not exist yet. Called by setUpUpdateCustomCollections for every account; accounts with the api group feature then get it filled and kept up to date. */
     public static void createUnauthenticatedApiGroup() {
 
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
@@ -2575,7 +2575,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void updateCustomCollections() {
-        createUnauthenticatedApiGroup();
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
                 Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()));
 
@@ -2648,6 +2647,8 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
+                            // for every account, not only the ones with the feature below
+                            createUnauthenticatedApiGroup();
                             if(!OrganizationsDao.instance.checkFeatureAccess(t.getId(), AKTO_API_GROUP_CRONS)){
                                 logger.info("Skipping update custom collections for account: " + t.getId());
                                 return;
