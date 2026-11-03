@@ -42,6 +42,7 @@ cp .env.example .env   # edit once — never commit .env
 | `*_FOUNDRY_*` (Azure AI Foundry providers) | yes | yes |
 | `BEDROCK_*` (AWS Bedrock provider) | yes | yes |
 | `REACHBACK_*` (Morgan Stanley reach-back demo API) | yes | no |
+| `OCR_MODEL_CONFIG_JSON` / `AZURE_VISION_*` (image OCR) | yes | yes |
 
 ## AWS Bedrock (`bedrock` provider)
 
@@ -79,6 +80,32 @@ IRSA, `sts.<region>` (VPC interface endpoints keep both private), plus
   interface endpoint); credentials and region are env-only.
 - Converse returns no logprobs, so Bedrock suits the LLM-judge roles (JSON
   verdict prompts), not the Qwen3Guard logprob-confidence path.
+
+## Image OCR (`POST /ocr`)
+
+Extracts the text in an image, so guardrails-service can hand images to
+agent-guard and agent-guard picks the OCR provider. The image goes to the
+providers in `OCR_MODEL_CONFIG_JSON`, in order: the first that answers wins,
+and one that fails or times out falls through to the next.
+
+| Variable | Notes |
+|----------|-------|
+| `OCR_MODEL_CONFIG_JSON` | JSON list, e.g. `[{"provider": "azure_vision", "baseUrl": "https://<resource>.cognitiveservices.azure.com", "timeoutMs": 30000}]`. An entry may set its own `baseUrl` and `timeoutMs` (default 30000); keys are env-only. Unset → one `azure_vision` entry when both vars below are set. |
+| `AZURE_VISION_BASE_URL` | Azure Computer Vision resource endpoint (OCR v3.2) for `azure_vision` entries without a `baseUrl` |
+| `AZURE_VISION_API_KEY` | that resource's key (`Ocp-Apim-Subscription-Key`) |
+
+Providers: `azure_vision` (Azure Computer Vision OCR v3.2).
+
+```bash
+curl -s localhost:8090/ocr -H 'Content-Type: application/json' \
+  -d "{\"image_b64\": \"$(base64 -w0 screenshot.png)\"}"
+# 200 {"text": "line one\nline two", "provider": "azure_vision"}
+# 400 missing/invalid base64 · 413 image over 4 MB · 503 no provider configured
+# 502 {"error": "every OCR provider failed", "failures": [{"provider": "azure_vision", "reason": "HTTP 401"}]}
+```
+
+Like `/scan`, the endpoint has no auth of its own: anything that can reach
+agent-guard can run OCR on the configured key.
 
 ## Morgan Stanley reach-back gateway (`POST /reachback/test`)
 

@@ -18,6 +18,7 @@ import reachback
 import scan_diag
 from constants import get_default_config
 from model_map import build_arbiter
+from ocr import ocr_payload
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -173,6 +174,13 @@ async def guardrails_llm_async(body: GuardrailsLLMRequest):
     """Same as /guardrails/llm for the calls that run after the block has been returned (reason, evidence,
     remediation): a larger reply ceiling, since nobody is waiting on them."""
     return await _run_guardrails_llm(body, relaxed=True)
+
+
+@app.post("/ocr")
+async def ocr(body: dict[str, Any]):
+    """Text from an image ({"image_b64": ...}) via the providers in OCR_MODEL_CONFIG_JSON, in order (see ocr.py)."""
+    status, result = await ocr_payload(body)
+    return JSONResponse(status_code=status, content=result)
 
 
 @app.post("/reachback/test")

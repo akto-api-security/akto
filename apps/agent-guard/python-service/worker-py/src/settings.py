@@ -76,6 +76,11 @@ _FIELDS = (
     "REACHBACK_MTLS_CERT_FILE",
     "REACHBACK_MTLS_KEY_FILE",
     "REACHBACK_CA_FILE",
+    # Image OCR (POST /ocr, ocr.py): the ordered provider list (JSON) and the Azure Computer Vision resource its
+    # "azure_vision" entries use. With the list unset, OCR uses azure_vision when both of these are set.
+    "OCR_MODEL_CONFIG_JSON",
+    "AZURE_VISION_BASE_URL",
+    "AZURE_VISION_API_KEY",
     # Integrations
     "SLACK_WEBHOOK_URL",
     "DATABASE_ABSTRACTOR_SERVICE_URL",
@@ -183,6 +188,9 @@ class Settings:
     REACHBACK_MTLS_CERT_FILE: str
     REACHBACK_MTLS_KEY_FILE: str
     REACHBACK_CA_FILE: str
+    OCR_MODEL_CONFIG_JSON: str
+    AZURE_VISION_BASE_URL: str
+    AZURE_VISION_API_KEY: str
     SLACK_WEBHOOK_URL: str
     FALLBACK_SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str

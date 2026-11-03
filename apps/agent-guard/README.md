@@ -39,6 +39,11 @@ curl -s -X POST localhost:8090/scan/batch \
   -H 'content-type: application/json' \
   -d '[{"scanner_name":"Secrets","text":"AKIAIOSFODNN7EXAMPLE"}]'
 
+# OCR an image (providers from OCR_MODEL_CONFIG_JSON, see ENV.md)
+curl -s -X POST localhost:8090/ocr \
+  -H 'content-type: application/json' \
+  -d "{\"image_b64\":\"$(base64 -w0 screenshot.png)\"}"
+
 # Anonymize (via worker)
 curl -s -X POST localhost:8090/scan \
   -H 'content-type: application/json' \
