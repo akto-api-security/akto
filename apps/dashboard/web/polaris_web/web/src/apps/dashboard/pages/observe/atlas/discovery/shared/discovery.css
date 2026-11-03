@@ -1,0 +1,22 @@
+/* Rounded colour key for a status; the colour comes from the data as --swatch-color. */
+.discovery-swatch {
+    width: 10px;
+    height: 10px;
+    flex: none;
+    border-radius: 3px;
+    background: var(--swatch-color);
+}
+
+/* A flush card that fills its grid cell, so a footer can sit at the bottom. */
+.discovery-card-fill {
+    display: flex;
+    flex-direction: column;
+}
+.discovery-card-fill > .Polaris-Box {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.discovery-card__footer {
+    margin-top: auto;
+}

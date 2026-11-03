@@ -56,6 +56,9 @@ public class InsightService {
      */
     public InsightDataBundle getOrLoadBundle(InsightContext ctx) {
         String key = ctx.bundleCacheKey();
+        // Drop long-expired entries (never one being refreshed) so the map stays bounded.
+        long nowMs = System.currentTimeMillis();
+        BUNDLE_CACHE.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * BUNDLE_CACHE_TTL_MS);
         CachedBundle cached = BUNDLE_CACHE.compute(key, (k, existing) -> {
             if (existing != null && System.currentTimeMillis() - existing.loadedAtMs < BUNDLE_CACHE_TTL_MS) return existing;
             return new CachedBundle(loader.load(ctx), System.currentTimeMillis());

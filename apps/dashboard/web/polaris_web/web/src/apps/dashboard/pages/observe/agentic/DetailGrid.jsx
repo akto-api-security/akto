@@ -3,7 +3,7 @@ import { Box, HorizontalGrid, HorizontalStack, Link, VerticalStack, Text } from 
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import TooltipText from "../../../components/shared/TooltipText";
 
-export default function DetailGrid({ heading, items = [], columns = 1, labelWidth = "140px" }) {
+export default function DetailGrid({ heading, items = [], columns = 1, labelWidth = "140px", valueMaxWidth = "150px" }) {
     const renderLabel = (d) => (
         <HorizontalStack gap="1" blockAlign="center">
             <Text variant="bodySm" color="subdued">{d.label}</Text>
@@ -13,12 +13,11 @@ export default function DetailGrid({ heading, items = [], columns = 1, labelWidt
 
     const cell = (d) => {
         const text = d.value || "-"
-        const display = <TooltipText tooltip={text} text={text} />
+        // The text styling goes through TooltipText: it renders a div, which cannot sit inside a Text paragraph.
+        const display = <TooltipText tooltip={text} text={text} textProps={{ variant: "bodySm", fontWeight: "semibold", color: d.isWarning ? "warning" : undefined }} />
         const content = (
-            <Box maxWidth="150px">
-                <Text variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined}>
-                    {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
-                </Text>
+            <Box maxWidth={valueMaxWidth}>
+                {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
             </Box>
         );
         return content;

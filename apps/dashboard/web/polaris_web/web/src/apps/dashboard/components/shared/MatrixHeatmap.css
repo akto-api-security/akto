@@ -1,0 +1,62 @@
+/* Row x column heatmap. Layout values arrive as CSS custom properties from MatrixHeatmap.jsx. */
+.matrix-heatmap {
+    overflow-x: auto;
+}
+
+.matrix-heatmap__grid {
+    display: grid;
+    grid-template-columns: var(--label-width) repeat(var(--columns), minmax(var(--min-cell-width), 1fr));
+    gap: 3px;
+    min-width: var(--grid-min-width);
+    font-size: 12px;
+}
+
+.matrix-heatmap__column {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    align-self: end;
+    padding-bottom: 4px;
+    line-height: 14px;
+    text-align: center;
+    color: var(--p-color-text-subdued);
+}
+
+.matrix-heatmap__column--danger {
+    color: #8E1F0B;
+    font-weight: 600;
+}
+
+.matrix-heatmap__row {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.matrix-heatmap__cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--cell-height);
+    border-radius: 4px;
+    background: var(--cell-bg);
+    color: var(--cell-fg);
+    font-weight: 500;
+}
+
+.matrix-heatmap__scale {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--p-color-text-subdued);
+}
+
+.matrix-heatmap__scale-bar {
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #F4EEFF, #B38CFF, #6200EA);
+}

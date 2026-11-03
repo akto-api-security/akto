@@ -87,6 +87,7 @@ const PAGE_REQUIRES = {
     '/dashboard/observe/audit': 'api/fetchAuditData',
     '/dashboard/observe/llm-observability': 'api/fetchLLMSessions',
     '/dashboard/observe/endpoint-shield': 'api/fetchEndpointShieldAgents',
+    '/dashboard/observe/agentic-discovery': 'api/fetchAtlasDiscoveryOverview',
     '/dashboard/nhi/identities': 'api/fetchAllNhiIdentities',
     '/dashboard/nhi/violations': 'api/fetchAllNhiViolations',
     '/dashboard/nhi/policies': 'api/fetchNhiPolicies',

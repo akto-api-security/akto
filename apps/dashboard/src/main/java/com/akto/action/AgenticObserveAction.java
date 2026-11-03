@@ -14,7 +14,9 @@ import com.akto.dao.AgentUsersDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.service.atlas.AtlasToolRow;
 import com.akto.service.insights.HostCollectionResolver;
+import com.akto.service.insights.InsightUtil;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.ApiInfo;
@@ -65,6 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.stream.Collectors;
 
 /**
  * Violations for agentic observe flyouts and assets table.
@@ -595,6 +598,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // account-wide agenticFlatData this rebuild deliberately doesn't send.
         final Map<String, Set<Integer>> serviceCollectionIds = new HashMap<>();
         final List<Integer> collectionIds = new ArrayList<>();
+        // Atlas flyout: the collections that hold this tool's own observed tools.
+        final Set<Integer> capabilityCollectionIds = new LinkedHashSet<>();
+        final Set<String> personalEndpointIds = new HashSet<>();
         double maxRiskScore = 0;
         Double baseRiskScore;
         String baseRiskScoreReason;
@@ -620,8 +626,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             this.rowType = rowType;
         }
 
+        // An MCP server's collections are all the server; an agent's own collection is the one named after it.
+        private boolean holdsOwnTools(String hostName) {
+            if ("service".equals(rowType)) return true;
+            if (!"agent".equals(rowType)) return false;
+            String serviceName = extractServiceNameForGrouping(hostName);
+            return serviceName != null && McpClientRegistry.resolveClientKey(serviceName).equalsIgnoreCase(groupKey);
+        }
+
         void accumulateCheap(ApiCollection c, String hostName, List<CollectionTags> envType, double collRisk, int collTraffic, String deviceId, List<String> sensitive) {
             collectionIds.add(c.getId());
+            if (holdsOwnTools(hostName)) capabilityCollectionIds.add(c.getId());
             hostNames.add(hostName);
             if (deviceId != null) endpointIds.add(deviceId);
             if (sensitive != null) {
@@ -662,6 +677,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     String value = tag.getValue();
                     if (("browser-llm-account-type".equals(key) || "login-user-email-type".equals(key)) && "personal".equals(value)) {
                         hasPersonalAccount = true;
+                        if (deviceId != null) personalEndpointIds.add(deviceId);
                     }
                     if ("local-mcp-server".equals(key)) hasLocalMcpServer = true;
                     if ("misconfigured-config".equals(key) && "true".equals(value)) {
@@ -4006,5 +4022,102 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         if (parts.length < 3) return null;
         if (Constants.AKTO_AI_AGENT_TAG.equals(parts[1])) return StringUtils.trimToNull(String.join(".", Arrays.copyOfRange(parts, 2, parts.length)));
         return parts[1];
+    }
+
+    private static final int ATLAS_VENDOR_HOST_SCAN_LIMIT = 50;
+    // Hosts of tools with no known vendor carry this placeholder in the vendor segment.
+    private static final String ATLAS_UNKNOWN_VENDOR = "unknown";
+
+    // Same server runs on many devices with the same tools, so a few collections describe it.
+    private static final int ATLAS_CAPABILITY_COLLECTIONS = 5;
+
+    // Atlas discovery's per-tool rows: one per classified group, with its devices and agent -> MCP server edges.
+    public List<AtlasToolRow> fetchAtlasToolRows() {
+        ClassificationCacheEntry cached = getOrBuildClassification(getOrComputeTrafficMap(), getOrComputeRiskScoreMap(), Collections.emptyMap());
+        Map<Integer, String> deviceByCollection = new HashMap<>();
+        Set<Integer> maliciousCollectionIds = new HashSet<>();
+        for (ApiCollection c : cached.collections) {
+            String deviceId = AgenticObserveUtil.extractEndpointId(c.getHostName());
+            if (deviceId != null) deviceByCollection.put(c.getId(), deviceId);
+            if (InsightUtil.isMaliciousMcpServer(c)) maliciousCollectionIds.add(c.getId());
+        }
+        Set<String> maliciousSkillKeys = atlasMaliciousSkillKeys();
+        List<AtlasToolRow> rows = new ArrayList<>();
+        for (GroupSummary g : cached.groups.values()) {
+            AtlasToolRow row = new AtlasToolRow();
+            row.setGroupKey(g.groupKey);
+            row.setRowType(g.rowType);
+            row.setName(StringUtils.defaultIfBlank(g.name, g.groupKey));
+            row.setClientType(g.clientType);
+            row.setVendorName(atlasVendorName(g));
+            row.setRiskReason(g.baseRiskScoreReason);
+            row.setRiskScore(g.maxRiskScore > 0 ? AgenticObserveUtil.roundRiskScore(g.maxRiskScore) : 0);
+            row.setFirstSeen(g.minStartTs);
+            row.setLastSeen(g.maxTrafficTimestamp);
+            // Skill and plugin rows borrow their parent agent's flags, so they must not count them again.
+            boolean fanOut = "skill".equals(g.rowType) || "plugin".equals(g.rowType);
+            row.setPersonal(g.hasPersonalAccount && !fanOut);
+            row.setLocalMcp(g.hasLocalMcpServer && !fanOut);
+            row.setMisconfigured(g.hasMisconfiguredConfig && !fanOut);
+            row.setMisconfiguredDevices(fanOut ? 0 : g.misconfiguredEndpointIds.size());
+            row.setPersonalDevices(fanOut ? 0 : g.personalEndpointIds.size());
+            if (!fanOut) {
+                row.setMisconfiguredDeviceIds(new HashSet<>(g.misconfiguredEndpointIds));
+                row.setPersonalDeviceIds(new HashSet<>(g.personalEndpointIds));
+            }
+            row.setMalicious(atlasIsMalicious(g, maliciousCollectionIds, maliciousSkillKeys));
+            row.setDeviceIds(new HashSet<>(g.endpointIds));
+            row.setCapabilityCollectionIds(g.capabilityCollectionIds.stream().limit(ATLAS_CAPABILITY_COLLECTIONS).collect(Collectors.toList()));
+            if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) row.setRawValues(new ArrayList<>(aiAgentRawValues(g)));
+            for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
+                Set<String> devices = new HashSet<>();
+                for (Integer collectionId : e.getValue()) {
+                    String deviceId = deviceByCollection.get(collectionId);
+                    if (deviceId != null) devices.add(deviceId);
+                }
+                row.getMcpDevices().put(e.getKey(), devices);
+            }
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    // Host names of one Atlas tool's group, so its violations can be summed from per-host counts.
+    public Set<String> fetchAtlasToolHosts(String rowType, String groupKey) {
+        ClassificationCacheEntry cached = getOrBuildClassification(getOrComputeTrafficMap(), getOrComputeRiskScoreMap(), Collections.emptyMap());
+        GroupSummary group = cached.groups.get(rowType + "|" + groupKey);
+        return group == null ? Collections.emptySet() : new HashSet<>(group.hostNames);
+    }
+
+    // A malicious-tagged MCP server collection, or a skill the skill scan flagged ("<collectionId>|<skill>" keys).
+    private static boolean atlasIsMalicious(GroupSummary g, Set<Integer> maliciousCollectionIds, Set<String> maliciousSkillKeys) {
+        boolean skill = "skill".equals(g.rowType) && StringUtils.isNotBlank(g.name);
+        String skillKeySuffix = skill ? "|" + g.name.toLowerCase(Locale.ROOT) : null;
+        for (Integer collectionId : g.collectionIds) {
+            if (maliciousCollectionIds.contains(collectionId)) return true;
+            if (skill && maliciousSkillKeys.contains(collectionId + skillKeySuffix)) return true;
+        }
+        return false;
+    }
+
+    // The skill scan is cached for a minute and optional here: a failure must not blank the overview.
+    private Set<String> atlasMaliciousSkillKeys() {
+        try {
+            return getOrBuildSkillData().maliciousSkillKeys;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Atlas discovery: skill scan unavailable: " + e.getMessage());
+            return Collections.emptySet();
+        }
+    }
+
+    // First vendor an endpoint host of this group resolves to; bounded so a 25k-host group stays cheap.
+    private static String atlasVendorName(GroupSummary g) {
+        int scanned = 0;
+        for (String host : g.hostNames) {
+            if (scanned++ >= ATLAS_VENDOR_HOST_SCAN_LIMIT) break;
+            String vendor = InsightUtil.endpointVendorNameOfHost(host);
+            if (vendor != null && !ATLAS_UNKNOWN_VENDOR.equalsIgnoreCase(vendor)) return vendor;
+        }
+        return null;
     }
 }

@@ -20,6 +20,9 @@ import SessionStore from "../../main/SessionStore";
 import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 import { loadPermissions } from "@/util/permissions";
 
+// A toast with a button stays up longer so there is time to use it.
+const TOAST_WITH_ACTION_MS = 10000;
+
 
 function Dashboard() {
 
@@ -179,7 +182,7 @@ function Dashboard() {
     }
 
     const toastMarkup = toastConfig.isActive ? (
-        <Toast content={toastConfig.message} error={toastConfig.isError} onDismiss={disableToast} duration={2000} />
+        <Toast content={toastConfig.message} error={toastConfig.isError} action={toastConfig.action} onDismiss={disableToast} duration={toastConfig.action ? TOAST_WITH_ACTION_MS : 2000} />
     ) : null;
 
     const confirmationModalConfig = Store(state => state.confirmationModalConfig)

@@ -109,11 +109,13 @@ const IPV6_REGEX = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|(([0-9a-fA-F]{1,4}:
 const func = {
   categoryMapping: categoryMapping,
   agenticCategoryMapping: agenticCategoryMapping,
-  setToast (isActive, isError, message) {
+  // `action` is optional: { content, onAction } adds a button to the toast (e.g. Undo).
+  setToast (isActive, isError, message, action) {
     Store.getState().setToastConfig({
           isActive: isActive,
           isError: isError,
-          message: message
+          message: message,
+          action: action
       })
   },
   formatJsonForEditor(data){

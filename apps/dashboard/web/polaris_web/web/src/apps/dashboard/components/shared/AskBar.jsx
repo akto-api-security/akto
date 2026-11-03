@@ -26,6 +26,9 @@ function AskBar({
     suggestions = [],
     chatScope,
     conversationType = "AGENTIC_OBSERVE",
+    // false drops the input and shows only a titled panel of suggestion chips.
+    showInput = true,
+    title,
 }) {
     const [query, setQuery] = useState("");
     const [messages, setMessages] = useState([]);
@@ -67,6 +70,59 @@ function AskBar({
         setConversationId(null);
         setLoading(false);
     }, []);
+
+    const suggestionsNode = suggestions.length > 0 && (
+        <HorizontalStack gap="2" blockAlign="center">
+            {showInput && <Text variant="bodySm" color="subdued">Try</Text>}
+            {suggestions.map((suggestion) => (
+                <Pressable
+                    key={suggestion}
+                    onClick={() => submit(suggestion)}
+                    background="bg-subdued"
+                    hoverBackground="bg-primary-subdued-hover"
+                    borderWidth="1"
+                    borderColor="border"
+                    hoverBorderColor="border-ask-magic"
+                    borderRadius="full"
+                    opacity={loading ? "0.6" : undefined}
+                    paddingBlockStart="1"
+                    paddingBlockEnd="1"
+                    paddingInlineStart="3"
+                    paddingInlineEnd="3"
+                >
+                    <Text as="span" variant="bodySm">{suggestion}</Text>
+                </Pressable>
+            ))}
+        </HorizontalStack>
+    );
+
+    const messagesNode = messages.length > 0 && (
+        <VerticalStack gap="3">
+            <Divider />
+            {messages.map((msg) => (
+                msg.role === "user"
+                    ? <AgenticUserMessage key={msg.id} content={msg.message} />
+                    : <AgenticStreamingResponse key={msg.id} content={msg.message} />
+            ))}
+            {loading && <AgenticThinkingBox />}
+            <HorizontalStack align="end">
+                <Button plain onClick={clear}>Clear conversation</Button>
+            </HorizontalStack>
+        </VerticalStack>
+    );
+
+    // Chips only, in a tinted panel: used inside flyouts where the questions are fixed.
+    if (!showInput) {
+        return (
+            <Box background="bg-primary-subdued-hover" borderWidth="1" borderColor="border-magic" borderRadius="3" padding="4">
+                <VerticalStack gap="3">
+                    <Box color="text-ask-magic"><Text as="h3" variant="headingSm">{title || label}</Text></Box>
+                    {suggestionsNode}
+                    {messagesNode}
+                </VerticalStack>
+            </Box>
+        );
+    }
 
     return (
         <LegacyCard>
@@ -121,44 +177,8 @@ function AskBar({
                             <Button primary submit size="large" loading={loading}>Ask</Button>
                         </HorizontalStack>
                     </Form>
-                    {suggestions.length > 0 && (
-                        <HorizontalStack gap="2" blockAlign="center">
-                            <Text variant="bodySm" color="subdued">Try</Text>
-                            {suggestions.map((suggestion) => (
-                                <Pressable
-                                    key={suggestion}
-                                    onClick={() => submit(suggestion)}
-                                    background="bg-subdued"
-                                    hoverBackground="bg-primary-subdued-hover"
-                                    borderWidth="1"
-                                    borderColor="border"
-                                    hoverBorderColor="border-ask-magic"
-                                    borderRadius="full"
-                                    opacity={loading ? "0.6" : undefined}
-                                    paddingBlockStart="1"
-                                    paddingBlockEnd="1"
-                                    paddingInlineStart="3"
-                                    paddingInlineEnd="3"
-                                >
-                                    <Text as="span" variant="bodySm">{suggestion}</Text>
-                                </Pressable>
-                            ))}
-                        </HorizontalStack>
-                    )}
-                    {messages.length > 0 && (
-                        <VerticalStack gap="3">
-                            <Divider />
-                            {messages.map((msg) => (
-                                msg.role === "user"
-                                    ? <AgenticUserMessage key={msg.id} content={msg.message} />
-                                    : <AgenticStreamingResponse key={msg.id} content={msg.message} />
-                            ))}
-                            {loading && <AgenticThinkingBox />}
-                            <HorizontalStack align="end">
-                                <Button plain onClick={clear}>Clear conversation</Button>
-                            </HorizontalStack>
-                        </VerticalStack>
-                    )}
+                    {suggestionsNode}
+                    {messagesNode}
                 </VerticalStack>
             </Box>
         </LegacyCard>

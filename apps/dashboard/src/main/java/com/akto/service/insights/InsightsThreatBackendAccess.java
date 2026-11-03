@@ -22,7 +22,7 @@ import java.util.Map;
  */
 public class InsightsThreatBackendAccess extends AbstractThreatDetectionAction {
 
-    List<HostSeverityCount> hostSeverityCounts(int startTs, int endTs) {
+    public List<HostSeverityCount> hostSeverityCounts(int startTs, int endTs) {
         return fetchHostSeverityCounts(startTs, endTs);
     }
 

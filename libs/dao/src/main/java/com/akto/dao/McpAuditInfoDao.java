@@ -59,6 +59,10 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
         fieldNames = new String[]{"updatedTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
+        // Lets the Atlas discovery decisions be read in _id order within a type without a sort.
+        fieldNames = new String[]{"type", "_id"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
         fieldNames = new String[]{McpAuditInfo.MCP_HOST, McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
