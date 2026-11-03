@@ -411,17 +411,28 @@ export function buildFallbackDetail(row) {
     const evidenceText = primaryValue || (row.evidenceText !== "-" ? row.evidenceText : "") || row.evidenceLine || row.violation;
     const evidenceIsMono = isJson && !!primaryValue && evidenceText === primaryValue;
 
+    // promptBody must come only from the request/tool-call payload. Never fall back to
+    // `reason` (a response/evidence-derived explanation) here — that leaks response
+    // content into what's meant to show what was actually requested; `reason` already
+    // renders in its own "Reason" field below. Config & Skill violations show the full
+    // captured file (Config.json with the flagged field highlighted / the skill's
+    // name+description+content) instead of just the small evidence excerpt - same
+    // content the old separate Config.json/Skill Info tabs used to show.
+    const showsFullFile = row.type === "Config" || row.type === "Skill";
+    const promptBody = (showsFullFile ? fileContent : null) || primaryValueFull || undefined;
+
     // Atlas and Argus: highlight the backend evidenceLine inside the text shown, as the old side window does. Config keeps its own field highlight.
-    const evidenceHighlights = (text) => {
-        if (!(isEndpointSecurityCategory() || isAgenticSecurityCategory()) || row.type === "Config") return undefined;
-        const phrases = buildEvidenceVulnerabilitySegments(row.evidenceLine, text, "").map((segment) => segment.phrase);
-        return phrases.length > 0 ? phrases : undefined;
-    };
     // The evidence can sit in the response instead (e.g. a tool whose output carried the PII): then show that side too.
     const responseText = typeof outer.responsePayload === "string" ? outer.responsePayload : "";
-    const responseEvidence = responseText && (isEndpointSecurityCategory() || isAgenticSecurityCategory()) && row.type !== "Config"
-        ? buildEvidenceVulnerabilitySegments(row.evidenceLine, "", responseText).map((segment) => segment.phrase)
+    const evidenceSegments = (isEndpointSecurityCategory() || isAgenticSecurityCategory()) && row.type !== "Config"
+        ? buildEvidenceVulnerabilitySegments(row.evidenceLine, promptBody || "", responseText)
         : [];
+    const phrasesAt = (location) => {
+        const phrases = evidenceSegments.filter((segment) => segment.location === location).map((segment) => segment.phrase);
+        return phrases.length > 0 ? phrases : undefined;
+    };
+    const requestEvidence = phrasesAt("REQUEST");
+    const responseEvidence = phrasesAt("RESPONSE");
 
     // Don't repeat `reason` in the trigger line when it's already the exact text shown
     // above in the evidence box (happens when there's no body/evidence field, so evidenceText
@@ -434,7 +445,7 @@ export function buildFallbackDetail(row) {
         evidence: {
             title: "Guardrail Violation",
             text: evidenceText,
-            highlights: primaryValue ? evidenceHighlights(evidenceText) : undefined,
+            highlights: primaryValue ? requestEvidence : undefined,
             mono: evidenceIsMono,
             // Atlas only: row.user is a real device user there. On Argus it's a host fragment
             // (e.g. "slash2-api" from slash2-api.concierge.razorpay.com), which reads as a
@@ -458,21 +469,12 @@ export function buildFallbackDetail(row) {
         fileHighlights: fileHighlights || undefined,
         skillName: skillName || undefined,
         promptResponse: (() => {
-            // promptBody must come only from the request/tool-call payload. Never fall back to
-            // `reason` (a response/evidence-derived explanation) here — that leaks response
-            // content into what's meant to show what was actually requested; `reason` already
-            // renders in its own "Reason" field below. Config & Skill violations show the full
-            // captured file (Config.json with the flagged field highlighted / the skill's
-            // name+description+content) instead of just the small evidence excerpt - same
-            // content the old separate Config.json/Skill Info tabs used to show.
-            const showsFullFile = row.type === "Config" || row.type === "Skill";
-            const promptBody = (showsFullFile ? fileContent : null) || primaryValueFull || undefined;
             return {
                 valueLabel: VALUE_SECTION_LABELS[row.type] || VALUE_SECTION_LABELS.Other,
                 promptBody,
-                highlights: row.type === "Config" ? (fileHighlights || undefined) : evidenceHighlights(promptBody),
-                responseBody: responseEvidence.length > 0 ? responseText : undefined,
-                responseHighlights: responseEvidence.length > 0 ? responseEvidence : undefined,
+                highlights: row.type === "Config" ? (fileHighlights || undefined) : requestEvidence,
+                responseBody: responseEvidence ? responseText : undefined,
+                responseHighlights: responseEvidence,
                 behaviour: row.behaviourRaw || meta.behaviour || meta.nbehaviour || row.action || undefined,
                 blockedAt: resp?.error?.data?.blocked_at || row.detected || undefined,
                 blockedBy: resp?.error?.data?.blocked_by || policyName || undefined,
