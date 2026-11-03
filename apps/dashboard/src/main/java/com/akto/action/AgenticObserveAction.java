@@ -156,14 +156,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Set<String> maliciousSkillKeys;
         final Set<String> misconfiguredSkills;
         final Set<Integer> misconfiguredCollectionIds;
+        // Same "<collectionId>|<skillNameLowercase>" keys as maliciousSkillKeys -> that copy's skill-tags
+        final Map<String, Set<String>> skillTagsByKey;
         final long builtAt;
         SkillDataCacheEntry(Map<String, Float> skillScoreMap, Set<String> maliciousSkills, Set<String> maliciousSkillKeys,
-                Set<String> misconfiguredSkills, Set<Integer> misconfiguredCollectionIds, long builtAt) {
+                Set<String> misconfiguredSkills, Set<Integer> misconfiguredCollectionIds,
+                Map<String, Set<String>> skillTagsByKey, long builtAt) {
             this.skillScoreMap = skillScoreMap;
             this.maliciousSkills = maliciousSkills;
             this.maliciousSkillKeys = maliciousSkillKeys;
             this.misconfiguredSkills = misconfiguredSkills;
             this.misconfiguredCollectionIds = misconfiguredCollectionIds;
+            this.skillTagsByKey = skillTagsByKey;
             this.builtAt = builtAt;
         }
     }
@@ -203,6 +207,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Set<String> maliciousSkillKeys = new HashSet<>();
             Set<String> misconfiguredSkills = new HashSet<>();
             Set<Integer> misconfiguredCollectionIds = new HashSet<>();
+            Map<String, Set<String>> skillTagsByKey = new HashMap<>();
 
             for (ApiInfo info : apiInfos) {
                 if (info == null || info.getId() == null) continue;
@@ -221,6 +226,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                             maliciousSkillKeys.add(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT));
                         }
                         if (misconfigured) misconfiguredSkills.add(skillName);
+                        Set<String> skillTags = skillTagValues(info.getTagsList());
+                        if (!skillTags.isEmpty()) {
+                            skillTagsByKey.put(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT), skillTags);
+                        }
                     }
                 }
                 if (url.contains("/config/") && misconfigured) {
@@ -230,7 +239,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             loggerMaker.warnAndAddToDb("[agenticSkillDataCache] rebuilt: " + (System.currentTimeMillis() - tStart)
                     + "ms, apiInfos=" + apiInfos.size() + ", maliciousSkillKeys=" + maliciousSkillKeys.size());
             return new SkillDataCacheEntry(skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills,
-                    misconfiguredCollectionIds, System.currentTimeMillis());
+                    misconfiguredCollectionIds, skillTagsByKey, System.currentTimeMillis());
         });
     }
 
@@ -251,6 +260,19 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             if (t != null && keyName.equals(t.getKeyName()) && "true".equals(t.getValue())) return true;
         }
         return false;
+    }
+
+    // A skill's risk tags as the agent page shows them: skill-tags values, minus the "version=" marker
+    private static Set<String> skillTagValues(List<CollectionTags> tags) {
+        Set<String> out = new TreeSet<>();
+        if (tags == null) return out;
+        for (CollectionTags t : tags) {
+            if (t == null || !"skill-tags".equals(t.getKeyName())) continue;
+            String v = t.getValue();
+            if (StringUtils.isBlank(v) || v.toLowerCase(Locale.ROOT).startsWith("version=")) continue;
+            out.add(v);
+        }
+        return out;
     }
 
     public String fetchAgenticViolations() {
@@ -2439,6 +2461,13 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     String lname = g.name.toLowerCase(Locale.ROOT);
                     boolean malicious = g.collectionIds.stream().anyMatch(cid -> maliciousKeys.contains(cid + "|" + lname));
                     if (malicious) row.put("isMalicious", true);
+                    // Every user's copy of the skill, each tag once
+                    Set<String> skillTags = new TreeSet<>();
+                    for (Integer cid : g.collectionIds) {
+                        Set<String> tags = skillData.skillTagsByKey.get(cid + "|" + lname);
+                        if (tags != null) skillTags.addAll(tags);
+                    }
+                    if (!skillTags.isEmpty()) row.put("skillTags", new ArrayList<>(skillTags));
                 }
                 // Plugin discovery carries no risk of its own, and g.maxRiskScore is the AGENT's —
                 // showing it would mark every plugin on a risky agent as risky.
