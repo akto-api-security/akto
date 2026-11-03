@@ -1,13 +1,21 @@
 package com.akto.logpipeline;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Environment-driven configuration for the log/metrics Kafka pipeline.
  *
- * The single switch is {@code LOG_KAFKA_ENABLED}. When it is not exactly "true" (the default) the
- * log/metrics API handlers behave exactly as before and nothing in this package is initialised:
- * no Kafka producer, no threads, no connections.
+ * The single switch is {@code LOG_PIPELINE_ACCOUNTS}:
+ * <ul>
+ *   <li>unset / empty : the pipeline is off for every account (legacy direct-to-Mongo behaviour)</li>
+ *   <li>{@code *}     : on for every account</li>
+ *   <li>{@code 1000000,1758595089} : on only for the listed account ids</li>
+ * </ul>
+ * For an account that is not enabled, the log/metrics API handlers behave exactly as before. While no account is
+ * enabled nothing in this package is initialised: no Kafka producer, no threads, no connections.
  *
  * Everything else here is only read when the pipeline is enabled (producer side) or when the
  * consumer process is started.
@@ -16,8 +24,46 @@ public final class LogPipelineConfig {
 
     private LogPipelineConfig() {}
 
-    /** The one flag. Default false => legacy direct-to-Mongo behaviour. */
-    public static final boolean ENABLED = "true".equalsIgnoreCase(env("LOG_KAFKA_ENABLED", "false"));
+    public static final String ACCOUNTS_ENV = "LOG_PIPELINE_ACCOUNTS";
+    private static final String ACCOUNTS_RAW = env(ACCOUNTS_ENV, "").trim();
+    /** True when the list contains "*". */
+    public static final boolean ALL_ACCOUNTS = parseAll(ACCOUNTS_RAW);
+    /** Explicit account ids (ignored when ALL_ACCOUNTS). Tokens that are not numbers are skipped. */
+    public static final Set<Integer> ACCOUNTS = parseIds(ACCOUNTS_RAW);
+
+    /** True when at least one account is enabled (used to decide whether to install the metrics override). */
+    public static final boolean ENABLED = ALL_ACCOUNTS || !ACCOUNTS.isEmpty();
+
+    /** Per-account decision. Null account id (no request context) is never enabled. */
+    public static boolean isEnabledFor(Integer accountId) {
+        if (accountId == null) {
+            return false;
+        }
+        return ALL_ACCOUNTS || ACCOUNTS.contains(accountId);
+    }
+
+    static boolean parseAll(String raw) {
+        for (String t : raw.split("[,\\s]+")) {
+            if ("*".equals(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static Set<Integer> parseIds(String raw) {
+        Set<Integer> ids = new HashSet<>();
+        for (String t : raw.split("[,\\s]+")) {
+            try {
+                if (!t.isEmpty()) {
+                    ids.add(Integer.parseInt(t));
+                }
+            } catch (NumberFormatException ignored) {
+                // not an account id: skipped
+            }
+        }
+        return Collections.unmodifiableSet(ids);
+    }
 
     public static final String BROKER_URL = env("LOG_KAFKA_BROKER_URL", null);
     public static final String TOPIC_LOGS = env("LOG_KAFKA_TOPIC_LOGS", "akto.logs");

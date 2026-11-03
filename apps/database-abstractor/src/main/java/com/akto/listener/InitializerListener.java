@@ -44,9 +44,14 @@ public class InitializerListener implements ServletContextListener {
         DictionaryFilter.readDictionaryBinary();
 
         if (LogPipeline.isEnabled()) {
-            // log pipeline on: metrics_data is persisted via Kafka -> logs DB (see DbLayer.metricsStoreOverride)
-            DbLayer.metricsStoreOverride =
-                    m -> LogPipeline.publishMetricsData(Context.accountId.get(), m);
+            // log pipeline on for some accounts: their metrics_data goes via Kafka -> logs DB, the rest is stored as before
+            DbLayer.metricsStoreOverride = m -> {
+                if (LogPipeline.isEnabledForCurrentAccount()) {
+                    LogPipeline.publishMetricsData(Context.accountId.get(), m);
+                } else {
+                    DbLayer.storeMetricsDataDirect(m);
+                }
+            };
         }
 
         String mongoURI = System.getenv("AKTO_MONGO_CONN");

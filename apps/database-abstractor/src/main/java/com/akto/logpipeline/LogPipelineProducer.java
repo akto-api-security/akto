@@ -162,7 +162,7 @@ final class LogPipelineProducer {
             }
             nextCreateAttemptAt = now + 30_000L;
             if (LogPipelineConfig.BROKER_URL == null) {
-                logger.error("LOG_KAFKA_ENABLED=true but LOG_KAFKA_BROKER_URL is not set; log pipeline records are being dropped");
+                logger.error("LOG_PIPELINE_ACCOUNTS is set but LOG_KAFKA_BROKER_URL is not set; log pipeline records are being dropped");
                 return null;
             }
             try {

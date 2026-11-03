@@ -14,3 +14,8 @@ Apps (cyborg/Ultron/dashboard) use:
 - `LOG_MONGO_CONN=mongodb://logs_admin:<password from .env>@<vm-private-ip>:27017/?authSource=admin`
 
 Notes: Docker published ports bypass ufw, so Mongo/Kafka are bound to the private IP only (see `.env` PRIVATE_IP) and Mongo needs the password. Plain-text Kafka, no SASL (not supported by the code yet).
+
+## Rolling out by account
+Set `LOG_PIPELINE_ACCOUNTS` on cyborg, Ultron and the dashboard (and `LOG_MONGO_CONN` on the dashboard):
+- unset / empty: nobody (old behaviour). `1000000,1758595089`: only those accounts. `*`: every account.
+- Use the same list everywhere, and change cyborg/Ultron and the dashboard together. Remove an account from the list to roll it back.

@@ -121,7 +121,7 @@ services:
       LOG_CONSUMER_MAX_POLL_RECORDS: "1000"
       LOG_CONSUMER_PAUSED: "false"
       # must stay off here: the consumer must not publish back into Kafka or start crons
-      LOG_KAFKA_ENABLED: "false"
+      LOG_PIPELINE_ACCOUNTS: ""
       TRIGGER_MERGING_CRON: "false"
       PROMETHEUS_METRICS_ENABLED: "false"
       JAVA_OPTS: ${CONSUMER_JAVA_OPTS:--Xmx1g}

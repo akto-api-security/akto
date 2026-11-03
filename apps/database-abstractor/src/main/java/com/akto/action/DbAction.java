@@ -1630,7 +1630,7 @@ public class DbAction extends ActionSupport {
         if (disableLogWrites) {
             return Action.SUCCESS.toUpperCase();
         }
-        if (LogPipeline.isEnabled()) {
+        if (LogPipeline.isEnabledForCurrentAccount()) {
             LogPipeline.publishTrafficMetrics(Context.accountId.get(), writesForTrafficMetrics);
             return Action.SUCCESS.toUpperCase();
         }
@@ -2200,7 +2200,7 @@ public class DbAction extends ActionSupport {
             }
 
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 // Log pipeline on: hand off to Kafka (non-blocking, drops on failure). The consumer writes to the logs DB.
                 LogPipeline.publishLog(LogPipeline.RUNTIME_LOG, accId, dbLog, shouldPersistRuntimeLog(dbLog));
                 return Action.SUCCESS.toUpperCase();
@@ -2246,7 +2246,7 @@ public class DbAction extends ActionSupport {
             // Producer mode: hand off to Kafka and return immediately so the API request
             // isn't blocked on a Mongo insert. The consumer service writes it to Mongo async.
             // Non-Kafka mode: fall back to a direct (w:1) Mongo write.
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishEndpointShieldLog(Context.accountId.get(), dbLog);
             } else if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.insertEndpointShieldLog(dbLog, Context.accountId.get());
@@ -2324,7 +2324,7 @@ public class DbAction extends ActionSupport {
             // return; the consumer already batches these into one insertMany per
             // poll (KafkaUtils.flushEndpointShieldLogs). Otherwise write them in a
             // single round trip with the existing bulk DbLayer method.
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 int accountId = Context.accountId.get();
                 for (LogsEndpointShield dbLog : dbLogs) {
                     LogPipeline.publishEndpointShieldLog(accountId, dbLog);
@@ -2377,7 +2377,7 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.ANALYSER_LOG, accId, dbLog, false);
                 return Action.SUCCESS.toUpperCase();
             }
@@ -3424,7 +3424,7 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
 
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.TESTING_LOG, accId, dbLog, false);
                 return Action.SUCCESS.toUpperCase();
             }
@@ -3439,7 +3439,7 @@ public class DbAction extends ActionSupport {
     public String insertAgenticTestingLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.AGENTIC_TESTING_LOG, Context.accountId.get(), dbLog, false);
                 return Action.SUCCESS.toUpperCase();
             }
@@ -3458,7 +3458,7 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.PROTECTION_LOG, Context.accountId.get(), dbLog, false);
                 return Action.SUCCESS.toUpperCase();
             }
@@ -4247,7 +4247,7 @@ public class DbAction extends ActionSupport {
     public String insertDataIngestionLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.DATA_INGESTION_LOG, Context.accountId.get(), dbLog, false);
                 return Action.SUCCESS.toUpperCase();
             }
@@ -4359,7 +4359,7 @@ public class DbAction extends ActionSupport {
     public String insertPuppeteerLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.PUPPETEER_LOG, Context.accountId.get(), dbLog, false);
                 return Action.SUCCESS.toUpperCase();
             }
@@ -4374,7 +4374,7 @@ public class DbAction extends ActionSupport {
     public String insertSmartTestingLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.SMART_TESTING_LOG, Context.accountId.get(), dbLog, false);
                 return Action.SUCCESS.toUpperCase();
             }
@@ -4394,7 +4394,7 @@ public class DbAction extends ActionSupport {
     public String insertDastLog() {
         try {
             int accountId = Context.accountId.get();
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 // consumer creates the capped collection in the logs DB; nothing to ensure on the main DB
                 LogPipeline.publishLog(LogPipeline.DAST_LOG, accountId,
                         new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp")), false);
@@ -4427,7 +4427,7 @@ public class DbAction extends ActionSupport {
     public String insertMiniTestingOrchestratorLog() {
         try {
             int accountId = Context.accountId.get();
-            if (LogPipeline.isEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
                 LogPipeline.publishLog(LogPipeline.MINI_TESTING_ORCHESTRATOR_LOG, accountId,
                         new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp")), false);
                 return Action.SUCCESS.toUpperCase();

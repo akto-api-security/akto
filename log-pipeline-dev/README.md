@@ -4,7 +4,7 @@ Everything log-related lives in this compose. **Cyborg runs on your host** (`../
 your existing local mongod as its main DB.
 
 ```
-cyborg (host, :9095) --LOG_KAFKA_ENABLED=true--> kafka (:9192) --> log-consumer(s) --> mongo-logs (:27018, MongoDB 8.0)
+cyborg (host, :9095) --LOG_PIPELINE_ACCOUNTS=*--> kafka (:9192) --> log-consumer(s) --> mongo-logs (:27018, MongoDB 8.0)
 ```
 
 ## Start / stop
@@ -22,10 +22,10 @@ mongod on 27017 and another kafka on 9092).
 ## Run cyborg with the pipeline ON
 ```bash
 cd ..    # repo root
-AKTO_MONGO_CONN=mongodb://localhost:27017 LOG_KAFKA_ENABLED=true LOG_KAFKA_BROKER_URL=localhost:9192 ./start-cyborg.sh
+AKTO_MONGO_CONN=mongodb://localhost:27017 LOG_PIPELINE_ACCOUNTS="*" LOG_KAFKA_BROKER_URL=localhost:9192 ./start-cyborg.sh
 # or: cp log-pipeline-dev/cyborg.env.example local.env && ./start-cyborg.sh
 ```
-`LOG_KAFKA_ENABLED` is the only switch. Unset/false = today's behaviour (direct Mongo writes), no Kafka client is created.
+`LOG_PIPELINE_ACCOUNTS` is the only switch: unset/empty = nobody (today's behaviour, direct Mongo writes, no Kafka client is created); `*` = every account; `1000000,1758595089` = only those accounts.
 Moved endpoints: insertRuntimeLog, insertTestingLog, insertProtectionLog, insertEndpointShieldLog, bulkWriteTrafficMetrics.
 
 ## Stop / resume the consumer (Kafka keeps buffering)

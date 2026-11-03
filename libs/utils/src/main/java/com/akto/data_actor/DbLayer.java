@@ -3386,7 +3386,7 @@ public class DbLayer {
 
     /**
      * Optional storage override, installed once at startup by the cyborg web app when the log pipeline is on
-     * (LOG_KAFKA_ENABLED=true): metrics are then published to Kafka and the consumer persists them in the logs DB.
+     * (LOG_PIPELINE_ACCOUNTS non-empty): the override decides per account whether metrics go to Kafka (consumer persists them in the logs DB) or are stored directly.
      * Null (the default) = legacy behaviour: write to this process's own Mongo. Covers every in-process caller,
      * e.g. the scheduled traffic-collector metrics job in AllMetrics, not only the HTTP handler.
      */
@@ -3399,6 +3399,11 @@ public class DbLayer {
             override.accept(metricData);
             return;
         }
+        storeMetricsDataDirect(metricData);
+    }
+
+    /** Legacy storage: write to this process's own Mongo. */
+    public static void storeMetricsDataDirect(List<MetricData> metricData) {
         // First check if cleanup should be performed
         if (MetricDataDao.instance.shouldPerformCleanup()) {
             long deletedCount = MetricDataDao.instance.deleteOldMetrics();

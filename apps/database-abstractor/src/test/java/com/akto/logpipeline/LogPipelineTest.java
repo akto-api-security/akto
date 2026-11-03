@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 import com.akto.dto.Log;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,10 +14,31 @@ import org.junit.Test;
 
 public class LogPipelineTest {
 
-    /** Default (no LOG_KAFKA_ENABLED) must leave legacy behaviour untouched. */
+    /** Default (no LOG_PIPELINE_ACCOUNTS) must leave legacy behaviour untouched. */
     @Test
     public void disabledByDefault() {
         assertFalse(LogPipeline.isEnabled());
+    }
+
+    @Test
+    public void accountListParsing() {
+        // empty => nobody
+        assertFalse(LogPipelineConfig.parseAll(""));
+        assertTrue(LogPipelineConfig.parseIds("").isEmpty());
+        // list => exactly those accounts; junk tokens are skipped
+        assertTrue(LogPipelineConfig.parseIds("1000000, 1758595089,nginx").containsAll(Arrays.asList(1000000, 1758595089)));
+        assertTrue(LogPipelineConfig.parseIds("1000000, 1758595089,nginx").size() == 2);
+        assertFalse(LogPipelineConfig.parseAll("1000000,1758595089"));
+        // star => everyone
+        assertTrue(LogPipelineConfig.parseAll("*"));
+        assertTrue(LogPipelineConfig.parseAll("1000000, *"));
+    }
+
+    /** No account is enabled by default, and no request context never counts as enabled. */
+    @Test
+    public void noAccountEnabledByDefault() {
+        assertFalse(LogPipelineConfig.isEnabledFor(1000000));
+        assertFalse(LogPipelineConfig.isEnabledFor(null));
     }
 
     /**

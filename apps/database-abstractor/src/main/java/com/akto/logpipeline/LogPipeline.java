@@ -1,5 +1,6 @@
 package com.akto.logpipeline;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.Log;
 import com.akto.dto.LogsEndpointShield;
 import com.akto.dto.bulk_updates.BulkUpdates;
@@ -16,7 +17,7 @@ import java.util.List;
  *
  * Usage in a handler:
  * <pre>
- *   if (LogPipeline.isEnabled()) {
+ *   if (LogPipeline.isEnabledForCurrentAccount()) {
  *       LogPipeline.publishLog(...);          // never blocks, never throws
  *   } else {
  *       ... legacy direct Mongo write ...
@@ -48,8 +49,14 @@ public final class LogPipeline {
     // MetricData has enums + nested ModuleInfo: use Jackson (same family the Struts JSON layer used to read it), skip nulls.
     private static final ObjectMapper metricMapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
+    /** True when at least one account is enabled (LOG_PIPELINE_ACCOUNTS non-empty). */
     public static boolean isEnabled() {
         return LogPipelineConfig.ENABLED;
+    }
+
+    /** Per-account decision for the account of the current request/thread. */
+    public static boolean isEnabledForCurrentAccount() {
+        return LogPipelineConfig.ENABLED && LogPipelineConfig.isEnabledFor(Context.accountId.get());
     }
 
     /** Runtime / testing / protection log. {@code persist} is only meaningful for runtime logs. */
