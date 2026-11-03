@@ -217,13 +217,26 @@ public abstract class ApiGroupSync {
         return ids;
     }
 
-    /** The time of the newest traffic that is in the database (api_info lastSeen), 0 when there is none. */
-    private static int newestDataTime() {
+    /**
+     * How far the data has reached the database: the last sync time never moves past it. By default the time of the newest
+     * traffic (api_info lastSeen), 0 when there is none. A group that reads another collection can use that collection's
+     * own time instead, for example {@link #newestSingleTypeInfoTime()}.
+     */
+    protected int newestDataTime() {
         ApiInfo newest = ApiInfoDao.instance.getMCollection()
                 .find(Filters.in(ApiInfo.ID_API_COLLECTION_ID, fetchApiCollectionIds()))
                 .projection(Projections.include(ApiInfo.LAST_SEEN))
                 .sort(Sorts.descending(ApiInfo.LAST_SEEN)).limit(1).first();
         return newest == null ? 0 : newest.getLastSeen();
+    }
+
+    /** The time of the newest single type info (when its param was first created), 0 when there is none. */
+    protected static int newestSingleTypeInfoTime() {
+        SingleTypeInfo newest = SingleTypeInfoDao.instance.getMCollection()
+                .find(Filters.in(SingleTypeInfo._API_COLLECTION_ID, fetchApiCollectionIds()))
+                .projection(Projections.include(SingleTypeInfo._TIMESTAMP))
+                .sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)).limit(1).first();
+        return newest == null ? 0 : newest.getTimestamp();
     }
 
     public final void run() {

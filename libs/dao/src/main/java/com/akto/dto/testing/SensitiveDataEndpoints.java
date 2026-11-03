@@ -67,6 +67,12 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
             return "sensitive group";
         }
 
+        // this group reads single type infos, so it is synced up to the time of the newest single type info
+        @Override
+        protected int newestDataTime() {
+            return newestSingleTypeInfoTime();
+        }
+
         @Override
         protected void scanUntimed(Predicate<Candidate> visitor) {
             // apis a user marked sensitive by hand
