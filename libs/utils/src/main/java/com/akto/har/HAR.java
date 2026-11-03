@@ -4,12 +4,15 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.sstoehr.harreader.HarReader;
 import de.sstoehr.harreader.HarReaderException;
 import de.sstoehr.harreader.HarReaderMode;
 import de.sstoehr.harreader.model.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class HAR {
     private final static ObjectMapper mapper = new ObjectMapper();
@@ -17,6 +20,10 @@ public class HAR {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Har.class);
     public static final String JSON_CONTENT_TYPE = "application/json";
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
+    public static final String WEBSOCKET_TYPE = "WEBSOCKET";
+    private static final String WEBSOCKET_MESSAGES = "_webSocketMessages";
+    // partial JSON frames
+    private static final Pattern MESSAGE_TYPE_PATTERN = Pattern.compile("\"(type|messageType|event)\"\\s*:\\s*\"([^\"]+)\"");
     public List<String> getMessages(String harString, int collection_id, int accountId, HttpResponseParams.Source source) throws HarReaderException {
         HarReader harReader = new HarReader();
         Har har = harReader.readFromString(harString, HarReaderMode.LAX);
@@ -29,8 +36,9 @@ public class HAR {
         for (HarEntry entry: entries) {
             idx += 1;
             try {
-                Map<String,String> result = getResultMap(entry, accountId);
-                if (result != null) {
+                List<Map<String,String>> results = isWebSocket(entry) ? getWebSocketResultMaps(entry, accountId) : Collections.singletonList(getResultMap(entry, accountId));
+                for (Map<String,String> result: results) {
+                    if (result == null) continue;
                     result.put("akto_vxlan_id", collection_id+"");
                     result.put("source", source.name());
                     entriesList.add(mapper.writeValueAsString(result));
@@ -94,6 +102,79 @@ public class HAR {
         result.put("source", "HAR");
 
         return result;
+    }
+
+    public static boolean isWebSocket(HarEntry entry) {
+        return entry.getResponse().getStatus() == 101 || entry.getAdditional().get(WEBSOCKET_MESSAGES) instanceof List;
+    }
+
+
+    public static List<Map<String,String>> getWebSocketResultMaps(HarEntry entry, int accountId) throws Exception {
+        List<Map<String,String>> results = new ArrayList<>();
+
+        Map<String,String> handshake = getResultMap(entry, accountId);
+        // ws(s):// is not a java.net.URL protocol; the WebSocket executor maps http(s) back to ws(s)
+        handshake.put("path", handshake.get("path").replaceFirst("^ws(s?)://", "http$1://"));
+        handshake.put("type", WEBSOCKET_TYPE);
+        handshake.put("statusCode", "101");
+        handshake.put("status", "Switching Protocols");
+        handshake.put("requestPayload", "");
+        handshake.put("responsePayload", "");
+        results.add(handshake);
+
+        Object frames = entry.getAdditional().get(WEBSOCKET_MESSAGES);
+        if (!(frames instanceof List)) return results;
+
+        for (Object frame: (List<?>) frames) {
+            if (!(frame instanceof Map)) continue;
+            Map<?,?> frameMap = (Map<?,?>) frame;
+
+            // control frames (close, ping, pong) are not endpoints
+            int opcode = frameMap.get("opcode") instanceof Number ? ((Number) frameMap.get("opcode")).intValue() : -1;
+            if (opcode < 0 || opcode > 7) continue;
+
+            String data = frameMap.get("data") == null ? "" : frameMap.get("data").toString();
+            int time = frameMap.get("time") instanceof Number ? ((Number) frameMap.get("time")).intValue() : Context.now();
+
+            boolean sentByClient = "send".equals(frameMap.get("type"));
+
+            Map<String,Object> event = new LinkedHashMap<>();
+            event.put("direction", sentByClient ? "incoming" : "outgoing");
+            event.put("opcode", opcode);
+            event.put("payload", data);
+            event.put("fin", true);
+            event.put("timestamp", time);
+            String eventJson = mapper.writeValueAsString(event);
+
+            Map<String,String> result = new HashMap<>(handshake);
+            result.put("method", "WS");
+            result.put("path", "/" + getWebSocketMessageType(data));
+            // the client's frame is the request body, so its params show up in the inventory; server frames have none
+            if (sentByClient) result.put("requestPayload", data);
+            result.put("responseHeaders", "{}");
+            result.put("responsePayload", eventJson);
+            result.put("events", "[" + eventJson + "]");
+            result.put("time", time + "");
+            results.add(result);
+        }
+
+        return results;
+    }
+
+    // "type", "messageType" or "event" of a JSON frame, else "data_frame", as mini-runtime's WebSocketMessageParser does (plus "event")
+    public static String getWebSocketMessageType(String data) {
+        try {
+            JsonNode node = mapper.readTree(data);
+            if (node != null && node.isObject()) {
+                if (node.hasNonNull("type")) return node.get("type").asText();
+                if (node.hasNonNull("messageType")) return node.get("messageType").asText();
+                if (node.hasNonNull("event")) return node.get("event").asText();
+            }
+        } catch (Exception e) {
+            Matcher matcher = MESSAGE_TYPE_PATTERN.matcher(data);
+            if (matcher.find()) return matcher.group(2);
+        }
+        return "data_frame";
     }
 
     public static boolean isApiRequest(List<HarHeader> headers) {
