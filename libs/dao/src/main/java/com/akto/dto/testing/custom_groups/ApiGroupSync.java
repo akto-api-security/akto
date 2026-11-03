@@ -148,7 +148,7 @@ public abstract class ApiGroupSync {
      * more than this, so an account with no traffic does not keep re-reading a growing window.
      */
     protected int maxHoldBackSeconds() {
-        return 48 * 60 * 60;
+        return 12 * 60 * 60;
     }
 
     protected abstract int groupId();
