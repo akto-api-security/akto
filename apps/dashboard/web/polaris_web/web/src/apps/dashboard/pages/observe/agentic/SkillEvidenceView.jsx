@@ -22,6 +22,15 @@ function toneOf(annotation) {
 
 const TONE_RANK = { critical: 0, warning: 1, attention: 2 };
 
+function worstTone(annotations) {
+    return annotations.map(toneOf).sort((x, y) => TONE_RANK[x] - TONE_RANK[y])[0];
+}
+
+// A mark's data-evidence lists every annotation behind its text, space separated.
+function evidenceIndices(value) {
+    return String(value || "").split(" ").filter(Boolean);
+}
+
 function whyText(annotation) {
     if (annotation.malicious) return "Backs the malicious verdict";
     return annotation.purposeAligned === false ? "Not explained by the skill's purpose" : "Explained by the skill's purpose";
@@ -69,21 +78,22 @@ function VerdictBanner({ verdict }) {
     );
 }
 
-function ScriptEvidence({ annotations }) {
-    if (!annotations.length) return null;
+// entries: [{ a, index }], index being the annotation's position, so a tag chip can jump here too
+function ScriptEvidence({ entries }) {
+    if (!entries.length) return null;
     return (
         <VerticalStack gap="2">
             <Text variant="headingSm">Scripts this skill runs</Text>
             <Text variant="bodySm" color="subdued">Not ingested — the evidence is quoted with its file and line.</Text>
-            {annotations.map((a, i) => (
-                <Box key={i} padding="2" borderColor="border-subdued" borderWidth="1" borderRadius="2">
+            {entries.map(({ a, index }) => (
+                <Box key={index} padding="2" borderColor="border-subdued" borderWidth="1" borderRadius="2">
                     <VerticalStack gap="1">
                         <HorizontalStack gap="2" blockAlign="center">
                             <Badge size="small" status={toneOf(a)}>{a.tag}</Badge>
                             <Text variant="bodySm" color="subdued">{`${a.file} L${a.line}`}</Text>
                         </HorizontalStack>
                         <Box className="violation-evidence-pre">
-                            <mark className={`skill-evidence skill-evidence--${toneOf(a)}`}>{a.text}</mark>
+                            <mark className={`skill-evidence skill-evidence--${toneOf(a)}`} data-evidence={String(index)}>{a.text}</mark>
                         </Box>
                         {a.reason && <Text variant="bodySm">{a.reason}</Text>}
                     </VerticalStack>
@@ -107,11 +117,16 @@ export default function SkillMarkdownViewer({ markdown, evidence }) {
     const extraComponents = useMemo(() => ({
         // eslint-disable-next-line no-unused-vars
         mark: ({ node, children, ...props }) => {
-            const annotation = annotations[Number(props["data-evidence"])];
-            if (!annotation) return <mark>{children}</mark>;
+            const marked = evidenceIndices(props["data-evidence"]).map(i => annotations[Number(i)]).filter(Boolean);
+            if (!marked.length) return <mark>{children}</mark>;
+            const tooltip = (
+                <VerticalStack gap="3">
+                    {marked.map((annotation, i) => <EvidenceTooltip key={i} annotation={annotation} />)}
+                </VerticalStack>
+            );
             return (
-                <Tooltip content={<EvidenceTooltip annotation={annotation} />} preferredPosition="above">
-                    <mark className={`skill-evidence skill-evidence--${toneOf(annotation)}`} data-evidence={props["data-evidence"]}>
+                <Tooltip content={tooltip} preferredPosition="above">
+                    <mark className={`skill-evidence skill-evidence--${worstTone(marked)}`} data-evidence={props["data-evidence"]}>
                         {children}
                     </mark>
                 </Tooltip>
@@ -120,8 +135,8 @@ export default function SkillMarkdownViewer({ markdown, evidence }) {
     }), [annotations]);
 
     const tags = useMemo(() => groupByTag(annotations), [annotations]);
-    const scriptAnnotations = useMemo(
-        () => annotations.filter(a => a?.file && a.file !== SKILL_FILE),
+    const scriptEntries = useMemo(
+        () => annotations.map((a, index) => ({ a, index })).filter(({ a }) => a?.file && a.file !== SKILL_FILE),
         [annotations]
     );
 
@@ -131,7 +146,7 @@ export default function SkillMarkdownViewer({ markdown, evidence }) {
         if (!root) return;
         const wanted = new Set(group.indices.map(String));
         const marks = [...root.querySelectorAll("mark.skill-evidence[data-evidence]")]
-            .filter(m => wanted.has(m.getAttribute("data-evidence")));
+            .filter(m => evidenceIndices(m.getAttribute("data-evidence")).some(i => wanted.has(i)));
         if (!marks.length) return;
         marks[0].scrollIntoView({ behavior: "smooth", block: "center" });
         marks.forEach(m => m.classList.add("skill-evidence--flash"));
@@ -160,9 +175,11 @@ export default function SkillMarkdownViewer({ markdown, evidence }) {
                 </VerticalStack>
             )}
             <div ref={containerRef}>
-                <MarkdownViewer markdown={markdown} inertLinks rehypePlugins={rehypePlugins} extraComponents={extraComponents} />
+                <VerticalStack gap="4">
+                    <MarkdownViewer markdown={markdown} inertLinks rehypePlugins={rehypePlugins} extraComponents={extraComponents} />
+                    <ScriptEvidence entries={scriptEntries} />
+                </VerticalStack>
             </div>
-            <ScriptEvidence annotations={scriptAnnotations} />
         </VerticalStack>
     );
 }

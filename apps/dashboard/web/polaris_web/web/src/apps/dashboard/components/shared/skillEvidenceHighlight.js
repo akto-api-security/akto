@@ -60,9 +60,9 @@ function splitText(text, parent, source, ranges) {
     const slice = source.slice(where.start, where.end)
     const at = slice === value ? 0 : slice.indexOf(value)
 
-    // Local [from, to) inside value for each overlapping range.
+    // Local [from, to) inside value for each overlapping range; the ranges may overlap one another.
     const pieces = []
-    let cursor = 0
+    let searchFrom = 0
     for (const r of overlapping) {
         let from, to
         if (at >= 0) {
@@ -71,27 +71,26 @@ function splitText(text, parent, source, ranges) {
             to = Math.min(r.end, base + value.length) - base
         } else {
             const quoted = source.slice(Math.max(r.start, where.start), Math.min(r.end, where.end)).trim()
-            from = quoted ? value.indexOf(quoted, cursor) : -1
+            from = quoted ? value.indexOf(quoted, searchFrom) : -1
             to = from + quoted.length
         }
-        if (from < cursor || to <= from || to > value.length) continue
+        if (from < 0 || to <= from || to > value.length) continue
         pieces.push({ from, to, index: r.index })
-        cursor = to
+        searchFrom = from
     }
     if (!pieces.length) return [text]
 
+    // Cut at every piece's edges, so text that several pieces cover becomes one mark naming all of them
+    // (data-evidence="2 5") rather than losing all but the first.
+    const cuts = [...new Set([0, value.length, ...pieces.flatMap(p => [p.from, p.to])])].sort((x, y) => x - y)
     const out = []
-    let last = 0
-    for (const p of pieces) {
-        if (p.from > last) out.push({ type: 'text', value: value.slice(last, p.from) })
-        out.push({
-            type: 'element',
-            tagName: 'mark',
-            properties: { dataEvidence: String(p.index) },
-            children: [{ type: 'text', value: value.slice(p.from, p.to) }],
-        })
-        last = p.to
+    for (let i = 0; i + 1 < cuts.length; i++) {
+        const from = cuts[i], to = cuts[i + 1]
+        const segment = { type: 'text', value: value.slice(from, to) }
+        const indices = pieces.filter(p => p.from <= from && p.to >= to).map(p => p.index)
+        out.push(indices.length
+            ? { type: 'element', tagName: 'mark', properties: { dataEvidence: indices.join(' ') }, children: [segment] }
+            : segment)
     }
-    if (last < value.length) out.push({ type: 'text', value: value.slice(last) })
     return out
 }

@@ -26,9 +26,6 @@ import java.util.Map;
 public class SkillRevalidationAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SkillRevalidationAction.class, LogDb.DASHBOARD);
 
-    // the account's recent jobs looked through for the latest revalidation
-    private static final int RECENT_JOBS_LIMIT = 50;
-
     @Setter
     private List<String> agentIds;
 
@@ -96,12 +93,10 @@ public class SkillRevalidationAction extends UserAction {
 
     private static Job findLatestJob() {
         List<Job> jobs = JobsDao.instance.findAll(
-            Filters.eq("accountId", Context.accountId.get()), 0, RECENT_JOBS_LIMIT, Sorts.descending(Job.SCHEDULED_AT));
-        for (Job job : jobs) {
-            if (job.getJobParams() != null && job.getJobParams().getJobType() == JobType.SKILL_REVALIDATION) {
-                return job;
-            }
-        }
-        return null;
+            Filters.and(
+                Filters.eq("accountId", Context.accountId.get()),
+                Filters.eq(Job.JOB_PARAMS + ".jobType", JobType.SKILL_REVALIDATION.name())
+            ), 0, 1, Sorts.descending(Job.SCHEDULED_AT));
+        return jobs.isEmpty() ? null : jobs.get(0);
     }
 }
