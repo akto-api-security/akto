@@ -38,8 +38,11 @@ public class FileInspectionAction extends ActionSupport {
     private static final Pattern SHA256_RE = Pattern.compile("^[a-f0-9]{64}$");
     private static final int MAX_PATH_LENGTH = 1024;
     private static final int RESULTS_PAGE_MAX = 500;
+    private static final int RULES_PAGE_DEFAULT = 500;
+    private static final int RULES_PAGE_MAX = 1000;
 
     @Setter private long updatedAfter;
+    @Setter private int skip;
     @Setter private FileInspectionResult result;
 
     @Setter private String path;
@@ -61,20 +64,23 @@ public class FileInspectionAction extends ActionSupport {
     @Getter private String blobContent;
 
     public String fetchFileInspectionRules() {
-        return fetchRules(Filters.eq(FileInspectionRule.AGENT, null), "fetchFileInspectionRules");
+        return fetchRules(Filters.eq(FileInspectionRule.AGENT, null), "fetchFileInspectionRules",
+            0, RULES_PAGE_DEFAULT, Sorts.descending(FileInspectionRule.UPDATED_TS));
     }
 
     public String fetchFileInspectionRulesV2() {
-        return fetchRules(Filters.empty(), "fetchFileInspectionRulesV2");
+        // Paged by skip/limit in _id order, so pages stay stable while rules are edited; a page
+        // shorter than limit is the last one.
+        int pageSize = limit > 0 && limit <= RULES_PAGE_MAX ? limit : RULES_PAGE_DEFAULT;
+        return fetchRules(Filters.empty(), "fetchFileInspectionRulesV2", Math.max(skip, 0), pageSize, Sorts.ascending("_id"));
     }
 
-    private String fetchRules(Bson kindFilter, String name) {
+    private String fetchRules(Bson kindFilter, String name, int skipCount, int pageSize, Bson sort) {
         try {
             FileInspectionRuleDao.getInstance().createIndicesIfAbsent();
             Bson filter = Filters.and(Filters.gt(FileInspectionRule.UPDATED_TS, (int) updatedAfter), kindFilter);
             this.rules = FileInspectionRuleDao.getInstance().findAll(
-                filter, 0, 500,
-                Sorts.descending(FileInspectionRule.UPDATED_TS)
+                filter, skipCount, pageSize, sort
             );
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
