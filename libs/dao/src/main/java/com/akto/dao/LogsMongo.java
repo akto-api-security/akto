@@ -7,6 +7,7 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.util.DbNames;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
+import com.mongodb.MongoTimeoutException;
 import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClient;
@@ -15,6 +16,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Indexes;
+import com.mongodb.connection.ClusterDescription;
 import com.mongodb.connection.ServerDescription;
 import com.mongodb.event.ClusterClosedEvent;
 import com.mongodb.event.ClusterDescriptionChangedEvent;
@@ -63,13 +65,13 @@ public class LogsMongo {
      * immediately instead of each call waiting for server selection, so a logs-Mongo outage cannot stall request
      * threads (e.g. LoggerMaker writing dashboard logs). Starts true; flips back by itself when the server returns.
      */
-    private static volatile com.mongodb.connection.ClusterDescription lastDescription = null;
+    private static volatile ClusterDescription lastDescription = null;
     private static volatile long clientCreatedAt = 0L;
     private static final long CONNECT_GRACE_MS = 3000L;
 
     /** Healthy = still connecting (grace period), or the latest cluster view has at least one usable server. */
     static boolean isHealthy() {
-        com.mongodb.connection.ClusterDescription d = lastDescription;
+        ClusterDescription d = lastDescription;
         if (d == null) return true;
         if (System.currentTimeMillis() - clientCreatedAt < CONNECT_GRACE_MS) return true;
         for (ServerDescription sd : d.getServerDescriptions()) {
@@ -146,7 +148,7 @@ public class LogsMongo {
             }
             d.getCollection(collName).createIndex(Indexes.ascending("timestamp"));
             ensured.add(key);
-        } catch (com.mongodb.MongoTimeoutException e) {
+        } catch (MongoTimeoutException e) {
             // logs Mongo unreachable: do not wait a second time for the write itself, fail this call now
             throw e;
         } catch (Exception e) {
