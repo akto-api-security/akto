@@ -63,7 +63,11 @@ async def on_fetch(request, env, ctx):
         return _json(results)
 
     if path == "/ocr" and request.method == "POST":
-        status, result = await ocr_payload(json.loads(await request.text()))
+        try:
+            payload = json.loads(await request.text())
+        except ValueError:
+            payload = None  # not JSON: ocr_payload answers 400 instead of the worker raising a 500
+        status, result = await ocr_payload(payload)
         return _json(result, status=status)
 
     return _json({"error": "not found", "path": path}, status=404)

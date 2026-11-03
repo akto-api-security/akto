@@ -97,8 +97,9 @@ and one that fails or times out falls through to the next.
 Providers: `azure_vision` (Azure Computer Vision OCR v3.2).
 
 ```bash
-curl -s localhost:8090/ocr -H 'Content-Type: application/json' \
-  -d "{\"image_b64\": \"$(base64 -w0 screenshot.png)\"}"
+# Piped, not inline: an inline base64 image over ~96 KB exceeds the shell's per-argument limit.
+{ printf '{"image_b64":"'; base64 -w0 screenshot.png; printf '"}'; } |
+  curl -s localhost:8090/ocr -H 'Content-Type: application/json' -d @-
 # 200 {"text": "line one\nline two", "provider": "azure_vision"}
 # 400 missing/invalid base64 · 413 image over 4 MB · 503 no provider configured
 # 502 {"error": "every OCR provider failed", "failures": [{"provider": "azure_vision", "reason": "HTTP 401"}]}

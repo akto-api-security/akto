@@ -119,6 +119,17 @@ async def test_a_slow_provider_times_out_and_falls_through(monkeypatch):
     assert status == 200
 
 
+async def test_a_bad_timeout_fails_only_that_entry(monkeypatch):
+    entries = [
+        {"provider": "azure_vision", "baseUrl": "https://a.example", "timeoutMs": "soon"},
+        {"provider": "azure_vision", "baseUrl": "https://b.example", "timeoutMs": "30000"},
+    ]
+    monkeypatch.setattr(settings, "OCR_MODEL_CONFIG_JSON", json.dumps(entries))
+    _azure(monkeypatch, **{"a.example": REPLY, "b.example": REPLY})
+    status, _ = await ocr.ocr_payload({"image_b64": B64})
+    assert status == 200
+
+
 async def test_every_provider_failing_is_a_502_with_reasons_only(monkeypatch):
     entries = [{"provider": "azure_vision", "baseUrl": f"https://{host}"} for host in ("a.example", "b.example")]
     monkeypatch.setattr(settings, "OCR_MODEL_CONFIG_JSON", json.dumps(entries))

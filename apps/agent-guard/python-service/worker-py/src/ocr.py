@@ -25,7 +25,7 @@ from settings import settings
 
 logger = logging.getLogger(__name__)
 
-MAX_IMAGE_BYTES = 4 * 1024 * 1024  # Azure Vision's own OCR limit
+MAX_IMAGE_BYTES = 4 * 1024 * 1024  # bounds what reaches a provider; guardrails-service already caps images at 2 MB
 _DEFAULT_TIMEOUT_MS = 30000
 _IDENTITY = {"Accept-Encoding": "identity"}  # Pyodide double-gunzip fix, as in providers.py
 
@@ -118,8 +118,8 @@ async def ocr_payload(payload: Any) -> tuple[int, dict[str, Any]]:
     failures = []
     for entry, provider in chain:
         started = time.perf_counter()
-        timeout_s = (entry.get("timeoutMs") or _DEFAULT_TIMEOUT_MS) / 1000.0
-        try:
+        try:  # a bad timeoutMs fails this entry like any other error, rather than the whole request
+            timeout_s = float(entry.get("timeoutMs") or _DEFAULT_TIMEOUT_MS) / 1000.0
             text = await asyncio.wait_for(provider.extract_text(image), timeout_s)
         except Exception as exc:
             reason = alerts.fallback_reason(exc)
