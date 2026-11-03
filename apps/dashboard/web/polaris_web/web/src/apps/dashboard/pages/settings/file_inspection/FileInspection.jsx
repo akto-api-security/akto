@@ -22,9 +22,9 @@ const OS_TABS = [
     { label: 'Windows', value: 'windows' },
 ]
 
-const ROLE_LABELS = { login: 'Login', credentials: 'Credentials', mcp_config: 'MCP config' }
+const ROLE_LABELS = { agent_login: 'Agent login', mcp_credentials: 'MCP credentials', mcp_config: 'MCP config' }
 
-const ROLE_ORDER = ['mcp_config', 'login', 'credentials']
+const ROLE_ORDER = ['agent_login', 'mcp_credentials', 'mcp_config']
 
 const ROLE_OPTIONS = ROLE_ORDER.map(value => ({ label: ROLE_LABELS[value], value }))
 

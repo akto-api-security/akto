@@ -38,7 +38,7 @@ public class FileInspectionRuleAction extends UserAction {
     private static final int MAX_PATH_LENGTH = 1024;
     private static final int MAX_AGENT_LENGTH = 100;
     private static final Set<String> VALID_OS = new HashSet<>(Arrays.asList("darwin", "linux", "windows"));
-    private static final Set<String> VALID_ROLES = new HashSet<>(Arrays.asList("login", "credentials", "mcp_config"));
+    private static final Set<String> VALID_ROLES = new HashSet<>(Arrays.asList("agent_login", "mcp_credentials", "mcp_config"));
     private static final String DEFAULTS_RESOURCE = "/file_inspection_agent_defaults.json";
     private static final String DEFAULTS_ADDED_BY = "akto-default";
 
@@ -198,7 +198,7 @@ public class FileInspectionRuleAction extends UserAction {
                 );
                 Bson insert = Updates.combine(
                     Updates.setOnInsert(FileInspectionRule.ACCOUNT_ID, Context.accountId.get()),
-                    Updates.setOnInsert(FileInspectionRule.EXISTENCE_ONLY, false),
+                    Updates.setOnInsert(FileInspectionRule.EXISTENCE_ONLY, d.path(FileInspectionRule.EXISTENCE_ONLY).asBoolean(false)),
                     Updates.setOnInsert(FileInspectionRule.MAX_DEPTH, 0),
                     Updates.setOnInsert(FileInspectionRule.ADDED_BY, DEFAULTS_ADDED_BY),
                     Updates.setOnInsert(FileInspectionRule.CREATED_TS, now),

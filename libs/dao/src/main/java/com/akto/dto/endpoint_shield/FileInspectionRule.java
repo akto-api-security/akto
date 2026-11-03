@@ -46,5 +46,5 @@ public class FileInspectionRule {
     private int updatedTs;
     private String agent; // null = custom rule
     private String os;    // darwin | linux | windows
-    private String role;  // login | credentials | mcp_config
+    private String role;  // agent_login | mcp_credentials | mcp_config
 }
