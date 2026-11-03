@@ -72,6 +72,7 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
 
 import okhttp3.MediaType;
@@ -802,12 +803,20 @@ public class Utils {
     }
 
     public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest){
+        return runRequestOnHybridTesting(originalHttpRequest, null);
+    }
+
+    // miniTestingName targets a specific mini-testing instance; when empty, any instance may pick the request up
+    public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest, String miniTestingName){
         OriginalHttpResponse res = null;
         TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
         testingRunPlayground.setState(TestingRun.State.SCHEDULED);
         testingRunPlayground.setCreatedAt(Context.now());
         testingRunPlayground.setTestingRunPlaygroundType(TestingRunPlayground.TestingRunPlaygroundType.POSTMAN_IMPORTS);
         testingRunPlayground.setOriginalHttpRequest(originalHttpRequest);
+        if (!StringUtils.isEmpty(miniTestingName)) {
+            testingRunPlayground.setMiniTestingName(miniTestingName);
+        }
         InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
         if (insertOne.wasAcknowledged()) {
             String testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
@@ -834,6 +843,18 @@ public class Utils {
                 }
             }
             
+            // mini-testing only ever looks at the first SCHEDULED request it finds, so an unanswered one
+            // blocks every later request until it ages out; fail it so they can go through
+            if (currentState != null && currentState.getState() == TestingRun.State.SCHEDULED) {
+                TestingRunPlaygroundDao.instance.updateOne(
+                    Filters.and(
+                        Filters.eq("_id", new ObjectId(testingRunPlaygroundHexId)),
+                        Filters.eq(TestingRunPlayground.STATE, TestingRun.State.SCHEDULED)
+                    ),
+                    Updates.set(TestingRunPlayground.STATE, TestingRun.State.FAILED)
+                );
+            }
+
             res = (currentState != null && (currentState.getState() != TestingRun.State.FAILED
                     || currentState.getState() != TestingRun.State.SCHEDULED)) ?
                 currentState.getOriginalHttpResponse() : new OriginalHttpResponse();
