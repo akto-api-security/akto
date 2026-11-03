@@ -2,50 +2,30 @@ package com.akto.dto.testing.custom_groups;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.dao.ApiInfoDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.context.Context;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 public class AllAPIsGroup extends TestingEndpoints {
 
-    private static final Logger logger = LoggerFactory.getLogger(AllAPIsGroup.class);
-
-    /**
-     * When set, the group is only (re)computed for these api collections. Lets crons add the group id to just the
-     * collections that received new data, so the update can use the apiCollectionId indexes instead of scanning
-     * every document with a $nin on collectionIds. Never persisted.
-     */
-    @BsonIgnore
-    private List<Integer> scopeApiCollectionIds;
-
     public AllAPIsGroup() {
         super(Type.ALL, Operator.OR);
-    }
-
-    public AllAPIsGroup(List<Integer> scopeApiCollectionIds) {
-        this();
-        this.scopeApiCollectionIds = scopeApiCollectionIds;
     }
 
     @Override
@@ -62,46 +42,70 @@ public class AllAPIsGroup extends TestingEndpoints {
 
     @Override
     public Bson createFilters(CollectionType type) {
-        if (scopeApiCollectionIds == null) {
-            return Filters.empty();
-        }
-        return Filters.in(getFilterPrefix(type) + SingleTypeInfo._API_COLLECTION_ID, scopeApiCollectionIds);
+        return Filters.empty();
     }
 
     /**
-     * Adds the group id to everything that received new data since the given timestamp. Anything older was already
-     * covered by an earlier run, and new docs are only ever created under their own api collection.
+     * Every api is in this group, so the only work is tagging what is new. New docs are created with only their own api
+     * collection id, so the apis with new single type infos, newly discovered apis and new test issues are looked at.
      */
-    public static void updateCollections(int since) {
-        long startMs = System.currentTimeMillis();
-        Set<Integer> apiCollectionIds = new HashSet<>();
-
-        SingleTypeInfoDao.instance.getMCollection()
-                .distinct(SingleTypeInfo._API_COLLECTION_ID, Filters.gte(SingleTypeInfo._TIMESTAMP, since), Integer.class)
-                .into(apiCollectionIds);
-
-        ApiInfoDao.instance.getMCollection()
-                .distinct(ApiInfo.ID_API_COLLECTION_ID, Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, since), Integer.class)
-                .into(apiCollectionIds);
-
-        // status is part of the index prefix, so list every status instead of leaving it out
-        List<String> allStatuses = Arrays.stream(TestRunIssueStatus.values()).map(Enum::name).collect(Collectors.toList());
-        TestingRunIssuesDao.instance.getMCollection()
-                .distinct("_id.apiInfoKey." + ApiInfoKey.API_COLLECTION_ID, Filters.and(
-                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allStatuses),
-                        Filters.gte(TestingRunIssues.CREATION_TIME, since)
-                ), Integer.class)
-                .into(apiCollectionIds);
-
-        long scopeMs = System.currentTimeMillis() - startMs;
-        if (apiCollectionIds.isEmpty()) {
-            logger.info(String.format("AccountId: %d All apis group: no new data since %d, scope lookup took: %d ms",
-                    Context.accountId.get(), since, scopeMs));
-            return;
+    private static final DeltaGroupSync GROUP_SYNC = new DeltaGroupSync() {
+        @Override
+        protected int groupId() {
+            return ALL_APIS_GROUP_ID;
         }
-        AllAPIsGroup scopedGroup = new AllAPIsGroup(new ArrayList<>(apiCollectionIds));
-        ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(scopedGroup), ALL_APIS_GROUP_ID);
-        logger.info(String.format("AccountId: %d All apis group: updating %d api collections since %d, scope lookup took: %d ms, total: %d ms",
-                Context.accountId.get(), apiCollectionIds.size(), since, scopeMs, System.currentTimeMillis() - startMs));
+
+        @Override
+        protected String groupName() {
+            return "all apis group";
+        }
+
+        @Override
+        protected void scan(int from, int to, Predicate<Candidate> visitor) {
+            // new params
+            Bson newParams = Filters.and(Filters.gte(SingleTypeInfo._TIMESTAMP, from), Filters.lt(SingleTypeInfo._TIMESTAMP, to));
+            if (!scanSingleTypeInfo(newParams, visitor)) {
+                return;
+            }
+
+            // newly discovered apis
+            Bson discovered = Filters.and(Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, from), Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, to));
+            try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find(discovered)
+                    .projection(Projections.include("_id", SingleTypeInfo._COLLECTION_IDS)).cursor()) {
+                while (cursor.hasNext()) {
+                    ApiInfo apiInfo = cursor.next();
+                    List<Integer> groupIds = apiInfo.getCollectionIds();
+                    if (!visitor.test(new Candidate(apiInfo.getId(), true, groupIds != null && groupIds.contains(ALL_APIS_GROUP_ID)))) {
+                        return;
+                    }
+                }
+            }
+
+            // new test issues; status is part of the index prefix, so list every status instead of leaving it out
+            List<String> allStatuses = Arrays.stream(TestRunIssueStatus.values()).map(Enum::name).collect(Collectors.toList());
+            Bson newIssues = Filters.and(
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allStatuses),
+                Filters.gte(TestingRunIssues.CREATION_TIME, from),
+                Filters.lt(TestingRunIssues.CREATION_TIME, to));
+            try (MongoCursor<TestingRunIssues> cursor = TestingRunIssuesDao.instance.getMCollection().find(newIssues)
+                    .projection(Projections.include("_id", SingleTypeInfo._COLLECTION_IDS)).cursor()) {
+                while (cursor.hasNext()) {
+                    TestingRunIssues issue = cursor.next();
+                    List<Integer> groupIds = issue.getCollectionIds();
+                    if (!visitor.test(new Candidate(issue.getId().getApiInfoKey(), true, groupIds != null && groupIds.contains(ALL_APIS_GROUP_ID)))) {
+                        return;
+                    }
+                }
+            }
+        }
+
+        @Override
+        protected TestingEndpoints endpointsFor(List<ApiInfoKey> keys) {
+            return new CustomTestingEndpoints(new ArrayList<>(keys));
+        }
+    };
+
+    public static void updateCollections() {
+        GROUP_SYNC.run();
     }
 }

@@ -1,22 +1,31 @@
 package com.akto.dto.testing.custom_groups;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
+import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -127,6 +136,39 @@ public abstract class DeltaGroupSync {
 
     /** The condition matching exactly the given apis, used to add them to or remove them from the group. */
     protected abstract TestingEndpoints endpointsFor(List<ApiInfoKey> keys);
+
+    /**
+     * For groups whose members come from single_type_info: reports every api that has a doc matching the filter, as a
+     * member. An api counts as tagged only if all of its matching docs carry the group tag. Apis with an unknown method
+     * are skipped. @return false when the visitor asked to stop
+     */
+    protected final boolean scanSingleTypeInfo(Bson filter, Predicate<Candidate> visitor) {
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + SingleTypeInfo._API_COLLECTION_ID)
+                .append(SingleTypeInfo._URL, "$" + SingleTypeInfo._URL)
+                .append(SingleTypeInfo._METHOD, "$" + SingleTypeInfo._METHOD);
+        BasicDBObject allTagged = new BasicDBObject("$in", Arrays.<Object>asList(groupId(),
+                new BasicDBObject("$ifNull", Arrays.<Object>asList("$" + SingleTypeInfo._COLLECTION_IDS, Collections.emptyList()))));
+        List<Bson> pipeline = Arrays.asList(
+            Aggregates.match(filter),
+            Aggregates.group(groupedId, Accumulators.min("allTagged", allTagged)));
+
+        try (MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).allowDiskUse(true).batchSize(1000).cursor()) {
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                BasicDBObject id = (BasicDBObject) doc.get("_id");
+                Method method = Method.fromString(id.getString(SingleTypeInfo._METHOD));
+                if (method.equals(Method.OTHER)) {
+                    continue;
+                }
+                ApiInfoKey key = new ApiInfoKey(id.getInt(SingleTypeInfo._API_COLLECTION_ID), id.getString(SingleTypeInfo._URL), method);
+                if (!visitor.test(new Candidate(key, true, doc.getBoolean("allTagged")))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 
     public final void run() {
         int accountId = Context.accountId.get();

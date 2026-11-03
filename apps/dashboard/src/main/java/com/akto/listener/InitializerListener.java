@@ -442,7 +442,6 @@ public class InitializerListener implements ServletContextListener {
     }
 
     // overlap between consecutive incremental windows, so docs written while the previous run was in flight are not missed
-    private static final int API_GROUPS_SYNC_BUFFER_SECONDS = 10 * 60;
 
     public void updateApiGroupsForAccounts() {
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -475,29 +474,9 @@ public class InitializerListener implements ServletContextListener {
         }, 0, 4, TimeUnit.HOURS);
     }
 
-    /** Recomputes the automated api groups: only the delta since the last run, and everything once a day. */
+    /** The all apis group keeps its own last sync time (see DeltaGroupSync), so nothing is tracked here. */
     private static void updateApiGroups() {
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
-        int lastSync = lastRunInfo == null ? 0 : lastRunInfo.getLastApiGroupsSync();
-        int lastFullSync = lastRunInfo == null ? 0 : lastRunInfo.getLastApiGroupsFullSync();
-
-        int now = Context.now();
-        boolean full = lastSync == 0 || (now - lastFullSync) >=  Constants.ONE_DAY_TIMESTAMP;
-        int since = Math.max(lastSync - API_GROUPS_SYNC_BUFFER_SECONDS, 0);
-
-        long startMs = System.currentTimeMillis();
-        createAllApisGroup(since, full);
-
-        List<Bson> updates = new ArrayList<>();
-        updates.add(Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_API_GROUPS_SYNC, now));
-        if (full) {
-            updates.add(Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_API_GROUPS_FULL_SYNC, now));
-        }
-        AccountSettingsDao.instance.getMCollection().updateOne(
-                AccountSettingsDao.generateFilter(), Updates.combine(updates), new UpdateOptions().upsert(true));
-        logger.info("AccountId: " + Context.accountId.get() + " api groups updated, mode: " + (full ? "full" : "incremental")
-                + ", since: " + since + ", took: " + (System.currentTimeMillis() - startMs) + " ms");
+        createAllApisGroup();
     }
 
     public void setUpGuardrailServiceUrlLatencyScheduler() {
@@ -2055,7 +2034,7 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-    public static void createAllApisGroup(int since, boolean full) {
+    public static void createAllApisGroup() {
         ApiCollection collection = ApiCollectionsDao.instance
                 .findOne(Filters.eq("_id", 111111121));
         if (collection == null) {
@@ -2071,13 +2050,7 @@ public class InitializerListener implements ServletContextListener {
 
             ApiCollectionsDao.instance.insertOne(allApisGroup);
         }else{
-            int startTime = Context.now();
-            if (full) {
-                ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
-            } else {
-                AllAPIsGroup.updateCollections(since);
-            }
-            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed ALL apis group (full: " + full + ") in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
+            AllAPIsGroup.updateCollections();
         }
 
     }
@@ -2590,7 +2563,8 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            if (isDeltaUpdateBasedApiGroup) {
+            // the all apis group is kept up to date by updateApiGroups
+            if (isDeltaUpdateBasedApiGroup || apiCollection.getId() == AllAPIsGroup.ALL_APIS_GROUP_ID) {
                 continue;
             }
 

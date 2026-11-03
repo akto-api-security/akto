@@ -1,8 +1,6 @@
 package com.akto.dto.testing;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -20,16 +18,11 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
 public class SensitiveDataEndpoints extends TestingEndpoints {
 
-    public static final int LIMIT = 1000;
 
     public SensitiveDataEndpoints() {
         super(Type.SENSITIVE_DATA);
@@ -122,35 +115,6 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
 
     public static void updateCollections() {
         GROUP_SYNC.run();
-    }
-
-    /** Groups the matching single type infos by api. An api counts as tagged only if all of its matching docs carry the tag. */
-    private static boolean scanSingleTypeInfo(Bson filter, Predicate<DeltaGroupSync.Candidate> visitor) {
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
-                .append(SingleTypeInfo._URL, "$url")
-                .append(SingleTypeInfo._METHOD, "$method");
-        BasicDBObject allTagged = new BasicDBObject("$in", Arrays.<Object>asList(API_GROUP_ID,
-                new BasicDBObject("$ifNull", Arrays.<Object>asList("$" + SingleTypeInfo._COLLECTION_IDS, Collections.emptyList()))));
-        List<Bson> pipeline = Arrays.asList(
-            Aggregates.match(filter),
-            Aggregates.group(groupedId, Accumulators.min("allTagged", allTagged)));
-
-        try (MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).allowDiskUse(true).batchSize(LIMIT).cursor()) {
-            while (cursor.hasNext()) {
-                BasicDBObject doc = cursor.next();
-                BasicDBObject id = (BasicDBObject) doc.get("_id");
-                Method method = Method.fromString(id.getString(SingleTypeInfo._METHOD));
-                if (method.equals(Method.OTHER)) {
-                    continue;
-                }
-                ApiInfoKey key = new ApiInfoKey(id.getInt(SingleTypeInfo._API_COLLECTION_ID), id.getString(SingleTypeInfo._URL), method);
-                if (!visitor.test(new DeltaGroupSync.Candidate(key, true, doc.getBoolean("allTagged")))) {
-                    return false;
-                }
-            }
-        }
-        return true;
     }
 
     @Override
