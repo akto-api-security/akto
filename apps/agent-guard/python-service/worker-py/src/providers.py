@@ -971,13 +971,21 @@ class TripwireProvider(LLMProvider):
     scan prompt, it judges PromptInjection only, and long text is windowed by the server, not chunked here."""
 
     name = "tripwire"
+    # Its own connection pool: a hung Tripwire must not hold the shared pool's connections that Qwen/Gemma need.
+    _MAX_CONNECTIONS = 20
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
+        self._http: httpx.AsyncClient | None = None
         logger.info(f"[Tripwire] base_url={self.base_url}")
 
+    def _client(self) -> httpx.AsyncClient:
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS))
+        return self._http
+
     async def detect(self, text: str) -> dict[str, Any]:
-        resp = await http_client.get_client().post(
+        resp = await self._client().post(
             f"{self.base_url}/v1/detect",
             headers=dict(_IDENTITY, **{"Content-Type": "application/json"}),
             json={"text": text},

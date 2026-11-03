@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import time
 
 import httpx
 import pytest
@@ -28,19 +29,22 @@ def test_a_detect_reply_becomes_a_scanner_result():
     assert benign["details"]["windows_skipped"] == 2
 
 
-async def test_detect_posts_the_raw_text(monkeypatch):
+async def test_detect_posts_the_raw_text_on_its_own_connection_pool(monkeypatch):
     sent = {}
 
-    class Client:
-        async def post(self, url, headers=None, json=None):
-            sent.update(url=url, json=json)
-            body = {"verdict": "benign", "is_attack": False, "attack_score": 0.01}
-            return httpx.Response(200, json=body, request=httpx.Request("POST", url))
+    def handler(request):
+        sent.update(url=str(request.url), json=json.loads(request.content))
+        return httpx.Response(200, json={"verdict": "benign", "is_attack": False, "attack_score": 0.01})
 
-    monkeypatch.setattr(providers.http_client, "get_client", lambda: Client())
-    reply = await TripwireProvider("http://tripwire:8000/").detect("hello")
+    shared = []
+    monkeypatch.setattr(providers.http_client, "get_client", lambda: shared.append(1))
+    tripwire = TripwireProvider("http://tripwire:8000/")
+    tripwire._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    reply = await tripwire.detect("hello")
     assert sent == {"url": "http://tripwire:8000/v1/detect", "json": {"text": "hello"}}
     assert reply["attack_score"] == 0.01
+    assert shared == []  # never the pool Qwen and Gemma share
+    assert TripwireProvider("http://t")._client()._transport._pool._max_connections == TripwireProvider._MAX_CONNECTIONS
 
 
 def test_built_from_the_entry_url_or_the_env(monkeypatch):
@@ -158,19 +162,39 @@ async def test_tripwire_results_reach_the_store():
     assert [r["details"]["llm_provider"] for r in stored] == ["qwen", "gemma", "tripwire"]
 
 
-async def test_a_failed_tripwire_changes_nothing():
-    r = await _scan(_llm(0.70), httpx.ConnectError("refused"))
-    assert r["is_valid"] is False and "error" not in r["details"]
+@pytest.mark.parametrize("llm_risk", [0.02, 0.70])
+async def test_a_failed_tripwire_changes_nothing(llm_risk):
+    r = await _scan(_llm(llm_risk), httpx.ConnectError("refused"))
+    assert r["is_valid"] is (llm_risk < 0.5) and r["risk_score"] == llm_risk and "error" not in r["details"]
     assert r["details"]["tripwire"] == {"completed": False}
 
 
-async def test_a_slow_tripwire_is_cut_off_at_its_timeout():
-    async def slow():
-        await asyncio.sleep(5)
-        return _trip(0.99)
+def _slow(seconds, result):
+    async def answer():
+        await asyncio.sleep(seconds)
+        return result
 
-    r = await asyncio.wait_for(_scan(_llm(0.02), slow, tripwire={"timeoutMs": 50}), 1)
+    return answer
+
+
+async def test_a_slow_tripwire_is_cut_off_at_its_timeout():
+    r = await asyncio.wait_for(_scan(_llm(0.02), _slow(5, _trip(0.99)), tripwire={"timeoutMs": 50}), 1)
     assert r["is_valid"] is True and r["details"]["tripwire"] == {"completed": False}
+
+
+async def test_the_default_wait_is_500ms():
+    started = time.perf_counter()
+    r = await asyncio.wait_for(_scan(_llm(0.02), _slow(5, _trip(0.99))), 2)
+    assert 0.4 < time.perf_counter() - started < 1.0
+    assert r["details"]["tripwire"] == {"completed": False}
+
+
+async def test_tripwire_runs_alongside_the_cascade_not_after_it():
+    # Qwen and Tripwire each take 0.4s: alongside, the scan takes ~0.4s; one after the other, ~0.8s.
+    started = time.perf_counter()
+    r = await _scan(_llm(0.02), _slow(0.4, _trip(0.99)), qwen=_slow(0.4, QWEN_SAFE), tripwire={"timeoutMs": 2000})
+    assert time.perf_counter() - started < 0.65
+    assert r["details"]["tripwire"]["completed"] is True
 
 
 async def test_tripwire_as_a_final_arbiter_still_only_observes(monkeypatch):
@@ -247,3 +271,18 @@ async def test_no_deployment_tripwire_means_none_is_added(monkeypatch):
     monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
     await _scan_with_policy_models()
     assert "tripwire" not in FakeScanner.calls
+
+
+async def test_password_never_runs_on_an_old_style_tripwire_entry(monkeypatch):
+    # Password's single model is picked by role; a Tripwire entry listed first must not be it.
+    deployment = {"modelConfigs": [{"provider": "tripwire", "modelRole": "FINAL_ARBITER"}, *POLICY_MODELS]}
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", json.dumps(deployment))
+    FakeScanner.script = {"gemma": _llm(0.95)}
+    payload = {"scanner_name": "Password", "scanner_type": "prompt", "text": "pw=hunter2", "config": {}}
+    r = await scan_handler.scan_payload(payload, schedule_fn=lambda coro: coro.close())
+    assert FakeScanner.calls == ["gemma"] and r["is_valid"] is False
+
+
+async def test_a_tripwire_entry_with_the_backup_role_is_still_reported():
+    r = await _scan(_llm(0.02), _trip(0.99), tripwire={"modelRole": "FINAL_ARBITER_BACKUP"})
+    assert r["details"]["tripwire"]["risk_score"] == 0.99

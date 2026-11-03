@@ -369,7 +369,8 @@ class ModelMapScanner:
             details["decision_confidence"] = winner["decision_confidence"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
-            if entry.get("modelRole") == _ROLE_ARBITER_BACKUP or self._skips(entry):
+            backup = entry.get("modelRole") == _ROLE_ARBITER_BACKUP and not is_tripwire(entry)
+            if backup or self._skips(entry):
                 continue
             stem = self._stem(entry.get("provider", ""))
             if stem:

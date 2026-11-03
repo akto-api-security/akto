@@ -128,8 +128,8 @@ def _pick_single_model(model_configs: list[dict[str, Any]]) -> dict[str, Any] | 
     """Choose the one entry a single-model scanner runs on: the first
     FAST_FALLBACK_SAFE_FILTER entry, else the first FINAL_ARBITER entry.
     Qwen3Guard is never eligible — it emits a safety verdict, not a
-    secret-value judgement (see GEMMA_ONLY_SCANNERS)."""
-    candidates = [m for m in model_configs if not _is_qwen(m)]
+    secret-value judgement (see GEMMA_ONLY_SCANNERS), and Tripwire only observes."""
+    candidates = [m for m in model_configs if not _is_qwen(m) and not is_tripwire(m)]
     for role in _SINGLE_MODEL_ROLE_PREFERENCE:
         for entry in candidates:
             if entry.get("modelRole") == role:
