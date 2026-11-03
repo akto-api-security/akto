@@ -59,9 +59,10 @@ import com.mongodb.client.model.Updates;
  * - Never updates in bulk: the writes are small synchronous batches with a pause after each.
  *
  * Algorithm of {@link #run()}:
- * 1. Read the group's last sync time from account settings (none: start a few days back). Start from the earlier of that
- *    and the minimum look back (the cron interval), minus an overlap for docs that reach the database late.
- * 2. Check the apis that cannot be found by time ({@link #scanUntimed}), then each time slice in order up to now.
+ * 1. Read the group's last sync time from account settings (none: start a few days back) and start from it, minus a
+ *    small overlap. Find the newest data time in the database; the run goes up to it (never more than the hold back
+ *    behind now).
+ * 2. Check the apis that cannot be found by time ({@link #scanUntimed}), then each time slice in order up to that time.
  * 3. For every reported api, compare "should be in the group" with "has the group tag"; if they agree, do nothing.
  * 4. Otherwise collect it, and write each full batch with one updateMany per collection (add or pull the tag), then pause.
  * 5. After a slice is fully written, save its end as the group's last sync time.
@@ -119,20 +120,12 @@ public abstract class ApiGroupSync {
     }
 
     /**
-     * A run always covers at least this much of the recent past (the cron interval), even when the last sync time is
-     * more recent, and goes back to the last sync time when that is older.
-     */
-    protected int minLookbackSeconds() {
-        return 90 * 60;
-    }
-
-    /**
-     * On top of that, a run re-checks this much extra, to cover docs that reach the database late, for example the
-     * backlog written when the service that consumes the runtime's data was down for a while. Docs that arrive later
-     * than this are not picked up. Re-checking only costs reads: a doc is written only when its tag is wrong.
+     * A run starts this much before the last sync time, to cover docs that were still being written when the last run
+     * read them. Re-checking only costs reads: a doc is written only when its tag is wrong. A service that was down and
+     * writes its backlog later is covered by the last sync time not moving past the newest data, not by this.
      */
     protected int syncBufferSeconds() {
-        return 6 * 60 * 60;
+        return 10 * 60;
     }
 
     /** How far back to start when the group has no last sync time. */
@@ -252,8 +245,8 @@ public abstract class ApiGroupSync {
         Integer lastSync = lastRunInfo == null || lastRunInfo.getGroupSyncTimes() == null
                 ? null : lastRunInfo.getGroupSyncTimes().get(String.valueOf(groupId()));
         boolean hasMarker = lastSync != null && lastSync != 0;
-        // the earlier of the last sync time and the minimum look back, then the extra overlap
-        int since = hasMarker ? Math.max(Math.min(lastSync, syncStartedAt - minLookbackSeconds()) - syncBufferSeconds(), 0)
+        // from the last sync time (a data time, not the clock) minus a small overlap
+        int since = hasMarker ? Math.max(lastSync - syncBufferSeconds(), 0)
                 : syncStartedAt - firstSyncLookbackDays() * Constants.ONE_DAY_TIMESTAMP;
         if (!hasMarker) {
             logger.warn(String.format("AccountId: %d %s has no last sync time, checking the last %d days (since=%d)",
@@ -263,24 +256,25 @@ public abstract class ApiGroupSync {
         Result result = new Result();
         int sliceFrom = since;
         int sliceTo = since;
-        // later runs go hour by hour, the first run covers its whole look back at once instead of many small queries
-        int sliceLength = hasMarker ? sliceSeconds() : Math.max(syncStartedAt - since, 1);
         int lastSaved = hasMarker ? lastSync : 0;
         int dataUpTo = 0;
         try {
-            // the last sync time only goes as far as the data that is really there, but never more than the hold back behind now
+            // the run goes up to the newest data that is really in the database, but never more than the hold back behind now
             dataUpTo = Math.min(newestDataTime(), syncStartedAt);
-            int saveCap = Math.max(dataUpTo, syncStartedAt - maxHoldBackSeconds());
+            int syncUpTo = Math.max(dataUpTo, syncStartedAt - maxHoldBackSeconds());
+            // end is exclusive, so +1 includes the newest doc
+            int windowEnd = Math.min(syncUpTo + 1, syncStartedAt);
+            // later runs go hour by hour, the first run covers its whole look back at once instead of many small queries
+            int sliceLength = hasMarker ? sliceSeconds() : Math.max(windowEnd - since, 1);
             sync(result, visitor -> scanUntimed(visitor));
-            for (; sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
-                sliceTo = Math.min(sliceFrom + sliceLength, syncStartedAt);
+            for (; sliceFrom < windowEnd; sliceFrom = sliceTo) {
+                sliceTo = Math.min(sliceFrom + sliceLength, windowEnd);
                 int from = sliceFrom;
                 int to = sliceTo;
                 sync(result, visitor -> scan(from, to, visitor));
-                int saveTo = Math.min(sliceTo, saveCap);
-                if (saveTo > lastSaved) {
-                    saveLastSync(saveTo);
-                    lastSaved = saveTo;
+                if (sliceTo > lastSaved) {
+                    saveLastSync(sliceTo);
+                    lastSaved = sliceTo;
                 }
                 result.slices++;
             }
