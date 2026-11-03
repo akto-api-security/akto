@@ -8,11 +8,10 @@
                                      SAFE/INCONC. → ALLOW (best tier2 result)
     tier1 all INCONCLUSIVE       → FINAL_ARBITER decides
 
-Several FINAL_ARBITER entries run in parallel. config.arbiterCombine says how
-their verdicts become one: "any" (default) blocks if any arbiter flags; with a
-Tripwire classifier entry next to an LLM arbiter, "shadow" lets the LLM decide
-and only records Tripwire, and "mean" averages the two scores against
-arbiterThreshold (see _combine_with_tripwire).
+A Tripwire classifier entry only observes, whatever its modelRole: on
+PromptInjection input it starts with the tiers, the scan waits for it at most
+its timeoutMs (counted from the scan's start), and its verdict is recorded in
+details.tripwire and the stored model results. It never changes the verdict.
 
 Verdict logic is identical to the container; only the executor changed
 (asyncio tasks + wait_for instead of a ThreadPoolExecutor).
@@ -24,7 +23,7 @@ import time
 from typing import Any
 
 import metrics_push
-from providers import FallbackProvider, TripwireProvider, build_provider_from_config
+from providers import FallbackProvider, build_provider_from_config
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +43,13 @@ _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 _DEFAULT_ARBITER_BACKUP_TIMEOUT_MS = 5000
 
 _TRIPWIRE = "tripwire"
-_DEFAULT_ARBITER_THRESHOLD = 0.5  # arbiterCombine "mean": block when the averaged score reaches this
+_DEFAULT_OBSERVER_TIMEOUT_MS = 500
 
 ScannerEntry = tuple[Any, dict[str, Any]]
+
+
+def _is_tripwire(entry: dict[str, Any]) -> bool:
+    return str(entry.get("provider", "")).strip().lower() == _TRIPWIRE
 
 
 def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
@@ -113,13 +116,16 @@ class ModelMapScanner:
         from llm_scanner import LLMScanner
 
         scanners: list[ScannerEntry] = []
+        observers: list[ScannerEntry] = []
         for entry in model_map:
             if self._skips(entry):
                 continue
             provider = build_provider_from_config(entry)
             if provider is not None:
-                # The backup is an LLM: it can stand in for an LLM arbiter, not for the Tripwire classifier.
-                if entry.get("modelRole") == _ROLE_ARBITER and not isinstance(provider, TripwireProvider):
+                if _is_tripwire(entry):
+                    observers.append((LLMScanner(provider), entry))
+                    continue
+                if entry.get("modelRole") == _ROLE_ARBITER:
                     provider = _with_backup(provider, model_map, _timeout_s(entry, _DEFAULT_ARBITER_TIMEOUT_MS))
                 scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
             else:
@@ -134,7 +140,7 @@ class ModelMapScanner:
             raise ValueError("ModelMapScanner: no usable providers in modelConfigs")
 
         start = time.time()
-        result = await self._run_pipeline(scanners)
+        result = await self._run_pipeline(scanners, observers)
         result["execution_time_ms"] = round((time.time() - start) * 1000, 2)
         _fire_store(self.store_fn, self.completed_all, self.scanner_name)
         logger.info(
@@ -145,11 +151,12 @@ class ModelMapScanner:
 
     # ── Pipeline core ───────────────────────────────────────────────────────
 
-    async def _run_pipeline(self, scanners: list[ScannerEntry]) -> dict[str, Any]:
+    async def _run_pipeline(self, scanners: list[ScannerEntry], observers: list[ScannerEntry]) -> dict[str, Any]:
         tier1 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER1]
         tier2 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER2]
         arbiters = [se for se in scanners if se[1].get("modelRole") == _ROLE_ARBITER]
 
+        observed = self._submit(observers, _DEFAULT_OBSERVER_TIMEOUT_MS)
         t1 = self._submit(tier1, _DEFAULT_TIER_TIMEOUT_MS)
         t2 = self._submit(tier2, _DEFAULT_TIER_TIMEOUT_MS)
         eager = bool(self.config.get("parallelExecution", False)) and bool(arbiters)
@@ -158,6 +165,7 @@ class ModelMapScanner:
             logger.info(f"[ModelMap] parallelExecution=true → {_ROLE_ARBITER} fired alongside tiers")
 
         winner = await self._cascade(t1, t2, arbiters, arb)
+        await self._observe(observed, winner)
         return self._shape_result(winner)
 
     async def _cascade(self, t1, t2, arbiters, arb) -> dict[str, Any]:
@@ -274,77 +282,36 @@ class ModelMapScanner:
             metrics_push.COUNTS["arbiter_errors"].increment("all_arbiters_failed")
             return self._error_result("all arbiters failed")
 
-        combine = str(self.config.get("arbiterCombine") or "any").strip().lower()
-        if combine in ("shadow", "mean"):
-            return self._combine_with_tripwire(completed, combine)
-        return self._any_flag(completed)
-
-    @staticmethod
-    def _any_flag(results: list[dict[str, Any]]) -> dict[str, Any]:
         # Convict only on an affirmative flag; safeDecisionThreshold only gates the fast tiers, not the final call.
-        unsafe = [r for r in results if not r.get("is_valid", True)]
-        pool = unsafe or results
+        unsafe = [r for r in completed if not r.get("is_valid", True)]
+        pool = unsafe or completed
         winner = pool[0]  # first-listed arbiter in modelConfigs wins ties/disagreement
         winner["is_valid"] = not unsafe
         return winner
 
-    def _combine_with_tripwire(self, completed: list[dict[str, Any]], combine: str) -> dict[str, Any]:
-        """One verdict from the LLM arbiter(s) and Tripwire.
-
-        shadow: the LLM arbiters decide exactly as with "any"; Tripwire's result is only recorded (it is in
-                completed_all, so the per-model summary in the result details carries its score).
-        mean:   average the LLM verdict's risk_score with Tripwire's attack_score; block at arbiterThreshold.
-                If only one side answered, it decides alone. Tripwire that read only part of a long input
-                (windows_skipped) never outvotes the LLM, which read all of it; and when it is alone, it may
-                block but not clear the input (that fails open instead, uncached, like any degraded verdict).
-        """
-        trip = next((r for r in completed if (r.get("details") or {}).get("llm_provider") == _TRIPWIRE), None)
-        llm = [r for r in completed if r is not trip]
-        if combine == "shadow" or trip is None:
-            if not llm:  # shadow mode and the LLM arbiter failed: as without Tripwire
-                metrics_push.COUNTS["arbiter_errors"].increment("all_arbiters_failed")
-                return self._error_result("LLM arbiter failed; Tripwire only shadows it")
-            winner = self._any_flag(llm)
-            if trip is not None and trip.get("is_valid") != winner["is_valid"]:
-                llm_says = "SAFE" if winner["is_valid"] else "UNSAFE"
-                llm_risk, trip_risk = float(winner.get("risk_score", 0.0)), float(trip.get("risk_score", 0.0))
+    async def _observe(self, observed: dict[asyncio.Task, dict[str, Any]], winner: dict[str, Any]) -> None:
+        """Record the observers' verdicts next to the cascade's. A failed or slow observer is only logged."""
+        for result, entry in await self._await_map(observed):
+            provider_name = entry.get("provider") or "unknown"
+            if isinstance(result, Exception):
+                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
+                metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
+                logger.warning(f"[ModelMap] observer '{provider_name}' failed: {result!r}")
+                continue
+            exec_ms = result.get("execution_time_ms")
+            if isinstance(exec_ms, (int, float)):
+                metrics_push.SAMPLES["provider"].record(provider_name, float(exec_ms))
+            self.completed_all.append(result)
+            if result.get("is_valid", True) != winner.get("is_valid", True):
                 logger.info(
-                    f"[ModelMap] {self.scanner_name} shadow disagreement: llm={llm_says} risk={llm_risk:.2f}, "
-                    f"tripwire={trip_risk:.2f}"
+                    f"[ModelMap] {self.scanner_name} observer disagreement: "
+                    f"cascade={'SAFE' if winner.get('is_valid', True) else 'UNSAFE'} "
+                    f"{provider_name}={float(result.get('risk_score', 0.0)):.2f}"
                 )
-            return self._tagged(winner, combine if trip is not None else "mean_llm_only")
-
-        partial = bool((trip.get("details") or {}).get("windows_skipped"))
-        if not llm:
-            if trip.get("is_valid", True) and partial:
-                return self._error_result("LLM arbiter failed and Tripwire read only part of the input")
-            return self._tagged(trip, "mean_tripwire_only")
-        llm_verdict = self._any_flag(llm)
-        if partial:
-            return self._tagged(llm_verdict, "mean_tripwire_partial")
-
-        threshold = float(self.config.get("arbiterThreshold") or _DEFAULT_ARBITER_THRESHOLD)
-        llm_risk, trip_risk = float(llm_verdict.get("risk_score", 0.0)), float(trip.get("risk_score", 0.0))
-        average = (llm_risk + trip_risk) / 2
-        blocked = average >= threshold
-        logger.info(
-            f"[ModelMap] {self.scanner_name} mean: llm={llm_risk:.2f} tripwire={trip_risk:.2f} average={average:.2f} "
-            f"threshold={threshold:g} → {'UNSAFE' if blocked else 'SAFE'}"
-        )
-        # The reason comes from whichever side agrees with the verdict (the LLM when both do).
-        source = llm_verdict if (not llm_verdict["is_valid"]) == blocked else trip
-        return {**self._tagged(source, "mean"), "is_valid": not blocked, "risk_score": average}
-
-    @staticmethod
-    def _tagged(result: dict[str, Any], combine: str) -> dict[str, Any]:
-        return {**result, "details": {**(result.get("details") or {}), "arbiter_combine": combine}}
 
     def _skips(self, entry: dict[str, Any]) -> bool:
-        """A Tripwire entry applies only to PromptInjection input from traffic other than Atlas (ENDPOINT)."""
-        if str(entry.get("provider", "")).strip().lower() != _TRIPWIRE:
-            return False
-        source = str(self.config.get("contextSource", "")).strip().upper()
-        return not (self.scanner_name == "PromptInjection" and self.scanner_type == "prompt" and source != "ENDPOINT")
+        """A Tripwire entry observes PromptInjection input only."""
+        return _is_tripwire(entry) and not (self.scanner_name == "PromptInjection" and self.scanner_type == "prompt")
 
     @staticmethod
     def _error_result(error: str) -> dict[str, Any]:
@@ -379,7 +346,6 @@ class ModelMapScanner:
         "prob_distribution",
         "confidence_source",
         "decision_confidence",
-        "arbiter_combine",  # how the FINAL_ARBITER verdicts were combined (shadow / mean / ...)
     )
 
     def _shape_result(self, winner: dict[str, Any]) -> dict[str, Any]:

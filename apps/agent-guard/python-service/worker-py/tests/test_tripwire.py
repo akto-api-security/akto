@@ -1,4 +1,6 @@
-"""Tripwire classifier next to the LLM arbiter: provider, scanner path, gating and arbiterCombine (no network)."""
+"""Tripwire classifier as an observer: provider, scanner path, gating, and never changing the verdict (no network)."""
+
+import asyncio
 
 import httpx
 import pytest
@@ -63,22 +65,18 @@ async def test_scanner_sends_tripwire_the_text_not_a_prompt(monkeypatch):
         await LLMScanner(TripwireProvider("http://t")).scan("Toxicity", "prompt", "x", {})
 
 
-# ── cascade: gating and arbiterCombine ───────────────────────────────────────
+# ── cascade: Tripwire observes, never decides ────────────────────────────────
 
 QWEN_UNSAFE = {"is_valid": False, "risk_score": 0.9, "decision_confidence": 0.9, "details": {}}
+QWEN_SAFE = {"is_valid": True, "risk_score": 0.02, "decision_confidence": 0.98, "details": {}}
 
 
 def _llm(risk):  # an LLM arbiter verdict at the A/B/C/D risk levels (0.02 / 0.35 / 0.70 / 0.95)
     return {"is_valid": risk < 0.5, "risk_score": risk, "decision_confidence": max(risk, 1 - risk), "details": {}}
 
 
-def _trip(score, **details):
-    return {
-        "is_valid": score < 0.5,
-        "risk_score": score,
-        "decision_confidence": max(score, 1 - score),
-        "details": {"attack_score": score, **details},
-    }
+def _trip(score):
+    return {"is_valid": score < 0.5, "risk_score": score, "decision_confidence": max(score, 1 - score), "details": {}}
 
 
 class FakeProvider:
@@ -100,6 +98,8 @@ class FakeScanner:
         entry = FakeScanner.script[self.provider.name]
         if isinstance(entry, Exception):
             raise entry
+        if callable(entry):
+            entry = await entry()
         return {**entry, "details": {**entry.get("details", {}), "llm_provider": self.provider.name}}
 
 
@@ -110,119 +110,91 @@ def fakes(monkeypatch):
     monkeypatch.setattr(model_map, "build_provider_from_config", lambda entry: FakeProvider(entry["provider"]))
 
 
-def _config(combine=None, **extra):
-    config = {
+def _config(tripwire=None, **extra):
+    return {
         "modelConfigs": [
             {"provider": "qwen", "modelRole": "FAST_THREAT_FILTER", "safeDecisionThreshold": 0.9},
             {"provider": "gemma", "modelRole": "FINAL_ARBITER"},
-            {"provider": "tripwire", "modelRole": "FINAL_ARBITER"},
+            {"provider": "tripwire", **(tripwire or {})},
         ],
         **extra,
     }
-    if combine:
-        config["arbiterCombine"] = combine
-    return config
 
 
-async def _scan(llm, trip, combine=None, scanner="PromptInjection", side="prompt", **extra):
-    FakeScanner.script = {"qwen": QWEN_UNSAFE, "gemma": llm, "tripwire": trip}  # qwen escalates to the arbiters
-    return await model_map.ModelMapScanner(scanner, side, "text", _config(combine, **extra)).run()
+async def _scan(llm, trip, qwen=QWEN_UNSAFE, scanner="PromptInjection", side="prompt", tripwire=None, **extra):
+    FakeScanner.script = {"qwen": qwen, "gemma": llm, "tripwire": trip}
+    return await model_map.ModelMapScanner(scanner, side, "text", _config(tripwire, **extra)).run()
 
 
-async def test_default_any_blocks_if_either_arbiter_flags():
-    r = await _scan(_llm(0.02), _trip(0.97))
-    assert r["is_valid"] is False
+@pytest.mark.parametrize("llm_risk,trip_score", [(0.02, 0.99), (0.95, 0.01)])
+async def test_tripwire_never_changes_the_verdict(llm_risk, trip_score):
+    r = await _scan(_llm(llm_risk), _trip(trip_score))
+    assert r["is_valid"] is (llm_risk < 0.5) and r["risk_score"] == llm_risk
+    assert r["details"]["llm_provider"] == "gemma"
+    assert r["details"]["tripwire"] == {
+        "completed": True,
+        "is_valid": trip_score < 0.5,
+        "risk_score": trip_score,
+        "decision_confidence": max(trip_score, 1 - trip_score),
+    }
 
 
-async def test_shadow_lets_the_llm_decide_and_records_tripwire():
-    r = await _scan(_llm(0.02), _trip(0.97), combine="shadow")
-    assert r["is_valid"] is True and r["details"]["arbiter_combine"] == "shadow"
-    assert r["details"]["tripwire"]["risk_score"] == 0.97  # Tripwire's score is in the result
+async def test_tripwire_observes_scans_the_fast_tier_allows():
+    # Qwen's confident "safe" allows the input before Gemma runs; Tripwire still records its view.
+    r = await _scan(_llm(0.95), _trip(0.99), qwen=QWEN_SAFE)
+    assert "gemma" not in FakeScanner.calls
+    assert r["is_valid"] is True and r["details"]["tripwire"]["risk_score"] == 0.99
 
 
-async def test_shadow_fails_open_like_today_when_the_llm_fails():
-    r = await _scan(TimeoutError(), _trip(0.97), combine="shadow")
-    assert r["is_valid"] is True and "error" in r["details"]
-
-
-@pytest.mark.parametrize(
-    "llm_risk,trip_score,blocked",
-    [
-        (0.02, 0.97, False),  # Gemma A: Tripwire needs >= 0.98 to override
-        (0.02, 0.99, True),
-        (0.35, 0.70, True),  # Gemma B, Tripwire leaning attack
-        (0.70, 0.20, False),  # Gemma C, Tripwire fairly sure it's safe
-        (0.95, 0.02, False),  # Gemma D: only a near-certain Tripwire clears it
-        (0.95, 0.10, True),
-    ],
-)
-async def test_mean_averages_the_two_scores(llm_risk, trip_score, blocked):
-    r = await _scan(_llm(llm_risk), _trip(trip_score), combine="mean")
-    assert r["is_valid"] is (not blocked)
-    assert r["risk_score"] == pytest.approx((llm_risk + trip_score) / 2)
-    assert r["details"]["arbiter_combine"] == "mean"
-
-
-async def test_mean_explains_the_verdict_with_the_side_that_agrees():
-    r = await _scan(
-        _llm(0.35), _trip(0.70, reason="Tripwire flagged this as jailbreak (attack score 0.70)."), combine="mean"
+async def test_tripwire_results_reach_the_store():
+    stored = []
+    FakeScanner.script = {"qwen": QWEN_UNSAFE, "gemma": _llm(0.02), "tripwire": _trip(0.99)}
+    scanner = model_map.ModelMapScanner(
+        "PromptInjection", "prompt", "text", _config(), store_fn=lambda completed, name: stored.extend(completed)
     )
-    assert r["is_valid"] is False and r["details"]["llm_provider"] == "tripwire"
-    assert "jailbreak" in r["details"]["reason"]
+    await scanner.run()
+    assert [r["details"]["llm_provider"] for r in stored] == ["qwen", "gemma", "tripwire"]
 
 
-async def test_mean_honours_arbiter_threshold():
-    r = await _scan(_llm(0.35), _trip(0.70), combine="mean", arbiterThreshold=0.6)
-    assert r["is_valid"] is True  # average 0.525 is below 0.6
+async def test_a_failed_tripwire_changes_nothing():
+    r = await _scan(_llm(0.70), httpx.ConnectError("refused"))
+    assert r["is_valid"] is False and "error" not in r["details"]
+    assert r["details"]["tripwire"] == {"completed": False}
 
 
-async def test_mean_with_tripwire_down_leaves_the_llm_alone():
-    r = await _scan(_llm(0.70), httpx.ConnectError("refused"), combine="mean")
-    assert r["is_valid"] is False and r["details"]["arbiter_combine"] == "mean_llm_only"
+async def test_a_slow_tripwire_is_cut_off_at_its_timeout():
+    async def slow():
+        await asyncio.sleep(5)
+        return _trip(0.99)
+
+    r = await asyncio.wait_for(_scan(_llm(0.02), slow, tripwire={"timeoutMs": 50}), 1)
+    assert r["is_valid"] is True and r["details"]["tripwire"] == {"completed": False}
 
 
-async def test_mean_with_the_llm_down_leaves_tripwire_alone():
-    blocked = await _scan(TimeoutError(), _trip(0.9), combine="mean")
-    assert blocked["is_valid"] is False and blocked["details"]["arbiter_combine"] == "mean_tripwire_only"
-    allowed = await _scan(TimeoutError(), _trip(0.1), combine="mean")
-    assert allowed["is_valid"] is True and "error" not in allowed["details"]
-
-
-async def test_a_partial_tripwire_read_never_clears_the_input():
-    # with the LLM: the LLM, which read everything, decides
-    r = await _scan(_llm(0.70), _trip(0.01, windows_skipped=3), combine="mean")
-    assert r["is_valid"] is False and r["details"]["arbiter_combine"] == "mean_tripwire_partial"
-    # alone: a partial "safe" fails open uncached instead of being served as a real verdict
-    alone = await _scan(TimeoutError(), _trip(0.01, windows_skipped=3), combine="mean")
-    assert alone["is_valid"] is True and "error" in alone["details"]
-
-
-@pytest.mark.parametrize(
-    "scanner,side,source",
-    [("Toxicity", "prompt", ""), ("PromptInjection", "output", ""), ("PromptInjection", "prompt", "ENDPOINT")],
-)
-async def test_tripwire_only_judges_promptinjection_input_outside_atlas(scanner, side, source):
-    r = await _scan(_llm(0.02), _trip(0.99), combine="mean", scanner=scanner, side=side, contextSource=source)
-    assert "tripwire" not in FakeScanner.calls and "tripwire" not in r["details"]
-    assert r["is_valid"] is True  # the LLM decided alone
-
-
-@pytest.mark.parametrize("source", ["", "AGENTIC"])
-async def test_tripwire_runs_for_argus_promptinjection_input(source):
-    await _scan(_llm(0.02), _trip(0.01), combine="mean", contextSource=source)
-    assert "tripwire" in FakeScanner.calls
-
-
-async def test_tripwire_is_not_wrapped_with_the_llm_backup(monkeypatch):
+async def test_tripwire_as_a_final_arbiter_still_only_observes(monkeypatch):
+    # An old-style config listing Tripwire as FINAL_ARBITER: it gets no vote and no LLM backup.
     monkeypatch.setattr(
         model_map,
         "build_provider_from_config",
         lambda e: TripwireProvider("http://t") if e["provider"] == "tripwire" else FakeProvider(e["provider"]),
     )
-    config = _config("mean")
+    config = _config({"modelRole": "FINAL_ARBITER"})
     config["modelConfigs"].append({"provider": "anthropic", "modelRole": "FINAL_ARBITER_BACKUP"})
-    FakeScanner.script = {"qwen": QWEN_UNSAFE, "gemma": _llm(0.02), "tripwire": _trip(0.01)}
-    await model_map.ModelMapScanner("PromptInjection", "prompt", "text", config).run()
+    FakeScanner.script = {"qwen": QWEN_UNSAFE, "gemma": _llm(0.02), "tripwire": _trip(0.99)}
+    r = await model_map.ModelMapScanner("PromptInjection", "prompt", "text", config).run()
+    assert r["is_valid"] is True
     by_name = {s.provider.name: s.provider for s in FakeScanner.built}
     assert isinstance(by_name["tripwire"], TripwireProvider)
     assert isinstance(by_name["gemma"], FallbackProvider)  # the LLM arbiter still gets its backup
+
+
+@pytest.mark.parametrize("scanner,side", [("Toxicity", "prompt"), ("PromptInjection", "output")])
+async def test_tripwire_only_observes_promptinjection_input(scanner, side):
+    r = await _scan(_llm(0.02), _trip(0.99), scanner=scanner, side=side)
+    assert "tripwire" not in FakeScanner.calls and "tripwire" not in r["details"]
+
+
+@pytest.mark.parametrize("source", ["", "AGENTIC", "ENDPOINT"])
+async def test_tripwire_observes_every_source(source):
+    await _scan(_llm(0.02), _trip(0.01), contextSource=source)
+    assert "tripwire" in FakeScanner.calls
