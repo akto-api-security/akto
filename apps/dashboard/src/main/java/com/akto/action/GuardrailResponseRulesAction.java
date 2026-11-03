@@ -10,6 +10,8 @@ import com.akto.dto.GuardrailResponseRule;
 import com.akto.dto.GuardrailResponseRule.RuleAction;
 import com.akto.dto.GuardrailResponseRule.RuleCondition;
 import com.akto.dto.User;
+import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
@@ -42,6 +44,7 @@ public class GuardrailResponseRulesAction extends UserAction {
     private static final int MAX_ACTIONS = 6;
     private static final int MAX_VALUES = 50;
     private static final int MAX_VALUE_LENGTH = 200;
+    private static final int MAX_DESTINATION_OPTIONS = 50;
 
     private static final Set<String> CONDITION_FIELDS = new HashSet<>(Arrays.asList(
         GuardrailResponseRule.CONDITION_SEVERITY, GuardrailResponseRule.CONDITION_POLICY,
@@ -192,10 +195,18 @@ public class GuardrailResponseRulesAction extends UserAction {
         try {
             destinations = new ArrayList<>();
             BasicDBObject any = new BasicDBObject();
-            destinations.add(destination("JIRA", "Jira", JiraIntegrationDao.instance.count(any) > 0, "Create tickets from violations"));
-            destinations.add(destination("SERVICENOW", "ServiceNow", ServiceNowIntegrationDao.instance.count(any) > 0, "Create incidents from violations"));
-            destinations.add(destination("SLACK", "Slack", SlackWebhooksDao.instance.count(any) > 0, "Send alerts to a Slack channel"));
-            destinations.add(destination("WEBHOOK", "Webhook", CustomWebhooksDao.instance.count(any) > 0, "Send violations to your SIEM or SOAR"));
+            List<Map<String, Object>> slackOptions = new ArrayList<>();
+            for (SlackWebhook webhook : SlackWebhooksDao.instance.findAll(Filters.empty(), 0, MAX_DESTINATION_OPTIONS, null)) {
+                slackOptions.add(option(webhook.getId(), webhook.getSlackWebhookName(), "Slack webhook"));
+            }
+            List<Map<String, Object>> webhookOptions = new ArrayList<>();
+            for (CustomWebhook webhook : CustomWebhooksDao.instance.findAll(Filters.empty(), 0, MAX_DESTINATION_OPTIONS, null)) {
+                webhookOptions.add(option(webhook.getId(), webhook.getWebhookName(), "Webhook"));
+            }
+            destinations.add(destination("JIRA", "Jira", JiraIntegrationDao.instance.count(any) > 0, "Create tickets from violations", new ArrayList<>()));
+            destinations.add(destination("SERVICENOW", "ServiceNow", ServiceNowIntegrationDao.instance.count(any) > 0, "Create incidents from violations", new ArrayList<>()));
+            destinations.add(destination("SLACK", "Slack", !slackOptions.isEmpty(), "Send alerts to a Slack channel", slackOptions));
+            destinations.add(destination("WEBHOOK", "Webhook", !webhookOptions.isEmpty(), "Send violations to your SIEM or SOAR", webhookOptions));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("fetchResponseRuleDestinations failed: " + e.getMessage(), LogDb.DASHBOARD);
@@ -204,12 +215,20 @@ public class GuardrailResponseRulesAction extends UserAction {
         }
     }
 
-    private static Map<String, Object> destination(String id, String label, boolean connected, String detail) {
+    private static Map<String, Object> destination(String id, String label, boolean connected, String detail, List<Map<String, Object>> options) {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", id);
         row.put("label", label);
         row.put("connected", connected);
         row.put("detail", detail);
+        row.put("options", options);
+        return row;
+    }
+
+    private static Map<String, Object> option(int id, String name, String fallbackName) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("value", String.valueOf(id));
+        row.put("label", StringUtils.isBlank(name) ? fallbackName + " " + id : name);
         return row;
     }
 

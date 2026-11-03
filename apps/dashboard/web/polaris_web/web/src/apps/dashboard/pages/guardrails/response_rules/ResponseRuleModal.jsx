@@ -95,6 +95,15 @@ function channelLabel(channel, destinations) {
     return channel.destination && !destinationConnected(destinations, channel.destination) ? `${channel.label} (not connected)` : channel.label;
 }
 
+function destinationOptions(destinations, id) {
+    return destinations.find((entry) => entry.id === id)?.options || [];
+}
+
+function WebhookChoice({ label, options, value, onChange }) {
+    if (options.length < 2) return null;
+    return <DropdownField label={label} options={options} value={value || options[0].value} onChange={onChange} />;
+}
+
 function NotConnected({ destinationId, destinations }) {
     if (destinationConnected(destinations, destinationId)) return null;
     return (
@@ -127,6 +136,7 @@ function ActionFields({ action, destinations, onChange }) {
                     <TextField label="Assign to" autoComplete="off" placeholder="Name or email" value={config.assignee} onChange={(assignee) => set({ assignee })} />
                     <DropdownField label="Due" options={DUE_OPTIONS} value={config.dueHours} onChange={(dueHours) => set({ dueHours })} />
                     <Checkbox label="Notify the assignee in Slack" checked={!!config.notifySlack} onChange={(notifySlack) => set({ notifySlack })} />
+                    <Text as="p" variant="bodySm" color="subdued">The assignee is applied to new violations. Due time and the Slack notice are saved but not applied yet.</Text>
                 </VerticalStack>
             );
         case "ALERT":
@@ -143,7 +153,10 @@ function ActionFields({ action, destinations, onChange }) {
                         onChange={(channels) => set({ channels })}
                     />
                     {config.channels.includes("slack") && (
-                        <Text as="p" variant="bodySm" color="subdued">Alerts go to the Slack webhook saved in Settings, Integrations, and include a link to the violation.</Text>
+                        <WebhookChoice label="Slack webhook" options={destinationOptions(destinations, "SLACK")} value={config.slackWebhookId} onChange={(slackWebhookId) => set({ slackWebhookId })} />
+                    )}
+                    {config.channels.includes("webhook") && (
+                        <WebhookChoice label="Webhook" options={destinationOptions(destinations, "WEBHOOK")} value={config.webhookId} onChange={(webhookId) => set({ webhookId })} />
                     )}
                     {config.channels.includes("email") && (
                         <TextField label="Email addresses" autoComplete="off" placeholder="security-oncall@example.com" helpText="Separate several with commas" value={config.emails} onChange={(emails) => set({ emails })} />
@@ -157,6 +170,7 @@ function ActionFields({ action, destinations, onChange }) {
                 <VerticalStack gap="3">
                     <ChoiceList title="Reason" choices={IGNORE_REASONS} selected={[config.reason]} onChange={(values) => set({ reason: values[0] })} />
                     <DropdownField label="Expires" options={IGNORE_EXPIRY_OPTIONS} value={config.expiryDays} onChange={(expiryDays) => set({ expiryDays })} />
+                    <Text as="p" variant="bodySm" color="subdued">New violations are marked ignored. The reason and expiry are saved but not applied yet.</Text>
                 </VerticalStack>
             );
         case "COACH_EMPLOYEE":
