@@ -242,10 +242,13 @@ export const markdownStyles = `
 const REMARK_PLUGINS = [remarkGfm]
 
 // React component for rendering markdown with shared components. inertLinks swaps in the
-// non-navigable variant (see inertMarkdownComponents above) for untrusted content.
-export const MarkdownRenderer = ({ children, inertLinks }) => {
+// non-navigable variant (see inertMarkdownComponents above) for untrusted content. rehypePlugins
+// and extraComponents let a caller decorate the rendered tree (e.g. skill evidence highlights).
+export const MarkdownRenderer = ({ children, inertLinks, rehypePlugins, extraComponents }) => {
+    const base = inertLinks ? inertMarkdownComponents : markdownComponents
+    const components = useMemo(() => (extraComponents ? { ...base, ...extraComponents } : base), [base, extraComponents])
     return (
-        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={inertLinks ? inertMarkdownComponents : markdownComponents}>
+        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} rehypePlugins={rehypePlugins} components={components}>
             {children}
         </ReactMarkdown>
     )
