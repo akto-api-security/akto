@@ -1,13 +1,14 @@
 import { Box, Card, HorizontalGrid, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
+import Pressable from '../../pages/dashboard/ask/components/Pressable'
 
 function SummaryCardInfo({summaryItems}) {
     return (
         <Card padding={0} key="info">
             <Box padding={2} paddingInlineStart={4} paddingInlineEnd={4}>
                 <HorizontalGrid columns={summaryItems.length} gap={4}>
-                    {summaryItems.map((item, index) => (
-                        <Box borderInlineEndWidth={index < (summaryItems.length - 1) ? "1" : ""} key={index} paddingBlockStart={1} paddingBlockEnd={1} borderColor="border-subdued">
+                    {summaryItems.map((item, index) => {
+                        const content = (
                             <VerticalStack gap="1">
                                 <Text color="subdued" variant="headingXs">
                                     {item.title}
@@ -17,8 +18,18 @@ function SummaryCardInfo({summaryItems}) {
                                 </Text>
                                 }
                             </VerticalStack>
-                        </Box>
-                    ))}
+                        )
+                        const cellProps = { borderInlineEndWidth: index < (summaryItems.length - 1) ? "1" : "", paddingBlockStart: 1, paddingBlockEnd: 1, borderColor: "border-subdued" }
+                        return item.onClick ? (
+                            <Pressable key={index} onClick={item.onClick} accessibilityLabel={String(item.title)} hoverBackground="bg-subdued" {...cellProps}>
+                                {content}
+                            </Pressable>
+                        ) : (
+                            <Box key={index} {...cellProps}>
+                                {content}
+                            </Box>
+                        )
+                    })}
                 </HorizontalGrid>
             </Box>
         </Card>

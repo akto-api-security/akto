@@ -35,9 +35,14 @@ export function topoIcon(category) {
     }
 }
 
+const TOPO_STATUS_BORDERS = { bad: "#D72C0D", review: "#E4C300" };
+const TOPO_SELECTED_BORDER = "#6200EA";
+
 export function TopoNode({ data }) {
     const { component } = data;
     const colors = topoColors(component.category);
+    const borderColor = component.selected ? TOPO_SELECTED_BORDER : TOPO_STATUS_BORDERS[component.status] || colors.borderColor;
+    const borderWidth = component.selected ? 2 : 1;
     const IconComponent = topoIcon(component.category);
     const isDevice = component.category === "external";
 
@@ -45,7 +50,7 @@ export function TopoNode({ data }) {
         <>
             {!isDevice && <Handle type="target" position={Position.Left} />}
             <Card padding={0}>
-                <Box style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
+                <Box style={{ border: `${borderWidth}px solid ${borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
                     <Box padding={3}>
                         <VerticalStack gap={1}>
                             <Box width="150px">
@@ -73,7 +78,11 @@ export function TopoNode({ data }) {
     );
 }
 
-export const TOPO_NODE_TYPES = { topoNode: TopoNode };
+export function TopoHead({ data }) {
+    return <Text variant="bodySm" fontWeight="semibold" color="subdued">{data.label}</Text>;
+}
+
+export const TOPO_NODE_TYPES = { topoNode: TopoNode, topoHead: TopoHead };
 
 const NODE_H = 84;
 const GRAPH_H = 300;
@@ -82,9 +91,9 @@ const FOCUS_ZOOM = 1;
 
 // Opens centred on the asset the flyout is actually about (the device on Endpoints, the agent/MCP
 // on Agentic Assets) instead of a fitView that shrinks everything to fit the widest branch.
-function centerOnFocus(api, nodes, focusId) {
+function centerOnFocus(api, nodes, focusId, fitPadding = 0.2) {
     const target = nodes.find(n => n.id === focusId);
-    if (!target) { api.fitView({ padding: 0.2 }); return; }
+    if (!target) { api.fitView({ padding: fitPadding }); return; }
     // getNode returns the store's copy, which carries the *measured* box — the node's width comes
     // from TopoNode's label widths, so hardcoding it here would drift the moment those change.
     const measured = api.getNode?.(focusId);
@@ -125,7 +134,7 @@ function buildDeviceItems(devices, deviceCount) {
     return items;
 }
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId }) {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId, onNodeClick, onPaneClick, fitKey, fitPadding }) {
     // Each MCP's own tools, keyed by collection id — the extra hop the Endpoints graph shows.
     // Only for our own layout; a caller that supplies nodes reserves its own tool rows.
     const mcpCollectionIds = useMemo(() => {
@@ -274,9 +283,10 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
     // Re-centres on every graph change, not just init — the flyouts' detail and tool fetches land
     // after the first render, and the view should still be on the focus node once they do.
     const flow = useRef(null);
+    const recenterOn = fitKey !== undefined ? fitKey : nodes;
     useEffect(() => {
-        if (flow.current) centerOnFocus(flow.current, nodes, focusId);
-    }, [nodes, focusId]);
+        if (flow.current) centerOnFocus(flow.current, nodes, focusId, fitPadding);
+    }, [recenterOn, focusId]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
@@ -284,12 +294,14 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={TOPO_NODE_TYPES}
-                onInit={api => { flow.current = api; centerOnFocus(api, nodes, focusId); }}
+                onInit={api => { flow.current = api; centerOnFocus(api, nodes, focusId, fitPadding); }}
                 minZoom={0.2}
                 maxZoom={4}
                 nodesDraggable={true}
                 nodesConnectable={false}
-                elementsSelectable={false}
+                elementsSelectable={!!onNodeClick}
+                onNodeClick={onNodeClick}
+                onPaneClick={onPaneClick}
                 zoomOnScroll
                 zoomOnPinch
                 panOnDrag
