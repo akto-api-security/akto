@@ -110,7 +110,10 @@ public abstract class ApiGroupSync {
         return 200;
     }
 
-    /** Length of the time ranges a run goes through in order; the last sync time is saved after each. */
+    /**
+     * Length of the time ranges a run goes through in order; the last sync time is saved after each. The first run of a
+     * group, which has no last sync time, is the exception: it goes through its whole look back in one go.
+     */
     protected int sliceSeconds() {
         return 60 * 60;
     }
@@ -260,6 +263,8 @@ public abstract class ApiGroupSync {
         Result result = new Result();
         int sliceFrom = since;
         int sliceTo = since;
+        // later runs go hour by hour, the first run covers its whole look back at once instead of many small queries
+        int sliceLength = hasMarker ? sliceSeconds() : Math.max(syncStartedAt - since, 1);
         int lastSaved = hasMarker ? lastSync : 0;
         int dataUpTo = 0;
         try {
@@ -268,7 +273,7 @@ public abstract class ApiGroupSync {
             int saveCap = Math.max(dataUpTo, syncStartedAt - maxHoldBackSeconds());
             sync(result, visitor -> scanUntimed(visitor));
             for (; sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
-                sliceTo = Math.min(sliceFrom + sliceSeconds(), syncStartedAt);
+                sliceTo = Math.min(sliceFrom + sliceLength, syncStartedAt);
                 int from = sliceFrom;
                 int to = sliceTo;
                 sync(result, visitor -> scan(from, to, visitor));
