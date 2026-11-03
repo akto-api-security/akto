@@ -5,10 +5,14 @@ import com.akto.action.skill_validation_v3.SkillEvidenceV3.SkillDocument;
 import com.akto.action.skill_validation_v3.SkillEvidenceV3.Span;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -26,6 +30,20 @@ import java.util.stream.Collectors;
 public class SkillTagValidatorV3 {
 
     static final double DESCRIPTION_MISMATCH_THRESHOLD = 0.7;
+
+    // Behaviour most skills need to do their job (an unpinned install of the skill's own tool): a tag
+    // only when the purpose does not explain it.
+    private static final Set<SkillTagCriteria> ROUTINE_CRITERIA = EnumSet.of(SkillTagCriteria.AST07_UNPINNED);
+
+    // A path under the user's home, and what follows it.
+    private static final Pattern HOME_PATH = Pattern.compile(
+            "(?:~|\\$home\\b|\\$\\{home\\}|%userprofile%|/users/[^/\\s]+|/home/[^/\\s]+|/root)(/[^\\s'\"`)>\\]}]*)?",
+            Pattern.CASE_INSENSITIVE);
+
+    // The agent's own folders, and the tool caches and config every CLI keeps under ~. Not the user's files.
+    private static final Pattern OWN_HOME_DIR = Pattern.compile(
+            "^/\\.(codex|claude|cursor|agents|kiro|windsurf|codeium|copilot|vscode|antigravity|cache|config|npm|local/share)(/|$)",
+            Pattern.CASE_INSENSITIVE);
 
     private SkillTagValidatorV3() {}
 
@@ -59,10 +77,11 @@ public class SkillTagValidatorV3 {
      * @param maliciousClaim       the model's malicious object when it claims the skill is malicious (and
      *                             the skill is not vendor-shipped), else null
      * @param descriptionMatchScore the model's name/description vs behaviour score; AST04 needs a mismatch
+     * @param vendorShipped        a built-in skill: only behaviour its purpose does not explain is tagged
      */
     @SuppressWarnings("unchecked")
     public static List<Finding> validate(List<?> rawTags, Map<String, Object> maliciousClaim, SkillDocument doc,
-            double descriptionMatchScore) {
+            double descriptionMatchScore, boolean vendorShipped) {
         TreeMap<SkillTagCriteria, Candidate> candidates = new TreeMap<>();
 
         if (rawTags != null) {
@@ -109,8 +128,13 @@ public class SkillTagValidatorV3 {
         while ((next = candidates.pollFirstEntry()) != null) {
             SkillTagCriteria criteria = next.getKey();
             Candidate candidate = next.getValue();
+            // Explained by the purpose and not a real risk on its own: not a tag, and its lines stay free.
+            if (candidate.purposeAligned && (vendorShipped || ROUTINE_CRITERIA.contains(criteria))) continue;
+            // A built-in skill's sudo installs the packages it needs; the vendor ships it, so no tag.
+            if (vendorShipped && criteria == SkillTagCriteria.AST06_ROOT) continue;
             List<Span> unclaimed = candidate.spans.stream()
                     .filter(span -> claimed.stream().noneMatch(span::sharesLineWith))
+                    .filter(span -> criteria != SkillTagCriteria.AST03_OUTSIDE_WORKSPACE || !onlyOwnHomeDirs(span.text))
                     .collect(Collectors.toList());
             List<Span> supported = supportedSpans(criteria, unclaimed);
 
@@ -210,6 +234,21 @@ public class SkillTagValidatorV3 {
             supported.add(span);
         }
         return anchored && companioned && hostFound ? supported : null;
+    }
+
+    /**
+     * True when every home path the text names is the agent's own folder or a tool's cache or config
+     * (~/.codex/skills, ~/.cache/wrangler): touching those is not touching the user's files.
+     */
+    static boolean onlyOwnHomeDirs(String text) {
+        Matcher m = HOME_PATH.matcher(text);
+        boolean found = false;
+        while (m.find()) {
+            found = true;
+            String rest = m.group(1);
+            if (rest == null || !OWN_HOME_DIR.matcher(rest).find()) return false;
+        }
+        return found;
     }
 
     /** The first occurrence of the quote that is a directive rather than a warning or threat write-up. */

@@ -63,9 +63,11 @@ public class SkillValidationV3Action extends ActionSupport {
         "below IN ORDER. Each step uses what the previous one established.\n" +
         "\n" +
         "You produce TWO different things. Never mix them up:\n" +
-        "  TAGS — information. Each tag states one thing the skill actually does (\"runs sudo to install a\n" +
-        "    package\", \"caches files under ~/.cache\"), proven by exact lines. Tags are not accusations: a\n" +
-        "    perfectly safe built-in skill that runs sudo gets the sudo tag.\n" +
+        "  TAGS — risks. Each tag states one thing the skill does that can hurt the user, their machine or\n" +
+        "    their data if it goes wrong or is abused (\"runs sudo\", \"uploads the repo to a paste site\",\n" +
+        "    \"adds a line to ~/.zshrc\"), proven by exact lines. A tag is NOT an inventory of what the skill\n" +
+        "    touches: the routine steps a skill needs to do its job are never tags. Most skills — and nearly\n" +
+        "    every built-in one — have NO tags, and an empty tags array is the normal answer.\n" +
         "  MALICIOUS — a verdict, with its own score, reason and evidence. isMalicious is true only when the\n" +
         "    skill genuinely attacks the user or their machine. This is rare. Only a malicious skill raises\n" +
         "    a security alert; tags never do.\n" +
@@ -88,16 +90,17 @@ public class SkillValidationV3Action extends ActionSupport {
         "work out:\n" +
         "  - what the skill is for (skillPurpose, one sentence), and what a user who installs it expects;\n" +
         "  - who ships it. FILE PATH tells you: skills under .cursor/skills-cursor, .codex/skills/.system,\n" +
+        "    .codex/vendor_imports/skills/skills/.curated, .gemini/antigravity/builtin,\n" +
         "    a claude-plugins-official plugin, or an openai-bundled / openai-primary-runtime plugin are\n" +
-        "    built-in vendor skills (openai-curated holds third-party plugins). They are tagged like any\n" +
-        "    other skill for what they really do, but they are never malicious;\n" +
+        "    built-in vendor skills (openai-curated holds third-party plugins). They are never malicious, and\n" +
+        "    they get a tag only for a line whose risk their purpose does NOT explain;\n" +
         "  - which parts of the skill file are LIVE INSTRUCTIONS the agent will follow, and which are only\n" +
         "    documentation, examples for the user, explanations, warnings, or descriptions of what an\n" +
         "    attacker might do. Only live instructions can produce a tag. Code in the FILES THIS SKILL RUNS\n" +
         "    is live when the skill runs that file; its comments are not.\n" +
         "Every later decision is judged against this understanding.\n" +
         "\n" +
-        "==================== STEP 2 — TAGS (information) ====================\n" +
+        "==================== STEP 2 — TAGS (risks) ====================\n" +
         "\n" +
         "The ONLY criteria you may use are listed below, in PRECEDENCE order (first = most specific). A tag\n" +
         "names exactly one criterion id; the label shown to users comes from the criterion. Tags never use\n" +
@@ -114,10 +117,30 @@ public class SkillValidationV3Action extends ActionSupport {
         "You may also add a line that is not in the list if it clearly meets a criterion. Candidate lines:\n" +
         "%s\n" +
         "\n" +
+        "NEVER A TAG — drop these even when a candidate line matches a criterion's pattern:\n" +
+        "  - installing or running the tool the skill is about from its official registry, even unpinned\n" +
+        "    (npm install -D wrangler@latest in a Wrangler skill, npx some-cli@latest in that CLI's skill);\n" +
+        "  - the agent's own directories: where skills, plugins or agent config live (~/.codex, $CODEX_HOME,\n" +
+        "    ~/.claude, ~/.cursor, ~/.agents and their skills/ folders), and documentation saying so;\n" +
+        "  - an API token or key for the service the skill integrates, read from the env var or config the\n" +
+        "    user set up for it (export SENTRY_AUTH_TOKEN in a Sentry skill);\n" +
+        "  - the tool's own cache or config under ~ (~/.cache/<tool>, ~/.config/<tool>, ~/.npm);\n" +
+        "  - setup or usage documentation, examples and placeholders, even when written as commands;\n" +
+        "  - shell, git, build, test, lint and package-manager commands, and file reads/writes inside the\n" +
+        "    project;\n" +
+        "  - calls to the skill's own documented API, first-party hosts, registries and public docs.\n" +
+        "  - a line that only names or reads a file, setting or permission that \"may contain\" secrets or\n" +
+        "    \"could\" grant too much \"if misconfigured\" or \"if mishandled\": the line itself has to do the\n" +
+        "    risky thing (dump the secrets, send them, grant the wildcard), not leave room for it;\n" +
+        "  - running sudo in a built-in vendor skill (installing the packages it needs).\n" +
+        "When in doubt, it is not a tag. A false tag on a legitimate skill is a worse mistake than a\n" +
+        "missing one.\n" +
+        "\n" +
         "How to choose the tag for a line — read what the line DOES, then pick the criterion whose\n" +
         "description says exactly that, so the tag explains the behaviour to someone who never opens the file:\n" +
-        "  - Running sudo/su is AST06.c1. Writing or reading under ~ / $HOME (caches, config, keys) is\n" +
-        "    AST03.c3. Editing /etc, /proc, chmod 777 or setuid is AST06.c3. cron/launchd/shell rc/git hooks\n" +
+        "  - Running sudo/su is AST06.c1. Writing, deleting or overwriting the user's files under ~ / $HOME\n" +
+        "    outside the agent's and the tool's own directories, or reading other users' files, is AST03.c3.\n" +
+        "    Editing /etc, /proc, chmod 777 or setuid is AST06.c3. cron/launchd/shell rc/git hooks\n" +
         "    is AST06.c4. Reading SSH keys, cloud credentials, .env or dumping the environment is AST03.c2.\n" +
         "  - Data exfiltration (AST03.c4) means LOCAL DATA REALLY LEAVES THE MACHINE: file contents, command\n" +
         "    output, env vars or source code uploaded to an external host. Writing a file under ~ is NOT\n" +
@@ -137,11 +160,14 @@ public class SkillValidationV3Action extends ActionSupport {
         "     already listed.\n" +
         "\n" +
         "For each tag:\n" +
-        "  reason — one concrete sentence: what these lines do, naming the actual command, path, host or\n" +
-        "    data, and whether the purpose from STEP 1 explains it. Not generic risk prose. It is shown\n" +
-        "    next to the highlighted lines, so it must make sense to someone reading just those lines.\n" +
-        "  purposeAligned — true when the purpose explains the behaviour (an install skill running sudo, a\n" +
-        "    firmware tool caching under ~/.cache, a deploy skill posting to its own API); false only when it\n" +
+        "  reason — one concrete sentence on the RISK: what these lines do, naming the actual command, path,\n" +
+        "    host or data, and what can go wrong because of it — what is exposed, changed, deleted or run,\n" +
+        "    and for whom. Never justify the line: no \"necessary\", \"required\", \"standard\", \"expected\",\n" +
+        "    \"default\" or \"aligned with its purpose\". If the only honest reason is that the skill needs\n" +
+        "    the line to work, it is not a tag — drop it. It is shown next to the highlighted lines, so it\n" +
+        "    must make sense to someone reading just those lines.\n" +
+        "  purposeAligned — true when the purpose explains the behaviour and it is still a real risk (an\n" +
+        "    install skill running sudo, a deploy skill uploading the build to its own host); false when it\n" +
         "    has nothing to do with the purpose.\n" +
         "\n" +
         "==================== STEP 3 — MALICIOUS (verdict) ====================\n" +
@@ -249,6 +275,8 @@ public class SkillValidationV3Action extends ActionSupport {
     private static final List<String> VENDOR_SKILL_PATHS = Arrays.asList(
             "/.cursor/skills-cursor/",
             "/.codex/skills/.system/",
+            "/.codex/vendor_imports/skills/skills/.curated/",
+            "/.gemini/antigravity/builtin/",
             "/plugins/marketplaces/claude-plugins-official/",
             "/plugins/cache/claude-plugins-official/",
             "/.codex/plugins/cache/openai-bundled/",
@@ -315,7 +343,8 @@ public class SkillValidationV3Action extends ActionSupport {
 
         Map<String, Object> malicious = parsed.get("malicious") instanceof Map
                 ? (Map<String, Object>) parsed.get("malicious") : new HashMap<>();
-        boolean claimedMalicious = Boolean.TRUE.equals(malicious.get("isMalicious")) && !isVendorShipped(filePath);
+        boolean vendorShipped = isVendorShipped(filePath);
+        boolean claimedMalicious = Boolean.TRUE.equals(malicious.get("isMalicious")) && !vendorShipped;
         double maliciousScore = numberOf(malicious.get("score"), 0.0);
         double matchScore = numberOf(parsed.get("toolNameDescriptionMatchScore"), 1.0);
         String reason = stringOf(malicious.get("reason"));
@@ -324,7 +353,7 @@ public class SkillValidationV3Action extends ActionSupport {
 
         List<?> claimedTags = parsed.get("tags") instanceof List ? (List<?>) parsed.get("tags") : new ArrayList<>();
         List<Finding> findings = SkillTagValidatorV3.validate(claimedTags, claimedMalicious ? malicious : null, doc,
-                matchScore);
+                matchScore, vendorShipped);
         Finding maliciousFinding = findings.stream().filter(f -> f.criteria.isMalicious()).findFirst().orElse(null);
         boolean flagged = claimedMalicious && maliciousFinding != null;
         maliciousScore = flagged ? Math.max(maliciousScore, 0.8) : Math.min(maliciousScore, 0.2);
