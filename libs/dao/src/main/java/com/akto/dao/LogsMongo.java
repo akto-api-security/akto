@@ -1,6 +1,7 @@
 package com.akto.dao;
 
 import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
@@ -25,6 +26,7 @@ import com.mongodb.event.ClusterOpeningEvent;
 import com.akto.util.DbMode;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -39,6 +41,9 @@ import org.slf4j.LoggerFactory;
  * Optional separate MongoDB for logs and traffic metrics, selected by env LOG_MONGO_CONN (a Mongo
  * connection string). Unset/blank => disabled and every DAO behaves exactly as before (clients[0]).
  *
+ * Which accounts use it is decided by env LOG_PIPELINE_ACCOUNTS (same variable as cyborg): unset/empty => no account,
+ * "*" => every account, "1000000,1758595089" => only those accounts. Other accounts keep using the main Mongo.
+ *
  * When set, ONLY the DAOs in ROUTED (exact classes, not subclasses) resolve their collection from the logs
  * Mongo: all log DAOs except AwsApiGatewayLogsDao and GuardrailsServiceLogsDao, plus TrafficMetricsDao.
  * Database-per-account naming and collection names are unchanged. The connection string is never logged.
@@ -49,6 +54,11 @@ public class LogsMongo {
     public static final String ENV = "LOG_MONGO_CONN";
     private static final String CONN = resolve();
     private static final boolean ENABLED = CONN != null;
+
+    public static final String ACCOUNTS_ENV = "LOG_PIPELINE_ACCOUNTS";
+    private static final String ACCOUNTS_RAW = envOrEmpty(ACCOUNTS_ENV);
+    private static final boolean ALL_ACCOUNTS = parseAll(ACCOUNTS_RAW);
+    private static final Set<Integer> ACCOUNTS = parseIds(ACCOUNTS_RAW);
 
     // exact classes only (no subclass matching). Deliberately NOT routed: AwsApiGatewayLogsDao, GuardrailsServiceLogsDao (nothing writes them any more)
     private static final Set<Class<?>> ROUTED = new HashSet<>(Arrays.asList(
@@ -100,9 +110,46 @@ public class LogsMongo {
         return ENABLED;
     }
 
-    /** True when this DAO instance must use the logs Mongo (feature on AND exact class is one of the routed DAOs). */
+    private static String envOrEmpty(String name) {
+        String v = System.getenv(name);
+        return v == null ? "" : v.trim();
+    }
+
+    static boolean parseAll(String raw) {
+        for (String t : raw.split("[,\\s]+")) {
+            if ("*".equals(t)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static Set<Integer> parseIds(String raw) {
+        Set<Integer> ids = new HashSet<>();
+        for (String t : raw.split("[,\\s]+")) {
+            try {
+                if (!t.isEmpty()) {
+                    ids.add(Integer.parseInt(t));
+                }
+            } catch (NumberFormatException ignored) {
+                // not an account id: skipped
+            }
+        }
+        return Collections.unmodifiableSet(ids);
+    }
+
+    /** Per-account decision. A missing account context never uses the logs Mongo. */
+    static boolean isAccountEnabled(Integer accountId) {
+        if (accountId == null) {
+            return false;
+        }
+        return ALL_ACCOUNTS || ACCOUNTS.contains(accountId);
+    }
+
+    /** True when this DAO instance must use the logs Mongo (feature on AND account enabled AND exact class is one of the routed DAOs). */
     public static boolean isRouted(MCollection<?> dao) {
         if (!ENABLED) return false;
+        if (!isAccountEnabled(Context.accountId.get())) return false;
         Class<?> c = dao.getClass();
         return ROUTED.contains(c);
     }
