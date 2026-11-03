@@ -1453,21 +1453,7 @@ public class MaliciousEventService {
       return new Document("_id", new Document("$in", eventIds));
     } else if (filterMap != null && !filterMap.isEmpty()) {
       // Query by filter criteria
-      Document query = buildQueryFromFilter(filterMap, contextSource, accountId);
-      if (!filterMap.containsKey("latestApiOrigRegex")) {
-        return query;
-      }
-      try {
-        List<Object> ids = new ArrayList<>();
-        maliciousEventDao.getDocumentCollection(accountId).find(query)
-            .projection(Projections.include("_id"))
-            .maxTime(ThreatUtils.REGEX_MAX_TIME_MS, TimeUnit.MILLISECONDS)
-            .forEach(d -> ids.add(d.get("_id")));
-        return new Document("_id", new Document("$in", ids));
-      } catch (MongoExecutionTimeoutException e) {
-        logger.error(operation + " by payload regex exceeded " + ThreatUtils.REGEX_MAX_TIME_MS + "ms, nothing changed: " + e.getMessage(), e);
-        return null;
-      }
+      return buildQueryFromFilter(filterMap, contextSource, accountId);
     } else {
       logger.warn("Neither eventIds nor filterMap provided for " + operation);
       return null;
