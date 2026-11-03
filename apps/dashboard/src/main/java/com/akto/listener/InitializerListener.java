@@ -293,7 +293,7 @@ public class InitializerListener implements ServletContextListener {
 
     // its own thread, so the group sync neither waits for nor holds up the other crons
     private final ScheduledExecutorService groupSyncExecutorService = Executors.newSingleThreadScheduledExecutor();
-    private static final int API_GROUPS_SYNC_INTERVAL_MINUTES = 60;
+    private static final int API_GROUPS_SYNC_INTERVAL_MINUTES = 90;
 
     public static boolean connectedToMongo = false;
 
