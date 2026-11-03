@@ -43,7 +43,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
     private static final long WRITE_PAUSE_MS = 200;
     private static final int MAX_CHANGES_PER_RUN = 20_000;
     private static final int SYNC_BUFFER_SECONDS = 10 * 60;
-    private static final int FIRST_SYNC_LOOKBACK_SECONDS = 5 * Constants.ONE_DAY_TIMESTAMP;
+    private static final int FIRST_SYNC_LOOKBACK_SECONDS = 3 * Constants.ONE_DAY_TIMESTAMP;
     private static final long SLOW_RUN_WARN_MS = 5 * 60 * 1000L;
     private static final Logger logger = LoggerFactory.getLogger(UnauthenticatedEndpoint.class);
 
@@ -106,7 +106,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
      * Brings the group in line with api_info (the source of truth for auth types), writing only the apis whose group
      * tag disagrees with their auth types. Auth types only change in runtime upserts, which bump lastSeen, so only apis
      * seen since the last sync are looked at. The last sync time is kept in account settings and is saved only after
-     * every write has succeeded; without it, the last 5 days are checked.
+     * every write has succeeded; without it, the last 3 days are checked.
      */
     public static void updateCollections(){
         int accountId = Context.accountId.get();
