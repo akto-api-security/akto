@@ -50,7 +50,7 @@ export const DUE_OPTIONS = [
 ];
 
 export const ALERT_CHANNELS = [
-    { label: "Slack", value: "slack", destination: "SLACK" },
+    { label: "Slack", value: "slack", destination: "SLACK", live: true },
     { label: "Email", value: "email" },
     { label: "Webhook", value: "webhook", destination: "WEBHOOK" },
 ];
@@ -72,7 +72,7 @@ export const IGNORE_EXPIRY_OPTIONS = [
 export const ACTION_TYPES = [
     { type: "CREATE_TICKET", label: "Create ticket", help: "Open a Jira or ServiceNow ticket", defaults: { destination: "JIRA", priority: "HIGH", includeEvidence: true, syncStatus: true } },
     { type: "ASSIGN", label: "Assign", help: "Assign the violation to a person", defaults: { assignee: "", dueHours: "24", notifySlack: false } },
-    { type: "ALERT", label: "Send alert", help: "Alert a channel when it happens", defaults: { channels: ["slack"], slackChannel: "", emails: "" } },
+    { type: "ALERT", label: "Send alert", help: "Alert a channel when it happens", live: true, defaults: { channels: ["slack"], emails: "" } },
     { type: "IGNORE", label: "Ignore", help: "Close it automatically with a reason", defaults: { reason: "expected", expiryDays: "0" } },
     { type: "COACH_EMPLOYEE", label: "Send coaching message", help: "Explain the policy to the employee", defaults: { message: "" } },
     { type: "NOTIFY_MANAGER", label: "Notify manager", help: "Escalate repeat events to their manager", defaults: { afterEvents: "3", windowDays: "7" } },

@@ -29,7 +29,7 @@ function actionText(action) {
         case "ASSIGN": return `Assign to ${config.assignee || "nobody yet"}${config.dueHours && config.dueHours !== "0" ? `, due in ${labelOf(DUE_OPTIONS, config.dueHours)}` : ""}`;
         case "ALERT": {
             const channels = (config.channels || []).map((channel) => labelOf(ALERT_CHANNELS, channel));
-            return `Alert ${listOf(channels)}${config.slackChannel ? ` ${config.slackChannel}` : ""}`;
+            return `Alert ${listOf(channels)}`;
         }
         case "IGNORE": return `Ignore with reason ${labelOf(IGNORE_REASONS, config.reason)}${config.expiryDays && config.expiryDays !== "0" ? `, expires in ${labelOf(IGNORE_EXPIRY_OPTIONS, config.expiryDays)}` : ""}`;
         case "COACH_EMPLOYEE": return "Send coaching message to employee";

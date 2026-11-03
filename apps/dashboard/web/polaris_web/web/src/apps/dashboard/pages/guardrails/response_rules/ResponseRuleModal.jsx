@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActionList, Banner, Box, Button, Card, Checkbox, ChoiceList, Divider, HorizontalStack, Link, Modal, Popover, Text, TextField, VerticalStack,
+    ActionList, Badge, Banner, Box, Button, Card, Checkbox, ChoiceList, Divider, HorizontalStack, Link, Modal, Popover, Text, TextField, VerticalStack,
 } from "@shopify/polaris";
 import { DeleteMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
@@ -77,6 +77,9 @@ function ConditionRow({ condition, usedFields, policyOptions, onChange, onRemove
                     </Box>
                     {removable && <Button icon={DeleteMinor} plain accessibilityLabel="Remove condition" onClick={onRemove} />}
                 </HorizontalStack>
+                {condition.field === "unassignedHours" && (
+                    <Banner status="info">This condition needs a timer and is not checked on new violations yet, so a rule that uses it will not run.</Banner>
+                )}
                 <ConditionValue definition={definition} values={condition.values} policyOptions={policyOptions} onChange={(values) => onChange({ ...condition, values })} />
             </VerticalStack>
         </Card>
@@ -85,6 +88,11 @@ function ConditionRow({ condition, usedFields, policyOptions, onChange, onRemove
 
 function destinationConnected(destinations, id) {
     return !!destinations.find((entry) => entry.id === id)?.connected;
+}
+
+function channelLabel(channel, destinations) {
+    if (!channel.live) return `${channel.label} (not sent yet)`;
+    return channel.destination && !destinationConnected(destinations, channel.destination) ? `${channel.label} (not connected)` : channel.label;
 }
 
 function NotConnected({ destinationId, destinations }) {
@@ -128,14 +136,14 @@ function ActionFields({ action, destinations, onChange }) {
                         allowMultiple
                         title="Send to"
                         choices={ALERT_CHANNELS.map((channel) => ({
-                            label: channel.destination && !destinationConnected(destinations, channel.destination) ? `${channel.label} (not connected)` : channel.label,
+                            label: channelLabel(channel, destinations),
                             value: channel.value,
                         }))}
                         selected={config.channels}
                         onChange={(channels) => set({ channels })}
                     />
                     {config.channels.includes("slack") && (
-                        <TextField label="Slack channel" autoComplete="off" placeholder="#atlas-alerts" value={config.slackChannel} onChange={(slackChannel) => set({ slackChannel })} />
+                        <Text as="p" variant="bodySm" color="subdued">Alerts go to the Slack webhook saved in Settings, Integrations, and include a link to the violation.</Text>
                     )}
                     {config.channels.includes("email") && (
                         <TextField label="Email addresses" autoComplete="off" placeholder="security-oncall@example.com" helpText="Separate several with commas" value={config.emails} onChange={(emails) => set({ emails })} />
@@ -184,6 +192,7 @@ function ActionCard({ action, destinations, onChange, onRemove }) {
                         <Text as="h4" variant="headingSm">{definition.label}</Text>
                         <Text as="span" variant="bodySm" color="subdued">{definition.help}</Text>
                     </VerticalStack>
+                    <Badge status={definition.live ? "success" : undefined}>{definition.live ? "Runs on new violations" : "Saved, not run yet"}</Badge>
                     <Button icon={DeleteMinor} plain accessibilityLabel={`Remove ${definition.label}`} onClick={onRemove} />
                 </HorizontalStack>
                 <Divider />
@@ -331,7 +340,7 @@ function ResponseRuleModal({ open, initialForm, destinations, onClose, onSaved }
                     </VerticalStack>
                     <Checkbox
                         label="Turn this rule on"
-                        helpText="Rules take effect on new violations once Atlas starts running them"
+                        helpText="Active rules run on each new violation, within about 15 seconds of saving"
                         checked={form.active}
                         onChange={(active) => setForm((current) => ({ ...current, active }))}
                     />
