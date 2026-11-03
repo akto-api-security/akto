@@ -39,6 +39,15 @@ import com.mongodb.client.model.Updates;
  * - With no last sync time, starts a few days back.
  * - Never updates in bulk: the writes are small synchronous batches with a pause after each.
  *
+ * Algorithm of {@link #run()}:
+ * 1. Read the group's last sync time from account settings (none: start a few days back); start from it minus a small buffer.
+ * 2. Check the apis that cannot be found by time ({@link #scanUntimed}), then each time slice in order up to now.
+ * 3. For every reported api, compare "should be in the group" with "has the group tag"; if they agree, do nothing.
+ * 4. Otherwise collect it, and write each full batch with one updateMany per collection (add or pull the tag), then pause.
+ * 5. After a slice is fully written, save its end as the group's last sync time.
+ * 6. On any error stop without saving the unfinished slice; the next run resumes from the last saved one.
+ * 7. Log one line: apis scanned, added, removed, write batches sent and documents modified.
+ *
  * The tuning values below have defaults and can be overridden by a group.
  */
 public abstract class DeltaGroupSync {
@@ -66,6 +75,9 @@ public abstract class DeltaGroupSync {
         int scanned;
         int added;
         int removed;
+        // database side of the writes: write batches sent (each is one updateMany per collection) and documents modified
+        int batches;
+        long docsModified;
     }
 
     /** Each write is one updateMany per collection with an $or of this many (url, method) pairs, so keep it small. */
@@ -147,16 +159,16 @@ public abstract class DeltaGroupSync {
                 result.slices++;
             }
         } catch (Exception e) {
-            logger.error(String.format("AccountId: %d %s sync failed in slice [%d, %d) after slices done=%d, scanned=%d, added=%d, removed=%d, took=%d ms, since=%d; the next run resumes from the last saved slice",
-                    accountId, groupName(), sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs, since), e);
+            logger.error(String.format("AccountId: %d %s sync failed in slice [%d, %d) after slices done=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms, since=%d; the next run resumes from the last saved slice",
+                    accountId, groupName(), sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, result.batches, result.docsModified, System.currentTimeMillis() - startMs, since), e);
             return;
         }
 
         long tookMs = System.currentTimeMillis() - startMs;
-        String message = String.format("AccountId: %d %s synced: since=%d (%s), slices=%d, scanned=%d, added=%d, removed=%d, took=%d ms",
+        String message = String.format("AccountId: %d %s synced: since=%d (%s), slices=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms",
                 accountId, groupName(), since,
                 hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback",
-                result.slices, result.scanned, result.added, result.removed, tookMs);
+                result.slices, result.scanned, result.added, result.removed, result.batches, result.docsModified, tookMs);
         if (tookMs > slowRunWarnMs()) {
             logger.warn(message);
         } else {
@@ -178,16 +190,16 @@ public abstract class DeltaGroupSync {
             (candidate.member ? toAdd : toRemove).add(candidate.key);
 
             if (toAdd.size() >= writeBatchSize()) {
-                result.added += write(toAdd, true);
+                result.added += write(toAdd, true, result);
             }
             if (toRemove.size() >= writeBatchSize()) {
-                result.removed += write(toRemove, false);
+                result.removed += write(toRemove, false, result);
             }
             return true;
         });
 
-        result.added += write(toAdd, true);
-        result.removed += write(toRemove, false);
+        result.added += write(toAdd, true, result);
+        result.removed += write(toRemove, false, result);
     }
 
     private void saveLastSync(int time) {
@@ -198,17 +210,16 @@ public abstract class DeltaGroupSync {
     }
 
     /** Writes the given apis on the calling thread (so failures reach run()), then empties the list. @return how many were written */
-    private int write(List<ApiInfoKey> keys, boolean add) {
+    private int write(List<ApiInfoKey> keys, boolean add, Result result) {
         if (keys.isEmpty()) {
             return 0;
         }
         int count = keys.size();
         List<TestingEndpoints> conditions = Collections.singletonList(endpointsFor(keys));
-        if (add) {
-            ApiCollectionUsers.addToCollectionsForCollectionId(conditions, groupId(), true);
-        } else {
-            ApiCollectionUsers.removeApisFromCollectionId(conditions, groupId(), true);
-        }
+        result.docsModified += add
+                ? ApiCollectionUsers.addToCollectionsForCollectionId(conditions, groupId(), true)
+                : ApiCollectionUsers.removeApisFromCollectionId(conditions, groupId(), true);
+        result.batches++;
         keys.clear();
 
         try {

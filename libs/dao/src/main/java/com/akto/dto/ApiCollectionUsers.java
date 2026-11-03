@@ -190,7 +190,8 @@ public class ApiCollectionUsers {
         operationForCollectionId(conditions, apiCollectionId, update, matchFilter, remove, false);
     }
 
-    private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove, boolean synchronous) {
+    /** @return documents modified when run synchronously, 0 when the updates are only queued */
+    private static long operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove, boolean synchronous) {
         
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
@@ -202,20 +203,23 @@ public class ApiCollectionUsers {
             filtersMap.put(type, finalFilter);
         }
         if(apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID && remove){
-            return;
+            return 0;
         }
-        updateCollectionsForCollectionId(filtersMap, update, synchronous);
+        return updateCollectionsForCollectionId(filtersMap, update, synchronous);
     }
 
     public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
         addToCollectionsForCollectionId(conditions, apiCollectionId, false);
     }
 
-    /** @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them */
-    public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
+    /**
+     * @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them
+     * @return documents modified when run synchronously, 0 when the updates are only queued
+     */
+    public static long addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
+        return operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
     }
 
     public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
@@ -247,11 +251,14 @@ public class ApiCollectionUsers {
         removeApisFromCollectionId(conditions, apiCollectionId, false);
     }
 
-    /** @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them */
-    public static void removeApisFromCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
+    /**
+     * @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them
+     * @return documents modified when run synchronously, 0 when the updates are only queued
+     */
+    public static long removeApisFromCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
         Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
+        return operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
     }
 
     public static void keepOnlyApiCollectionId(int apiCollectionId) {
@@ -289,10 +296,9 @@ public class ApiCollectionUsers {
         updateApiCollection(conditions, apiCollectionId);
     }
 
-    private static void updateCollectionsForCollectionId(Map<CollectionType, Bson> filtersMap, Bson update, boolean synchronous) {
+    private static long updateCollectionsForCollectionId(Map<CollectionType, Bson> filtersMap, Bson update, boolean synchronous) {
         if (synchronous) {
-            updateAllCollections(filtersMap, update);
-            return;
+            return updateAllCollections(filtersMap, update);
         }
         int accountId = Context.accountId.get();
         executorService.schedule(new Runnable() {
@@ -301,18 +307,24 @@ public class ApiCollectionUsers {
                 updateAllCollections(filtersMap, update);
             }
         }, 0, TimeUnit.SECONDS);
+        return 0;
     }
 
-    private static void updateAllCollections(Map<CollectionType, Bson> filtersMap, Bson update) {
+    private static long updateAllCollections(Map<CollectionType, Bson> filtersMap, Bson update) {
+        long modified = 0;
         for (Map.Entry<CollectionType, MCollection<?>[]> collectionsEntry : COLLECTIONS_WITH_API_COLLECTION_ID.entrySet()) {
-            updateCollections(collectionsEntry.getValue(), filtersMap.get(collectionsEntry.getKey()), update);
+            modified += updateCollections(collectionsEntry.getValue(), filtersMap.get(collectionsEntry.getKey()), update);
         }
+        return modified;
     }
 
-    private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
+    private static long updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
+        long modified = 0;
         for (MCollection<?> collection : collections) {
             UpdateResult res = collection.getMCollection().updateMany(filter, update);
+            modified += res.getModifiedCount();
         }
+        return modified;
     }
 
     public static void updateCollections(MCollection<?>[] collections, Bson filter, List<Bson> update) {
