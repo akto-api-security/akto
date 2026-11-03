@@ -2,17 +2,22 @@ package com.akto.threat.backend.service;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.GuardrailResponseRuleRunsDao;
 import com.akto.dao.GuardrailResponseRulesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
+import com.akto.dao.notifications.SlackWebhooksDao;
+import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.Config;
 import com.akto.dto.GuardrailResponseRule;
 import com.akto.dto.GuardrailResponseRule.RuleAction;
 import com.akto.dto.GuardrailResponseRule.RuleCondition;
+import com.akto.dto.GuardrailResponseRuleRun;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.notifications.CustomWebhook;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
@@ -20,17 +25,22 @@ import com.akto.notifications.email.SendgridEmail;
 import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.testing.ApiExecutor;
-import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ErrorCategory;
+import com.mongodb.MongoWriteException;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 import com.sendgrid.helpers.mail.objects.Personalization;
+import com.slack.api.Slack;
+import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.conversions.Bson;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -39,13 +49,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -56,7 +70,6 @@ public class ResponseRuleEngine {
     private static final ResponseRuleEngine INSTANCE = new ResponseRuleEngine();
 
     private static final String ACTIVITY_PATH = "/dashboard/protection/threat-activity";
-    private static final String CLAIMED_RULES_FIELD = "responseRuleIds";
     private static final long RULES_TTL_MS = 15_000L;
     private static final long PERSONAL_TTL_MS = 60_000L;
     private static final int PERSONAL_CACHE_CAPACITY = 10_000;
@@ -64,9 +77,16 @@ public class ResponseRuleEngine {
     private static final int DELIVERY_WORKERS = 3;
     private static final int QUEUE_CAPACITY = 10_000;
     private static final int MAX_EMAILS = 20;
+    private static final int MAX_ATTEMPTS = 4;
+    private static final int[] RETRY_DELAYS_SECONDS = {60, 300, 1800};
+    private static final int LEASE_SECONDS = 300;
+    private static final int RETRY_SWEEP_SECONDS = 60;
+    private static final int RETRY_BATCH = 50;
+    private static final int MAX_ERROR_LENGTH = 500;
     private static final String CHANNEL_SLACK = "slack";
     private static final String CHANNEL_WEBHOOK = "webhook";
     private static final String CHANNEL_EMAIL = "email";
+    private static final List<String> ALERT_CHANNELS = Arrays.asList(CHANNEL_SLACK, CHANNEL_WEBHOOK, CHANNEL_EMAIL);
     private static final String CONFIG_CHANNELS = "channels";
     private static final String CONFIG_SLACK_WEBHOOK_ID = "slackWebhookId";
     private static final String CONFIG_WEBHOOK_ID = "webhookId";
@@ -88,10 +108,13 @@ public class ResponseRuleEngine {
     private static final Set<String> BROWSER_MARKERS = new HashSet<>(Arrays.asList("chrome", "edge", "firefox", "safari", "brave", "arc", "opera"));
 
     private final ExecutorService executor = newPool(WORKERS, "Response rule queue is full, a violation was not evaluated");
-    private final ExecutorService deliveries = newPool(DELIVERY_WORKERS, "Response rule delivery queue is full, an alert was not sent");
+    private final ExecutorService deliveries = newPool(DELIVERY_WORKERS, "Response rule delivery queue is full, a delivery will be retried by the sweep");
+    private final ScheduledExecutorService retryScheduler = Executors.newSingleThreadScheduledExecutor();
     private final Map<String, CachedRules> rulesByAccount = new ConcurrentHashMap<>();
     private final Map<String, CachedFlag> personalByHost = new ConcurrentHashMap<>();
+    private final Set<Integer> indexedAccounts = ConcurrentHashMap.newKeySet();
     private volatile MaliciousEventService eventService;
+    private volatile boolean started;
 
     private ResponseRuleEngine() {}
 
@@ -99,8 +122,11 @@ public class ResponseRuleEngine {
         return INSTANCE;
     }
 
-    public void setEventService(MaliciousEventService eventService) {
+    public synchronized void init(MaliciousEventService eventService) {
         this.eventService = eventService;
+        if (started) return;
+        started = true;
+        retryScheduler.scheduleWithFixedDelay(this::sweepRetries, RETRY_SWEEP_SECONDS, RETRY_SWEEP_SECONDS, TimeUnit.SECONDS);
     }
 
     private static ExecutorService newPool(int workers, String rejectedMessage) {
@@ -130,9 +156,16 @@ public class ResponseRuleEngine {
         }
     }
 
+    private static final class PermanentFailure extends Exception {
+        PermanentFailure(String message) {
+            super(message);
+        }
+    }
+
     private final class Violation {
         final int accountId;
         final String eventId;
+        final String eventKey;
         final String severity;
         final String filterId;
         final String category;
@@ -158,6 +191,7 @@ public class ResponseRuleEngine {
             this.refId = nonNull(event.getRefId());
             this.eventType = event.getEventType() == null ? "" : event.getEventType().name();
             this.detectedAt = event.getDetectedAt();
+            this.eventKey = StringUtils.firstNonBlank(eventId, refId, UUID.randomUUID().toString());
         }
 
         boolean isPersonalAccount() {
@@ -194,9 +228,16 @@ public class ResponseRuleEngine {
 
     private void runRule(GuardrailResponseRule rule, Violation violation) {
         try {
-            if (!matches(rule, violation) || !claim(rule, violation)) return;
-            execute(rule, violation);
-            recordRun(rule);
+            if (!matches(rule, violation)) return;
+            List<GuardrailResponseRuleRun> units = unitsOf(rule, violation);
+            if (units.isEmpty()) return;
+            if (indexedAccounts.add(violation.accountId)) GuardrailResponseRuleRunsDao.instance.createIndicesIfAbsent();
+            for (int i = 0; i < units.size(); i++) {
+                GuardrailResponseRuleRun run = units.get(i);
+                if (!claim(run)) continue;
+                if (i == 0) recordRun(rule);
+                submit(violation.accountId, run);
+            }
         } catch (Exception e) {
             logger.error("Response rule " + rule.getHexId() + " failed: " + e.getMessage(), e);
         }
@@ -209,14 +250,6 @@ public class ResponseRuleEngine {
         List<GuardrailResponseRule> loaded = GuardrailResponseRulesDao.instance.findAll(Filters.eq("active", true));
         rulesByAccount.put(accountId, new CachedRules(loaded, now));
         return loaded;
-    }
-
-    private boolean claim(GuardrailResponseRule rule, Violation violation) {
-        if (violation.eventId.isEmpty()) return true;
-        long modified = MaliciousEventDao.instance.getDocumentCollection(String.valueOf(violation.accountId)).updateOne(
-            Filters.and(Filters.eq("_id", violation.eventId), Filters.ne(CLAIMED_RULES_FIELD, rule.getHexId())),
-            Updates.addToSet(CLAIMED_RULES_FIELD, rule.getHexId())).getModifiedCount();
-        return modified > 0;
     }
 
     private boolean matches(GuardrailResponseRule rule, Violation violation) {
@@ -304,114 +337,82 @@ public class ResponseRuleEngine {
         return false;
     }
 
-    private void execute(GuardrailResponseRule rule, Violation violation) {
+    private List<GuardrailResponseRuleRun> unitsOf(GuardrailResponseRule rule, Violation violation) {
+        List<GuardrailResponseRuleRun> units = new ArrayList<>();
         List<RuleAction> actions = rule.getActions();
-        if (actions == null) return;
-        for (RuleAction action : actions) {
-            try {
-                executeAction(rule, action, violation);
-            } catch (Exception e) {
-                logger.error("Response rule " + rule.getHexId() + " action " + action.getType() + " failed: " + e.getMessage(), e);
+        if (actions == null) return units;
+        for (int idx = 0; idx < actions.size(); idx++) {
+            RuleAction action = actions.get(idx);
+            Map<String, Object> config = action.getConfig() == null ? Collections.emptyMap() : action.getConfig();
+            for (String channel : channelsOf(action.getType(), config, violation)) {
+                units.add(newRun(rule, violation, idx, action.getType(), channel, config));
             }
         }
+        return units;
     }
 
-    private void executeAction(GuardrailResponseRule rule, RuleAction action, Violation violation) {
-        Map<String, Object> config = action.getConfig() == null ? Collections.emptyMap() : action.getConfig();
-        switch (action.getType()) {
+    private static List<String> channelsOf(String type, Map<String, Object> config, Violation violation) {
+        switch (type) {
             case GuardrailResponseRule.ACTION_ALERT:
-                sendAlerts(rule, config, violation);
-                break;
+                List<String> channels = new ArrayList<>();
+                Object value = config.get(CONFIG_CHANNELS);
+                if (!(value instanceof Collection)) return channels;
+                for (String channel : ALERT_CHANNELS) {
+                    if (((Collection<?>) value).contains(channel)) channels.add(channel);
+                }
+                return channels;
             case GuardrailResponseRule.ACTION_IGNORE:
-                updateEvent(rule, violation, MaliciousEventDto.Status.IGNORED.name(), null);
-                break;
+                return violation.eventId.isEmpty() ? Collections.emptyList() : Collections.singletonList("");
             case GuardrailResponseRule.ACTION_ASSIGN:
-                String assignee = String.valueOf(config.getOrDefault(CONFIG_ASSIGNEE, "")).trim();
-                if (!assignee.isEmpty()) updateEvent(rule, violation, null, assignee);
-                break;
+                boolean assignable = !violation.eventId.isEmpty() && !assigneeOf(config).isEmpty();
+                return assignable ? Collections.singletonList("") : Collections.emptyList();
             default:
-                logger.debug("Response rule action " + action.getType() + " is not executed yet");
+                return Collections.emptyList();
         }
     }
 
-    private void updateEvent(GuardrailResponseRule rule, Violation violation, String status, String owner) {
-        if (eventService == null || violation.eventId.isEmpty()) return;
-        eventService.updateMaliciousEventStatus(String.valueOf(violation.accountId), Collections.singletonList(violation.eventId),
-            null, status, null, null, null, owner, null, UPDATED_BY_PREFIX + rule.getName());
+    private static String assigneeOf(Map<String, Object> config) {
+        return String.valueOf(config.getOrDefault(CONFIG_ASSIGNEE, "")).trim();
     }
 
-    private void sendAlerts(GuardrailResponseRule rule, Map<String, Object> config, Violation violation) {
-        Object value = config.get(CONFIG_CHANNELS);
-        Collection<?> channels = value instanceof Collection ? (Collection<?>) value : Collections.emptyList();
-        if (channels.contains(CHANNEL_SLACK)) {
-            SlackSender.sendAlert(violation.accountId, new CustomTextAlert(slackText(rule, violation)), toInteger(config.get(CONFIG_SLACK_WEBHOOK_ID)));
-        }
-        if (channels.contains(CHANNEL_WEBHOOK)) {
-            deliver(violation.accountId, () -> postWebhook(rule, violation, toInteger(config.get(CONFIG_WEBHOOK_ID))));
-        }
-        if (channels.contains(CHANNEL_EMAIL)) {
-            deliver(violation.accountId, () -> sendEmail(rule, violation, String.valueOf(config.getOrDefault(CONFIG_EMAILS, ""))));
-        }
+    private GuardrailResponseRuleRun newRun(GuardrailResponseRule rule, Violation violation, int idx, String type, String channel, Map<String, Object> config) {
+        GuardrailResponseRuleRun run = new GuardrailResponseRuleRun();
+        run.setId(rule.getHexId() + ":" + violation.eventKey + ":" + idx + ":" + channel);
+        run.setRuleId(rule.getHexId());
+        run.setRuleName(rule.getName());
+        run.setEventId(violation.eventId);
+        run.setActionIdx(idx);
+        run.setActionType(type);
+        run.setChannel(channel);
+        run.setActionConfig(config);
+        run.setSeverity(violation.severity);
+        run.setPolicy(violation.policy());
+        run.setFilterId(violation.filterId);
+        run.setHost(violation.host);
+        run.setActor(violation.actor);
+        run.setRefId(violation.refId);
+        run.setEventType(violation.eventType);
+        run.setDetectedAt(violation.detectedAt);
+        run.setStatus(GuardrailResponseRuleRun.STATUS_PENDING);
+        run.setAttempts(0);
+        run.setNextAttemptAt(Context.now() + LEASE_SECONDS);
+        run.setCreatedAt(new Date());
+        return run;
     }
 
-    @FunctionalInterface
-    private interface Delivery {
-        void run() throws Exception;
-    }
-
-    private void deliver(int accountId, Delivery task) {
-        deliveries.execute(() -> {
-            try {
-                Context.accountId.set(accountId);
-                task.run();
-            } catch (Exception e) {
-                logger.error("Response rule delivery failed: " + e.getMessage(), e);
-            } finally {
-                Context.accountId.remove();
-            }
-        });
-    }
-
-    private void postWebhook(GuardrailResponseRule rule, Violation violation, Integer webhookId) throws Exception {
-        CustomWebhook webhook = webhookId == null
-            ? CustomWebhooksDao.instance.findOne(Filters.empty())
-            : CustomWebhooksDao.instance.findOne(Filters.eq("_id", webhookId));
-        if (webhook == null || StringUtils.isBlank(webhook.getUrl())) {
-            logger.error("Response rule webhook is not configured");
-            return;
+    private boolean claim(GuardrailResponseRuleRun run) {
+        try {
+            GuardrailResponseRuleRunsDao.instance.insertOne(run);
+            return true;
+        } catch (MongoWriteException e) {
+            if (e.getError().getCategory() == ErrorCategory.DUPLICATE_KEY) return false;
+            throw e;
         }
-        Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
-        boolean hasContentType = headers.keySet().stream().anyMatch("content-type"::equalsIgnoreCase);
-        if (!hasContentType) headers.put("content-type", Collections.singletonList("application/json"));
-        String method = webhook.getMethod() == null ? "POST" : webhook.getMethod().toString();
-        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(), webhook.getQueryParams(), method, webhookPayload(rule, violation), headers, "");
-        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-        if (response == null || response.getStatusCode() >= 300) {
-            logger.error("Response rule webhook " + webhook.getId() + " returned " + (response == null ? "no response" : response.getStatusCode()));
-        }
-    }
-
-    private void sendEmail(GuardrailResponseRule rule, Violation violation, String recipients) throws Exception {
-        Personalization personalization = new Personalization();
-        int added = 0;
-        for (String address : recipients.split("[,;\\s]+")) {
-            if (added >= MAX_EMAILS) break;
-            if (!address.contains("@")) continue;
-            personalization.addTo(new Email(address));
-            added++;
-        }
-        if (added == 0) return;
-        Mail mail = new Mail();
-        mail.setFrom(new Email(EMAIL_FROM, EMAIL_FROM_NAME));
-        personalization.setSubject(violation.severity + " violation: " + rule.getName());
-        mail.addPersonalization(personalization);
-        mail.addContent(new Content("text/plain", plainText(rule, violation)));
-        SendgridEmail.getInstance().send(mail);
     }
 
     private void recordRun(GuardrailResponseRule rule) {
         try {
-            GuardrailResponseRulesDao.instance.updateOne(
+            GuardrailResponseRulesDao.instance.updateOneNoUpsert(
                 Filters.eq("_id", rule.getId()),
                 Updates.combine(Updates.inc("runCount", 1L), Updates.set("lastRunAt", Context.now())));
         } catch (Exception e) {
@@ -419,50 +420,198 @@ public class ResponseRuleEngine {
         }
     }
 
-    private String slackText(GuardrailResponseRule rule, Violation violation) {
+    private void submit(int accountId, GuardrailResponseRuleRun run) {
+        deliveries.execute(() -> {
+            try {
+                Context.accountId.set(accountId);
+                attempt(run);
+            } finally {
+                Context.accountId.remove();
+            }
+        });
+    }
+
+    private void attempt(GuardrailResponseRuleRun run) {
+        try {
+            perform(run);
+            GuardrailResponseRuleRunsDao.instance.updateOneNoUpsert(Filters.eq("_id", run.getId()), Updates.combine(
+                Updates.set(GuardrailResponseRuleRun.STATUS, GuardrailResponseRuleRun.STATUS_SENT),
+                Updates.set(GuardrailResponseRuleRun.SENT_AT, Context.now()),
+                Updates.inc(GuardrailResponseRuleRun.ATTEMPTS, 1),
+                Updates.unset(GuardrailResponseRuleRun.LAST_ERROR)));
+        } catch (PermanentFailure e) {
+            recordFailure(run, e.getMessage(), true);
+        } catch (Exception e) {
+            recordFailure(run, e.getMessage(), false);
+        }
+    }
+
+    private void recordFailure(GuardrailResponseRuleRun run, String error, boolean permanent) {
+        try {
+            int attempts = permanent ? MAX_ATTEMPTS : run.getAttempts() + 1;
+            int delay = RETRY_DELAYS_SECONDS[Math.min(Math.max(attempts - 1, 0), RETRY_DELAYS_SECONDS.length - 1)];
+            String message = StringUtils.abbreviate(StringUtils.defaultString(error, "Unknown error"), MAX_ERROR_LENGTH);
+            logger.error("Response rule " + run.getRuleId() + " " + run.getActionType() + " " + run.getChannel() + " failed (attempt " + attempts + "): " + message);
+            GuardrailResponseRuleRunsDao.instance.updateOneNoUpsert(Filters.eq("_id", run.getId()), Updates.combine(
+                Updates.set(GuardrailResponseRuleRun.STATUS, GuardrailResponseRuleRun.STATUS_FAILED),
+                Updates.set(GuardrailResponseRuleRun.ATTEMPTS, attempts),
+                Updates.set(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, Context.now() + delay),
+                Updates.set(GuardrailResponseRuleRun.LAST_ERROR, message)));
+        } catch (Exception e) {
+            logger.error("Could not record a response rule failure: " + e.getMessage(), e);
+        }
+    }
+
+    private void sweepRetries() {
+        try {
+            AccountTask.instance.executeTask((Account account) -> retryDue(account.getId()), "response-rule-retry");
+        } catch (Exception e) {
+            logger.error("Response rule retry sweep failed: " + e.getMessage(), e);
+        }
+    }
+
+    private void retryDue(int accountId) {
+        int now = Context.now();
+        Bson due = Filters.and(
+            Filters.in(GuardrailResponseRuleRun.STATUS, GuardrailResponseRuleRun.STATUS_PENDING, GuardrailResponseRuleRun.STATUS_FAILED),
+            Filters.lt(GuardrailResponseRuleRun.ATTEMPTS, MAX_ATTEMPTS),
+            Filters.lte(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, now));
+        for (GuardrailResponseRuleRun run : GuardrailResponseRuleRunsDao.instance.findAll(due, 0, RETRY_BATCH, null)) {
+            GuardrailResponseRuleRun leased = GuardrailResponseRuleRunsDao.instance.updateOneNoUpsert(
+                Filters.and(Filters.eq("_id", run.getId()), Filters.eq(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, run.getNextAttemptAt())),
+                Updates.set(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, now + LEASE_SECONDS));
+            if (leased != null) submit(accountId, leased);
+        }
+    }
+
+    private void perform(GuardrailResponseRuleRun run) throws Exception {
+        switch (run.getActionType()) {
+            case GuardrailResponseRule.ACTION_ALERT:
+                sendAlert(run);
+                break;
+            case GuardrailResponseRule.ACTION_IGNORE:
+                updateEvent(run, MaliciousEventDto.Status.IGNORED.name(), null);
+                break;
+            case GuardrailResponseRule.ACTION_ASSIGN:
+                updateEvent(run, null, assigneeOf(run.getActionConfig()));
+                break;
+            default:
+                throw new PermanentFailure("Action " + run.getActionType() + " is not supported");
+        }
+    }
+
+    private void sendAlert(GuardrailResponseRuleRun run) throws Exception {
+        switch (run.getChannel()) {
+            case CHANNEL_SLACK:
+                postSlack(run);
+                break;
+            case CHANNEL_WEBHOOK:
+                postWebhook(run);
+                break;
+            case CHANNEL_EMAIL:
+                sendEmail(run);
+                break;
+            default:
+                throw new PermanentFailure("Channel " + run.getChannel() + " is not supported");
+        }
+    }
+
+    private void updateEvent(GuardrailResponseRuleRun run, String status, String owner) throws PermanentFailure {
+        if (eventService == null || StringUtils.isBlank(run.getEventId())) throw new PermanentFailure("The event cannot be updated");
+        eventService.updateMaliciousEventStatus(String.valueOf(Context.accountId.get()), Collections.singletonList(run.getEventId()),
+            null, status, null, null, null, owner, null, UPDATED_BY_PREFIX + run.getRuleName());
+    }
+
+    private void postSlack(GuardrailResponseRuleRun run) throws Exception {
+        Integer webhookId = toInteger(run.getActionConfig().get(CONFIG_SLACK_WEBHOOK_ID));
+        SlackWebhook webhook = webhookId == null ? null : SlackWebhooksDao.instance.findOne(Filters.eq("_id", webhookId));
+        String url = webhook == null ? SlackSender.getDefaultSlackWebhook() : webhook.getWebhook();
+        if (StringUtils.isBlank(url)) throw new PermanentFailure("No Slack webhook is connected");
+        WebhookResponse response = Slack.getInstance().send(url, new CustomTextAlert(slackText(run)).toJson());
+        if (response.getCode() != 200) throw new Exception("Slack returned " + response.getCode() + " " + response.getMessage());
+    }
+
+    private void postWebhook(GuardrailResponseRuleRun run) throws Exception {
+        Integer webhookId = toInteger(run.getActionConfig().get(CONFIG_WEBHOOK_ID));
+        CustomWebhook webhook = webhookId == null
+            ? CustomWebhooksDao.instance.findOne(Filters.empty())
+            : CustomWebhooksDao.instance.findOne(Filters.eq("_id", webhookId));
+        if (webhook == null || StringUtils.isBlank(webhook.getUrl())) throw new PermanentFailure("No webhook is connected");
+        Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
+        boolean hasContentType = headers.keySet().stream().anyMatch("content-type"::equalsIgnoreCase);
+        if (!hasContentType) headers.put("content-type", Collections.singletonList("application/json"));
+        String method = webhook.getMethod() == null ? "POST" : webhook.getMethod().toString();
+        OriginalHttpRequest request = new OriginalHttpRequest(webhook.getUrl(), webhook.getQueryParams(), method, webhookPayload(run), headers, "");
+        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+        if (response == null) throw new Exception("The webhook did not respond");
+        if (response.getStatusCode() >= 300) throw new Exception("The webhook returned " + response.getStatusCode());
+    }
+
+    private void sendEmail(GuardrailResponseRuleRun run) throws Exception {
+        String secretKey = com.akto.onprem.Constants.getSendgridConfig().getSendgridSecretKey();
+        if (StringUtils.isBlank(secretKey)) throw new PermanentFailure("SendGrid is not configured");
+        Personalization personalization = new Personalization();
+        int added = 0;
+        for (String address : String.valueOf(run.getActionConfig().getOrDefault(CONFIG_EMAILS, "")).split("[,;\\s]+")) {
+            if (added >= MAX_EMAILS) break;
+            if (!address.contains("@")) continue;
+            personalization.addTo(new Email(address));
+            added++;
+        }
+        if (added == 0) throw new PermanentFailure("No valid email address in the rule");
+        Mail mail = new Mail();
+        mail.setFrom(new Email(EMAIL_FROM, EMAIL_FROM_NAME));
+        personalization.setSubject(run.getSeverity() + " violation: " + run.getRuleName());
+        mail.addPersonalization(personalization);
+        mail.addContent(new Content("text/plain", plainText(run)));
+        SendgridEmail.getInstance().send(mail);
+    }
+
+    private String slackText(GuardrailResponseRuleRun run) {
         StringBuilder text = new StringBuilder();
-        text.append(":rotating_light: *Response rule* \"").append(escape(rule.getName())).append("\"\n");
-        text.append("*").append(escape(violation.severity)).append("* violation");
-        if (StringUtils.isNotBlank(violation.policy())) text.append(" · ").append(escape(violation.policy()));
-        if (!violation.host.isEmpty()) text.append("\nAgent: ").append(escape(violation.host));
-        if (!violation.actor.isEmpty()) text.append("\nUser: ").append(escape(violation.actor));
-        String link = activityUrl(violation);
+        text.append(":rotating_light: *Response rule* \"").append(escape(run.getRuleName())).append("\"\n");
+        text.append("*").append(escape(run.getSeverity())).append("* violation");
+        if (StringUtils.isNotBlank(run.getPolicy())) text.append(" · ").append(escape(run.getPolicy()));
+        if (!StringUtils.isEmpty(run.getHost())) text.append("\nAgent: ").append(escape(run.getHost()));
+        if (!StringUtils.isEmpty(run.getActor())) text.append("\nUser: ").append(escape(run.getActor()));
+        String link = activityUrl(run);
         if (link != null) text.append("\n<").append(link).append("|View violation>");
         return text.toString();
     }
 
-    private String plainText(GuardrailResponseRule rule, Violation violation) {
+    private String plainText(GuardrailResponseRuleRun run) {
         StringBuilder text = new StringBuilder();
-        text.append("Response rule: ").append(rule.getName()).append("\n");
-        text.append("Severity: ").append(violation.severity).append("\n");
-        if (StringUtils.isNotBlank(violation.policy())) text.append("Policy: ").append(violation.policy()).append("\n");
-        if (!violation.host.isEmpty()) text.append("Agent: ").append(violation.host).append("\n");
-        if (!violation.actor.isEmpty()) text.append("User: ").append(violation.actor).append("\n");
-        String link = activityUrl(violation);
+        text.append("Response rule: ").append(run.getRuleName()).append("\n");
+        text.append("Severity: ").append(run.getSeverity()).append("\n");
+        if (StringUtils.isNotBlank(run.getPolicy())) text.append("Policy: ").append(run.getPolicy()).append("\n");
+        if (!StringUtils.isEmpty(run.getHost())) text.append("Agent: ").append(run.getHost()).append("\n");
+        if (!StringUtils.isEmpty(run.getActor())) text.append("User: ").append(run.getActor()).append("\n");
+        String link = activityUrl(run);
         if (link != null) text.append("View violation: ").append(link).append("\n");
         return text.toString();
     }
 
-    private String webhookPayload(GuardrailResponseRule rule, Violation violation) {
-        return new BasicDBObject("rule", rule.getName())
-            .append("severity", violation.severity)
-            .append("policy", violation.policy())
-            .append("agent", violation.host)
-            .append("user", violation.actor)
-            .append("eventId", violation.eventId)
-            .append("refId", violation.refId)
-            .append("detectedAt", violation.detectedAt)
-            .append("link", activityUrl(violation))
+    private String webhookPayload(GuardrailResponseRuleRun run) {
+        return new BasicDBObject("rule", run.getRuleName())
+            .append("severity", run.getSeverity())
+            .append("policy", run.getPolicy())
+            .append("agent", run.getHost())
+            .append("user", run.getActor())
+            .append("eventId", run.getEventId())
+            .append("refId", run.getRefId())
+            .append("detectedAt", run.getDetectedAt())
+            .append("link", activityUrl(run))
             .toJson();
     }
 
-    private String activityUrl(Violation violation) {
-        if (violation.refId.isEmpty() || violation.eventType.isEmpty() || violation.actor.isEmpty() || violation.filterId.isEmpty()) return null;
+    private String activityUrl(GuardrailResponseRuleRun run) {
+        boolean complete = StringUtils.isNoneEmpty(run.getRefId(), run.getEventType(), run.getActor(), run.getFilterId());
+        if (!complete) return null;
         return dashboardBaseUrl() + ACTIVITY_PATH
-            + "?refId=" + encode(violation.refId)
-            + "&eventType=" + encode(violation.eventType)
-            + "&actor=" + encode(violation.actor)
-            + "&filterId=" + encode(violation.filterId);
+            + "?refId=" + encode(run.getRefId())
+            + "&eventType=" + encode(run.getEventType())
+            + "&actor=" + encode(run.getActor())
+            + "&filterId=" + encode(run.getFilterId());
     }
 
     private String dashboardBaseUrl() {

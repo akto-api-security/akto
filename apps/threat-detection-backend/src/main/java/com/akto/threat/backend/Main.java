@@ -91,7 +91,7 @@ public class Main {
 
     MaliciousEventService maliciousEventService =
         new MaliciousEventService(internalKafkaConfig, MaliciousEventDao.instance);
-    ResponseRuleEngine.getInstance().setEventService(maliciousEventService);
+    ResponseRuleEngine.getInstance().init(maliciousEventService);
 
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
     ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);

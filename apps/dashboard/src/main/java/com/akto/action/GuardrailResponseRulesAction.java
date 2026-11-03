@@ -127,13 +127,17 @@ public class GuardrailResponseRulesAction extends UserAction {
                 addActionError("Rule not found");
                 return ERROR.toUpperCase();
             }
-            rule = GuardrailResponseRulesDao.instance.updateOne(scope, Updates.combine(
+            rule = GuardrailResponseRulesDao.instance.updateOneNoUpsert(scope, Updates.combine(
                 Updates.set("name", name.trim()),
                 Updates.set("active", active),
                 Updates.set("conditions", conditions),
                 Updates.set("actions", actions),
                 Updates.set("updatedBy", login),
                 Updates.set("updatedTimestamp", now)));
+            if (rule == null) {
+                addActionError("Rule not found");
+                return ERROR.toUpperCase();
+            }
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("saveGuardrailResponseRule failed: " + e.getMessage(), LogDb.DASHBOARD);
@@ -151,7 +155,7 @@ public class GuardrailResponseRulesAction extends UserAction {
             }
             Bson scope = Filters.and(Filters.eq("_id", id), GuardrailResponseRulesDao.instance.contextSourceFilter());
             User user = getSUser();
-            rule = GuardrailResponseRulesDao.instance.updateOne(scope, Updates.combine(
+            rule = GuardrailResponseRulesDao.instance.updateOneNoUpsert(scope, Updates.combine(
                 Updates.set("active", active),
                 Updates.set("updatedBy", user != null ? user.getLogin() : null),
                 Updates.set("updatedTimestamp", Context.now())));
