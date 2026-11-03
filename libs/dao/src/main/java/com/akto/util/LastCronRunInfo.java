@@ -1,5 +1,7 @@
 package com.akto.util;
 
+import java.util.Map;
+
 public class LastCronRunInfo {
     public static final String LAST_SYNCED_CRON = "lastSyncedCron";
     private int lastSyncedCron;
@@ -25,8 +27,9 @@ public class LastCronRunInfo {
     public static final String LAST_API_GROUPS_FULL_SYNC = "lastApiGroupsFullSync";
     private int lastApiGroupsFullSync;
 
-    public static final String LAST_UNAUTHENTICATED_GROUP_SYNC = "lastUnauthenticatedGroupSync";
-    private int lastUnauthenticatedGroupSync;
+    // last sync time of each automated api group that is kept up to date by DeltaGroupSync, keyed by the group id
+    public static final String GROUP_SYNC_TIMES = "groupSyncTimes";
+    private Map<String, Integer> groupSyncTimes;
 
     public LastCronRunInfo() {
     }
@@ -102,11 +105,11 @@ public class LastCronRunInfo {
         this.lastApiGroupsFullSync = lastApiGroupsFullSync;
     }
 
-    public int getLastUnauthenticatedGroupSync() {
-        return lastUnauthenticatedGroupSync;
+    public Map<String, Integer> getGroupSyncTimes() {
+        return groupSyncTimes;
     }
 
-    public void setLastUnauthenticatedGroupSync(int lastUnauthenticatedGroupSync) {
-        this.lastUnauthenticatedGroupSync = lastUnauthenticatedGroupSync;
+    public void setGroupSyncTimes(Map<String, Integer> groupSyncTimes) {
+        this.groupSyncTimes = groupSyncTimes;
     }
 }

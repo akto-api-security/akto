@@ -2594,7 +2594,12 @@ public class InitializerListener implements ServletContextListener {
                 continue;
             }
 
-            ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
+            // one group failing must not stop the others
+            try {
+                ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
+            } catch (Exception e) {
+                logger.errorAndAddToDb(e, "Error while updating api group " + apiCollection.getId() + " (" + apiCollection.getName() + "): " + e.getMessage(), LogDb.DASHBOARD);
+            }
         }
     }
 
