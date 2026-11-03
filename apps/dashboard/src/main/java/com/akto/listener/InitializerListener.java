@@ -291,6 +291,10 @@ public class InitializerListener implements ServletContextListener {
     public static String aktoVersion;
     private final ScheduledExecutorService telemetryExecutorService = Executors.newSingleThreadScheduledExecutor();
 
+    // its own thread, so the group sync neither waits for nor holds up the other crons
+    private final ScheduledExecutorService groupSyncExecutorService = Executors.newSingleThreadScheduledExecutor();
+    private static final int API_GROUPS_SYNC_INTERVAL_MINUTES = 60;
+
     public static boolean connectedToMongo = false;
 
     SyncCron syncCronInfo = new SyncCron();
@@ -443,7 +447,7 @@ public class InitializerListener implements ServletContextListener {
 
     // overlap between consecutive incremental windows, so docs written while the previous run was in flight are not missed
 
-    public void updateApiGroupsForAccounts() {
+    public void backFillStatusCodeTypeForAccounts() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 long runStartMs = System.currentTimeMillis();
@@ -455,28 +459,19 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         if (DormantAccountFilter.isDormant(t.getId(), accountsWithRecentUserLogin)) {
                             dormantAccounts.incrementAndGet();
-                            logger.info("Skipping update api groups for dormant account: " + t.getId());
+                            logger.info("Skipping backFillStatusCodeType for dormant account: " + t.getId());
                             return;
                         }
                         processedAccounts.incrementAndGet();
                         long accountStartMs = System.currentTimeMillis();
-                        updateApiGroups();
-                        long groupsMs = System.currentTimeMillis() - accountStartMs;
                         backFillStatusCodeType();
-                        logger.info("update-api-groups AccountId: " + t.getId() + " api groups: " + groupsMs + " ms"
-                                + ", backFillStatusCodeType: " + (System.currentTimeMillis() - accountStartMs - groupsMs) + " ms"
-                                + ", total: " + (System.currentTimeMillis() - accountStartMs) + " ms");
+                        logger.info("backfill-status-code-type AccountId: " + t.getId() + " took: " + (System.currentTimeMillis() - accountStartMs) + " ms");
                     }
-                }, "update-api-groups");
-                logger.info("update-api-groups run finished: accounts processed: " + processedAccounts.get()
+                }, "backfill-status-code-type");
+                logger.info("backfill-status-code-type run finished: accounts processed: " + processedAccounts.get()
                         + ", skipped as dormant: " + dormantAccounts.get() + ", total: " + (System.currentTimeMillis() - runStartMs) + " ms");
             }
         }, 0, 4, TimeUnit.HOURS);
-    }
-
-    /** The all apis group keeps its own last sync time (see DeltaGroupSync), so nothing is tracked here. */
-    private static void updateApiGroups() {
-        createAllApisGroup();
     }
 
     public void setUpGuardrailServiceUrlLatencyScheduler() {
@@ -2012,7 +2007,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    /** Creates the group if it does not exist yet. Called by setUpUpdateCustomCollections for every account; accounts with the api group feature then get it filled and kept up to date. */
+    /** Creates the group if it does not exist yet. Called by syncApiGroups for every account; the group is then filled and kept up to date by updateCustomCollections for accounts with the api group feature. */
     public static void createUnauthenticatedApiGroup() {
 
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
@@ -2563,7 +2558,7 @@ public class InitializerListener implements ServletContextListener {
                 }
             }
 
-            // the all apis group is kept up to date by updateApiGroups
+            // the all apis group is not behind the api group feature, so syncApiGroups handles it
             if (isDeltaUpdateBasedApiGroup || apiCollection.getId() == AllAPIsGroup.ALL_APIS_GROUP_ID) {
                 continue;
             }
@@ -2619,29 +2614,61 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public void setUpUpdateCustomCollections() {
+    /**
+     * Keeps the automated api groups up to date every API_GROUPS_SYNC_INTERVAL_MINUTES (see DeltaGroupSync): the unauthenticated, sensitive, custom and
+     * all apis groups. Each account and each group is handled on its own, so one failing does not stop the others.
+     */
+    public void setUpApiGroupsSync() {
+        groupSyncExecutorService.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                try {
+                    Set<Integer> accountsWithRecentUserLogin = DormantAccountFilter.fetchAccountsWithRecentUserLogin();
+                    AccountTask.instance.executeTask(new Consumer<Account>() {
+                        @Override
+                        public void accept(Account t) {
+                            syncApiGroups(t.getId(), accountsWithRecentUserLogin);
+                        }
+                    }, "api-groups-sync");
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Error while syncing api groups: " + e.getMessage(), LogDb.DASHBOARD);
+                }
+            }
+        }, 0, API_GROUPS_SYNC_INTERVAL_MINUTES, TimeUnit.MINUTES);
+    }
+
+    private static void syncApiGroups(int accountId, Set<Integer> accountsWithRecentUserLogin) {
+        // for every account, not only the ones with the api group feature
+        runSafely("creating the unauthenticated api group", accountId, InitializerListener::createUnauthenticatedApiGroup);
+
+        // the all apis group is not behind the feature, only dormant accounts are left out
+        if (!DormantAccountFilter.isDormant(accountId, accountsWithRecentUserLogin)) {
+            runSafely("syncing the all apis group", accountId, InitializerListener::createAllApisGroup);
+        }
+
+        if (OrganizationsDao.instance.checkFeatureAccess(accountId, AKTO_API_GROUP_CRONS)) {
+            runSafely("syncing the api groups", accountId, new InitializerListener()::updateCustomCollections);
+        }
+    }
+
+    private static void runSafely(String what, int accountId, Runnable task) {
+        try {
+            task.run();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "AccountId: " + accountId + " error while " + what + ": " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    public void setUpIntercomEventsScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
                         try {
-                            // for every account, not only the ones with the feature below
-                            createUnauthenticatedApiGroup();
                             if(!OrganizationsDao.instance.checkFeatureAccess(t.getId(), AKTO_API_GROUP_CRONS)){
-                                logger.info("Skipping update custom collections for account: " + t.getId());
                                 return;
                             }
 
-                            // Run only for allowed accounts
-                            logger.info("Running update custom collections for account: " + t.getId());
-                            updateCustomCollections();
-                            // removeCollectionIdsFromAgenticTraffic();
-                        } catch (Exception e){
-                            logger.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
-                        }
-
-                        try {
                             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                                 AccountSettingsDao.generateFilter()
                             );
@@ -2652,7 +2679,7 @@ public class InitializerListener implements ServletContextListener {
                             logger.errorAndAddToDb(e, "Error while reporting event to Intercom: " + e.getMessage(), LogDb.DASHBOARD);
                         }
                     }
-                }, "update-custom-collections");
+                }, "send-intercom-events");
             }
         }, 0, 3, TimeUnit.HOURS);
     }
@@ -2770,12 +2797,13 @@ public class InitializerListener implements ServletContextListener {
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
 
                     // API group jobs
-                    setUpUpdateCustomCollections();
+                    setUpIntercomEventsScheduler();
+                    setUpApiGroupsSync();
                     // Disabled temporarily: Azure OpenAI input-token cost.
                     // logger.warn("Setting up user analysis cron scheduler");
                     // userAnalysisCron.setUpUserAnalysisCronScheduler();
                     // logger.warn("User analysis cron scheduler setup complete");
-                    updateApiGroupsForAccounts();
+                    backFillStatusCodeTypeForAccounts();
                     syncCronInfo.setUpUpdateCronScheduler();
                     syncCronInfo.setUpMcpMaliciousnessCronScheduler();
                     setUpGuardrailServiceUrlLatencyScheduler();
