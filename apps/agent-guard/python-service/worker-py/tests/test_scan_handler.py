@@ -84,6 +84,35 @@ async def test_context_source_is_folded_into_the_scanner_config(monkeypatch):
     assert FakeScanner.configs and all(c.get("contextSource") == "ENDPOINT" for c in FakeScanner.configs)
 
 
+async def test_a_context_source_already_in_the_config_wins(monkeypatch):
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
+    monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
+    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "")
+    await scan_handler.scan_payload(
+        {
+            "scanner_name": "PromptInjection",
+            "scanner_type": "prompt",
+            "text": "hi",
+            "context_source": "ENDPOINT",
+            "config": {"contextSource": "AGENTIC"},
+        },
+        schedule_fn=lambda coro: coro.close(),
+    )
+    assert FakeScanner.configs and all(c.get("contextSource") == "AGENTIC" for c in FakeScanner.configs)
+
+
+async def test_the_prompt_version_reaches_the_scan_response(monkeypatch):
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
+    monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
+    monkeypatch.setattr(settings, "GEMMA_FOUNDRY_BASE_URL", "")
+    monkeypatch.setitem(UNSAFE["details"], "prompt_version", "atlas")
+    r = await scan_handler.scan_payload(
+        {"scanner_name": "PromptInjection", "scanner_type": "prompt", "text": "hi"},
+        schedule_fn=lambda coro: coro.close(),
+    )
+    assert r["details"]["prompt_version"] == "atlas"
+
+
 async def test_password_ignores_caller_models_and_runs_vertex_gemma(monkeypatch):
     monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
     monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")

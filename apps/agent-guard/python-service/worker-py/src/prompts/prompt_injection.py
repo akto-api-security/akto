@@ -613,18 +613,28 @@ def _augment(text: str) -> str:
     return f"{text}{_DECODED_HEADER}\n{decoded}"
 
 
+_warned: set[str] = set()
+
+
+def _warn_once(message: str) -> None:
+    """Settings load once per process, so a misconfiguration is reported once, not on every scan."""
+    if message not in _warned:
+        _warned.add(message)
+        logger.warning(message)
+
+
 def input_version() -> str:
     """The deployment-wide input-side rules, from PROMPT_INJECTION_PROMPT_VERSION.
 
     Empty means v1. Only _DEPLOYMENT_VERSIONS (v1/v2) are selectable here: "atlas"
     and any unknown value are logged and fall back to v1, so a typo — or an
     attempt to turn Atlas rules on globally — reads as "still on v1" instead of a
-    silent switch. Atlas is per-request only; see _version_for.
+    silent switch. Atlas is per-request only; see version_for.
     """
     raw = (settings.PROMPT_INJECTION_PROMPT_VERSION or "").strip().lower()
     if not raw or raw in _DEPLOYMENT_VERSIONS:
         return raw or _DEFAULT_VERSION
-    logger.warning(
+    _warn_once(
         f"[prompt_injection] PROMPT_INJECTION_PROMPT_VERSION={raw!r} is not selectable "
         f"deployment-wide (choose one of {list(_DEPLOYMENT_VERSIONS)}; atlas is ENDPOINT-only). "
         f"Using {_DEFAULT_VERSION}"
@@ -639,7 +649,7 @@ def _atlas_version() -> str:
     raw = (settings.PROMPT_INJECTION_ATLAS_PROMPT_VERSION or "").strip().lower() or _ATLAS_VERSION
     if raw in _INPUT_TEMPLATES:
         return raw
-    logger.warning(
+    _warn_once(
         f"[prompt_injection] PROMPT_INJECTION_ATLAS_PROMPT_VERSION={raw!r} is unknown; "
         f"known: {sorted(_INPUT_TEMPLATES)}. Using {_ATLAS_VERSION}"
     )
@@ -657,9 +667,6 @@ def version_for(context_source: str) -> str:
     return input_version()
 
 
-_version_for = version_for  # backwards-compatible alias
-
-
 def build(scanner_type: str, text: str, response_format: str = "", context_source: str = "") -> str:
     """Render the scan prompt.
 
@@ -669,11 +676,11 @@ def build(scanner_type: str, text: str, response_format: str = "", context_sourc
     input-side rules — only the answer contract is shared.
 
     The input-side rules are PROMPT_INJECTION_PROMPT_VERSION (input_version), or
-    the atlas rules when context_source is ENDPOINT (see _version_for). The output
+    the atlas rules when context_source is ENDPOINT (see version_for). The output
     side has a single version.
     """
     abcd = response_format.strip().lower() == "abcd"
     if scanner_type == "output":
         return (OUTPUT_ABCD if abcd else OUTPUT) % _augment(text)
-    json_template, abcd_template = _INPUT_TEMPLATES[_version_for(context_source)]
+    json_template, abcd_template = _INPUT_TEMPLATES[version_for(context_source)]
     return (abcd_template if abcd else json_template) % _augment(text)

@@ -12,11 +12,15 @@ Two invariants keep this prompt healthy:
    cascade does not escalate ordinary traffic to the slow arbiter.
 """
 
+import json
+import logging
 import re
 
 import pytest
 
+from llm_scanner import LLMScanner
 from prompts import build_scan_prompt, prompt_injection
+from providers import LLMProvider, Qwen3GuardOutput
 from settings import settings
 
 # Hard prefill-latency step on the Gemma Foundry deployment (chars of final prompt).
@@ -80,14 +84,78 @@ def test_atlas_rollback_version_moves_endpoint_off_atlas(monkeypatch):
     assert prompt == prompt_injection.INPUT_ABCD_V2 % "hi"
 
 
+def _rendered_examples(template):
+    return re.findall(r"^Input: (.*)\nOutput: (.*)$", template, re.M)
+
+
 def test_atlas_variants_render_from_one_example_list():
-    """The JSON and letter atlas prompts must not drift: both are rendered from _ATLAS_EXAMPLES,
-    so every example input appears in both, with matching verdict polarity."""
-    for text, is_inj, _conf, _reason, letter in prompt_injection._ATLAS_EXAMPLES:
-        shown = text.strip('"')
-        assert shown in prompt_injection.INPUT_ATLAS and shown in prompt_injection.INPUT_ABCD_ATLAS, text
-        assert (letter == "D") == is_inj  # letter and JSON verdicts agree
-    assert len(prompt_injection._ATLAS_EXAMPLES) == prompt_injection.INPUT_ABCD_ATLAS.count("\nInput: ")
+    """The JSON and letter atlas prompts must not drift: both render every _ATLAS_EXAMPLES row, in order,
+    each with that row's own verdict (as rendered, not just as listed)."""
+    rows = prompt_injection._ATLAS_EXAMPLES
+    as_json = _rendered_examples(prompt_injection.INPUT_ATLAS)
+    as_letter = _rendered_examples(prompt_injection.INPUT_ABCD_ATLAS)
+    assert len(as_json) == len(as_letter) == len(rows)
+    for (text, is_inj, confidence, _reason, letter), (json_in, json_out), (letter_in, letter_out) in zip(
+        rows, as_json, as_letter
+    ):
+        assert json_in == letter_in == text.replace("%", "%%")
+        verdict = json.loads(json_out)
+        assert verdict["isInjection"] is is_inj and verdict["confidence"] == confidence
+        assert letter_out == letter and (letter in "CD") == is_inj  # A/B benign, C/D injection
+
+
+@pytest.mark.parametrize("source", ["endpoint", " Endpoint\n", "ENDPOINT "])
+def test_endpoint_match_ignores_case_and_surrounding_whitespace(monkeypatch, source):
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_ATLAS_PROMPT_VERSION", "")
+    assert prompt_injection.version_for(source) == "atlas"
+
+
+def test_a_misconfigured_version_warns_once_not_per_scan(monkeypatch, caplog):
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "v9")
+    monkeypatch.setattr(prompt_injection, "_warned", set())
+    with caplog.at_level(logging.WARNING):
+        for _ in range(3):
+            assert prompt_injection.version_for("") == "v1"
+    assert len([r for r in caplog.records if "'v9'" in r.getMessage()]) == 1
+
+
+class _Judge(LLMProvider):
+    """A prompt-judging model that answers benign."""
+
+    name = "judge"
+
+    async def complete(self, prompt):
+        return '{"isInjection": false, "confidence": 0.02, "reason": "ok"}'
+
+
+class _Guard(Qwen3GuardOutput, LLMProvider):
+    name = "qwen3guard"
+
+    async def complete_with_logprobs(self, text, top_logprobs=5, temperature=0.0):
+        return "Safety: Safe\nCategories: None", None
+
+
+@pytest.mark.parametrize(
+    "scanner_type,context_source,stamp",
+    [
+        ("prompt", "ENDPOINT", "atlas"),
+        ("prompt", "", "v1"),
+        ("prompt", "AGENTIC", "v1"),
+        ("output", "ENDPOINT", "output"),
+    ],
+)
+async def test_a_verdict_records_the_rules_that_judged_it(monkeypatch, scanner_type, context_source, stamp):
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_PROMPT_VERSION", "")
+    monkeypatch.setattr(settings, "PROMPT_INJECTION_ATLAS_PROMPT_VERSION", "")
+    r = await LLMScanner(_Judge()).scan("PromptInjection", scanner_type, "hi", {"contextSource": context_source})
+    assert r["details"]["prompt_version"] == stamp
+
+
+async def test_qwen3guard_and_other_scanners_are_stamped_for_what_they_are():
+    r = await LLMScanner(_Guard()).scan("PromptInjection", "prompt", "hi", {"contextSource": "ENDPOINT"})
+    assert r["details"]["prompt_version"] == "qwen3guard"
+    r = await LLMScanner(_Judge()).scan("Toxicity", "prompt", "hi", {"contextSource": "ENDPOINT"})
+    assert "prompt_version" not in r["details"]
 
 
 def test_recall_critical_guidance_is_present():

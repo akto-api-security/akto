@@ -182,11 +182,15 @@ class LLMScanner:
             raise ValueError(f"Scanner {scanner_name} not supported by LLM path")
 
         start = time.time()
+        # Which rules judged a PromptInjection verdict; set only by the paths below that judge with a prompt or
+        # Qwen3Guard, so any other kind of model added later records none.
+        prompt_version = ""
         if isinstance(self.provider, Qwen3GuardOutput):
             logger.debug(f"[LLMScanner] {scanner_name} qwen3guard input: {text!r}")
             raw, logprobs = await self.provider.complete_with_logprobs(text)
             logger.debug(f"[LLMScanner] {scanner_name} qwen3guard raw response: {raw!r}")
             result = parse_qwen3guard_result(scanner_name, raw, logprobs)
+            prompt_version = "qwen3guard"
         else:
             prompt = build_scan_prompt(
                 scanner_name,
@@ -203,6 +207,9 @@ class LLMScanner:
             logger.debug(f"[LLMScanner] {scanner_name} raw response: {raw!r}")
             effective = resolve_response_format(scanner_name, scanner_type, self.response_format)
             result = _FORMAT_PARSERS.get(effective, parse_llm_result)(scanner_name, raw)
+            if scanner_name == "PromptInjection":
+                context_source = str(config.get("contextSource", ""))
+                prompt_version = "output" if scanner_type == "output" else prompt_injection.version_for(context_source)
 
         elapsed_ms = (time.time() - start) * 1000
         result["details"]["llm_provider"] = self.provider.name
@@ -210,13 +217,8 @@ class LLMScanner:
         # Record which rules judged this verdict: one deployment now mixes the
         # atlas and v1/v2 PromptInjection prompts per request (by contextSource),
         # so a disputed block has to be traceable to the prompt that produced it.
-        if scanner_name == "PromptInjection":
-            if isinstance(self.provider, Qwen3GuardOutput):
-                result["details"]["prompt_version"] = "qwen3guard"
-            elif scanner_type == "output":
-                result["details"]["prompt_version"] = "output"
-            else:
-                result["details"]["prompt_version"] = prompt_injection.version_for(str(config.get("contextSource", "")))
+        if scanner_name == "PromptInjection" and prompt_version:
+            result["details"]["prompt_version"] = prompt_version
         result["execution_time_ms"] = round(elapsed_ms, 2)
         logger.info(
             f"[LLMScanner] {scanner_name} provider={self.provider.name} "
