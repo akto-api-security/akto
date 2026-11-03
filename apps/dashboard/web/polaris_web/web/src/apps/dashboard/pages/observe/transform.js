@@ -8,6 +8,7 @@ import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor,
 import api from "./api";
 import GetPrettifyEndpoint, { MethodBox } from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
+import CollectionTagsList from "./api_collections/component/CollectionTagsList";
 import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
 import { CollectionIcon } from "../../components/shared/CollectionIcon";
 
@@ -457,7 +458,7 @@ const transform = {
         )
     },
 
-    getCollectionTypeList(envType, maxItems, wrap){
+    getCollectionTypeList(envType, maxItems, wrap, expandable = false){
         if(envType == null || envType.length === 0){
             return <></>
         }
@@ -475,6 +476,17 @@ const transform = {
             if (bKey === 'privatecloud.agoda.com/service') return 1;
             return 0;
         });
+
+        if (expandable) {
+            return (
+                <CollectionTagsList
+                    itemsArr={sortedEnvType}
+                    maxItems={maxItems}
+                    wrap={wrap}
+                    getItemStatus={(item) => item.split('=')[0] === aiAgentEmailKey ? 'success' : 'info'}
+                />
+            )
+        }
 
         return (
             <ShowListInBadge
@@ -631,7 +643,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType, 1, false),
+                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType, 1, false, true),
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })
