@@ -104,6 +104,11 @@ async def scan_payload(
     scanner_type = payload.get("scanner_type", "prompt")
     text = payload.get("text", "")
     config = payload.get("config") or {}
+    # Fold the request's traffic source into config so the prompt builder can
+    # pick a per-source prompt. config wins if it already carries one.
+    context_source = payload.get("context_source") or ""
+    if context_source and not config.get("contextSource"):
+        config = {**config, "contextSource": context_source}
 
     def _elapsed_ms() -> float:
         return (time.perf_counter() - started) * 1000.0
