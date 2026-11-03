@@ -19,7 +19,7 @@ export const OS_ICON_KEYS = { macos: "mac", windows: "windows", linux: "linux" }
 
 export const HEALTH_ORDER = ["healthy", "outdated", "offline"];
 export const MODE_ORDER = ["enforce", "monitor", "none"];
-export const CATEGORY_ORDER = ["agents", "ide", "mcp", "browser"];
+export const CATEGORY_ORDER = ["agents", "mcp", "browser"];
 
 export const OS_LABELS = {
     macos: "macOS",
@@ -30,14 +30,12 @@ export const OS_LABELS = {
 
 export const CATEGORY_LABELS = {
     agents: "Agents & CLIs",
-    ide: "IDE assistants",
     mcp: "MCP servers",
     browser: "Browser AI",
 };
 
 export const CATEGORY_BACKGROUNDS = {
     agents: "bg-magic-strong",
-    ide: "bg-magic-active",
     mcp: "bg-magic-hover",
     browser: "bg-magic-subdued",
 };

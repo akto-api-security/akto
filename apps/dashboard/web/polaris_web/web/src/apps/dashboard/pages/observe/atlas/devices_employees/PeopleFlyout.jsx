@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Box, Button, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { useNavigate } from "react-router-dom";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
@@ -12,7 +13,7 @@ import { LegendDot } from "../../agentic/AgenticStatsCard";
 import AskBar from "../../../../components/shared/AskBar";
 import { openViolationInGuardrailViolations } from "../../agentic/agenticObserveApi";
 import {
-    ACTION_UNAVAILABLE_TOOLTIP, ATLAS_CHAT_SCOPE, ATLAS_DEVICE_QUESTIONS, ATLAS_EMPLOYEE_QUESTIONS,
+    ATLAS_CHAT_SCOPE, ATLAS_DEVICE_QUESTIONS, ATLAS_EMPLOYEE_QUESTIONS,
 } from "./constants";
 import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS } from "./peopleConstants";
 import transform from "./transform";
@@ -66,25 +67,11 @@ function employeeDetails(employee) {
 }
 
 function ActionButton({ action }) {
-    if (!action.onClick) {
-        return (
-            <Tooltip content={ACTION_UNAVAILABLE_TOOLTIP}>
-                <Button primary={action.primary} disabled>{action.label}</Button>
-            </Tooltip>
-        );
-    }
     return <Button primary={action.primary} plain={action.plain} onClick={action.onClick}>{action.label}</Button>;
 }
 
-function devicePrimary(device) {
-    if (device.guardrailMode === "monitor") return "Switch to Enforce";
-    if (device.health === "outdated") return "Update Atlas agent";
-    if (device.health === "offline") return "Notify owner";
-    if (device.unapprovedTools > 0) return "Remove unapproved tools";
-    return "Run discovery scan";
-}
-
 function DeviceActions({ device, onOpen, onUpdated }) {
+    const navigate = useNavigate();
     const updateAgent = () => {
         func.showConfirmationModal(`Update the Atlas agent on ${device.name} to the latest version? It picks up the change on its next reboot.`, "Update", async () => {
             try {
@@ -96,12 +83,10 @@ function DeviceActions({ device, onOpen, onUpdated }) {
             }
         });
     };
-    const primaryLabel = devicePrimary(device);
-    const updateAction = { label: "Update Atlas agent", onClick: updateAgent };
+    const outdated = device.health === "outdated";
     const actions = [
-        primaryLabel === updateAction.label ? { ...updateAction, primary: true } : { label: primaryLabel, primary: true },
-        ...(device.health === "outdated" && primaryLabel !== updateAction.label ? [updateAction] : []),
-        { label: "Isolate AI tools" },
+        ...(outdated ? [{ label: "Update Atlas agent", primary: true, onClick: updateAgent }] : []),
+        ...(device.unapprovedTools > 0 ? [{ label: "Review unapproved tools", primary: !outdated, onClick: () => navigate("/dashboard/observe/audit") }] : []),
         ...(device.owner ? [
             { label: "Open owner", onClick: () => onOpen("employee", device.owner) },
             { label: "View violations", plain: true, onClick: viewViolations(device.owner) },
@@ -116,10 +101,7 @@ function DeviceActions({ device, onOpen, onUpdated }) {
 
 function EmployeeActions({ employee }) {
     const actions = [
-        { label: "Send coaching message", primary: true },
-        { label: "Notify manager" },
-        { label: "Watch employee" },
-        { label: "View violations", plain: true, onClick: viewViolations(employee.username) },
+        { label: "View violations", primary: true, onClick: viewViolations(employee.username) },
     ];
     return (
         <HorizontalStack gap="2" blockAlign="center">

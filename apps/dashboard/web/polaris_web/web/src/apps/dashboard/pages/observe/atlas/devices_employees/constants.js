@@ -12,7 +12,6 @@ export const ATLAS_DEVICE_QUESTIONS = [
     "Who else has the same AI setup as {name}?",
 ];
 
-export const ACTION_UNAVAILABLE_TOOLTIP = "Atlas has no backend for this action yet";
 
 export const ASK_ATLAS_PLACEHOLDER = "Ask about AI agents, MCP servers, skills, models or browser AI on your devices";
 

@@ -50,13 +50,12 @@ public class AtlasPeopleService {
     public static final String MODE_NONE = "none";
 
     public static final String CAT_AGENTS = "agents";
-    public static final String CAT_IDE = "ide";
     public static final String CAT_MCP = "mcp";
     public static final String CAT_BROWSER = "browser";
     public static final String CAT_PLUGIN = "plugin";
     public static final String CAT_SKILL = "skill";
     public static final int MAX_SKILLS_PER_TOOL = 1000;
-    public static final List<String> CATEGORIES = Arrays.asList(CAT_AGENTS, CAT_IDE, CAT_MCP, CAT_BROWSER);
+    public static final List<String> CATEGORIES = Arrays.asList(CAT_AGENTS, CAT_MCP, CAT_BROWSER);
 
     public static final String OS_MAC = "macos";
     public static final String OS_WINDOWS = "windows";
@@ -78,7 +77,6 @@ public class AtlasPeopleService {
     private static final String BROWSER_HOST_MARKER = "chrome";
     private static final long CACHE_TTL_MS = 60_000;
     private static final Pattern VERSION = Pattern.compile("^v?(\\d+)\\.(\\d+)\\.(\\d+)");
-    private static final Pattern IDE_VENDOR = Pattern.compile("cursor|copilot|windsurf|codeium|vscode|antigravity|kiro|zed|jetbrains|intellij");
 
     private static final Map<String, CachedSnapshot> CACHE = new ConcurrentHashMap<>();
 
@@ -392,10 +390,7 @@ public class AtlasPeopleService {
     private static String categoryOf(ApiCollection c, String[] parts) {
         String marker = parts.length > 1 ? parts[1] : "";
         if (BROWSER_HOST_MARKER.equals(marker) || InsightUtil.hasTag(c, Constants.AKTO_BROWSER_LLM_TAG)) return CAT_BROWSER;
-        if (Constants.AKTO_AI_AGENT_TAG.equals(marker)) {
-            String vendor = parts.length > 2 ? parts[2].toLowerCase(Locale.ROOT) : "";
-            return IDE_VENDOR.matcher(vendor).find() ? CAT_IDE : CAT_AGENTS;
-        }
+        if (Constants.AKTO_AI_AGENT_TAG.equals(marker)) return CAT_AGENTS;
         if (InsightUtil.hasTag(c, Constants.AKTO_MCP_SERVER_TAG) || InsightUtil.hasTag(c, Constants.AKTO_MCP_CLIENT_TAG)) return CAT_MCP;
         return CAT_AGENTS;
     }

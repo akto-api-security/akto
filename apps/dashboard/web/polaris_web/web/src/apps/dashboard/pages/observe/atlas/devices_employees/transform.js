@@ -5,7 +5,7 @@ import {
     CATEGORY_LABELS, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, MODE_LABELS, OS_LABELS, STAT_CARDS, STAT_EMPTY_VALUE,
 } from "./peopleConstants";
 
-const ALL_CATEGORIES = ["agents", "ide", "mcp", "browser"];
+const ALL_CATEGORIES = ["agents", "mcp", "browser"];
 
 const STAT_CARD_TARGETS = {
     managedDevices: { tab: "devices", filters: {} },
