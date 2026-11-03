@@ -1,0 +1,127 @@
+# Logs pipeline on ONE VM: Mongo (new logs DB) + consumers (+ optional Kafka).
+# Start:  docker compose up -d                    (Kafka lives elsewhere; set KAFKA_BOOTSTRAP in .env)
+#         docker compose --profile kafka up -d    (also run Kafka on this VM)
+
+name: log-pipeline
+
+services:
+  mongo-logs:
+    container_name: mongo
+    image: ${MONGO_IMAGE:-mongo:8.0.34}
+    restart: unless-stopped
+    ports:
+      - "${PRIVATE_IP}:27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    command: ["mongod", "--bind_ip_all", "--wiredTigerCacheSizeGB", "${MONGO_CACHE_GB:-4}"]
+    mem_limit: ${MONGO_MEM_LIMIT:-10g}
+    init: true
+    stop_grace_period: 120s          # let WiredTiger shut down cleanly
+    ulimits:
+      nofile: { soft: 64000, hard: 64000 }
+    security_opt: ["no-new-privileges:true"]
+    volumes:
+      - /data/mongo:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand(\"ping\").ok'"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+
+  kafka:
+    profiles: ["kafka"]
+    container_name: kafka
+    image: apache/kafka:4.4.0
+    hostname: kafka
+    restart: unless-stopped
+    ports:
+      - "${PRIVATE_IP}:9092:9092"
+    mem_limit: ${KAFKA_MEM_LIMIT:-5g}
+    stop_grace_period: 60s
+    ulimits:
+      nofile: { soft: 100000, hard: 100000 }
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP:--Xms2g -Xmx2g}
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # CONTAINER = other containers on this VM, EXTERNAL = cyborg/ultron over the private network
+      KAFKA_LISTENERS: CONTAINER://:19092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: CONTAINER://kafka:19092,EXTERNAL://${PRIVATE_IP}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTAINER:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: CONTAINER
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - /data/kafka:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  kafka-init:
+    profiles: ["kafka"]
+    image: apache/kafka:4.4.0
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        for t in akto.logs akto.metrics; do
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --if-not-exists \
+            --topic $$t --partitions 10 --replication-factor 1 \
+            --config retention.ms=21600000 --config compression.type=producer
+        done
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --list
+
+  log-consumer:
+    image: ${CONSUMER_IMAGE:-log-consumer:local}
+    restart: unless-stopped
+    depends_on:
+      mongo-logs:
+        condition: service_healthy
+    deploy:
+      replicas: ${CONSUMER_REPLICAS:-2}
+    mem_limit: ${CONSUMER_MEM_LIMIT:-1536m}
+    init: true
+    stop_grace_period: 30s
+    read_only: true                  # nothing is written to disk by the consumer
+    tmpfs: ["/tmp"]                  # pause file lives here: touch /tmp/log-consumer.pause
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f LogPipelineConsumerMain >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    environment:
+      # consumer writes to the NEW logs Mongo only
+      AKTO_MONGO_CONN: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo-logs:27017/?authSource=admin
+      AKTO_INSTANCE_TYPE: DATABASE_ABS
+      AKTO_LOG_LEVEL: INFO
+      LOG_KAFKA_BROKER_URL: ${KAFKA_BOOTSTRAP:-kafka:19092}
+      LOG_KAFKA_TOPIC_LOGS: akto.logs
+      LOG_KAFKA_TOPIC_METRICS: akto.metrics
+      LOG_KAFKA_GROUP_ID_LOGS: log-writer-logs
+      LOG_KAFKA_GROUP_ID_METRICS: log-writer-metrics
+      LOG_CONSUMER_THREADS: ${LOG_CONSUMER_THREADS:-5}
+      LOG_CONSUMER_MAX_POLL_RECORDS: "1000"
+      LOG_CONSUMER_PAUSED: "false"
+      # must stay off here: the consumer must not publish back into Kafka or start crons
+      LOG_KAFKA_ENABLED: "false"
+      TRIGGER_MERGING_CRON: "false"
+      PROMETHEUS_METRICS_ENABLED: "false"
+      JAVA_OPTS: ${CONSUMER_JAVA_OPTS:--Xmx1g}
