@@ -37,7 +37,7 @@ import com.mongodb.client.model.Updates;
  *   from the last finished slice instead of starting over.
  * - Keeps a separate last sync time per group (groupSyncTimes.groupId), so a failing group does not affect the others.
  * - With no last sync time, starts a few days back.
- * - Spreads the writes: small synchronous batches, a pause after each, and a cap on changes per run.
+ * - Spreads the writes: small synchronous batches, a pause after each, and a time budget per run.
  *
  * The tuning values below have defaults and can be overridden by a group.
  */
@@ -66,10 +66,7 @@ public abstract class DeltaGroupSync {
         int scanned;
         int added;
         int removed;
-
-        int changes() {
-            return added + removed;
-        }
+        boolean outOfTime;
     }
 
     /** Each write is one updateMany per collection with an $or of this many (url, method) pairs, so keep it small. */
@@ -82,9 +79,9 @@ public abstract class DeltaGroupSync {
         return 200;
     }
 
-    /** Cap on changes in one run; the rest continues next run. */
-    protected int maxChangesPerRun() {
-        return 20_000;
+    /** Time budget of one run, so it cannot hold the shared cron thread for long; the rest continues next run. */
+    protected long maxRunMs() {
+        return 5 * 60 * 1000L;
     }
 
     /** Length of the time ranges a run goes through in order; the last sync time is saved after each. */
@@ -146,17 +143,14 @@ public abstract class DeltaGroupSync {
         int sliceFrom = since;
         int sliceTo = since;
         try {
-            sync(result, visitor -> scanUntimed(visitor));
-            for (; sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
+            sync(result, startMs, visitor -> scanUntimed(visitor));
+            for (; !result.outOfTime && sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
                 sliceTo = Math.min(sliceFrom + sliceSeconds(), syncStartedAt);
                 int from = sliceFrom;
                 int to = sliceTo;
-                sync(result, visitor -> scan(from, to, visitor));
-                if (result.changes() >= maxChangesPerRun()) {
-                    // this slice may be unfinished, so it is not saved; what is already fixed is skipped next time
-                    logger.warn(String.format("AccountId: %d %s sync hit the cap of %d changes in slice [%d, %d): slices done=%d, scanned=%d, added=%d, removed=%d, took=%d ms; the rest continues next run from the last saved slice",
-                            accountId, groupName(), maxChangesPerRun(), sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs));
-                    return;
+                sync(result, startMs, visitor -> scan(from, to, visitor));
+                if (result.outOfTime) {
+                    break;
                 }
                 saveLastSync(sliceTo);
                 result.slices++;
@@ -168,6 +162,12 @@ public abstract class DeltaGroupSync {
         }
 
         long tookMs = System.currentTimeMillis() - startMs;
+        if (result.outOfTime) {
+            // the slice that was running is not saved; what is already fixed is skipped when it is checked again
+            logger.warn(String.format("AccountId: %d %s sync used up its time budget of %d ms in slice [%d, %d): slices done=%d, scanned=%d, added=%d, removed=%d, took=%d ms; the rest continues next run from the last saved slice",
+                    accountId, groupName(), maxRunMs(), sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, tookMs));
+            return;
+        }
         String message = String.format("AccountId: %d %s synced: since=%d (%s), slices=%d, scanned=%d, added=%d, removed=%d, took=%d ms",
                 accountId, groupName(), since,
                 hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback",
@@ -180,11 +180,15 @@ public abstract class DeltaGroupSync {
     }
 
     /** Feeds the candidates of one scan through the compare and write logic, and writes what is left at the end. */
-    private void sync(Result result, Consumer<Predicate<Candidate>> scanner) {
+    private void sync(Result result, long runStartMs, Consumer<Predicate<Candidate>> scanner) {
         List<ApiInfoKey> toAdd = new ArrayList<>();
         List<ApiInfoKey> toRemove = new ArrayList<>();
 
         scanner.accept(candidate -> {
+            if (System.currentTimeMillis() - runStartMs >= maxRunMs()) {
+                result.outOfTime = true;
+                return false;
+            }
             result.scanned++;
             // write only when the group tag disagrees with the source data
             if (candidate.member == candidate.inGroup) {
@@ -198,7 +202,7 @@ public abstract class DeltaGroupSync {
             if (toRemove.size() >= writeBatchSize()) {
                 result.removed += write(toRemove, false);
             }
-            return result.changes() < maxChangesPerRun();
+            return true;
         });
 
         result.added += write(toAdd, true);
