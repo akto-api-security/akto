@@ -6,7 +6,6 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
-import com.akto.data_actor.ClientActor;
 import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
@@ -59,7 +58,7 @@ public class SkillRevalidationJobExecutor extends JobExecutor<SkillRevalidationJ
     // ApiInfo does not map tagsList on every branch, so the field is named here
     private static final String API_INFO_TAGS_LIST = "tagsList";
 
-    private static final String CYBORG_URL = System.getenv().getOrDefault("SKILL_REVALIDATION_CYBORG_URL", ClientActor.CYBORG_URL)
+    private static final String CYBORG_URL = System.getenv().getOrDefault("SKILL_REVALIDATION_CYBORG_URL", "https://ultron.akto.io")
         .replaceAll("/+$", "");
 
     // Each call is a synchronous LLM call in cyborg; back to back they trip the provider's rate limit.
