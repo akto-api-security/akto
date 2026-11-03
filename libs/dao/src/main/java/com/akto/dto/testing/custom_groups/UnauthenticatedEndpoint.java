@@ -88,7 +88,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
      * The group follows api_info (the source of truth for auth types). Auth types only change in runtime upserts, which
      * bump lastSeen, so only the apis seen since the last sync are looked at.
      */
-    private static final DeltaGroupSync GROUP_SYNC = new DeltaGroupSync() {
+    private static final ApiGroupSync GROUP_SYNC = new ApiGroupSync() {
         @Override
         protected int groupId() {
             return UNAUTHENTICATED_GROUP_ID;

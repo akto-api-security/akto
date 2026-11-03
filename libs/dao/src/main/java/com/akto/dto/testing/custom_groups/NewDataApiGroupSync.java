@@ -23,7 +23,7 @@ import com.mongodb.client.model.Projections;
  * discovered apis and new test issues are the ones that may need the group tag. A group that has a rule for membership
  * can override {@link #scan} and re-decide membership for what this reports.
  */
-public abstract class NewDataGroupSync extends DeltaGroupSync {
+public abstract class NewDataApiGroupSync extends ApiGroupSync {
 
     @Override
     protected void scan(int from, int to, Predicate<Candidate> visitor) {

@@ -2615,7 +2615,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     /**
-     * Keeps the automated api groups up to date every API_GROUPS_SYNC_INTERVAL_MINUTES (see DeltaGroupSync): the unauthenticated, sensitive, custom and
+     * Keeps the automated api groups up to date every API_GROUPS_SYNC_INTERVAL_MINUTES (see ApiGroupSync): the unauthenticated, sensitive, custom and
      * all apis groups. Each account and each group is handled on its own, so one failing does not stop the others.
      */
     public void setUpApiGroupsSync() {

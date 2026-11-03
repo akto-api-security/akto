@@ -13,7 +13,7 @@ import com.akto.dao.MCollection;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
-import com.akto.dto.testing.custom_groups.DeltaGroupSync;
+import com.akto.dto.testing.custom_groups.ApiGroupSync;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.type.SingleTypeInfo;
@@ -56,7 +56,7 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
      * the ones a user marked by hand have no time and are checked on every run.
      * Apis that stop being sensitive are not found this way and keep the tag.
      */
-    private static final DeltaGroupSync GROUP_SYNC = new DeltaGroupSync() {
+    private static final ApiGroupSync GROUP_SYNC = new ApiGroupSync() {
         @Override
         protected int groupId() {
             return API_GROUP_ID;

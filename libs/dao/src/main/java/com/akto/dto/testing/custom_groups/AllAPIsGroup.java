@@ -35,7 +35,7 @@ public class AllAPIsGroup extends TestingEndpoints {
     }
 
     /** Every api is in this group, so the only work is tagging the apis with new data. */
-    private static final DeltaGroupSync GROUP_SYNC = new NewDataGroupSync() {
+    private static final ApiGroupSync GROUP_SYNC = new NewDataApiGroupSync() {
         @Override
         protected int groupId() {
             return ALL_APIS_GROUP_ID;

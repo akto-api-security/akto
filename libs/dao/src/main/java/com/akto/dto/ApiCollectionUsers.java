@@ -34,7 +34,7 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
-import com.akto.dto.testing.custom_groups.CustomGroupSync;
+import com.akto.dto.testing.custom_groups.CustomApiGroupSync;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -307,7 +307,7 @@ public class ApiCollectionUsers {
         } else if (SensitiveDataEndpoints.API_GROUP_ID == collection.getId()) {
             SensitiveDataEndpoints.updateCollections();
         } else {
-            new CustomGroupSync(collection).run();
+            new CustomApiGroupSync(collection).run();
         }
     }
 

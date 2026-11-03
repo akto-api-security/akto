@@ -59,9 +59,9 @@ import com.mongodb.client.model.Updates;
  *
  * The tuning values below have defaults and can be overridden by a group.
  */
-public abstract class DeltaGroupSync {
+public abstract class ApiGroupSync {
 
-    private static final Logger logger = LoggerFactory.getLogger(DeltaGroupSync.class);
+    private static final Logger logger = LoggerFactory.getLogger(ApiGroupSync.class);
 
     public static final class Candidate {
         final ApiInfoKey key;

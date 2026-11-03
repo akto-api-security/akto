@@ -25,14 +25,14 @@ import com.mongodb.client.model.Projections;
  * so who is in the group is decided exactly as the rules' database filters decide it. The rules themselves are applied
  * to everything when the group is created or edited; this only follows new data after that.
  */
-public class CustomGroupSync extends NewDataGroupSync {
+public class CustomApiGroupSync extends NewDataApiGroupSync {
 
     private static final int EVALUATE_BATCH_SIZE = 200;
 
     private final ApiCollection collection;
     private Bson ruleFilter;
 
-    public CustomGroupSync(ApiCollection collection) {
+    public CustomApiGroupSync(ApiCollection collection) {
         this.collection = collection;
     }
 
