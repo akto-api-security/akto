@@ -25,13 +25,6 @@ import com.mongodb.client.model.Projections;
  */
 public abstract class NewDataApiGroupSync extends ApiGroupSync {
 
-    // the main source is single type info, so these groups are synced up to the time of the newest single type info;
-    // api_info discoveries and issues that are newer only make a run re-read a little more
-    @Override
-    protected int newestDataTime() {
-        return newestSingleTypeInfoTime();
-    }
-
     @Override
     protected void scan(int from, int to, Predicate<Candidate> visitor) {
         // new params
@@ -43,11 +36,11 @@ public abstract class NewDataApiGroupSync extends ApiGroupSync {
         // newly discovered apis
         Bson discovered = Filters.and(Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, from), Filters.lt(ApiInfo.DISCOVERED_TIMESTAMP, to));
         try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find(discovered)
-                .projection(Projections.include("_id", SingleTypeInfo._COLLECTION_IDS)).cursor()) {
+                .projection(Projections.include("_id", SingleTypeInfo._COLLECTION_IDS, ApiInfo.DISCOVERED_TIMESTAMP)).cursor()) {
             while (cursor.hasNext()) {
                 ApiInfo apiInfo = cursor.next();
                 List<Integer> groupIds = apiInfo.getCollectionIds();
-                if (!visitor.test(new Candidate(apiInfo.getId(), true, groupIds != null && groupIds.contains(groupId())))) {
+                if (!visitor.test(new Candidate(apiInfo.getId(), true, groupIds != null && groupIds.contains(groupId()), apiInfo.getDiscoveredTimestamp()))) {
                     return;
                 }
             }
@@ -60,11 +53,11 @@ public abstract class NewDataApiGroupSync extends ApiGroupSync {
             Filters.gte(TestingRunIssues.CREATION_TIME, from),
             Filters.lt(TestingRunIssues.CREATION_TIME, to));
         try (MongoCursor<TestingRunIssues> cursor = TestingRunIssuesDao.instance.getMCollection().find(newIssues)
-                .projection(Projections.include("_id", SingleTypeInfo._COLLECTION_IDS)).cursor()) {
+                .projection(Projections.include("_id", SingleTypeInfo._COLLECTION_IDS, TestingRunIssues.CREATION_TIME)).cursor()) {
             while (cursor.hasNext()) {
                 TestingRunIssues issue = cursor.next();
                 List<Integer> groupIds = issue.getCollectionIds();
-                if (!visitor.test(new Candidate(issue.getId().getApiInfoKey(), true, groupIds != null && groupIds.contains(groupId())))) {
+                if (!visitor.test(new Candidate(issue.getId().getApiInfoKey(), true, groupIds != null && groupIds.contains(groupId()), issue.getCreationTime()))) {
                     return;
                 }
             }

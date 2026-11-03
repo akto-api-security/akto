@@ -15,13 +15,11 @@ import org.slf4j.LoggerFactory;
 
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
@@ -35,7 +33,6 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -60,12 +57,12 @@ import com.mongodb.client.model.Updates;
  *
  * Algorithm of {@link #run()}:
  * 1. Read the group's last sync time from account settings (none: start a few days back) and start from it, minus a
- *    small overlap. Find the newest data time in the database; the run goes up to it (never more than the hold back
- *    behind now).
- * 2. Check the apis that cannot be found by time ({@link #scanUntimed}), then each time slice in order up to that time.
+ *    small overlap.
+ * 2. Check the apis that cannot be found by time ({@link #scanUntimed}), then each time slice in order up to now.
  * 3. For every reported api, compare "should be in the group" with "has the group tag"; if they agree, do nothing.
  * 4. Otherwise collect it, and write each full batch with one updateMany per collection (add or pull the tag), then pause.
- * 5. After a slice is fully written, save its end as the group's last sync time.
+ * 5. After a slice is fully written, save the time of the newest data read so far as the group's last sync time (when
+ *    nothing newer is read it stays, but not more than the hold back behind now).
  * 6. On any error stop without saving the unfinished slice; the next run resumes from the last saved one.
  * 7. Log one line: apis scanned, added, removed, write batches sent and documents modified.
  *
@@ -79,15 +76,18 @@ public abstract class ApiGroupSync {
         final ApiInfoKey key;
         final boolean member;
         final boolean inGroup;
+        final int time;
 
         /**
          * @param member  whether the api should be in the group
          * @param inGroup whether the api carries the group tag right now
+         * @param time    the time of the data it was found by (0 when it has none); the last sync time follows the newest one read
          */
-        public Candidate(ApiInfoKey key, boolean member, boolean inGroup) {
+        public Candidate(ApiInfoKey key, boolean member, boolean inGroup, int time) {
             this.key = key;
             this.member = member;
             this.inGroup = inGroup;
+            this.time = time;
         }
     }
 
@@ -96,6 +96,8 @@ public abstract class ApiGroupSync {
         int scanned;
         int added;
         int removed;
+        // the newest time of the data read in this run
+        int newestSeen;
         // database side of the writes: write batches sent (each is one updateMany per collection) and documents modified
         int batches;
         long docsModified;
@@ -139,9 +141,10 @@ public abstract class ApiGroupSync {
     }
 
     /**
-     * The last sync time never moves past the newest data that is really in the database, so data that is still on its
-     * way (for example while the service that consumes the runtime's data is down) is not skipped. It is not held back
-     * more than this, so an account with no traffic does not keep re-reading a growing window.
+     * The last sync time is the time of the newest data a run really read, so data that is still on its way (for
+     * example while the service that consumes the runtime's data is down) is not skipped. When a run reads nothing it
+     * stays where it was, but it is not held back more than this behind now, so an account with no traffic does not
+     * keep re-reading a growing window.
      */
     protected int maxHoldBackSeconds() {
         return 12 * 60 * 60;
@@ -178,7 +181,8 @@ public abstract class ApiGroupSync {
                 new BasicDBObject("$ifNull", Arrays.<Object>asList("$" + SingleTypeInfo._COLLECTION_IDS, Collections.emptyList()))));
         List<Bson> pipeline = Arrays.asList(
             Aggregates.match(filter),
-            Aggregates.group(groupedId, Accumulators.min("allTagged", allTagged)));
+            Aggregates.group(groupedId, Accumulators.min("allTagged", allTagged),
+                Accumulators.max("time", "$" + SingleTypeInfo._TIMESTAMP)));
 
         try (MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).allowDiskUse(true).batchSize(1000).cursor()) {
@@ -190,7 +194,7 @@ public abstract class ApiGroupSync {
                     continue;
                 }
                 ApiInfoKey key = new ApiInfoKey(id.getInt(SingleTypeInfo._API_COLLECTION_ID), id.getString(SingleTypeInfo._URL), method);
-                if (!visitor.test(new Candidate(key, true, doc.getBoolean("allTagged")))) {
+                if (!visitor.test(new Candidate(key, true, doc.getBoolean("allTagged"), doc.getInt("time", 0)))) {
                     return false;
                 }
             }
@@ -211,28 +215,6 @@ public abstract class ApiGroupSync {
             ids.add(apiCollection.getId());
         }
         return ids;
-    }
-
-    /**
-     * How far the data has reached the database: the last sync time never moves past it. By default the time of the newest
-     * traffic (api_info lastSeen), 0 when there is none. A group that reads another collection can use that collection's
-     * own time instead, for example {@link #newestSingleTypeInfoTime()}.
-     */
-    protected int newestDataTime() {
-        ApiInfo newest = ApiInfoDao.instance.getMCollection()
-                .find(Filters.in(ApiInfo.ID_API_COLLECTION_ID, fetchApiCollectionIds()))
-                .projection(Projections.include(ApiInfo.LAST_SEEN))
-                .sort(Sorts.descending(ApiInfo.LAST_SEEN)).limit(1).first();
-        return newest == null ? 0 : newest.getLastSeen();
-    }
-
-    /** The time of the newest single type info (when its param was first created), 0 when there is none. */
-    protected static int newestSingleTypeInfoTime() {
-        SingleTypeInfo newest = SingleTypeInfoDao.instance.getMCollection()
-                .find(Filters.in(SingleTypeInfo._API_COLLECTION_ID, fetchApiCollectionIds()))
-                .projection(Projections.include(SingleTypeInfo._TIMESTAMP))
-                .sort(Sorts.descending(SingleTypeInfo._TIMESTAMP)).limit(1).first();
-        return newest == null ? 0 : newest.getTimestamp();
     }
 
     public final void run() {
@@ -257,26 +239,27 @@ public abstract class ApiGroupSync {
         int sliceFrom = since;
         int sliceTo = since;
         int lastSaved = hasMarker ? lastSync : 0;
-        int dataUpTo = 0;
         try {
-            // the run goes up to the newest data that is really in the database, but never more than the hold back behind now
-            dataUpTo = Math.min(newestDataTime(), syncStartedAt);
-            int syncUpTo = Math.max(dataUpTo, syncStartedAt - maxHoldBackSeconds());
-            // end is exclusive, so +1 includes the newest doc
-            int windowEnd = Math.min(syncUpTo + 1, syncStartedAt);
             // later runs go hour by hour, the first run covers its whole look back at once instead of many small queries
-            int sliceLength = hasMarker ? sliceSeconds() : Math.max(windowEnd - since, 1);
+            int sliceLength = hasMarker ? sliceSeconds() : Math.max(syncStartedAt - since, 1);
             sync(result, visitor -> scanUntimed(visitor));
-            for (; sliceFrom < windowEnd; sliceFrom = sliceTo) {
-                sliceTo = Math.min(sliceFrom + sliceLength, windowEnd);
+            for (; sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
+                sliceTo = Math.min(sliceFrom + sliceLength, syncStartedAt);
                 int from = sliceFrom;
                 int to = sliceTo;
                 sync(result, visitor -> scan(from, to, visitor));
-                if (sliceTo > lastSaved) {
-                    saveLastSync(sliceTo);
-                    lastSaved = sliceTo;
+                // the last sync time follows the newest data read, not the clock
+                if (result.newestSeen > lastSaved) {
+                    saveLastSync(result.newestSeen);
+                    lastSaved = result.newestSeen;
                 }
                 result.slices++;
+            }
+            // nothing newer was read: stay where it was, but not more than the hold back behind now
+            int heldBack = syncStartedAt - maxHoldBackSeconds();
+            if (heldBack > lastSaved) {
+                saveLastSync(heldBack);
+                lastSaved = heldBack;
             }
         } catch (Exception e) {
             logger.error(String.format("AccountId: %d %s sync failed in slice [%d, %d) after slices done=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms, since=%d; the next run resumes from the last saved slice",
@@ -285,10 +268,10 @@ public abstract class ApiGroupSync {
         }
 
         long tookMs = System.currentTimeMillis() - startMs;
-        String message = String.format("AccountId: %d %s synced: since=%d (%s), data up to=%d, saved=%d, slices=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms",
+        String message = String.format("AccountId: %d %s synced: since=%d (%s), newest data read=%d, saved=%d, slices=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms",
                 accountId, groupName(), since,
                 hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback",
-                dataUpTo, lastSaved, result.slices, result.scanned, result.added, result.removed, result.batches, result.docsModified, tookMs);
+                result.newestSeen, lastSaved, result.slices, result.scanned, result.added, result.removed, result.batches, result.docsModified, tookMs);
         if (tookMs > slowRunWarnMs()) {
             logger.warn(message);
         } else {
@@ -303,6 +286,7 @@ public abstract class ApiGroupSync {
 
         scanner.accept(candidate -> {
             result.scanned++;
+            result.newestSeen = Math.max(result.newestSeen, candidate.time);
             // write only when the group tag disagrees with the source data
             if (candidate.member == candidate.inGroup) {
                 return true;

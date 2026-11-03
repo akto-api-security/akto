@@ -108,7 +108,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                 );
 
                 try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find(filter)
-                        .projection(Projections.include("_id", ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.COLLECTION_IDS))
+                        .projection(Projections.include("_id", ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.COLLECTION_IDS, ApiInfo.LAST_SEEN))
                         .batchSize(limit).cursor()) {
                     while (cursor.hasNext()) {
                         ApiInfo apiInfo = cursor.next();
@@ -116,7 +116,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                         boolean isUnauthenticated = authTypesFound != null && authTypesFound.contains(UNAUTHENTICATED_AUTH_SET);
                         List<Integer> apiGroupIds = apiInfo.getCollectionIds();
                         boolean inGroup = apiGroupIds != null && apiGroupIds.contains(UNAUTHENTICATED_GROUP_ID);
-                        if (!visitor.test(new Candidate(apiInfo.getId(), isUnauthenticated, inGroup))) {
+                        if (!visitor.test(new Candidate(apiInfo.getId(), isUnauthenticated, inGroup, apiInfo.getLastSeen()))) {
                             return;
                         }
                     }

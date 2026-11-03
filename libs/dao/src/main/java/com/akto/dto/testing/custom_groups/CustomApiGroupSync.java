@@ -76,7 +76,7 @@ public class CustomApiGroupSync extends NewDataApiGroupSync {
         Set<ApiInfoKey> matching = matchingApis(batch);
         boolean keepGoing = true;
         for (Candidate candidate : batch) {
-            if (!visitor.test(new Candidate(candidate.key, matching.contains(candidate.key), candidate.inGroup))) {
+            if (!visitor.test(new Candidate(candidate.key, matching.contains(candidate.key), candidate.inGroup, candidate.time))) {
                 keepGoing = false;
                 break;
             }
