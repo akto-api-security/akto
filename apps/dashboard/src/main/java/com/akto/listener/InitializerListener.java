@@ -487,7 +487,7 @@ public class InitializerListener implements ServletContextListener {
         int since = Math.max(lastSync - API_GROUPS_SYNC_BUFFER_SECONDS, 0);
 
         long startMs = System.currentTimeMillis();
-        createFirstUnauthenticatedApiGroup(since, full);
+        createAllApisGroup(since, full);
 
         List<Bson> updates = new ArrayList<>();
         updates.add(Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_API_GROUPS_SYNC, now));
@@ -2033,7 +2033,7 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    /** Only creates the group; its members are kept up to date by setUpUpdateCustomCollections (UnauthenticatedEndpoint.updateCollections). */
+    /** Creates the group if it does not exist yet. Called at the start of updateCustomCollections, which then fills it and keeps it up to date. */
     public static void createUnauthenticatedApiGroup() {
 
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
@@ -2082,14 +2082,6 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
-
-    public static void createFirstUnauthenticatedApiGroup(int since, boolean full){
-        long startMs = System.currentTimeMillis();
-        createUnauthenticatedApiGroup();
-        createAllApisGroup(since, full);
-        // updateMany writes are queued on the shared collection-id executor, so this timing covers the scan and queueing
-        logger.info("AccountId: " + Context.accountId.get() + " all apis group: " + (System.currentTimeMillis() - startMs) + " ms");
-    }
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
         logger.debugAndAddToDb("Creating risk score group: " + name, LogDb.DASHBOARD);
@@ -2583,6 +2575,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void updateCustomCollections() {
+        createUnauthenticatedApiGroup();
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
                 Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()));
 
