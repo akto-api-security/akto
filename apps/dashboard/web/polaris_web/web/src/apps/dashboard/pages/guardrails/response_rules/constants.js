@@ -16,7 +16,6 @@ export const ACCOUNT_TYPE_OPTIONS = [
 
 export const SURFACE_OPTIONS = [
     { label: "Agents & CLIs", value: "agents" },
-    { label: "IDE assistants", value: "ide" },
     { label: "MCP servers", value: "mcp" },
     { label: "Browser AI apps", value: "browser" },
 ];

@@ -53,7 +53,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
 
 public class ResponseRuleEngine {
 
@@ -82,7 +81,6 @@ public class ResponseRuleEngine {
     private static final String EMAIL_FROM_NAME = "Akto";
     private static final String UPDATED_BY_PREFIX = "Response rule: ";
     private static final String SURFACE_AGENTS = "agents";
-    private static final String SURFACE_IDE = "ide";
     private static final String SURFACE_MCP = "mcp";
     private static final String SURFACE_BROWSER = "browser";
     private static final String AGENT_HOST_MARKER = "ai-agent";
@@ -90,7 +88,6 @@ public class ResponseRuleEngine {
     private static final String TAG_LOGIN_EMAIL_TYPE = "login-user-email-type";
     private static final String PERSONAL = "personal";
     private static final String CORPORATE = "corporate";
-    private static final Pattern IDE_VENDOR = Pattern.compile("cursor|copilot|windsurf|codeium|vscode|antigravity|kiro|zed|jetbrains|intellij");
     private static final Set<String> BROWSER_MARKERS = new HashSet<>(Arrays.asList("chrome", "edge", "firefox", "safari", "brave", "arc", "opera"));
 
     private final ExecutorService executor = newPool(WORKERS, "Response rule queue is full, a violation was not evaluated");
@@ -283,10 +280,7 @@ public class ResponseRuleEngine {
         String[] parts = host.toLowerCase().split("\\.");
         String marker = parts.length > 1 ? parts[1] : "";
         if (BROWSER_MARKERS.contains(marker)) return SURFACE_BROWSER;
-        if (AGENT_HOST_MARKER.equals(marker)) {
-            String vendor = parts.length > 2 ? parts[2] : "";
-            return IDE_VENDOR.matcher(vendor).find() ? SURFACE_IDE : SURFACE_AGENTS;
-        }
+        if (AGENT_HOST_MARKER.equals(marker)) return SURFACE_AGENTS;
         return SURFACE_MCP;
     }
 
