@@ -354,7 +354,12 @@ public class ResponseRuleEngine {
         }
     }
 
-    private void deliver(int accountId, Runnable task) {
+    @FunctionalInterface
+    private interface Delivery {
+        void run() throws Exception;
+    }
+
+    private void deliver(int accountId, Delivery task) {
         deliveries.execute(() -> {
             try {
                 Context.accountId.set(accountId);
