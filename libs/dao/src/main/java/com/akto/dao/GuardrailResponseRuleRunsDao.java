@@ -24,7 +24,5 @@ public class GuardrailResponseRuleRunsDao extends AccountsContextDao<GuardrailRe
     public void createIndicesIfAbsent() {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), Indexes.ascending("createdAt"),
             new IndexOptions().name("createdAt_ttl").expireAfter((long) RETENTION_DAYS, TimeUnit.DAYS));
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-            new String[]{GuardrailResponseRuleRun.STATUS, GuardrailResponseRuleRun.NEXT_ATTEMPT_AT}, true);
     }
 }

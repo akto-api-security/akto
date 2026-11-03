@@ -18,8 +18,6 @@ public class GuardrailResponseRuleRun {
     public static final String STATUS_FAILED = "FAILED";
 
     public static final String STATUS = "status";
-    public static final String ATTEMPTS = "attempts";
-    public static final String NEXT_ATTEMPT_AT = "nextAttemptAt";
     public static final String LAST_ERROR = "lastError";
     public static final String SENT_AT = "sentAt";
 
@@ -40,8 +38,6 @@ public class GuardrailResponseRuleRun {
     private String eventType;
     private long detectedAt;
     private String status;
-    private int attempts;
-    private int nextAttemptAt;
     private String lastError;
     private int sentAt;
     private Date createdAt;

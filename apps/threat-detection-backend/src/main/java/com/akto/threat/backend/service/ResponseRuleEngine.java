@@ -6,8 +6,6 @@ import com.akto.dao.GuardrailResponseRuleRunsDao;
 import com.akto.dao.GuardrailResponseRulesDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
-import com.akto.dao.notifications.SlackWebhooksDao;
-import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.Config;
 import com.akto.dto.GuardrailResponseRule;
@@ -17,7 +15,6 @@ import com.akto.dto.GuardrailResponseRuleRun;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.notifications.CustomWebhook;
-import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
@@ -25,7 +22,6 @@ import com.akto.notifications.email.SendgridEmail;
 import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.testing.ApiExecutor;
-import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
@@ -37,10 +33,7 @@ import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 import com.sendgrid.helpers.mail.objects.Personalization;
-import com.slack.api.Slack;
-import com.slack.api.webhook.WebhookResponse;
 import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -58,8 +51,6 @@ import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -77,11 +68,6 @@ public class ResponseRuleEngine {
     private static final int DELIVERY_WORKERS = 3;
     private static final int QUEUE_CAPACITY = 10_000;
     private static final int MAX_EMAILS = 20;
-    private static final int MAX_ATTEMPTS = 4;
-    private static final int[] RETRY_DELAYS_SECONDS = {60, 300, 1800};
-    private static final int LEASE_SECONDS = 300;
-    private static final int RETRY_SWEEP_SECONDS = 60;
-    private static final int RETRY_BATCH = 50;
     private static final int MAX_ERROR_LENGTH = 500;
     private static final String CHANNEL_SLACK = "slack";
     private static final String CHANNEL_WEBHOOK = "webhook";
@@ -109,12 +95,10 @@ public class ResponseRuleEngine {
 
     private final ExecutorService executor = newPool(WORKERS, "Response rule queue is full, a violation was not evaluated");
     private final ExecutorService deliveries = newPool(DELIVERY_WORKERS, "Response rule delivery queue is full, a delivery will be retried by the sweep");
-    private final ScheduledExecutorService retryScheduler = Executors.newSingleThreadScheduledExecutor();
     private final Map<String, CachedRules> rulesByAccount = new ConcurrentHashMap<>();
     private final Map<String, CachedFlag> personalByHost = new ConcurrentHashMap<>();
     private final Set<Integer> indexedAccounts = ConcurrentHashMap.newKeySet();
     private volatile MaliciousEventService eventService;
-    private volatile boolean started;
 
     private ResponseRuleEngine() {}
 
@@ -122,11 +106,8 @@ public class ResponseRuleEngine {
         return INSTANCE;
     }
 
-    public synchronized void init(MaliciousEventService eventService) {
+    public void init(MaliciousEventService eventService) {
         this.eventService = eventService;
-        if (started) return;
-        started = true;
-        retryScheduler.scheduleWithFixedDelay(this::sweepRetries, RETRY_SWEEP_SECONDS, RETRY_SWEEP_SECONDS, TimeUnit.SECONDS);
     }
 
     private static ExecutorService newPool(int workers, String rejectedMessage) {
@@ -153,12 +134,6 @@ public class ResponseRuleEngine {
         CachedFlag(boolean value, long loadedAt) {
             this.value = value;
             this.loadedAt = loadedAt;
-        }
-    }
-
-    private static final class PermanentFailure extends Exception {
-        PermanentFailure(String message) {
-            super(message);
         }
     }
 
@@ -394,8 +369,6 @@ public class ResponseRuleEngine {
         run.setEventType(violation.eventType);
         run.setDetectedAt(violation.detectedAt);
         run.setStatus(GuardrailResponseRuleRun.STATUS_PENDING);
-        run.setAttempts(0);
-        run.setNextAttemptAt(Context.now() + LEASE_SECONDS);
         run.setCreatedAt(new Date());
         return run;
     }
@@ -436,51 +409,21 @@ public class ResponseRuleEngine {
             perform(run);
             GuardrailResponseRuleRunsDao.instance.updateOneNoUpsert(Filters.eq("_id", run.getId()), Updates.combine(
                 Updates.set(GuardrailResponseRuleRun.STATUS, GuardrailResponseRuleRun.STATUS_SENT),
-                Updates.set(GuardrailResponseRuleRun.SENT_AT, Context.now()),
-                Updates.inc(GuardrailResponseRuleRun.ATTEMPTS, 1),
-                Updates.unset(GuardrailResponseRuleRun.LAST_ERROR)));
-        } catch (PermanentFailure e) {
-            recordFailure(run, e.getMessage(), true);
+                Updates.set(GuardrailResponseRuleRun.SENT_AT, Context.now())));
         } catch (Exception e) {
-            recordFailure(run, e.getMessage(), false);
+            recordFailure(run, e.getMessage());
         }
     }
 
-    private void recordFailure(GuardrailResponseRuleRun run, String error, boolean permanent) {
+    private void recordFailure(GuardrailResponseRuleRun run, String error) {
         try {
-            int attempts = permanent ? MAX_ATTEMPTS : run.getAttempts() + 1;
-            int delay = RETRY_DELAYS_SECONDS[Math.min(Math.max(attempts - 1, 0), RETRY_DELAYS_SECONDS.length - 1)];
             String message = StringUtils.abbreviate(StringUtils.defaultString(error, "Unknown error"), MAX_ERROR_LENGTH);
-            logger.error("Response rule " + run.getRuleId() + " " + run.getActionType() + " " + run.getChannel() + " failed (attempt " + attempts + "): " + message);
+            logger.error("Response rule " + run.getRuleId() + " " + run.getActionType() + " " + run.getChannel() + " failed: " + message);
             GuardrailResponseRuleRunsDao.instance.updateOneNoUpsert(Filters.eq("_id", run.getId()), Updates.combine(
                 Updates.set(GuardrailResponseRuleRun.STATUS, GuardrailResponseRuleRun.STATUS_FAILED),
-                Updates.set(GuardrailResponseRuleRun.ATTEMPTS, attempts),
-                Updates.set(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, Context.now() + delay),
                 Updates.set(GuardrailResponseRuleRun.LAST_ERROR, message)));
         } catch (Exception e) {
             logger.error("Could not record a response rule failure: " + e.getMessage(), e);
-        }
-    }
-
-    private void sweepRetries() {
-        try {
-            AccountTask.instance.executeTask((Account account) -> retryDue(account.getId()), "response-rule-retry");
-        } catch (Exception e) {
-            logger.error("Response rule retry sweep failed: " + e.getMessage(), e);
-        }
-    }
-
-    private void retryDue(int accountId) {
-        int now = Context.now();
-        Bson due = Filters.and(
-            Filters.in(GuardrailResponseRuleRun.STATUS, GuardrailResponseRuleRun.STATUS_PENDING, GuardrailResponseRuleRun.STATUS_FAILED),
-            Filters.lt(GuardrailResponseRuleRun.ATTEMPTS, MAX_ATTEMPTS),
-            Filters.lte(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, now));
-        for (GuardrailResponseRuleRun run : GuardrailResponseRuleRunsDao.instance.findAll(due, 0, RETRY_BATCH, null)) {
-            GuardrailResponseRuleRun leased = GuardrailResponseRuleRunsDao.instance.updateOneNoUpsert(
-                Filters.and(Filters.eq("_id", run.getId()), Filters.eq(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, run.getNextAttemptAt())),
-                Updates.set(GuardrailResponseRuleRun.NEXT_ATTEMPT_AT, now + LEASE_SECONDS));
-            if (leased != null) submit(accountId, leased);
         }
     }
 
@@ -496,7 +439,7 @@ public class ResponseRuleEngine {
                 updateEvent(run, null, assigneeOf(run.getActionConfig()));
                 break;
             default:
-                throw new PermanentFailure("Action " + run.getActionType() + " is not supported");
+                throw new Exception("Action " + run.getActionType() + " is not supported");
         }
     }
 
@@ -512,23 +455,18 @@ public class ResponseRuleEngine {
                 sendEmail(run);
                 break;
             default:
-                throw new PermanentFailure("Channel " + run.getChannel() + " is not supported");
+                throw new Exception("Channel " + run.getChannel() + " is not supported");
         }
     }
 
-    private void updateEvent(GuardrailResponseRuleRun run, String status, String owner) throws PermanentFailure {
-        if (eventService == null || StringUtils.isBlank(run.getEventId())) throw new PermanentFailure("The event cannot be updated");
+    private void updateEvent(GuardrailResponseRuleRun run, String status, String owner) throws Exception {
+        if (eventService == null || StringUtils.isBlank(run.getEventId())) throw new Exception("The event cannot be updated");
         eventService.updateMaliciousEventStatus(String.valueOf(Context.accountId.get()), Collections.singletonList(run.getEventId()),
             null, status, null, null, null, owner, null, UPDATED_BY_PREFIX + run.getRuleName());
     }
 
-    private void postSlack(GuardrailResponseRuleRun run) throws Exception {
-        Integer webhookId = toInteger(run.getActionConfig().get(CONFIG_SLACK_WEBHOOK_ID));
-        SlackWebhook webhook = webhookId == null ? null : SlackWebhooksDao.instance.findOne(Filters.eq("_id", webhookId));
-        String url = webhook == null ? SlackSender.getDefaultSlackWebhook() : webhook.getWebhook();
-        if (StringUtils.isBlank(url)) throw new PermanentFailure("No Slack webhook is connected");
-        WebhookResponse response = Slack.getInstance().send(url, new CustomTextAlert(slackText(run)).toJson());
-        if (response.getCode() != 200) throw new Exception("Slack returned " + response.getCode() + " " + response.getMessage());
+    private void postSlack(GuardrailResponseRuleRun run) {
+        SlackSender.sendAlert(Context.accountId.get(), new CustomTextAlert(slackText(run)), toInteger(run.getActionConfig().get(CONFIG_SLACK_WEBHOOK_ID)));
     }
 
     private void postWebhook(GuardrailResponseRuleRun run) throws Exception {
@@ -536,7 +474,7 @@ public class ResponseRuleEngine {
         CustomWebhook webhook = webhookId == null
             ? CustomWebhooksDao.instance.findOne(Filters.empty())
             : CustomWebhooksDao.instance.findOne(Filters.eq("_id", webhookId));
-        if (webhook == null || StringUtils.isBlank(webhook.getUrl())) throw new PermanentFailure("No webhook is connected");
+        if (webhook == null || StringUtils.isBlank(webhook.getUrl())) throw new Exception("No webhook is connected");
         Map<String, List<String>> headers = OriginalHttpRequest.buildHeadersMap(webhook.getHeaderString());
         boolean hasContentType = headers.keySet().stream().anyMatch("content-type"::equalsIgnoreCase);
         if (!hasContentType) headers.put("content-type", Collections.singletonList("application/json"));
@@ -549,7 +487,7 @@ public class ResponseRuleEngine {
 
     private void sendEmail(GuardrailResponseRuleRun run) throws Exception {
         String secretKey = com.akto.onprem.Constants.getSendgridConfig().getSendgridSecretKey();
-        if (StringUtils.isBlank(secretKey)) throw new PermanentFailure("SendGrid is not configured");
+        if (StringUtils.isBlank(secretKey)) throw new Exception("SendGrid is not configured");
         Personalization personalization = new Personalization();
         int added = 0;
         for (String address : String.valueOf(run.getActionConfig().getOrDefault(CONFIG_EMAILS, "")).split("[,;\\s]+")) {
@@ -558,7 +496,7 @@ public class ResponseRuleEngine {
             personalization.addTo(new Email(address));
             added++;
         }
-        if (added == 0) throw new PermanentFailure("No valid email address in the rule");
+        if (added == 0) throw new Exception("No valid email address in the rule");
         Mail mail = new Mail();
         mail.setFrom(new Email(EMAIL_FROM, EMAIL_FROM_NAME));
         personalization.setSubject(run.getSeverity() + " violation: " + run.getRuleName());
