@@ -93,7 +93,7 @@ public class Cron {
                         " accountId " + accountId);
 
                 try {
-                    MergingLogic.mergeUrlsAndSave(apiCollectionId, !doBodyMatch, accountSettings != null && accountSettings.isAllowMergingOnVersions());
+                    MergingLogic.mergeUrlsAndSave(apiCollectionId, !doBodyMatch, accountSettings.isAllowMergingOnVersions());
                     loggerMaker.infoAndAddToDb("Finished merging API collection " +
                             apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
                             + " seconds");

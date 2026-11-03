@@ -39,6 +39,8 @@ public class MergingLogic {
     static final Set<String> MERGE_NAMESPACE_LITERALS = new HashSet<>(Arrays.asList("skills", "skill"));
     static final Set<String> TEMPLATE_PLACEHOLDERS = new HashSet<>(Arrays.asList(
             "INTEGER", "STRING", "UUID", "OBJECT_ID", "FLOAT", "VERSIONED", "LOCALE"));
+    // Account for which templates without a STRING segment (e.g. /api/INTEGER/BW48) are also merged
+    static final int TEMPLATE_MERGING_ACCOUNT_ID = 1772780065;
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class, LogDb.DB_ABS);
     private static final int OPTIMIZED_MERGING_ACCOUNT_ID = 1736798101;
 
@@ -331,9 +333,9 @@ public class MergingLogic {
                 String key = sti.getMethod() + " " + sti.getUrl();
                 if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID") || key.contains("OBJECT_ID") || key.contains("FLOAT") || key.contains("VERSIONED") || key.contains("LOCALE")) {
                     templateUrlSet.add(key);
-                    // A template without a STRING segment (e.g. /api/INTEGER/BW48) can still differ from
-                    // its siblings in a static segment, so it is also a candidate for static-to-static merging.
-                    if (hasStringToken(sti.getUrl()) || !hasPlaceholderToken(sti.getUrl())) continue;
+                    // A template without a STRING segment can still differ from its siblings in a static
+                    // segment (e.g. /api/INTEGER/BW48 and /api/INTEGER/BC05), so it is also merged like a static URL
+                    if (!isTemplateMergingCandidate(sti.getUrl())) continue;
                 };
 
                 if (sti.getIsUrlParam()) continue;
@@ -400,6 +402,9 @@ public class MergingLogic {
                         continue;
                     }
 
+                    // Existing templates only absorb static URLs, never another template
+                    if (isTemplateMergingCandidate(staticEndpoint)) continue;
+
                     for (String templateURL: templateUrls) {
                         if (templateURL == null || templateURL.isEmpty() || !templateURL.contains(" ")) {
                             loggerMaker.warnAndAddToDb("Invalid templateURL: '" + templateURL + "'");
@@ -417,10 +422,8 @@ public class MergingLogic {
                             continue;
                         }
 
-                        if (isSameUrl(templateMethod, templateEndpoint, staticMethod, staticEndpoint)) continue;
-
                         URLTemplate urlTemplate = createUrlTemplate(templateEndpoint, templateMethod);
-                        if (matchesTemplate(urlTemplate, staticEndpoint, staticMethod)) {
+                        if (urlTemplate.match(staticEndpoint, staticMethod)) {
                             // Don't delete static URLs if the matching template was previously demerged
                             if (!isDemergedUrl(urlTemplate, apiCollectionId)) {
                                 finalResult.deleteStaticUrls.add(staticURL);
@@ -487,6 +490,7 @@ public class MergingLogic {
 
     private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions, boolean allowStringMerging, int apiCollectionId) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
+        Set<String> groupedUrls = new HashSet<>();
 
         Iterator<Map.Entry<String, Set<String>>> iterator = pendingRequests.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -507,11 +511,21 @@ public class MergingLogic {
             URLMethods.Method newMethod = URLMethods.Method.fromString(newUrlParts[0]);
             String newEndpoint = newUrlParts[1];
 
+            // Templates without STRING (only for TEMPLATE_MERGING_ACCOUNT_ID) get stricter checks; static URLs keep the original ones.
+            // A merge only pairs URLs with placeholders at the same positions, so newUrl decides for both.
+            boolean strict = isTemplateMergingCandidate(newEndpoint);
+            // strict: a URL goes into one merge group only. In two groups, mergeUrlsAndSave would rename its STIs
+            // into one template and delete them for the other, and the unordered bulk write can lose them.
+            if (strict && groupedUrls.contains(newUrl)) {
+                continue;
+            }
+
             boolean matchedInDeltaTemplate = false;
             for(URLTemplate urlTemplate: templateToStaticURLs.keySet()){
                 if (urlTemplate.match(newEndpoint, newMethod)) {
                     matchedInDeltaTemplate = true;
                     templateToStaticURLs.get(urlTemplate).add(newUrl);
+                    if (strict) groupedUrls.add(newUrl);
                     break;
                 }
             }
@@ -519,10 +533,6 @@ public class MergingLogic {
             if (matchedInDeltaTemplate) {
                 continue;
             }
-
-            // Templates without STRING (e.g. /api/INTEGER/BW48) get stricter checks; static URLs keep the original ones.
-            // A merge only pairs URLs with placeholders at the same positions, so newUrl decides for both.
-            boolean strict = hasPlaceholderToken(newEndpoint);
 
             int countSimilarURLs = 0;
             // strict: similar URLs counted per candidate template, since a URL can line up with different
@@ -532,6 +542,9 @@ public class MergingLogic {
             for(String aUrl: pendingRequests.keySet()) {
                 if (aUrl == null || aUrl.isEmpty() || !aUrl.contains(" ")) {
                     loggerMaker.warnAndAddToDb("Invalid aUrl: '" + aUrl + "'");
+                    continue;
+                }
+                if (strict && groupedUrls.contains(aUrl)) {
                     continue;
                 }
                 String[] aUrlParts = aUrl.split(" ", 2);
@@ -548,7 +561,8 @@ public class MergingLogic {
                 if (mergedTemplate == null) {
                     continue;
                 }
-                // Case variants (e.g. /INTEGER/ab12 and /INTEGER/AB12) produce no typed segment: not a merge
+                // Templates differing only in case (e.g. /INTEGER/ab12 and /INTEGER/AB12) produce no typed segment.
+                // For static URLs such a result is never saved; for templates it would be, so skip it.
                 if (strict && !hasTypedSegment(mergedTemplate)) {
                     continue;
                 }
@@ -612,6 +626,11 @@ public class MergingLogic {
 
                 for (Map.Entry<String, Set<String>> rt: potentialMerges.getOrDefault(mergedTemplate, new HashMap<>()).entrySet()) {
                     matchedStaticURLs.add(rt.getKey());
+                }
+
+                if (strict) {
+                    groupedUrls.add(newUrl);
+                    groupedUrls.addAll(potentialMerges.get(mergedTemplate).keySet());
                 }
             }
         }
@@ -727,8 +746,13 @@ public class MergingLogic {
         return trim(url).split("/");
     }
 
-    static boolean hasStringToken(String url) {
-        return Arrays.asList(tokenize(url)).contains(SingleTypeInfo.SuperType.STRING.name());
+    static boolean isTemplateMergingAccount() {
+        Integer accountId = Context.accountId.get();
+        return accountId != null && accountId == TEMPLATE_MERGING_ACCOUNT_ID;
+    }
+
+    static boolean isTemplateMergingCandidate(String url) {
+        return isTemplateMergingAccount() && hasPlaceholderToken(url) && !Arrays.asList(tokenize(url)).contains(SingleTypeInfo.SuperType.STRING.name());
     }
 
     static boolean hasPlaceholderToken(String url) {
@@ -743,43 +767,6 @@ public class MergingLogic {
             if (type != null) return true;
         }
         return false;
-    }
-
-    static boolean isSameUrl(URLMethods.Method aMethod, String aEndpoint, URLMethods.Method bMethod, String bEndpoint) {
-        return aMethod == bMethod && trim(aEndpoint).equals(trim(bEndpoint));
-    }
-
-    /**
-     * Like URLTemplate.match, but a placeholder segment in the URL (e.g. INTEGER in /api/INTEGER/BW48)
-     * also matches a template position of the same type (e.g. /api/INTEGER/STRING).
-     */
-    static boolean matchesTemplate(URLTemplate template, String endpoint, URLMethods.Method method) {
-        String[] urlTokens = tokenize(endpoint);
-        String[] templateTokens = template.getTokens();
-        SingleTypeInfo.SuperType[] templateTypes = template.getTypes();
-        if (urlTokens.length != templateTokens.length) {
-            return false;
-        }
-
-        List<String> restUrlTokens = new ArrayList<>();
-        List<String> restTemplateTokens = new ArrayList<>();
-        List<SingleTypeInfo.SuperType> restTemplateTypes = new ArrayList<>();
-        for (int i = 0; i < urlTokens.length; i++) {
-            if (templateTokens[i] == null && templateTypes[i] != null && templateTypes[i].name().equals(urlTokens[i])) {
-                continue;
-            }
-            restUrlTokens.add(urlTokens[i]);
-            restTemplateTokens.add(templateTokens[i]);
-            restTemplateTypes.add(templateTypes[i]);
-        }
-
-        if (restUrlTokens.size() == urlTokens.length) {
-            return template.match(endpoint, method);
-        }
-
-        URLTemplate rest = new URLTemplate(restTemplateTokens.toArray(new String[0]),
-                restTemplateTypes.toArray(new SingleTypeInfo.SuperType[0]), template.getMethod());
-        return rest.match(restUrlTokens.toArray(new String[0]), method);
     }
 
 
@@ -803,26 +790,32 @@ public class MergingLogic {
             String dbToken = dbTokens[i];
 
             // A placeholder of an already-templatized URL only lines up with the same placeholder
-            if (TEMPLATE_PLACEHOLDERS.contains(tempToken) || TEMPLATE_PLACEHOLDERS.contains(dbToken)) {
+            if (isTemplateMergingAccount() && (TEMPLATE_PLACEHOLDERS.contains(tempToken) || TEMPLATE_PLACEHOLDERS.contains(dbToken))) {
                 if (!tempToken.equals(dbToken)) {
                     return null;
                 }
                 continue;
             }
 
-            // Same segment: nothing to merge. Checked before the dictionary lookups below, which are the costly part.
-            if (tempToken.equalsIgnoreCase(dbToken)) {
-                continue;
-            }
-
             // Never merge English words - they must remain static path segments
             if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) {
-                return null;
+                if (!tempToken.equalsIgnoreCase(dbToken)) {
+                    // Two different English words at the same position = no merge possible
+                    return null;
+                }
+                continue;
             }
 
             // Never merge tokens that follow a namespace literal (e.g. /skills/<name>)
             if (i > 0 && MERGE_NAMESPACE_LITERALS.contains(newTokens[i - 1])) {
-                return null;
+                if (!tempToken.equalsIgnoreCase(dbToken)) {
+                    return null;
+                }
+                continue;
+            }
+
+            if (tempToken.equalsIgnoreCase(dbToken)) {
+                continue;
             }
 
             if (NumberUtils.isParsable(tempToken) && NumberUtils.isParsable(dbToken)) {
@@ -1031,9 +1024,7 @@ public class MergingLogic {
                 List<URLTemplate> candidates = index.get(key);
                 if (candidates == null) continue;
                 for (URLTemplate tmpl : candidates) {
-                    URLMethods.Method staticMethod = URLMethods.Method.fromString(method);
-                    if (isSameUrl(tmpl.getMethod(), tmpl.getTemplateString(), staticMethod, endpoint)) continue;
-                    if (matchesTemplate(tmpl, endpoint, staticMethod)) {
+                    if (tmpl.match(endpoint, URLMethods.Method.fromString(method))) {
                         if (!isDemergedUrl(tmpl, apiCollectionId)) {
                             result.deleteStaticUrls.add(staticURL);
                             String tplKey = tmpl.getMethod().name() + " " + tmpl.getTemplateString();
