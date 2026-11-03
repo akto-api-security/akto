@@ -23,6 +23,7 @@ import time
 from typing import Any
 
 import metrics_push
+from constants import is_tripwire
 from providers import FallbackProvider, build_provider_from_config
 
 logger = logging.getLogger(__name__)
@@ -42,18 +43,14 @@ _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 _DEFAULT_ARBITER_BACKUP_TIMEOUT_MS = 5000
 
-_TRIPWIRE = "tripwire"
 _DEFAULT_OBSERVER_TIMEOUT_MS = 500
 
 ScannerEntry = tuple[Any, dict[str, Any]]
 
 
-def _is_tripwire(entry: dict[str, Any]) -> bool:
-    return str(entry.get("provider", "")).strip().lower() == _TRIPWIRE
-
-
 def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
-    return next((m for m in (model_configs or []) if m.get("modelRole") == role), None)
+    # Tripwire only observes, so it never fills a role (e.g. build_arbiter's LLM for /guardrails/llm and reasons).
+    return next((m for m in (model_configs or []) if m.get("modelRole") == role and not is_tripwire(m)), None)
 
 
 def _timeout_s(entry: dict[str, Any], default_ms: int) -> float:
@@ -122,7 +119,7 @@ class ModelMapScanner:
                 continue
             provider = build_provider_from_config(entry)
             if provider is not None:
-                if _is_tripwire(entry):
+                if is_tripwire(entry):
                     observers.append((LLMScanner(provider), entry))
                     continue
                 if entry.get("modelRole") == _ROLE_ARBITER:
@@ -311,7 +308,7 @@ class ModelMapScanner:
 
     def _skips(self, entry: dict[str, Any]) -> bool:
         """A Tripwire entry observes PromptInjection input only."""
-        return _is_tripwire(entry) and not (self.scanner_name == "PromptInjection" and self.scanner_type == "prompt")
+        return is_tripwire(entry) and not (self.scanner_name == "PromptInjection" and self.scanner_type == "prompt")
 
     @staticmethod
     def _error_result(error: str) -> dict[str, Any]:

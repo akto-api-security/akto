@@ -1,6 +1,7 @@
 """Tripwire classifier as an observer: provider, scanner path, gating, and never changing the verdict (no network)."""
 
 import asyncio
+import json
 
 import httpx
 import pytest
@@ -8,6 +9,7 @@ import pytest
 import llm_scanner
 import model_map
 import providers
+import scan_handler
 from llm_scanner import LLMScanner
 from providers import FallbackProvider, TripwireProvider, build_provider_from_config, parse_tripwire_result
 from settings import settings
@@ -198,3 +200,50 @@ async def test_tripwire_only_observes_promptinjection_input(scanner, side):
 async def test_tripwire_observes_every_source(source):
     await _scan(_llm(0.02), _trip(0.01), contextSource=source)
     assert "tripwire" in FakeScanner.calls
+
+
+def test_build_arbiter_never_picks_tripwire():
+    # /guardrails/llm and reason generation use build_arbiter: an old-style Tripwire entry listed first
+    # with the FINAL_ARBITER role must not become that LLM.
+    configs = [
+        {"provider": "tripwire", "modelRole": "FINAL_ARBITER"},
+        {"provider": "gemma", "modelRole": "FINAL_ARBITER"},
+    ]
+    assert model_map.build_arbiter(configs).name == "gemma"
+
+
+DEPLOYMENT = {
+    "modelConfigs": [
+        {"provider": "qwen", "modelRole": "FAST_THREAT_FILTER", "safeDecisionThreshold": 0.9},
+        {"provider": "gemma", "modelRole": "FINAL_ARBITER"},
+        {"provider": "tripwire", "timeoutMs": 500},
+    ]
+}
+POLICY_MODELS = [
+    {"provider": "qwen", "modelRole": "FAST_THREAT_FILTER", "safeDecisionThreshold": 0.9},
+    {"provider": "gemma", "modelRole": "FINAL_ARBITER"},
+]
+
+
+async def _scan_with_policy_models(scanner="PromptInjection"):
+    FakeScanner.script = {"qwen": QWEN_UNSAFE, "gemma": _llm(0.02), "tripwire": _trip(0.99)}
+    payload = {
+        "scanner_name": scanner,
+        "scanner_type": "prompt",
+        "text": "x",
+        "config": {"modelConfigs": POLICY_MODELS},
+    }
+    return await scan_handler.scan_payload(payload, schedule_fn=lambda coro: coro.close())
+
+
+async def test_tripwire_observes_scans_whose_policy_sends_its_own_models(monkeypatch):
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", json.dumps(DEPLOYMENT))
+    r = await _scan_with_policy_models()
+    assert FakeScanner.calls.count("tripwire") == 1
+    assert r["is_valid"] is True and r["details"]["tripwire"]["risk_score"] == 0.99  # recorded, verdict unchanged
+
+
+async def test_no_deployment_tripwire_means_none_is_added(monkeypatch):
+    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
+    await _scan_with_policy_models()
+    assert "tripwire" not in FakeScanner.calls

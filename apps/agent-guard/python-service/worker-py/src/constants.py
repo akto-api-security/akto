@@ -103,6 +103,23 @@ def _is_qwen(entry: dict[str, Any]) -> bool:
     return str(entry.get("provider", "")).lower().startswith("qwen")
 
 
+def is_tripwire(entry: dict[str, Any]) -> bool:
+    return str(entry.get("provider", "")).strip().lower() == "tripwire"
+
+
+def with_deployment_tripwire(model_configs, raw_json: str):
+    """Add the deployment's Tripwire observer to modelConfigs that lack one.
+
+    A guardrail policy can send its own modelConfigs, which replace the deployment's; without this, Tripwire
+    would never observe those scans. It only observes, so the policy's verdict is unchanged.
+    """
+    configs = list(model_configs or [])
+    if any(is_tripwire(m) for m in configs):
+        return configs
+    deployment = _parse_deployment_config(raw_json) or {}
+    return configs + [m for m in deployment.get("modelConfigs", []) if is_tripwire(m)]
+
+
 # Roles a single-model scanner draws its one model from, in preference order.
 _SINGLE_MODEL_ROLE_PREFERENCE = ("FAST_FALLBACK_SAFE_FILTER", "FINAL_ARBITER")
 
