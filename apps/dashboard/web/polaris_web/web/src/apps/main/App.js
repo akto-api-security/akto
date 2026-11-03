@@ -126,6 +126,7 @@ import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetec
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import GuardrailViolations from "../dashboard/pages/guardrails/violations/ViolationsPage";
 import Misconfigurations from "../dashboard/pages/guardrails/Misconfigurations";
+import ResponseRules from "../dashboard/pages/guardrails/response_rules/ResponseRules";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import ThreatProtectedLayout from "../dashboard/pages/threat_detection/ThreatProtectedLayout";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
@@ -413,6 +414,10 @@ const router = createBrowserRouter([
                             {
                                 path: "violations",
                                 element: <GuardrailViolations/>
+                            },
+                            {
+                                path: "response-rules",
+                                element: <ResponseRules/>
                             },
                             {
                                 path: "misconfigurations",

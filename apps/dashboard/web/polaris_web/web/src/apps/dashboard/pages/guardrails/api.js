@@ -188,4 +188,23 @@ export default {
         return resp
     },
 
+    async fetchGuardrailResponseRules({ skip = 0, limit = 20 } = {}) {
+        return await request({ url: '/api/fetchGuardrailResponseRules', method: 'post', data: { skip, limit } })
+    },
+
+    async saveGuardrailResponseRule(payload) {
+        return await request({ url: '/api/saveGuardrailResponseRule', method: 'post', data: payload })
+    },
+
+    async toggleGuardrailResponseRule(ruleId, active) {
+        return await request({ url: '/api/toggleGuardrailResponseRule', method: 'post', data: { ruleId, active } })
+    },
+
+    async deleteGuardrailResponseRules(ruleIds) {
+        return await request({ url: '/api/deleteGuardrailResponseRules', method: 'post', data: { ruleIds } })
+    },
+
+    async fetchResponseRuleDestinations() {
+        return await request({ url: '/api/fetchResponseRuleDestinations', method: 'post', data: {} })
+    }
 }
