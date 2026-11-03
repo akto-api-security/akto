@@ -113,9 +113,13 @@ public abstract class ApiGroupSync {
         return 90 * 60;
     }
 
-    /** On top of that, a run re-checks this much extra, to cover docs that reach the database late. */
+    /**
+     * On top of that, a run re-checks this much extra, to cover docs that reach the database late, for example the
+     * backlog written when the service that consumes the runtime's data was down for a while. Docs that arrive later
+     * than this are not picked up. Re-checking only costs reads: a doc is written only when its tag is wrong.
+     */
     protected int syncBufferSeconds() {
-        return 60 * 60;
+        return 6 * 60 * 60;
     }
 
     /** How far back to start when the group has no last sync time. */
