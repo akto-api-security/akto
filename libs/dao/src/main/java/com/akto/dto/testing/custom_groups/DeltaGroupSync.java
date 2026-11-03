@@ -36,22 +36,14 @@ import com.mongodb.client.model.Updates;
  *   account settings after every finished slice. If a run breaks (error, crash, restart, cap), the next run resumes
  *   from the last finished slice instead of starting over.
  * - Keeps a separate last sync time per group (groupSyncTimes.groupId), so a failing group does not affect the others.
- * - With no last sync time, starts {@value #FIRST_SYNC_LOOKBACK_DAYS} days back.
+ * - With no last sync time, starts a few days back.
  * - Spreads the writes: small synchronous batches, a pause after each, and a cap on changes per run.
+ *
+ * The tuning values below have defaults and can be overridden by a group.
  */
 public abstract class DeltaGroupSync {
 
     private static final Logger logger = LoggerFactory.getLogger(DeltaGroupSync.class);
-
-    // each write is one updateMany per collection with an $or of this many (url, method) pairs, so keep it small
-    private static final int WRITE_BATCH_SIZE = 100;
-    // pause after each write batch, and a cap per run, so a large change set is spread over time instead of spiking the primary
-    private static final long WRITE_PAUSE_MS = 200;
-    private static final int MAX_CHANGES_PER_RUN = 20_000;
-    private static final int SLICE_SECONDS = 60 * 60;
-    private static final int SYNC_BUFFER_SECONDS = 10 * 60;
-    private static final int FIRST_SYNC_LOOKBACK_DAYS = 3;
-    private static final long SLOW_RUN_WARN_MS = 5 * 60 * 1000L;
 
     public static final class Candidate {
         private final ApiInfoKey key;
@@ -78,6 +70,41 @@ public abstract class DeltaGroupSync {
         int changes() {
             return added + removed;
         }
+    }
+
+    /** Each write is one updateMany per collection with an $or of this many (url, method) pairs, so keep it small. */
+    protected int writeBatchSize() {
+        return 100;
+    }
+
+    /** Pause after each write batch, so a large change set is spread over time instead of spiking the primary. */
+    protected long writePauseMs() {
+        return 200;
+    }
+
+    /** Cap on changes in one run; the rest continues next run. */
+    protected int maxChangesPerRun() {
+        return 20_000;
+    }
+
+    /** Length of the time ranges a run goes through in order; the last sync time is saved after each. */
+    protected int sliceSeconds() {
+        return 60 * 60;
+    }
+
+    /** A run re-checks this much before the last sync time, to cover writes that were still in flight. */
+    protected int syncBufferSeconds() {
+        return 10 * 60;
+    }
+
+    /** How far back to start when the group has no last sync time. */
+    protected int firstSyncLookbackDays() {
+        return 3;
+    }
+
+    /** A run longer than this is logged as a warning. */
+    protected long slowRunWarnMs() {
+        return 5 * 60 * 1000L;
     }
 
     protected abstract int groupId();
@@ -108,11 +135,11 @@ public abstract class DeltaGroupSync {
         Integer lastSync = lastRunInfo == null || lastRunInfo.getGroupSyncTimes() == null
                 ? null : lastRunInfo.getGroupSyncTimes().get(String.valueOf(groupId()));
         boolean hasMarker = lastSync != null && lastSync != 0;
-        int since = hasMarker ? Math.max(lastSync - SYNC_BUFFER_SECONDS, 0)
-                : syncStartedAt - FIRST_SYNC_LOOKBACK_DAYS * Constants.ONE_DAY_TIMESTAMP;
+        int since = hasMarker ? Math.max(lastSync - syncBufferSeconds(), 0)
+                : syncStartedAt - firstSyncLookbackDays() * Constants.ONE_DAY_TIMESTAMP;
         if (!hasMarker) {
             logger.warn(String.format("AccountId: %d %s has no last sync time, checking the last %d days (since=%d)",
-                    accountId, groupName(), FIRST_SYNC_LOOKBACK_DAYS, since));
+                    accountId, groupName(), firstSyncLookbackDays(), since));
         }
 
         Result result = new Result();
@@ -121,14 +148,14 @@ public abstract class DeltaGroupSync {
         try {
             sync(result, visitor -> scanUntimed(visitor));
             for (; sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
-                sliceTo = Math.min(sliceFrom + SLICE_SECONDS, syncStartedAt);
+                sliceTo = Math.min(sliceFrom + sliceSeconds(), syncStartedAt);
                 int from = sliceFrom;
                 int to = sliceTo;
                 sync(result, visitor -> scan(from, to, visitor));
-                if (result.changes() >= MAX_CHANGES_PER_RUN) {
+                if (result.changes() >= maxChangesPerRun()) {
                     // this slice may be unfinished, so it is not saved; what is already fixed is skipped next time
                     logger.warn(String.format("AccountId: %d %s sync hit the cap of %d changes in slice [%d, %d): slices done=%d, scanned=%d, added=%d, removed=%d, took=%d ms; the rest continues next run from the last saved slice",
-                            accountId, groupName(), MAX_CHANGES_PER_RUN, sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs));
+                            accountId, groupName(), maxChangesPerRun(), sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs));
                     return;
                 }
                 saveLastSync(sliceTo);
@@ -145,7 +172,7 @@ public abstract class DeltaGroupSync {
                 accountId, groupName(), since,
                 hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback",
                 result.slices, result.scanned, result.added, result.removed, tookMs);
-        if (tookMs > SLOW_RUN_WARN_MS) {
+        if (tookMs > slowRunWarnMs()) {
             logger.warn(message);
         } else {
             logger.info(message);
@@ -165,13 +192,13 @@ public abstract class DeltaGroupSync {
             }
             (candidate.member ? toAdd : toRemove).add(candidate.key);
 
-            if (toAdd.size() >= WRITE_BATCH_SIZE) {
+            if (toAdd.size() >= writeBatchSize()) {
                 result.added += write(toAdd, true);
             }
-            if (toRemove.size() >= WRITE_BATCH_SIZE) {
+            if (toRemove.size() >= writeBatchSize()) {
                 result.removed += write(toRemove, false);
             }
-            return result.changes() < MAX_CHANGES_PER_RUN;
+            return result.changes() < maxChangesPerRun();
         });
 
         result.added += write(toAdd, true);
@@ -200,7 +227,7 @@ public abstract class DeltaGroupSync {
         keys.clear();
 
         try {
-            Thread.sleep(WRITE_PAUSE_MS);
+            Thread.sleep(writePauseMs());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
