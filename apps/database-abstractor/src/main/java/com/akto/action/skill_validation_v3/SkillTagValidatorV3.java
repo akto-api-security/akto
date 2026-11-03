@@ -238,7 +238,8 @@ public class SkillTagValidatorV3 {
 
     /**
      * True when every home path the text names is the agent's own folder or a tool's cache or config
-     * (~/.codex/skills, ~/.cache/wrangler): touching those is not touching the user's files.
+     * (~/.codex/skills, ~/.cache/wrangler): touching those is not touching the user's files. A path
+     * that climbs out with ".." (~/.cache/../Documents) is never one of them.
      */
     static boolean onlyOwnHomeDirs(String text) {
         Matcher m = HOME_PATH.matcher(text);
@@ -246,7 +247,7 @@ public class SkillTagValidatorV3 {
         while (m.find()) {
             found = true;
             String rest = m.group(1);
-            if (rest == null || !OWN_HOME_DIR.matcher(rest).find()) return false;
+            if (rest == null || rest.contains("..") || !OWN_HOME_DIR.matcher(rest).find()) return false;
         }
         return found;
     }

@@ -18,10 +18,12 @@ import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -313,7 +315,8 @@ public class SkillValidationV3Action extends ActionSupport {
         }
         if (skillDescription == null) skillDescription = "";
         if (agentName == null) agentName = "";
-        if (filePath == null) filePath = "";
+        // resolved once, so the model's provenance and the vendor check see where the file really is
+        filePath = normalizePath(filePath);
         if (collectionName == null) collectionName = "";
 
         SkillDocument doc = new SkillDocument(skillContent);
@@ -330,7 +333,7 @@ public class SkillValidationV3Action extends ActionSupport {
                 return Action.ERROR.toUpperCase();
             }
             try {
-                parsed = parseLlmJson(rawContent);
+                parsed = requireAssessment(parseLlmJson(rawContent));
             } catch (Exception e) {
                 logger.error("[SkillValidationV3] failed to parse LLM response for skill=" + skillName
                         + " attempt=" + attempt + ": " + e.getMessage() + "\n" + rawContent);
@@ -535,6 +538,36 @@ public class SkillValidationV3Action extends ActionSupport {
             entries.add(entry);
         }
         return entries;
+    }
+
+    /** The path with "." and ".." segments resolved: ~/.cursor/skills-cursor/../../evil is ~/evil. */
+    static String normalizePath(String filePath) {
+        if (filePath == null || filePath.isEmpty()) return "";
+        String path = filePath.replace('\\', '/');
+        Deque<String> segments = new ArrayDeque<>();
+        for (String segment : path.split("/", -1)) {
+            if (segment.equals(".")) continue;
+            if (segment.equals("..")) {
+                if (!segments.isEmpty() && !segments.peekLast().isEmpty()) segments.pollLast();
+                continue;
+            }
+            segments.addLast(segment);
+        }
+        return String.join("/", segments);
+    }
+
+    /**
+     * The reply as an assessment, or an error when it is not one: an empty or partial reply ({} or one
+     * without the verdict) must not pass for "no tags, not malicious" and replace a skill's findings.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> requireAssessment(Map<String, Object> parsed) {
+        Object malicious = parsed.get("malicious");
+        if (!(parsed.get("tags") instanceof List) || !(malicious instanceof Map)
+                || !(((Map<String, Object>) malicious).get("isMalicious") instanceof Boolean)) {
+            throw new IllegalStateException("incomplete assessment: tags and malicious.isMalicious are required");
+        }
+        return parsed;
     }
 
     static boolean isVendorShipped(String filePath) {
