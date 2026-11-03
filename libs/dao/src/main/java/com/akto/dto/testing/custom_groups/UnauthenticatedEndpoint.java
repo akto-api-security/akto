@@ -10,15 +10,12 @@ import java.util.function.Predicate;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
 
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.MCollection;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
-import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiInfo.AuthType;
-import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.MongoCursor;
@@ -101,7 +98,7 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
         @Override
         protected void scan(int from, int to, Predicate<Candidate> visitor) {
-            List<Integer> collectionIds = new ArrayList<>(fetchAllowedCollectionIds());
+            List<Integer> collectionIds = new ArrayList<>(fetchApiCollectionIds());
             for (int i = 0; i < collectionIds.size(); i += limit) {
                 List<Integer> chunk = collectionIds.subList(i, Math.min(i + limit, collectionIds.size()));
                 Bson filter = Filters.and(
@@ -137,20 +134,6 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     public static void updateCollections(){
         GROUP_SYNC.run();
-    }
-
-    private static Set<Integer> fetchAllowedCollectionIds() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-            Filters.and(
-                UsersCollectionsList.getApiContextFilter(),
-                Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString())
-            ), Projections.include("_id")
-        );
-        Set<Integer> ids = new HashSet<>();
-        for (ApiCollection apiCollection : apiCollections) {
-            ids.add(apiCollection.getId());
-        }
-        return ids;
     }
 
     @Override

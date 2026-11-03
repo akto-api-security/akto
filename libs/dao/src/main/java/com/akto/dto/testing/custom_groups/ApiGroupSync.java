@@ -3,7 +3,9 @@ package com.akto.dto.testing.custom_groups;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -12,11 +14,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.akto.dao.AccountSettingsDao;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
@@ -26,6 +33,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -132,6 +142,15 @@ public abstract class ApiGroupSync {
         return 5 * 60 * 1000L;
     }
 
+    /**
+     * The last sync time never moves past the newest data that is really in the database, so data that is still on its
+     * way (for example while the service that consumes the runtime's data is down) is not skipped. It is not held back
+     * more than this, so an account with no traffic does not keep re-reading a growing window.
+     */
+    protected int maxHoldBackSeconds() {
+        return 48 * 60 * 60;
+    }
+
     protected abstract int groupId();
 
     /** used in log lines */
@@ -183,6 +202,30 @@ public abstract class ApiGroupSync {
         return true;
     }
 
+    /** The api collections whose apis can be in a group: not groups themselves, and not mcp server or gen ai collections. */
+    protected static Set<Integer> fetchApiCollectionIds() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+            Filters.and(
+                UsersCollectionsList.getApiContextFilter(),
+                Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString())
+            ), Projections.include("_id")
+        );
+        Set<Integer> ids = new HashSet<>();
+        for (ApiCollection apiCollection : apiCollections) {
+            ids.add(apiCollection.getId());
+        }
+        return ids;
+    }
+
+    /** The time of the newest traffic that is in the database (api_info lastSeen), 0 when there is none. */
+    private static int newestDataTime() {
+        ApiInfo newest = ApiInfoDao.instance.getMCollection()
+                .find(Filters.in(ApiInfo.ID_API_COLLECTION_ID, fetchApiCollectionIds()))
+                .projection(Projections.include(ApiInfo.LAST_SEEN))
+                .sort(Sorts.descending(ApiInfo.LAST_SEEN)).limit(1).first();
+        return newest == null ? 0 : newest.getLastSeen();
+    }
+
     public final void run() {
         int accountId = Context.accountId.get();
         long startMs = System.currentTimeMillis();
@@ -204,14 +247,23 @@ public abstract class ApiGroupSync {
         Result result = new Result();
         int sliceFrom = since;
         int sliceTo = since;
+        int lastSaved = hasMarker ? lastSync : 0;
+        int dataUpTo = 0;
         try {
+            // the last sync time only goes as far as the data that is really there, but never more than the hold back behind now
+            dataUpTo = Math.min(newestDataTime(), syncStartedAt);
+            int saveCap = Math.max(dataUpTo, syncStartedAt - maxHoldBackSeconds());
             sync(result, visitor -> scanUntimed(visitor));
             for (; sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
                 sliceTo = Math.min(sliceFrom + sliceSeconds(), syncStartedAt);
                 int from = sliceFrom;
                 int to = sliceTo;
                 sync(result, visitor -> scan(from, to, visitor));
-                saveLastSync(sliceTo);
+                int saveTo = Math.min(sliceTo, saveCap);
+                if (saveTo > lastSaved) {
+                    saveLastSync(saveTo);
+                    lastSaved = saveTo;
+                }
                 result.slices++;
             }
         } catch (Exception e) {
@@ -221,10 +273,10 @@ public abstract class ApiGroupSync {
         }
 
         long tookMs = System.currentTimeMillis() - startMs;
-        String message = String.format("AccountId: %d %s synced: since=%d (%s), slices=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms",
+        String message = String.format("AccountId: %d %s synced: since=%d (%s), data up to=%d, saved=%d, slices=%d, scanned=%d, added=%d, removed=%d, write batches=%d, docs modified=%d, took=%d ms",
                 accountId, groupName(), since,
                 hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback",
-                result.slices, result.scanned, result.added, result.removed, result.batches, result.docsModified, tookMs);
+                dataUpTo, lastSaved, result.slices, result.scanned, result.added, result.removed, result.batches, result.docsModified, tookMs);
         if (tookMs > slowRunWarnMs()) {
             logger.warn(message);
         } else {
