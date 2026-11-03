@@ -34,6 +34,7 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.CustomGroupSync;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -167,7 +168,7 @@ public class ApiCollectionUsers {
                 Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
     }
 
-    private static Bson getFilters(List<TestingEndpoints> conditions, CollectionType type){
+    public static Bson getFilters(List<TestingEndpoints> conditions, CollectionType type){
         List<Bson> filters = new ArrayList<>();
         List<Bson> orFilters = new ArrayList<>();
         conditions.forEach((condition) -> {
@@ -294,6 +295,20 @@ public class ApiCollectionUsers {
         addToCollectionsForCollectionId(conditions, apiCollectionId);
         removeFromCollectionsForCollectionId(conditions, apiCollectionId);
         updateApiCollection(conditions, apiCollectionId);
+    }
+
+    /**
+     * The cron version of {@link #computeCollectionsForCollectionId}: instead of recomputing the whole group it only
+     * follows what changed since the group's last sync. Creating or editing a group still computes it in full.
+     */
+    public static void syncCollectionsForCollectionId(ApiCollection collection) {
+        if (UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == collection.getId()) {
+            UnauthenticatedEndpoint.updateCollections();
+        } else if (SensitiveDataEndpoints.API_GROUP_ID == collection.getId()) {
+            SensitiveDataEndpoints.updateCollections();
+        } else {
+            new CustomGroupSync(collection).run();
+        }
     }
 
     private static long updateCollectionsForCollectionId(Map<CollectionType, Bson> filtersMap, Bson update, boolean synchronous) {

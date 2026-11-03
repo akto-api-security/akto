@@ -2570,7 +2570,7 @@ public class InitializerListener implements ServletContextListener {
 
             // one group failing must not stop the others
             try {
-                ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
+                ApiCollectionUsers.syncCollectionsForCollectionId(apiCollection);
             } catch (Exception e) {
                 logger.errorAndAddToDb(e, "Error while updating api group " + apiCollection.getId() + " (" + apiCollection.getName() + "): " + e.getMessage(), LogDb.DASHBOARD);
             }

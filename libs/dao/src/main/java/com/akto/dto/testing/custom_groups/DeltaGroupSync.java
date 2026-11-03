@@ -64,9 +64,9 @@ public abstract class DeltaGroupSync {
     private static final Logger logger = LoggerFactory.getLogger(DeltaGroupSync.class);
 
     public static final class Candidate {
-        private final ApiInfoKey key;
-        private final boolean member;
-        private final boolean inGroup;
+        final ApiInfoKey key;
+        final boolean member;
+        final boolean inGroup;
 
         /**
          * @param member  whether the api should be in the group
