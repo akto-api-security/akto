@@ -100,13 +100,14 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         }
 
         @Override
-        protected void scan(int since, Predicate<Candidate> visitor) {
+        protected void scan(int from, int to, Predicate<Candidate> visitor) {
             List<Integer> collectionIds = new ArrayList<>(fetchAllowedCollectionIds());
             for (int i = 0; i < collectionIds.size(); i += limit) {
                 List<Integer> chunk = collectionIds.subList(i, Math.min(i + limit, collectionIds.size()));
                 Bson filter = Filters.and(
                     Filters.in(ApiInfo.ID_API_COLLECTION_ID, chunk),
-                    Filters.gte(ApiInfo.LAST_SEEN, since)
+                    Filters.gte(ApiInfo.LAST_SEEN, from),
+                    Filters.lt(ApiInfo.LAST_SEEN, to)
                 );
 
                 try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find(filter)

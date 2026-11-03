@@ -59,7 +59,8 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
 
     /**
      * The group holds the apis that have sensitive data in a request or response, or that a user marked sensitive.
-     * Sensitive params are read from single_type_info by timestamp, so only the ones seen since the last sync are looked at.
+     * Sensitive params are read from single_type_info by timestamp, so only the ones seen since the last sync are looked at;
+     * the ones a user marked by hand have no time and are checked on every run.
      * Apis that stop being sensitive are not found this way and keep the tag.
      */
     private static final DeltaGroupSync GROUP_SYNC = new DeltaGroupSync() {
@@ -74,12 +75,7 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
         }
 
         @Override
-        protected void scan(int since, Predicate<Candidate> visitor) {
-            SingleTypeInfo.fetchCustomDataTypes(1000000);
-            Set<String> sensitiveInRequest = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());
-            Set<String> sensitiveInResponse = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames());
-            Set<ApiInfoKey> seen = new HashSet<>();
-
+        protected void scanUntimed(Predicate<Candidate> visitor) {
             // apis a user marked sensitive by hand
             for (SensitiveParamInfo sensitiveParamInfo : SensitiveParamInfoDao.instance.findAll(Filters.eq("sensitive", true))) {
                 Method method = Method.fromString(sensitiveParamInfo.getMethod());
@@ -88,24 +84,32 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
                 }
                 ApiInfoKey key = new ApiInfoKey(sensitiveParamInfo.getApiCollectionId(), sensitiveParamInfo.getUrl(), method);
                 List<Integer> groupIds = sensitiveParamInfo.getCollectionIds();
-                if (!report(key, groupIds != null && groupIds.contains(API_GROUP_ID), seen, visitor)) {
+                if (!visitor.test(new Candidate(key, true, groupIds != null && groupIds.contains(API_GROUP_ID)))) {
                     return;
                 }
             }
+        }
+
+        @Override
+        protected void scan(int from, int to, Predicate<Candidate> visitor) {
+            SingleTypeInfo.fetchCustomDataTypes(1000000);
+            Set<String> sensitiveInRequest = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames());
+            Set<String> sensitiveInResponse = new HashSet<>(SingleTypeInfoDao.instance.sensitiveSubTypeInResponseNames());
+            Bson timeRange = Filters.and(Filters.gte(SingleTypeInfo._TIMESTAMP, from), Filters.lt(SingleTypeInfo._TIMESTAMP, to));
 
             // request params are stored with response code -1
             Bson requestFilter = Filters.and(
                 Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
                 Filters.in(SingleTypeInfo.SUB_TYPE, sensitiveInRequest),
-                Filters.gte(SingleTypeInfo._TIMESTAMP, since));
-            if (!scanSingleTypeInfo(requestFilter, seen, visitor)) {
+                timeRange);
+            if (!scanSingleTypeInfo(requestFilter, visitor)) {
                 return;
             }
             Bson responseFilter = Filters.and(
                 Filters.ne(SingleTypeInfo._RESPONSE_CODE, -1),
                 Filters.in(SingleTypeInfo.SUB_TYPE, sensitiveInResponse),
-                Filters.gte(SingleTypeInfo._TIMESTAMP, since));
-            scanSingleTypeInfo(responseFilter, seen, visitor);
+                timeRange);
+            scanSingleTypeInfo(responseFilter, visitor);
         }
 
         @Override
@@ -121,7 +125,7 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
     }
 
     /** Groups the matching single type infos by api. An api counts as tagged only if all of its matching docs carry the tag. */
-    private static boolean scanSingleTypeInfo(Bson filter, Set<ApiInfoKey> seen, Predicate<DeltaGroupSync.Candidate> visitor) {
+    private static boolean scanSingleTypeInfo(Bson filter, Predicate<DeltaGroupSync.Candidate> visitor) {
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
                 .append(SingleTypeInfo._URL, "$url")
                 .append(SingleTypeInfo._METHOD, "$method");
@@ -141,20 +145,12 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
                     continue;
                 }
                 ApiInfoKey key = new ApiInfoKey(id.getInt(SingleTypeInfo._API_COLLECTION_ID), id.getString(SingleTypeInfo._URL), method);
-                if (!report(key, doc.getBoolean("allTagged"), seen, visitor)) {
+                if (!visitor.test(new DeltaGroupSync.Candidate(key, true, doc.getBoolean("allTagged")))) {
                     return false;
                 }
             }
         }
         return true;
-    }
-
-    /** @return false when the scan should stop */
-    private static boolean report(ApiInfoKey key, boolean inGroup, Set<ApiInfoKey> seen, Predicate<DeltaGroupSync.Candidate> visitor) {
-        if (!seen.add(key)) {
-            return true;
-        }
-        return visitor.test(new DeltaGroupSync.Candidate(key, true, inGroup));
     }
 
     @Override

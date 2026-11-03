@@ -3,6 +3,7 @@ package com.akto.dto.testing.custom_groups;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import org.slf4j.Logger;
@@ -20,12 +21,23 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 /**
- * Keeps an api group in line with its source data without ever resetting it: a group only reports which apis changed
- * since the last sync and whether each should be in the group, and only the apis whose group tag is wrong get written.
+ * Base class for keeping an automated api group in line with its source data without ever resetting it.
  *
- * Every group has its own last sync time in account settings, saved only after all its writes succeeded, so a failing
- * group retries from its own last good point and does not affect the others. With no last sync time the last
- * {@value #FIRST_SYNC_LOOKBACK_DAYS} days are checked.
+ * To support a new group, extend this class and implement:
+ * - {@link #groupId()} and {@link #groupName()},
+ * - {@link #scan} to report the apis that changed in a time range and whether each should be in the group,
+ * - {@link #endpointsFor} to build the condition that matches exactly some apis,
+ * - optionally {@link #scanUntimed} for apis that cannot be found by time,
+ * then call {@link #run()} from the cron.
+ *
+ * What this class does for every group:
+ * - Writes only the apis whose group tag disagrees with the source data, so running it again is harmless.
+ * - Goes through the time since the last sync in order, one slice at a time, and saves the group's last sync time in
+ *   account settings after every finished slice. If a run breaks (error, crash, restart, cap), the next run resumes
+ *   from the last finished slice instead of starting over.
+ * - Keeps a separate last sync time per group (groupSyncTimes.groupId), so a failing group does not affect the others.
+ * - With no last sync time, starts {@value #FIRST_SYNC_LOOKBACK_DAYS} days back.
+ * - Spreads the writes: small synchronous batches, a pause after each, and a cap on changes per run.
  */
 public abstract class DeltaGroupSync {
 
@@ -36,6 +48,7 @@ public abstract class DeltaGroupSync {
     // pause after each write batch, and a cap per run, so a large change set is spread over time instead of spiking the primary
     private static final long WRITE_PAUSE_MS = 200;
     private static final int MAX_CHANGES_PER_RUN = 20_000;
+    private static final int SLICE_SECONDS = 60 * 60;
     private static final int SYNC_BUFFER_SECONDS = 10 * 60;
     private static final int FIRST_SYNC_LOOKBACK_DAYS = 3;
     private static final long SLOW_RUN_WARN_MS = 5 * 60 * 1000L;
@@ -57,6 +70,7 @@ public abstract class DeltaGroupSync {
     }
 
     private static final class Result {
+        int slices;
         int scanned;
         int added;
         int removed;
@@ -71,8 +85,15 @@ public abstract class DeltaGroupSync {
     /** used in log lines */
     protected abstract String groupName();
 
-    /** Reports the apis that may have changed since the given time; stops as soon as the visitor returns false. */
-    protected abstract void scan(int since, Predicate<Candidate> visitor);
+    /**
+     * Reports the apis that changed in [from, to) (epoch seconds, by whatever time field the source data has) and stops
+     * as soon as the visitor returns false.
+     */
+    protected abstract void scan(int from, int to, Predicate<Candidate> visitor);
+
+    /** Reports apis that cannot be found by time, once per run. Nothing by default. */
+    protected void scanUntimed(Predicate<Candidate> visitor) {
+    }
 
     /** The condition matching exactly the given apis, used to add them to or remove them from the group. */
     protected abstract TestingEndpoints endpointsFor(List<ApiInfoKey> keys);
@@ -81,7 +102,6 @@ public abstract class DeltaGroupSync {
         int accountId = Context.accountId.get();
         long startMs = System.currentTimeMillis();
         int syncStartedAt = Context.now();
-        String markerKey = LastCronRunInfo.GROUP_SYNC_TIMES + "." + groupId();
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
         LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
@@ -96,31 +116,35 @@ public abstract class DeltaGroupSync {
         }
 
         Result result = new Result();
+        int sliceFrom = since;
+        int sliceTo = since;
         try {
-            sync(since, result);
+            sync(result, visitor -> scanUntimed(visitor));
+            for (; sliceFrom < syncStartedAt; sliceFrom = sliceTo) {
+                sliceTo = Math.min(sliceFrom + SLICE_SECONDS, syncStartedAt);
+                int from = sliceFrom;
+                int to = sliceTo;
+                sync(result, visitor -> scan(from, to, visitor));
+                if (result.changes() >= MAX_CHANGES_PER_RUN) {
+                    // this slice may be unfinished, so it is not saved; what is already fixed is skipped next time
+                    logger.warn(String.format("AccountId: %d %s sync hit the cap of %d changes in slice [%d, %d): slices done=%d, scanned=%d, added=%d, removed=%d, took=%d ms; the rest continues next run from the last saved slice",
+                            accountId, groupName(), MAX_CHANGES_PER_RUN, sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs));
+                    return;
+                }
+                saveLastSync(sliceTo);
+                result.slices++;
+            }
         } catch (Exception e) {
-            logger.error(String.format("AccountId: %d %s sync failed after scanned=%d, added=%d, removed=%d, took=%d ms, since=%d; last sync time not saved, next run starts from the same point",
-                    accountId, groupName(), result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs, since), e);
+            logger.error(String.format("AccountId: %d %s sync failed in slice [%d, %d) after slices done=%d, scanned=%d, added=%d, removed=%d, took=%d ms, since=%d; the next run resumes from the last saved slice",
+                    accountId, groupName(), sliceFrom, sliceTo, result.slices, result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs, since), e);
             return;
         }
 
         long tookMs = System.currentTimeMillis() - startMs;
-        if (result.changes() >= MAX_CHANGES_PER_RUN) {
-            // marker left as is: what is already fixed is skipped next time, so the next run carries on from here
-            logger.warn(String.format("AccountId: %d %s sync hit the cap of %d changes: scanned=%d, added=%d, removed=%d, took=%d ms, since=%d; last sync time not saved, the rest continues next run",
-                    accountId, groupName(), MAX_CHANGES_PER_RUN, result.scanned, result.added, result.removed, tookMs, since));
-            return;
-        }
-
-        AccountSettingsDao.instance.getMCollection().updateOne(
-            AccountSettingsDao.generateFilter(),
-            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + markerKey, syncStartedAt),
-            new UpdateOptions().upsert(true));
-
-        String message = String.format("AccountId: %d %s synced: since=%d (%s), scanned=%d, added=%d, removed=%d, took=%d ms",
+        String message = String.format("AccountId: %d %s synced: since=%d (%s), slices=%d, scanned=%d, added=%d, removed=%d, took=%d ms",
                 accountId, groupName(), since,
                 hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback",
-                result.scanned, result.added, result.removed, tookMs);
+                result.slices, result.scanned, result.added, result.removed, tookMs);
         if (tookMs > SLOW_RUN_WARN_MS) {
             logger.warn(message);
         } else {
@@ -128,11 +152,12 @@ public abstract class DeltaGroupSync {
         }
     }
 
-    private void sync(int since, Result result) {
+    /** Feeds the candidates of one scan through the compare and write logic, and writes what is left at the end. */
+    private void sync(Result result, Consumer<Predicate<Candidate>> scanner) {
         List<ApiInfoKey> toAdd = new ArrayList<>();
         List<ApiInfoKey> toRemove = new ArrayList<>();
 
-        scan(since, candidate -> {
+        scanner.accept(candidate -> {
             result.scanned++;
             // write only when the group tag disagrees with the source data
             if (candidate.member == candidate.inGroup) {
@@ -151,6 +176,13 @@ public abstract class DeltaGroupSync {
 
         result.added += write(toAdd, true);
         result.removed += write(toRemove, false);
+    }
+
+    private void saveLastSync(int time) {
+        AccountSettingsDao.instance.getMCollection().updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.GROUP_SYNC_TIMES + "." + groupId(), time),
+            new UpdateOptions().upsert(true));
     }
 
     /** Writes the given apis on the calling thread (so failures reach run()), then empties the list. @return how many were written */
