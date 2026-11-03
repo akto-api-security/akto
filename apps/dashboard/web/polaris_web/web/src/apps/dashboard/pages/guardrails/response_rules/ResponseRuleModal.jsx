@@ -5,7 +5,6 @@ import {
 import { DeleteMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
-import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
 import api from "../api";
 import {
     ACTION_TYPES, ALERT_CHANNELS, CONDITION_FIELDS, CONDITION_KIND, DESTINATION_PAGES, DUE_OPTIONS, IGNORE_EXPIRY_OPTIONS, IGNORE_REASONS,
@@ -14,13 +13,31 @@ import {
 import transform, { defaultAction } from "./transform";
 
 function DropdownField({ label, options, value, onChange }) {
+    const [open, setOpen] = useState(false);
     const current = options.find((option) => option.value === value)?.label || "Select";
     return (
         <VerticalStack gap="1">
             {label && <Text as="span" variant="bodyMd">{label}</Text>}
-            <Box width="max-content">
-                <OperatorDropdown label={current} items={options} selected={onChange} designer />
-            </Box>
+            <Popover
+                fullWidth
+                preferredAlignment="left"
+                preferredPosition="below"
+                active={open}
+                onClose={() => setOpen(false)}
+                activator={<Button fullWidth disclosure textAlign="left" onClick={() => setOpen((currentOpen) => !currentOpen)}>{current}</Button>}
+            >
+                <ActionList
+                    actionRole="menuitem"
+                    items={options.map((option) => ({
+                        content: option.label,
+                        active: option.value === value,
+                        onAction: () => {
+                            onChange(option.value);
+                            setOpen(false);
+                        },
+                    }))}
+                />
+            </Popover>
         </VerticalStack>
     );
 }
@@ -55,7 +72,9 @@ function ConditionRow({ condition, usedFields, policyOptions, onChange, onRemove
         <Card padding="3">
             <VerticalStack gap="3">
                 <HorizontalStack align="space-between" blockAlign="end" wrap={false} gap="2">
-                    <DropdownField options={fieldOptions} value={condition.field} onChange={(field) => onChange({ field, values: [] })} />
+                    <Box width="100%">
+                        <DropdownField options={fieldOptions} value={condition.field} onChange={(field) => onChange({ field, values: [] })} />
+                    </Box>
                     {removable && <Button icon={DeleteMinor} plain accessibilityLabel="Remove condition" onClick={onRemove} />}
                 </HorizontalStack>
                 <ConditionValue definition={definition} values={condition.values} policyOptions={policyOptions} onChange={(values) => onChange({ ...condition, values })} />
@@ -180,6 +199,8 @@ function AddActionButton({ actions, onAdd }) {
     if (remaining.length === 0) return null;
     return (
         <Popover
+            preferredAlignment="left"
+            preferredPosition="mostSpace"
             active={open}
             onClose={() => setOpen(false)}
             activator={<Button disclosure onClick={() => setOpen((current) => !current)}>Add action</Button>}
