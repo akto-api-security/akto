@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Button, HorizontalStack, Tabs, Tag, Text } from "@shopify/polaris";
+import { Box, Button, ChoiceList, HorizontalStack, Popover, Tabs, Tag, Text } from "@shopify/polaris";
 import func from "@/util/func";
 import AgGridTable from "../../../../components/tables/AgGridTable";
 import Pressable from "../../../dashboard/ask/components/Pressable";
@@ -9,7 +9,7 @@ import {
     LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, PEOPLE_TABLE_HEIGHT, RISK_MAX, SEARCH_HINTS,
+    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, PEOPLE_TABLE_HEIGHT, RISK_MAX, SEARCH_HINTS,
 } from "./peopleConstants";
 import transform from "./transform";
 
@@ -64,6 +64,7 @@ function toggleChip(chipKey, filters, onFiltersChange) {
 
 function appliedTags(filters) {
     const tags = [];
+    filters.teams.forEach((team) => tags.push({ key: `team-${team}`, label: `Team: ${team}`, clear: { teams: filters.teams.filter((x) => x !== team) } }));
     filters.osList.forEach((os) => tags.push({ key: `os-${os}`, label: OS_LABELS[os] || os, clear: { osList: filters.osList.filter((x) => x !== os) } }));
     filters.categories.forEach((category) => tags.push({ key: `cat-${category}`, label: CATEGORY_LABELS[category] || category, clear: { categories: filters.categories.filter((x) => x !== category) } }));
     if (!isMonitorOnly(filters)) {
@@ -100,11 +101,35 @@ function FilterChip({ label, active, onClick }) {
     );
 }
 
-function FilterRow({ tab, filters, onFiltersChange }) {
+function ListFilter({ field, options, selected, onChange }) {
+    const [open, setOpen] = useState(false);
+    const label = FILTER_LABELS[field];
+    return (
+        <Popover
+            active={open}
+            onClose={() => setOpen(false)}
+            activator={<Button disclosure onClick={() => setOpen((current) => !current)}>{selected.length ? `${label} (${selected.length})` : label}</Button>}
+        >
+            <Box padding="3">
+                <ChoiceList allowMultiple title={label} titleHidden choices={options} selected={selected} onChange={(values) => onChange({ [field]: values })} />
+            </Box>
+        </Popover>
+    );
+}
+
+function filterOptions(field, teamOptions) {
+    if (field === "teams") return teamOptions.map((team) => ({ label: team, value: team }));
+    return Object.entries(FILTER_OPTION_LABELS[field]).map(([value, label]) => ({ label, value }));
+}
+
+function FilterRow({ tab, filters, onFiltersChange, teamOptions }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
     const tags = appliedTags(filters);
     return (
         <HorizontalStack gap="2" blockAlign="center">
+            {LIST_FILTERS[tab].map((field) => (
+                <ListFilter key={field} field={field} options={filterOptions(field, teamOptions)} selected={filters[field]} onChange={onFiltersChange} />
+            ))}
             {chips.map((chip) => (
                 <FilterChip key={chip.key} label={chip.label} active={isChipActive(chip.key, filters)}
                     onClick={() => toggleChip(chip.key, filters, onFiltersChange)} />
@@ -115,7 +140,7 @@ function FilterRow({ tab, filters, onFiltersChange }) {
     );
 }
 
-function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen, selected }) {
+function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen, selected, teamOptions }) {
     const isEmployees = tab === "employees";
     const gridRef = useRef(null);
     const [rows, setRows] = useState([]);
@@ -172,7 +197,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 searchValue={search}
                 onSearchChange={onSearchChange}
                 searchPlaceholder={SEARCH_HINTS[tab]}
-                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} />}
+                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} teamOptions={teamOptions} />}
                 height={PEOPLE_TABLE_HEIGHT}
                 domLayout="normal"
                 rowHeight={ROW_HEIGHT}

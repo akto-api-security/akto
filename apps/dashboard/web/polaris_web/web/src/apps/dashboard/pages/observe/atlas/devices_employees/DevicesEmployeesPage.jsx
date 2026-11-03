@@ -174,6 +174,7 @@ function DevicesEmployeesPage() {
                     riskAvailable={overview?.riskAvailable}
                     onOpen={openPerson}
                     selected={openTarget}
+                    teamOptions={overview?.teamOptions || []}
                 />,
                 <PeopleFlyout
                     key="people-flyout"

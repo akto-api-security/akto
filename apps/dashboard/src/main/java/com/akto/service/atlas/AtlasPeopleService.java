@@ -54,6 +54,7 @@ public class AtlasPeopleService {
     public static final String CAT_MCP = "mcp";
     public static final String CAT_BROWSER = "browser";
     public static final String CAT_PLUGIN = "plugin";
+    public static final String CAT_SKILL = "skill";
     public static final int MAX_SKILLS_PER_TOOL = 1000;
     public static final List<String> CATEGORIES = Arrays.asList(CAT_AGENTS, CAT_IDE, CAT_MCP, CAT_BROWSER);
 
@@ -101,12 +102,14 @@ public class AtlasPeopleService {
         public boolean personal;
         public double riskScore;
         public String plugin;
+        public boolean orphan;
         public int skillCount;
         public List<String> skills = new ArrayList<>();
 
         public Map<String, Object> toMap() {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("plugin", plugin);
+            row.put("orphan", orphan);
             row.put("skillCount", skillCount);
             row.put("skills", skills);
             row.put("collectionId", collectionId);
@@ -229,6 +232,7 @@ public class AtlasPeopleService {
         public List<String> categories;
         public List<String> healthStates;
         public List<String> guardrailModes;
+        public List<String> teams;
         public boolean hasUnapproved;
         public boolean usesPersonal;
         public boolean agentIssues;
@@ -345,6 +349,7 @@ public class AtlasPeopleService {
             tool.approved = isSanctioned(c, bundle.allowlistNamesLower, remarksByServiceName);
             tool.personal = InsightUtil.isPersonalAccount(c);
             tool.plugin = AgenticObserveUtil.getPluginName(c);
+            tool.orphan = c.getHostName().contains(AgenticObserveUtil.NOT_ATTACHED_VALUE);
             Set<String> skills = skillNamesOf(c);
             if (!skills.isEmpty()) {
                 device.skillNames.addAll(skills);
@@ -355,6 +360,10 @@ public class AtlasPeopleService {
             device.tools.add(tool);
             if (tool.plugin != null) {
                 tool.category = CAT_PLUGIN;
+                continue;
+            }
+            if (tool.orphan) {
+                tool.category = CAT_SKILL;
                 continue;
             }
             device.toolsByCategory.merge(tool.category, 1, Integer::sum);
@@ -591,6 +600,9 @@ public class AtlasPeopleService {
         List<Integer> histogramList = new ArrayList<>();
         for (int count : histogram) histogramList.add(count);
 
+        Set<String> teamOptions = new java.util.TreeSet<>();
+        for (EmployeeRow employee : snapshot.employees) teamOptions.addAll(employee.teams);
+        overview.put("teamOptions", new ArrayList<>(teamOptions));
         overview.put("deviceCount", snapshot.devices.size());
         overview.put("employeeCount", snapshot.employees.size());
         overview.put("agentHealth", health);
@@ -632,6 +644,7 @@ public class AtlasPeopleService {
             if (!deviceMatchesAllTerms(device, terms)) continue;
             if (query.agentIssues && HEALTH_HEALTHY.equals(device.health)) continue;
             if (query.hasUnapproved && device.unapprovedTools == 0) continue;
+            if (query.usesPersonal && device.personalAccounts == 0) continue;
             matching.add(device);
         }
         matching.sort(deviceComparator(query));
@@ -650,6 +663,7 @@ public class AtlasPeopleService {
             List<DeviceRow> devices = devicesOf(snapshot, employee);
             if (deviceFiltered && devices.stream().noneMatch(device -> matchesDeviceFilters(device, query))) continue;
             if (!employeeMatchesAllTerms(employee, devices, terms)) continue;
+            if (notEmpty(query.teams) && employee.teams.stream().noneMatch(query.teams::contains)) continue;
             if (query.hasUnapproved && employee.unapprovedTools == 0) continue;
             if (query.usesPersonal && employee.personalAccounts == 0) continue;
             if (employee.riskScore < query.riskMin) continue;

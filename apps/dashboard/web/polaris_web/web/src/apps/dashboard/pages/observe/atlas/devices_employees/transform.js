@@ -1,9 +1,8 @@
 import { Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
-import Pressable from "../../../dashboard/ask/components/Pressable";
 import {
-    CATEGORY_LABELS, FLYOUT_GRAPH_LIMIT, HEALTH_LABELS, MODE_LABELS, OS_LABELS, STAT_CARDS, STAT_EMPTY_VALUE,
+    CATEGORY_LABELS, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, MODE_LABELS, OS_LABELS, STAT_CARDS, STAT_EMPTY_VALUE,
 } from "./peopleConstants";
 
 const ALL_CATEGORIES = ["agents", "ide", "mcp", "browser"];
@@ -64,26 +63,24 @@ function statSubtexts(deviceStats) {
     };
 }
 
-function statValue(value, subtext, onClick, label) {
+function statValue(value, subtext) {
     return (
-        <Pressable onClick={onClick} accessibilityLabel={label} hoverBackground="bg-subdued" borderRadius="2">
-            <VerticalStack gap="1">
-                <Text as="p" variant="heading2xl">{formatCount(value)}</Text>
-                {subtext && <Text as="p" variant="bodySm" color={subtext.color || "subdued"}>{subtext.text}</Text>}
-            </VerticalStack>
-        </Pressable>
+        <VerticalStack gap="1">
+            <Text as="p" variant="heading2xl">{formatCount(value)}</Text>
+            {subtext && <Text as="p" variant="bodySm" color={subtext.color || "subdued"}>{subtext.text}</Text>}
+        </VerticalStack>
     );
 }
 
-function capped(items) {
-    if (items.length <= FLYOUT_GRAPH_LIMIT) return { shown: items, hidden: 0, rest: [] };
-    const shown = items.slice(0, FLYOUT_GRAPH_LIMIT - 1);
-    return { shown, hidden: items.length - shown.length, rest: items.slice(shown.length) };
+function capped(items, limit) {
+    if (items.length <= limit) return { shown: items, hidden: 0 };
+    const shown = items.slice(0, limit - 1);
+    return { shown, hidden: items.length - shown.length };
 }
 
 function balanced(groups, limit) {
     const total = groups.reduce((sum, group) => sum + group.length, 0);
-    if (total <= limit) return { shown: groups.flat(), hidden: 0, rest: [] };
+    if (total <= limit) return { shown: groups.flat(), hidden: 0 };
     const taken = groups.map(() => 0);
     let room = limit - 1;
     while (room > 0) {
@@ -98,18 +95,17 @@ function balanced(groups, limit) {
         if (!progressed) break;
     }
     const shown = groups.flatMap((group, index) => group.slice(0, taken[index]));
-    const rest = groups.flatMap((group, index) => group.slice(taken[index]));
-    return { shown, hidden: rest.length, rest };
+    return { shown, hidden: total - shown.length };
 }
 
-const MORE_TITLES = { "device-more": "More devices", "tool-more": "More AI tools", "mcp-more": "More MCP servers, plugins and skills" };
+const defaultFootprintView = () => ({ devices: FLYOUT_GRAPH_LIMIT, agents: FLYOUT_GRAPH_LIMIT, mcps: FLYOUT_GRAPH_LIMIT, skills: {} });
 
 function toolStatus(tool) {
     return !tool.approved || tool.personal ? "bad" : "ok";
 }
 
 function toolSub(tool) {
-    if (tool.plugin) return "Plugin";
+    if (tool.plugin) return tool.skills?.length ? `Plugin · ${plural(tool.skillCount, "skill")}` : "Plugin";
     const category = CATEGORY_LABELS[tool.category] || tool.category;
     if (tool.category === "mcp") return tool.approved ? "Approved" : "Unapproved";
     return tool.personal ? `${category} · Personal account` : category;
@@ -121,9 +117,15 @@ function clientMatches(client, agentName) {
     return !!left && !!right && (left.startsWith(right) || right.startsWith(left));
 }
 
-function footprintModel(root, devices, heads) {
+function moreNode(id, category, count, noun) {
+    return { id, category, label: `+${count} more ${noun}`, sub: "Select to show more", status: "neutral" };
+}
+
+function footprintModel(root, devices, heads, view) {
     const withDevices = !!root.devicesColumn;
     const edges = [];
+    const actions = {};
+    const skillSources = {};
     const deviceNodes = [];
     const agentNodes = [];
     const mcpNodes = [];
@@ -131,15 +133,15 @@ function footprintModel(root, devices, heads) {
     const skillNodes = [];
     const link = (source, target, status) => edges.push({ source, target, risky: status === "bad" });
 
-    const { shown: shownDevices, hidden: hiddenDevices, rest: restDevices } = capped(devices);
-    shownDevices.forEach((device, deviceIndex) => {
+    const visibleDevices = capped(devices, view.devices);
+    visibleDevices.shown.forEach((device, deviceIndex) => {
         const deviceId = withDevices ? `device-${deviceIndex}` : "root";
         if (withDevices) {
             deviceNodes.push({ id: deviceId, category: "external", label: device.name, sub: `${OS_LABELS[device.os] || device.os} · ${HEALTH_LABELS[device.health] || device.health}`, status: device.health === "healthy" ? "neutral" : "review" });
             link("root", deviceId, "ok");
         }
         const tools = device.tools || [];
-        const agents = tools.filter((tool) => tool.category !== "mcp" && !tool.plugin);
+        const agents = tools.filter((tool) => tool.category !== "mcp" && !tool.plugin && !tool.orphan);
         const parentOf = (tool) => {
             const parentTool = agents.find((agent) => clientMatches(tool.client, agent.name));
             return parentTool ? `tool-${parentTool.collectionId}` : deviceId;
@@ -151,24 +153,55 @@ function footprintModel(root, devices, heads) {
             mcpNodes.push({ id: `tool-${tool.collectionId}`, category: "mcp", label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: parentOf(tool) });
         });
         tools.filter((tool) => tool.plugin).forEach((tool) => {
-            pluginNodes.push({ id: `plugin-${tool.collectionId}`, category: "plugin", label: tool.plugin, sub: toolSub(tool), status: "neutral", parent: parentOf(tool) });
+            const id = `plugin-${tool.collectionId}`;
+            if (tool.skills?.length) skillSources[id] = tool;
+            pluginNodes.push({ id, category: "plugin", label: tool.plugin, sub: toolSub(tool), status: "neutral", parent: parentOf(tool) });
         });
-        agents.filter((tool) => tool.skillCount > 0).forEach((tool) => {
-            skillNodes.push({ id: `skills-${tool.collectionId}`, category: "skill", label: plural(tool.skillCount, "skill"), sub: "Skills · select to list", status: "neutral", parent: `tool-${tool.collectionId}` });
+        const skillOwners = agents.filter((tool) => tool.skillCount > 0).map((tool) => ({ tool, sub: "Skills", parent: `tool-${tool.collectionId}` }))
+            .concat(tools.filter((tool) => tool.orphan && tool.skillCount > 0).map((tool) => ({ tool, sub: "Not attached to an agent", parent: deviceId })));
+        skillOwners.forEach(({ tool, sub, parent }) => {
+            const id = `skills-${tool.collectionId}`;
+            const expandable = !!tool.skills?.length;
+            if (expandable) skillSources[id] = tool;
+            const hint = expandable ? `${sub} · select to ${view.skills[id] === undefined ? "expand" : "collapse"}` : sub;
+            skillNodes.push({ id, category: "skill", label: plural(tool.skillCount, "skill"), sub: hint, status: "neutral", parent });
         });
     });
-    if (hiddenDevices > 0) deviceNodes.push({ id: "device-more", category: "external", label: `+${hiddenDevices} more devices`, sub: "", status: "neutral" });
-
-    const hiddenItems = {};
-    if (hiddenDevices > 0) {
-        hiddenItems["device-more"] = restDevices.map((device) => ({ label: device.name, sub: `${OS_LABELS[device.os] || device.os} · ${HEALTH_LABELS[device.health] || device.health}` }));
+    if (visibleDevices.hidden > 0) {
+        deviceNodes.push(moreNode("device-more", "external", visibleDevices.hidden, "devices"));
+        actions["device-more"] = { type: "more", key: "devices" };
     }
-    const visibleAgents = capped(agentNodes);
-    const visibleMcps = balanced([mcpNodes, pluginNodes, skillNodes], FLYOUT_GRAPH_LIMIT);
-    if (visibleAgents.hidden > 0) hiddenItems["tool-more"] = visibleAgents.rest.map((node) => ({ label: node.label, sub: node.sub }));
-    if (visibleMcps.hidden > 0) hiddenItems["mcp-more"] = visibleMcps.rest.map((node) => ({ label: node.label, sub: node.sub }));
-    if (visibleAgents.hidden > 0) visibleAgents.shown.push({ id: "tool-more", category: "agent", label: `+${visibleAgents.hidden} more AI tools`, sub: "", status: "neutral" });
-    if (visibleMcps.hidden > 0) visibleMcps.shown.push({ id: "mcp-more", category: "mcp", label: `+${visibleMcps.hidden} more MCP servers`, sub: "", status: "neutral" });
+
+    const visibleAgents = capped(agentNodes, view.agents);
+    const visibleMcps = balanced([mcpNodes, pluginNodes, skillNodes], view.mcps);
+    if (visibleAgents.hidden > 0) {
+        visibleAgents.shown.push(moreNode("tool-more", "agent", visibleAgents.hidden, "AI tools"));
+        actions["tool-more"] = { type: "more", key: "agents" };
+    }
+    if (visibleMcps.hidden > 0) {
+        visibleMcps.shown.push(moreNode("mcp-more", "mcp", visibleMcps.hidden, "MCP servers, plugins and skills"));
+        actions["mcp-more"] = { type: "more", key: "mcps" };
+    }
+
+    const skillChildren = [];
+    visibleMcps.shown.forEach((node) => {
+        const tool = skillSources[node.id];
+        if (!tool) return;
+        actions[node.id] = { type: "skills-toggle", id: node.id };
+        const limit = view.skills[node.id];
+        if (limit === undefined) return;
+        tool.skills.slice(0, limit).forEach((name, index) => {
+            const child = { id: `skill-${node.id}-${index}`, category: "skill", label: name, sub: "Skill", status: "neutral", parent: node.id };
+            skillChildren.push(child);
+            link(node.id, child.id, "neutral");
+        });
+        if (tool.skills.length > limit) {
+            const more = moreNode(`skillmore-${node.id}`, "skill", tool.skills.length - limit, "skills");
+            skillChildren.push(more);
+            actions[more.id] = { type: "skills-more", id: node.id };
+            link(node.id, more.id, "neutral");
+        }
+    });
 
     const statusById = new Map([["root", "root"]]);
     const columns = [[{ id: "root", category: "external", label: root.label, sub: root.sub, status: "root" }]];
@@ -180,7 +213,12 @@ function footprintModel(root, devices, heads) {
         const parent = statusById.has(node.parent) ? node.parent : statusById.has("tool-more") && node.category !== "agent" ? "tool-more" : null;
         if (parent) link(parent, node.id, node.status);
     });
-    return { heads, columns, edges, hiddenItems };
+    const columnHeads = [...heads];
+    if (skillChildren.length) {
+        columns.push(skillChildren);
+        columnHeads.push("Skills");
+    }
+    return { heads: columnHeads, columns, edges, actions };
 }
 
 function connectedIds(edges, start) {
@@ -248,7 +286,8 @@ const transform = {
         return STAT_CARDS.map((card) => ({
             title: card.label,
             isComp: true,
-            data: statValue(deviceStats?.[card.id], subtexts[card.id], () => onSelect(card.id), card.label),
+            data: statValue(deviceStats?.[card.id], subtexts[card.id]),
+            onClick: () => onSelect(card.id),
         }));
     },
     cardBody: (status, body) => {
@@ -256,31 +295,26 @@ const transform = {
         if (status === "error") return <Text as="p" color="subdued">This card could not be loaded. The other cards are unaffected.</Text>;
         return body;
     },
-    footprintGraph: (kind, detail) => (kind === "device"
-        ? footprintModel({ label: detail.name, sub: OS_LABELS[detail.os] || detail.os }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"])
-        : footprintModel({ label: detail.username, sub: (detail.teams || []).join(", ") || "Employee", devicesColumn: true }, detail.deviceDetails || [], ["Employee", "Devices", "AI tools", "MCP servers, plugins and skills"])),
+    defaultFootprintView,
+    isDefaultFootprintView: (view) => JSON.stringify(view) === JSON.stringify(defaultFootprintView()),
+    nextFootprintView: (view, action) => {
+        if (action.type === "more") return { ...view, [action.key]: view[action.key] + FLYOUT_GRAPH_STEP };
+        const skills = { ...view.skills };
+        if (action.type === "skills-more") skills[action.id] += FLYOUT_GRAPH_STEP;
+        else if (skills[action.id] === undefined) skills[action.id] = FLYOUT_GRAPH_STEP;
+        else delete skills[action.id];
+        return { ...view, skills };
+    },
+    footprintGraph: (kind, detail, view) => (kind === "device"
+        ? footprintModel({ label: detail.name, sub: OS_LABELS[detail.os] || detail.os }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"], view)
+        : footprintModel({ label: detail.username, sub: (detail.teams || []).join(", ") || "Employee", devicesColumn: true }, detail.deviceDetails || [], ["Employee", "Devices", "AI tools", "MCP servers, plugins and skills"], view)),
     employeeAiToolCount: (employee) => (employee.deviceDetails || []).reduce(
         (total, device) => total + device.toolCount - (device.toolsByCategory?.mcp || 0), 0),
     pluginCount: (tools) => tools.filter((tool) => tool.plugin).length,
-    allTools: (kind, detail) => (kind === "device"
-        ? detail.tools || []
-        : (detail.deviceDetails || []).flatMap((device) => device.tools || [])),
-    nodeList: (model, kind, detail, nodeId) => {
-        const hidden = model.hiddenItems?.[nodeId];
-        if (hidden) return { title: `${MORE_TITLES[nodeId]} (${hidden.length})`, items: hidden };
-        const match = /^(skills|plugin)-(\d+)$/.exec(nodeId || "");
-        if (!match) return null;
-        const tool = transform.allTools(kind, detail).find((row) => String(row.collectionId) === match[2]);
-        if (!tool || !tool.skillCount) return null;
-        return {
-            title: `Skills in ${match[1] === "plugin" ? `plugin ${tool.plugin}` : tool.name} (${tool.skillCount})`,
-            items: (tool.skills || []).map((skill) => ({ label: skill })),
-            empty: "The server did not return skill names for this item.",
-        };
-    },
     peopleParams: (deviceScope, filters, searchString) => ({
         deviceScope,
         atlasQuery: searchString,
+        teams: filters.teams,
         atlasOs: filters.osList,
         toolCategories: filters.categories,
         healthStates: filters.healthStates,

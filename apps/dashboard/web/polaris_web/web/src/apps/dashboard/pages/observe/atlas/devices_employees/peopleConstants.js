@@ -92,6 +92,7 @@ export const DEVICE_CHIPS = [
     { key: "agentIssues", label: "Agent issues" },
     { key: "monitorMode", label: "Monitor mode" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
+    { key: "usesPersonal", label: "Uses personal AI accounts" },
 ];
 
 export const SEARCH_HINTS = {
@@ -100,6 +101,7 @@ export const SEARCH_HINTS = {
 };
 
 export const FLYOUT_GRAPH_LIMIT = 8;
+export const FLYOUT_GRAPH_STEP = 16;
 
 export const FOOTPRINT_LEGEND = [
     { color: "#D72C0D", label: "Unapproved or personal account" },
@@ -113,7 +115,28 @@ export const MIN_SEARCH_LENGTH = 3;
 export const EXPORT_PAGE_SIZE = 500;
 export const EXPORT_ROW_LIMIT = 10000;
 
+export const FILTER_LABELS = {
+    teams: "Team",
+    osList: "OS",
+    healthStates: "Agent",
+    guardrailModes: "Guardrail mode",
+    categories: "Tool type",
+};
+
+export const LIST_FILTERS = {
+    employees: ["teams", "osList", "categories"],
+    devices: ["osList", "healthStates", "guardrailModes", "categories"],
+};
+
+export const FILTER_OPTION_LABELS = {
+    osList: { macos: OS_LABELS.macos, windows: OS_LABELS.windows, linux: OS_LABELS.linux },
+    healthStates: HEALTH_LABELS,
+    guardrailModes: MODE_LABELS,
+    categories: CATEGORY_LABELS,
+};
+
 export const EMPTY_PEOPLE_FILTERS = {
+    teams: [],
     osList: [],
     categories: [],
     healthStates: [],

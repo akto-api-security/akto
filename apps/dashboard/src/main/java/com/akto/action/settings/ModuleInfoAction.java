@@ -111,6 +111,7 @@ public class ModuleInfoAction extends UserAction {
     @Setter private List<String> guardrailModes;
     @Setter private double riskMin;
     @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
+    @Setter private List<String> teams;
     @Getter private Map<String, Object> atlasOverview;
     @Getter private List<Map<String, Object>> atlasRows;
     @Getter private long atlasTotal;
@@ -445,6 +446,7 @@ public class ModuleInfoAction extends UserAction {
         query.usesPersonal = usesPersonal;
         query.agentIssues = agentIssues;
         query.guardrailModes = guardrailModes;
+        query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(java.util.stream.Collectors.toList());
         query.riskMin = riskMin;
         query.riskMax = riskMax;
         query.sortKey = sortKey;

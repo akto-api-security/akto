@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Box, Button, HorizontalStack, Modal, Scrollable, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
@@ -18,7 +18,6 @@ import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHO
 import transform from "./transform";
 
 const FLYOUT_WIDTH = 760;
-const NODE_LIST_LIMIT = 100;
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 const viewViolations = (username) => () => openViolationInGuardrailViolations({ actor: username });
@@ -129,56 +128,33 @@ function EmployeeActions({ employee }) {
     );
 }
 
-function NodeList({ source }) {
-    const [query, setQuery] = useState("");
-    const matching = useMemo(() => {
-        const term = query.trim().toLowerCase();
-        return term ? source.items.filter((item) => item.label.toLowerCase().includes(term)) : source.items;
-    }, [source, query]);
-    const shown = matching.slice(0, NODE_LIST_LIMIT);
-    return (
-        <Modal.Section>
-            <VerticalStack gap="2">
-                <TextField label="Filter list" labelHidden autoComplete="off" placeholder="Filter" value={query} onChange={setQuery} clearButton onClearButtonClick={() => setQuery("")} />
-                <Scrollable shadow style={{ height: "320px" }}>
-                    <VerticalStack gap="1">
-                        {shown.map((item, index) => (
-                            <HorizontalStack key={`${item.label}-${index}`} gap="2" blockAlign="center" wrap={false}>
-                                <Text as="span" variant="bodySm">{item.label}</Text>
-                                {item.sub && <Text as="span" variant="bodySm" color="subdued">{item.sub}</Text>}
-                            </HorizontalStack>
-                        ))}
-                        {shown.length === 0 && <Text as="p" variant="bodySm" color="subdued">{source.items.length === 0 && source.empty ? source.empty : "Nothing matches."}</Text>}
-                    </VerticalStack>
-                </Scrollable>
-                {matching.length > shown.length && (
-                    <Text as="p" variant="bodySm" color="subdued">{`Showing ${shown.length} of ${matching.length}. Filter to narrow the list.`}</Text>
-                )}
-            </VerticalStack>
-        </Modal.Section>
-    );
-}
-
 function Footprint({ kind, detail }) {
     const [highlight, setHighlight] = useState(null);
-    const [listNode, setListNode] = useState(null);
-    const model = useMemo(() => transform.footprintGraph(kind, detail), [kind, detail]);
+    const [view, setView] = useState(transform.defaultFootprintView);
+    const model = useMemo(() => transform.footprintGraph(kind, detail, view), [kind, detail, view]);
     const graph = useMemo(() => transform.footprintLayout(model, highlight), [model, highlight]);
     const onNodeClick = useCallback((event, node) => {
         if (node.type !== "topoNode") return;
+        const action = model.actions[node.id];
+        if (action) setView((current) => transform.nextFootprintView(current, action));
+        if (action && action.type !== "skills-toggle") return;
         setHighlight((current) => (current === node.id ? null : node.id));
-        setListNode(transform.nodeList(model, kind, detail, node.id) ? node.id : null);
-    }, [model, kind, detail]);
+    }, [model]);
     const clearHighlight = useCallback(() => setHighlight(null), []);
-    const closeList = useCallback(() => setListNode(null), []);
-    const listSource = useMemo(() => transform.nodeList(model, kind, detail, listNode), [model, kind, detail, listNode]);
+    const resetView = useCallback(() => {
+        setView(transform.defaultFootprintView());
+        setHighlight(null);
+    }, []);
     return (
         <VerticalStack gap="2">
             <HorizontalStack align="space-between" blockAlign="baseline">
                 <Text as="h3" variant="headingSm">AI footprint</Text>
-                <Text as="span" variant="bodySm" color="subdued">Select a node to trace its paths</Text>
+                <HorizontalStack gap="3" blockAlign="baseline">
+                    <Text as="span" variant="bodySm" color="subdued">Select a node to trace its paths. Select "+N more" or a skills node to expand it</Text>
+                    {!transform.isDefaultFootprintView(view) && <Button plain onClick={resetView}>Reset view</Button>}
+                </HorizontalStack>
             </HorizontalStack>
-            {detail.toolCount > 0 ? (
+            {detail.toolCount > 0 || detail.skillCount > 0 ? (
                 <VerticalStack gap="3">
                     <AssetTopologyGraph
                         nodes={graph.nodes}
@@ -197,9 +173,6 @@ function Footprint({ kind, detail }) {
                             </HorizontalStack>
                         ))}
                     </HorizontalStack>
-                    <Modal open={!!listSource} onClose={closeList} title={listSource?.title || ""}>
-                        {listSource && <NodeList key={listNode} source={listSource} />}
-                    </Modal>
                 </VerticalStack>
             ) : <Text as="p" color="subdued">No AI tools were seen in the last 7 days.</Text>}
         </VerticalStack>
