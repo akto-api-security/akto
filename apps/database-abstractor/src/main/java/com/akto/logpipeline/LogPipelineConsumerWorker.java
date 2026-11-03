@@ -21,6 +21,7 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.WriteConcern;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -78,7 +80,7 @@ public class LogPipelineConsumerWorker implements Runnable {
     private static final Gson gson = new Gson();
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final ObjectMapper metricMapper = new ObjectMapper()
-            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     // (accountId + target) combos whose collections have already been created/indexed in this process
     private static final Set<String> ensured = ConcurrentHashMap.newKeySet();
@@ -133,7 +135,7 @@ public class LogPipelineConsumerWorker implements Runnable {
 
         try (KafkaConsumer<String, String> c = new KafkaConsumer<>(props)) {
             this.consumer = c;
-            c.subscribe(java.util.Collections.singletonList(topic));
+            c.subscribe(Collections.singletonList(topic));
             logger.info("log consumer started: kind={} topic={} group={} index={}", kind, topic, groupId, index);
 
             while (running) {

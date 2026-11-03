@@ -1,5 +1,7 @@
 package com.akto.logpipeline;
 
+import java.io.File;
+
 /**
  * Environment-driven configuration for the log/metrics Kafka pipeline.
  *
@@ -57,7 +59,7 @@ public final class LogPipelineConfig {
             return true;
         }
         try {
-            return new java.io.File(PAUSE_FILE).exists();
+            return new File(PAUSE_FILE).exists();
         } catch (Exception e) {
             return false;
         }

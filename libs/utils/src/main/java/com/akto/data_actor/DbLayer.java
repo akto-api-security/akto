@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
@@ -3389,11 +3390,11 @@ public class DbLayer {
      * Null (the default) = legacy behaviour: write to this process's own Mongo. Covers every in-process caller,
      * e.g. the scheduled traffic-collector metrics job in AllMetrics, not only the HTTP handler.
      */
-    public static volatile java.util.function.Consumer<List<MetricData>> metricsStoreOverride = null;
+    public static volatile Consumer<List<MetricData>> metricsStoreOverride = null;
 
     /** Persist only (cleanup + insert). The log pipeline consumer does the equivalent against the logs DB. */
     public static void storeMetricsData(List<MetricData> metricData) {
-        java.util.function.Consumer<List<MetricData>> override = metricsStoreOverride;
+        Consumer<List<MetricData>> override = metricsStoreOverride;
         if (override != null) {
             override.accept(metricData);
             return;
