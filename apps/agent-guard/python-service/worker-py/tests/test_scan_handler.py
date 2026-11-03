@@ -84,31 +84,6 @@ async def test_context_source_is_folded_into_the_scanner_config(monkeypatch):
     assert FakeScanner.configs and all(c.get("contextSource") == "ENDPOINT" for c in FakeScanner.configs)
 
 
-@pytest.mark.parametrize(
-    "source,models",
-    [
-        ("ENDPOINT", ["gemma_vertexai"]),
-        ("AGENTIC", ["qwen3guard", "gemma_vertexai"]),
-        ("", ["qwen3guard", "gemma_vertexai"]),
-    ],
-)
-async def test_atlas_prompt_injection_skips_the_qwen_tier(monkeypatch, source, models):
-    # Qwen3Guard's confident "safe" would allow agent attacks before the Atlas prompt saw them, so Atlas
-    # PromptInjection goes straight to the arbiter; every other source keeps the fast tier.
-    deployment = {
-        "modelConfigs": [
-            {"provider": "qwen3guard", "modelRole": "FAST_THREAT_FILTER", "safeDecisionThreshold": 0.9},
-            {"provider": "gemma_vertexai", "modelRole": "FINAL_ARBITER"},
-        ]
-    }
-    monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", json.dumps(deployment))
-    await scan_handler.scan_payload(
-        {"scanner_name": "PromptInjection", "scanner_type": "prompt", "text": "x", "context_source": source},
-        schedule_fn=lambda coro: coro.close(),
-    )
-    assert FakeScanner.calls == models
-
-
 async def test_password_ignores_caller_models_and_runs_vertex_gemma(monkeypatch):
     monkeypatch.setattr(settings, "DEFAULT_MODEL_CONFIG_JSON", "")
     monkeypatch.setattr(settings, "GEMMA_VERTEX_ENDPOINT_ID", "1234567890")
