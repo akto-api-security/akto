@@ -25,6 +25,13 @@ import com.mongodb.client.model.Projections;
  */
 public abstract class NewDataApiGroupSync extends ApiGroupSync {
 
+    // the main source is single type info, so these groups are synced up to the time of the newest single type info;
+    // api_info discoveries and issues that are newer only make a run re-read a little more
+    @Override
+    protected int newestDataTime() {
+        return newestSingleTypeInfoTime();
+    }
+
     @Override
     protected void scan(int from, int to, Predicate<Candidate> visitor) {
         // new params
