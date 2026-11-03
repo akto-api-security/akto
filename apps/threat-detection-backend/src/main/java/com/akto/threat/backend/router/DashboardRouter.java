@@ -38,6 +38,8 @@ import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Semaphore;
+import com.mongodb.MongoExecutionTimeoutException;
 import java.util.HashMap;
 import java.util.ArrayList;
 import org.apache.commons.lang3.StringUtils;
@@ -47,6 +49,10 @@ import com.akto.log.LoggerMaker.LogDb;
 public class DashboardRouter implements ARouter {
 
     private static final LoggerMaker logger = new LoggerMaker(DashboardRouter.class, LogDb.THREAT_DETECTION);
+
+    private static final Semaphore PAYLOAD_SEARCH_PERMITS = new Semaphore(
+        Integer.parseInt(System.getenv().getOrDefault("LATEST_API_ORIG_REGEX_MAX_CONCURRENCY", "4"))
+    );
 
     private final MaliciousEventService dsService;
     private final ThreatActorService threatActorService;
@@ -180,10 +186,24 @@ public class DashboardRouter implements ARouter {
                     return;
                 }
 
-                ProtoMessageUtils.toString(
-                    dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode, humanResponseFilter)
-                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            });
+                boolean payloadSearch = req.getFilter().hasLatestApiOrigRegex() && !req.getFilter().getLatestApiOrigRegex().isEmpty();
+                if (payloadSearch && !PAYLOAD_SEARCH_PERMITS.tryAcquire()) {
+                    ctx.response().setStatusCode(429).end("Too many payload searches running, retry shortly");
+                    return;
+                }
+                try {
+                    ProtoMessageUtils.toString(
+                        dsService.listMaliciousRequests(ctx.get("accountId"), req, contextSource, skillEvalMode, configEvalMode, humanResponseFilter)
+                    ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+                } catch (MongoExecutionTimeoutException e) {
+                    logger.error("list_malicious_requests search timed out: " + e.getMessage(), e);
+                    ctx.response().setStatusCode(504).end("Search timed out, narrow the filters or time range");
+                } finally {
+                    if (payloadSearch) {
+                        PAYLOAD_SEARCH_PERMITS.release();
+                    }
+                }
+            }, false);
 
         router
             .post("/list_guardrail_violation_payloads")
