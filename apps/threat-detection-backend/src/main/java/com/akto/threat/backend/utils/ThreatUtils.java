@@ -30,6 +30,13 @@ public class ThreatUtils {
    * Events of the given hosts, matched the same way as the activity list: exact host, loose "device service"
    * key, or claude-config events by device id. Null when nothing is given.
    */
+  public static String anchorLookaheadRegex(String regex) {
+    if (regex != null && regex.startsWith("(?i)(?=")) {
+      return "(?is)^" + regex.substring(4);
+    }
+    return regex;
+  }
+
   public static Document hostAttributionMatch(List<String> hosts, List<String> looseHostKeys,
                                               List<String> claudeDeviceIds, boolean matchClaudeConfig) {
     List<Document> hostOrConditions = new ArrayList<>();

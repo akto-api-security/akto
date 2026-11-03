@@ -48,6 +48,7 @@ import org.bson.conversions.Bson;
 
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -64,6 +65,10 @@ public class MaliciousEventService {
 
   private static final boolean USE_ACTOR_INFO_TABLE = Boolean.parseBoolean(
       System.getenv().getOrDefault("USE_ACTOR_INFO_TABLE", "false")
+  );
+
+  private static final long REGEX_MAX_TIME_MS = Long.parseLong(
+      System.getenv().getOrDefault("LATEST_API_ORIG_REGEX_MAX_TIME_MS", "30000")
   );
 
   private static final DashboardFilterCache<FetchAlertFiltersResponse> alertFiltersCache = new DashboardFilterCache<>();
@@ -581,8 +586,10 @@ public class MaliciousEventService {
       query.append("$and", allClauses);
     }
 
-    if (filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty()) {
-      query.append("latestApiOrig", new Document("$regex", filter.getLatestApiOrigRegex()));
+    boolean hasPayloadRegex = filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty();
+    long payloadRegexMaxTimeMs = hasPayloadRegex ? REGEX_MAX_TIME_MS : 0;
+    if (hasPayloadRegex) {
+      query.append("latestApiOrig", new Document("$regex", ThreatUtils.anchorLookaheadRegex(filter.getLatestApiOrigRegex())));
     }
 
 
@@ -721,7 +728,7 @@ public class MaliciousEventService {
       total = activityRows.total;
       cursor = activityRows.cursor;
     } else if (sortBySeverity) {
-      total = maliciousEventDao.countDocuments(accountId, query);
+      total = maliciousEventDao.countDocuments(accountId, query, payloadRegexMaxTimeMs);
       // Use aggregation pipeline for custom severity sorting
       List<Document> pipeline = new ArrayList<>(matchStages);
       pipeline.addAll(Arrays.asList(
@@ -732,7 +739,7 @@ public class MaliciousEventService {
           ));
       cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else if (sortByRiskScore) {
-      total = maliciousEventDao.countDocuments(accountId, query);
+      total = maliciousEventDao.countDocuments(accountId, query, payloadRegexMaxTimeMs);
       List<Document> pipeline = new ArrayList<>(matchStages);
       pipeline.addAll(Arrays.asList(
               new Document("$addFields", riskScoreSortAddFields()),
@@ -742,9 +749,10 @@ public class MaliciousEventService {
           ));
       cursor = maliciousEventDao.getCollection(accountId).aggregate(pipeline).cursor();
     } else {
-      total = maliciousEventDao.countDocuments(accountId, query);
+      total = maliciousEventDao.countDocuments(accountId, query, payloadRegexMaxTimeMs);
       cursor = maliciousEventDao.getCollection(accountId)
           .find(query)
+          .maxTime(payloadRegexMaxTimeMs, TimeUnit.MILLISECONDS)
           .projection(Projections.exclude(excludedFields))
           .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
           .skip(skip)
@@ -1565,7 +1573,7 @@ public class MaliciousEventService {
 
     String latestApiOrigRegex = (String) filter.get("latestApiOrigRegex");
     if (latestApiOrigRegex != null && !latestApiOrigRegex.isEmpty()) {
-      query.append("latestApiOrig", new Document("$regex", latestApiOrigRegex));
+      query.append("latestApiOrig", new Document("$regex", ThreatUtils.anchorLookaheadRegex(latestApiOrigRegex)));
     }
 
     // A bulk action on a filtered view must reach exactly the rows the view shows.

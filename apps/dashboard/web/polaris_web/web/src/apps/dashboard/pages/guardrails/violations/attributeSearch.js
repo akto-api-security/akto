@@ -48,8 +48,8 @@ export function toLatestApiOrigRegex(freeText, clauses = []) {
     const text = (freeText || "").trim();
     if (text.length >= 3) parts.push(escapeRegex(text));
     if (parts.length === 0) return null;
-    const body = parts.length === 1 ? parts[0] : parts.map((p) => `(?=.*${p})`).join("");
-    return `(?i)${body}`;
+    if (parts.length === 1) return `(?i)${parts[0]}`;
+    return `(?is)^${parts.map((p) => `(?=.*${p})`).join("")}`;
 }
 
 export function addAdvancedFilter(filters, next) {
