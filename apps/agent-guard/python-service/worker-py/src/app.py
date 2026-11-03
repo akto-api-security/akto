@@ -18,7 +18,7 @@ import reachback
 import scan_diag
 from constants import get_default_config
 from model_map import build_arbiter
-from ocr import ocr_payload
+from ocr import handle_ocr
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -177,9 +177,10 @@ async def guardrails_llm_async(body: GuardrailsLLMRequest):
 
 
 @app.post("/ocr")
-async def ocr(body: dict[str, Any]):
-    """Text from an image ({"image_b64": ...}) via the providers in OCR_MODEL_CONFIG_JSON, in order (see ocr.py)."""
-    status, result = await ocr_payload(body)
+async def ocr(request: Request):
+    """Text from an image ({"image_b64": ...}) via the providers in OCR_MODEL_CONFIG_JSON, in order (see ocr.py).
+    Takes the raw request so an oversized body is refused before it is read, the same as on the worker."""
+    status, result = await handle_ocr(request.headers.get("content-length"), request.body)
     return JSONResponse(status_code=status, content=result)
 
 

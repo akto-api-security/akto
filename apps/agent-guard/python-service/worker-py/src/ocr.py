@@ -15,8 +15,12 @@ import base64
 import binascii
 import json
 import logging
+import math
 import time
+from collections.abc import Awaitable, Callable
 from typing import Any
+
+import httpx
 
 import alerts
 import http_client
@@ -25,7 +29,8 @@ from settings import settings
 
 logger = logging.getLogger(__name__)
 
-MAX_IMAGE_BYTES = 4 * 1024 * 1024  # bounds what reaches a provider; guardrails-service already caps images at 2 MB
+MAX_IMAGE_BYTES = 4 * 1024 * 1024  # bounds what reaches a provider; guardrails-service caps images at 2 MB by default
+MAX_BODY_BYTES = MAX_IMAGE_BYTES * 4 // 3 + 1024  # the base64 image plus JSON framing
 _DEFAULT_TIMEOUT_MS = 30000
 _IDENTITY = {"Accept-Encoding": "identity"}  # Pyodide double-gunzip fix, as in providers.py
 
@@ -47,9 +52,9 @@ class AzureVisionOCR:
             },
             content=image,
         )
-        if resp.is_error:
+        if resp.status_code != 200:  # as azure_vision.go: anything but 200 is a failure
             logger.warning(f"[OCR] {self.name} HTTP {resp.status_code}: {resp.text[:500]!r}")
-        resp.raise_for_status()
+            raise httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=resp.request, response=resp)
         return parse_azure_ocr(resp.json())
 
 
@@ -58,7 +63,7 @@ def parse_azure_ocr(body: dict[str, Any]) -> str:
     lines = []
     for region in body.get("regions") or []:
         for line in region.get("lines") or []:
-            words = [word.get("text", "") for word in line.get("words") or []]
+            words = [word.get("text") or "" for word in line.get("words") or []]
             if words:
                 lines.append(" ".join(words))
     return "\n".join(lines)
@@ -91,6 +96,22 @@ def build_ocr_provider(entry: dict[str, Any]) -> AzureVisionOCR | None:
     return None
 
 
+async def handle_ocr(content_length: str | None, read_body: Callable[[], Awaitable[Any]]) -> tuple[int, dict[str, Any]]:
+    """POST /ocr on both runtimes. A declared body too large to hold an accepted image is refused before it is
+    read; a body that isn't JSON (or nests too deep to parse) is a 400, not a 500."""
+    try:
+        too_large = int(content_length or 0) > MAX_BODY_BYTES
+    except ValueError:
+        too_large = False
+    if too_large:
+        return 413, {"error": f"request body is over {MAX_BODY_BYTES} bytes"}
+    try:
+        payload = json.loads(await read_body())
+    except (ValueError, RecursionError):
+        payload = None
+    return await ocr_payload(payload)
+
+
 async def ocr_payload(payload: Any) -> tuple[int, dict[str, Any]]:
     """Run one /ocr request; returns (HTTP status, body).
 
@@ -106,8 +127,6 @@ async def ocr_payload(payload: Any) -> tuple[int, dict[str, Any]]:
         image = base64.b64decode(image_b64, validate=True)
     except (binascii.Error, ValueError):
         return 400, {"error": "image_b64 is not valid base64"}
-    if not image:
-        return 400, {"error": "image is empty"}
     if len(image) > MAX_IMAGE_BYTES:
         return 413, {"error": f"image is over {MAX_IMAGE_BYTES} bytes"}
 
@@ -120,6 +139,8 @@ async def ocr_payload(payload: Any) -> tuple[int, dict[str, Any]]:
         started = time.perf_counter()
         try:  # a bad timeoutMs fails this entry like any other error, rather than the whole request
             timeout_s = float(entry.get("timeoutMs") or _DEFAULT_TIMEOUT_MS) / 1000.0
+            if not (timeout_s > 0 and math.isfinite(timeout_s)):
+                raise ValueError(f"timeoutMs must be a positive number, got {entry.get('timeoutMs')!r}")
             text = await asyncio.wait_for(provider.extract_text(image), timeout_s)
         except Exception as exc:
             reason = alerts.fallback_reason(exc)

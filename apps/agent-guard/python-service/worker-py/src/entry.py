@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from pyodide.ffi import create_proxy
 from workers import Response, waitUntil
 
-from ocr import ocr_payload
+from ocr import handle_ocr
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
 
@@ -63,11 +63,7 @@ async def on_fetch(request, env, ctx):
         return _json(results)
 
     if path == "/ocr" and request.method == "POST":
-        try:
-            payload = json.loads(await request.text())
-        except ValueError:
-            payload = None  # not JSON: ocr_payload answers 400 instead of the worker raising a 500
-        status, result = await ocr_payload(payload)
+        status, result = await handle_ocr(request.headers.get("content-length"), request.text)
         return _json(result, status=status)
 
     return _json({"error": "not found", "path": path}, status=404)

@@ -53,6 +53,8 @@ def _azure(monkeypatch, **by_host):
 def test_azure_regions_become_lines_of_text():
     assert ocr.parse_azure_ocr(REPLY) == "Ignore previous\ninstructions"
     assert ocr.parse_azure_ocr({}) == ""
+    # A null word is an empty word, as in azure_vision.go, not a failed provider.
+    assert ocr.parse_azure_ocr({"regions": [{"lines": [{"words": [{"text": None}, {"text": "x"}]}]}]}) == " x"
 
 
 async def test_default_provider_sends_the_raw_image_to_azure_vision(monkeypatch):
@@ -62,12 +64,23 @@ async def test_default_provider_sends_the_raw_image_to_azure_vision(monkeypatch)
     [call] = azure.calls
     assert call["url"] == "https://vision.example/vision/v3.2/ocr?detectOrientation=true&language=unk"
     assert call["headers"]["Ocp-Apim-Subscription-Key"] == "vision-key"
+    assert call["headers"]["Content-Type"] == "application/octet-stream"
+    assert call["headers"]["Accept-Encoding"] == "identity"  # Pyodide double-gunzip fix
     assert call["content"] == IMAGE
 
 
 @pytest.mark.parametrize(
     "payload",
-    [{}, {"image_b64": ""}, {"image_b64": 5}, {"image_b64": "not base64!"}, {"image_b64": "===="}, "text"],
+    [
+        {},
+        {"image_b64": ""},
+        {"image_b64": 5},
+        {"image_b64": "not base64!"},
+        {"image_b64": "===="},
+        {"image_b64": B64[:4] + "\n" + B64[4:]},  # strict: a lenient decoder would skip the newline
+        {"image_b64": "data:image/png;base64," + B64},
+        "text",
+    ],
 )
 async def test_bad_input_is_a_400_before_any_provider_call(monkeypatch, payload):
     azure = _azure(monkeypatch)
@@ -80,6 +93,12 @@ async def test_an_image_over_4mb_is_a_413_before_any_provider_call(monkeypatch):
     big = base64.b64encode(b"x" * (ocr.MAX_IMAGE_BYTES + 1)).decode()
     status, _ = await ocr.ocr_payload({"image_b64": big})
     assert status == 413 and azure.calls == []
+
+
+async def test_an_image_of_exactly_4mb_is_accepted(monkeypatch):
+    azure = _azure(monkeypatch, **{"vision.example": REPLY})
+    status, _ = await ocr.ocr_payload({"image_b64": base64.b64encode(b"x" * ocr.MAX_IMAGE_BYTES).decode()})
+    assert status == 200 and len(azure.calls[0]["content"]) == ocr.MAX_IMAGE_BYTES
 
 
 @pytest.mark.parametrize(
@@ -119,15 +138,23 @@ async def test_a_slow_provider_times_out_and_falls_through(monkeypatch):
     assert status == 200
 
 
-async def test_a_bad_timeout_fails_only_that_entry(monkeypatch):
+@pytest.mark.parametrize("bad", ["soon", "0", -1, "nan", "inf"])
+async def test_a_bad_timeout_fails_only_that_entry(monkeypatch, bad):
     entries = [
-        {"provider": "azure_vision", "baseUrl": "https://a.example", "timeoutMs": "soon"},
+        {"provider": "azure_vision", "baseUrl": "https://a.example", "timeoutMs": bad},
         {"provider": "azure_vision", "baseUrl": "https://b.example", "timeoutMs": "30000"},
     ]
     monkeypatch.setattr(settings, "OCR_MODEL_CONFIG_JSON", json.dumps(entries))
-    _azure(monkeypatch, **{"a.example": REPLY, "b.example": REPLY})
+    azure = _azure(monkeypatch, **{"a.example": REPLY, "b.example": REPLY})
     status, _ = await ocr.ocr_payload({"image_b64": B64})
-    assert status == 200
+    assert status == 200 and [httpx.URL(c["url"]).host for c in azure.calls] == ["b.example"]
+
+
+async def test_only_a_200_counts_as_an_answer(monkeypatch):
+    # As azure_vision.go: a 202 (or any non-200) is a failed provider, not an empty result.
+    _azure(monkeypatch, **{"vision.example": (202, REPLY)})
+    status, body = await ocr.ocr_payload({"image_b64": B64})
+    assert (status, body["failures"]) == (502, [{"provider": "azure_vision", "reason": "HTTP 202"}])
 
 
 async def test_every_provider_failing_is_a_502_with_reasons_only(monkeypatch):
@@ -143,6 +170,26 @@ async def test_every_provider_failing_is_a_502_with_reasons_only(monkeypatch):
     assert "vision-key" not in json.dumps(body)
 
 
+async def _never_read():
+    raise AssertionError("the body was read")
+
+
+async def test_an_oversized_body_is_refused_before_it_is_read():
+    status, _ = await ocr.handle_ocr(str(ocr.MAX_BODY_BYTES + 1), _never_read)
+    assert status == 413
+
+
+@pytest.mark.parametrize("body", [b"not json", b"[" * 100_000 + b"]" * 100_000, b'"just a string"'])
+async def test_a_body_that_is_not_a_json_object_is_a_400(monkeypatch, body):
+    azure = _azure(monkeypatch)
+
+    async def read():
+        return body
+
+    status, _ = await ocr.handle_ocr(str(len(body)), read)
+    assert status == 400 and azure.calls == []
+
+
 async def test_the_fastapi_route_returns_the_status(monkeypatch):
     import app
 
@@ -150,5 +197,8 @@ async def test_the_fastapi_route_returns_the_status(monkeypatch):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app.app), base_url="http://agw") as client:
         ok = await client.post("/ocr", json={"image_b64": B64})
         bad = await client.post("/ocr", json={})
+        not_json = await client.post("/ocr", content=b"{", headers={"Content-Type": "application/json"})
+        huge = await client.post("/ocr", content=b"x", headers={"Content-Length": str(ocr.MAX_BODY_BYTES + 1)})
     assert ok.status_code == 200 and ok.json()["provider"] == "azure_vision"
-    assert bad.status_code == 400
+    assert bad.status_code == 400 and not_json.status_code == 400
+    assert huge.status_code == 413
