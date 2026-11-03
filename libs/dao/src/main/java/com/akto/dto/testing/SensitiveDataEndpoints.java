@@ -75,15 +75,18 @@ public class SensitiveDataEndpoints extends TestingEndpoints {
 
         @Override
         protected void scanUntimed(Predicate<Candidate> visitor) {
-            // apis a user marked sensitive by hand
-            for (SensitiveParamInfo sensitiveParamInfo : SensitiveParamInfoDao.instance.findAll(Filters.eq("sensitive", true))) {
+            // apis a user marked sensitive by hand: they have no time, so only the ones without the group tag yet are read
+            Bson notTagged = Filters.and(
+                Filters.eq(SensitiveParamInfo.SENSITIVE, true),
+                Filters.nin(SingleTypeInfo._COLLECTION_IDS, API_GROUP_ID));
+            Bson projection = Projections.include(SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD);
+            for (SensitiveParamInfo sensitiveParamInfo : SensitiveParamInfoDao.instance.findAll(notTagged, projection)) {
                 Method method = Method.fromString(sensitiveParamInfo.getMethod());
                 if (method.equals(Method.OTHER)) {
                     continue;
                 }
                 ApiInfoKey key = new ApiInfoKey(sensitiveParamInfo.getApiCollectionId(), sensitiveParamInfo.getUrl(), method);
-                List<Integer> groupIds = sensitiveParamInfo.getCollectionIds();
-                if (!visitor.test(new Candidate(key, true, groupIds != null && groupIds.contains(API_GROUP_ID)))) {
+                if (!visitor.test(new Candidate(key, true, false))) {
                     return;
                 }
             }
