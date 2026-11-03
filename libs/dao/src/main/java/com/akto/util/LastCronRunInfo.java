@@ -25,6 +25,9 @@ public class LastCronRunInfo {
     public static final String LAST_API_GROUPS_FULL_SYNC = "lastApiGroupsFullSync";
     private int lastApiGroupsFullSync;
 
+    public static final String LAST_UNAUTHENTICATED_GROUP_SYNC = "lastUnauthenticatedGroupSync";
+    private int lastUnauthenticatedGroupSync;
+
     public LastCronRunInfo() {
     }
 
@@ -97,5 +100,13 @@ public class LastCronRunInfo {
 
     public void setLastApiGroupsFullSync(int lastApiGroupsFullSync) {
         this.lastApiGroupsFullSync = lastApiGroupsFullSync;
+    }
+
+    public int getLastUnauthenticatedGroupSync() {
+        return lastUnauthenticatedGroupSync;
+    }
+
+    public void setLastUnauthenticatedGroupSync(int lastUnauthenticatedGroupSync) {
+        this.lastUnauthenticatedGroupSync = lastUnauthenticatedGroupSync;
     }
 }

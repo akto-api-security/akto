@@ -187,6 +187,10 @@ public class ApiCollectionUsers {
     }
 
     private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, remove, false);
+    }
+
+    private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove, boolean synchronous) {
         
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
@@ -200,13 +204,18 @@ public class ApiCollectionUsers {
         if(apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID && remove){
             return;
         }
-        updateCollectionsForCollectionId(filtersMap, update);
+        updateCollectionsForCollectionId(filtersMap, update, synchronous);
     }
 
     public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+        addToCollectionsForCollectionId(conditions, apiCollectionId, false);
+    }
+
+    /** @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them */
+    public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
     }
 
     public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
@@ -235,9 +244,14 @@ public class ApiCollectionUsers {
      * {@link #removeFromCollectionsForCollectionId}, which pulls it from everything the conditions do NOT match).
      */
     public static void removeApisFromCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+        removeApisFromCollectionId(conditions, apiCollectionId, false);
+    }
+
+    /** @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them */
+    public static void removeApisFromCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
         Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
     }
 
     public static void keepOnlyApiCollectionId(int apiCollectionId) {
@@ -250,7 +264,7 @@ public class ApiCollectionUsers {
         for (CollectionType type : CollectionType.values()) {
             filtersMap.put(type, matchFilter);
         }
-        updateCollectionsForCollectionId(filtersMap, update);
+        updateCollectionsForCollectionId(filtersMap, update, false);
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
@@ -275,25 +289,24 @@ public class ApiCollectionUsers {
         updateApiCollection(conditions, apiCollectionId);
     }
 
-    private static void updateCollectionsForCollectionId(Map<CollectionType, Bson> filtersMap, Bson update) {
+    private static void updateCollectionsForCollectionId(Map<CollectionType, Bson> filtersMap, Bson update, boolean synchronous) {
+        if (synchronous) {
+            updateAllCollections(filtersMap, update);
+            return;
+        }
         int accountId = Context.accountId.get();
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-
-                Map<CollectionType, MCollection<?>[]> collectionsMap = COLLECTIONS_WITH_API_COLLECTION_ID;
-
-                for (Map.Entry<CollectionType, MCollection<?>[]> collectionsEntry : collectionsMap.entrySet()) {
-
-                    CollectionType type = collectionsEntry.getKey();
-                    MCollection<?>[] collections = collectionsEntry.getValue();
-                    Bson filter = filtersMap.get(type);
-
-                    updateCollections(collections, filter, update);
-                }
-
+                updateAllCollections(filtersMap, update);
             }
         }, 0, TimeUnit.SECONDS);
+    }
+
+    private static void updateAllCollections(Map<CollectionType, Bson> filtersMap, Bson update) {
+        for (Map.Entry<CollectionType, MCollection<?>[]> collectionsEntry : COLLECTIONS_WITH_API_COLLECTION_ID.entrySet()) {
+            updateCollections(collectionsEntry.getValue(), filtersMap.get(collectionsEntry.getKey()), update);
+        }
     }
 
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {

@@ -2033,7 +2033,8 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    public static void createUnauthenticatedApiGroup(int since, boolean full) {
+    /** Only creates the group; its members are kept up to date by setUpUpdateCustomCollections (UnauthenticatedEndpoint.updateCollections). */
+    public static void createUnauthenticatedApiGroup() {
 
         ApiCollection collection = ApiCollectionsDao.instance.findOne(
                 Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID));
@@ -2050,10 +2051,6 @@ public class InitializerListener implements ServletContextListener {
             unauthenticatedApisGroup.setConditions(conditions);
 
             ApiCollectionsDao.instance.insertOne(unauthenticatedApisGroup);
-        }else{
-            int startTime = Context.now();
-            UnauthenticatedEndpoint.updateCollections(since, full);
-            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed unauthenticated api group (full: " + full + ") in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
         }
 
     }
@@ -2088,12 +2085,10 @@ public class InitializerListener implements ServletContextListener {
 
     public static void createFirstUnauthenticatedApiGroup(int since, boolean full){
         long startMs = System.currentTimeMillis();
-        createUnauthenticatedApiGroup(since, full);
-        long unauthenticatedMs = System.currentTimeMillis() - startMs;
+        createUnauthenticatedApiGroup();
         createAllApisGroup(since, full);
-        // updateMany writes are queued on the shared collection-id executor, so these timings cover the scan and queueing
-        logger.info("AccountId: " + Context.accountId.get() + " unauthenticated group: " + unauthenticatedMs + " ms"
-                + ", all apis group: " + (System.currentTimeMillis() - startMs - unauthenticatedMs) + " ms");
+        // updateMany writes are queued on the shared collection-id executor, so this timing covers the scan and queueing
+        logger.info("AccountId: " + Context.accountId.get() + " all apis group: " + (System.currentTimeMillis() - startMs) + " ms");
     }
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {

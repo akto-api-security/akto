@@ -11,11 +11,13 @@ import org.bson.conversions.Bson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
@@ -24,14 +26,25 @@ import com.akto.dto.ApiInfo.AuthType;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
+import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 
 public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     private static int limit = 1000;
+    // each write is one updateMany per collection with an $or of this many (url, method) pairs, so keep it small
+    private static final int WRITE_BATCH_SIZE = 100;
+    // pause after each write batch, and a cap per run, so a large change set is spread over time instead of spiking the primary
+    private static final long WRITE_PAUSE_MS = 200;
+    private static final int MAX_CHANGES_PER_RUN = 20_000;
+    private static final int SYNC_BUFFER_SECONDS = 10 * 60;
+    private static final int FIRST_SYNC_LOOKBACK_SECONDS = 5 * Constants.ONE_DAY_TIMESTAMP;
+    private static final long SLOW_RUN_WARN_MS = 5 * 60 * 1000L;
     private static final Logger logger = LoggerFactory.getLogger(UnauthenticatedEndpoint.class);
 
     @BsonIgnore
@@ -89,22 +102,56 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     private static final Set<AuthType> UNAUTHENTICATED_AUTH_SET = Collections.singleton(AuthType.UNAUTHENTICATED);
 
-    /** Full recompute: used on first run, once a day, and when a group is recomputed explicitly. */
-    public static void updateCollections(){
-        updateCollections(0, true);
-    }
-
     /**
-     * @param since only used when !full: apis whose lastSeen is older than this cannot have changed their auth types
-     *              (auth types only change in runtime upserts, which bump lastSeen), so they are not looked at.
-     * @param full  reset the group and rebuild it from every api info.
+     * Brings the group in line with api_info (the source of truth for auth types), writing only the apis whose group
+     * tag disagrees with their auth types. Auth types only change in runtime upserts, which bump lastSeen, so only apis
+     * seen since the last sync are looked at. The last sync time is kept in account settings and is saved only after
+     * every write has succeeded; without it, the last 5 days are checked.
      */
-    public static void updateCollections(int since, boolean full){
-        Set<Integer> allowedCollectionIds = fetchAllowedCollectionIds();
-        if (full) {
-            fullUpdate(allowedCollectionIds);
+    public static void updateCollections(){
+        int accountId = Context.accountId.get();
+        long startMs = System.currentTimeMillis();
+        int syncStartedAt = Context.now();
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
+        int lastSync = lastRunInfo == null ? 0 : lastRunInfo.getLastUnauthenticatedGroupSync();
+        boolean hasMarker = lastSync != 0;
+        int since = hasMarker ? Math.max(lastSync - SYNC_BUFFER_SECONDS, 0) : syncStartedAt - FIRST_SYNC_LOOKBACK_SECONDS;
+        if (!hasMarker) {
+            logger.warn(String.format("AccountId: %d unauthenticated group has no last sync time, checking the last %d days (since=%d)",
+                    accountId, FIRST_SYNC_LOOKBACK_SECONDS / Constants.ONE_DAY_TIMESTAMP, since));
+        }
+
+        SyncResult result = new SyncResult();
+        try {
+            incrementalUpdate(fetchAllowedCollectionIds(), since, result);
+        } catch (Exception e) {
+            logger.error(String.format("AccountId: %d unauthenticated group sync failed after collections=%d, scanned=%d, added=%d, removed=%d, took=%d ms, since=%d; last sync time not saved, next run starts from the same point",
+                    accountId, result.collections, result.scanned, result.added, result.removed, System.currentTimeMillis() - startMs, since), e);
+            return;
+        }
+
+        long tookMs = System.currentTimeMillis() - startMs;
+        if (result.changes() >= MAX_CHANGES_PER_RUN) {
+            // marker left as is: what is already fixed is skipped next time, so the next run carries on from here
+            logger.warn(String.format("AccountId: %d unauthenticated group sync hit the cap of %d changes: collections=%d, scanned=%d, added=%d, removed=%d, took=%d ms, since=%d; last sync time not saved, the rest continues next run",
+                    accountId, MAX_CHANGES_PER_RUN, result.collections, result.scanned, result.added, result.removed, tookMs, since));
+            return;
+        }
+
+        AccountSettingsDao.instance.getMCollection().updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_UNAUTHENTICATED_GROUP_SYNC, syncStartedAt),
+            new UpdateOptions().upsert(true));
+
+        String message = String.format("AccountId: %d unauthenticated group synced: since=%d (%s), collections=%d, scanned=%d, added=%d, removed=%d, took=%d ms",
+                accountId, since, hasMarker ? "last sync " + (syncStartedAt - lastSync) / 60 + " min ago" : "no last sync, fallback", 
+                result.collections, result.scanned, result.added, result.removed, tookMs);
+        if (tookMs > SLOW_RUN_WARN_MS) {
+            logger.warn(message);
         } else {
-            incrementalUpdate(allowedCollectionIds, since);
+            logger.info(message);
         }
     }
 
@@ -122,54 +169,20 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         return ids;
     }
 
-    private static void fullUpdate(Set<Integer> allowedCollectionIds) {
-        ApiCollectionUsers.reset(UNAUTHENTICATED_GROUP_ID);
+    private static class SyncResult {
+        int collections;
+        int scanned;
+        int added;
+        int removed;
 
-        Bson unauthenticatedFilter = Filters.in(
-            ApiInfo.ALL_AUTH_TYPES_FOUND,
-            Collections.singletonList(Collections.singletonList(ApiInfo.AuthType.UNAUTHENTICATED))
-        );
-        Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
-        int accountId = Context.accountId.get();
-        long startMs = System.currentTimeMillis();
-        logger.info(String.format("AccountId: %d Starting full update of unauthenticated data collection", accountId));
-
-        // single keyset scan over api_info instead of one query per api collection
-        Bson filter = unauthenticatedFilter;
-        int scanned = 0;
-        while (true) {
-            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter, 0, limit, sort, Projections.include("_id"));
-            if (apiInfos.isEmpty()) {
-                break;
-            }
-            List<ApiInfoKey> keys = new ArrayList<>();
-            for (ApiInfo apiInfo : apiInfos) {
-                if (allowedCollectionIds.contains(apiInfo.getId().getApiCollectionId())) {
-                    keys.add(apiInfo.getId());
-                }
-            }
-            addToGroup(keys);
-            scanned += apiInfos.size();
-
-            if (apiInfos.size() < limit) {
-                break;
-            }
-            ApiInfoKey last = apiInfos.get(apiInfos.size() - 1).getId();
-            filter = Filters.and(unauthenticatedFilter,
-                    ApiInfoDao.keysetAfter(last.getApiCollectionId(), last.getUrl(), last.getMethod().name()));
+        int changes() {
+            return added + removed;
         }
-        logger.info(String.format("AccountId: %d Finished full update of unauthenticated data collection, scanned: %d, took: %d ms",
-                accountId, scanned, System.currentTimeMillis() - startMs));
     }
 
-    private static void incrementalUpdate(Set<Integer> allowedCollectionIds, int since) {
-        int accountId = Context.accountId.get();
-        long startMs = System.currentTimeMillis();
-        logger.info(String.format("AccountId: %d Starting incremental update of unauthenticated data collection since %d",
-                accountId, since));
-
+    private static void incrementalUpdate(Set<Integer> allowedCollectionIds, int since, SyncResult result) {
         List<Integer> collectionIds = new ArrayList<>(allowedCollectionIds);
-        int changed = 0;
+        result.collections = collectionIds.size();
         for (int i = 0; i < collectionIds.size(); i += limit) {
             List<Integer> chunk = collectionIds.subList(i, Math.min(i + limit, collectionIds.size()));
             Bson filter = Filters.and(
@@ -177,35 +190,47 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                 Filters.gte(ApiInfo.LAST_SEEN, since)
             );
 
-            List<ApiInfoKey> unauthenticated = new ArrayList<>();
-            List<ApiInfoKey> authenticated = new ArrayList<>();
+            List<ApiInfoKey> toAdd = new ArrayList<>();
+            List<ApiInfoKey> toRemove = new ArrayList<>();
             try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find(filter)
-                    .projection(Projections.include("_id", ApiInfo.ALL_AUTH_TYPES_FOUND))
+                    .projection(Projections.include("_id", ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.COLLECTION_IDS))
                     .batchSize(limit).cursor()) {
                 while (cursor.hasNext()) {
                     ApiInfo apiInfo = cursor.next();
+                    result.scanned++;
                     Set<Set<AuthType>> authTypesFound = apiInfo.getAllAuthTypesFound();
                     boolean isUnauthenticated = authTypesFound != null && authTypesFound.contains(UNAUTHENTICATED_AUTH_SET);
-                    (isUnauthenticated ? unauthenticated : authenticated).add(apiInfo.getId());
-
-                    if (unauthenticated.size() >= limit) {
-                        addToGroup(unauthenticated);
-                        changed += unauthenticated.size();
-                        unauthenticated.clear();
+                    List<Integer> apiGroupIds = apiInfo.getCollectionIds();
+                    boolean inGroup = apiGroupIds != null && apiGroupIds.contains(UNAUTHENTICATED_GROUP_ID);
+                    // write only when the group tag disagrees with the auth types
+                    if (isUnauthenticated == inGroup) {
+                        continue;
                     }
-                    if (authenticated.size() >= limit) {
-                        removeFromGroup(authenticated);
-                        changed += authenticated.size();
-                        authenticated.clear();
+                    (isUnauthenticated ? toAdd : toRemove).add(apiInfo.getId());
+
+                    if (toAdd.size() >= WRITE_BATCH_SIZE) {
+                        addToGroup(toAdd);
+                        result.added += toAdd.size();
+                        toAdd.clear();
+                    }
+                    if (toRemove.size() >= WRITE_BATCH_SIZE) {
+                        removeFromGroup(toRemove);
+                        result.removed += toRemove.size();
+                        toRemove.clear();
+                    }
+                    if (result.changes() >= MAX_CHANGES_PER_RUN) {
+                        break;
                     }
                 }
             }
-            addToGroup(unauthenticated);
-            removeFromGroup(authenticated);
-            changed += unauthenticated.size() + authenticated.size();
+            addToGroup(toAdd);
+            result.added += toAdd.size();
+            removeFromGroup(toRemove);
+            result.removed += toRemove.size();
+            if (result.changes() >= MAX_CHANGES_PER_RUN) {
+                break;
+            }
         }
-        logger.info(String.format("AccountId: %d Finished incremental update of unauthenticated data collection, collections: %d, apis checked: %d, took: %d ms",
-                accountId, collectionIds.size(), changed, System.currentTimeMillis() - startMs));
     }
 
     private static void addToGroup(List<ApiInfoKey> keys) {
@@ -214,7 +239,17 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         }
         UnauthenticatedEndpoint endpoint = new UnauthenticatedEndpoint();
         endpoint.setApiInfos(new ArrayList<>(keys));
-        ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(endpoint), UNAUTHENTICATED_GROUP_ID);
+        // synchronous: errors must reach updateCollections() so the last sync time is not saved for a failed run
+        ApiCollectionUsers.addToCollectionsForCollectionId(Collections.singletonList(endpoint), UNAUTHENTICATED_GROUP_ID, true);
+        pauseBetweenWrites();
+    }
+
+    private static void pauseBetweenWrites() {
+        try {
+            Thread.sleep(WRITE_PAUSE_MS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static void removeFromGroup(List<ApiInfoKey> keys) {
@@ -223,7 +258,8 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
         }
         UnauthenticatedEndpoint endpoint = new UnauthenticatedEndpoint();
         endpoint.setApiInfos(new ArrayList<>(keys));
-        ApiCollectionUsers.removeApisFromCollectionId(Collections.singletonList(endpoint), UNAUTHENTICATED_GROUP_ID);
+        ApiCollectionUsers.removeApisFromCollectionId(Collections.singletonList(endpoint), UNAUTHENTICATED_GROUP_ID, true);
+        pauseBetweenWrites();
     }
 
 
