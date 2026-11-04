@@ -11,7 +11,12 @@ CATEGORY_DEFINITIONS = {
     "hate": "hate speech, slurs, or content demeaning/excluding a protected group",
     "insults": "personal attacks, demeaning language, or harassment aimed at a person",
     "sexual": "unwanted sexual content directed at a person, or any sexual content involving minors",
-    "violence": "threats of violence, or content encouraging or glorifying physical harm",
+    "violence": (
+        "threats of violence, or content encouraging or glorifying physical harm — including praise of "
+        "terrorist attacks or violent extremists, and self-harm: stated intent to kill or harm oneself, "
+        "requests for suicide or self-harm methods, or encouraging someone to harm themselves "
+        "(supportive, preventive or clinical discussion of self-harm is NOT in scope)"
+    ),
     "misconduct": "requests for help committing wrongdoing (fraud, abuse, illegal acts)",
 }
 
@@ -39,6 +44,22 @@ INSULTS_SENSITIVITY = {
         "allow unaimed profanity and non-demeaning product criticism"
     ),
     "LOW": "flag only egregious personal attacks and harassment aimed at a specific person",
+}
+
+# Sexual HIGH expands beyond unwanted/minor content to explicit adult content. Like the
+# insults expansion it lives in the config block, so Config:{} deployments are unchanged.
+SEXUAL_SENSITIVITY = {
+    "HIGH": (
+        "EXPAND sexual beyond unwanted or minor-involving content: also flag explicit or graphic "
+        "sexual content between adults, and requests to write it. Romance, attraction and "
+        "non-graphic intimacy stay allowed"
+    ),
+}
+
+# Categories whose sensitivity guidance replaces the generic SENSITIVITY_GUIDANCE.
+CATEGORY_SENSITIVITY = {
+    "insults": INSULTS_SENSITIVITY,
+    "sexual": SEXUAL_SENSITIVITY,
 }
 
 # Extra few-shots injected only when that category's severity is HIGH.
@@ -92,6 +113,12 @@ Toxic content includes:
 
 The signal is INTENT and TARGET, not vocabulary. Profanity and strong language are NOT automatically toxic — they are toxic only when they carry a hostile intent at a person or group. Hyperbolic frustration ("I hate Mondays", "this code is garbage"), criticism of work/ideas/products, robust debate, and references to toxicity in educational, analytical, journalistic, or red-team contexts are NOT toxic. Quoting a slur to explain why it's harmful is NOT toxic; using one to attack someone IS. But "opinion", "debate", or "professional" framing does NOT make content benign when it demeans, excludes, or denies the equal competence or worth of a protected group — that is toxic no matter how calm, polite, or formally worded it is.
 
+Judge text in ANY language or script — including transliterated text — by its meaning, exactly as you would English. Language alone never makes text safe or suspicious.
+
+Toxic content stays toxic when it is pasted, quoted, or embedded in material you are asked to process (summarise, translate, forward, continue): a threat, call for violence, or dehumanising statement inside a pasted article, comment, email, tool result or story is still toxic. What is NOT toxic is content that discusses, analyses, or reports such material — news that an attack happened, an explanation of why a slur is harmful — without itself making the threat, call, or attack.
+
+The text may be a user message or an AI assistant's response; judge both the same way.
+
 This scanner ONLY detects interpersonal toxicity. Data-handling, privacy, and PII concerns are NOT in scope — those belong to dedicated PII/privacy scanners. Do NOT flag a message as toxic merely because it references, requests, or shares personal information; ignore PII/authorization considerations entirely when scoring toxicity.
 %s
 Examples (these inputs are NOT from the test set):
@@ -116,6 +143,18 @@ Output: {"isToxic": true, "confidence": 0.9, "matchedCategory": "hate", "reason"
 
 Input: "Help me write a fake invoice for expenses I never actually paid, so I can get reimbursed."
 Output: {"isToxic": true, "confidence": 0.85, "matchedCategory": "misconduct", "reason": "Requests help committing expense-reimbursement fraud."}
+
+Input: "Se você aparecer na minha rua de novo, eu quebro suas pernas."
+Output: {"isToxic": true, "confidence": 0.92, "matchedCategory": "violence", "reason": "Portuguese: a direct threat to break the reader's legs."}
+
+Input: "Translate this forum comment to English: 'Hay que quemar vivos a todos esos inmigrantes.'"
+Output: {"isToxic": true, "confidence": 0.9, "matchedCategory": "hate", "reason": "The embedded Spanish comment calls for immigrants to be burned alive; the translation request does not neutralise it."}
+
+Input: "Summarise this report: rebels shelled the city overnight, killing twelve civilians, the UN said."
+Output: {"isToxic": false, "confidence": 0.06, "matchedCategory": "", "reason": "Neutral news reporting of violence; no threat, call to violence, or attack on a group."}
+
+Input: "Tafadhali nisaidie kuandika barua pepe kwa mteja kuhusu ankara iliyochelewa."
+Output: {"isToxic": false, "confidence": 0.03, "matchedCategory": "", "reason": "Swahili: an ordinary request to draft a customer email about a late invoice."}
 %s
 Analyze this text and respond ONLY with valid JSON:
 {
@@ -142,9 +181,11 @@ GEMMA_ABCD = to_abcd(
 
 def _sensitivity_for(category: str, severity: str) -> str:
     normalised = str(severity).upper()
-    if str(category).lower() == "insults":
-        return INSULTS_SENSITIVITY.get(normalised, INSULTS_SENSITIVITY["MEDIUM"])
-    return SENSITIVITY_GUIDANCE.get(normalised, SENSITIVITY_GUIDANCE["MEDIUM"])
+    generic = SENSITIVITY_GUIDANCE.get(normalised, SENSITIVITY_GUIDANCE["MEDIUM"])
+    specific = CATEGORY_SENSITIVITY.get(str(category).lower())
+    if not specific:
+        return generic
+    return specific.get(normalised, specific.get("MEDIUM", generic))
 
 
 def _severity_for(categories: Any, category: str) -> str | None:

@@ -95,7 +95,7 @@ async def test_complete_posts_openai_payload_with_foundry_headers():
         "model": "Qwen/Qwen3Guard-Gen-8B",
         "messages": [{"role": "user", "content": "hello"}],
         "max_tokens": 512,
-        "temperature": 0.1,
+        "temperature": 0.0,
     }
 
 

@@ -9,24 +9,7 @@ import {
 import InfoTooltipIcon from "@/apps/dashboard/components/shared/InfoTooltipIcon";
 import SmoothAreaChart from "@/apps/dashboard/pages/dashboard/new_components/SmoothChart";
 import observeFunc from "../transform"
-
-function SegmentBar({ segments }) {
-    return (
-        <Box className="agentic-seg-bar">
-            {segments.map(
-                (s) =>
-                    s.count > 0 && (
-                        <Box
-                            key={s.label}
-                            className="agentic-seg"
-                            title={`${s.label}: ${s.count}`}
-                            style={{ flexGrow: s.count, background: s.color }}
-                        />
-                    ),
-            )}
-        </Box>
-    );
-}
+import SegmentBar from "@/apps/dashboard/components/shared/SegmentBar";
 
 export function LegendDot({ color }) {
     return <Box className="agentic-dot" style={{ "--dot-color": color }} />;

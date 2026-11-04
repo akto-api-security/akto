@@ -788,6 +788,10 @@ public class StartTestAction extends UserAction {
             if (!filtersForTestingRunResults.equals(Filters.empty())) {
                 filterList.add(filtersForTestingRunResults);
             }
+            List<String> aiVerdicts = reportFilterList.get(AiVerificationAction.AI_VERDICT_FILTER);
+            if (aiVerdicts != null && !aiVerdicts.isEmpty()) {
+                filterList.add(resultsWithAiVerdict(testingRunResultSummaryId, aiVerdicts));
+            }
         }
 
         Bson vulnerableTestFilter = ignoreVulnerableInResults ? vulnerableFilter : Filters.eq(TestingRunResult.VULNERABLE, true);
@@ -852,6 +856,38 @@ public class StartTestAction extends UserAction {
         }
 
         return sortStage;
+    }
+
+    /**
+     * The AI verdict lives in the issue's description, so the run's vulnerable results are matched to
+     * their issues and only results whose issue has one of the verdicts are kept.
+     */
+    private Bson resultsWithAiVerdict(ObjectId testingRunResultSummaryId, List<String> aiVerdicts) {
+        boolean inVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(testingRunResultSummaryId, true);
+        List<TestingRunResult> results = VulnerableTestingRunResultDao.instance.findAll(
+            Filters.and(
+                Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId),
+                Filters.eq(TestingRunResult.VULNERABLE, true)
+            ),
+            Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE),
+            inVulnerableCollection);
+        Map<TestingIssuesId, List<ObjectId>> resultIdsByIssue = new HashMap<>();
+        for (TestingRunResult result : results) {
+            resultIdsByIssue.computeIfAbsent(getTestingIssueIdFromRunResult(result), k -> new ArrayList<>()).add(result.getId());
+        }
+        List<ObjectId> resultIds = new ArrayList<>();
+        if (!resultIdsByIssue.isEmpty()) {
+            List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
+                Filters.and(
+                    Filters.in(Constants.ID, new ArrayList<>(resultIdsByIssue.keySet())),
+                    AiVerificationAction.aiVerdictFilter(aiVerdicts)
+                ),
+                Projections.include(Constants.ID));
+            for (TestingRunIssues issue : issues) {
+                resultIds.addAll(resultIdsByIssue.getOrDefault(issue.getId(), Collections.emptyList()));
+            }
+        }
+        return Filters.in(Constants.ID, resultIds);
     }
 
     private Bson prepareIgnoredFilterListFromResults(List<Bson> filterList) {

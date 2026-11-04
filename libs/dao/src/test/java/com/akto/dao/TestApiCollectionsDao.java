@@ -2,11 +2,14 @@ package com.akto.dao;
 
 import com.akto.dto.ApiCollection;
 import com.akto.utils.MongoBasedTest;
+import com.mongodb.client.model.Filters;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
@@ -36,5 +39,25 @@ public class TestApiCollectionsDao extends MongoBasedTest {
 
         assertEquals(apiCollectionIdsSet, new HashSet<>(Arrays.asList(2000,3000,4000)));
 
+    }
+
+    @Test
+    public void testListProjectionKeepsServiceTagDisplayName() {
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        ApiCollection serviceCollection = new ApiCollection(5000, "booking-api", 5000, new HashSet<>(), "booking-api-qa.example.com", 0, false, true);
+        serviceCollection.setServiceTag("booking-api");
+        ApiCollection hostCollection = new ApiCollection(6000, "booking-api", 6000, new HashSet<>(), "booking-api-qa.example.com", 0, false, true);
+
+        ApiCollectionsDao.instance.insertMany(Arrays.asList(serviceCollection, hostCollection));
+
+        List<ApiCollection> collections = ApiCollectionsDao.instance.findAll(Filters.empty(), ApiCollectionsDao.LIST_PROJECTION);
+        Map<Integer, String> displayNames = new HashMap<>();
+        for (ApiCollection c : collections) {
+            displayNames.put(c.getId(), c.getDisplayName());
+        }
+
+        assertEquals("booking-api", displayNames.get(5000));
+        assertEquals("booking-api-qa.example.com - booking-api", displayNames.get(6000));
     }
 }

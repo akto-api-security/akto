@@ -116,7 +116,8 @@ public abstract class JobExecutor<T extends JobParams> {
     }
 
     private void handleRecurringJob(Job job) {
-        if (job.getScheduleType() != ScheduleType.RECURRING) {
+        // job is null when it was stopped while running
+        if (job == null || job.getScheduleType() != ScheduleType.RECURRING) {
             return;
         }
         logger.info("Re-scheduling recurring job: {}", job);

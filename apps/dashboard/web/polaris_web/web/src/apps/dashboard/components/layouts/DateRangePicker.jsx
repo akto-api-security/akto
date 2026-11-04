@@ -1,11 +1,15 @@
 import { Box, Button, ButtonGroup, DatePicker, HorizontalGrid, HorizontalStack, Icon, OptionList, Popover, Scrollable, Select, TextField, VerticalStack, useBreakpoints } from "@shopify/polaris";
 import {useRef, useState } from "react";
 import { CalendarMinor, ArrowRightMinor } from "@shopify/polaris-icons"
+import func from "@/util/func"
 
 function DateRangePicker(props) {
       const { mdDown, lgUp } = useBreakpoints();
       const shouldShowMultiMonth = lgUp;
-      const ranges = props.ranges;
+      // values.ranges has no 30-day preset; slot it in after "Last 7 days" so it can be re-selected.
+      const ranges = props.ranges.some((r) => r.alias === "last30days")
+        ? props.ranges
+        : [...props.ranges.slice(0, 3), func.getLast30DaysRange(), ...props.ranges.slice(3)];
       const [activeDateRange, setActiveDateRange] = useState(props.initialDispatch);
       const [inputValues, setInputValues] = useState({
         since: formatDate(props.initialDispatch.period.since),

@@ -281,6 +281,21 @@ func (c *Client) SendRequest(method, endpoint string, body interface{}) ([]byte,
 	return respBody, nil
 }
 
+// FetchOrgEmailDomains fetches the email domains of the users in this account.
+func (c *Client) FetchOrgEmailDomains() ([]string, error) {
+	body, err := c.SendRequest("POST", "/fetchOrgEmailDomains", map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("fetchOrgEmailDomains: %w", err)
+	}
+	var resp struct {
+		OrgEmailDomains []string `json:"orgEmailDomains"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("fetchOrgEmailDomains: %w", err)
+	}
+	return resp.OrgEmailDomains, nil
+}
+
 // IngestMetrics sends accumulated latency metrics to the database-abstractor for persistence.
 // accountId is included in each MetricData object so the receiver can route to the correct account DB.
 func (c *Client) IngestMetrics(metrics []interface{}) error {

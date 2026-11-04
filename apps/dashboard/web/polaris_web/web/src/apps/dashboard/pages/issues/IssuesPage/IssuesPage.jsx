@@ -50,8 +50,11 @@ const sortOptions = [
     { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest', sortKey: 'severity', columnIndex: 2 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints asc', directionLabel: 'More', sortKey: 'numberOfEndpoints', columnIndex: 5 },
     { label: 'Number of endpoints', value: 'numberOfEndpoints desc', directionLabel: 'Less', sortKey: 'numberOfEndpoints', columnIndex: 5 },
-    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 7 },
-    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
+    { label: 'Discovered time', value: 'creationTime asc', directionLabel: 'Newest', sortKey: 'creationTime', columnIndex: 8 },
+    { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 8 },
+    // No column: these only appear in the Sort menu. Verify with AI's verdict and confidence are in the description.
+    { label: 'AI confidence', value: 'aiConfidence asc', directionLabel: 'High', sortKey: 'aiConfidence' },
+    { label: 'AI confidence', value: 'aiConfidence desc', directionLabel: 'Low', sortKey: 'aiConfidence' },
 ];
 
 let filtersOptions = [
@@ -110,6 +113,16 @@ let filtersOptions = [
         label: 'Tags',
         title: 'Tags',
         choices: [],
+    },
+    {
+        key: 'aiVerdict',
+        label: 'AI verdict',
+        title: 'AI verdict',
+        choices: [
+            { label: 'False positive', value: 'FALSE_POSITIVE' },
+            { label: 'True positive', value: 'TRUE_POSITIVE' },
+            { label: 'Not verified', value: 'NOT_VERIFIED' }
+        ],
     }
 ]
 
@@ -571,11 +584,11 @@ function IssuesPage() {
 
         function verifyWithAiAction() {
             func.showConfirmationModal(
-                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"}. Issues it judges as false positives will be moved to Ignored. You can reopen them anytime.`,
+                `AI will review the ${items.length} selected issue${items.length === 1 ? "" : "s"} and add its verdict and confidence to each issue's description. Issue statuses won't change, so you can review the verdicts and mark false positives.`,
                 "Verify",
                 async () => {
                     await api.verifyIssuesWithAi(items).then(() => {
-                        setToast(true, false, "AI verification started. False positives will move to Ignored - refresh in a few minutes to see the results.")
+                        setToast(true, false, "AI verification started. Refresh in a few minutes to see the verdicts in the issue descriptions.")
                         resetResourcesSelected()
                     }).catch(() => {
                         // request() already shows the server's error as a toast
@@ -681,11 +694,11 @@ function IssuesPage() {
                 onAction: () => { ignoreAction('noTimeToFix') },
                 requires: ignoreRequires('noTimeToFix')
             },
-            ...(func.checkForFeatureSaas('AKTO_GPT_AI') ? [{
+            {
                 content: 'Verify with AI',
                 onAction: () => { verifyWithAiAction() },
                 requires: 'api/verifyIssuesWithAi'
-            }] : []),
+            },
             {
                 content: 'Export selected Issues',
                 onAction: () => { openVulnerabilityReport(items, false) },
@@ -922,6 +935,7 @@ function IssuesPage() {
         let filterStatus = [selectedTab.toUpperCase()]
         let filterSeverity = filters.severity
         let filterCompliance = filters.compliance
+        let filterAiVerdict = filters.aiVerdict
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const filterCollectionsId = mergeFilterCollectionsId(filters, pageScopeApiCollectionIds)
         let filterSubCategory = []
@@ -939,7 +953,8 @@ function IssuesPage() {
             filterSubCategory: filterSubCategory,
             startEpoch: [startTimestamp.toString()],
             endTimeStamp: [endTimestamp.toString()],
-            activeCollections: [activeCollections.toString()]
+            activeCollections: [activeCollections.toString()],
+            filterAiVerdict: filterAiVerdict
         }
         setIssuesFilters(obj)
 
@@ -948,7 +963,7 @@ function IssuesPage() {
 
         let issueItem = []
 
-        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance, filterAiVerdict).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory || ''}|${item?.severity || ''}|${item?.testRunIssueStatus || ''}`
@@ -1042,7 +1057,7 @@ function IssuesPage() {
         }
         let issueItems = []
 
-        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance, filters?.aiVerdict || []).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
                 if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
                 const issue = {
@@ -1099,7 +1114,7 @@ function IssuesPage() {
         }
         let issueItems = []
 
-        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+        await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance, filters?.aiVerdict || []).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
                 if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
                 const issue = {

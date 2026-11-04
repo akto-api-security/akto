@@ -1,9 +1,13 @@
 package com.akto.util;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.util.enums.GlobalEnums;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
@@ -82,6 +86,42 @@ public final class AgenticObserveUtil {
             }
         }
         return sb.length() > 0 ? sb.toString() : raw;
+    }
+
+    public static void retainSkillsWithApiInfo(List<ApiCollection> collections) {
+        List<Integer> idsWithSkills = new ArrayList<>();
+        for (ApiCollection c : collections) {
+            if (c.getSkills() != null && !c.getSkills().isEmpty()) {
+                idsWithSkills.add(c.getId());
+            }
+        }
+        if (idsWithSkills.isEmpty()) {
+            return;
+        }
+
+        Set<String> existing = new HashSet<>();
+        List<ApiInfo> infos = ApiInfoDao.instance.findAll(
+            Filters.and(
+                Filters.in(ApiInfo.ID_API_COLLECTION_ID, idsWithSkills),
+                Filters.regex(ApiInfo.ID_URL, "^/skills/")),
+            Projections.include(Constants.ID));
+        for (ApiInfo info : infos) {
+            String url = info.getId().getUrl();
+            existing.add(info.getId().getApiCollectionId() + "|" + url.substring("/skills/".length()).toLowerCase(Locale.ROOT));
+        }
+
+        for (ApiCollection c : collections) {
+            if (c.getSkills() == null || c.getSkills().isEmpty()) {
+                continue;
+            }
+            List<String> kept = new ArrayList<>();
+            for (String s : c.getSkills()) {
+                if (StringUtils.isNotBlank(s) && existing.contains(c.getId() + "|" + s.toLowerCase(Locale.ROOT))) {
+                    kept.add(s);
+                }
+            }
+            c.setSkills(kept);
+        }
     }
 
     public static Set<String> getSkillNames(ApiCollection collection) {

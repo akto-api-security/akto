@@ -134,6 +134,7 @@ function SingleRequest(){
                 key="Sample values"
                 sampleData={sampleData}
                 heading={"Sample values"}
+                isAPISampleData={true}
               />,
             ]}
         />

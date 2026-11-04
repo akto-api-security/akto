@@ -1,6 +1,6 @@
 """gcp_auth — JWT signing + token exchange, with the network mocked.
 
-Proves _load_private_key (PKCS#8 -> PKCS#1) + rsa RS256 signing produce a
+Proves jwt_sign.load_private_key (PKCS#8 -> PKCS#1) + rsa RS256 signing produce a
 verifiable assertion, and that get_token caches by service account.
 """
 
@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa as crsa
 
 import gcp_auth
+from jwt_sign import load_private_key
 
 
 def _make_sa_info(email="svc@proj.iam.gserviceaccount.com"):
@@ -61,7 +62,7 @@ def patch_httpx_and_cache(monkeypatch):
 
 def test_load_private_key_roundtrips():
     sa_info, _ = _make_sa_info()
-    pk = gcp_auth._load_private_key(sa_info["private_key"])
+    pk = load_private_key(sa_info["private_key"])
     assert isinstance(pk, rsa.PrivateKey)
 
 
