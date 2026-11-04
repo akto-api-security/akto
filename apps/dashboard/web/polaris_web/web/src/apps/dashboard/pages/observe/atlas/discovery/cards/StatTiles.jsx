@@ -11,7 +11,7 @@ function subLine(id, tile) {
     if (id === "browser" && tile.personalAccounts > 0) return { text: `${format(tile.personalAccounts)} personal accounts`, critical: true };
     // Skills and plugins cannot be approved or blocked here, so there is no review line, just the count.
     if (id === "skills") return { text: "" };
-    return tile.unapproved > 0 ? { text: `${format(tile.unapproved)} unapproved`, critical: true } : { text: "All approved" };
+    return tile.unapproved > 0 ? { text: `${format(tile.unapproved)} need a decision`, critical: true } : { text: "All approved" };
 }
 
 function Tile({ value, sub, critical }) {

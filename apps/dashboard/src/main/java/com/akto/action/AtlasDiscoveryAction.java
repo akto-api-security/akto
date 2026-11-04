@@ -186,10 +186,13 @@ public class AtlasDiscoveryAction extends UserAction {
     private static CachedDevices loadDevices() {
         long nowMs = System.currentTimeMillis();
         DEVICE_CACHE.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * DEVICE_CACHE_TTL_MS);
-        return DEVICE_CACHE.compute(Context.accountId.get(), (account, cached) -> {
-            if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < DEVICE_CACHE_TTL_MS) return cached;
-            return new CachedDevices(ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), ModuleInfoDao.instance.countEndpointShieldRows(), System.currentTimeMillis());
-        });
+        Integer account = Context.accountId.get();
+        CachedDevices cached = DEVICE_CACHE.get(account);
+        if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < DEVICE_CACHE_TTL_MS) return cached;
+        // Read outside the map's lock; two concurrent loads at worst both read and the later put wins.
+        cached = new CachedDevices(ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), ModuleInfoDao.instance.countEndpointShieldRows(), System.currentTimeMillis());
+        DEVICE_CACHE.put(account, cached);
+        return cached;
     }
 
     private static int bucketUp(int timestamp) {

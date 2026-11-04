@@ -223,7 +223,7 @@ public class AtlasDiscoveryService {
         Map<String, Integer> devicesByUser = new HashMap<>();
         for (String deviceId : tool.row.getDeviceIds()) {
             String username = usernameByDevice.get(deviceId);
-            if (StringUtils.isNotBlank(username) && !UNKNOWN_USERNAME.equals(username)) devicesByUser.merge(username, 1, Integer::sum);
+            if (isKnownUser(username)) devicesByUser.merge(username, 1, Integer::sum);
         }
         List<Map<String, Object>> users = new ArrayList<>();
         devicesByUser.entrySet().stream()
@@ -295,11 +295,26 @@ public class AtlasDiscoveryService {
         }
     }
 
+    private static boolean isKnownUser(String username) {
+        return StringUtils.isNotBlank(username) && !UNKNOWN_USERNAME.equals(username);
+    }
+
+    // Only the users on devices with a personal account; a tool with no per-device detail falls back to all its users.
+    private Set<String> personalUsersOf(Tool tool) {
+        if (tool.row.getPersonalDeviceIds().isEmpty()) return tool.users;
+        Set<String> users = new HashSet<>();
+        for (String deviceId : tool.row.getPersonalDeviceIds()) {
+            String username = usernameByDevice.get(deviceId);
+            if (isKnownUser(username)) users.add(username);
+        }
+        return users;
+    }
+
     private Set<String> usersOf(AtlasToolRow row) {
         Set<String> users = new HashSet<>();
         for (String deviceId : row.getDeviceIds()) {
             String username = usernameByDevice.get(deviceId);
-            if (StringUtils.isNotBlank(username) && !UNKNOWN_USERNAME.equals(username)) users.add(username);
+            if (isKnownUser(username)) users.add(username);
         }
         return users;
     }
@@ -331,7 +346,7 @@ public class AtlasDiscoveryService {
                 count++;
                 if (tool.needsDecision()) unapproved++;
                 if (tool.row.isMisconfigured()) misconfigured++;
-                if (tool.row.isPersonal()) personalUsers.addAll(tool.users);
+                if (tool.row.isPersonal()) personalUsers.addAll(personalUsersOf(tool));
             }
             Map<String, Object> tile = new LinkedHashMap<>();
             tile.put("id", category);
@@ -613,7 +628,7 @@ public class AtlasDiscoveryService {
         for (String team : teamByUser.values()) headcount.merge(team, 1, Integer::sum);
         List<Map<String, Object>> teamNodes = new ArrayList<>();
         for (String team : teams) {
-            Map<String, Object> teamNode = node("team:" + team, team, null, devicesByTeam.get(team).size(), null);
+            Map<String, Object> teamNode = node("team:" + team, team.isEmpty() ? "Untagged devices" : team, null, devicesByTeam.get(team).size(), null);
             // Untagged devices have no known headcount.
             if (headcount.containsKey(team)) teamNode.put("employees", headcount.get(team));
             teamNodes.add(teamNode);

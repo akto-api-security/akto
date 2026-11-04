@@ -25,13 +25,19 @@ export function useToolsExport({ startTimestamp, endTimestamp, deviceScope }) {
         setExporting(true);
         try {
             const rows = [];
+            let total = 0;
             for (let skip = 0; skip < EXPORT_ROW_LIMIT; skip += EXPORT_PAGE_SIZE) {
                 const response = await discoveryApi.fetchAtlasTools({ startTimestamp, endTimestamp, deviceScope, skip, limit: EXPORT_PAGE_SIZE });
                 const page = response?.tools || [];
+                total = response?.total || 0;
                 rows.push(...page);
                 if (page.length < EXPORT_PAGE_SIZE || rows.length >= (response?.total || 0)) break;
             }
-            func.saveCsv(toCsvLines(rows), "atlas-ai-tools");
+            const lines = toCsvLines(rows);
+            // The byte-order mark keeps Excel from garbling non-ASCII tool names.
+            lines[0] = `\uFEFF${lines[0]}`;
+            func.saveCsv(lines, "atlas-ai-tools");
+            if (total > rows.length) func.setToast(true, false, `Exported the first ${rows.length.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} tools`);
         } catch (error) {
             func.setToast(true, true, "Failed to export the tools");
         } finally {

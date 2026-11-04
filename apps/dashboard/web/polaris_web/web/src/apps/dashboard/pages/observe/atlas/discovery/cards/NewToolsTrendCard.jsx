@@ -38,7 +38,7 @@ export default function NewToolsTrendCard({ periods, status }) {
             legend={<StatusLegend statuses={TREND_STATUSES} selected={selected} onSelect={setSelected} />}
             status={status}
             empty={!hasData}
-            emptyText="No tools have been discovered yet."
+            emptyText="No tools to show yet."
         >
             <StackedBarChart categories={categories} series={series} height={CHART_HEIGHT} tooltipFormatter={tooltipOf} />
         </DiscoveryCard>

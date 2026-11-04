@@ -27,6 +27,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -53,6 +54,7 @@ public class AtlasAssetStatusService {
             AtlasAssetStatus.BLOCKED, AtlasAssetStatus.APPROVED, AtlasAssetStatus.UNDER_REVIEW, AtlasAssetStatus.UNAPPROVED);
 
     private static final Map<String, CachedDecisions> CACHE = new ConcurrentHashMap<>();
+    private static final AtomicLong GENERATION = new AtomicLong();
 
     private static class CachedDecisions {
         final Map<String, AtlasAssetStatus> decisions;
@@ -93,14 +95,17 @@ public class AtlasAssetStatusService {
         // Drop long-expired entries (never one being refreshed) so the map stays bounded.
         long nowMs = System.currentTimeMillis();
         CACHE.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * CACHE_TTL_MS);
-        CachedDecisions cached = CACHE.compute(cacheKey, (k, existing) -> {
-            if (existing != null && System.currentTimeMillis() - existing.loadedAtMs < CACHE_TTL_MS) return existing;
-            return new CachedDecisions(readDecisions(), System.currentTimeMillis());
-        });
+        CachedDecisions cached = CACHE.get(cacheKey);
+        if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < CACHE_TTL_MS) return cached.decisions;
+        // Read outside the map's lock. A write that lands meanwhile bumps the generation, so a snapshot read before it is not cached.
+        long generation = GENERATION.get();
+        cached = new CachedDecisions(readDecisions(), System.currentTimeMillis());
+        if (GENERATION.get() == generation) CACHE.put(cacheKey, cached);
         return cached.decisions;
     }
 
     public static void invalidate() {
+        GENERATION.incrementAndGet();
         String prefix = Context.accountId.get() + "_";
         CACHE.keySet().removeIf(key -> key.startsWith(prefix));
     }

@@ -68,7 +68,7 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
                 groupPadding: 0,
                 borderWidth: 0,
                 cursor: onBarClick ? 'pointer' : undefined,
-                dataLabels: showDataLabels ? { enabled: true } : undefined,
+                ...(showDataLabels ? { dataLabels: { enabled: true } } : {}),
                 point: {
                     events: {
                         click: onBarClick ? function() { onBarClick(this.name, this.options.custom) } : undefined

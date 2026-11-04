@@ -1569,9 +1569,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             />
           </HorizontalStack>
         }
-        searchBelow={atlasToolKey || advancedFilters.length > 0 ? (
+        searchBelow={atlasToolKey ? (
           <HorizontalStack gap="2" blockAlign="center">
-            {atlasToolKey && <Tag onRemove={clearAtlasTool}>{`Tool: ${atlasToolName}`}</Tag>}
+            <Tag onRemove={clearAtlasTool}>{`Tool: ${atlasToolName}`}</Tag>
             {advancedFilters.length > 0 && (
               <AdvancedPayloadSearch
                 filters={advancedFilters}
@@ -1580,6 +1580,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
               />
             )}
           </HorizontalStack>
+        ) : advancedFilters.length > 0 ? (
+          <AdvancedPayloadSearch
+            filters={advancedFilters}
+            onChange={handleAdvancedFiltersChange}
+            showButton={false}
+          />
         ) : null}
         callFromOutside={advancedFetchKey + refreshNonce + groupToggles}
         clearSelectionKey={refreshNonce}

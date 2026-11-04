@@ -87,6 +87,8 @@ function AgenticDiscoveryOverview() {
     };
 
     const closeFlyout = useCallback(() => setOpenRow(null), []);
+    // A tool may not exist in the new device scope, so its flyout would only show an error.
+    useEffect(() => { setOpenRow(null); }, [deviceScope]);
 
     const agentMatrix = useMemo(() => (data?.agentMcpMatrix ? agentMcpMatrix(data.agentMcpMatrix) : null), [data]);
     const teamsMatrix = useMemo(() => (data?.teamCategoryMatrix ? teamMatrix(data.teamCategoryMatrix) : null), [data]);

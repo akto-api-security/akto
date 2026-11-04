@@ -4069,13 +4069,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             row.setDeviceIds(new HashSet<>(g.endpointIds));
             row.setCapabilityCollectionIds(g.capabilityCollectionIds.stream().limit(ATLAS_CAPABILITY_COLLECTIONS).collect(Collectors.toList()));
             if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) row.setRawValues(new ArrayList<>(aiAgentRawValues(g)));
+            // Servers that differ only by case are one server; one with no resolved device is left out.
+            Map<String, String> serverNames = new HashMap<>();
             for (Map.Entry<String, Set<Integer>> e : g.serviceCollectionIds.entrySet()) {
                 Set<String> devices = new HashSet<>();
                 for (Integer collectionId : e.getValue()) {
                     String deviceId = deviceByCollection.get(collectionId);
                     if (deviceId != null) devices.add(deviceId);
                 }
-                row.getMcpDevices().put(e.getKey(), devices);
+                if (devices.isEmpty()) continue;
+                String name = serverNames.computeIfAbsent(e.getKey().toLowerCase(Locale.ROOT), k -> e.getKey());
+                row.getMcpDevices().computeIfAbsent(name, k -> new HashSet<>()).addAll(devices);
             }
             rows.add(row);
         }

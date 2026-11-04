@@ -425,4 +425,16 @@ public class TestAtlasDiscoveryService {
         assertEquals(Arrays.asList("dev.agent.name", "name"), AtlasAssetStatusService.serverNamesOf("Dev.Agent.Name"));
         assertEquals(Collections.singletonList("name"), AtlasAssetStatusService.serverNamesOf("Name"));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void personalAccountsCountOnlyUsersOnThePersonalDevices() {
+        AtlasToolRow agent = tool("agent", "agent-a", 1, NOW, "d1", "d2");
+        agent.setPersonal(true);
+        agent.setPersonalDeviceIds(new HashSet<>(Collections.singletonList("d1")));
+        Map<String, Object> tiles = section(service(Collections.singletonList(agent), new HashMap<>(), Collections.emptySet()).buildOverview(), "tiles");
+        Map<String, Object> agents = ((List<Map<String, Object>>) tiles.get("categories")).stream()
+                .filter(category -> "agents".equals(category.get("id"))).findFirst().get();
+        assertEquals(1, agents.get("personalAccounts"));
+    }
 }

@@ -32,11 +32,14 @@ export const CATEGORY_SHORT = {
     local: "Local",
 };
 
+// Mirrors RISK_REACH_LIMIT in AtlasDiscoveryService.
+const RISK_REACH_LIMIT = 50;
+
 export const SUBTITLES = {
     decisions: "Newly discovered or unreviewed tools, ranked by risk and spread",
     adoption: "Employees using each tool",
     trend: "Tools by when they were first seen, colored by current status",
-    reach: "Each circle is a tool, sized by the employees using it. The shaded corner is high risk on many devices. Select a circle for details.",
+    reach: `Top ${RISK_REACH_LIMIT} tools by devices. Each circle is a tool, sized by its employees. The shaded corner is high risk on many devices. Select a circle for details.`,
     chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first. Line width shows devices.",
     agentMcp: "Devices where an agent has each MCP server configured; darker means more devices. Shows up to 5 agents and 8 MCP servers, the busiest first.",
     teams: "Share of each team's employees using a category",

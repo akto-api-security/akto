@@ -205,6 +205,12 @@ export const openThreatActivityPage = (filters = {}) =>
 export const openGuardrailActivityPage = (filters = {}) =>
     openActivityPage("/dashboard/guardrails/activity", filters);
 
+// Drops the filters saved for Guardrail Activity (every tab), so a link into it starts from only its own filters.
+export const clearSavedGuardrailActivityFilters = () => {
+    const { filtersMap, setFiltersMap } = PersistStore.getState();
+    setFiltersMap(Object.fromEntries(Object.entries(filtersMap || {}).filter(([pageKey]) => !pageKey.startsWith("/dashboard/guardrails/activity/"))));
+};
+
 // In-app link to Guardrail Activity, for a same-tab navigate.
 export const guardrailActivityLink = (filters = {}) => activityLink("/dashboard/guardrails/activity", filters);
 
