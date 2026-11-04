@@ -16,7 +16,7 @@ import metrics_push
 import providers
 import reachback
 import scan_diag
-from constants import get_default_config
+from constants import get_default_config, get_enrichment_config
 from model_map import build_arbiter
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
@@ -170,8 +170,17 @@ async def guardrails_llm(body: GuardrailsLLMRequest):
 
 @app.post("/guardrails/llm/async")
 async def guardrails_llm_async(body: GuardrailsLLMRequest):
-    """Same as /guardrails/llm for the calls that run after the block has been returned (reason, evidence,
-    remediation): a larger reply ceiling, since nobody is waiting on them."""
+    """Same as /guardrails/llm for the enrichment calls that run after the block has been returned
+    (reason, evidence, remediation): a larger reply ceiling, since nobody is waiting on them. Runs on
+    ENRICHMENT_MODEL_CONFIG_JSON when set, so this load stays off the core guardrails model; unset,
+    it uses the core model exactly as /guardrails/llm does."""
+    return await _run_guardrails_llm(body, relaxed=True, enrichment=True)
+
+
+@app.post("/guardrails/llm/session")
+async def guardrails_llm_session(body: GuardrailsLLMRequest):
+    """The session risk summary. Also runs after the turn, so it gets the larger reply ceiling, but
+    the summary feeds the next turn's verdict, so it always stays on the core model."""
     return await _run_guardrails_llm(body, relaxed=True)
 
 
@@ -189,12 +198,15 @@ async def reachback_test(body: dict[str, Any]):
         return JSONResponse(status_code=502, content=exc.as_dict())
 
 
-async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool):
+async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool, enrichment: bool = False):
     start = time.perf_counter()
     logger.debug(f"[GuardrailsLLM] request received: model={body.model!r} prompt_len={len(body.prompt)}")
-    provider = build_arbiter(get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"], body.model)
+    config = get_enrichment_config() if enrichment else None
+    source = "enrichment" if config else "default"
+    config = config or get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+    provider = build_arbiter(config["modelConfigs"], body.model)
     if provider is None:
-        logger.warning("[GuardrailsLLM] not configured (no usable FINAL_ARBITER entry in the model config)")
+        logger.warning(f"[GuardrailsLLM] not configured (no usable FINAL_ARBITER entry in the {source} model config)")
         raise HTTPException(
             status_code=503,
             detail="guardrails LLM not configured (no usable FINAL_ARBITER entry in the model config)",
@@ -209,7 +221,7 @@ async def _run_guardrails_llm(body: GuardrailsLLMRequest, relaxed: bool):
     elapsed_ms = (time.perf_counter() - start) * 1000
     logger.debug(f"[GuardrailsLLM] response: {content!r}")
     logger.info(
-        f"[GuardrailsLLM] provider={provider.name} prompt_len={len(body.prompt)} "
+        f"[GuardrailsLLM] provider={provider.name} source={source} prompt_len={len(body.prompt)} "
         f"relaxed={relaxed} response_len={len(content)} ms={elapsed_ms:.0f}"
     )
     return {"content": content}

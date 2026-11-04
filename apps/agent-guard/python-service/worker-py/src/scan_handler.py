@@ -20,6 +20,7 @@ from constants import (
     apply_scanner_response_format,
     canonical_scanner,
     get_default_config,
+    get_enrichment_config,
     single_model_config,
     strip_qwen_tier,
 )
@@ -63,14 +64,17 @@ def scanners_metadata() -> dict:
 
 async def _generate_reason(payload: dict) -> dict:
     """Explain an already-decided block: one call to the FINAL_ARBITER entry, asking
-    only for the reason — not a fresh verdict. Every scanner shares this one prompt."""
+    only for the reason — not a fresh verdict. Every scanner shares this one prompt.
+    ENRICHMENT_MODEL_CONFIG_JSON, when set, wins over the policy's modelConfigs so the
+    core model is kept for verdicts; unset, the policy's (else the default) config is used."""
     scanner_name = canonical_scanner(payload.get("scanner_name", ""))
     text = payload.get("text", "")
-    config = payload.get("config") or {}
-    if not config.get("modelConfigs"):
-        default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
-        config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
-    provider = build_arbiter(config.get("modelConfigs"))
+    model_configs = (get_enrichment_config() or {}).get("modelConfigs")
+    if not model_configs:
+        model_configs = (payload.get("config") or {}).get("modelConfigs")
+    if not model_configs:
+        model_configs = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"]
+    provider = build_arbiter(model_configs)
     if provider is None:
         return shape_response(scanner_name, True, 0.0, text, {"reason": ""})
     reason = ""

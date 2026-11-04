@@ -26,6 +26,25 @@ cp .env.example .env   # edit once — never commit .env
   `cp .env python-service/worker-py/.dev.vars.exec` and edit that one key, then  
   `./scripts/set-secrets.sh .dev.vars.exec -c wrangler-exec.jsonc`
 
+## Enrichment model (`ENRICHMENT_MODEL_CONFIG_JSON`)
+
+A separate model for the post-verdict enrichment calls, so they don't load the
+core guardrails model. Same JSON shape as `DEFAULT_MODEL_CONFIG_JSON`; only its
+`FINAL_ARBITER` (and optional `FINAL_ARBITER_BACKUP`) entries are used.
+
+| Route | Unset (default) | Set |
+|-------|-----------------|-----|
+| `POST /guardrails/llm` (blocking LLM rules, PII) | core model | core model |
+| `POST /guardrails/llm/session` (session risk summary) | core model | core model |
+| `POST /guardrails/llm/async` (evidence line, remediation, custom-rule reason) | core model | enrichment model |
+| `POST /scan` with `enrichment: "reason"` | policy `modelConfigs`, else core model | enrichment model |
+
+Unset, unparseable, or without `modelConfigs` → behaves exactly as before (a
+warning is logged for the last two). Set but its provider can't be built (e.g.
+missing key) → enrichment calls fail (503 / empty reason) rather than silently
+falling back onto the core model. Logs carry `source=enrichment|default` on
+`[GuardrailsLLM]` lines.
+
 ## Docker-only vs Cloudflare-only keys
 
 | Variable | Docker | Cloudflare |
