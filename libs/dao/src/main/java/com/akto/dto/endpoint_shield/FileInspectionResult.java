@@ -31,6 +31,7 @@ public class FileInspectionResult {
     public static final String STATUS = "status";
     public static final String ERROR_MESSAGE = "errorMessage";
     public static final String MATCHES = "matches";
+    public static final String AGENT = "agent";
 
     public enum Status {
         OK,
@@ -51,6 +52,7 @@ public class FileInspectionResult {
         public static final String CONTENT_BLOB_NAME = "contentBlobName";
         public static final String CONTENT_TRUNCATED = "contentTruncated";
         public static final String READ_ERROR = "readError";
+        public static final String ROLE = "role";
 
         private String path;
         private boolean exists;
@@ -62,6 +64,7 @@ public class FileInspectionResult {
         private String contentBlobName; // Azure blob name for larger content
         private boolean contentTruncated;
         private String readError;       // permission denied, encoding error, etc.
+        private String role;            // login | credentials | mcp_config
 
         @BsonIgnore
         private String contentRaw;      // transient: base64 bytes from agent, replaced by contentBlobName before DB write
@@ -81,4 +84,5 @@ public class FileInspectionResult {
     private Status status;
     private String errorMessage;
     private List<Match> matches;
+    private String agent;
 }
