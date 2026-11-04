@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
@@ -423,10 +423,29 @@ const transform = {
         }
     },
 
-    // Suppressed when either score is 0/falsy — a "0" risk-score badge showing a non-zero base
-    // score (or vice versa) in its tooltip reads as contradictory, so both have to be meaningfully
-    // non-zero before the extra context is worth surfacing.
-    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason){
+    // Prefer riskScoreFactors (point breakdown from ApiInfoDao.getRiskScore) when present — that is
+    // what Agentic assets rows ship. Fall back to the older baseRiskScoreReason string used on
+    // inventory / collection pages. Suppressed when the badge score is 0/falsy so a blank cell
+    // never shows a contradictory explanation.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors){
+        if (riskScore && Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) {
+            return (
+                <Tooltip dismissOnMouseOut content={
+                    <Box>
+                        <VerticalStack gap="1">
+                            <Text variant="bodyMd" fontWeight="semibold">Highest-risk endpoint in this asset</Text>
+                            {riskScoreFactors.map((factor, index) => (
+                                <Text key={index} variant="bodyMd">
+                                    {factor.points} → {factor.label}
+                                </Text>
+                            ))}
+                        </VerticalStack>
+                    </Box>
+                }>
+                    {badge}
+                </Tooltip>
+            );
+        }
         if(!baseRiskScoreReason || !riskScore || !baseRiskScore) return badge;
         return (
             <Tooltip dismissOnMouseOut content={

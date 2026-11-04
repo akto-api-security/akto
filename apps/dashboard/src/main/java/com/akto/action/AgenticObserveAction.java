@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.utils.ArgusCollectionScope;
+import com.akto.utils.RiskScoreExplainer;
 import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.ApiCollectionsDao;
@@ -152,6 +153,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     private static final class SkillDataCacheEntry {
         final Map<String, Float> skillScoreMap;
+        // skillName -> factor lines for the same ApiInfo that last wrote skillScoreMap (legacy tooltip)
+        final Map<String, List<BasicDBObject>> skillScoreFactorsMap;
         final Set<String> maliciousSkills;
         final Set<String> maliciousSkillKeys;
         final Set<String> misconfiguredSkills;
@@ -159,10 +162,12 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         // Same "<collectionId>|<skillNameLowercase>" keys as maliciousSkillKeys -> that copy's skill-tags
         final Map<String, Set<String>> skillTagsByKey;
         final long builtAt;
-        SkillDataCacheEntry(Map<String, Float> skillScoreMap, Set<String> maliciousSkills, Set<String> maliciousSkillKeys,
+        SkillDataCacheEntry(Map<String, Float> skillScoreMap, Map<String, List<BasicDBObject>> skillScoreFactorsMap,
+                Set<String> maliciousSkills, Set<String> maliciousSkillKeys,
                 Set<String> misconfiguredSkills, Set<Integer> misconfiguredCollectionIds,
                 Map<String, Set<String>> skillTagsByKey, long builtAt) {
             this.skillScoreMap = skillScoreMap;
+            this.skillScoreFactorsMap = skillScoreFactorsMap;
             this.maliciousSkills = maliciousSkills;
             this.maliciousSkillKeys = maliciousSkillKeys;
             this.misconfiguredSkills = misconfiguredSkills;
@@ -200,6 +205,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     ));
 
             Map<String, Float> skillScoreMap = new HashMap<>();
+            Map<String, List<BasicDBObject>> skillScoreFactorsMap = new HashMap<>();
             Set<String> maliciousSkills = new HashSet<>();
             // Collection-scoped "<collectionId>|<skillNameLowercase>" keys — matches constants.js's
             // skillCollectionKey exactly — so a same-named skill on a different user/collection
@@ -221,6 +227,11 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     String skillName = url.substring(idx + "skills/".length());
                     if (!skillName.isEmpty()) {
                         skillScoreMap.put(skillName, info.getRiskScore());
+                        // Same overwrite semantics as skillScoreMap — factors track the ApiInfo that
+                        // last wrote the score so the legacy skill badge tooltip matches the number.
+                        List<BasicDBObject> factors = RiskScoreExplainer.explain(info);
+                        if (!factors.isEmpty()) skillScoreFactorsMap.put(skillName, factors);
+                        else skillScoreFactorsMap.remove(skillName);
                         if (malicious) {
                             maliciousSkills.add(skillName);
                             maliciousSkillKeys.add(info.getId().getApiCollectionId() + "|" + skillName.toLowerCase(Locale.ROOT));
@@ -238,8 +249,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             loggerMaker.warnAndAddToDb("[agenticSkillDataCache] rebuilt: " + (System.currentTimeMillis() - tStart)
                     + "ms, apiInfos=" + apiInfos.size() + ", maliciousSkillKeys=" + maliciousSkillKeys.size());
-            return new SkillDataCacheEntry(skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills,
-                    misconfiguredCollectionIds, skillTagsByKey, System.currentTimeMillis());
+            return new SkillDataCacheEntry(skillScoreMap, skillScoreFactorsMap, maliciousSkills, maliciousSkillKeys,
+                    misconfiguredSkills, misconfiguredCollectionIds, skillTagsByKey, System.currentTimeMillis());
         });
     }
 
@@ -247,6 +258,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         response = new BasicDBObject();
         SkillDataCacheEntry cached = getOrBuildSkillData();
         response.put("skillScoreMap", cached.skillScoreMap);
+        response.put("skillScoreFactorsMap", cached.skillScoreFactorsMap);
         response.put("maliciousSkills", new ArrayList<>(cached.maliciousSkills));
         response.put("maliciousSkillKeys", new ArrayList<>(cached.maliciousSkillKeys));
         response.put("misconfiguredSkills", new ArrayList<>(cached.misconfiguredSkills));
@@ -618,6 +630,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         final Map<String, Set<Integer>> serviceCollectionIds = new HashMap<>();
         final List<Integer> collectionIds = new ArrayList<>();
         double maxRiskScore = 0;
+        // Collection whose collRisk last raised maxRiskScore — used to load the winning endpoint's
+        // factor breakdown for the risk-score tooltip (see fetchAgenticAssetsSummary page loop).
+        Integer winningCollectionId;
         Double baseRiskScore;
         String baseRiskScoreReason;
         int maxTrafficTimestamp = 0;
@@ -694,6 +709,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
             if (collRisk > maxRiskScore) {
                 maxRiskScore = collRisk;
+                winningCollectionId = c.getId();
                 baseRiskScore = c.getBaseRiskScore();
                 baseRiskScoreReason = c.getBaseRiskScoreReason();
             }
@@ -2422,9 +2438,27 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
             SkillDataCacheEntry skillData = getOrBuildSkillData();
             Set<String> maliciousKeys = skillData.maliciousSkillKeys;
+            // Risk-score tooltip factors: one aggregation for this page's winning collections only
+            // (not all ~800 groups). Explains the endpoint that produced each row's max riskScore.
+            Set<Integer> winningCollectionIds = new HashSet<>();
+            for (GroupSummary g : page) {
+                if (g.winningCollectionId != null && g.maxRiskScore > 0 && !"plugin".equals(g.rowType)) {
+                    winningCollectionIds.add(g.winningCollectionId);
+                }
+            }
+            Map<Integer, ApiInfo> winningApiInfos =
+                    RiskScoreExplainer.loadHighestRiskApiInfoByCollection(winningCollectionIds);
             List<BasicDBObject> rowsOut = new ArrayList<>();
             for (GroupSummary g : page) {
                 BasicDBObject row = g.toSummaryResponse();
+                if (!"plugin".equals(g.rowType) && g.winningCollectionId != null && g.maxRiskScore > 0) {
+                    ApiInfo winning = winningApiInfos.get(g.winningCollectionId);
+                    if (winning != null) {
+                        float displayed = ((Number) row.get("riskScore")).floatValue();
+                        List<BasicDBObject> factors = RiskScoreExplainer.explain(winning, displayed);
+                        if (!factors.isEmpty()) row.put("riskScoreFactors", factors);
+                    }
+                }
                 // devices itself is NOT sent (dropped in favor of the two small values actually
                 // derived from it below) — a group with hundreds of member devices turned this into
                 // the single biggest contributor to a 16MB response once hostNames/collectionIds were
