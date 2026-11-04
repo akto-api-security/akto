@@ -1305,18 +1305,28 @@ const settingRequests = {
     fetchFileInspectionRules() {
         return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
     },
-    addFileInspectionRule(path, existenceOnly, maxDepth) {
+    addFileInspectionRule(path, existenceOnly, maxDepth, agent, os, role) {
         return request({
             url: '/api/addFileInspectionRule',
             method: 'post',
-            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
         })
     },
-    deleteFileInspectionRule(path) {
+    updateFileInspectionRule(ruleId, path, existenceOnly, maxDepth, agent, os, role) {
+        return request({
+            url: '/api/updateFileInspectionRule',
+            method: 'post',
+            data: { ruleId, path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
+        })
+    },
+    restoreFileInspectionDefaults() {
+        return request({ url: '/api/restoreFileInspectionDefaults', method: 'post', data: {} })
+    },
+    deleteFileInspectionRule(ruleId) {
         return request({
             url: '/api/deleteFileInspectionRule',
             method: 'post',
-            data: { path }
+            data: { ruleId }
         })
     },
     fetchFileInspectionResults(ruleId) {
