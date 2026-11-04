@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import api from "../api";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
+import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Tag, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents, showsActivityGrouping } from "../utils/activityGroups";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
@@ -284,6 +284,16 @@ const HUMAN_RESPONSE = { PENDING: "PENDING", APPROVED: "APPROVED", BLOCKED: "BLO
 
 function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABELS.THREAT, initialTab, onRegisterPayloadSearch, onRegisterExport, refreshNonce = 0 }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  // An Atlas tool picked on the discovery overview; its events only.
+  const atlasToolKey = new URLSearchParams(location.search).get("tool") || "";
+  const atlasToolName = new URLSearchParams(location.search).get("toolName") || atlasToolKey;
+  const clearAtlasTool = () => {
+    const params = new URLSearchParams(location.search);
+    params.delete("tool");
+    params.delete("toolName");
+    navigate({ search: params.toString(), hash: location.hash }, { replace: true });
+  };
   const { canCall } = usePermissions();
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
@@ -1059,7 +1069,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       riskScoreFilterType,
       riskScoreFilterValue,
       isNeedsApproval,
-      caseFilters: caseFilterRequestParams(currentTab, filters),
+      caseFilters: { ...caseFilterRequestParams(currentTab, filters), atlasToolKey: atlasToolKey || undefined },
     };
 
     const res = await api.fetchSuspectSampleData(
@@ -1087,7 +1097,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       riskScoreFilterValue,
       undefined,
       !groupActivities,
-      caseFilterRequestParams(currentTab, filters)
+      { ...caseFilterRequestParams(currentTab, filters), atlasToolKey: atlasToolKey || undefined }
     );
 
     // Store the total count for filtered results
@@ -1495,7 +1505,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   // Recompute rows once the async guardrail compliance map has loaded (same pattern as usernameMapLoaded).
   const guardrailComplianceLoaded = !needsGuardrailCompliance || Object.keys(guardrailComplianceMap).length > 0;
   // Owners' names fill the Owner column, so the Under Review tab refetches once they have loaded (as for usernames).
-  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '') + (currentTab === 'under_review' && caseOwnersLoaded ? '_co' : '');
+  const key = startTimestamp + endTimestamp + currentTab + (usernameMapLoaded ? '_u' : '') + (guardrailComplianceLoaded ? '_gc' : '') + (currentTab === 'under_review' && caseOwnersLoaded ? '_co' : '') + atlasToolKey;
   const headers = getHeaders();
   // Under Review is where cases live: its table also shows each case's owner and notes.
   if (currentTab === 'under_review') {
@@ -1559,12 +1569,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
             />
           </HorizontalStack>
         }
-        searchBelow={advancedFilters.length > 0 ? (
-          <AdvancedPayloadSearch
-            filters={advancedFilters}
-            onChange={handleAdvancedFiltersChange}
-            showButton={false}
-          />
+        searchBelow={atlasToolKey || advancedFilters.length > 0 ? (
+          <HorizontalStack gap="2" blockAlign="center">
+            {atlasToolKey && <Tag onRemove={clearAtlasTool}>{`Tool: ${atlasToolName}`}</Tag>}
+            {advancedFilters.length > 0 && (
+              <AdvancedPayloadSearch
+                filters={advancedFilters}
+                onChange={handleAdvancedFiltersChange}
+                showButton={false}
+              />
+            )}
+          </HorizontalStack>
         ) : null}
         callFromOutside={advancedFetchKey + refreshNonce + groupToggles}
         clearSelectionKey={refreshNonce}

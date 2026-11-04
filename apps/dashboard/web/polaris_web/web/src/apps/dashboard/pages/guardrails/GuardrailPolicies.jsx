@@ -245,6 +245,14 @@ function GuardrailPolicies() {
         navigate(location.pathname + location.search, { replace: true, state: {} });
     }, [location.state, location.pathname, location.search, navigate]);
 
+    // The Atlas discovery flyout opens the empty create page; Close goes back to where it came from.
+    useEffect(() => {
+        if (!location.state?.openCreateGuardrail) return;
+        setShowCreateModal(true);
+        setOpenedViaDeepLink(true);
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+    }, [location.state, location.pathname, location.search, navigate]);
+
     // Load guardrail policies on component mount
     useEffect(() => {
         fetchGuardrailPolicies();
@@ -812,7 +820,7 @@ function GuardrailPolicies() {
     // mount was pushing an extra history entry, breaking the Close button's
     // navigate(-1). Only spin while actively resolving; if a ?policy= name never
     // matches a policy, fall through to the table instead of spinning forever.
-    if ((policyName && (loading || pendingPolicyName)) || location.state?.topicGuardrailPrefill) {
+    if ((policyName && (loading || pendingPolicyName)) || location.state?.topicGuardrailPrefill || location.state?.openCreateGuardrail) {
         return <SpinnerCentered />;
     }
 

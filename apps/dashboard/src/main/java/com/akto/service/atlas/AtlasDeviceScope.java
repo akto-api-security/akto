@@ -30,11 +30,10 @@ public final class AtlasDeviceScope {
         return browsers;
     }
 
-    /** Managed devices inside the scope, counted from the same metadata. */
-    public static int countDevices(Map<String, Map<String, String>> metadata, String scope) {
-        int browsers = browserDevices(metadata).size();
+    /** Managed devices inside the scope, from the Endpoint Shield row counts (all rows, and the browser ones). */
+    public static int countDevices(int all, int browsers, String scope) {
         if (BROWSER.equals(scope)) return browsers;
-        return DESKTOP.equals(scope) ? metadata.size() - browsers : metadata.size();
+        return DESKTOP.equals(scope) ? all - browsers : all;
     }
 
     /** Rows restricted to in-scope devices; a tool left on no device is dropped. */

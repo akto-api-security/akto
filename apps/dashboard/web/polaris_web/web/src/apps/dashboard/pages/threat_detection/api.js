@@ -56,6 +56,7 @@ const threatDetectionRequests = {
                 ...(riskScoreFilterValue != null && riskScoreFilterValue !== "" ? { riskScoreFilterValue } : {}),
                 ...(humanResponseFilter ? { humanResponse: humanResponseFilter } : {}),
                 ...(ungroupActivities ? { ungroupActivities: true } : {}),
+                ...(extraFilters.atlasToolKey ? { atlasToolKey: extraFilters.atlasToolKey } : {}),
                 ...(extraFilters.agenticTypes?.length ? { agenticTypes: extraFilters.agenticTypes } : {}),
                 ...(extraFilters.behaviours?.length ? { behaviours: extraFilters.behaviours } : {}),
                 // Guardrail case management: owner logins (UNASSIGNED_OWNER = no owner) and whether the event has notes.

@@ -55,7 +55,7 @@ export default function StatusDonutCard({ counts, status }) {
     return (
         <DiscoveryCard
             title="Inventory by status"
-            subtitle={counts ? `${total} AI tools seen in the selected range` : undefined}
+            subtitle={counts ? `${total} AI tools discovered` : undefined}
             status={status}
             empty={total === 0}
             emptyText="No tools discovered yet."

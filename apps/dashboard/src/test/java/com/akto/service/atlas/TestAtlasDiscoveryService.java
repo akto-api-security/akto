@@ -221,8 +221,9 @@ public class TestAtlasDiscoveryService {
         assertEquals(new HashSet<>(Collections.singletonList("desk-one")), desktop.getDeviceIds());
         assertEquals(new HashSet<>(Collections.singletonList("desk-one")), desktop.getMcpDevices().get("server-a"));
         assertEquals(new HashSet<>(Collections.singletonList("browser-one")), AtlasDeviceScope.apply(rows, "browser", browsers).get(0).getDeviceIds());
-        assertEquals(1, AtlasDeviceScope.countDevices(metadata, "browser"));
-        assertEquals(1, AtlasDeviceScope.countDevices(metadata, "desktop"));
+        assertEquals(1, AtlasDeviceScope.countDevices(2, 1, "browser"));
+        assertEquals(1, AtlasDeviceScope.countDevices(2, 1, "desktop"));
+        assertEquals(2, AtlasDeviceScope.countDevices(2, 1, "all"));
         assertTrue(AtlasDeviceScope.apply(Collections.singletonList(tool("agent", "agent-b", 1, NOW, "browser-one")), "desktop", browsers).isEmpty());
     }
 

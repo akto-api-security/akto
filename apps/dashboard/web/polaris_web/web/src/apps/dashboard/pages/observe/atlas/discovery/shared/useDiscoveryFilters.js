@@ -1,23 +1,20 @@
-import { useReducer, useState } from "react";
-import { produce } from "immer";
+import { useState } from "react";
 import func from "@/util/func";
 import discoveryApi from "../discoveryApi";
 import { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../constants";
 import { toCsvLines } from "../transform";
 
-const epochOf = (dateRange, key) => Math.floor(Date.parse(dateRange.period[key]) / 1000);
+// Zero asks the backend for all time, up to now.
+const ALL_TIME = 0;
 
-// Date range and device scope for the overview and its CSV export.
+// Device scope for the overview and its CSV export; the range is always all time.
 export default function useDiscoveryFilters() {
-    const [dateRange, dispatchDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), func.getLast30DaysRange());
     const [deviceScope, setDeviceScope] = useState(DEVICE_SCOPES[0].value);
     return {
-        dateRange,
-        dispatchDateRange,
         deviceScope,
         setDeviceScope,
-        startTimestamp: epochOf(dateRange, "since"),
-        endTimestamp: epochOf(dateRange, "until"),
+        startTimestamp: ALL_TIME,
+        endTimestamp: ALL_TIME,
     };
 }
 

@@ -4,9 +4,13 @@ package com.akto.dao.monitoring;
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dto.monitoring.ModuleInfo;
+import org.bson.Document;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -96,6 +100,19 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
                 ModuleInfo.ADDITIONAL_DATA + ".deviceId",
                 ModuleInfo.ADDITIONAL_DATA + ".endpointId",
                 ModuleInfo.ADDITIONAL_DATA + ".mcpServers")));
+    }
+
+    // Rows the Endpoint Shield page lists, one per (name, os): {all, browser}; a browser row reports a browser name.
+    public int[] countEndpointShieldRows() {
+        Document browserFlag = new Document("$cond", Arrays.asList(
+            new Document("$in", Arrays.asList(new Document("$ifNull", Arrays.asList("$" + ModuleInfo.ADDITIONAL_DATA + ".browserName", "")), Arrays.asList("", null))), 0, 1));
+        Document row = getMCollection().aggregate(Arrays.asList(
+            Aggregates.match(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD.toString())),
+            Aggregates.group(new Document(ModuleInfo.NAME, "$" + ModuleInfo.NAME).append("os", "$" + ModuleInfo.ADDITIONAL_DATA + ".os"),
+                Accumulators.max("browser", browserFlag)),
+            Aggregates.group(null, Accumulators.sum("all", 1), Accumulators.sum("browser", "$browser"))
+        ), Document.class).first();
+        return row == null ? new int[] {0, 0} : new int[] {((Number) row.get("all")).intValue(), ((Number) row.get("browser")).intValue()};
     }
 
     // Pure transform split from the query above; key shapes must match the JS builder exactly.

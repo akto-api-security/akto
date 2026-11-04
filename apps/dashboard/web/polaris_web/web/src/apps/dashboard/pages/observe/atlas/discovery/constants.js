@@ -34,12 +34,12 @@ export const CATEGORY_SHORT = {
 
 export const SUBTITLES = {
     decisions: "Newly discovered or unreviewed tools, ranked by risk and spread",
-    adoption: "Employees using each tool in the selected range",
-    trend: "Tools first seen in the selected range, by current status",
-    reach: "Each circle is a tool. Size shows employees using it. Select a circle to see details.",
+    adoption: "Employees using each tool",
+    trend: "Tools by when they were first seen, colored by current status",
+    reach: "Each circle is a tool, sized by the employees using it. The shaded corner is high risk on many devices. Select a circle for details.",
     chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first. Line width shows devices.",
     agentMcp: "Devices where an agent has each MCP server configured; darker means more devices. Shows up to 5 agents and 8 MCP servers, the busiest first.",
-    teams: "Share of each team's employees using a category in the selected range",
+    teams: "Share of each team's employees using a category",
 };
 
 // Risk-and-reach bubble fill, outline and legend dot per status.
@@ -83,8 +83,8 @@ export const INSTALL_METHODS = {
 };
 
 export const VIOLATION_WINDOW_LABEL = "last 7 days";
+export const VIOLATION_WINDOW_SECONDS = 7 * 24 * 3600;
 
-export const GUARDRAIL_ACTIVITY_PATH = "/dashboard/guardrails/activity";
 export const GUARDRAIL_POLICIES_PATH = "/dashboard/guardrails/policies";
 
 // Row signals, shown as small tags; the red ones are the ones to act on.

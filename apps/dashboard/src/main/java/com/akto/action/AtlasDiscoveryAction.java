@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dto.User;
@@ -14,18 +13,15 @@ import com.akto.service.atlas.AtlasToolRow;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
-import com.akto.service.insights.InsightsThreatBackendAccess;
 import com.akto.utils.ArgusCollectionScope;
 import com.mongodb.BasicDBObject;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,21 +38,19 @@ public class AtlasDiscoveryAction extends UserAction {
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final long DEVICE_CACHE_TTL_MS = 60_000;
     private static final Map<Integer, CachedDevices> DEVICE_CACHE = new ConcurrentHashMap<>();
-    // The flyout's violation strip always covers the last week, whatever range the page shows.
-    private static final int VIOLATION_WINDOW_SECONDS = 7 * 24 * 3600;
 
     private final InsightService insightService = new InsightService();
     private final AtlasAssetStatusService statusService = new AtlasAssetStatusService();
-    private final InsightsThreatBackendAccess threatAccess = new InsightsThreatBackendAccess();
-    // Loaded by buildService() and reused when one tool's violations are summed.
-    private InsightDataBundle bundle;
 
     private static final class CachedDevices {
         final Map<String, Map<String, String>> devices;
+        // Endpoint Shield page rows: {all, browser}.
+        final int[] shieldRows;
         final long loadedAtMs;
 
-        CachedDevices(Map<String, Map<String, String>> devices, long loadedAtMs) {
+        CachedDevices(Map<String, Map<String, String>> devices, int[] shieldRows, long loadedAtMs) {
             this.devices = devices;
+            this.shieldRows = shieldRows;
             this.loadedAtMs = loadedAtMs;
         }
     }
@@ -124,7 +118,7 @@ public class AtlasDiscoveryAction extends UserAction {
         }
     }
 
-    // One tool for the flyout: its row, top employees, connections and its violation counts for the last 7 days.
+    // One tool for the flyout: its row, top employees and connections.
     public String fetchAtlasToolDetail() {
         try {
             AtlasDiscoveryService service = buildService();
@@ -135,38 +129,12 @@ public class AtlasDiscoveryAction extends UserAction {
                 return ERROR.toUpperCase();
             }
             response = new BasicDBObject(detail);
-            response.put("violations", violationsOf(assetKey));
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error loading Atlas tool detail: " + e.getMessage());
             addActionError("Failed to load the tool");
             return ERROR.toUpperCase();
         }
-    }
-
-    // Null when the threat backend could not be reached, so "0 violations" is never claimed without checking.
-    private Map<String, Integer> violationsOf(String key) {
-        if (!bundle.threatBackendAvailable) return null;
-        int split = key.indexOf('|');
-        Set<String> hosts = new AgenticObserveAction().fetchAtlasToolHosts(key.substring(0, split), key.substring(split + 1))
-                .stream().map(host -> host.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
-        int critical = 0, high = 0, medium = 0, low = 0;
-        int end = Context.now();
-        List<HostSeverityCount> recent = threatAccess.hostSeverityCounts(end - VIOLATION_WINDOW_SECONDS, end);
-        for (HostSeverityCount count : recent == null ? Collections.<HostSeverityCount>emptyList() : recent) {
-            if (count.getHost() == null || !hosts.contains(count.getHost().toLowerCase(Locale.ROOT))) continue;
-            critical += count.getCritical();
-            high += count.getHigh();
-            medium += count.getMedium();
-            low += count.getLow();
-        }
-        Map<String, Integer> violations = new HashMap<>();
-        violations.put("total", critical + high + medium + low);
-        violations.put("critical", critical);
-        violations.put("high", high);
-        violations.put("medium", medium);
-        violations.put("low", low);
-        return violations;
     }
 
     public String updateAtlasAssetStatus() {
@@ -204,23 +172,24 @@ public class AtlasDiscoveryAction extends UserAction {
         // Never in the future, and rounded up so the newest traffic is in range.
         int end = bucketUp(endTimestamp > 0 ? Math.min(endTimestamp, now) : now);
         int start = Math.min(Math.max(startTimestamp, 0) / CACHE_BUCKET_SECONDS * CACHE_BUCKET_SECONDS, end);
-        bundle = insightService.getOrLoadBundle(buildCtx(start, end));
-        Map<String, Map<String, String>> devices = deviceMetadata();
+        InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx(start, end));
+        CachedDevices shield = loadDevices();
+        Map<String, Map<String, String>> devices = shield.devices;
         List<AtlasToolRow> rows = AtlasDeviceScope.apply(
                 new AgenticObserveAction().fetchAtlasToolRows(), deviceScope, AtlasDeviceScope.browserDevices(devices));
-        int managedDevices = devices.isEmpty() ? bundle.deviceIdToUsername.size() : AtlasDeviceScope.countDevices(devices, deviceScope);
+        int managedDevices = shield.shieldRows[0] == 0 ? bundle.deviceIdToUsername.size() : AtlasDeviceScope.countDevices(shield.shieldRows[0], shield.shieldRows[1], deviceScope);
         return new AtlasDiscoveryService(rows, statusService.loadDecisions(), bundle.allowlistNamesLower,
                 bundle.deviceIdToUsername, teamByUser(bundle), managedDevices, start, end, now);
     }
 
     // Every endpoint-shield module is read, so share one read per account across the requests of a page load.
-    private static Map<String, Map<String, String>> deviceMetadata() {
+    private static CachedDevices loadDevices() {
         long nowMs = System.currentTimeMillis();
         DEVICE_CACHE.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * DEVICE_CACHE_TTL_MS);
         return DEVICE_CACHE.compute(Context.accountId.get(), (account, cached) -> {
             if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < DEVICE_CACHE_TTL_MS) return cached;
-            return new CachedDevices(ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), System.currentTimeMillis());
-        }).devices;
+            return new CachedDevices(ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), ModuleInfoDao.instance.countEndpointShieldRows(), System.currentTimeMillis());
+        });
     }
 
     private static int bucketUp(int timestamp) {

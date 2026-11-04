@@ -46,7 +46,7 @@ export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabel
                     {zone && (
                         <>
                             <div className="bubble-plot__zone" style={{ "--zone-width": `${zone.widthPct}%`, "--zone-height": `${zone.heightPct}%` }} />
-                            <span className="bubble-plot__zone-label"><Text as="span" variant="bodySm" fontWeight="semibold" color="critical">{zone.label}</Text></span>
+                            <span className="bubble-plot__zone-label">{zone.label}</span>
                         </>
                     )}
                     {bubbles.map((bubble) => (
