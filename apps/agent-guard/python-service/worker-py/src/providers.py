@@ -255,7 +255,18 @@ class AnthropicProvider(LLMProvider):
             },
             self._log_tag,
         )
-        return body["content"][0]["text"]
+        return _anthropic_text(body)
+
+
+def _anthropic_text(body: dict) -> str:
+    """The first text block of a Messages API reply. Current Claude models think by default, so the
+    reply can open with a `thinking` block (no "text" key) before the answer; a refusal has no answer."""
+    if body.get("stop_reason") == "refusal":
+        raise ValueError(f"Anthropic declined the request (stop_reason=refusal): {body!r}"[:500])
+    for block in body.get("content") or []:
+        if "text" in block:
+            return block["text"]
+    raise ValueError(f"Anthropic response has no text content block: {body!r}"[:500])
 
 
 def _normalize_anthropic_foundry_base_url(base_url: str) -> str:
