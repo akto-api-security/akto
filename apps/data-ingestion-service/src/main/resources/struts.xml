@@ -61,9 +61,12 @@
         </action>
 
         <action name="api/http-proxy" class="com.akto.action.HttpProxyAction" method="httpProxy">
+            <!-- The whole request body arrives as ONE string field (requestPayload), so a 5 MB
+                 prompt needs a string limit above 5 MiB plus JSON-escaping headroom; the total
+                 also carries responsePayload. 10 MiB per string, 20 MiB per body. -->
             <interceptor-ref name="json">
-                <param name="maxStringLength">5242880</param>
-                <param name="maxLength">10485760</param>
+                <param name="maxStringLength">10485760</param>
+                <param name="maxLength">20971520</param>
             </interceptor-ref>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
