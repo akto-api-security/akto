@@ -8,6 +8,7 @@ import com.akto.dto.endpoint_shield.FileInspectionResult;
 import com.akto.dto.endpoint_shield.FileInspectionRule;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.blob.AzureBlobClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,12 +26,14 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import java.io.InputStream;
+import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class FileInspectionRuleAction extends UserAction {
 
@@ -39,7 +42,7 @@ public class FileInspectionRuleAction extends UserAction {
     private static final int MAX_AGENT_LENGTH = 100;
     private static final Set<String> VALID_OS = new HashSet<>(Arrays.asList("darwin", "linux", "windows"));
     private static final Set<String> VALID_ROLES = new HashSet<>(Arrays.asList("agent_login", "mcp_credentials", "mcp_config"));
-    private static final String DEFAULTS_RESOURCE = "/file_inspection_agent_defaults.json";
+    private static final String DEFAULTS_ENTRY = "/agent-file-config/defaults.json";
     private static final String DEFAULTS_ADDED_BY = "akto-default";
 
     @Setter private String path;
@@ -180,12 +183,24 @@ public class FileInspectionRuleAction extends UserAction {
         }
     }
 
+    private static JsonNode readDefaults(byte[] testsLibraryZip) throws Exception {
+        if (testsLibraryZip == null) return null;
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(testsLibraryZip))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (entry.getName().endsWith(DEFAULTS_ENTRY)) return new ObjectMapper().readTree(zip);
+            }
+        }
+        return null;
+    }
+
     public String restoreFileInspectionDefaults() {
         try {
             FileInspectionRuleDao.instance.createIndicesIfAbsent();
-            JsonNode defaults;
-            try (InputStream in = FileInspectionRuleAction.class.getResourceAsStream(DEFAULTS_RESOURCE)) {
-                defaults = new ObjectMapper().readTree(in);
+            JsonNode defaults = readDefaults(TestTemplateUtils.getTestingTemplates());
+            if (defaults == null) {
+                addActionError("Agent defaults not found in tests-library");
+                return Action.ERROR.toUpperCase();
             }
             int now = Context.now();
             List<WriteModel<FileInspectionRule>> writes = new ArrayList<>();
