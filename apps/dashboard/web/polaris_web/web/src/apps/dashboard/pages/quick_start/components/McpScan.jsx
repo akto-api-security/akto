@@ -5,6 +5,7 @@ import func from "@/util/func";
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import Dropdown from '../../../components/layouts/Dropdown';
 import TestRoleDropdown from '../../../components/shared/TestRoleDropdown';
+import MiniTestingSelector from './MiniTestingSelector';
 
 const AUTH_TYPE_HEADER = 'HEADER'
 const AUTH_TYPE_TEST_ROLE = 'TEST_ROLE'
@@ -22,6 +23,8 @@ const McpScan = () => {
     const [requireAuth, setRequireAuth] = useState(false)
     const [authType, setAuthType] = useState(AUTH_TYPE_HEADER)
     const [testRole, setTestRole] = useState('')
+    const [useMiniTesting, setUseMiniTesting] = useState(false)
+    const [miniTestingName, setMiniTestingName] = useState('')
 
     const goToDocs = () => {
         window.open("https://docs.akto.io/mcp-scan")
@@ -42,7 +45,7 @@ const McpScan = () => {
         }
 
         setLoading(true)
-        api.initiateMCPScan(serverUrl, useHeaderAuth ? authKey : '', useHeaderAuth ? authValue : '', window.location.origin, useTestRole ? testRole : null).then((res) => {
+        api.initiateMCPScan(serverUrl, useHeaderAuth ? authKey : '', useHeaderAuth ? authValue : '', window.location.origin, useTestRole ? testRole : null, useMiniTesting ? (miniTestingName || null) : null).then((res) => {
             func.setToast(true, false, "MCP Scan initiated successfully. Please check your dashboard for updates.")
             setServerUrl('')
             setRequireAuth(false)
@@ -50,6 +53,8 @@ const McpScan = () => {
             setAuthValue('')
             setAuthType(AUTH_TYPE_HEADER)
             setTestRole('')
+            setUseMiniTesting(false)
+            setMiniTestingName('')
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
             // specific errors (e.g. test role login failure) are already shown by the request handler
@@ -102,6 +107,14 @@ const McpScan = () => {
                         helpText="Auth configured in the role (e.g. OAuth token request or recorded login) is used to fetch a token for the MCP server."
                     />
                 }
+
+                <MiniTestingSelector
+                    id="mcp-mini-testing"
+                    enabled={useMiniTesting}
+                    setEnabled={setUseMiniTesting}
+                    selected={miniTestingName}
+                    setSelected={setMiniTestingName}
+                />
 
                 <ButtonGroup>
                     <Button onClick={primaryAction} primary disabled={serverUrl?.length == 0} loading={loading}>Import</Button>

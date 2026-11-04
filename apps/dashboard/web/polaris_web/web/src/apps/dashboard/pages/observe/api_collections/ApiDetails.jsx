@@ -23,7 +23,8 @@ import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 import ApiIssuesTab from "./ApiIssuesTab";
 import ForbiddenRole from "../../../components/shared/ForbiddenRole";
-import MarkdownViewer from "../../../components/shared/MarkdownViewer";
+import SkillMarkdownViewer from "../agentic/SkillEvidenceView";
+import { parseSkillSample } from "../agentic/SkillComponentsView";
 import { usePermissions, permissions, withPermissions } from "@/util/permissions";
 
 import Highcharts from 'highcharts';
@@ -643,19 +644,8 @@ function ApiDetails(props) {
     }
     const isSkillEndpoint = apiDetail?.endpoint?.includes('/skills/')
 
-    let skillMarkdown = null
-    if (isSkillEndpoint && sampleData.length > 0) {
-        try {
-            const parsedMsg = JSON.parse(sampleData[0].message)
-            const bodyStr = parsedMsg?.request?.body || parsedMsg?.requestPayload || '{}'
-            const body = JSON.parse(bodyStr)
-            if (body.skill_name) {
-                skillMarkdown = `# ${body.skill_name}\n\n` +
-                    (body.skill_description ? `**${body.skill_description}**\n\n` : '') +
-                    (body.skill_content || '')
-            }
-        } catch (_) {}
-    }
+    const skillSample = isSkillEndpoint && sampleData.length > 0 ? parseSkillSample(sampleData[0].message) : null
+    const skillMarkdown = skillSample?.markdown || null
 
     // Base risk score/remarks live on the owning collection, not the per-endpoint ApiInfo — same
     // fields AgentEndpointTreeTable.jsx/AgenticAssetDevicesPage.jsx surface via wrapRiskScoreTooltip.
@@ -700,7 +690,7 @@ function ApiDetails(props) {
         id: 'values',
         content: "Values",
         component: isSkillEndpoint && skillMarkdown
-            ? <MarkdownViewer markdown={skillMarkdown} inertLinks />
+            ? <Box paddingBlockStart={"4"}><SkillMarkdownViewer markdown={skillMarkdown} evidence={skillSample.evidence} /></Box>
             : sampleData.length > 0 && <Box paddingBlockStart={"4"}>
                 <VerticalStack gap="4">
                     {agentRiskAnalysis && (

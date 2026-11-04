@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Mirrors FileInspectionRuleDao.createIndicesIfAbsent: one rule per (path, agent, os, role).
+        Name matches the DAO, so this is a no-op where the DAO already built it.
+    -->
+
+    <changeSet id="034-account-file-inspection-rules-agent-unique-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="file_inspection_rules"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="file_inspection_rules">
+            <mongodb:keys>{ "path": 1, "agent": 1, "os": 1, "role": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "path-agent-os-role_1", "unique": true }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="file_inspection_rules">
+                <mongodb:keys>{ "path": 1, "agent": 1, "os": 1, "role": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
