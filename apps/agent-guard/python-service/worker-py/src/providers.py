@@ -1151,6 +1151,17 @@ _HEALTH_FAILURES_TO_DOWN = int(os.getenv("AGW_ARBITER_HEALTH_FAILURES_TO_DOWN", 
 _PRIMARY_AVAILABLE: dict[str, bool] = {}
 _HEALTH_FAILURES: dict[str, int] = {}
 _HEALTH_TASKS: dict[str, "asyncio.Task[None]"] = {}
+_HEALTH_CLIENT: httpx.AsyncClient | None = None
+
+
+def _health_client() -> httpx.AsyncClient:
+    # Probes get their own pool: in the shared one, multi-second scan calls fill every connection under load,
+    # httpx counts the wait for a free one against the probe timeout (PoolTimeout), and a healthy primary is
+    # marked DOWN.
+    global _HEALTH_CLIENT
+    if _HEALTH_CLIENT is None or _HEALTH_CLIENT.is_closed:
+        _HEALTH_CLIENT = httpx.AsyncClient(timeout=_HEALTH_PROBE_TIMEOUT_S, limits=httpx.Limits(max_connections=4))
+    return _HEALTH_CLIENT
 
 
 def _set_availability(health_url: str, available: bool) -> None:
@@ -1163,11 +1174,18 @@ def _set_availability(health_url: str, available: bool) -> None:
 async def _health_loop(health_url: str) -> None:
     while True:
         try:
-            resp = await http_client.get_client().get(health_url, timeout=_HEALTH_PROBE_TIMEOUT_S)
+            resp = await _health_client().get(health_url)
             healthy = resp.status_code == 200
-        except Exception:
+            why = f"HTTP {resp.status_code}"
+        except Exception as exc:
             healthy = False
+            why = repr(exc)
         _HEALTH_FAILURES[health_url] = 0 if healthy else _HEALTH_FAILURES.get(health_url, 0) + 1
+        if not healthy:
+            logger.warning(
+                f"[FinalArbiter] health probe {health_url} failed ({why}), "
+                f"{_HEALTH_FAILURES[health_url]}/{_HEALTH_FAILURES_TO_DOWN} before DOWN"
+            )
         if healthy or _HEALTH_FAILURES[health_url] >= _HEALTH_FAILURES_TO_DOWN:
             _set_availability(health_url, healthy)
         await asyncio.sleep(_HEALTH_INTERVAL_S)
