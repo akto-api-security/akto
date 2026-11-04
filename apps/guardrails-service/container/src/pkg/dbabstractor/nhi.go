@@ -17,6 +17,9 @@ type FileInspectionRule struct {
 	AccountID     int    `json:"accountId"`
 	CreatedTs     int    `json:"createdTs"`
 	UpdatedTs     int    `json:"updatedTs"`
+	Agent         string `json:"agent"` // empty = custom rule
+	OS            string `json:"os"`
+	Role          string `json:"role"` // agent_login | mcp_credentials | mcp_config
 }
 
 // FileInspectionMatch mirrors cyborg's FileInspectionResult.Match.
@@ -72,6 +75,20 @@ func (c *Client) AddFileInspectionRule(path string, existenceOnly bool, maxDepth
 		return nil, fmt.Errorf("addFileInspectionRule: no rule in response: %s", truncate(raw, 200))
 	}
 	return wrap.Rule, nil
+}
+
+// FetchFileInspectionRulesV2 returns custom and agent rules (agent rules are the per-agent defaults
+// from tests-library, edited in Settings > File Inspection).
+func (c *Client) FetchFileInspectionRulesV2() ([]FileInspectionRule, error) {
+	raw, err := c.SendRequest("POST", "/fetchFileInspectionRulesV2", map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("fetchFileInspectionRulesV2: %w", err)
+	}
+	var out []FileInspectionRule
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, fmt.Errorf("fetchFileInspectionRulesV2: parse: %w (body=%s)", err, truncate(raw, 200))
+	}
+	return out, nil
 }
 
 // FetchFileInspectionResults returns up to `limit` results with executedAt > since,

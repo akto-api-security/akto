@@ -136,6 +136,16 @@ func (s *Source) refreshRules(ctx context.Context) error {
 		}
 	}
 
+	rules, err := s.client.FetchFileInspectionRulesV2()
+	if err != nil {
+		return err
+	}
+	for _, r := range rules {
+		if t, ok := agentTarget(r); ok && r.IDHex != "" {
+			tmpMap[r.IDHex] = t
+		}
+	}
+
 	s.mu.Lock()
 	s.ruleIDToTarget = tmpMap
 	s.mu.Unlock()
@@ -226,6 +236,9 @@ func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
 			// one Keychain item per OS user; without the home, users of one device overwrite each other
 			source = home + "#" + m.Path
 		}
+		if target.Extractor == nil {
+			continue
+		}
 		findings := target.Extractor(m.Path, content)
 		s.logger.Debug("NHI: extractor ran",
 			zap.String("path", m.Path),
@@ -295,12 +308,12 @@ var _ nhi.Source = (*Source)(nil)
 // Target ties one file path (or glob) to the extractor that parses it.
 // Each Target becomes one FileInspectionRule registered with cyborg.
 type Target struct {
-	Path      string
-	MaxDepth  int
+	Path       string
+	MaxDepth   int
 	SourceType string
-	AgentName string
-	AgentType string
-	Extractor extract.ExtractorFunc
+	AgentName  string
+	AgentType  string
+	Extractor  extract.ExtractorFunc
 	// Login is set on the target that holds the agent's login (e.g. ~/.claude.json for Claude Code).
 	Login extract.LoginFunc
 }
@@ -350,24 +363,9 @@ func DefaultTargets() []Target {
 		"~/AppData/Roaming/Claude/claude_desktop_config.json",
 		"~/AppData/Local/AnthropicClaude/claude_desktop_config.json",
 	)
-	targets = append(targets, Target{
-		Path: "~/.claude.json", SourceType: "mcp_config",
-		AgentName: "Claude Code", AgentType: "CODE_EDITOR",
-		Extractor: extract.ClaudeCodeConfig,
-		Login:     extract.ClaudeCodeLogin,
-	})
-	// Claude Code's OAuth store (login + every remote MCP server's token): a file on Linux/Windows,
-	// a Keychain item on macOS, read by the shield's inspection executor via the "keychain:" scheme.
-	for _, p := range []string{"~/.claude/credentials.json", "~/.claude/.credentials.json", "keychain:Claude Code-credentials"} {
-		targets = append(targets, Target{
-			Path: p, SourceType: "claude_credentials",
-			AgentName: "Claude Code", AgentType: "CODE_EDITOR",
-			Extractor: extract.ClaudeCredentials,
-		})
-	}
+	// Claude Code, Codex and Cursor CLI files come from agent rules (agents.go).
 
 	addMCP("Cursor",
-		"~/.cursor/mcp.json",
 		"~/Library/Application Support/Cursor/User/mcp.json",
 		"~/.config/Cursor/User/mcp.json",
 		"~/AppData/Roaming/Cursor/User/mcp.json",
@@ -481,7 +479,6 @@ func DefaultTargets() []Target {
 	for _, t := range []Target{
 		{Path: "~/.config/openai/auth.json", SourceType: "openai_auth", AgentName: "OpenAI CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/AppData/Roaming/openai/auth.json", SourceType: "openai_auth", AgentName: "OpenAI CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
-		{Path: "~/.codex/auth.json", SourceType: "codex_auth", AgentName: "Codex CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/.config/gemini/oauth_creds.json", SourceType: "gemini_auth", AgentName: "Gemini CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/AppData/Roaming/gemini/oauth_creds.json", SourceType: "gemini_auth", AgentName: "Gemini CLI", AgentType: "AI_AGENT", Extractor: extract.OpenAIAuth},
 		{Path: "~/.gemini/.env", SourceType: "gemini_auth", AgentName: "Gemini CLI", AgentType: "AI_AGENT", Extractor: extract.DotEnv},
