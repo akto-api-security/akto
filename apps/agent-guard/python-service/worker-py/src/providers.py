@@ -1150,6 +1150,7 @@ _HEALTH_PROBE_TIMEOUT_S = 3.0
 _HEALTH_FAILURES_TO_DOWN = int(os.getenv("AGW_ARBITER_HEALTH_FAILURES_TO_DOWN", "3"))
 _PRIMARY_AVAILABLE: dict[str, bool] = {}
 _HEALTH_FAILURES: dict[str, int] = {}
+_HEALTH_FAILURE_REASONS: dict[str, dict[str, int]] = {}
 _HEALTH_TASKS: dict[str, "asyncio.Task[None]"] = {}
 _HEALTH_CLIENT: httpx.AsyncClient | None = None
 
@@ -1164,10 +1165,10 @@ def _health_client() -> httpx.AsyncClient:
     return _HEALTH_CLIENT
 
 
-def _set_availability(health_url: str, available: bool) -> None:
+def _set_availability(health_url: str, available: bool, reasons: str = "") -> None:
     if _PRIMARY_AVAILABLE.get(health_url, True) != available:
         logger.warning(f"[FinalArbiter] primary {health_url} is now {'AVAILABLE' if available else 'DOWN'}")
-        alerts.note_availability(urlparse(health_url).netloc or health_url, available)
+        alerts.note_availability(urlparse(health_url).netloc or health_url, available, reasons)
     _PRIMARY_AVAILABLE[health_url] = available
 
 
@@ -1176,10 +1177,16 @@ async def _health_loop(health_url: str) -> None:
         try:
             resp = await _health_client().get(health_url)
             healthy = resp.status_code == 200
-            why = f"HTTP {resp.status_code}"
+            reason = why = f"HTTP {resp.status_code}"
         except Exception as exc:
             healthy = False
-            why = repr(exc)
+            reason, why = type(exc).__name__, repr(exc)
+        # Causes of the current failure streak, for the DOWN alert; a good probe ends the streak.
+        streak = _HEALTH_FAILURE_REASONS.setdefault(health_url, {})
+        if healthy:
+            streak.clear()
+        else:
+            streak[reason] = streak.get(reason, 0) + 1
         _HEALTH_FAILURES[health_url] = 0 if healthy else _HEALTH_FAILURES.get(health_url, 0) + 1
         if not healthy:
             logger.warning(
@@ -1187,7 +1194,7 @@ async def _health_loop(health_url: str) -> None:
                 f"{_HEALTH_FAILURES[health_url]}/{_HEALTH_FAILURES_TO_DOWN} before DOWN"
             )
         if healthy or _HEALTH_FAILURES[health_url] >= _HEALTH_FAILURES_TO_DOWN:
-            _set_availability(health_url, healthy)
+            _set_availability(health_url, healthy, ", ".join(f"{r} x{n}" for r, n in streak.items()))
         await asyncio.sleep(_HEALTH_INTERVAL_S)
 
 
