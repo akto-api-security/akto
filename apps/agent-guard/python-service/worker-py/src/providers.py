@@ -26,6 +26,7 @@ import alerts
 import aws_auth
 import gcp_auth
 import http_client
+import reachback
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -515,6 +516,36 @@ class Qwen3GuardFoundryProvider(Qwen3GuardOutput, AzureFoundryProvider):
     ) -> tuple[str, list | None]:
         body = await self._chat(_qwen3guard_params(text, top_logprobs, temperature))
         return _choice_content_and_logprobs(body)
+
+
+class ReachbackProvider(LLMProvider):
+    """Model behind a client's reach-back gateway (OpenAI chat completions).
+
+    Auth (Azure AD token + mTLS) and transport live in reachback.py, shared
+    with POST /reachback/test. Reasoning is off (`reasoning_effort: "none"`)
+    so the verdict is not spent on hidden reasoning tokens and greedy
+    `temperature` is accepted; models that cannot turn reasoning off
+    (gpt-6-astra, gpt-6.1-sol) reject this with a 400. Uses
+    `max_completion_tokens`, as GPT-5/6 models reject `max_tokens`."""
+
+    name = "reachback"
+
+    def __init__(self, model: str):
+        self.model = model
+        logger.info(f"[Reachback] model={self.model} base_url={settings.REACHBACK_BASE_URL}")
+
+    async def complete(self, prompt: str) -> str:
+        result = await reachback.chat(
+            {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_completion_tokens": _max_tokens(),
+                "temperature": _TEMPERATURE,
+                "reasoning_effort": "none",
+            }
+        )
+        content, _ = _choice_content_and_logprobs(result["response"])
+        return content
 
 
 # Converse stopReasons meaning Bedrock itself withheld the answer — surfaced as
@@ -1051,6 +1082,18 @@ def _build_bedrock(model: str, base_url: str) -> LLMProvider | None:
     return None
 
 
+def _build_reachback(model: str) -> LLMProvider | None:
+    """Gateway URL and credentials come from REACHBACK_* env only; the entry picks the model."""
+    missing = reachback.missing_settings()
+    if missing:
+        logger.warning(f"[Providers] reachback: missing required vars {missing}; skipping")
+        return None
+    if not model:
+        logger.warning("[Providers] reachback: modelConfigs entry has no model; skipping")
+        return None
+    return ReachbackProvider(model)
+
+
 _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
     "openai": lambda model, _b, _d: _build_openai_compatible(model, base_url=""),
     "openai_compatible": lambda model, base_url, _d: _build_openai_compatible(model, base_url),
@@ -1082,6 +1125,7 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
         else None
     ),
     "bedrock": lambda model, base_url, _d: _build_bedrock(model, base_url),
+    "reachback": lambda model, _b, _d: _build_reachback(model),
 }
 
 

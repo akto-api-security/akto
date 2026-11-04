@@ -177,8 +177,8 @@ async def guardrails_llm_async(body: GuardrailsLLMRequest):
 
 @app.post("/reachback/test")
 async def reachback_test(body: dict[str, Any]):
-    """Demo: forward an OpenAI chat-completions body as-is to a model behind Morgan Stanley's
-    reach-back gateway (Azure AD token + mTLS) and return the gateway's JSON reply under "response".
+    """Demo: forward an OpenAI chat-completions body as-is to a model behind the reach-back
+    gateway (Azure AD token + mTLS) and return the gateway's JSON reply under "response".
     Failures return 502 with the stage that failed: token / connect / http."""
     missing = reachback.missing_settings()
     if missing:
