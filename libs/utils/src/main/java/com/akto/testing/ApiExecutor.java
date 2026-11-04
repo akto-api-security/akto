@@ -309,6 +309,13 @@ public class ApiExecutor {
     }
 
     private static OriginalHttpResponse handleWebSocketRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig, int collectionId) throws Exception {
+        // a red-teaming message carries its collection (stripped with the other internal headers below):
+        // slow replies, the frame goes out as the agent built it, and the whole (streamed) reply is collected
+        Integer redTeamingCollectionId = redTeamingCollectionId(request);
+        boolean agenticTarget = redTeamingCollectionId != null;
+        if (agenticTarget) {
+            collectionId = redTeamingCollectionId;
+        }
         if (testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null
                 && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()) {
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
@@ -322,9 +329,10 @@ public class ApiExecutor {
 
         // type and requestId go in before the script, so a script that signs the frame signs what is sent
         String requestId = null;
-        if (!request.isConnectionString() && !StringUtils.isEmpty(request.getBody())) {
+        if (!agenticTarget && !request.isConnectionString() && !StringUtils.isEmpty(request.getBody())) {
             String body = WebSocketExecutor.enrichMessageWithUrl(request.getBody(), request.getUrl());
-            if (Constants.IS_NEW_TESTING_ENABLED) {
+            // only the single-reply mode picks the frame echoing requestId; collected replies don't need it
+            if (Constants.IS_NEW_TESTING_ENABLED && !WebSocketExecutor.COLLECT_REPLIES) {
                 requestId = UUID.randomUUID().toString();
                 body = WebSocketExecutor.enrichMessageWithRequestId(body, requestId);
             }
@@ -347,7 +355,18 @@ public class ApiExecutor {
             headers.put(Constants.AKTO_IGNORE_FLAG, Collections.singletonList("0"));
         }
 
-        long timeoutMs = 30000;  // Default 30 second timeout for WebSocket messages
+        // Default 30 second timeout for WebSocket messages; agentic targets (red teaming) can be slow to
+        // reply, so they get the HTTP high timeout (AKTO_TESTING_TARGET_READ_TIMEOUT_SECONDS)
+        long timeoutMs = agenticTarget ? Constants.TESTING_TARGET_READ_TIMEOUT_SECONDS * 1000L : 30000;
+
+        // red teaming: every reply frame collected, the turns of one conversation on one connection
+        if (agenticTarget) {
+            String conversationId = testingRunConfig != null ? testingRunConfig.getConversationId() : null;
+            if (conversationId != null && !request.isConnectionString()) {
+                return WebSocketSessionStore.send(conversationId, request, connectionUrl, headers, timeoutMs);
+            }
+            return WebSocketExecutor.sendMessageDirect(request, connectionUrl, headers, timeoutMs, null, true);
+        }
 
         // For Kafka parallel execution (new testing mode), use direct (non-pooled) connections
         // to avoid message mixing between concurrent tasks
@@ -377,7 +396,10 @@ public class ApiExecutor {
 
         // Check protocol type and route accordingly
         if (request.getProtocolType() == OriginalHttpRequest.ProtocolType.WEBSOCKET) {
-            return handleWebSocketRequest(request, testingRunConfig, collectionId);
+            OriginalHttpResponse wsResponse = handleWebSocketRequest(request, testingRunConfig, collectionId);
+            // as for HTTP: the POST_REQUEST script sees the reply (body, and its frames as streamingResponse),
+            // may rewrite it, and may publish conversationState for the conversation's next turn
+            return testingRunConfig != null ? ApiExecutorUtil.runPostRequestScript(request, wsResponse, true, testingRunConfig) : wsResponse;
         }
 
         // Detect protocol type from URL if not explicitly set
@@ -1168,6 +1190,17 @@ public class ApiExecutor {
         // the sample's query was split off into queryParams; a WS handshake often carries its token there
         String query = request.getQueryParams();
 
+        // an imported endpoint keeps its full URL: only the scheme becomes the WS one
+        if (path != null && path.startsWith("https://")) {
+            return OriginalHttpRequest.getFullUrlWithParams("wss://" + path.substring("https://".length()), query);
+        }
+        if (path != null && path.startsWith("http://")) {
+            return OriginalHttpRequest.getFullUrlWithParams("ws://" + path.substring("http://".length()), query);
+        }
+        if (path != null && (path.startsWith("ws://") || path.startsWith("wss://"))) {
+            return OriginalHttpRequest.getFullUrlWithParams(path, query);
+        }
+
         // Extract host from headers
         String host = null;
         if (request.getHeaders() != null) {
@@ -1187,6 +1220,18 @@ public class ApiExecutor {
 
         // Build full URL: scheme + host + path
         return OriginalHttpRequest.getFullUrlWithParams(scheme + host + path, query);
+    }
+
+    private static Integer redTeamingCollectionId(OriginalHttpRequest request) {
+        List<String> values = request.getHeaders() != null ? request.getHeaders().get(Constants.AKTO_API_COLLECTION_ID_HEADER) : null;
+        if (values == null || values.isEmpty() || values.get(0) == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(values.get(0).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     // the override test-app URL applies to the WS connection as it does to HTTP, keeping the WS scheme

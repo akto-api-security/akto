@@ -37,6 +37,8 @@ public class WebSocketConnection {
     private volatile int closeCode;
     /** HTTP status of a refused handshake; 0 when the handshake succeeded or never got a response. */
     private volatile int handshakeStatus;
+    /** Response headers of the accepted handshake (101); empty until connected. */
+    private volatile Map<String, List<String>> handshakeHeaders = new HashMap<>();
     private volatile String failureMessage;
 
     public WebSocketConnection(String url, Map<String, List<String>> headers, String subcategoryId) {
@@ -136,6 +138,40 @@ public class WebSocketConnection {
         return resultMsg.content;
     }
 
+
+    public List<String> collectReplies(long timeoutMs, long quietMs) throws TimeoutException, InterruptedException, ClosedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        List<String> replies = new ArrayList<>();
+        long lastFrameAt = -1;
+        try {
+            while (true) {
+                TimestampedMessage next;
+                while ((next = receivedMessages.poll()) != null) {
+                    if (next.receivedAt >= lastSentAt && !isPingPong(next.content)) {
+                        replies.add(next.content);
+                        lastFrameAt = System.currentTimeMillis();
+                    }
+                }
+                long now = System.currentTimeMillis();
+                if (replies.isEmpty()) {
+                    if (isClosed) {
+                        throw new ClosedException("Connection closed before a reply (code " + closeCode + ")");
+                    }
+                    if (now >= deadline) {
+                        throw new TimeoutException("No response received within " + timeoutMs + "ms");
+                    }
+                } else if (isClosed || now >= deadline || now - lastFrameAt >= quietMs) {
+                    break;
+                }
+                Thread.sleep(10);
+            }
+        } finally {
+            receivedMessages.clear();
+        }
+        loggerMaker.infoAndAddToDb("WebSocket replies received: " + replies.size() + " frame(s)", LogDb.TESTING);
+        return replies;
+    }
+
     public void onMessage(String text) {
         receivedMessages.add(new TimestampedMessage(text));
     }
@@ -148,6 +184,13 @@ public class WebSocketConnection {
         }
     }
 
+    public void onOpen(WebSocket webSocket, okhttp3.Response response) {
+        if (response != null) {
+            this.handshakeHeaders = new HashMap<>(response.headers().toMultimap());
+        }
+        onOpen(webSocket);
+    }
+
     public void onOpen(WebSocket webSocket) {
         synchronized (lock) {
             this.webSocket = webSocket;
@@ -158,6 +201,14 @@ public class WebSocketConnection {
     }
 
     public void onClosing(WebSocket webSocket, int code, String reason) {
+        // the server closed: nothing more will be accepted or received, so stop waiting and answer its close
+        synchronized (lock) {
+            this.isClosed = true;
+            this.closeCode = code;
+            this.closeReason = reason;
+            lock.notifyAll();
+        }
+        webSocket.close(code, null);
         loggerMaker.infoAndAddToDb("WebSocket closing with code " + code + ": " + reason, LogDb.TESTING);
     }
 
@@ -248,6 +299,10 @@ public class WebSocketConnection {
 
     public int getHandshakeStatus() {
         return handshakeStatus;
+    }
+
+    public Map<String, List<String>> getHandshakeHeaders() {
+        return handshakeHeaders;
     }
 
     public String getFailureMessage() {

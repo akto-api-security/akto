@@ -525,7 +525,10 @@ public class ApiExecutorUtil {
                 body = response.getBody();
             }
 
-            return new OriginalHttpResponse(body, responseHeaders, statusCode);
+            OriginalHttpResponse scripted = new OriginalHttpResponse(body, responseHeaders, statusCode);
+            // the received chunks / frames stay with the response the script returns
+            scripted.setStreamingChunks(response.getStreamingChunks());
+            return scripted;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in runPostRequestScript " + e.getMessage());
             e.printStackTrace();

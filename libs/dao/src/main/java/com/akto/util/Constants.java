@@ -28,6 +28,8 @@ public class Constants {
     public static final String AKTO_AGENT_CONVERSATIONS= "x-agent-conversations";
     public static final String AKTO_MESSAGE_ID_HEADER = "x-akto-message-id";
     public static final String AKTO_SOURCE_HEADER = "x-akto-source";
+    // red teaming: the WS message's collection, so the utility server can find its connection URL
+    public static final String AKTO_API_COLLECTION_ID_HEADER = "x-akto-api-collection-id";
     public static final String AKTO_SOURCE_RED_TEAMING = "red-teaming";
 
     public static final String LOCAL_KAFKA_BROKER_URL = System.getenv("KAFKA_BROKER_URL") != null ? System.getenv("KAFKA_BROKER_URL") : "localhost:29092"; // run kafka process with name kafka1 in docker

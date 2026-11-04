@@ -302,7 +302,19 @@ public class Main {
         OriginalHttpResponse res;
         TestingRunConfig testingRunConfig = new TestingRunConfig();
         try {
-            res = ApiExecutor.sendRequest(originalRequest, true, testingRunConfig, false, new ArrayList<>());
+            // a WebSocket agent import comes as its http(s) handshake URL marked WEBSOCKET
+            if (OriginalHttpRequest.WEBSOCKET_TYPE.equalsIgnoreCase(originalRequest.getType())) {
+                String url = originalRequest.getUrl().trim().replaceFirst("(?i)^http(s?)://", "ws$1://");
+                if (originalRequest.getBody() == null || originalRequest.getBody().trim().isEmpty()) {
+                    // connection string: only the handshake, 101 or the refusal
+                    res = WebSocketExecutor.handshake(url, originalRequest.getHeaders(), 30000);
+                } else {
+                    // event: every reply frame until the agent goes quiet (a streamed answer is saved whole)
+                    res = WebSocketExecutor.sendMessageDirect(originalRequest, url, originalRequest.getHeaders(), 60000, null, true);
+                }
+            } else {
+                res = ApiExecutor.sendRequest(originalRequest, true, testingRunConfig, false, new ArrayList<>());
+            }
         } catch (Exception e) {
             res = new OriginalHttpResponse();
         }

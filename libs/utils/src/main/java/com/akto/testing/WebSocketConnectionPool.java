@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
+import okhttp3.ConnectionPool;
 import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -26,6 +27,13 @@ public class WebSocketConnectionPool {
     private static final OkHttpClient sharedClient = new OkHttpClient.Builder()
             .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(0, java.util.concurrent.TimeUnit.SECONDS)  // 0 = no read timeout (WS is persistent)
+            // protocol pings keep a quiet connection alive (e.g. between red teaming turns) through proxies and
+            // load balancers that drop idle sockets, such as nginx's 60s proxy_read_timeout
+            .pingInterval(20, java.util.concurrent.TimeUnit.SECONDS)
+            // no idle connections kept: after a refused handshake (e.g. 404) OkHttp returns the connection to the
+            // pool while its body is still unread, and a concurrent handshake reusing it reads that body as its
+            // status line. Each WebSocket gets its own connection anyway.
+            .connectionPool(new ConnectionPool(0, 1, java.util.concurrent.TimeUnit.SECONDS))
             .dispatcher(dispatcher)
             .build();
 
@@ -86,7 +94,7 @@ public class WebSocketConnectionPool {
             okhttp3.WebSocketListener listener = new okhttp3.WebSocketListener() {
                 @Override
                 public void onOpen(WebSocket webSocket, okhttp3.Response response) {
-                    wsConnection.onOpen(webSocket);
+                    wsConnection.onOpen(webSocket, response);
                 }
 
                 @Override

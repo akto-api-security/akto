@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.testing.WebSocketSessionStore;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -134,9 +135,12 @@ public class AgentClient {
             errorResult.setMessage("Agentic test execution failed: " + e.getMessage());
             setAgenticResultFields(errorResult, conversationId, false, Arrays.asList(e.getMessage()), 0.0, TestResult.Confidence.LOW);
             return Collections.singletonList(errorResult);
+        } finally {
+            // a WebSocket target kept one connection open for this conversation's turns
+            WebSocketSessionStore.closeConversation(conversationId);
         }
     }
-    
+
     private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId, boolean shouldFetchRecords) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         int index = 0;

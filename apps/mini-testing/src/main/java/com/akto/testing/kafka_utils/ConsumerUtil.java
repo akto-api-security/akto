@@ -146,6 +146,9 @@ public class ConsumerUtil {
                     }
                 }
                 String sample = messagesList.get(messagesList.size() - 1);
+                com.akto.dto.RawApi cachedRawApi = instance.getRawApiMap().get(apiInfoKey);
+                boolean webSocket = cachedRawApi != null
+                        && cachedRawApi.getRequest().getProtocolType() == com.akto.dto.OriginalHttpRequest.ProtocolType.WEBSOCKET;
                 metrics.recordPayloadSize(sample == null ? 0 : sample.length());
                 loggerMaker.infoAndAddToDb("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
 
@@ -156,7 +159,9 @@ public class ConsumerUtil {
                 long runWallStart = System.nanoTime();
                 TestingRunResult runResult;
                 try {
-                    runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
+                    // a WebSocket test waits for its collection's server to be free (one test at a time by default)
+                    runResult = WebSocketTestSlots.run(webSocket, apiInfoKey.getApiCollectionId(), () ->
+                            executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample));
                 } finally {
                     metrics.recordStage(Stage.RUN_TEST, System.nanoTime() - runWallStart);
                     metrics.recordStage(Stage.SEND_REQUEST, TestPhaseTimer.sendReqNanos());

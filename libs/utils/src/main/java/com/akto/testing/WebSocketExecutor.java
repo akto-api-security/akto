@@ -4,6 +4,8 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
@@ -39,9 +41,12 @@ public class WebSocketExecutor {
 
             // Drain any pending messages before sending to avoid response mismatch
             conn.drainPendingMessages();
-            
+
             conn.sendMessage(requestBody);
 
+            if (COLLECT_REPLIES) {
+                return repliesResponse(conn.collectReplies(timeoutMs, TEST_REPLY_QUIET_MS));
+            }
             String response = conn.getNextResponse(timeoutMs);
 
             return new OriginalHttpResponse(
@@ -78,7 +83,7 @@ public class WebSocketExecutor {
         "sec-websocket-extensions", "sec-websocket-accept", "host"
     ));
 
-    private static Map<String, List<String>> filterWebSocketHeaders(Map<String, List<String>> headers) {
+    static Map<String, List<String>> filterWebSocketHeaders(Map<String, List<String>> headers) {
         if (headers == null) return new HashMap<>();
         Map<String, List<String>> filtered = new HashMap<>();
         for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
@@ -107,6 +112,29 @@ public class WebSocketExecutor {
             return closedResponse(conn, e.getMessage());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("WS connection string connect failed: " + e.getMessage(), LogDb.TESTING);
+            return errorResponse(e.getMessage(), 500);
+        } finally {
+            conn.close();
+        }
+    }
+
+    /**
+     * Connect-only, for importing a connection string: 101 with the server's handshake headers when accepted,
+     * else the refusal (e.g. 401/403). Any greeting is not kept, as a connection string's body must stay empty.
+     */
+    public static OriginalHttpResponse handshake(String wsUrl, Map<String, List<String>> headers, long timeoutMs) {
+        if (timeoutMs <= 0) timeoutMs = DEFAULT_TIMEOUT_MS;
+        Map<String, List<String>> filteredHeaders = filterWebSocketHeaders(headers);
+        WebSocketConnection conn = new WebSocketConnection(wsUrl, filteredHeaders, "connection-string");
+        try {
+            WebSocketConnectionPool.createDirectConnection(wsUrl, filteredHeaders, conn);
+            conn.waitForConnection(timeoutMs);
+            return new OriginalHttpResponse("", conn.getHandshakeHeaders(), 101);
+        } catch (WebSocketConnection.ClosedException e) {
+            loggerMaker.errorAndAddToDb("WS handshake refused: " + e.getMessage(), LogDb.TESTING);
+            return closedResponse(conn, e.getMessage());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("WS handshake failed: " + e.getMessage(), LogDb.TESTING);
             return errorResponse(e.getMessage(), 500);
         } finally {
             conn.close();
@@ -152,7 +180,34 @@ public class WebSocketExecutor {
         }
     }
 
-    private static OriginalHttpResponse closedResponse(WebSocketConnection conn, String message) {
+    // normal tests: every reply frame until the server goes quiet; "false" keeps only the latest frame of the first burst
+    static final boolean COLLECT_REPLIES = !"false".equalsIgnoreCase(System.getenv("AKTO_WS_COLLECT_REPLIES"));
+
+    private static final ObjectMapper mapper = new ObjectMapper();
+
+    /** The reply frames as one response: a single frame as is, several as a JSON array (one element per frame). */
+    static OriginalHttpResponse repliesResponse(List<String> frames) {
+        OriginalHttpResponse response = new OriginalHttpResponse(replyBody(frames), new HashMap<>(), 200);
+        response.setStreamingChunks(frames);
+        return response;
+    }
+
+    static String replyBody(List<String> frames) {
+        if (frames.size() == 1) {
+            return frames.get(0);
+        }
+        ArrayNode body = mapper.createArrayNode();
+        for (String frame : frames) {
+            try {
+                body.add(mapper.readTree(frame));
+            } catch (Exception e) {
+                body.add(frame); // not JSON: kept as a string
+            }
+        }
+        return body.toString();
+    }
+
+    static OriginalHttpResponse closedResponse(WebSocketConnection conn, String message) {
         BasicDBObject body = new BasicDBObject("error", message);
         if (conn.getCloseCode() > 0) {
             body.put("closeCode", conn.getCloseCode());
@@ -162,14 +217,17 @@ public class WebSocketExecutor {
                 statusForClosedConnection(conn.getHandshakeStatus(), conn.getCloseCode()));
     }
 
-    private static OriginalHttpResponse errorResponse(String message, int status) {
+    static OriginalHttpResponse errorResponse(String message, int status) {
         return new OriginalHttpResponse(new BasicDBObject("error", message).toJson(), new HashMap<>(), status);
     }
 
+    // the keys a frame names its message type with, in the order ingestion reads them
+    private static final List<String> MESSAGE_TYPE_KEYS = Arrays.asList("type", "messageType", "event");
+
     /**
-     * Enriches a WebSocket message body by injecting the URL path as the "type" field.
-     * Parses the body as JSON, sets type to the URL, and returns the modified JSON.
-     * If parsing fails, returns the original body unchanged.
+     * Enriches a WebSocket message body with its message type (the URL path): set on the key the frame
+     * already uses (type, messageType or event), else added as "type". Parses the body as JSON and
+     * returns the modified JSON; if parsing fails, returns the original body unchanged.
      */
     static String enrichMessageWithUrl(String requestBody, String url) {
         try {
@@ -180,7 +238,14 @@ public class WebSocketExecutor {
             }
             
             BasicDBObject bodyObj = BasicDBObject.parse(requestBody);
-            bodyObj.put("type", cleanUrl);
+            String typeKey = "type";
+            for (String key : MESSAGE_TYPE_KEYS) {
+                if (bodyObj.containsKey(key)) {
+                    typeKey = key;
+                    break;
+                }
+            }
+            bodyObj.put(typeKey, cleanUrl);
             return bodyObj.toJson();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Failed to inject URL into WS message body: " + e.getMessage(), LogDb.TESTING);
@@ -209,6 +274,33 @@ public class WebSocketExecutor {
      */
     public static OriginalHttpResponse sendMessageDirect(
             OriginalHttpRequest request, String wsUrl, Map<String, List<String>> headers, long timeoutMs, String requestId) {
+        return sendMessageDirect(request, wsUrl, headers, timeoutMs, requestId, false);
+    }
+
+    // after the last reply frame, how long a multi-frame (streamed) reply may go quiet before it is complete;
+    // agents can pause for a tool call or retrieval mid-answer, so the default is generous
+    static final long DEFAULT_REPLY_QUIET_MS = 15000;
+    static final long REPLY_QUIET_MS = replyQuietMs(System.getenv("AKTO_WS_REPLY_QUIET_MS"), DEFAULT_REPLY_QUIET_MS);
+    // normal tests: a reply (an ack, an error, a few frames) normally completes well within this
+    static final long DEFAULT_TEST_REPLY_QUIET_MS = 1000;
+    static final long TEST_REPLY_QUIET_MS = replyQuietMs(System.getenv("AKTO_WS_TEST_REPLY_QUIET_MS"), DEFAULT_TEST_REPLY_QUIET_MS);
+
+    static long replyQuietMs(String value, long defaultMs) {
+        try {
+            long ms = Long.parseLong(value.trim());
+            return ms > 0 ? ms : defaultMs;
+        } catch (Exception e) {
+            return defaultMs;
+        }
+    }
+
+    /**
+     * collectAllReplies (red teaming): the reply is every frame the server sends until it goes quiet,
+     * so an agent's streamed answer arrives whole.
+     */
+    public static OriginalHttpResponse sendMessageDirect(
+            OriginalHttpRequest request, String wsUrl, Map<String, List<String>> headers, long timeoutMs, String requestId,
+            boolean collectAllReplies) {
         if (timeoutMs <= 0) timeoutMs = DEFAULT_TIMEOUT_MS;
         Map<String, List<String>> filteredHeaders = filterWebSocketHeaders(headers);
         WebSocketConnection conn = new WebSocketConnection(wsUrl, filteredHeaders, "kafka-task");
@@ -233,6 +325,12 @@ public class WebSocketExecutor {
 
             conn.sendMessage(requestBody);
 
+            if (collectAllReplies) {
+                return repliesResponse(conn.collectReplies(timeoutMs, REPLY_QUIET_MS));
+            }
+            if (COLLECT_REPLIES) {
+                return repliesResponse(conn.collectReplies(timeoutMs, TEST_REPLY_QUIET_MS));
+            }
             // the frame echoing requestId when the server echoes it, else the first reply
             String response = conn.getNextResponse(timeoutMs, requestId);
 
