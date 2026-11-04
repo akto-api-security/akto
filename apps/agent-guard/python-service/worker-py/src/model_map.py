@@ -8,6 +8,11 @@
                                      SAFE/INCONC. → ALLOW (best tier2 result)
     tier1 all INCONCLUSIVE       → FINAL_ARBITER decides
 
+A Tripwire classifier entry only observes, whatever its modelRole: on
+PromptInjection input it starts with the tiers, the scan waits for it at most
+its timeoutMs (counted from the scan's start), and its verdict is recorded in
+details.tripwire and the stored model results. It never changes the verdict.
+
 Verdict logic is identical to the container; only the executor changed
 (asyncio tasks + wait_for instead of a ThreadPoolExecutor).
 """
@@ -18,6 +23,7 @@ import time
 from typing import Any
 
 import metrics_push
+from constants import is_tripwire
 from providers import FallbackProvider, build_provider_from_config
 
 logger = logging.getLogger(__name__)
@@ -37,11 +43,14 @@ _DEFAULT_TIER_TIMEOUT_MS = 5000
 _DEFAULT_ARBITER_TIMEOUT_MS = 10000
 _DEFAULT_ARBITER_BACKUP_TIMEOUT_MS = 5000
 
+_DEFAULT_OBSERVER_TIMEOUT_MS = 500
+
 ScannerEntry = tuple[Any, dict[str, Any]]
 
 
 def _role_entry(model_configs: Any, role: str) -> dict[str, Any] | None:
-    return next((m for m in (model_configs or []) if m.get("modelRole") == role), None)
+    # Tripwire only observes, so it never fills a role (e.g. build_arbiter's LLM for /guardrails/llm and reasons).
+    return next((m for m in (model_configs or []) if m.get("modelRole") == role and not is_tripwire(m)), None)
 
 
 def _timeout_s(entry: dict[str, Any], default_ms: int) -> float:
@@ -104,9 +113,15 @@ class ModelMapScanner:
         from llm_scanner import LLMScanner
 
         scanners: list[ScannerEntry] = []
+        observers: list[ScannerEntry] = []
         for entry in model_map:
+            if self._skips(entry):
+                continue
             provider = build_provider_from_config(entry)
             if provider is not None:
+                if is_tripwire(entry):
+                    observers.append((LLMScanner(provider), entry))
+                    continue
                 if entry.get("modelRole") == _ROLE_ARBITER:
                     provider = _with_backup(provider, model_map, _timeout_s(entry, _DEFAULT_ARBITER_TIMEOUT_MS))
                 scanners.append((LLMScanner(provider, entry.get("responseFormat", "")), entry))
@@ -122,7 +137,7 @@ class ModelMapScanner:
             raise ValueError("ModelMapScanner: no usable providers in modelConfigs")
 
         start = time.time()
-        result = await self._run_pipeline(scanners)
+        result = await self._run_pipeline(scanners, observers)
         result["execution_time_ms"] = round((time.time() - start) * 1000, 2)
         _fire_store(self.store_fn, self.completed_all, self.scanner_name)
         logger.info(
@@ -133,11 +148,12 @@ class ModelMapScanner:
 
     # ── Pipeline core ───────────────────────────────────────────────────────
 
-    async def _run_pipeline(self, scanners: list[ScannerEntry]) -> dict[str, Any]:
+    async def _run_pipeline(self, scanners: list[ScannerEntry], observers: list[ScannerEntry]) -> dict[str, Any]:
         tier1 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER1]
         tier2 = [se for se in scanners if se[1].get("modelRole") == _ROLE_TIER2]
         arbiters = [se for se in scanners if se[1].get("modelRole") == _ROLE_ARBITER]
 
+        observed = self._submit(observers, _DEFAULT_OBSERVER_TIMEOUT_MS)
         t1 = self._submit(tier1, _DEFAULT_TIER_TIMEOUT_MS)
         t2 = self._submit(tier2, _DEFAULT_TIER_TIMEOUT_MS)
         eager = bool(self.config.get("parallelExecution", False)) and bool(arbiters)
@@ -146,6 +162,7 @@ class ModelMapScanner:
             logger.info(f"[ModelMap] parallelExecution=true → {_ROLE_ARBITER} fired alongside tiers")
 
         winner = await self._cascade(t1, t2, arbiters, arb)
+        await self._observe(observed, winner)
         return self._shape_result(winner)
 
     async def _cascade(self, t1, t2, arbiters, arb) -> dict[str, Any]:
@@ -269,6 +286,30 @@ class ModelMapScanner:
         winner["is_valid"] = not unsafe
         return winner
 
+    async def _observe(self, observed: dict[asyncio.Task, dict[str, Any]], winner: dict[str, Any]) -> None:
+        """Record the observers' verdicts next to the cascade's. A failed or slow observer is only logged."""
+        for result, entry in await self._await_map(observed):
+            provider_name = entry.get("provider") or "unknown"
+            if isinstance(result, Exception):
+                reason = "timeout" if isinstance(result, TimeoutError) else type(result).__name__
+                metrics_push.COUNTS["provider_errors"].increment(f"{provider_name}:{reason}")
+                logger.warning(f"[ModelMap] observer '{provider_name}' failed: {result!r}")
+                continue
+            exec_ms = result.get("execution_time_ms")
+            if isinstance(exec_ms, (int, float)):
+                metrics_push.SAMPLES["provider"].record(provider_name, float(exec_ms))
+            self.completed_all.append(result)
+            if result.get("is_valid", True) != winner.get("is_valid", True):
+                logger.info(
+                    f"[ModelMap] {self.scanner_name} observer disagreement: "
+                    f"cascade={'SAFE' if winner.get('is_valid', True) else 'UNSAFE'} "
+                    f"{provider_name}={float(result.get('risk_score', 0.0)):.2f}"
+                )
+
+    def _skips(self, entry: dict[str, Any]) -> bool:
+        """A Tripwire entry observes PromptInjection input only."""
+        return is_tripwire(entry) and not (self.scanner_name == "PromptInjection" and self.scanner_type == "prompt")
+
     @staticmethod
     def _error_result(error: str) -> dict[str, Any]:
         # Fail OPEN: an arbiter that never answered is an infrastructure failure,
@@ -328,7 +369,8 @@ class ModelMapScanner:
             details["decision_confidence"] = winner["decision_confidence"]
         completed_by_stem = self._index_completed_by_stem()
         for entry in self.config.get("modelConfigs", []):
-            if entry.get("modelRole") == _ROLE_ARBITER_BACKUP:
+            backup = entry.get("modelRole") == _ROLE_ARBITER_BACKUP and not is_tripwire(entry)
+            if backup or self._skips(entry):
                 continue
             stem = self._stem(entry.get("provider", ""))
             if stem:

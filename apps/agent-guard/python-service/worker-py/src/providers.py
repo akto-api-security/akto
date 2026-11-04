@@ -965,6 +965,57 @@ class GemmaFastArbiterProvider(OpenAIProvider):
         self.name = "gemma_fast_arbiter"
 
 
+class TripwireProvider(LLMProvider):
+    """Tripwire, a prompt-injection classifier (akto-api-security/Tripwire): POST {base_url}/v1/detect with the
+    raw text returns an attack_score in [0, 1]. Not an LLM, so LLMScanner sends it the text itself rather than a
+    scan prompt, it judges PromptInjection only, and long text is windowed by the server, not chunked here."""
+
+    name = "tripwire"
+    # Its own connection pool: a hung Tripwire must not hold the shared pool's connections that Qwen/Gemma need.
+    _MAX_CONNECTIONS = 20
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+        self._http: httpx.AsyncClient | None = None
+        logger.info(f"[Tripwire] base_url={self.base_url}")
+
+    def _client(self) -> httpx.AsyncClient:
+        if self._http is None or self._http.is_closed:
+            self._http = httpx.AsyncClient(timeout=10.0, limits=httpx.Limits(max_connections=self._MAX_CONNECTIONS))
+        return self._http
+
+    async def detect(self, text: str) -> dict[str, Any]:
+        resp = await self._client().post(
+            f"{self.base_url}/v1/detect",
+            headers=dict(_IDENTITY, **{"Content-Type": "application/json"}),
+            json={"text": text},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def complete(self, prompt: str) -> str:
+        """Satisfies LLMProvider; the startup self-check pings every provider through it."""
+        return json.dumps(await self.detect(prompt))
+
+
+def parse_tripwire_result(body: dict[str, Any]) -> dict[str, Any]:
+    """A /v1/detect reply as a scanner result. is_attack applies the server's own THRESHOLD; risk_score is the
+    attack_score (1 - P(benign)), on the same scale as an LLM arbiter's risk_score."""
+    score = float(body["attack_score"])
+    verdict = body.get("verdict", "")
+    details: dict[str, Any] = {"verdict": verdict, "attack_score": score}
+    if body.get("is_attack"):
+        details["reason"] = f"Tripwire flagged this as {verdict.replace('_', ' ')} (attack score {score:.2f})."
+    if body.get("windows_skipped"):  # a long input the server read only part of
+        details["windows_skipped"] = int(body["windows_skipped"])
+    return {
+        "is_valid": not body.get("is_attack", score >= 0.5),
+        "risk_score": score,
+        "decision_confidence": max(score, 1.0 - score),
+        "details": details,
+    }
+
+
 _FAST_PROVIDERS = ("qwen3guard_fast", "gemma_fast", "gemma_fast_arbiter")
 
 # Fast provider name → settings attr holding its default endpoint. An entry's
@@ -1082,6 +1133,7 @@ _BUILDERS: dict[str, Callable[[str, str, str], LLMProvider | None]] = {
         else None
     ),
     "bedrock": lambda model, base_url, _d: _build_bedrock(model, base_url),
+    "tripwire": lambda _m, base_url, _d: TripwireProvider(base_url) if base_url else None,
 }
 
 
@@ -1211,6 +1263,8 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
         # model/baseUrl (e.g. a VPC interface endpoint) are routing, not secrets;
         # credentials and region stay env-only.
         return _dispatch(name, model, (entry.get("baseUrl") or "").strip())
+    if name == "tripwire":
+        return _dispatch(name, "", (entry.get("baseUrl") or "").strip() or settings.TRIPWIRE_BASE_URL)
     return _dispatch(name, model, "")
 
 
