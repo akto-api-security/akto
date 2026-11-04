@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Box, Button, ChoiceList, HorizontalStack, Popover, Tabs, Tag, Text } from "@shopify/polaris";
+import { Box, Button, ChoiceList, HorizontalStack, Popover, Tabs, Text } from "@shopify/polaris";
+import { CancelSmallMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import AgGridTable from "../../../../components/tables/AgGridTable";
 import Pressable from "../../../dashboard/ask/components/Pressable";
@@ -29,7 +30,7 @@ const EMPLOYEE_COLUMNS = [
 
 const DEVICE_COLUMNS = [
     { field: "name", headerName: "Device", flex: 2, minWidth: 220, cellRenderer: DeviceCellRenderer },
-    { field: "os", headerName: "OS", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer },
+    { field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer },
     { field: "owner", headerName: "Owner", flex: 1, minWidth: 140, cellRenderer: OwnerCellRenderer },
     { field: "health", headerName: "Atlas agent", flex: 1.5, minWidth: 220, cellRenderer: AgentCellRenderer },
     { field: "guardrailMode", headerName: "Guardrail mode", width: 150, cellRenderer: GuardrailModeCellRenderer },
@@ -66,6 +67,7 @@ function appliedTags(filters) {
     const tags = [];
     filters.teams.forEach((team) => tags.push({ key: `team-${team}`, label: `Team: ${team}`, clear: { teams: filters.teams.filter((x) => x !== team) } }));
     filters.osList.forEach((os) => tags.push({ key: `os-${os}`, label: OS_LABELS[os] || os, clear: { osList: filters.osList.filter((x) => x !== os) } }));
+    filters.browserList.forEach((browser) => tags.push({ key: `browser-${browser}`, label: capitalize(browser), clear: { browserList: filters.browserList.filter((x) => x !== browser) } }));
     filters.categories.forEach((category) => tags.push({ key: `cat-${category}`, label: CATEGORY_LABELS[category] || category, clear: { categories: filters.categories.filter((x) => x !== category) } }));
     if (!isMonitorOnly(filters)) {
         filters.guardrailModes.forEach((mode) => tags.push({ key: `mode-${mode}`, label: MODE_LABELS[mode] || mode, clear: { guardrailModes: filters.guardrailModes.filter((x) => x !== mode) } }));
@@ -74,7 +76,7 @@ function appliedTags(filters) {
     const isCustomRiskRange = (filters.riskMin > 0 || filters.riskMax < RISK_MAX)
         && !(filters.riskMin === HIGH_RISK_THRESHOLD && filters.riskMax === RISK_MAX);
     if (isCustomRiskRange) {
-        tags.push({ key: "risk", label: `Risk ${filters.riskMin}-${filters.riskMax}`, clear: { riskMin: 0, riskMax: RISK_MAX } });
+        tags.push({ key: "risk", label: `Risk score ${filters.riskMin} to ${filters.riskMax}`, clear: { riskMin: 0, riskMax: RISK_MAX } });
     }
     return tags;
 }
@@ -117,30 +119,53 @@ function ListFilter({ field, options, selected, onChange }) {
     );
 }
 
-function filterOptions(field, teamOptions) {
-    if (field === "teams") return teamOptions.map((team) => ({ label: team, value: team }));
-    return Object.entries(FILTER_OPTION_LABELS[field]).map(([value, label]) => ({ label, value }));
+const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+function osBrowserLabel(value) {
+    const [type, name] = value.split(":");
+    return type === "os" ? (OS_LABELS[name] || name) : capitalize(name);
 }
 
-function FilterRow({ tab, filters, onFiltersChange, teamOptions }) {
+function filterOptions(field, dataOptions) {
+    return (dataOptions[field] || []).map((value) => ({ label: field === "osBrowser" ? osBrowserLabel(value) : (FILTER_OPTION_LABELS[field]?.[value] || value), value }));
+}
+
+function selectedOsBrowser(filters) {
+    return [...filters.osList.map((os) => `os:${os}`), ...filters.browserList.map((browser) => `browser:${browser}`)];
+}
+
+function splitOsBrowser(values) {
+    const pick = (type) => values.filter((value) => value.startsWith(`${type}:`)).map((value) => value.slice(type.length + 1));
+    return { osList: pick("os"), browserList: pick("browser") };
+}
+
+function FilterRow({ tab, filters, onFiltersChange, dataOptions }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
     const tags = appliedTags(filters);
     return (
         <HorizontalStack gap="2" blockAlign="center">
             {LIST_FILTERS[tab].map((field) => (
-                <ListFilter key={field} field={field} options={filterOptions(field, teamOptions)} selected={filters[field]} onChange={onFiltersChange} />
+                <ListFilter
+                    key={field}
+                    field={field}
+                    options={filterOptions(field, dataOptions)}
+                    selected={field === "osBrowser" ? selectedOsBrowser(filters) : filters[field]}
+                    onChange={field === "osBrowser" ? (patch) => onFiltersChange(splitOsBrowser(patch.osBrowser)) : onFiltersChange}
+                />
             ))}
             {chips.map((chip) => (
                 <FilterChip key={chip.key} label={chip.label} active={isChipActive(chip.key, filters)}
                     onClick={() => toggleChip(chip.key, filters, onFiltersChange)} />
             ))}
-            {tags.map((tag) => <Tag key={tag.key} onRemove={() => onFiltersChange(tag.clear)}>{tag.label}</Tag>)}
+            {tags.map((tag) => (
+                <Button key={tag.key} icon={CancelSmallMinor} accessibilityLabel={`Remove ${tag.label}`} onClick={() => onFiltersChange(tag.clear)}>{tag.label}</Button>
+            ))}
             {tags.length > 0 && <Button plain onClick={() => onFiltersChange(EMPTY_PEOPLE_FILTERS)}>Clear filters</Button>}
         </HorizontalStack>
     );
 }
 
-function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen, selected, teamOptions }) {
+function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen, selected, filterOptions: dataOptions }) {
     const isEmployees = tab === "employees";
     const gridRef = useRef(null);
     const [rows, setRows] = useState([]);
@@ -173,7 +198,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
 
     const selectedId = selected?.kind === (isEmployees ? "employee" : "device") ? selected.id : null;
     const getRowStyle = useCallback(({ data }) => {
-        const id = isEmployees ? data?.username : data?.name;
+        const id = isEmployees ? data?.username : data?.key;
         return { cursor: "pointer", background: selectedId && id === selectedId ? "var(--p-color-bg-primary-subdued-hover)" : undefined };
     }, [isEmployees, selectedId]);
     useEffect(() => { gridRef.current?.api?.redrawRows(); }, [selectedId]);
@@ -197,14 +222,14 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 searchValue={search}
                 onSearchChange={onSearchChange}
                 searchPlaceholder={SEARCH_HINTS[tab]}
-                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} teamOptions={teamOptions} />}
+                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} dataOptions={dataOptions} />}
                 height={PEOPLE_TABLE_HEIGHT}
                 domLayout="normal"
                 rowHeight={ROW_HEIGHT}
                 noOuterBorder
                 sideBar={false}
                 context={{ violationsAvailable, riskAvailable }}
-                onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.name)}
+                onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.key)}
                 gridRef={gridRef}
                 getRowStyle={getRowStyle}
                 rowSelection={undefined}

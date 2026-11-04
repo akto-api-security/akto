@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, HorizontalGrid } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
+import observeApi from "../../api";
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards";
 import AskBar from "../../../../components/shared/AskBar";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
-import OperatorDropdown from "../../../../components/layouts/OperatorDropdown";
 import AgentHealthCard from "./AgentHealthCard";
 import AiToolsByOsCard from "./AiToolsByOsCard";
 import PeopleTable from "./PeopleTable";
@@ -19,7 +20,7 @@ import {
 import transform from "./transform";
 
 function DevicesEmployeesPage() {
-    const [deviceScope, setDeviceScope] = useState(DEVICE_SCOPES[0].value);
+    const deviceScope = DEVICE_SCOPES[0].value;
     const [stats, setStats] = useState(null);
     const [overview, setOverview] = useState(null);
     const [overviewStatus, setOverviewStatus] = useState("loading");
@@ -27,6 +28,8 @@ function DevicesEmployeesPage() {
     const [filters, setFilters] = useState(EMPTY_PEOPLE_FILTERS);
     const [search, setSearch] = useState("");
     const [refreshKey, setRefreshKey] = useState(0);
+    const navigate = useNavigate();
+    const [discovery, setDiscovery] = useState(null);
     const [openTarget, setOpenTarget] = useState(null);
     const [exporting, setExporting] = useState(false);
 
@@ -41,6 +44,18 @@ function DevicesEmployeesPage() {
             });
         return () => { ignore = true; };
     }, [deviceScope, refreshKey]);
+
+    useEffect(() => {
+        let ignore = false;
+        observeApi.fetchUsersAndDevicesStats()
+            .then((res) => {
+                if (!ignore) setDiscovery(res);
+            })
+            .catch(() => {
+                if (!ignore) func.setToast(true, true, "Failed to load AI discovery counts");
+            });
+        return () => { ignore = true; };
+    }, [refreshKey]);
 
     useEffect(() => {
         let ignore = false;
@@ -71,7 +86,7 @@ function DevicesEmployeesPage() {
     const onDevicesTab = tab === "devices";
     const activeHealth = onDevicesTab && filters.healthStates.length === 1 ? filters.healthStates[0] : null;
     const activeMode = onDevicesTab && filters.guardrailModes.length === 1 ? filters.guardrailModes[0] : null;
-    const activeCategory = onDevicesTab && filters.osList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
+    const activeCategory = onDevicesTab && filters.osList.length === 0 && filters.browserList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
 
     const openPerson = useCallback((kind, id) => {
         const nextTab = kind === "employee" ? "employees" : "devices";
@@ -101,6 +116,10 @@ function DevicesEmployeesPage() {
     };
 
     const onSelectStat = (id) => {
+        if (id === "devicesWithAiTools" || id === "employeesUsingAi") {
+            navigate("/dashboard/observe/users-and-devices");
+            return;
+        }
         const target = transform.statCardTarget(id);
         if (target) toggleView(target.tab, target.filters);
     };
@@ -117,12 +136,6 @@ function DevicesEmployeesPage() {
             isFirstPage
             secondaryActions={
                 <>
-                    <OperatorDropdown
-                        label={(DEVICE_SCOPES.find((scope) => scope.value === deviceScope) || DEVICE_SCOPES[0]).label}
-                        items={DEVICE_SCOPES}
-                        selected={setDeviceScope}
-                        designer
-                    />
                     <Button icon={ExportMinor} onClick={exportTable} loading={exporting}>Export</Button>
                 </>
             }
@@ -134,7 +147,7 @@ function DevicesEmployeesPage() {
                     suggestions={ASK_ATLAS_SUGGESTIONS}
                     chatScope={ATLAS_CHAT_SCOPE}
                 />,
-                <SummaryCardInfo key="stats-row" summaryItems={transform.buildStatItems(stats, onSelectStat)} />,
+                <SummaryCardInfo key="stats-row" summaryItems={transform.buildStatItems(stats, onSelectStat, discovery)} />,
                 <HorizontalGrid key="overview-cards" columns={{ xs: 1, md: 3 }} gap="4">
                     <AgentHealthCard
                         overview={overview}
@@ -151,6 +164,7 @@ function DevicesEmployeesPage() {
                         activeCategory={activeCategory}
                         onSelectCategory={(category) => toggleView("devices", { categories: [category] })}
                         onSelect={(os, category) => toggleView("devices", { osList: [os], categories: [category] })}
+                        onSelectBrowser={(browser, category) => toggleView("devices", { browserList: [browser], categories: [category] })}
                     />
                     <RiskHistogramCard
                         overview={overview}
@@ -174,7 +188,7 @@ function DevicesEmployeesPage() {
                     riskAvailable={overview?.riskAvailable}
                     onOpen={openPerson}
                     selected={openTarget}
-                    teamOptions={overview?.teamOptions || []}
+                    filterOptions={transform.filterOptions(overview)}
                 />,
                 <PeopleFlyout
                     key="people-flyout"

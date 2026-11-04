@@ -65,7 +65,7 @@ public class AtlasPeopleService {
 
     public static final List<String> SEVERITIES = Arrays.asList("critical", "high", "medium", "low");
     public static final int VIOLATION_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-    public static final int OFFLINE_SECONDS = 7 * 24 * 60 * 60;
+    public static final int OFFLINE_SECONDS = 3 * 24 * 60 * 60;
     public static final double RISK_MAX = 5.0;
     public static final double HIGH_RISK_SCORE = 4.0;
     public static final int RISK_BUCKETS = 5;
@@ -75,6 +75,9 @@ public class AtlasPeopleService {
     private static final String TEAM_TAG_KEY = "team";
     private static final String UNKNOWN_USERNAME_PLACEHOLDER = "not-available";
     private static final String BROWSER_HOST_MARKER = "chrome";
+    private static final String BROWSER_USER_EMAIL_TAG = "browser-user-email";
+    private static final Pattern ACCOUNT_SLOT_SUFFIX = Pattern.compile("-u\\d+$");
+    private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-z0-9]");
     private static final long CACHE_TTL_MS = 60_000;
     private static final Pattern VERSION = Pattern.compile("^v?(\\d+)\\.(\\d+)\\.(\\d+)");
 
@@ -124,6 +127,8 @@ public class AtlasPeopleService {
 
     public static class DeviceRow {
         public String name;
+        public String browser = "";
+        public String key = "";
         public String moduleId;
         public String status;
         public String os = OS_UNKNOWN;
@@ -139,6 +144,7 @@ public class AtlasPeopleService {
         public final Set<String> skillNames = new LinkedHashSet<>();
         public final Set<Set<String>> skillSets = new HashSet<>();
         public int unapprovedTools;
+        public int unapprovedSkills;
         public int personalAccounts;
         public double riskScore;
 
@@ -155,7 +161,10 @@ public class AtlasPeopleService {
         public Map<String, Object> toMap() {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("name", name);
+            row.put("label", extension ? (username.isEmpty() ? (name.isEmpty() ? "Unidentified browser" : name) : username) : name);
             row.put("moduleId", moduleId);
+            row.put("browser", browser);
+            row.put("key", key);
             row.put("os", os);
             row.put("owner", username);
             row.put("agentVersion", version);
@@ -166,6 +175,7 @@ public class AtlasPeopleService {
             row.put("toolsByCategory", toolsByCategory);
             row.put("skillCount", skillNames.size());
             row.put("unapprovedTools", unapprovedTools);
+            row.put("unapprovedSkills", unapprovedSkills);
             row.put("personalAccounts", personalAccounts);
             row.put("violations", violationsBySeverity);
             row.put("violationCount", sum(violationsBySeverity));
@@ -186,6 +196,7 @@ public class AtlasPeopleService {
     public static class EmployeeRow {
         public String username;
         public final List<String> deviceNames = new ArrayList<>();
+        public final List<String> deviceKeys = new ArrayList<>();
         public final Set<String> teams = new LinkedHashSet<>();
         public final Set<String> skillNames = new LinkedHashSet<>();
         public final Map<String, Integer> violationsBySeverity = emptySeverityCounts();
@@ -222,6 +233,8 @@ public class AtlasPeopleService {
         public boolean violationsAvailable = true;
         public boolean riskAvailable = true;
         public int unapprovedTeams;
+        public int unapprovedNoTeam;
+        public final Set<String> unmatchedBrowserIdentities = new HashSet<>();
     }
 
     public static class PeopleQuery {
@@ -234,6 +247,9 @@ public class AtlasPeopleService {
         public boolean hasUnapproved;
         public boolean usesPersonal;
         public boolean agentIssues;
+        public boolean agentActive;
+        public boolean usesAi;
+        public List<String> browserList;
         public double riskMin;
         public double riskMax = RISK_MAX;
         public String sortKey;
@@ -271,7 +287,8 @@ public class AtlasPeopleService {
         snapshot.latestVersionByOs.putAll(latestVersionByOs);
         for (Document module : moduleRows) {
             DeviceRow device = toDeviceRow(module, latestVersionByOs, now);
-            snapshot.devicesByLowerName.putIfAbsent(device.name.toLowerCase(Locale.ROOT), device);
+            if (snapshot.devicesByLowerName.containsKey(device.key)) device.key = device.key + "|" + device.moduleId;
+            snapshot.devicesByLowerName.put(device.key, device);
         }
 
         if (bundle == null) {
@@ -279,7 +296,7 @@ public class AtlasPeopleService {
             snapshot.violationsAvailable = false;
         } else {
             try {
-                addTools(snapshot.devicesByLowerName, bundle, startTs, endTs);
+                addTools(snapshot.devicesByLowerName, snapshot.unmatchedBrowserIdentities, bundle, startTs, endTs);
                 addGuardrailModes(snapshot.devicesByLowerName.values(), bundle);
             } catch (Exception e) {
                 snapshot.toolsAvailable = false;
@@ -297,7 +314,9 @@ public class AtlasPeopleService {
         snapshot.employees.addAll(buildEmployees(snapshot.devices, bundle));
         Set<String> unapprovedTeams = new HashSet<>();
         for (EmployeeRow employee : snapshot.employees) {
-            if (employee.unapprovedTools > 0) unapprovedTeams.addAll(employee.teams);
+            if (employee.unapprovedTools == 0) continue;
+            unapprovedTeams.addAll(employee.teams);
+            if (employee.teams.isEmpty()) snapshot.unapprovedNoTeam++;
         }
         snapshot.unapprovedTeams = unapprovedTeams.size();
         return snapshot;
@@ -305,7 +324,8 @@ public class AtlasPeopleService {
 
     private static DeviceRow toDeviceRow(Document module, Map<String, String> latestVersionByOs, int now) {
         DeviceRow device = new DeviceRow();
-        device.name = String.valueOf(module.get("_id"));
+        device.name = module.getString("deviceName") == null ? "" : module.getString("deviceName");
+        device.browser = module.getString("browserName") == null ? "" : module.getString("browserName").toLowerCase(Locale.ROOT);
         device.moduleId = String.valueOf(module.get("moduleId"));
         device.status = module.getString("status");
         device.version = module.getString("currentVersion");
@@ -315,7 +335,8 @@ public class AtlasPeopleService {
         device.lastHeartbeat = heartbeat == null ? 0 : heartbeat.intValue();
         device.extension = module.getString("browserName") != null
                 || (device.version != null && device.version.contains("extension"));
-        device.os = normalizeOs(module.getString("os"), module.getString("platform"));
+        device.key = device.extension ? "ext|" + device.name : device.name.toLowerCase(Locale.ROOT);
+        device.os = device.extension ? normalizeOs(module.getString("os"), null) : normalizeOs(module.getString("os"), module.getString("platform"));
 
         boolean offline = device.lastHeartbeat > 0 && device.lastHeartbeat < now - OFFLINE_SECONDS;
         String latest = latestVersionByOs.get(device.os);
@@ -326,15 +347,25 @@ public class AtlasPeopleService {
         return device;
     }
 
-    private static void addTools(Map<String, DeviceRow> devicesByLowerName, InsightDataBundle bundle, int startTs, int endTs) {
+    private static void addTools(Map<String, DeviceRow> devicesByLowerName, Set<String> unmatchedBrowserIdentities, InsightDataBundle bundle, int startTs, int endTs) {
         boolean ranged = startTs > 0 || endTs > 0;
+        Map<String, DeviceRow> browserRowByName = new HashMap<>();
+        Map<String, DeviceRow> browserRowByEmail = new HashMap<>();
+        for (DeviceRow row : devicesByLowerName.values()) {
+            if (!row.extension) continue;
+            String nameKey = identityKey(row.name);
+            if (!nameKey.isEmpty()) browserRowByName.putIfAbsent(nameKey, row);
+            String emailKey = identityKey(localPart(row.username));
+            if (!emailKey.isEmpty()) browserRowByEmail.putIfAbsent(emailKey, row);
+        }
         Map<String, String> remarksByServiceName = loadServerRemarks();
         for (ApiCollection c : bundle.collections) {
             if (!InsightUtil.hasTagValue(c, Constants.AKTO_ENDPOINT_SOURCE_TAG, Constants.AKTO_ENDPOINT_SOURCE_VALUE)) continue;
             String hostDevice = InsightUtil.deviceIdOf(c);
             if (hostDevice == null || c.getHostName() == null) continue;
-            DeviceRow device = devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
-            if (device == null) continue;
+            boolean browser = InsightUtil.hasTag(c, Constants.AKTO_BROWSER_LLM_TAG);
+            DeviceRow device = browser ? null : devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
+            if (!browser && device == null) continue;
             if (ranged && !seenInWindow(bundle.collectionLastTrafficSeen.get(c.getId()), startTs, endTs)) continue;
 
             String[] parts = c.getHostName().split("\\.");
@@ -348,6 +379,16 @@ public class AtlasPeopleService {
             tool.personal = InsightUtil.isPersonalAccount(c);
             tool.plugin = AgenticObserveUtil.getPluginName(c);
             tool.orphan = c.getHostName().contains(AgenticObserveUtil.NOT_ATTACHED_VALUE);
+            if (browser) {
+                String identity = identityKey(ACCOUNT_SLOT_SUFFIX.matcher(parts[0].toLowerCase(Locale.ROOT)).replaceAll(""));
+                device = browserRowByName.get(identity);
+                String email = browserEmailOf(c);
+                if (device == null && email != null) device = browserRowByEmail.get(identityKey(localPart(email)));
+                if (device == null) {
+                    unmatchedBrowserIdentities.add(identity);
+                    continue;
+                }
+            }
             Set<String> skills = skillNamesOf(c);
             if (!skills.isEmpty()) {
                 device.skillNames.addAll(skills);
@@ -368,6 +409,14 @@ public class AtlasPeopleService {
             if (!tool.approved) device.unapprovedTools++;
             if (tool.personal) device.personalAccounts++;
         }
+        Set<String> approvedSkills = loadApprovedSkillNames();
+        for (DeviceRow device : devicesByLowerName.values()) {
+            for (String skill : device.skillNames) {
+                if (approvedSkills.contains(skill.toLowerCase(Locale.ROOT))) continue;
+                device.unapprovedSkills++;
+                device.unapprovedTools++;
+            }
+        }
     }
 
     private static Set<String> skillNamesOf(ApiCollection c) {
@@ -387,6 +436,26 @@ public class AtlasPeopleService {
         return names;
     }
 
+    private static String localPart(String value) {
+        if (value == null) return "";
+        int at = value.indexOf('@');
+        return at < 0 ? value : value.substring(0, at);
+    }
+
+    static String identityKey(String value) {
+        return value == null ? "" : NON_ALPHANUMERIC.matcher(value.toLowerCase(Locale.ROOT)).replaceAll("");
+    }
+
+    private static String browserEmailOf(ApiCollection c) {
+        if (c.getEnvType() == null) return null;
+        for (CollectionTags tag : c.getEnvType()) {
+            if (tag != null && BROWSER_USER_EMAIL_TAG.equals(tag.getKeyName()) && tag.getValue() != null && !tag.getValue().trim().isEmpty()) {
+                return tag.getValue().trim().toLowerCase(Locale.ROOT);
+            }
+        }
+        return null;
+    }
+
     private static String categoryOf(ApiCollection c, String[] parts) {
         String marker = parts.length > 1 ? parts[1] : "";
         if (BROWSER_HOST_MARKER.equals(marker) || InsightUtil.hasTag(c, Constants.AKTO_BROWSER_LLM_TAG)) return CAT_BROWSER;
@@ -403,6 +472,18 @@ public class AtlasPeopleService {
         String serviceName = InsightUtil.serviceNameOf(c);
         return (groupingName != null && allowlistNamesLower.contains(groupingName.toLowerCase(Locale.ROOT)))
                 || (serviceName != null && McpAuditInfo.REMARKS_APPROVED.equals(remarksByServiceName.get(serviceName.toLowerCase(Locale.ROOT))));
+    }
+
+    private static Set<String> loadApprovedSkillNames() {
+        Bson filter = Filters.and(
+                Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
+                Filters.eq(McpAuditInfo.REMARKS, McpAuditInfo.REMARKS_APPROVED),
+                contextSourceFilter(Context.contextSource.get()));
+        Set<String> approved = new HashSet<>();
+        for (McpAuditInfo row : McpAuditInfoDao.instance.findAll(filter, Projections.include(McpAuditInfo.RESOURCE_NAME))) {
+            if (row.getResourceName() != null) approved.add(row.getResourceName().toLowerCase(Locale.ROOT));
+        }
+        return approved;
     }
 
     private static Map<String, String> loadServerRemarks() {
@@ -481,12 +562,13 @@ public class AtlasPeopleService {
         Map<String, EmployeeRow> byUsername = new LinkedHashMap<>();
         for (DeviceRow device : devices) {
             if (device.username.isEmpty()) continue;
-            EmployeeRow employee = byUsername.computeIfAbsent(device.username, name -> {
+            EmployeeRow employee = byUsername.computeIfAbsent(device.username.toLowerCase(Locale.ROOT), key -> {
                 EmployeeRow row = new EmployeeRow();
-                row.username = name;
+                row.username = device.username;
                 return row;
             });
             employee.deviceNames.add(device.name);
+            employee.deviceKeys.add(device.key);
             employee.skillNames.addAll(device.skillNames);
             employee.toolCount += device.toolCount();
             employee.unapprovedTools += device.unapprovedTools;
@@ -512,34 +594,64 @@ public class AtlasPeopleService {
     }
 
     public Map<String, Object> stats(Snapshot snapshot) {
-        long agentActive = 0, offline = 0, withTools = 0, unapproved = 0, monitorOnly = 0, employeesUsingAi = 0;
+        long desktop = 0, browsers = 0, desktopActive = 0, browserActive = 0, offline = 0;
+        long unapproved = 0, monitorOnly = 0;
         for (DeviceRow device : snapshot.devices) {
-            if (STATUS_ACTIVE.equals(device.status)) agentActive++;
+            boolean active = STATUS_ACTIVE.equals(device.status);
+            if (device.extension) {
+                browsers++;
+                if (active) browserActive++;
+            } else {
+                desktop++;
+                if (active) desktopActive++;
+            }
             if (HEALTH_OFFLINE.equals(device.health)) offline++;
-            if (device.toolCount() > 0) withTools++;
             if (device.unapprovedTools > 0) unapproved++;
             if (MODE_MONITOR.equals(device.guardrailMode)) monitorOnly++;
         }
-        for (EmployeeRow employee : snapshot.employees) {
-            if (employee.toolCount > 0) employeesUsingAi++;
-        }
-        long managed = snapshot.devices.size();
+        long managed = desktop + browsers;
         boolean tools = snapshot.toolsAvailable;
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("managedDevices", managed);
-        stats.put("agentActive", agentActive);
-        stats.put("offlineSevenDays", offline);
-        stats.put("devicesWithAiTools", tools ? withTools : null);
-        stats.put("devicesWithAiToolsPercent", tools ? (managed > 0 ? Math.round(100.0 * withTools / managed) : 0L) : null);
-        stats.put("employeesUsingAi", tools ? employeesUsingAi : null);
+        stats.put("desktopDevices", desktop);
+        stats.put("browserDevices", browsers);
+        stats.put("agentActive", desktopActive + browserActive);
+        stats.put("desktopActive", desktopActive);
+        stats.put("browserActive", browserActive);
+        stats.put("offlineDevices", offline);
         stats.put("totalEmployees", (long) snapshot.employees.size());
-        stats.put("devicesWithUnapprovedTools", tools ? unapproved : null);
         stats.put("unapprovedTeams", tools ? snapshot.unapprovedTeams : null);
+        stats.put("unapprovedNoTeam", tools ? snapshot.unapprovedNoTeam : null);
+        stats.put("devicesWithUnapprovedTools", tools ? unapproved : null);
         stats.put("monitorOnlyDevices", tools ? monitorOnly : null);
+        stats.put("unattributedBrowserUsers", (long) snapshot.unmatchedBrowserIdentities.size());
         List<String> unavailableSources = new ArrayList<>();
         if (!tools) unavailableSources.add("insightsBundle");
         stats.put("unavailableSources", unavailableSources);
         return stats;
+    }
+
+    private static Map<String, Object> matrixRow(String keyField, String key) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put(keyField, key);
+        row.put("devices", 0);
+        row.put("totalTools", 0);
+        row.put("devicesWithTools", 0);
+        Map<String, Integer> categoryCounts = new LinkedHashMap<>();
+        for (String category : CATEGORIES) categoryCounts.put(category, 0);
+        row.put("toolsByCategory", categoryCounts);
+        return row;
+    }
+
+    private static List<Map<String, Object>> finalizedMatrixRows(Map<String, Map<String, Object>> matrix) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> row : matrix.values()) {
+            int devices = (Integer) row.get("devices");
+            if (devices == 0) continue;
+            row.put("avgTools", Math.round(10.0 * (Integer) row.get("totalTools") / devices) / 10.0);
+            rows.add(row);
+        }
+        return rows;
     }
 
     public Map<String, Object> overview(Snapshot snapshot) {
@@ -551,40 +663,31 @@ public class AtlasPeopleService {
         Map<String, Integer> categoryTotals = new LinkedHashMap<>();
         for (String category : CATEGORIES) categoryTotals.put(category, 0);
         Map<String, Map<String, Object>> osMatrix = new LinkedHashMap<>();
-        for (String os : OS_ORDER) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("os", os);
-            row.put("devices", 0);
-            row.put("totalTools", 0);
-            Map<String, Integer> categoryCounts = new LinkedHashMap<>();
-            for (String category : CATEGORIES) categoryCounts.put(category, 0);
-            row.put("toolsByCategory", categoryCounts);
-            osMatrix.put(os, row);
-        }
+        for (String os : OS_ORDER) osMatrix.put(os, matrixRow("os", os));
+        Map<String, Map<String, Object>> browserMatrix = new LinkedHashMap<>();
 
         List<String> outdatedModuleIds = new ArrayList<>();
         for (DeviceRow device : snapshot.devices) {
             health.merge(device.health, 1, Integer::sum);
             modes.merge(device.guardrailMode, 1, Integer::sum);
             if (HEALTH_OUTDATED.equals(device.health)) outdatedModuleIds.add(device.moduleId);
-            Map<String, Object> osRow = osMatrix.get(device.os);
+            Map<String, Object> osRow = device.extension
+                    ? browserMatrix.computeIfAbsent(device.browser.isEmpty() ? "other" : device.browser, key -> matrixRow("browser", key))
+                    : osMatrix.get(device.os);
             osRow.put("devices", (Integer) osRow.get("devices") + 1);
             osRow.put("totalTools", (Integer) osRow.get("totalTools") + device.toolCount());
+            if (device.toolCount() > 0) osRow.put("devicesWithTools", (Integer) osRow.get("devicesWithTools") + 1);
             @SuppressWarnings("unchecked")
             Map<String, Integer> categoryCounts = (Map<String, Integer>) osRow.get("toolsByCategory");
             for (String category : CATEGORIES) {
-                categoryCounts.merge(category, device.toolsByCategory.get(category), Integer::sum);
-                if (!OS_UNKNOWN.equals(device.os)) categoryTotals.merge(category, device.toolsByCategory.get(category), Integer::sum);
+                int hasCategory = device.toolsByCategory.get(category) > 0 ? 1 : 0;
+                categoryCounts.merge(category, hasCategory, Integer::sum);
+                if (device.extension || !OS_UNKNOWN.equals(device.os)) categoryTotals.merge(category, hasCategory, Integer::sum);
             }
         }
 
-        List<Map<String, Object>> osRows = new ArrayList<>();
-        for (Map<String, Object> osRow : osMatrix.values()) {
-            int devices = (Integer) osRow.get("devices");
-            if (devices == 0) continue;
-            osRow.put("avgTools", Math.round(10.0 * (Integer) osRow.get("totalTools") / devices) / 10.0);
-            osRows.add(osRow);
-        }
+        List<Map<String, Object>> osRows = finalizedMatrixRows(osMatrix);
+        List<Map<String, Object>> browserRows = finalizedMatrixRows(browserMatrix);
 
         int[] histogram = new int[RISK_BUCKETS];
         int highRisk = 0;
@@ -605,6 +708,7 @@ public class AtlasPeopleService {
         overview.put("outdatedModuleIds", outdatedModuleIds);
         overview.put("latestVersionByOs", snapshot.latestVersionByOs);
         overview.put("osMatrix", osRows);
+        overview.put("browserMatrix", browserRows);
         overview.put("categoryTotals", categoryTotals);
         overview.put("riskHistogram", histogramList);
         overview.put("highRiskEmployees", highRisk);
@@ -617,11 +721,12 @@ public class AtlasPeopleService {
     public Map<String, Object> detail(Snapshot snapshot, String kind, String id) {
         if (id == null) return null;
         if ("device".equals(kind)) {
-            DeviceRow device = snapshot.devicesByLowerName.get(id.toLowerCase(Locale.ROOT));
+            DeviceRow device = snapshot.devicesByLowerName.get(id);
+            if (device == null) device = snapshot.devicesByLowerName.get(id.toLowerCase(Locale.ROOT));
             return device == null ? null : device.toDetailMap();
         }
         for (EmployeeRow employee : snapshot.employees) {
-            if (!employee.username.equals(id)) continue;
+            if (!employee.username.equalsIgnoreCase(id)) continue;
             Map<String, Object> detail = employee.toMap();
             List<Map<String, Object>> devices = new ArrayList<>();
             for (DeviceRow device : devicesOf(snapshot, employee)) devices.add(device.toDetailMap());
@@ -631,6 +736,23 @@ public class AtlasPeopleService {
         return null;
     }
 
+    public boolean isModulePageable(PeopleQuery query) {
+        String sortKey = query.sortKey == null ? "" : query.sortKey;
+        boolean moduleSort = sortKey.isEmpty() || "lastHeartbeat".equals(sortKey) || "name".equals(sortKey) || "agentVersion".equals(sortKey);
+        boolean noJoinFilter = (query.text == null || query.text.trim().isEmpty())
+                && !notEmpty(query.osList) && !notEmpty(query.browserList) && !notEmpty(query.categories) && !notEmpty(query.healthStates)
+                && !notEmpty(query.guardrailModes) && !notEmpty(query.teams)
+                && !query.hasUnapproved && !query.usesPersonal && !query.agentIssues
+                && query.riskMin <= 0 && query.riskMax >= RISK_MAX;
+        return moduleSort && noJoinFilter;
+    }
+
+    public List<Map<String, Object>> deviceRows(Snapshot snapshot) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (DeviceRow device : snapshot.devices) rows.add(device.toMap());
+        return rows;
+    }
+
     public List<Map<String, Object>> pageDevices(Snapshot snapshot, PeopleQuery query, long[] totalOut) {
         List<String[]> terms = parseTerms(query.text);
         List<DeviceRow> matching = new ArrayList<>();
@@ -638,6 +760,7 @@ public class AtlasPeopleService {
             if (!matchesDeviceFilters(device, query)) continue;
             if (!deviceMatchesAllTerms(device, terms)) continue;
             if (query.agentIssues && HEALTH_HEALTHY.equals(device.health)) continue;
+            if (query.agentActive && !STATUS_ACTIVE.equals(device.status)) continue;
             if (query.hasUnapproved && device.unapprovedTools == 0) continue;
             if (query.usesPersonal && device.personalAccounts == 0) continue;
             matching.add(device);
@@ -651,7 +774,7 @@ public class AtlasPeopleService {
 
     public List<Map<String, Object>> pageEmployees(Snapshot snapshot, PeopleQuery query, long[] totalOut) {
         List<String[]> terms = parseTerms(query.text);
-        boolean deviceFiltered = notEmpty(query.osList) || notEmpty(query.categories)
+        boolean deviceFiltered = notEmpty(query.osList) || notEmpty(query.browserList) || notEmpty(query.categories)
                 || notEmpty(query.healthStates) || notEmpty(query.guardrailModes);
         List<EmployeeRow> matching = new ArrayList<>();
         for (EmployeeRow employee : snapshot.employees) {
@@ -659,6 +782,7 @@ public class AtlasPeopleService {
             if (deviceFiltered && devices.stream().noneMatch(device -> matchesDeviceFilters(device, query))) continue;
             if (!employeeMatchesAllTerms(employee, devices, terms)) continue;
             if (notEmpty(query.teams) && employee.teams.stream().noneMatch(query.teams::contains)) continue;
+            if (query.usesAi && employee.toolCount == 0) continue;
             if (query.hasUnapproved && employee.unapprovedTools == 0) continue;
             if (query.usesPersonal && employee.personalAccounts == 0) continue;
             if (employee.riskScore < query.riskMin) continue;
@@ -674,15 +798,19 @@ public class AtlasPeopleService {
 
     private static List<DeviceRow> devicesOf(Snapshot snapshot, EmployeeRow employee) {
         List<DeviceRow> devices = new ArrayList<>();
-        for (String name : employee.deviceNames) {
-            DeviceRow device = snapshot.devicesByLowerName.get(name.toLowerCase(Locale.ROOT));
+        for (String key : employee.deviceKeys) {
+            DeviceRow device = snapshot.devicesByLowerName.get(key);
             if (device != null) devices.add(device);
         }
         return devices;
     }
 
     private static boolean matchesDeviceFilters(DeviceRow device, PeopleQuery query) {
-        if (notEmpty(query.osList) && !query.osList.contains(device.os)) return false;
+        if (notEmpty(query.osList) || notEmpty(query.browserList)) {
+            boolean osMatch = !device.extension && notEmpty(query.osList) && query.osList.contains(device.os);
+            boolean browserMatch = device.extension && notEmpty(query.browserList) && query.browserList.contains(device.browser.isEmpty() ? "other" : device.browser);
+            if (!osMatch && !browserMatch) return false;
+        }
         if (notEmpty(query.healthStates) && !query.healthStates.contains(device.health)) return false;
         if (notEmpty(query.guardrailModes) && !query.guardrailModes.contains(device.guardrailMode)) return false;
         if (notEmpty(query.categories)) {

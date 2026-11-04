@@ -132,7 +132,6 @@ function Footprint({ kind, detail }) {
             <HorizontalStack align="space-between" blockAlign="baseline">
                 <Text as="h3" variant="headingSm">AI footprint</Text>
                 <HorizontalStack gap="3" blockAlign="baseline">
-                    <Text as="span" variant="bodySm" color="subdued">Select a node to trace its paths. Select "+N more" or a skills node to expand it</Text>
                     {!transform.isDefaultFootprintView(view) && <Button plain onClick={resetView}>Reset view</Button>}
                 </HorizontalStack>
             </HorizontalStack>
@@ -156,7 +155,7 @@ function Footprint({ kind, detail }) {
                         ))}
                     </HorizontalStack>
                 </VerticalStack>
-            ) : <Text as="p" color="subdued">No AI tools were seen in the last 7 days.</Text>}
+            ) : <Text as="p" color="subdued">No AI tools discovered.</Text>}
         </VerticalStack>
     );
 }
@@ -196,7 +195,8 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
     const subtitle = !ready ? undefined : isDevice
         ? `${OS_LABELS[detail.os] || detail.os} · ${detail.owner || "No owner"}`
         : `${(detail.teams || []).join(", ") || "No team"} · ${plural(detail.deviceCount, "device")}`;
-    const questions = (isDevice ? ATLAS_DEVICE_QUESTIONS : ATLAS_EMPLOYEE_QUESTIONS).map((question) => question.replace("{name}", target.id));
+    const displayName = ready ? (detail.label || detail.name || detail.username || target.id) : target.id;
+    const questions = (isDevice ? ATLAS_DEVICE_QUESTIONS : ATLAS_EMPLOYEE_QUESTIONS).map((question) => question.replace("{name}", displayName));
 
     return (
         <>
@@ -205,7 +205,7 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
                 width={FLYOUT_WIDTH}
                 header={
                     <FlyoutBreadcrumb
-                        items={[{ label: target.id, badge: ready && !isDevice && detail.riskScore ? detail.riskScore : undefined }]}
+                        items={[{ label: displayName, badge: ready && !isDevice && detail.riskScore ? detail.riskScore : undefined }]}
                         onClose={onClose}
                         subtitle={subtitle}
                     >

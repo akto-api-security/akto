@@ -8,7 +8,7 @@ import SegmentBar from "../../../../components/shared/SegmentBar";
 import { HEALTH_BACKGROUNDS, HEALTH_LABELS, HEALTH_ORDER, MODE_BACKGROUNDS, MODE_LABELS, MODE_ORDER, tokenVar } from "./peopleConstants";
 import transform from "./transform";
 
-const HEALTH_TOOLTIP = "Offline: no heartbeat for 7+ days. Outdated: older than the latest release for the device's OS.";
+const HEALTH_TOOLTIP = "Offline: no heartbeat for 3+ days. Outdated: older than the latest release for the device's OS.";
 
 const HEALTH_BAR_HEIGHT = "12px";
 const MODE_BAR_HEIGHT = "8px";

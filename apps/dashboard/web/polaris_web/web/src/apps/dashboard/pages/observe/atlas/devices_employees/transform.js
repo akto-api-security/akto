@@ -2,16 +2,16 @@ import { Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    CATEGORY_LABELS, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, MODE_LABELS, OS_LABELS, STAT_CARDS, STAT_EMPTY_VALUE,
+    CATEGORY_LABELS, CATEGORY_ORDER, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, OS_LABELS, STAT_CARDS, STAT_EMPTY_VALUE,
 } from "./peopleConstants";
 
 const ALL_CATEGORIES = ["agents", "mcp", "browser"];
 
 const STAT_CARD_TARGETS = {
     managedDevices: { tab: "devices", filters: {} },
-    agentActive: { tab: "devices", filters: { agentIssues: true } },
+    agentActive: { tab: "devices", filters: { agentActive: true } },
     devicesWithAiTools: { tab: "devices", filters: { categories: ALL_CATEGORIES } },
-    employeesUsingAi: { tab: "employees", filters: {} },
+    employeesUsingAi: { tab: "employees", filters: { usesAi: true } },
     devicesWithUnapprovedTools: { tab: "devices", filters: { hasUnapproved: true } },
     monitorOnlyDevices: { tab: "devices", filters: { guardrailModes: ["monitor"] } },
 };
@@ -33,8 +33,8 @@ const CSV_COLUMNS = {
         ["Last active", (row) => (row.lastActive ? func.epochToDateTime(row.lastActive) : "")],
     ],
     devices: [
-        ["Device", (row) => row.name],
-        ["OS", (row) => OS_LABELS[row.os] || row.os],
+        ["Device", (row) => row.label || row.name],
+        ["OS/Browser", (row) => (row.extension ? row.browser : OS_LABELS[row.os] || row.os)],
         ["Owner", (row) => row.owner],
         ["Atlas agent", (row) => HEALTH_LABELS[row.health] || row.health],
         ["Agent version", (row) => row.agentVersion],
@@ -50,15 +50,24 @@ const CSV_COLUMNS = {
 const formatCount = (count) => (count == null ? STAT_EMPTY_VALUE : count.toLocaleString("en-US"));
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 
-function statSubtexts(deviceStats) {
+function statSubtexts(deviceStats, discovery) {
     const {
-        offlineSevenDays, devicesWithAiToolsPercent, totalEmployees, unapprovedTeams, monitorOnlyDevices,
+        managedDevices, desktopDevices, browserDevices, desktopActive, browserActive, offlineDevices, totalEmployees, unapprovedTeams, unapprovedNoTeam, monitorOnlyDevices,
     } = deviceStats;
+    const agentActiveParts = [`${formatCount(desktopActive)} desktop`, `${formatCount(browserActive)} browsers`];
+    if (offlineDevices > 0) agentActiveParts.push(`${formatCount(offlineDevices)} offline 3+ days`);
+    const unapprovedParts = [];
+    if (unapprovedTeams > 0) unapprovedParts.push(`Across ${plural(unapprovedTeams, "team")}`);
+    if (unapprovedNoTeam > 0) unapprovedParts.push(`${formatCount(unapprovedNoTeam)} ${unapprovedNoTeam === 1 ? "employee" : "employees"} with no team`);
+    const managedParts = [];
+    if (desktopDevices > 0) managedParts.push(`${formatCount(desktopDevices)} desktop`);
+    if (browserDevices > 0) managedParts.push(`${formatCount(browserDevices)} browsers`);
     return {
-        agentActive: offlineSevenDays > 0 ? { text: `${formatCount(offlineSevenDays)} offline for 7+ days`, color: "critical" } : null,
-        devicesWithAiTools: devicesWithAiToolsPercent != null ? { text: `${devicesWithAiToolsPercent}% of fleet` } : null,
+        managedDevices: managedParts.length ? { text: managedParts.join(" · ") } : null,
+        agentActive: agentActiveParts.length ? { text: agentActiveParts.join(" · "), color: offlineDevices > 0 ? "critical" : undefined } : null,
+        devicesWithAiTools: discovery && managedDevices > 0 ? { text: `${Math.round((100 * discovery.devicesCount) / managedDevices)}% of fleet` } : null,
         employeesUsingAi: totalEmployees != null ? { text: `of ${formatCount(totalEmployees)}` } : null,
-        devicesWithUnapprovedTools: unapprovedTeams > 0 ? { text: `Across ${plural(unapprovedTeams, "team")}`, color: "critical" } : null,
+        devicesWithUnapprovedTools: unapprovedParts.length ? { text: unapprovedParts.join(" · "), color: "critical" } : null,
         monitorOnlyDevices: monitorOnlyDevices != null ? { text: "Not blocking violations", color: "critical" } : null,
     };
 }
@@ -281,12 +290,20 @@ function footprintLayout(model, highlight) {
 const transform = {
     footprintLayout,
     statCardTarget: (id) => STAT_CARD_TARGETS[id],
-    buildStatItems: (deviceStats, onSelect) => {
-        const subtexts = deviceStats ? statSubtexts(deviceStats) : {};
+    filterOptions: (overview) => ({
+        teams: overview?.teamOptions || [],
+        osBrowser: [...(overview?.osMatrix || []).map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`)],
+        healthStates: HEALTH_ORDER.filter((state) => (overview?.agentHealth?.[state] || 0) > 0),
+        guardrailModes: Object.keys(MODE_LABELS).filter((mode) => (overview?.guardrailModes?.[mode] || 0) > 0),
+        categories: CATEGORY_ORDER.filter((category) => (overview?.categoryTotals?.[category] || 0) > 0),
+    }),
+    buildStatItems: (deviceStats, onSelect, discovery) => {
+        const subtexts = deviceStats ? statSubtexts(deviceStats, discovery) : {};
+        const values = { ...deviceStats, devicesWithAiTools: discovery?.devicesCount, employeesUsingAi: discovery?.usersCount };
         return STAT_CARDS.map((card) => ({
             title: card.label,
             isComp: true,
-            data: statValue(deviceStats?.[card.id], subtexts[card.id]),
+            data: statValue(values[card.id], subtexts[card.id]),
             onClick: () => onSelect(card.id),
         }));
     },
@@ -316,11 +333,14 @@ const transform = {
         atlasQuery: searchString,
         teams: filters.teams,
         atlasOs: filters.osList,
+        atlasBrowsers: filters.browserList,
         toolCategories: filters.categories,
         healthStates: filters.healthStates,
         hasUnapproved: filters.hasUnapproved,
         usesPersonal: filters.usesPersonal,
         agentIssues: filters.agentIssues,
+        usesAi: filters.usesAi,
+        agentActive: filters.agentActive,
         guardrailModes: filters.guardrailModes,
         riskMin: filters.riskMin,
         riskMax: filters.riskMax,

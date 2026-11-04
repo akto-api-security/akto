@@ -103,11 +103,14 @@ public class ModuleInfoAction extends UserAction {
     private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
     @Setter private String atlasQuery;
     @Setter private List<String> atlasOs;
+    @Setter private List<String> atlasBrowsers;
     @Setter private List<String> toolCategories;
     @Setter private List<String> healthStates;
     @Setter private boolean hasUnapproved;
     @Setter private boolean usesPersonal;
     @Setter private boolean agentIssues;
+    @Setter private boolean agentActive;
+    @Setter private boolean usesAi;
     @Setter private List<String> guardrailModes;
     @Setter private double riskMin;
     @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
@@ -284,69 +287,14 @@ public class ModuleInfoAction extends UserAction {
         Bson filter = buildEndpointShieldFilter();
         Bson groupId = endpointShieldGroupId();
 
-        Document countResult = ModuleInfoDao.instance.getMCollection().aggregate(Arrays.asList(
-                Aggregates.match(filter),
-                Aggregates.group(groupId),
-                Aggregates.count("total")
-        ), Document.class).first();
-        total = countResult == null ? 0 : ((Number) countResult.get("total")).longValue();
+        total = countEndpointShieldModules(filter, groupId, Context.now(), statuses);
 
         String sortField = mapEndpointShieldSortField(sortKey);
         Bson finalSort = (sortOrder < 0) ? Sorts.descending(sortField) : Sorts.ascending(sortField);
         int lim = (limit <= 0) ? 20 : Math.min(limit, 200);
         int sk = Math.max(skip, 0);
 
-        List<Bson> pipeline = Arrays.asList(
-                Aggregates.match(filter),
-                // Dedup on the newest DEPLOYMENT, not the newest heartbeat. A reinstall that
-                // failed never heartbeats (lastHeartbeatReceived stays 0), so ordering by
-                // heartbeat alone always handed the {name, os} group to the previous, still
-                // running doc — exactly the "failed deploy while the old agent keeps running"
-                // case the banner is for, which therefore never surfaced. Heartbeat stays as
-                // the tiebreaker for docs deployed at the same second (or never deployed).
-                Aggregates.addFields(new Field<>(DEDUP_TS_FIELD, endpointShieldLastDeployedExpr())),
-                Aggregates.sort(Sorts.orderBy(
-                        Sorts.descending(DEDUP_TS_FIELD),
-                        Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED))),
-                Aggregates.group(groupId,
-                        Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
-                        Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),
-                        Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
-                        Accumulators.first(ModuleInfo.STARTED_TS, ifNullExpr(ModuleInfo.STARTED_TS, 0)),
-                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
-                        Accumulators.first(ModuleInfo.NAME, "$" + ModuleInfo.NAME),
-                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA),
-                        Accumulators.first(ModuleInfo._REBOOT, ifNullExpr(ModuleInfo._REBOOT, false)),
-                        Accumulators.first(ModuleInfo.DELETE_TOPIC_AND_REBOOT, ifNullExpr(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)),
-                        Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
-                Aggregates.addFields(
-                        new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
-                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(Context.now())),
-                        new Field<>(AD_LAST_DEPLOYED_TS, endpointShieldLastDeployedExpr())),
-                Aggregates.match(statuses == null || statuses.isEmpty() ? new Document() : Filters.in(AD_CURRENT_STATUS, statuses)),
-                Aggregates.project(Projections.exclude(ORIG_ID_FIELD)),
-                Aggregates.sort(finalSort),
-                Aggregates.skip(sk),
-                Aggregates.limit(lim)
-        );
-
-        if (statuses != null && !statuses.isEmpty()) {
-            List<Bson> countPipeline = new ArrayList<>(pipeline.subList(0, pipeline.size() - 3));
-            countPipeline.add(Aggregates.count("total"));
-            Document statusCount = ModuleInfoDao.instance.getMCollection()
-                    .aggregate(countPipeline, Document.class).allowDiskUse(true).first();
-            total = statusCount == null ? 0 : ((Number) statusCount.get("total")).longValue();
-        }
-
-        moduleInfos = new ArrayList<>();
-        // The dedup sorts on a computed deployment timestamp, so the planner cannot serve it
-        // from the {moduleType, lastHeartbeatReceived} index and sorts the matched docs in
-        // memory. Spilling beats failing at the 100MB sort limit on a large fleet.
-        MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection()
-                .aggregate(pipeline, ModuleInfo.class).allowDiskUse(true).cursor();
-        while (cursor.hasNext()) {
-            moduleInfos.add(cursor.next());
-        }
+        moduleInfos = aggregateEndpointShieldModules(filter, groupId, Context.now(), statuses, finalSort, sk, lim);
 
         filterEnvironmentVariables(moduleInfos);
         allowedEnvFields = computeAllowedEnvFields();
@@ -372,43 +320,86 @@ public class ModuleInfoAction extends UserAction {
                 Context.contextSource.get(), windowEnd - AtlasPeopleService.VIOLATION_WINDOW_SECONDS, windowEnd);
     }
 
-    private List<Document> loadEndpointShieldDeviceRows(int now) {
-        List<Bson> pipeline = Arrays.asList(
-                Aggregates.match(Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope))),
-                Aggregates.project(Projections.include(
-                        ModuleInfo.NAME,
-                        ModuleInfo.STARTED_TS,
-                        ModuleInfo.LAST_HEARTBEAT_RECEIVED,
-                        ModuleInfo.CURRENT_VERSION,
-                        AD_INSTALL_STARTED_TS,
-                        AD_INSTALL_OUTCOME,
-                        AD_USERNAME,
-                        AD_OS,
-                        AD_PLATFORM,
-                        AD_BROWSER_NAME,
-                        ModuleInfo.ADDITIONAL_DATA + ".installStatus")),
+    private static List<Bson> endpointShieldGroupedStages(Bson filter, Bson groupId, int now, List<String> statuses) {
+        return Arrays.asList(
+                Aggregates.match(filter),
+                // Dedup on the newest DEPLOYMENT, not the newest heartbeat. A reinstall that
+                // failed never heartbeats (lastHeartbeatReceived stays 0), so ordering by
+                // heartbeat alone always handed the {name, os} group to the previous, still
+                // running doc — exactly the "failed deploy while the old agent keeps running"
+                // case the banner is for, which therefore never surfaced. Heartbeat stays as
+                // the tiebreaker for docs deployed at the same second (or never deployed).
                 Aggregates.addFields(new Field<>(DEDUP_TS_FIELD, endpointShieldLastDeployedExpr())),
                 Aggregates.sort(Sorts.orderBy(
                         Sorts.descending(DEDUP_TS_FIELD),
                         Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED))),
-                Aggregates.group("$" + ModuleInfo.NAME,
-                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
-                        Accumulators.first("moduleId", "$" + ModuleInfoDao.ID),
+                Aggregates.group(groupId,
+                        Accumulators.first(ORIG_ID_FIELD, "$" + ModuleInfoDao.ID),
+                        Accumulators.first(ModuleInfo.MODULE_TYPE, "$" + ModuleInfo.MODULE_TYPE),
                         Accumulators.first(ModuleInfo.CURRENT_VERSION, "$" + ModuleInfo.CURRENT_VERSION),
-                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA)),
-                Aggregates.addFields(new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(now))),
-                Aggregates.project(Projections.fields(
-                        Projections.include(ModuleInfo.LAST_HEARTBEAT_RECEIVED, "moduleId", ModuleInfo.CURRENT_VERSION),
-                        Projections.computed("status", "$" + AD_CURRENT_STATUS),
-                        Projections.computed("username", "$" + AD_USERNAME),
-                        Projections.computed("os", "$" + AD_OS),
-                        Projections.computed("platform", "$" + AD_PLATFORM),
-                        Projections.computed("browserName", "$" + AD_BROWSER_NAME)))
+                        Accumulators.first(ModuleInfo.STARTED_TS, ifNullExpr(ModuleInfo.STARTED_TS, 0)),
+                        Accumulators.first(ModuleInfo.LAST_HEARTBEAT_RECEIVED, ifNullExpr(ModuleInfo.LAST_HEARTBEAT_RECEIVED, 0)),
+                        Accumulators.first(ModuleInfo.NAME, "$" + ModuleInfo.NAME),
+                        Accumulators.first(ModuleInfo.ADDITIONAL_DATA, "$" + ModuleInfo.ADDITIONAL_DATA),
+                        Accumulators.first(ModuleInfo._REBOOT, ifNullExpr(ModuleInfo._REBOOT, false)),
+                        Accumulators.first(ModuleInfo.DELETE_TOPIC_AND_REBOOT, ifNullExpr(ModuleInfo.DELETE_TOPIC_AND_REBOOT, false)),
+                        Accumulators.first(ModuleInfo.MINI_RUNTIME_NAME, "$" + ModuleInfo.MINI_RUNTIME_NAME)),
+                Aggregates.addFields(
+                        new Field<>(ModuleInfoDao.ID, "$" + ORIG_ID_FIELD),
+                        new Field<>(AD_CURRENT_STATUS, endpointShieldCurrentStatusExpr(now)),
+                        new Field<>(AD_LAST_DEPLOYED_TS, endpointShieldLastDeployedExpr())),
+                Aggregates.match(statuses == null || statuses.isEmpty() ? new Document() : Filters.in(AD_CURRENT_STATUS, statuses))
         );
+    }
+
+    private List<ModuleInfo> aggregateEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses, Bson sort, int skip, int limit) {
+        List<Bson> pipeline = new ArrayList<>(endpointShieldGroupedStages(filter, groupId, now, statuses));
+        pipeline.add(Aggregates.project(Projections.exclude(ORIG_ID_FIELD)));
+        if (sort != null) pipeline.add(Aggregates.sort(sort));
+        if (skip > 0) pipeline.add(Aggregates.skip(skip));
+        if (limit > 0) pipeline.add(Aggregates.limit(limit));
+        List<ModuleInfo> modules = new ArrayList<>();
+        try (MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection()
+                .aggregate(pipeline, ModuleInfo.class).allowDiskUse(true).cursor()) {
+            while (cursor.hasNext()) modules.add(cursor.next());
+        }
+        return modules;
+    }
+
+    private long countEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses) {
+        List<Bson> pipeline = new ArrayList<>();
+        if (statuses == null || statuses.isEmpty()) {
+            pipeline.add(Aggregates.match(filter));
+            pipeline.add(Aggregates.group(groupId));
+        } else {
+            pipeline.addAll(endpointShieldGroupedStages(filter, groupId, now, statuses));
+        }
+        pipeline.add(Aggregates.count("total"));
+        Document result = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, Document.class).allowDiskUse(true).first();
+        return result == null ? 0 : ((Number) result.get("total")).longValue();
+    }
+
+    private static Document toAtlasModuleRow(ModuleInfo module) {
+        Map<String, Object> additional = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
+        return new Document("deviceName", module.getName())
+                .append("moduleId", module.getId())
+                .append("status", additional.get("currentStatus"))
+                .append("username", additional.get("username"))
+                .append("os", additional.get("os"))
+                .append("platform", additional.get("platform"))
+                .append("browserName", additional.get("browserName"))
+                .append(ModuleInfo.LAST_HEARTBEAT_RECEIVED, module.getLastHeartbeatReceived())
+                .append(ModuleInfo.CURRENT_VERSION, module.getCurrentVersion());
+    }
+
+    private Bson atlasModuleFilter() {
+        return Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope));
+    }
+
+    private List<Document> loadEndpointShieldDeviceRows(int now) {
         List<Document> rows = new ArrayList<>();
-        try (MongoCursor<Document> cursor = ModuleInfoDao.instance.getMCollection()
-                .aggregate(pipeline, Document.class).allowDiskUse(true).cursor()) {
-            while (cursor.hasNext()) rows.add(cursor.next());
+        for (ModuleInfo module : aggregateEndpointShieldModules(atlasModuleFilter(), endpointShieldGroupId(), now, null, null, 0, 0)) {
+            rows.add(toAtlasModuleRow(module));
         }
         return rows;
     }
@@ -440,11 +431,14 @@ public class ModuleInfoAction extends UserAction {
         AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
         query.text = atlasQuery;
         query.osList = atlasOs;
+        query.browserList = atlasBrowsers;
         query.categories = toolCategories;
         query.healthStates = healthStates;
         query.hasUnapproved = hasUnapproved;
         query.usesPersonal = usesPersonal;
         query.agentIssues = agentIssues;
+        query.agentActive = agentActive;
+        query.usesAi = usesAi;
         query.guardrailModes = guardrailModes;
         query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(java.util.stream.Collectors.toList());
         query.riskMin = riskMin;
@@ -488,8 +482,13 @@ public class ModuleInfoAction extends UserAction {
         atlasRows = new ArrayList<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
         try {
+            AtlasPeopleService.PeopleQuery query = buildPeopleQuery();
+            if (atlasPeopleService.isModulePageable(query)) {
+                fetchAtlasDevicesPage(query);
+                return SUCCESS.toUpperCase();
+            }
             long[] total = new long[1];
-            atlasRows = atlasPeopleService.pageDevices(loadAtlasSnapshot(), buildPeopleQuery(), total);
+            atlasRows = atlasPeopleService.pageDevices(loadAtlasSnapshot(), query, total);
             atlasTotal = total[0];
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -497,6 +496,30 @@ public class ModuleInfoAction extends UserAction {
             addActionError("Unable to load devices");
             return ERROR.toUpperCase();
         }
+    }
+
+    private void fetchAtlasDevicesPage(AtlasPeopleService.PeopleQuery query) {
+        int now = Context.now();
+        Bson filter = atlasModuleFilter();
+        Bson groupId = endpointShieldGroupId();
+        List<String> statuses = query.agentActive ? Arrays.asList(STATUS_ACTIVE) : null;
+        String sortField = "name".equals(query.sortKey) ? ModuleInfo.NAME
+                : "agentVersion".equals(query.sortKey) ? ModuleInfo.CURRENT_VERSION : ModuleInfo.LAST_HEARTBEAT_RECEIVED;
+        Bson sort = query.sortOrder >= 0 ? Sorts.ascending(sortField) : Sorts.descending(sortField);
+        atlasTotal = countEndpointShieldModules(filter, groupId, now, statuses);
+        List<Document> rows = new ArrayList<>();
+        for (ModuleInfo module : aggregateEndpointShieldModules(filter, groupId, now, statuses, sort, query.skip, query.limit)) {
+            rows.add(toAtlasModuleRow(module));
+        }
+        InsightContext ctx = buildInsightContext();
+        InsightDataBundle bundle = null;
+        try {
+            bundle = insightService.getOrLoadBundle(ctx);
+        } catch (Exception e) {
+            statsLogger.error("atlas page insights bundle failed: " + e.getMessage());
+        }
+        AtlasPeopleService.Snapshot page = atlasPeopleService.build(rows, bundle, loadLatestVersionByOs(), now, startTimestamp, endTimestamp);
+        atlasRows = atlasPeopleService.deviceRows(page);
     }
 
     public String fetchEndpointShieldStats() {

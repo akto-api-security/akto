@@ -3,7 +3,7 @@ import func from "@/util/func";
 import AgGridRow from "../../../../components/tables/rows/AgGridRow";
 import { OsIcon } from "../../agentic/DeviceEndpoints";
 import { RiskScoreCellRenderer, ViolationsCellRenderer as SeverityViolationsCellRenderer } from "../../agentic/AgenticCellRenderers";
-import { HEALTH_BADGE_STATUS, HEALTH_LABELS, MODE_LABELS, OS_ICON_KEYS, OS_LABELS } from "./peopleConstants";
+import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, MODE_LABELS, OS_ICON_KEYS, OS_LABELS } from "./peopleConstants";
 
 function Unavailable({ what }) {
     return (
@@ -24,18 +24,22 @@ export function EmployeeCellRenderer({ data }) {
     );
 }
 
+function BrowserIcon({ browser }) {
+    return <img src={BROWSER_ICONS[browser] || GENERIC_BROWSER_ICON} width={16} height={16} alt={browser || "Browser"} style={{ flexShrink: 0 }} />;
+}
+
+const browserLabel = (browser) => (browser ? browser.charAt(0).toUpperCase() + browser.slice(1) : "Browser");
+
 export function DeviceCellRenderer({ data }) {
     if (!data) return null;
-    return <AgGridRow icon={<OsIcon os={OS_ICON_KEYS[data.os]} />} label={data.name} isBold />;
+    const icon = data.extension ? <BrowserIcon browser={data.browser} /> : <OsIcon os={OS_ICON_KEYS[data.os]} />;
+    return <AgGridRow icon={icon} label={data.label || data.name} isBold />;
 }
 
 export function OsCellRenderer({ data }) {
     if (!data) return null;
-    return (
-        <Text as="span" color="subdued" truncate>
-            {OS_LABELS[data.os] || data.os}
-        </Text>
-    );
+    if (data.extension) return <AgGridRow icon={<BrowserIcon browser={data.browser} />} label={browserLabel(data.browser)} />;
+    return <AgGridRow icon={<OsIcon os={OS_ICON_KEYS[data.os]} />} label={OS_LABELS[data.os] || data.os} />;
 }
 
 export function OwnerCellRenderer({ value }) {

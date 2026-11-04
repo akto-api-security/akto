@@ -15,6 +15,8 @@ export const STAT_CARDS = [
 
 export const STAT_EMPTY_VALUE = "\u2014";
 
+export const BROWSER_ICONS = { chrome: "/public/chrome.svg", edge: "/public/edge.svg" };
+export const GENERIC_BROWSER_ICON = "/public/Globe_icon.svg";
 export const OS_ICON_KEYS = { macos: "mac", windows: "windows", linux: "linux" };
 
 export const HEALTH_ORDER = ["healthy", "outdated", "offline"];
@@ -43,7 +45,7 @@ export const CATEGORY_BACKGROUNDS = {
 export const HEALTH_LABELS = {
     healthy: "Healthy",
     outdated: "Outdated agent",
-    offline: "Offline 7+ days",
+    offline: "Offline 3+ days",
 };
 
 export const HEALTH_BACKGROUNDS = {
@@ -81,6 +83,7 @@ export const RISK_COLORS = { low: "#B38CFF", medium: "#E86A00", high: "#D72C0D" 
 export const RISK_EXPLANATION = "The highest API risk score (0 to 5, from the stored api_info risk score) across the AI tools on an employee's devices.";
 
 export const EMPLOYEE_CHIPS = [
+    { key: "usesAi", label: "Uses AI tools" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
     { key: "highRisk", label: "Risk 4+" },
@@ -88,6 +91,7 @@ export const EMPLOYEE_CHIPS = [
 
 export const DEVICE_CHIPS = [
     { key: "agentIssues", label: "Agent issues" },
+    { key: "agentActive", label: "Agent active" },
     { key: "monitorMode", label: "Monitor mode" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
@@ -115,19 +119,18 @@ export const EXPORT_ROW_LIMIT = 10000;
 
 export const FILTER_LABELS = {
     teams: "Team",
-    osList: "OS",
+    osBrowser: "OS/Browser",
     healthStates: "Agent",
     guardrailModes: "Guardrail mode",
     categories: "Tool type",
 };
 
 export const LIST_FILTERS = {
-    employees: ["teams", "osList", "categories"],
-    devices: ["osList", "healthStates", "guardrailModes", "categories"],
+    employees: ["teams", "osBrowser", "categories"],
+    devices: ["osBrowser", "healthStates", "guardrailModes", "categories"],
 };
 
 export const FILTER_OPTION_LABELS = {
-    osList: { macos: OS_LABELS.macos, windows: OS_LABELS.windows, linux: OS_LABELS.linux },
     healthStates: HEALTH_LABELS,
     guardrailModes: MODE_LABELS,
     categories: CATEGORY_LABELS,
@@ -136,11 +139,14 @@ export const FILTER_OPTION_LABELS = {
 export const EMPTY_PEOPLE_FILTERS = {
     teams: [],
     osList: [],
+    browserList: [],
     categories: [],
     healthStates: [],
     hasUnapproved: false,
     usesPersonal: false,
     agentIssues: false,
+    usesAi: false,
+    agentActive: false,
     guardrailModes: [],
     riskMin: 0,
     riskMax: RISK_MAX,
