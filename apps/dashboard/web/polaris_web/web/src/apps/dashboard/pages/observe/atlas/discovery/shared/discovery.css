@@ -20,3 +20,22 @@
 .discovery-card__footer {
     margin-top: auto;
 }
+
+/* A card whose body sits in the middle of the space left under the header. */
+.Polaris-Box:has(> .discovery-card-center) {
+    display: flex;
+    flex-direction: column;
+}
+.discovery-card-center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--p-space-3);
+}
+.discovery-card-center__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+}

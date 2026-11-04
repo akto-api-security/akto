@@ -121,7 +121,7 @@ public class TestAtlasDiscoveryService {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void weeklyBucketsSplitByCurrentStatus() {
+    public void trendBucketsSpanTheRangeAndSplitByCurrentStatus() {
         List<AtlasToolRow> rows = Arrays.asList(
                 tool("agent", "agent-a", 1, NOW - 3 * DAY, "d1"),
                 tool("agent", "agent-b", 1, NOW - 10 * DAY, "d1"));
@@ -129,11 +129,12 @@ public class TestAtlasDiscoveryService {
         decisions.put("ai-agent|agent-b", AtlasAssetStatus.APPROVED);
 
         List<Map<String, Object>> weeks = (List<Map<String, Object>>) service(rows, decisions, Collections.emptySet())
-                .buildOverview().get("weeklyNew");
+                .buildOverview().get("newToolsTrend");
 
-        assertEquals(12, weeks.size());
-        assertEquals(1, weeks.get(11).get("UNAPPROVED"));
-        assertEquals(1, weeks.get(10).get("APPROVED"));
+        // All time starts at the oldest first-seen (10 days back), so one period per day.
+        assertEquals(10, weeks.size());
+        assertEquals(1, weeks.get(0).get("APPROVED"));
+        assertEquals(1, weeks.get(7).get("UNAPPROVED"));
     }
 
     @Test

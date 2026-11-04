@@ -2,8 +2,8 @@ import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polari
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import "./discovery.css";
 
-// Card frame with loading/error/empty states; flush drops body padding, fill pins a footer to the bottom.
-export default function DiscoveryCard({ title, subtitle, legend, status, empty, emptyText, flush, fill, children }) {
+// Card frame with loading/error/empty states; flush drops body padding, fill pins a footer to the bottom, center middles the body.
+export default function DiscoveryCard({ title, subtitle, legend, status, empty, emptyText, flush, fill, center, children }) {
     let body = children;
     let isMessage = false;
     if (status === "loading") {
@@ -34,6 +34,19 @@ export default function DiscoveryCard({ title, subtitle, legend, status, empty, 
             </Card>
         );
         return fill ? <div className="discovery-card-fill">{card}</div> : card;
+    }
+    if (center) {
+        return (
+            <Card padding="4">
+                <div className="discovery-card-center">
+                    <VerticalStack gap="3">
+                        {header}
+                        {!isMessage && legend}
+                    </VerticalStack>
+                    <div className="discovery-card-center__body">{body}</div>
+                </div>
+            </Card>
+        );
     }
     return (
         <Card padding="4">

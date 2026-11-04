@@ -6,7 +6,7 @@ const PERCENT_MAX = 100;
 // Unreviewed tools at or above this risk get their name drawn next to the bubble.
 const LABEL_MIN_RISK = 4;
 const TOPO_STATUS = { UNAPPROVED: BAD, UNDER_REVIEW: "review", APPROVED: "ok", BLOCKED: "neutral" };
-const CHAIN_HEADS = ["Teams", "AI tools", "MCP servers"];
+const CHAIN_HEADS = ["Devices and teams", "AI tools", "MCP servers"];
 // Team -> external, AI tool -> agent, MCP server -> mcp: the node styles AssetTopologyGraph already knows.
 const CHAIN_CATEGORIES = ["external", "agent", "mcp"];
 

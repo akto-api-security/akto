@@ -5,7 +5,7 @@ import Highcharts from "highcharts";
 const TOTAL_COLOR = "#6D7175";
 const BAR_RADIUS = 2;
 
-// Labels only at the first, middle and last category, so a long run of weeks stays readable.
+// Labels only at the first, middle and last category, so a long run of periods stays readable.
 const sparseTicks = (count) => [...new Set([0, Math.floor((count - 1) / 2), count - 1])];
 
 // Stacked columns with totals on top; series: [{ name, color, data }] listed bottom to top.

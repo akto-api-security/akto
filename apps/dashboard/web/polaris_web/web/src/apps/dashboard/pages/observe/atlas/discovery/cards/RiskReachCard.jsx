@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import BubblePlot from "@/apps/dashboard/components/shared/BubblePlot";
 import DiscoveryCard from "../shared/DiscoveryCard";
 import StatusLegend from "./StatusLegend";
@@ -11,13 +11,16 @@ const LEVELS_TOP_DOWN = [...RISK_LEVEL_LABELS].reverse();
 const LEGEND_COLORS = Object.fromEntries(STATUS_ORDER.map((status) => [status, BUBBLE_STYLE[status].legend]));
 
 export default function RiskReachCard({ rows, status, onOpen }) {
+    const [selected, setSelected] = useState(null);
+    // The axis stays fixed while a status is picked, so the circles do not move.
     const axisMax = useMemo(() => devicesAxisMax(rows || []), [rows]);
-    const bubbles = useMemo(() => bubblePoints(rows || [], axisMax, onOpen), [rows, axisMax, onOpen]);
+    const shown = useMemo(() => (selected ? (rows || []).filter((row) => row.status === selected) : rows || []), [rows, selected]);
+    const bubbles = useMemo(() => bubblePoints(shown, axisMax, onOpen), [shown, axisMax, onOpen]);
     return (
         <DiscoveryCard
             title="Risk and reach"
             subtitle={SUBTITLES.reach}
-            legend={<StatusLegend colors={LEGEND_COLORS} />}
+            legend={<StatusLegend colors={LEGEND_COLORS} selected={selected} onSelect={setSelected} />}
             status={status}
             empty={!rows || rows.length === 0}
             emptyText="No tools to plot yet."

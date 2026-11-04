@@ -1,6 +1,7 @@
 export const ATLAS_DISCOVERY_CHAT_SCOPE = "atlas_agentic_discovery";
 
-export const CATEGORY_ORDER = ["agents", "mcp", "browser", "skills", "local"];
+// Tiles on the overview; "local" (local models) is left out until it has a proper source.
+export const CATEGORY_ORDER = ["agents", "mcp", "browser", "skills"];
 
 export const CATEGORY_LABELS = {
     agents: "AI agents & CLIs",
@@ -19,9 +20,12 @@ export const DEVICE_SCOPES = [
 export const EXPORT_PAGE_SIZE = 500;
 export const EXPORT_ROW_LIMIT = 10000;
 
+// The Ask Atlas panel in the tool flyout is switched off until the Ask service is ready.
+export const FLYOUT_ASK_ENABLED = false;
+
 // Short type tag shown next to a tool name in lists.
 export const CATEGORY_SHORT = {
-    agents: "CLI",
+    agents: "Agent",
     mcp: "MCP",
     browser: "Browser",
     skills: "Skill",
@@ -31,10 +35,10 @@ export const CATEGORY_SHORT = {
 export const SUBTITLES = {
     decisions: "Newly discovered or unreviewed tools, ranked by risk and spread",
     adoption: "Employees using each tool in the selected range",
-    trend: "Per week, last 12 weeks, by current status",
+    trend: "Tools first seen in the selected range, by current status",
     reach: "Each circle is a tool. Size shows employees using it. Select a circle to see details.",
-    chain: "How teams reach MCP servers through AI tools. Line width shows devices. Select a node to trace its paths.",
-    agentMcp: "Devices where an agent has each MCP server configured. Red columns are unapproved.",
+    chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first. Line width shows devices.",
+    agentMcp: "Devices where an agent has each MCP server configured; darker means more devices. Shows up to 5 agents and 8 MCP servers, the busiest first.",
     teams: "Share of each team's employees using a category in the selected range",
 };
 
@@ -46,7 +50,7 @@ export const BUBBLE_STYLE = {
     BLOCKED: { fill: "rgba(140,145,150,.4)", stroke: "#8C9196", legend: "#8C9196" },
 };
 export const RISK_LEVEL_LABELS = ["Low", "Medium", "High", "Critical"];
-// Statuses the weekly chart stacks; blocked tools are decided, so they are left out.
+// Statuses the trend chart stacks; blocked tools are decided, so they are left out.
 export const TREND_STATUSES = ["APPROVED", "UNDER_REVIEW", "UNAPPROVED"];
 
 // Adoption bar colours: the filled part and the empty track.

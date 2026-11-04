@@ -5,7 +5,7 @@ import { buildColumnGraph } from "@/apps/dashboard/pages/observe/agentic/columnG
 import DiscoveryCard from "../shared/DiscoveryCard";
 import { SUBTITLES } from "../constants";
 import { chainModel } from "../transform";
-import ChainLegend from "./ChainLegend";
+import ColorLegend from "./ColorLegend";
 
 const TOPO_HEAD_TYPE = "topoHead";
 const FIT_PADDING = 0.1;
@@ -28,7 +28,7 @@ export default function SupplyChainCard({ chain, status }) {
         <DiscoveryCard
             title="AI supply chain"
             subtitle={SUBTITLES.chain}
-            legend={<ChainLegend />}
+            legend={<ColorLegend />}
             status={status}
             empty={empty}
             emptyText="No tool connections discovered yet."

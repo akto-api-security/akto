@@ -16,7 +16,7 @@ function shade(value, max, scale) {
 
 // Row x column grid shaded by value; max is the darkest value.
 export default function MatrixHeatmap({
-    columns, rows, max, format = (value) => value, emptyText = EMPTY_CELL_TEXT, labelWidth = 120, cellHeight = 36, minCellWidth = 52, showScale,
+    columns, rows, max, format = (value) => value, tipUnit = "", emptyText = EMPTY_CELL_TEXT, labelWidth = 120, cellHeight = 36, minCellWidth = 52, showScale, scaleLabel, dangerScaleLabel,
 }) {
     const gridVars = {
         "--label-width": `${labelWidth}px`,
@@ -34,30 +34,55 @@ export default function MatrixHeatmap({
                         <span key={columnIndex} title={column.label} className={`matrix-heatmap__column${column.danger ? " matrix-heatmap__column--danger" : ""}`}>{column.label}</span>
                     ))}
                     {rows.map((row, rowIndex) => (
-                        <RowCells key={rowIndex} row={row} columns={columns} max={max} format={format} emptyText={emptyText} />
+                        <RowCells key={rowIndex} row={row} columns={columns} max={max} format={format} tipUnit={tipUnit} emptyText={emptyText} />
                     ))}
                 </div>
             </div>
             {showScale && (
                 <div className="matrix-heatmap__scale">
-                    {format(0)}<span className="matrix-heatmap__scale-bar" />{format(max)}
+                    <ScaleKey label={scaleLabel} format={format} max={max} />
+                    {columns.some((column) => column.danger) && <ScaleKey label={dangerScaleLabel} format={format} max={max} danger />}
                 </div>
             )}
         </div>
     );
 }
 
-function RowCells({ row, columns, max, format, emptyText }) {
+// A light-to-dark bar from 0 to the darkest value, with an optional label.
+function ScaleKey({ label, format, max, danger }) {
+    return (
+        <span className={`matrix-heatmap__scale-key${label ? " matrix-heatmap__scale-key--labelled" : ""}`}>
+            {label && <span className="matrix-heatmap__scale-label">{label}</span>}
+            <span>{format(0)}</span>
+            <span className={`matrix-heatmap__scale-bar${danger ? " matrix-heatmap__scale-bar--danger" : ""}`} />
+            <span>{format(max)}</span>
+        </span>
+    );
+}
+
+// The first and last columns hang their hover text inward so it stays inside the grid.
+const tipEdge = (index, count) => {
+    if (index === 0) return " matrix-heatmap__cell--tip-start";
+    return index === count - 1 ? " matrix-heatmap__cell--tip-end" : "";
+};
+
+// "5 devices", "1 device"; just the formatted value when there is no unit.
+const tipValue = (value, format, unit) => `${format(value)}${unit ? ` ${unit}${value === 1 ? "" : "s"}` : ""}`;
+
+function RowCells({ row, columns, max, format, tipUnit, emptyText }) {
     return (
         <>
             <span className="matrix-heatmap__row">{row.label}</span>
             {row.cells.map((value, index) => {
                 const { background, color } = shade(value, max, columns[index].danger ? RED_SCALE : PURPLE_SCALE);
+                const tip = `${row.label} · ${columns[index].label}: ${tipValue(value || 0, format, tipUnit)}`;
                 return (
                     <div
                         key={index}
-                        className="matrix-heatmap__cell"
-                        title={`${row.label} · ${columns[index].label}: ${value || 0}`}
+                        className={`matrix-heatmap__cell${tipEdge(index, columns.length)}`}
+                        role="img"
+                        aria-label={tip}
+                        data-tip={tip}
                         style={{ "--cell-bg": background, "--cell-fg": color }}
                     >
                         {value ? format(value) : emptyText}

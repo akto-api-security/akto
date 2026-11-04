@@ -47,9 +47,9 @@ public class AtlasDiscoveryService {
     private static final int MATRIX_AGENTS = 5;
     private static final int MATRIX_SERVERS = 8;
     private static final int MATRIX_TEAMS = 8;
-    private static final int CHAIN_COLUMN_LIMIT = 6;
-    private static final int TREND_WEEKS = 12;
-    private static final int WEEK_SECONDS = 7 * 24 * 60 * 60;
+    private static final int CHAIN_COLUMN_LIMIT = 10;
+    private static final int TREND_BUCKETS = 12;
+    private static final int DAY_SECONDS = 24 * 60 * 60;
     private static final int NEW_TOOL_SECONDS = 7 * 24 * 60 * 60;
     private static final double HIGH_RISK_SCORE = 4.0;
 
@@ -129,7 +129,7 @@ public class AtlasDiscoveryService {
         section(out, unavailable, "adoption", this::adoption);
         section(out, unavailable, "riskyConfigs", this::riskyConfigs);
         section(out, unavailable, "statusCounts", this::statusCounts);
-        section(out, unavailable, "weeklyNew", this::weeklyNew);
+        section(out, unavailable, "newToolsTrend", this::newToolsTrend);
         section(out, unavailable, "riskReach", this::riskReach);
         section(out, unavailable, "agentMcpMatrix", this::agentMcpMatrix);
         section(out, unavailable, "teamCategoryMatrix", this::teamCategoryMatrix);
@@ -454,24 +454,31 @@ public class AtlasDiscoveryService {
         return counts;
     }
 
-    // Weekly buckets by first-seen time, split by the tool's current status (there is no status history).
-    private List<Map<String, Object>> weeklyNew() {
+    // Tools first seen in the selected range, in up to TREND_BUCKETS equal periods, split by current status (no status history).
+    private List<Map<String, Object>> newToolsTrend() {
         int end = endTs > 0 ? endTs : now;
-        List<Map<String, Object>> weeks = new ArrayList<>();
-        for (int i = TREND_WEEKS - 1; i >= 0; i--) {
-            int to = end - i * WEEK_SECONDS;
-            int from = to - WEEK_SECONDS;
-            Map<String, Object> week = new LinkedHashMap<>();
-            week.put("weekStart", from);
-            for (AtlasAssetStatus status : AtlasAssetStatus.values()) week.put(status.name(), 0);
-            for (Tool tool : allTools) {
-                int first = tool.row.getFirstSeen();
-                if (!tool.governable() || first <= from || first > to) continue;
-                week.merge(tool.status.name(), 1, (a, b) -> (Integer) a + (Integer) b);
-            }
-            weeks.add(week);
+        int start = startTs > 0 ? startTs : earliestFirstSeen(end);
+        int period = Math.max(DAY_SECONDS, (int) Math.ceil((end - start) / (double) TREND_BUCKETS));
+        int count = Math.max(1, (int) Math.ceil((end - start) / (double) period));
+        List<Map<String, Object>> periods = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("periodStart", start + i * period);
+            for (AtlasAssetStatus status : AtlasAssetStatus.values()) entry.put(status.name(), 0);
+            periods.add(entry);
         }
-        return weeks;
+        for (Tool tool : allTools) {
+            int first = tool.row.getFirstSeen();
+            if (!tool.governable() || first < start || first > end) continue;
+            periods.get(Math.min(count - 1, (first - start) / period)).merge(tool.status.name(), 1, (a, b) -> (Integer) a + (Integer) b);
+        }
+        return periods;
+    }
+
+    // The start of an all-time range: the oldest first-seen time, or a quarter back when no tool has one.
+    private int earliestFirstSeen(int end) {
+        return allTools.stream().filter(Tool::governable).mapToInt(t -> t.row.getFirstSeen()).filter(first -> first > 0).min()
+                .orElse(end - TREND_BUCKETS * 7 * DAY_SECONDS);
     }
 
     private List<Map<String, Object>> riskReach() {

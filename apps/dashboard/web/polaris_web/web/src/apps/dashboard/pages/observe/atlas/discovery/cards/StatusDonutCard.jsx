@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Box, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import DonutChart from "@/apps/dashboard/components/shared/DonutChart";
+import Pressable from "@/apps/dashboard/pages/dashboard/ask/components/Pressable";
 import DiscoveryCard from "../shared/DiscoveryCard";
 import { STATUS_META, STATUS_ORDER } from "../constants";
 import "../shared/discovery.css";
@@ -12,14 +13,14 @@ const DONUT_MARGIN = 20;
 const COUNT_COLUMN_WIDTH = "40px";
 const PERCENT_COLUMN_WIDTH = "44px";
 
-// DonutChart wants { label: { text: count, color } }.
-const donutData = (counts) => Object.fromEntries(STATUS_ORDER.map((key) => [
+// DonutChart wants { label: { text: count, color } }; a picked status leaves only its slice.
+const donutData = (counts, selected) => Object.fromEntries(STATUS_ORDER.filter((key) => !selected || key === selected).map((key) => [
     STATUS_META[key].label,
     { text: counts[key] || 0, color: STATUS_META[key].color },
 ]));
 
-function LegendRow({ statusKey, count, total }) {
-    return (
+function LegendRow({ statusKey, count, total, dimmed, selected, onClick }) {
+    const row = (
         <Box padding="1">
             <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
                 <HorizontalStack gap="3" blockAlign="center" wrap={false}>
@@ -33,15 +34,28 @@ function LegendRow({ statusKey, count, total }) {
             </HorizontalStack>
         </Box>
     );
+    return (
+        <Pressable
+            onClick={onClick}
+            accessibilityLabel={`Show only ${STATUS_META[statusKey].label}, ${count} tools`}
+            aria-pressed={selected}
+            hoverBackground="bg-subdued"
+            borderRadius="2"
+            opacity={dimmed ? "0.5" : undefined}
+        >
+            {row}
+        </Pressable>
+    );
 }
 
 export default function StatusDonutCard({ counts, status }) {
     const total = counts?.total || 0;
-    const data = useMemo(() => (counts ? donutData(counts) : {}), [counts]);
+    const [selected, setSelected] = useState(null);
+    const data = useMemo(() => (counts ? donutData(counts, selected) : {}), [counts, selected]);
     return (
         <DiscoveryCard
             title="Inventory by status"
-            subtitle={counts ? `${total} AI tools across all categories` : undefined}
+            subtitle={counts ? `${total} AI tools seen in the selected range` : undefined}
             status={status}
             empty={total === 0}
             emptyText="No tools discovered yet."
@@ -53,8 +67,8 @@ export default function StatusDonutCard({ counts, status }) {
                             data={data}
                             size={DONUT_SIZE}
                             pieInnerSize={INNER_SIZE}
-                            title={String(counts.needsDecision || 0)}
-                            subtitle="need a decision"
+                            title={String(selected ? counts[selected] || 0 : counts.needsDecision || 0)}
+                            subtitle={selected ? STATUS_META[selected].label.toLowerCase() : "need a decision"}
                             titleFontWeight="600"
                             sliceBorderWidth={0}
                         />
@@ -62,7 +76,15 @@ export default function StatusDonutCard({ counts, status }) {
                     <Box width="100%">
                         <VerticalStack gap="2">
                             {STATUS_ORDER.map((key) => (
-                                <LegendRow key={key} statusKey={key} count={counts[key] || 0} total={total} />
+                                <LegendRow
+                                    key={key}
+                                    statusKey={key}
+                                    count={counts[key] || 0}
+                                    total={total}
+                                    dimmed={selected && selected !== key}
+                                    selected={selected === key}
+                                    onClick={() => setSelected(selected === key ? null : key)}
+                                />
                             ))}
                         </VerticalStack>
                     </Box>

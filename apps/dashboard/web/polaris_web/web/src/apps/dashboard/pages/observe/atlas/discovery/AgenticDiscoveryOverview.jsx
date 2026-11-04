@@ -128,7 +128,7 @@ function AgenticDiscoveryOverview() {
             </div>
         </HorizontalGrid>,
         <HorizontalGrid key="trend" columns={{ xs: 1, md: 2 }} gap="4">
-            <NewToolsTrendCard weeks={data?.weeklyNew} status={statusOf("weeklyNew")} />
+            <NewToolsTrendCard periods={data?.newToolsTrend} status={statusOf("newToolsTrend")} />
             <StatusDonutCard counts={data?.statusCounts} status={statusOf("statusCounts")} />
         </HorizontalGrid>,
         <RiskReachCard key="reach" rows={data?.riskReach} status={statusOf("riskReach")} onOpen={setOpenRow} />,
@@ -137,6 +137,10 @@ function AgenticDiscoveryOverview() {
             <MatrixCard
                 title="Agent to MCP server connections"
                 subtitle={SUBTITLES.agentMcp}
+                showScale
+                scaleLabel="Approved or under review"
+                dangerScaleLabel="Unapproved"
+                tipUnit="device"
                 status={statusOf("agentMcpMatrix")}
                 matrix={agentMatrix}
                 emptyText="No agent is connected to an MCP server yet."
@@ -163,7 +167,7 @@ function AgenticDiscoveryOverview() {
     return (
         <PageWithMultipleCards
             title="Agentic discovery"
-            subtitle={`Every AI agent, MCP server, skill, local model and browser AI app${data?.tiles ? ` on ${data.tiles.managedDevices.toLocaleString("en-US")} managed devices` : ""}`}
+            subtitle={`Every AI agent, MCP server, skill and browser AI app${data?.tiles ? ` on ${data.tiles.managedDevices.toLocaleString("en-US")} managed devices` : ""}`}
             isFirstPage
             secondaryActions={<DiscoveryHeaderActions filters={filters} onExport={exportTools} exporting={exporting} />}
             components={components}

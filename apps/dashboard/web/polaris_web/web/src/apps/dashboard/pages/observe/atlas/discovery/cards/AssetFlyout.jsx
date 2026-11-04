@@ -11,7 +11,7 @@ import ToolAvatar from "../shared/ToolAvatar";
 import useAssetStatusUpdate from "../shared/useAssetStatusUpdate";
 import useToolCapabilities from "../useToolCapabilities";
 import {
-    ATLAS_DISCOVERY_CHAT_SCOPE, CAPABILITY_TITLES, CATEGORY_LABELS, GUARDRAIL_ACTIVITY_PATH, GUARDRAIL_POLICIES_PATH, HIGH_RISK_LEVELS, INSTALL_METHODS, VIOLATION_WINDOW_LABEL,
+    ATLAS_DISCOVERY_CHAT_SCOPE, CAPABILITY_TITLES, CATEGORY_LABELS, FLYOUT_ASK_ENABLED, GUARDRAIL_ACTIVITY_PATH, GUARDRAIL_POLICIES_PATH, HIGH_RISK_LEVELS, INSTALL_METHODS, VIOLATION_WINDOW_LABEL,
 } from "../constants";
 import { capabilityTags, formatDate, signalsOf } from "../transform";
 
@@ -138,7 +138,7 @@ export default function AssetFlyout({ row, startTimestamp, endTimestamp, deviceS
             status={loadState}
             errorText="This tool is unavailable right now."
             actions={actions}
-            askBar={row && (
+            askBar={FLYOUT_ASK_ENABLED && row && (
                 <AskBar
                     key={key}
                     showInput={false}
