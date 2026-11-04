@@ -108,7 +108,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
             pie: {
               size: (size+'px'),
               innerSize: pieInnerSize ? pieInnerSize : '60%',
-              borderWidth: sliceBorderWidth,
+              ...(sliceBorderWidth !== undefined && { borderWidth: sliceBorderWidth }),
               dataLabels: {
                 enabled: false
               },

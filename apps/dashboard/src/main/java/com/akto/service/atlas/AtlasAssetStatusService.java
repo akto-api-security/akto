@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /** Resolves and writes the review status of a discovered AI tool, from McpAuditInfo rows and the allowlist. */
 public class AtlasAssetStatusService {
@@ -111,12 +112,15 @@ public class AtlasAssetStatusService {
         List<Bson> decision = decisionUpdates(status, markedBy, now);
         Set<Integer> serverCollectionIds = new HashSet<>();
         try {
+            List<AtlasToolRow> servers = new ArrayList<>();
             for (AtlasToolRow tool : tools) {
                 String type = auditTypeOf(tool.getRowType());
                 if (type == null) continue;
-                serverCollectionIds.addAll(updateRows(tool, type, status, decision));
+                if (Constants.AKTO_MCP_SERVER_TAG.equals(type)) servers.add(tool);
+                else updateRows(tool, type, status, decision);
                 updated++;
             }
+            if (!servers.isEmpty()) serverCollectionIds.addAll(updateServerRows(servers, status, decision));
             // One pass over the tool rows for all servers, not one per server.
             cascadeToTools(new ArrayList<>(serverCollectionIds), decision);
         } finally {
@@ -210,12 +214,6 @@ public class AtlasAssetStatusService {
         return "";
     }
 
-    private static List<Integer> serverCollectionIds(Bson rowFilter) {
-        return McpAuditInfoDao.instance.getMCollection()
-                .distinct(McpAuditInfo.HOST_COLLECTION_ID, Filters.and(rowFilter, Filters.exists(McpAuditInfo.HOST_COLLECTION_ID)), Integer.class)
-                .into(new ArrayList<>());
-    }
-
     // Same decision on the server's tool rows, so a tool still approved cannot undo a server block.
     private static void cascadeToTools(List<Integer> serverCollectionIds, List<Bson> decision) {
         for (int from = 0; from < serverCollectionIds.size(); from += CASCADE_BATCH_SIZE) {
@@ -233,25 +231,67 @@ public class AtlasAssetStatusService {
         return Constants.AKTO_MCP_SERVER_TAG.equals(type) ? "^(?:[^.]+\\.[^.]+\\.)?" + name + "$" : "^" + name + "$";
     }
 
-    // Updates every global row of this tool, or inserts one; returns the collections of the server rows it updated.
-    private List<Integer> updateRows(AtlasToolRow tool, String type, AtlasAssetStatus status, List<Bson> decision) {
-        boolean isServer = Constants.AKTO_MCP_SERVER_TAG.equals(type);
+    private static Bson globalScope() {
+        return Filters.and(globalRowsOnly(), contextSourceFilter(Context.contextSource.get()));
+    }
+
+    // Updates every global row of an agent or browser app by name, or inserts one.
+    private void updateRows(AtlasToolRow tool, String type, AtlasAssetStatus status, List<Bson> decision) {
         List<Bson> updates = new ArrayList<>(decision);
-        if (isServer) updates.add(Updates.set(McpAuditInfo.BLOCK_ALL, status == AtlasAssetStatus.BLOCKED));
         // Agent rows keep the raw names guardrails matches on, as the Audit page's AI Agents tab does.
         if (Constants.AKTO_AI_AGENT_TAG.equals(type)) updates.add(Updates.addEachToSet(McpAuditInfo.RAW_VALUES, tool.getRawValues()));
-        Bson scope = Filters.and(globalRowsOnly(), contextSourceFilter(Context.contextSource.get()));
         Bson rowFilter = Filters.and(Filters.eq(McpAuditInfo.TYPE, type),
-                Filters.regex(McpAuditInfo.RESOURCE_NAME, rowNamePattern(type, tool.getGroupKey()), "i"), scope);
-        List<Integer> serverCollectionIds = isServer ? serverCollectionIds(rowFilter) : Collections.emptyList();
-        long matched = McpAuditInfoDao.instance.getMCollection().updateMany(rowFilter, Updates.combine(updates)).getMatchedCount();
-        if (matched > 0) return serverCollectionIds;
+                Filters.regex(McpAuditInfo.RESOURCE_NAME, rowNamePattern(type, tool.getGroupKey()), "i"), globalScope());
+        if (McpAuditInfoDao.instance.getMCollection().updateMany(rowFilter, Updates.combine(updates)).getMatchedCount() > 0) return;
+        insertRow(tool, type, status, updates);
+    }
+
+    // One scan finds the global rows of every selected server; the update then goes by _id, so many servers cost one scan.
+    private List<Integer> updateServerRows(List<AtlasToolRow> servers, AtlasAssetStatus status, List<Bson> decision) {
+        List<Bson> updates = new ArrayList<>(decision);
+        updates.add(Updates.set(McpAuditInfo.BLOCK_ALL, status == AtlasAssetStatus.BLOCKED));
+        String names = servers.stream().map(tool -> Pattern.quote(tool.getGroupKey())).collect(Collectors.joining("|"));
+        Bson rowFilter = Filters.and(Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
+                Filters.regex(McpAuditInfo.RESOURCE_NAME, "^(?:[^.]+\\.[^.]+\\.)?(?:" + names + ")$", "i"), globalScope());
+        Bson projection = Projections.include(McpAuditInfo.RESOURCE_NAME, McpAuditInfo.HOST_COLLECTION_ID);
+        Set<Integer> collectionIds = new HashSet<>();
+        Set<String> matchedNames = new HashSet<>();
+        ObjectId lastId = null;
+        while (true) {
+            Bson page = lastId == null ? rowFilter : Filters.and(rowFilter, Filters.gt(Constants.ID, lastId));
+            List<McpAuditInfo> rows = McpAuditInfoDao.instance.findAll(page, 0, PAGE_SIZE, Sorts.ascending(Constants.ID), projection);
+            if (rows.isEmpty()) break;
+            List<ObjectId> ids = new ArrayList<>();
+            for (McpAuditInfo row : rows) {
+                ids.add(row.getId());
+                if (row.getHostCollectionId() != 0) collectionIds.add(row.getHostCollectionId());
+                matchedNames.addAll(serverNamesOf(row.getResourceName()));
+            }
+            McpAuditInfoDao.instance.getMCollection().updateMany(Filters.in(Constants.ID, ids), Updates.combine(updates));
+            if (rows.size() < PAGE_SIZE) break;
+            lastId = rows.get(rows.size() - 1).getId();
+        }
+        for (AtlasToolRow tool : servers) {
+            if (!matchedNames.contains(tool.getGroupKey().toLowerCase(Locale.ROOT))) insertRow(tool, Constants.AKTO_MCP_SERVER_TAG, status, updates);
+        }
+        return new ArrayList<>(collectionIds);
+    }
+
+    // The names a server row answers to: its whole name, and the name after "<device>.<agent>." when it has that prefix.
+    static List<String> serverNamesOf(String resourceName) {
+        String name = StringUtils.defaultString(resourceName).toLowerCase(Locale.ROOT);
+        String[] parts = name.split("\\.", 3);
+        return parts.length == 3 ? Arrays.asList(name, parts[2]) : Collections.singletonList(name);
+    }
+
+    // A tool with no decision row yet gets one, except a reset to unapproved: no row already reads as unapproved.
+    private void insertRow(AtlasToolRow tool, String type, AtlasAssetStatus status, List<Bson> updates) {
+        if (status == AtlasAssetStatus.UNAPPROVED) return;
         List<Bson> insert = new ArrayList<>(updates);
         insert.add(Updates.max(McpAuditInfo.LAST_DETECTED, tool.getLastSeen()));
         insert.add(Updates.setOnInsert(McpAuditInfo.CONTEXT_SOURCE, CONTEXT_SOURCE.ENDPOINT.name()));
         McpAuditInfoDao.instance.getMCollection().updateOne(
-                Filters.and(Filters.eq(McpAuditInfo.TYPE, type), Filters.eq(McpAuditInfo.RESOURCE_NAME, tool.getGroupKey()), scope),
+                Filters.and(Filters.eq(McpAuditInfo.TYPE, type), Filters.eq(McpAuditInfo.RESOURCE_NAME, tool.getGroupKey()), globalScope()),
                 Updates.combine(insert), new UpdateOptions().upsert(true));
-        return Collections.emptyList();
     }
 }

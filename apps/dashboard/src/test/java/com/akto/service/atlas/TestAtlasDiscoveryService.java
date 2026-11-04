@@ -419,4 +419,10 @@ public class TestAtlasDiscoveryService {
         assertTrue(all.isMisconfigured());
         assertEquals(2, all.getPersonalDevices());
     }
+
+    @Test
+    public void serverRowNamesIncludeTheNameAfterTheDevicePrefix() {
+        assertEquals(Arrays.asList("dev.agent.name", "name"), AtlasAssetStatusService.serverNamesOf("Dev.Agent.Name"));
+        assertEquals(Collections.singletonList("name"), AtlasAssetStatusService.serverNamesOf("Name"));
+    }
 }

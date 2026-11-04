@@ -13,11 +13,12 @@ export default function DetailGrid({ heading, items = [], columns = 1, labelWidt
 
     const cell = (d) => {
         const text = d.value || "-"
-        // The text styling goes through TooltipText: it renders a div, which cannot sit inside a Text paragraph.
-        const display = <TooltipText tooltip={text} text={text} textProps={{ variant: "bodySm", fontWeight: "semibold", color: d.isWarning ? "warning" : undefined }} />
+        const display = <TooltipText tooltip={text} text={text} />
         const content = (
             <Box maxWidth={valueMaxWidth}>
-                {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
+                <Text as="div" variant="bodySm" fontWeight="semibold" color={d.isWarning ? "warning" : undefined}>
+                    {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
+                </Text>
             </Box>
         );
         return content;
