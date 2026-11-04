@@ -154,7 +154,7 @@ public class FileInspectionRuleAction extends UserAction {
             FileInspectionRuleDao.instance.createIndicesIfAbsent();
             this.rules = FileInspectionRuleDao.instance.findAll(
                 Filters.empty(),
-                0, 5000,
+                0, 500,
                 Sorts.descending(FileInspectionRule.UPDATED_TS)
             );
             return Action.SUCCESS.toUpperCase();
