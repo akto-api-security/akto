@@ -1,8 +1,7 @@
 """Azure AD (Entra ID) app-only tokens with a certificate credential.
 
 The OAuth2 client-credentials grant with a signed client assertion, as MSAL's
-ConfidentialClientApplication does it (see Morgan Stanley's
-github.com/morganstanley/api client samples): RS256-sign a short-lived JWT
+ConfidentialClientApplication does it: RS256-sign a short-lived JWT
 with the app's private key, `x5t` naming the registered certificate by its
 SHA-1 thumbprint, and exchange it at the tenant's v2.0 token endpoint. Tokens
 are cached per (tenant, client_id, scope) until shortly before expiry, so
