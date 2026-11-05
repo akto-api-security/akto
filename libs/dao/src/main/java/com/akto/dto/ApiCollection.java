@@ -33,6 +33,9 @@ public class ApiCollection {
     public static final String URLS_STRING = "urls";
     String hostName;
     public static final String HOST_NAME = "hostName";
+
+    String serviceTag;
+    public static final String SERVICE_TAG = "serviceTag";
     int vxlanId;
 
     boolean redact;
@@ -221,6 +224,14 @@ public class ApiCollection {
 
     public String getHostName() {
         return hostName;
+    }
+
+    public String getServiceTag() {
+        return serviceTag;
+    }
+
+    public void setServiceTag(String serviceTag) {
+        this.serviceTag = serviceTag;
     }
 
     public void setHostName(String hostName) {
