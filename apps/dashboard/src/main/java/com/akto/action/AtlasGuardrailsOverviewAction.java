@@ -7,6 +7,7 @@ import com.akto.service.guardrails.AtlasGuardrailsOverviewService;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
+import com.akto.util.TimePeriodUtils;
 import com.mongodb.BasicDBObject;
 
 import lombok.Getter;
@@ -21,6 +22,7 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
 
     @Getter @Setter private int startTimestamp;
     @Getter @Setter private int endTimestamp;
+    @Getter @Setter private String timeZone;
 
     @Getter private BasicDBObject response = new BasicDBObject();
 
@@ -44,6 +46,18 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Atlas guardrails overview triage: " + e.getMessage());
             addActionError("Failed to build Atlas guardrails overview triage");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchAtlasGuardrailsOverviewDecisions() {
+        try {
+            InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
+            this.response = overviewService.buildDecisions(bundle, TimePeriodUtils.zoneOrDefault(timeZone));
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Atlas guardrails overview decisions: " + e.getMessage());
+            addActionError("Failed to build Atlas guardrails overview decisions");
             return ERROR.toUpperCase();
         }
     }

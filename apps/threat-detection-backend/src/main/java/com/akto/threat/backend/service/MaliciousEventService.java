@@ -516,7 +516,7 @@ public class MaliciousEventService {
     boolean minimalFields = request.hasMinimalFields() && request.getMinimalFields();
     List<String> excludedFields = new ArrayList<>();
     if (minimalFields) {
-      excludedFields.addAll(Arrays.asList("metadata","latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
+      excludedFields.addAll(Arrays.asList("latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
     }
 
     Document query = new Document();

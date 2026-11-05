@@ -1,8 +1,3 @@
-const DECISION_COUNTS = [
-    [88, 40, 52], [96, 44, 60], [70, 31, 48], [42, 18, 30], [38, 15, 26], [104, 52, 61], [118, 58, 70],
-    [126, 61, 66], [131, 66, 72], [98, 47, 59], [51, 22, 33], [47, 20, 29], [142, 71, 80], [151, 74, 84],
-];
-
 const guardrailOverviewMock = {
     discoveredAssets: 96,
     attention: [
@@ -12,12 +7,6 @@ const guardrailOverviewMock = {
         { severity: "HIGH", title: "Hidden prompt injection on a public docs site", meta: "docs.example-sdk.dev read by 5 agents · Prompt injection · Blocked", count: 5, secondaryAction: "Block domain" },
         { severity: "MEDIUM", title: "Unsanctioned AI app spreading in Marketing", meta: "DeepSeek Chat · 22 employees continued past the warning", count: 22, secondaryAction: "Block app" },
     ],
-    decisions: DECISION_COUNTS.map(([blocked, redacted, alerted], i) => ({
-        day: new Date(2026, 9, 15 + i).getTime(),
-        blocked,
-        redacted,
-        alerted,
-    })),
     byPolicy: [
         { name: "Sensitive data (PII)", count: 412, ignoredPct: 18 },
         { name: "Shadow AI apps", count: 366, ignoredPct: 9 },

@@ -88,6 +88,7 @@ function AtlasGuardrailsOverview() {
     );
     const [kpis, setKpis] = useState(null);
     const [triage, setTriage] = useState(null);
+    const [decisions, setDecisions] = useState(null);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -102,6 +103,10 @@ function AtlasGuardrailsOverview() {
         guardrailsApi.fetchAtlasGuardrailsOverviewTriage(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTriage(resp); })
             .catch(() => { if (!cancelled) setTriage(null); });
+        setDecisions(null);
+        guardrailsApi.fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp, Intl.DateTimeFormat().resolvedOptions().timeZone)
+            .then((resp) => { if (!cancelled) setDecisions(resp); })
+            .catch(() => { if (!cancelled) setDecisions(null); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -116,7 +121,7 @@ function AtlasGuardrailsOverview() {
             <TriageStatusCard triage={{ statuses: triage?.statuses || [], staleCriticalUnassigned: triage?.staleCriticalUnassigned || 0, staleAfterHours: triage?.staleAfterHours }} periodDays={triage?.periodDays} onStatusClick={openActivity} onAssign={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
-            <DecisionsTrendCard decisions={data.decisions} />
+            <DecisionsTrendCard bars={decisions?.bars || []} intervalTitle={decisions?.intervalTitle} periodDays={decisions?.periodDays} />
             <PolicyViolationsCard policies={data.byPolicy} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">

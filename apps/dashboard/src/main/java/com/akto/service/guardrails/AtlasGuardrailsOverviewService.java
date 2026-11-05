@@ -5,8 +5,10 @@ import com.akto.dao.context.Context;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto.Status;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.util.AgenticObserveUtil;
+import com.akto.util.TimePeriodUtils;
 import com.mongodb.BasicDBObject;
 
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -37,6 +39,44 @@ public class AtlasGuardrailsOverviewService {
                 .filter(e -> AtlasGuardrailUtils.isOpenCriticalUnassigned(e) && e.getTimestamp() < staleBefore)
                 .count());
         return triage;
+    }
+
+    public BasicDBObject buildDecisions(InsightDataBundle bundle, ZoneId zone) {
+        BasicDBObject response = new BasicDBObject();
+        List<BasicDBObject> bars = new ArrayList<>();
+        response.put("bars", bars);
+        response.put("periodDays", bundle.ctx.getStartTs() > 0 ? AtlasGuardrailUtils.periodDays(bundle) : null);
+        List<DashboardMaliciousEvent> events = bundle.windowEvents();
+        if (events == null) return response;
+        List<DashboardMaliciousEvent> current = AtlasGuardrailUtils.collapseConfigFindings(events);
+
+        long endTs = Math.min(bundle.ctx.getEndTs(), Context.now());
+        long startTs = bundle.ctx.getStartTs();
+        if (startTs <= 0) {
+            if (current.isEmpty()) return response;
+            startTs = current.stream().mapToLong(DashboardMaliciousEvent::getTimestamp).min().getAsLong();
+        }
+
+        TimePeriodUtils.BucketInterval interval = TimePeriodUtils.autoInterval(startTs, endTs, AtlasGuardrailUtils.DECISION_TARGET_BARS);
+        List<Long> starts = TimePeriodUtils.bucketStarts(startTs, endTs, interval, zone);
+        long[] blocked = TimePeriodUtils.countPerBucket(current, DashboardMaliciousEvent::getTimestamp,
+                e -> AtlasGuardrailUtils.BEHAVIOUR_BLOCK.equalsIgnoreCase(e.getBehaviour()), starts, endTs);
+        long[] approval = TimePeriodUtils.countPerBucket(current, DashboardMaliciousEvent::getTimestamp,
+                e -> AtlasGuardrailUtils.BEHAVIOUR_APPROVAL.equalsIgnoreCase(e.getBehaviour()), starts, endTs);
+        long[] alerted = TimePeriodUtils.countPerBucket(current, DashboardMaliciousEvent::getTimestamp,
+                e -> !AtlasGuardrailUtils.BEHAVIOUR_BLOCK.equalsIgnoreCase(e.getBehaviour())
+                        && !AtlasGuardrailUtils.BEHAVIOUR_APPROVAL.equalsIgnoreCase(e.getBehaviour()), starts, endTs);
+
+        for (int i = 0; i < starts.size(); i++) {
+            BasicDBObject bar = new BasicDBObject();
+            bar.put("start", starts.get(i) * 1000L);
+            bar.put("blocked", blocked[i]);
+            bar.put("approval", approval[i]);
+            bar.put("alerted", alerted[i]);
+            bars.add(bar);
+        }
+        response.put("intervalTitle", interval.getTitle());
+        return response;
     }
 
     public BasicDBObject buildKpis(InsightDataBundle bundle) {
