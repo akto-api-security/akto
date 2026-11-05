@@ -117,6 +117,7 @@ public class AutomatedAgenticTestExecutor {
             JsonNode payload = objectMapper.readTree(buildRequestBody(original, testSubType));
             JsonNode findingNode = objectMapper.readTree(buildRequestBody(finding, testSubType));
             ((ObjectNode) findingNode).remove("testSubType");
+            ((ObjectNode) findingNode).remove("digestAuth");
             ((ObjectNode) payload).set("finding", findingNode);
             RequestBody requestBody = RequestBody.create(objectMapper.writeValueAsString(payload), MediaType.parse("application/json"));
 
@@ -202,6 +203,15 @@ public class AutomatedAgenticTestExecutor {
         payload.put("testSubType", testSubType != null ? testSubType : "");
         payload.put("request", requestMap);
         payload.put("response", responseMap);
+
+        // Digest credentials are kept outside the headers map (see DigestAuthParam): the Authorization
+        // header only exists after the server's 401 challenge, so the service runs that exchange itself.
+        if (req.getDigestAuthUsername() != null && req.getDigestAuthPassword() != null) {
+            Map<String, String> digestAuth = new HashMap<>();
+            digestAuth.put("username", req.getDigestAuthUsername());
+            digestAuth.put("password", req.getDigestAuthPassword());
+            payload.put("digestAuth", digestAuth);
+        }
 
         return objectMapper.writeValueAsString(payload);
     }
