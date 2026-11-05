@@ -597,5 +597,7 @@ public class DaoInit {
         AgentGuardCorpusDao.instance.createIndicesIfAbsent();
         AgentGuardCorpusQueueDao.instance.createIndicesIfAbsent();
         ComplianceClauseCoverageDao.instance.createIndicesIfAbsent();
+        McpOAuthClientsDao.instance.createIndicesIfAbsent();
+        McpOAuthGrantsDao.instance.createIndicesIfAbsent();
     }
 }
