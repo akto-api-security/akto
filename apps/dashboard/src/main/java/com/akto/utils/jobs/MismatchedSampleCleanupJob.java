@@ -840,13 +840,16 @@ public class MismatchedSampleCleanupJob {
                 // Pass 1, two phases. Phase A decides on sample_data evidence only and marks suspect
                 // (url, param) pairs; phase B lets only NON-suspect sensitive docs on concrete URLs vouch
                 // for a wildcard URL (otherwise swapped docs would vouch for each other).
-                Map<Document, List<String>> proofCache = new HashMap<>();
+                // Only the (small) phase-A decision is kept, never the proofs: a large collection holds GBs of
+                // proof payloads. Phase B can only change a verdict through wildcardCovers (which only gains
+                // evidence), so only template URLs that are covered now are re-fetched and re-decided.
+                Map<Document, Pass1Decision> phaseA = new HashMap<>();
                 Set<String> suspect = new HashSet<>();
                 for (Document idDoc : collSens) {
                     if (quickVerdict(model, idDoc) != null) continue;
-                    List<String> proofs = fetchProofs(sensRead, idDoc);
-                    proofCache.put(idDoc, proofs);
-                    String v = decidePass1(model, idDoc, proofs).verdict;
+                    Pass1Decision a = decidePass1(model, idDoc, fetchProofs(sensRead, idDoc));
+                    phaseA.put(idDoc, a);
+                    String v = a.verdict;
                     if (v.equals("DELETE") || v.contains("SWAP_LIKELY") || v.equals("REVIEW_BORROWED_CORE")) {
                         suspect.add(idDoc.getString("url") + "\u0000" + idDoc.getString("param"));
                     }
@@ -866,7 +869,13 @@ public class MismatchedSampleCleanupJob {
                         d = new Pass1Decision();
                         d.verdict = quick;
                     } else {
-                        d = decidePass1(model, idDoc, proofCache.get(idDoc));
+                        d = phaseA.get(idDoc);
+                        String url = idDoc.getString("url");
+                        if (!"KEEP_WILDCARD_COVERS".equals(d.verdict) && hasTemplateToken(url)
+                                && wildcardCovers(model, model.endpoints.get(endpointKey(idDoc.getString("method"), url)),
+                                url, idDoc.getString("param"))) {
+                            d = decidePass1(model, idDoc, fetchProofs(sensRead, idDoc));
+                        }
                     }
                     report.pass1Verdicts.merge(d.verdict, 1, Integer::sum);
                     if (!d.verdict.startsWith("KEEP_REQUEST") && !d.verdict.equals("KEEP_CONFIRMED")) out.pass1(coll, idDoc, d);
