@@ -1,6 +1,7 @@
 package com.akto.util;
 
 import com.akto.dto.type.RequestTemplate;
+import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.modifier.PayloadModifier;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -9,6 +10,7 @@ import com.google.gson.JsonParser;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import java.io.IOException;
 import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -272,5 +274,18 @@ public class JSONUtils {
         map.remove(key);
         String updated = getString(map);
         return updated != null ? updated : json;
+    }
+
+    /**
+     * Parses a SingleTypeInfo as the database-abstractor returns it. Its id is taken from strId, and its
+     * subType, which is an object Jackson cannot read, is looked up by name. Changes doc while doing so.
+     */
+    public static SingleTypeInfo parseSingleTypeInfo(BasicDBObject doc, ObjectMapper objectMapper) throws IOException {
+        doc.put("id", doc.get("strId"));
+        BasicDBObject subType = (BasicDBObject) doc.get("subType");
+        doc.remove("subType");
+        SingleTypeInfo singleTypeInfo = objectMapper.readValue(doc.toJson(), SingleTypeInfo.class);
+        singleTypeInfo.setSubType(SingleTypeInfo.subTypeMap.get(subType.get("name")));
+        return singleTypeInfo;
     }
 }

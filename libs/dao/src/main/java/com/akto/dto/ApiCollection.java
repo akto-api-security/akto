@@ -498,6 +498,17 @@ public class ApiCollection {
         return false;
     }
 
+    /**
+     * Named for the tag rather than shortened to isRagCollection, which would read as the unrelated
+     * AKTO_RAG_COLLECTION_TAG ("rag-collection").
+     */
+    public boolean isRagDatabaseCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_RAG_DATABASE_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
     public boolean isGuardRailCollection() {
         if (!CollectionUtils.isEmpty(this.getTagsList())) {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GUARD_RAIL_TAG.equals(t.getKeyName()));

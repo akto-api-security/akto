@@ -48,18 +48,19 @@
             <artifactId>kafka-clients</artifactId>
             <version>3.0.0</version>
         </dependency>
-        <!-- Amazon MSK IAM auth (AKTO_KAFKA_SASL_MECHANISM=AWS_MSK_IAM). The "all" jar bundles its AWS SDK and
-             relocates Jackson, so its transitive deps are excluded to keep the runtime's dependency versions
-             unchanged. 2.3.7 is the last release that supports kafka-clients older than 3.9.2. -->
+        <!-- Amazon MSK IAM auth (AKTO_KAFKA_SASL_MECHANISM=AWS_MSK_IAM). 2.3.7 is the last release that supports
+             kafka-clients older than 3.9.2. Use the plain jar, not the "all" one: "all" bundles an unrelocated
+             netty plus Jackson 2.18.3 (and its pom.properties), which scanners flag in our image. The plain jar's
+             AWS SDK resolves normally and our pinned Jackson wins. It only uses the sync STS client
+             (apache-client), so the netty-based async client is excluded. -->
         <dependency>
             <groupId>software.amazon.msk</groupId>
             <artifactId>aws-msk-iam-auth</artifactId>
             <version>2.3.7</version>
-            <classifier>all</classifier>
             <exclusions>
                 <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

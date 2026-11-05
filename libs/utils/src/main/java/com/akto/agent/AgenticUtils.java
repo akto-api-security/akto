@@ -15,6 +15,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Operations;
+import com.akto.util.ApiCollectionMetaCache;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.akto.dto.OriginalHttpRequest;
@@ -44,7 +45,7 @@ public class AgenticUtils {
     public static void checkAndInitializeAgent(String conversationId, RawApi rawApi, int apiCollectionId) {
         if (agentClient.performHealthCheck()) {
 
-            ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
+            ApiCollection apiCollection = ApiCollectionMetaCache.get(apiCollectionId);
             boolean isMcpCollection = apiCollection.isMcpCollection();
 
             if (rawApi != null && !isMcpCollection) {

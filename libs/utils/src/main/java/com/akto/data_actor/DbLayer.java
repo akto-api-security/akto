@@ -90,6 +90,7 @@ import com.akto.dto.tracing.Span;
 import com.akto.dto.tracing.Trace;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.traffic.SensitiveDataCount;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
@@ -1227,6 +1228,10 @@ public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<
 
     public static void bulkWriteDependencyNodes(List<DependencyNode> dependencyNodeList) {
         DependencyAnalyserUtils.syncWithDb(dependencyNodeList);
+    }
+
+    public static void bulkIncSensitiveDataCounts(String idempotencyKey, List<SensitiveDataCount> increments) {
+        SensitiveDataCountDao.instance.bulkInc(idempotencyKey, increments);
     }
 
     public static List<ApiInfo.ApiInfoKey> fetchLatestEndpointsForTesting(int startTimestamp, int endTimestamp, int apiCollectionId) {

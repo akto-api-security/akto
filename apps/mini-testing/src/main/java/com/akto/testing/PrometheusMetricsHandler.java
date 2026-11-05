@@ -65,9 +65,10 @@ public class PrometheusMetricsHandler {
 
     private static void initPrometheusServer() throws IOException {
         loggerMaker.infoAndAddToDb("Prometheus HTTPServer starting on port: " + PROMETHEUS_SERVER_PORT);
-        server = HTTPServer.builder()
-                .port(PROMETHEUS_SERVER_PORT)
-                .buildAndStart();
+        HTTPServer.Builder builder = HTTPServer.builder()
+                .port(PROMETHEUS_SERVER_PORT);
+        OrchestratorControl.attach(builder);
+        server = builder.buildAndStart();
 
         loggerMaker.infoAndAddToDb("Prometheus HTTPServer started on port: " + server.getPort());
     }

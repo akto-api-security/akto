@@ -30,6 +30,10 @@ on:
         type: boolean
         default: false
         description: Datadog-Trace-Exporter
+      mini-testing-orchestrator:
+        type: boolean
+        default: false
+        description: Mini-Testing-Orchestrator
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -118,6 +122,13 @@ jobs:
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3"
           fi
 
+          if [[ "${{ github.event.inputs.mini-testing-orchestrator }}" == "true" ]]; then
+            cd ../mini-testing-orchestrator
+            # Go service: tagged with the plain release version (e.g. 1.0.0), as the helm chart pins it
+            docker buildx build --platform linux/arm64/v8,linux/amd64 --build-arg VERSION=$IMAGE_TAG4 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-mini-testing-orchestrator:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-mini-testing-orchestrator:$IMAGE_TAG4 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-mini-testing-orchestrator:$IMAGE_TAG4"
+          fi
+
 
       - name: DockerHub login
         env:
@@ -163,6 +174,11 @@ jobs:
           if [[ "${{ github.event.inputs.datadog-trace-exporter }}" == "true" ]]; then
             cd ../datadog-trace-exporter
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG -t $ECR_REGISTRY/akto-api-security-datadog-trace-exporter:$IMAGE_TAG3 . --push
+          fi
+
+          if [[ "${{ github.event.inputs.mini-testing-orchestrator }}" == "true" ]]; then
+            cd ../mini-testing-orchestrator
+            docker buildx build --platform linux/arm64/v8,linux/amd64 --build-arg VERSION=$IMAGE_TAG4 -t $ECR_REGISTRY/mini-testing-orchestrator:$IMAGE_TAG -t $ECR_REGISTRY/mini-testing-orchestrator:$IMAGE_TAG4 . --push
           fi
 
       - name: Send Github release notification to Slack - Mini-Runtime
@@ -217,6 +233,19 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
         
+      - name: Send Github release notification to Slack - Mini-Testing-Orchestrator
+        id: slack-mini-testing-orchestrator
+        if: ${{ github.event.inputs.mini-testing-orchestrator == 'true' }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "📈 Mini-Testing-Orchestrator version v${{ github.event.inputs.release_version }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
       - name: Push git tag Mini-Runtime
         if: ${{ github.event.inputs.mini-runtime == 'true' }}
         id: tag_version
@@ -308,4 +337,20 @@ jobs:
         with:
           tag: ${{ steps.tag_datadog_forwarder.outputs.new_tag }}
           name: Release ${{ steps.tag_datadog_forwarder.outputs.new_tag }}
+          omitBody: true
+
+      - name: Push git tag Mini-Testing-Orchestrator
+        if: ${{ github.event.inputs.mini-testing-orchestrator == 'true' }}
+        id: tag_mini_testing_orchestrator
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: mini-testing-orchestrator-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release Mini-Testing-Orchestrator
+        if: ${{ github.event.inputs.mini-testing-orchestrator == 'true' }}
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_mini_testing_orchestrator.outputs.new_tag }}
+          name: Release ${{ steps.tag_mini_testing_orchestrator.outputs.new_tag }}
           omitBody: true

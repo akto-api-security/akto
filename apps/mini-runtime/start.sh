@@ -4,9 +4,15 @@ LOG_FILE="/var/log/app/runtime.log"
 MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
 CHECK_INTERVAL=60                        # Check interval in seconds
 MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
+ENABLE_LOGS=${ENABLE_LOGS:-true}         # Set to "false" to keep logs out of container stdout/stderr
 
 # Ensure log directory exists before first use
 mkdir -p /var/log/app
+
+# With ENABLE_LOGS=false nothing reaches the container logs; everything still goes to $LOG_FILE
+if [ "$ENABLE_LOGS" = "false" ]; then
+    exec > /dev/null 2>> "$LOG_FILE"
+fi
 
 # 1. Detect and read cgroup memory limits
 if [ -f /sys/fs/cgroup/memory.max ]; then

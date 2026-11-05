@@ -6,6 +6,7 @@ LOG_FILE="/var/log/app/runtime.log"
 MAX_LOG_SIZE=${MAX_LOG_SIZE:-104857600}  # Default to 10 MB if not set (10 MB = 10 * 1024 * 1024 bytes)
 CHECK_INTERVAL=60                        # Check interval in seconds
 MEMORY_RESTART_THRESHOLD=${MEMORY_RESTART_THRESHOLD:-95}  # Restart if memory usage exceeds 95%
+JAVA_HEAP_PERCENT=${JAVA_HEAP_PERCENT:-50}               # Max heap as % of the container memory limit
 
 # Ensure log directory exists before first use
 mkdir -p /var/log/app
@@ -96,12 +97,9 @@ start_java() {
     # Start Java (stdout+stderr → FIFO)
     # --add-opens: Java 17 strong-encapsulation opens needed by reflective libraries
     # (MongoDB POJO codec, etc.). Single-token "=" form.
-    # No explicit -Xmx: an explicit 80%-of-cgroup heap left too little room for this
-    # workload's off-heap usage (100 concurrent test workers, Kafka parallel-consumer
-    # buffers, bulk-write payload buffering) and caused repeated OOM kills under real
-    # load. The JVM's own cgroup-aware default (MaxRAMPercentage=25%) is what ran
-    # reliably before the restart-loop rewrite - so leave heap sizing to the JVM.
-    java -XX:+ExitOnOutOfMemoryError \
+    # Heap is JAVA_HEAP_PERCENT of the container limit (default 50%); 80% left too little
+    # room for off-heap usage and caused OOM kills.
+    java -XX:MaxRAMPercentage="$JAVA_HEAP_PERCENT" -XX:+ExitOnOutOfMemoryError \
         --add-opens=java.base/java.lang=ALL-UNNAMED \
         --add-opens=java.base/java.util=ALL-UNNAMED \
         --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
