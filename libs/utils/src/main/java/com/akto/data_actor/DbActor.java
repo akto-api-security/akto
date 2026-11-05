@@ -271,8 +271,8 @@ public class DbActor extends DataActor {
     }
 
     @Override
-    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId) {
-        return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId);
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId, String moduleName) {
+        return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId, moduleName);
     }
 
     @Override

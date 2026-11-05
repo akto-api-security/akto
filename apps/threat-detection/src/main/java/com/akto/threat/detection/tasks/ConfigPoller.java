@@ -50,19 +50,19 @@ public class ConfigPoller implements Runnable {
     private void pollAndProcessConfig() {
         try {
             ModuleInfo self = ModuleInfoWorker.getModuleInfo();
-            if (self == null) {
+            if (self == null || self.getName() == null || self.getName().isEmpty()) {
                 return;
             }
-            String moduleId = self.getId();
+            String moduleName = self.getName();
 
-            List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(MODULE_TYPE, null, moduleId);
+            List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(MODULE_TYPE, null, null, moduleName);
 
             if (moduleInfoList == null || moduleInfoList.isEmpty()) {
                 return;
             }
 
             moduleInfoList = moduleInfoList.stream()
-                    .filter(m -> moduleId.equals(m.getId()))
+                    .filter(m -> moduleName.equals(m.getName()))
                     .collect(Collectors.toList());
             if (moduleInfoList.isEmpty()) {
                 return;

@@ -115,7 +115,7 @@ public abstract class DataActor {
 
     public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName);
 
-    public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId);
+    public abstract List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId, String moduleName);
 
     public abstract void ingestMetricData(List<MetricData> metricData);
 
