@@ -228,6 +228,16 @@ public class SkillValidationV3Action extends ActionSupport {
         "toolNameDescriptionMatchScore (0.0-1.0): how well the name/description matches actual behaviour.\n" +
         "  Below 0.7 only when the content does something material the description never discloses — that is\n" +
         "  also the only time AST04.c1 may be used. A powerful skill that does what it says scores high.\n" +
+        "riskScore (0.0-5.0): how much harm this skill can do to the user, judged ONLY from the tags you keep\n" +
+        "  and the malicious verdict — never from how powerful the skill sounds:\n" +
+        "    4.0-5.0  malicious. 5.0 for a clear, working payload (data or credentials really sent out, a\n" +
+        "             safety override, persistence that calls out); 4.0 when the payload is partial.\n" +
+        "    2.0-3.9  not malicious, with at least one tag on a HIGH or CRITICAL category (credentials, root,\n" +
+        "             system files, the user's files, data sent out) whose risk the purpose does NOT explain;\n" +
+        "             higher the more such tags there are and the more damage they can do.\n" +
+        "    1.0-1.9  not malicious, and every tag is explained by the purpose or is MEDIUM severity.\n" +
+        "    0.0-0.9  no tags.\n" +
+        "  It is checked against the verified tags and verdict, and moved into the band they fall in.\n" +
         "overallConfidence: HIGH / MEDIUM / LOW.\n" +
         "\n" +
         "==================== OUTPUT ====================\n" +
@@ -252,6 +262,7 @@ public class SkillValidationV3Action extends ActionSupport {
         "    \"evidence\": []\n" +
         "  },\n" +
         "  \"toolNameDescriptionMatchScore\": 0.0,\n" +
+        "  \"riskScore\": 0.0,\n" +
         "  \"couldBeBenign\": true,\n" +
         "  \"couldBeBenignReason\": \"Explanation.\",\n" +
         "  \"socAnalystSummary\": \"2-3 sentences covering intent, risk surface, and recommended action.\",\n" +
@@ -272,6 +283,13 @@ public class SkillValidationV3Action extends ActionSupport {
         "}";
 
     private static final List<String> SEVERITY_ORDER = Arrays.asList("LOW", "MEDIUM", "HIGH", "CRITICAL");
+
+    // Risk score bands, on the 0-5 scale of an endpoint's risk and threat score.
+    static final double RISK_MAX = 5.0;
+    static final double MALICIOUS_RISK_FLOOR = 4.0;
+    static final double UNEXPLAINED_RISK_FLOOR = 2.0;
+    static final double TAGGED_RISK_FLOOR = 1.0;
+    private static final double BAND_GAP = 0.1;
 
     // Skill folders the agent vendors ship themselves. Their skills are tagged but never flagged.
     private static final List<String> VENDOR_SKILL_PATHS = Arrays.asList(
@@ -300,7 +318,7 @@ public class SkillValidationV3Action extends ActionSupport {
     // The skill's collection host, e.g. "<device>.ai-agent.claude"
     private String collectionName;
 
-    // Output field: tagLabels, annotations, verdict (what is stored as skill_verdict)
+    // Output field: tagLabels, annotations, verdict (what is stored as skill_verdict), riskScore
     private Map<String, Object> validationResult;
 
     @SuppressWarnings("unchecked")
@@ -360,12 +378,14 @@ public class SkillValidationV3Action extends ActionSupport {
         Finding maliciousFinding = findings.stream().filter(f -> f.criteria.isMalicious()).findFirst().orElse(null);
         boolean flagged = claimedMalicious && maliciousFinding != null;
         maliciousScore = flagged ? Math.max(maliciousScore, 0.8) : Math.min(maliciousScore, 0.2);
+        Double claimedRisk = parsed.get("riskScore") instanceof Number ? ((Number) parsed.get("riskScore")).doubleValue() : null;
+        double riskScore = riskScore(claimedRisk, findings, flagged, maliciousScore);
         String evidence = flagged ? labelledEvidence(maliciousFinding, doc) : "";
         List<Map<String, String>> owaspCategories = buildCategoryEntries(findings, doc);
 
         logger.infoAndAddToDb(String.format(
-                "[SkillValidationV3] skill=%s collection=%s flagged=%b maliciousScore=%.2f claimedTags=%d keptTags=%d",
-                skillName, collectionName, flagged, maliciousScore, claimedTags.size(), findings.size()), LogDb.DB_ABS);
+                "[SkillValidationV3] skill=%s collection=%s flagged=%b maliciousScore=%.2f riskScore=%.1f claimedTags=%d keptTags=%d",
+                skillName, collectionName, flagged, maliciousScore, riskScore, claimedTags.size(), findings.size()), LogDb.DB_ABS);
 
         try {
             String evidenceText = evidence.isEmpty() ? reason : reason + "\n\n" + evidence;
@@ -403,7 +423,49 @@ public class SkillValidationV3Action extends ActionSupport {
         validationResult.put("tagLabels", tagLabels(findings));
         validationResult.put("annotations", buildAnnotations(findings, doc));
         validationResult.put("verdict", verdict);
+        validationResult.put("riskScore", riskScore);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * The model's risk score moved into the band the verified result falls in, so it can never
+     * contradict the tags or the verdict:
+     *   malicious                                              4.0-5.0
+     *   a HIGH/CRITICAL tag the purpose does not explain       2.0-3.9
+     *   other tags                                             1.0-1.9
+     *   no tags                                                0.0-0.9
+     * Without a score from the model, the band's floor is used (for a malicious skill, its verdict score
+     * scaled to 0-5).
+     */
+    static double riskScore(Double claimed, List<Finding> findings, boolean flagged, double maliciousScore) {
+        double floor;
+        double ceiling;
+        double fallback;
+        if (flagged) {
+            floor = MALICIOUS_RISK_FLOOR;
+            ceiling = RISK_MAX;
+            fallback = maliciousScore * RISK_MAX;
+        } else if (findings.stream().anyMatch(SkillValidationV3Action::unexplainedSevere)) {
+            floor = UNEXPLAINED_RISK_FLOOR;
+            ceiling = MALICIOUS_RISK_FLOOR - BAND_GAP;
+            fallback = floor;
+        } else if (!findings.isEmpty()) {
+            floor = TAGGED_RISK_FLOOR;
+            ceiling = UNEXPLAINED_RISK_FLOOR - BAND_GAP;
+            fallback = floor;
+        } else {
+            floor = 0.0;
+            ceiling = TAGGED_RISK_FLOOR - BAND_GAP;
+            fallback = floor;
+        }
+        double score = claimed == null || claimed.isNaN() ? fallback : claimed;
+        score = Math.max(floor, Math.min(ceiling, score));
+        return Math.round(score * 10) / 10.0;
+    }
+
+    private static boolean unexplainedSevere(Finding finding) {
+        String severity = finding.criteria.getCategory().getSeverity();
+        return !finding.purposeAligned && SEVERITY_ORDER.indexOf(severity) >= SEVERITY_ORDER.indexOf("HIGH");
     }
 
     private String buildPrompt(List<String> candidateLines) {
