@@ -205,6 +205,7 @@ public class ModuleInfoAction extends UserAction {
     private static final String STATUS_INACTIVE = "inactive";
     private static final String STATUS_ERROR = "error";
     private static final String ORIG_ID_FIELD = "origId";
+    private static final String NAME_LOWER_FIELD = "nameLower";
 
     // A physical host can show up as multiple ModuleInfo docs per {name, os} (reinstall/reconnect) — this
     // is the dedup key used to collapse those down to one row per host.
@@ -355,9 +356,13 @@ public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> aggregateEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses, Bson sort, int skip, int limit) {
         List<Bson> pipeline = new ArrayList<>(endpointShieldGroupedStages(filter, groupId, now, statuses));
         pipeline.add(Aggregates.project(Projections.exclude(ORIG_ID_FIELD)));
-        if (sort != null) pipeline.add(Aggregates.sort(sort));
+        if (sort != null) {
+            pipeline.add(Aggregates.addFields(new Field<>(NAME_LOWER_FIELD, new Document("$toLower", new Document("$ifNull", Arrays.asList("$" + ModuleInfo.NAME, ""))))));
+            pipeline.add(Aggregates.sort(sort));
+        }
         if (skip > 0) pipeline.add(Aggregates.skip(skip));
         if (limit > 0) pipeline.add(Aggregates.limit(limit));
+        if (sort != null) pipeline.add(Aggregates.project(Projections.exclude(NAME_LOWER_FIELD)));
         List<ModuleInfo> modules = new ArrayList<>();
         try (MongoCursor<ModuleInfo> cursor = ModuleInfoDao.instance.getMCollection()
                 .aggregate(pipeline, ModuleInfo.class).allowDiskUse(true).cursor()) {
@@ -425,7 +430,6 @@ public class ModuleInfoAction extends UserAction {
         });
     }
 
-    private static final int ATLAS_MAX_PAGE_SIZE = 500;
 
     private AtlasPeopleService.PeopleQuery buildPeopleQuery() {
         AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
@@ -446,7 +450,7 @@ public class ModuleInfoAction extends UserAction {
         query.sortKey = sortKey;
         query.sortOrder = sortOrder == 0 ? -1 : sortOrder;
         query.skip = skip;
-        query.limit = limit <= 0 ? 50 : Math.min(limit, ATLAS_MAX_PAGE_SIZE);
+        query.limit = limit <= 0 ? 50 : limit;
         return query;
     }
 
@@ -503,9 +507,9 @@ public class ModuleInfoAction extends UserAction {
         Bson filter = atlasModuleFilter();
         Bson groupId = endpointShieldGroupId();
         List<String> statuses = query.agentActive ? Arrays.asList(STATUS_ACTIVE) : null;
-        String sortField = "name".equals(query.sortKey) ? ModuleInfo.NAME
+        String sortField = "name".equals(query.sortKey) ? NAME_LOWER_FIELD
                 : "agentVersion".equals(query.sortKey) ? ModuleInfo.CURRENT_VERSION : ModuleInfo.LAST_HEARTBEAT_RECEIVED;
-        Bson sort = query.sortOrder >= 0 ? Sorts.ascending(sortField) : Sorts.descending(sortField);
+        Bson sort = Sorts.orderBy(query.sortOrder >= 0 ? Sorts.ascending(sortField) : Sorts.descending(sortField), Sorts.ascending(ModuleInfoDao.ID));
         atlasTotal = countEndpointShieldModules(filter, groupId, now, statuses);
         List<Document> rows = new ArrayList<>();
         for (ModuleInfo module : aggregateEndpointShieldModules(filter, groupId, now, statuses, sort, query.skip, query.limit)) {

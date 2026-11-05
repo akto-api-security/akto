@@ -227,6 +227,7 @@ public class AtlasPeopleService {
     public static class Snapshot {
         public final List<DeviceRow> devices = new ArrayList<>();
         public final Map<String, DeviceRow> devicesByLowerName = new LinkedHashMap<>();
+        public final Map<String, DeviceRow> devicesByHost = new HashMap<>();
         public final List<EmployeeRow> employees = new ArrayList<>();
         public final Map<String, String> latestVersionByOs = new HashMap<>();
         public boolean toolsAvailable = true;
@@ -259,6 +260,7 @@ public class AtlasPeopleService {
     }
 
     public Snapshot getOrBuild(String key, Supplier<Snapshot> loader) {
+        CACHE.values().removeIf(entry -> System.currentTimeMillis() - entry.loadedAtMs >= CACHE_TTL_MS);
         CachedSnapshot cached = CACHE.compute(key, (k, existing) -> {
             if (existing != null && System.currentTimeMillis() - existing.loadedAtMs < CACHE_TTL_MS) return existing;
             return new CachedSnapshot(loader.get(), System.currentTimeMillis());
@@ -296,7 +298,7 @@ public class AtlasPeopleService {
             snapshot.violationsAvailable = false;
         } else {
             try {
-                addTools(snapshot.devicesByLowerName, snapshot.unmatchedBrowserIdentities, bundle, startTs, endTs);
+                addTools(snapshot.devicesByLowerName, snapshot.devicesByHost, snapshot.unmatchedBrowserIdentities, bundle, startTs, endTs);
                 addGuardrailModes(snapshot.devicesByLowerName.values(), bundle);
             } catch (Exception e) {
                 snapshot.toolsAvailable = false;
@@ -307,7 +309,7 @@ public class AtlasPeopleService {
                 snapshot.riskAvailable = false;
             }
             snapshot.violationsAvailable = bundle.threatBackendAvailable;
-            if (snapshot.violationsAvailable) addViolations(snapshot.devicesByLowerName, bundle);
+            if (snapshot.violationsAvailable) addViolations(snapshot.devicesByLowerName, snapshot.devicesByHost, bundle);
         }
 
         snapshot.devices.addAll(snapshot.devicesByLowerName.values());
@@ -338,7 +340,7 @@ public class AtlasPeopleService {
         device.key = device.extension ? "ext|" + device.name : device.name.toLowerCase(Locale.ROOT);
         device.os = device.extension ? normalizeOs(module.getString("os"), null) : normalizeOs(module.getString("os"), module.getString("platform"));
 
-        boolean offline = device.lastHeartbeat > 0 && device.lastHeartbeat < now - OFFLINE_SECONDS;
+        boolean offline = device.lastHeartbeat <= 0 || device.lastHeartbeat < now - OFFLINE_SECONDS;
         String latest = latestVersionByOs.get(device.os);
         int[] deviceVersion = parseVersion(device.version);
         boolean outdated = !device.extension && latest != null && deviceVersion != null
@@ -347,7 +349,7 @@ public class AtlasPeopleService {
         return device;
     }
 
-    private static void addTools(Map<String, DeviceRow> devicesByLowerName, Set<String> unmatchedBrowserIdentities, InsightDataBundle bundle, int startTs, int endTs) {
+    private static void addTools(Map<String, DeviceRow> devicesByLowerName, Map<String, DeviceRow> devicesByHost, Set<String> unmatchedBrowserIdentities, InsightDataBundle bundle, int startTs, int endTs) {
         boolean ranged = startTs > 0 || endTs > 0;
         Map<String, DeviceRow> browserRowByName = new HashMap<>();
         Map<String, DeviceRow> browserRowByEmail = new HashMap<>();
@@ -401,6 +403,7 @@ public class AtlasPeopleService {
             }
 
             device.tools.add(tool);
+            devicesByHost.put(c.getHostName().toLowerCase(Locale.ROOT), device);
             if (tool.plugin != null) {
                 tool.category = CAT_PLUGIN;
                 continue;
@@ -549,11 +552,14 @@ public class AtlasPeopleService {
         }
     }
 
-    private static void addViolations(Map<String, DeviceRow> devicesByLowerName, InsightDataBundle bundle) {
+    private static void addViolations(Map<String, DeviceRow> devicesByLowerName, Map<String, DeviceRow> devicesByHost, InsightDataBundle bundle) {
         for (HostSeverityCount counts : bundle.hostSeverityCounts) {
-            String hostDevice = AgenticObserveUtil.extractEndpointId(counts.getHost());
-            if (hostDevice == null) continue;
-            DeviceRow device = devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
+            if (counts.getHost() == null) continue;
+            DeviceRow device = devicesByHost.get(counts.getHost().toLowerCase(Locale.ROOT));
+            if (device == null) {
+                String hostDevice = AgenticObserveUtil.extractEndpointId(counts.getHost());
+                if (hostDevice != null) device = devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
+            }
             if (device == null) continue;
             device.violationsBySeverity.merge("critical", counts.getCritical(), Integer::sum);
             device.violationsBySeverity.merge("high", counts.getHigh(), Integer::sum);
@@ -918,7 +924,7 @@ public class AtlasPeopleService {
 
     private static <T> List<T> slice(List<T> rows, PeopleQuery query) {
         int from = Math.min(Math.max(query.skip, 0), rows.size());
-        int to = Math.min(from + Math.min(Math.max(query.limit, 1), 200), rows.size());
+        int to = from + Math.min(Math.max(query.limit, 1), rows.size() - from);
         return rows.subList(from, to);
     }
 

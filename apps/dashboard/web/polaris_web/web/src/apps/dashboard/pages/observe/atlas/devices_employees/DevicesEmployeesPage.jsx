@@ -105,7 +105,7 @@ function DevicesEmployeesPage() {
                 const response = await settingRequests[requestName]({ ...params, skip, limit: EXPORT_PAGE_SIZE });
                 const page = response?.atlasRows || [];
                 rows.push(...page);
-                if (page.length < EXPORT_PAGE_SIZE || rows.length >= (response?.atlasTotal || 0)) break;
+                if (page.length === 0 || rows.length >= (response?.atlasTotal || 0)) break;
             }
             func.saveCsv(transform.toCsvLines(tab, rows), `atlas-${tab}`);
         } catch (error) {
