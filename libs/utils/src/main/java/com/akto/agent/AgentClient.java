@@ -1,5 +1,6 @@
 package com.akto.agent;
 
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
@@ -23,9 +24,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
 
 import static com.akto.agent.AgenticUtils.getTestModeFromRole;
 import static com.akto.agent.AgenticUtils.isCopilotBotCollection;
@@ -42,6 +48,27 @@ public class AgentClient {
     private static final String JSON_KEY_IS_LAST_REQUEST = "isLastRequest";
     private static final String JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID = "testingRunResultSummaryId";
     private static final String JSON_KEY_FETCH_QUERY_RECORDS = "shouldFetchRecords";
+
+    /** Runs this worker sent agentic tests for, so only those runs ask the agent server to consolidate learnings. */
+    private static final int MAX_TRACKED_AGENTIC_SUMMARIES = 1000;
+    private static final Set<String> agenticSummaryIds = Collections.synchronizedSet(Collections.newSetFromMap(
+            new LinkedHashMap<String, Boolean>() {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+                    return size() > MAX_TRACKED_AGENTIC_SUMMARIES;
+                }
+            }));
+    static final int CONSOLIDATE_MAX_ATTEMPTS = 3;
+    private static final long CONSOLIDATE_BACKOFF_MILLIS = 2000;
+    /** The agent server answers 202 before it starts consolidating, so the call itself is short. */
+    private static final OkHttpClient consolidateHttpClient = CoreHTTPClient.client.newBuilder()
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(10, TimeUnit.SECONDS)
+            .build();
+    /** One dedicated thread; at most one call per finished run, so a small queue is plenty. */
+    private static final ExecutorService consolidateExecutor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(50),
+            (task, executor) -> loggerMaker.errorAndAddToDb("consolidateLearnings: queue full, a finished run's learnings will not be consolidated"));
 
     private static final OkHttpClient agentHttpClient = CoreHTTPClient.client.newBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -62,8 +89,11 @@ public class AgentClient {
         this.agentBaseUrl = agentBaseUrl == null || agentBaseUrl.isEmpty() ? "" : agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
     }
 
-    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId) throws Exception {
+    public List<TestResult> executeAgenticTest(RawApi rawApi, int apiCollectionId, String testingRunResultSummaryId, AgentLearningContext learningContext) throws Exception {
         String conversationId = UUID.randomUUID().toString();
+        if (testingRunResultSummaryId != null && !testingRunResultSummaryId.isEmpty()) {
+            agenticSummaryIds.add(testingRunResultSummaryId);
+        }
         List<String> promptsList = rawApi.getConversationsList();
         String testMode = getTestModeFromRole();
 
@@ -108,7 +138,7 @@ public class AgentClient {
         }
 
         try {
-            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode, testingRunResultSummaryId, shouldFetchRecords);
+            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode, testingRunResultSummaryId, shouldFetchRecords, learningContext);
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
 
@@ -135,14 +165,14 @@ public class AgentClient {
         }
     }
     
-    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId, boolean shouldFetchRecords) throws Exception {
+    private List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         int index = 0;
         int totalRequests = prompts.size();
         for (String prompt : prompts) {
             index++;
             try {
-                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests, testingRunResultSummaryId, shouldFetchRecords);
+                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode, index == totalRequests, testingRunResultSummaryId, shouldFetchRecords, learningContext);
                 results.add(result);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error processing prompt: " + prompt + ", error: " + e.getMessage());
@@ -153,8 +183,8 @@ public class AgentClient {
         return results;
     }
     
-    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords) throws Exception {
-        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, testingRunResultSummaryId, shouldFetchRecords);
+    private AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) throws Exception {
+        Request request = buildOkHttpChatRequest(prompt, conversationId, isLastRequest, testingRunResultSummaryId, shouldFetchRecords, learningContext);
 
         Call call = clientWithLongTimeout.newCall(request);
 
@@ -169,14 +199,22 @@ public class AgentClient {
         }
     }
     
-    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords) {
+    static Map<String, Object> buildChatRequestBody(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) {
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put(JSON_KEY_PROMPT, prompt);
         requestBody.put(JSON_KEY_CONVERSATION_ID, conversationId);
         requestBody.put(JSON_KEY_IS_LAST_REQUEST, isLastRequest);
         requestBody.put(JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId != null ? testingRunResultSummaryId : "");
         requestBody.put(JSON_KEY_FETCH_QUERY_RECORDS, shouldFetchRecords);
-        
+        if (learningContext != null) {
+            learningContext.addTo(requestBody);
+        }
+        return requestBody;
+    }
+
+    private Request buildOkHttpChatRequest(String prompt, String conversationId, boolean isLastRequest, String testingRunResultSummaryId, boolean shouldFetchRecords, AgentLearningContext learningContext) {
+        Map<String, Object> requestBody = buildChatRequestBody(prompt, conversationId, isLastRequest, testingRunResultSummaryId, shouldFetchRecords, learningContext);
+
         String body;
         try {
             body = objectMapper.writeValueAsString(requestBody);
@@ -385,6 +423,66 @@ public class AgentClient {
         requestBody.put("requestMethod", requestMethod != null && !requestMethod.isEmpty() ? requestMethod : "POST");
         requestBody.put("conversationId", conversationId);
         initializeAgent(requestBody);
+    }
+
+    /**
+     * Asks the agent server, off the caller's thread, to write the final learnings of a finished run. Only runs this
+     * worker sent agentic tests for are sent; the agent server's version ids make a repeated call a no-op.
+     */
+    public boolean consolidateLearningsInBackground(String testingRunResultSummaryId) {
+        if (testingRunResultSummaryId == null || !agenticSummaryIds.remove(testingRunResultSummaryId)) {
+            return false;
+        }
+        Integer accountId = Context.accountId.get();
+        consolidateExecutor.execute(() -> {
+            Context.accountId.set(accountId);
+            consolidateLearnings(testingRunResultSummaryId, CONSOLIDATE_BACKOFF_MILLIS);
+        });
+        return true;
+    }
+
+    /** True once the agent server accepted the call. Retries, with backoff, only an unreachable server, 429 and 5xx. */
+    boolean consolidateLearnings(String testingRunResultSummaryId, long backoffMillis) {
+        String failure = null;
+        for (int attempt = 1; attempt <= CONSOLIDATE_MAX_ATTEMPTS; attempt++) {
+            try (Response response = consolidateHttpClient.newCall(buildConsolidateRequest(testingRunResultSummaryId)).execute()) {
+                if (response.isSuccessful()) {
+                    loggerMaker.infoAndAddToDb("consolidateLearnings: accepted for summaryId=" + testingRunResultSummaryId);
+                    return true;
+                }
+                failure = "status " + response.code();
+                if (response.code() != 429 && response.code() < 500) {
+                    break;
+                }
+            } catch (Exception e) {
+                failure = e.getMessage();
+            }
+            if (attempt < CONSOLIDATE_MAX_ATTEMPTS && !sleepQuietly(backoffMillis * attempt)) {
+                break;
+            }
+        }
+        loggerMaker.errorAndAddToDb("consolidateLearnings: not accepted for summaryId=" + testingRunResultSummaryId + ": " + failure);
+        return false;
+    }
+
+    private static boolean sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private Request buildConsolidateRequest(String testingRunResultSummaryId) throws Exception {
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put(JSON_KEY_TESTING_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId);
+        return new Request.Builder()
+                .url(agentBaseUrl + "/consolidateLearnings")
+                .post(RequestBody.create(objectMapper.writeValueAsString(requestBody), MediaType.parse("application/json")))
+                .addHeader("Accept", "application/json")
+                .build();
     }
 
     public void initializeAgent(Map<String, Object> requestBody) {

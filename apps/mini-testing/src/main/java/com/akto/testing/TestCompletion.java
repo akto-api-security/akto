@@ -1,6 +1,9 @@
 package com.akto.testing;
 
+import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dto.testing.TestingRun.State;
+import com.akto.util.Constants;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
@@ -43,6 +46,7 @@ public class TestCompletion {
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestCompletion.class, LogDb.TESTING);
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final AgentClient agentClient = new AgentClient(Constants.AGENT_BASE_URL);
 
     public void markTestAsCompleteAndRunFunctions(TestingRun testingRun, ObjectId summaryId, long startDetailed){
         int scheduleTs = 0;
@@ -67,7 +71,11 @@ public class TestCompletion {
         }
 
         if(summaryId != null && testingRun.getTestIdConfig() != 1){
-            TestExecutor.updateTestSummary(summaryId);
+            State finalState = TestExecutor.updateTestSummary(summaryId);
+            // Learnings from a failed or stopped run stay as their last batch version; only a finished run is final.
+            if (finalState == State.COMPLETED) {
+                agentClient.consolidateLearningsInBackground(summaryId.toHexString());
+            }
         }
 
         AllMetrics.instance.setTestingRunLatency(System.currentTimeMillis() - startDetailed);
