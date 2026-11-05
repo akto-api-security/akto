@@ -24,7 +24,7 @@ public class SessionIdentifier implements UserIdentifier {
 
     public static final String SOURCES_ENV = "BEHAVIOUR_SESSION_ID_SOURCES";
     public static final String DEFAULT_SOURCES =
-            "cookie:coulomb_sess,cookie:IDENTITYSID,header:cp-session-token,jwt:cp-sso-ims-token:sid,xff,ip";
+            "cookie:coulomb_sess,cookie:IDENTITYSID,header:cp-session-token,jwt:cp-sso-ims-token:sid,header:authorization";
 
     private static final int HASH_HEX_CHARS = 16;
     private static final char[] HEX = "0123456789abcdef".toCharArray();

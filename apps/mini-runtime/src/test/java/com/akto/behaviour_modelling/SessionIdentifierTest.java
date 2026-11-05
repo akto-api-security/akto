@@ -57,6 +57,7 @@ public class SessionIdentifierTest {
                 "cookie", "a=1; IDENTITYSID=ident-1; coulomb_sess=coul==1",
                 "cp-session-token", "cp-tok-1",
                 "cp-sso-ims-token", token,
+                "authorization", "opaque-1",
                 "x-forwarded-for", "9.9.9.9, 10.0.0.1");
 
         String coulomb = id(all, "1.1.1.1");
@@ -74,10 +75,10 @@ public class SessionIdentifierTest {
         Assertions.assertEquals(sha16("jwt:cp-sso-ims-token:sid:jwt-sid-1"), id(all, "1.1.1.1"));
 
         all.remove("cp-sso-ims-token");
-        Assertions.assertEquals(sha16("xff:9.9.9.9"), id(all, "1.1.1.1"));
+        Assertions.assertEquals(sha16("header:authorization:opaque-1"), id(all, "1.1.1.1"));
 
-        all.remove("x-forwarded-for");
-        Assertions.assertEquals(sha16("ip:1.1.1.1"), id(all, "1.1.1.1"));
+        all.put("authorization", Collections.singletonList("Token partner-1"));
+        Assertions.assertEquals(sha16("header:authorization:Token partner-1"), id(all, "1.1.1.1"));
 
         Assertions.assertNull(id(new HashMap<>(), null));
     }
@@ -88,16 +89,15 @@ public class SessionIdentifierTest {
                 id(headers("Cookie", "coulomb_sess=abc"), "1.1.1.1"));
         Assertions.assertEquals(sha16("header:cp-session-token:t"),
                 id(headers("CP-Session-Token", "t"), "1.1.1.1"));
-        Assertions.assertEquals(sha16("xff:9.9.9.9"),
-                id(headers("X-Forwarded-For", "9.9.9.9"), "1.1.1.1"));
+        Assertions.assertEquals(sha16("header:authorization:o1"),
+                id(headers("Authorization", "o1"), "1.1.1.1"));
     }
 
     @Test
     public void jwtWithoutSidOrMalformedFallsThrough() throws Exception {
-        Assertions.assertEquals(sha16("xff:8.8.8.8"),
-                id(headers("cp-sso-ims-token", jwt("{\"sub\":\"u\"}"), "x-forwarded-for", "8.8.8.8"), "1.1.1.1"));
-        Assertions.assertEquals(sha16("ip:1.1.1.1"),
-                id(headers("cp-sso-ims-token", "not-a-jwt"), "1.1.1.1"));
+        Assertions.assertEquals(sha16("header:authorization:o1"),
+                id(headers("cp-sso-ims-token", jwt("{\"sub\":\"u\"}"), "authorization", "o1"), "1.1.1.1"));
+        Assertions.assertNull(id(headers("cp-sso-ims-token", "not-a-jwt"), "1.1.1.1"));
         Assertions.assertEquals(sha16("jwt:cp-sso-ims-token:sid:s1"),
                 id(headers("cp-sso-ims-token", "Bearer " + jwt("{\"sid\":\"s1\"}")), "1.1.1.1"));
     }
