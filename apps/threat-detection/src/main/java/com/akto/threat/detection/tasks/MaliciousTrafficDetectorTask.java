@@ -357,8 +357,9 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
       } else if (apiFilter.getId().equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
         if (apiCollectionId != 0) {
-          String currentApiKey = new ApiInfo.ApiInfoKey(apiCollectionId, urlForAggregation, method).toString();
-          hasPassedFilter = sequenceCache.checkSequenceAnomaly(actor, currentApiKey);
+          URLTemplate sequenceTemplate = matchedTemplate != null ? matchedTemplate : threatDetector.findMatchingUrlTemplate(responseParam);
+          String sequenceUrl = sequenceTemplate != null ? sequenceTemplate.getTemplateString() : urlForAggregation;
+          hasPassedFilter = sequenceCache.checkSequenceAnomaly(responseParam, apiCollectionId, sequenceUrl, method);
         }
       } else {
         boolean hasSuccessFailureFilters = (apiFilter.getSuccessFilter() != null || apiFilter.getFailureFilter() != null);
