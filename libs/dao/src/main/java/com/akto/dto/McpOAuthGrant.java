@@ -17,6 +17,8 @@ public class McpOAuthGrant {
     public static final String ID = "_id";
     public static final String TYPE = "type";
     public static final String EXPIRES_AT = "expiresAt";
+    public static final String CLIENT_ID = "clientId";
+    public static final String ACCOUNT_ID = "accountId";
 
     public static final String TYPE_REQUEST = "REQUEST";
     public static final String TYPE_CODE = "CODE";

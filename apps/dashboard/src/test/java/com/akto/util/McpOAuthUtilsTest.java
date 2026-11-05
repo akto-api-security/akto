@@ -5,7 +5,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.Test;
@@ -180,6 +182,34 @@ public class McpOAuthUtilsTest {
         assertEquals("localhost", McpOAuthUtils.redirectDisplayHost("http://localhost:1/cb"));
         assertEquals("com.example.app", McpOAuthUtils.redirectDisplayHost("com.example.app:/oauth2redirect"));
         assertEquals("", McpOAuthUtils.redirectDisplayHost(null));
+    }
+
+    @Test
+    public void adminAllowedUrisExtendTheKnownListExactlyOrByPrefix() {
+        List<String> admin = Arrays.asList("https://app.example.com/oauth/callback", "https://agents.example.com/connect/*");
+        assertTrue(McpOAuthUtils.isKnownRedirect("https://app.example.com/oauth/callback", admin));
+        assertTrue(McpOAuthUtils.isKnownRedirect("https://agents.example.com/connect/abc", admin));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://app.example.com/oauth/callback/extra", admin));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://agents.example.com/other", admin));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://app.example.com/oauth/callback", null));
+        assertTrue(McpOAuthUtils.isKnownRedirect("https://claude.ai/api/mcp/auth_callback", admin));
+    }
+
+    @Test
+    public void adminEntriesMustBeHttpsWithAHostAndPath() {
+        assertTrue(McpOAuthUtils.isValidAllowedRedirectEntry("https://app.example.com/oauth/callback"));
+        assertTrue(McpOAuthUtils.isValidAllowedRedirectEntry("https://app.example.com:8443/cb/*"));
+        assertTrue(McpOAuthUtils.isValidAllowedRedirectEntry("https://app.example.com/*"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("http://app.example.com/cb"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("https://app.example.com"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("https://*.example.com/cb"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("https://*/cb"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("https://app.example.com/a*b"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("https://user@app.example.com/cb"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("https://app.example.com/cb?x=1"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry("cursor://anysphere.cursor-mcp/oauth/callback"));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry(""));
+        assertFalse(McpOAuthUtils.isValidAllowedRedirectEntry(null));
     }
 
     @Test

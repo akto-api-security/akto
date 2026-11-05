@@ -1,6 +1,8 @@
 package com.akto.dao;
 
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
@@ -35,6 +37,8 @@ public class McpOAuthGrantsDao extends CommonContextDao<McpOAuthGrant> {
                 .name("expiresAt_ttl")
                 .expireAfter(0L, TimeUnit.SECONDS);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), ttlIndex, ttlOptions);
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                Indexes.ascending(McpOAuthGrant.TYPE, McpOAuthGrant.ACCOUNT_ID), new IndexOptions().name("type_1_accountId_1"));
     }
 
     public void insert(McpOAuthGrant grant) {
@@ -55,5 +59,18 @@ public class McpOAuthGrantsDao extends CommonContextDao<McpOAuthGrant> {
                 Filters.eq(McpOAuthGrant.ID, secretHash),
                 Filters.eq(McpOAuthGrant.TYPE, type),
                 Filters.gt(McpOAuthGrant.EXPIRES_AT, new Date())));
+    }
+
+    // Clients that hold a refresh token in this account
+    public List<String> refreshClientIds(int accountId) {
+        return getMCollection().distinct(McpOAuthGrant.CLIENT_ID, refreshFilter(accountId), String.class).into(new ArrayList<>());
+    }
+
+    public long deleteRefreshForClients(int accountId, List<String> clientIds) {
+        return getMCollection().deleteMany(Filters.and(refreshFilter(accountId), Filters.in(McpOAuthGrant.CLIENT_ID, clientIds))).getDeletedCount();
+    }
+
+    private static Bson refreshFilter(int accountId) {
+        return Filters.and(Filters.eq(McpOAuthGrant.TYPE, McpOAuthGrant.TYPE_REFRESH), Filters.eq(McpOAuthGrant.ACCOUNT_ID, accountId));
     }
 }

@@ -121,6 +121,7 @@ const PAGE_REQUIRES = {
     '/dashboard/settings/remote-commands': 'api/fetchEndpointRemoteCommandList',
     '/dashboard/settings/file-inspection': 'api/fetchFileInspectionRules',
     '/dashboard/settings/audit-logs': 'api/fetchApiAuditLogsFromDb',
+    '/dashboard/settings/mcp-clients': 'api/fetchAdminSettings',
     '/dashboard/settings/self-hosted': 'api/getCustomerStiggDetails',
     '/dashboard/settings/integrations/ci-cd': 'api/fetchApiTokens',
     '/dashboard/settings/integrations/akto_apis': 'api/fetchApiTokens',

@@ -110,6 +110,7 @@ public class McpOAuthUtils {
             "https://chatgpt.com/connector/oauth/*",
             "https://vscode.dev/redirect");
     // RFC 8252 7.1 private-use schemes (cursor://, vscode://, com.example.app:/); never schemes a browser would execute or read from disk
+    private static final Pattern ALLOWED_ENTRY = Pattern.compile("^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/[^\\s*?#]*\\*?$");
     private static final Pattern APP_SCHEME = Pattern.compile("^[a-z][a-z0-9+.-]*$");
     private static final List<String> BLOCKED_SCHEMES = Arrays.asList("javascript", "data", "vbscript", "file", "about", "blob", "filesystem", "view-source", "chrome", "chrome-extension", "moz-extension", "ftp", "ws", "wss");
     private static final Pattern PKCE_VERIFIER = Pattern.compile("^[A-Za-z0-9._~-]{43,128}$");
@@ -237,8 +238,12 @@ public class McpOAuthUtils {
         return parsed.getHost() != null ? parsed.getHost() : parsed.getScheme();
     }
 
-    // Loopback and app-scheme redirects stay on the user's device; https redirects must be on the known list
     public static boolean isKnownRedirect(String uri) {
+        return isKnownRedirect(uri, null);
+    }
+
+    // Loopback and app-scheme redirects stay on the user's device; https redirects must be on the built-in list or the admin's
+    public static boolean isKnownRedirect(String uri, List<String> adminAllowed) {
         URI parsed = parse(uri);
         if (parsed == null) {
             return false;
@@ -246,9 +251,18 @@ public class McpOAuthUtils {
         if (!"https".equalsIgnoreCase(parsed.getScheme())) {
             return true;
         }
-        for (String known : knownRedirectUris()) {
-            boolean prefix = known.endsWith("*");
-            if (prefix ? uri.startsWith(known.substring(0, known.length() - 1)) : uri.equals(known)) {
+        return matchesAny(uri, knownRedirectUris()) || (adminAllowed != null && matchesAny(uri, adminAllowed));
+    }
+
+    // An admin entry is https with a host and a path; a trailing * makes it a prefix
+    public static boolean isValidAllowedRedirectEntry(String entry) {
+        return entry != null && entry.length() <= MAX_REDIRECT_URI_LENGTH && ALLOWED_ENTRY.matcher(entry).matches();
+    }
+
+    private static boolean matchesAny(String uri, List<String> entries) {
+        for (String entry : entries) {
+            boolean prefix = entry.endsWith("*");
+            if (prefix ? uri.startsWith(entry.substring(0, entry.length() - 1)) : uri.equals(entry)) {
                 return true;
             }
         }

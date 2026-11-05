@@ -19,6 +19,7 @@ import com.akto.dto.McpOAuthClient;
 import com.akto.dto.McpOAuthGrant;
 import com.akto.dto.RBAC.Role;
 import com.akto.util.Constants;
+import com.akto.util.McpClientPolicy;
 import com.akto.util.McpOAuthUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
@@ -36,6 +37,7 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
     private static final String SESSION_API_KEY_UTILITY = "utility";
     private static final String INTERACTIVE_LOGIN_REQUIRED_MESSAGE = "Connections can only be approved from a signed-in Akto dashboard session.";
     private static final String NOT_STARTED_HERE_MESSAGE = "This connection was not started in this browser. Start it again from your MCP client.";
+    private static final String NOT_APPROVED_MESSAGE = "Your admin only allows approved MCP clients, and %s is not approved. Ask an admin to allow it.";
     private static final String CONFIRM_UNVERIFIED_MESSAGE = "Confirm that you trust this app to continue.";
     private static final String NO_PRODUCT_ACCESS_MESSAGE = "You don't have access to any Akto product in this account. Ask an admin for access.";
 
@@ -69,12 +71,17 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
             addActionError(NOT_STARTED_HERE_MESSAGE);
             return ERROR.toUpperCase();
         }
+        McpClientPolicy policy = McpClientPolicy.load();
+        if (policy.blocks(request.getRedirectUri())) {
+            addActionError(String.format(NOT_APPROVED_MESSAGE, McpOAuthUtils.redirectDisplayHost(request.getRedirectUri())));
+            return ERROR.toUpperCase();
+        }
         McpOAuthClient client = McpOAuthClientsDao.instance.findById(request.getClientId());
         clientName = client == null ? McpOAuthUtils.DEFAULT_CLIENT_NAME : client.getClientName();
         clientCreatedAt = client == null ? 0 : client.getCreatedAt();
         redirectUri = request.getRedirectUri();
         redirectHost = McpOAuthUtils.redirectDisplayHost(request.getRedirectUri());
-        unverifiedRedirect = !McpOAuthUtils.isKnownRedirect(request.getRedirectUri());
+        unverifiedRedirect = !policy.isKnown(request.getRedirectUri());
         int currentAccountId = Context.accountId.get();
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, currentAccountId));
         accountName = account == null ? String.valueOf(currentAccountId) : account.getName();
@@ -104,11 +111,18 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
             addActionError("You don't have access to this product in this account.");
             return ERROR.toUpperCase();
         }
-        // Unknown https hosts need an explicit confirmation; checked before the single-use request is spent
+        // The admin's policy and the unknown-host confirmation are checked before the single-use request is spent
         McpOAuthGrant pending = McpOAuthGrantsDao.instance.find(hashOfRequestId(), McpOAuthGrant.TYPE_REQUEST);
-        if (pending != null && !confirmUnverified && !McpOAuthUtils.isKnownRedirect(pending.getRedirectUri())) {
-            addActionError(CONFIRM_UNVERIFIED_MESSAGE);
-            return ERROR.toUpperCase();
+        if (pending != null) {
+            McpClientPolicy policy = McpClientPolicy.load();
+            if (policy.blocks(pending.getRedirectUri())) {
+                addActionError(String.format(NOT_APPROVED_MESSAGE, McpOAuthUtils.redirectDisplayHost(pending.getRedirectUri())));
+                return ERROR.toUpperCase();
+            }
+            if (!confirmUnverified && !policy.isKnown(pending.getRedirectUri())) {
+                addActionError(CONFIRM_UNVERIFIED_MESSAGE);
+                return ERROR.toUpperCase();
+            }
         }
         McpOAuthGrant request = consumeRequest();
         if (request == null) {

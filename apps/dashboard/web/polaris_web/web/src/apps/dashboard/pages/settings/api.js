@@ -1444,6 +1444,27 @@ const settingRequests = {
             method: 'post',
             data: { commandId }
         })
+    },
+    updateMcpKnownClientsOnly(mcpKnownClientsOnly) {
+        return request({
+            url: '/api/updateMcpKnownClientsOnly',
+            method: 'post',
+            data: { mcpKnownClientsOnly }
+        })
+    },
+    addMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/addMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
+        })
+    },
+    deleteMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/deleteMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
+        })
     }
 }
 

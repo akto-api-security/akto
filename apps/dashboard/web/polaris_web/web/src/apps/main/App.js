@@ -95,6 +95,7 @@ import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
 import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
+import McpClients from "../dashboard/pages/settings/mcp_clients/McpClients";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
@@ -703,6 +704,10 @@ const router = createBrowserRouter([
                     {
                         path: 'audit-logs',
                         element: <AuditLogs/>
+                    },
+                    {
+                        path: 'mcp-clients',
+                        element: <McpClients/>
                     },
                     {
                         path: 'undo-demerge-apis',

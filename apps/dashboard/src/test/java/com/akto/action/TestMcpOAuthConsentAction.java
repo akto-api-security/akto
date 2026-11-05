@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,10 +19,12 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
+import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.McpOAuthGrantsDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.McpOAuthGrant;
 import com.akto.dto.RBAC;
 import com.akto.dto.User;
@@ -29,6 +32,8 @@ import com.akto.dto.UserAccountEntry;
 import com.akto.util.McpOAuthUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.UpdateOptions;
+import com.mongodb.client.model.Updates;
 
 /* Consent approval: only interactive sessions can approve, and unknown redirect hosts need a confirmation. */
 public class TestMcpOAuthConsentAction extends MongoBasedTest {
@@ -44,6 +49,7 @@ public class TestMcpOAuthConsentAction extends MongoBasedTest {
         Context.accountId.set(ACCOUNT_ID);
         Context.contextSource.set(CONTEXT_SOURCE.API);
         McpOAuthGrantsDao.instance.getMCollection().drop();
+        AccountSettingsDao.instance.getMCollection().drop();
         UsersDao.instance.deleteAll(new BasicDBObject());
         RBACDao.instance.deleteAll(new BasicDBObject());
         Map<String, UserAccountEntry> accounts = new HashMap<>();
@@ -90,6 +96,14 @@ public class TestMcpOAuthConsentAction extends MongoBasedTest {
         return action(extraSession, requestWith(bindingCookie()));
     }
 
+    // The admin's MCP client settings for this account
+    private void setPolicy(boolean knownClientsOnly, String... allowedUris) {
+        AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(),
+                Updates.combine(Updates.set(AccountSettings.MCP_KNOWN_CLIENTS_ONLY, knownClientsOnly),
+                        Updates.set(AccountSettings.MCP_ALLOWED_REDIRECT_URIS, Arrays.asList(allowedUris))),
+                new UpdateOptions().upsert(true));
+    }
+
     private boolean requestStillParked() {
         return McpOAuthGrantsDao.instance.find(McpOAuthUtils.sha256Hex(REQUEST_SECRET), McpOAuthGrant.TYPE_REQUEST) != null;
     }
@@ -105,6 +119,49 @@ public class TestMcpOAuthConsentAction extends MongoBasedTest {
         String wrongValue = McpOAuthUtils.requestBindingCookieName(McpOAuthUtils.sha256Hex(REQUEST_SECRET));
         assertEquals("ERROR", action(new HashMap<>(), requestWith(new Cookie(wrongValue, "not-the-hash"))).approveAuthorizeRequest());
         assertTrue(requestStillParked());
+    }
+
+    @Test
+    public void knownClientsOnlyRefusesAnUnknownHostEvenWhenConfirmed() {
+        setPolicy(true);
+        parkRequest(UNKNOWN_REDIRECT);
+        McpOAuthConsentAction fetch = action(new HashMap<>());
+        assertEquals("ERROR", fetch.fetchAuthorizeRequest());
+        assertTrue(fetch.getActionErrors().iterator().next().contains("unknown.example.com"));
+
+        McpOAuthConsentAction approve = action(new HashMap<>());
+        approve.setConfirmUnverified(true);
+        assertEquals("ERROR", approve.approveAuthorizeRequest());
+        assertNull(approve.getRedirectUrl());
+        assertTrue(requestStillParked());
+    }
+
+    @Test
+    public void knownClientsOnlyStillApprovesKnownAndAdminAllowedClients() {
+        setPolicy(true, UNKNOWN_REDIRECT);
+        parkRequest(UNKNOWN_REDIRECT);
+        McpOAuthConsentAction fetch = action(new HashMap<>());
+        assertEquals("SUCCESS", fetch.fetchAuthorizeRequest());
+        assertFalse(fetch.isUnverifiedRedirect());
+        assertEquals("SUCCESS", action(new HashMap<>()).approveAuthorizeRequest());
+
+        parkRequest(KNOWN_REDIRECT);
+        assertEquals("SUCCESS", action(new HashMap<>()).approveAuthorizeRequest());
+    }
+
+    @Test
+    public void anAdminAllowedUriNeedsNoConfirmationWhenTheSettingIsOff() {
+        setPolicy(false, UNKNOWN_REDIRECT);
+        parkRequest(UNKNOWN_REDIRECT);
+        assertEquals("SUCCESS", action(new HashMap<>()).approveAuthorizeRequest());
+    }
+
+    @Test
+    public void denyStillWorksWhenTheClientIsBlocked() {
+        setPolicy(true);
+        parkRequest(UNKNOWN_REDIRECT);
+        assertEquals("SUCCESS", action(new HashMap<>()).denyAuthorizeRequest());
+        assertFalse(requestStillParked());
     }
 
     @Test
