@@ -66,6 +66,11 @@ public class SensitiveDataThresholdAlertsIT {
             CustomWebhooksDao.instance.getMCollection().drop();
             CustomWebhooksResultDao.instance.getMCollection().drop();
             ApiCollectionsDao.instance.getMCollection().drop();
+            // Only service-tag collections are alerted on, so ids the tests seed counts for need
+            // one. 3 is left out: one test covers counts whose collection has no doc.
+            collection(1, "svc-one");
+            collection(2, "svc-two");
+            for (int c = 100; c < 300; c++) collection(c, "svc-" + c);
         }
         Context.accountId.set(ACCOUNT);
         Files.write(Paths.get(receiverLog), new byte[0]);
@@ -107,8 +112,12 @@ public class SensitiveDataThresholdAlertsIT {
         SensitiveDataCountDao.instance.bulkInc(Collections.singletonList(new SensitiveDataCount(collection, type, hour, count)));
     }
 
-    private static void collection(int id, String name) {
-        ApiCollection c = new ApiCollection(id, name, now(), new HashSet<>(), name, 0, false, true);
+    /** A service-tag collection; its hostName is deliberately not the service name. */
+    private static void collection(int id, String serviceTag) {
+        ApiCollection c = new ApiCollection(id, serviceTag, now(), new HashSet<>(),
+                "host-" + id + ".example.com", 0, false, true);
+        c.setServiceTag(serviceTag);
+        ApiCollectionsDao.instance.getMCollection().deleteMany(Filters.eq("_id", id));
         ApiCollectionsDao.instance.insertOne(c);
     }
 
@@ -166,10 +175,10 @@ public class SensitiveDataThresholdAlertsIT {
 
         List<Map<String, Object>> got = received();
         assertEquals(1, got.size());
-        assertEquals(new HashSet<>(Arrays.asList("T|1|25", "T|3|21")), alertedPairs(got.get(0)));
+        // 3 has no collection doc, so no service tag, so it is not alerted on.
+        assertEquals(Collections.singleton("T|1|25"), alertedPairs(got.get(0)));
         String body = (String) got.get(0).get("body");
         assertTrue(body.contains("c-one"));
-        assertTrue("unknown collection falls back to its id: " + body, body.contains("\"apiCollectionName\":\"3\""));
     }
 
     @Test
@@ -311,5 +320,25 @@ public class SensitiveDataThresholdAlertsIT {
         assertEquals(1, got.size());
         assertEquals(200, alertedPairs(got.get(0)).size());
         assertEquals(200, alertedAt(26).size());
+    }
+
+    @Test
+    public void onlyServiceTagCollectionsAreAlertedOnAndAreNamedByTheTag() throws Exception {
+        collection(1, "payments");
+        ApiCollectionsDao.instance.getMCollection().deleteMany(Filters.eq("_id", 2));
+        ApiCollectionsDao.instance.insertOne(
+                new ApiCollection(2, null, now(), new HashSet<>(), "payments.example.com", 0, false, true));
+        counts(1, "T", 1, 3067);
+        counts(2, "T", 1, 1457);
+        webhook(27, "", true, rule("T", 500, 7));
+
+        SensitiveDataThresholdAlerts.run();
+
+        List<Map<String, Object>> got = received();
+        assertEquals(1, got.size());
+        assertEquals(Collections.singleton("T|1|3067"), alertedPairs(got.get(0)));
+        String body = (String) got.get(0).get("body");
+        assertTrue(body, body.contains("\"apiCollectionName\":\"payments\""));
+        assertTrue("names the service, not its host: " + body, !body.contains("host-1.example.com"));
     }
 }

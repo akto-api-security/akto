@@ -131,9 +131,18 @@ public class SensitiveDataThresholdAlerts {
                 webhook.getSensitiveDataAlertedAt(), now, SensitiveDataCountDao.instance::countsByCollectionAbove);
         if (breaches.isEmpty()) return;
 
+        // Only collections with a service tag are alerted on.
+        Map<Integer, String> names = collectionNames(breaches);
+        List<Breach> tagged = new ArrayList<>();
+        for (Breach b : breaches) {
+            if (names.containsKey(b.apiCollectionId)) tagged.add(b);
+        }
+        if (tagged.isEmpty()) return;
+        breaches = tagged;
+
         List<String> errors = new ArrayList<>();
         OriginalHttpResponse response = WebhookSender.sendCustomWebhook(webhook,
-                buildPayload(breaches, collectionNames(breaches)), errors, now, LogDb.DASHBOARD);
+                buildPayload(breaches, names), errors, now, LogDb.DASHBOARD);
         int status = response == null ? 0 : response.getStatusCode();
         if (status < 200 || status >= 300) {
             // Not marked as alerted, so the next run tries again.
@@ -181,9 +190,8 @@ public class SensitiveDataThresholdAlerts {
         Map<Integer, String> names = new HashMap<>();
         try {
             for (ApiCollection c : ApiCollectionsDao.instance.getMetaForIds(ids)) {
-                String name = c.getDisplayName();
-                if (name == null || name.isEmpty()) name = c.getHostName();
-                if (name != null) names.put(c.getId(), name);
+                String tag = c.getServiceTag();
+                if (tag != null && !tag.trim().isEmpty()) names.put(c.getId(), tag.trim());
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "could not load collection names for sensitive data alert");
