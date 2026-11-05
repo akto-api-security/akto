@@ -8,11 +8,11 @@ const mcpOAuthRequests = {
             data: { requestId }
         })
     },
-    approveAuthorizeRequest(requestId, contextSource) {
+    approveAuthorizeRequest(requestId, contextSource, confirmUnverified) {
         return request({
             url: '/api/mcpOAuth/approveAuthorizeRequest',
             method: 'post',
-            data: { requestId, contextSource }
+            data: { requestId, contextSource, confirmUnverified }
         })
     },
     denyAuthorizeRequest(requestId) {

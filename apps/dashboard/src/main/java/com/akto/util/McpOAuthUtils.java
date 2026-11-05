@@ -5,12 +5,15 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 import com.akto.dto.McpOAuthGrant;
@@ -36,8 +39,15 @@ public class McpOAuthUtils {
     // Must match the context sources the dashboard sends as x-context-source
     public static final List<String> CONTEXT_SOURCES = Arrays.asList("API", "AGENTIC", "DAST", "ENDPOINT");
 
+    // Comma-separated override of the redirect hosts shown without an "unverified app" warning
+    public static final String KNOWN_REDIRECT_HOSTS_ENV = "MCP_OAUTH_KNOWN_REDIRECT_HOSTS";
+
     private static final int MAX_REDIRECT_URI_LENGTH = 2048;
     private static final List<String> LOOPBACK_HOSTS = Arrays.asList("localhost", "127.0.0.1", "[::1]");
+    private static final List<String> DEFAULT_KNOWN_REDIRECT_HOSTS = Arrays.asList("claude.ai", "claude.com", "chatgpt.com", "vscode.dev", "cursor.com");
+    // RFC 8252 7.1 private-use schemes (cursor://, vscode://, com.example.app:/); never schemes a browser would execute or read from disk
+    private static final Pattern APP_SCHEME = Pattern.compile("^[a-z][a-z0-9+.-]*$");
+    private static final List<String> BLOCKED_SCHEMES = Arrays.asList("javascript", "data", "vbscript", "file", "about", "blob", "filesystem", "view-source", "chrome", "chrome-extension", "moz-extension", "ftp", "ws", "wss");
     private static final Pattern PKCE_VERIFIER = Pattern.compile("^[A-Za-z0-9._~-]{43,128}$");
     private static final Pattern PKCE_CHALLENGE = Pattern.compile("^[A-Za-z0-9_-]{43,128}$");
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -121,23 +131,93 @@ public class McpOAuthUtils {
         }
     }
 
-    // https, or http only for loopback (native/CLI clients); no fragments
+    // https, http on loopback, or an app scheme (RFC 8252); no fragments
     public static boolean isAllowedRedirectUri(String uri) {
-        if (uri == null || uri.isEmpty() || uri.length() > MAX_REDIRECT_URI_LENGTH) {
+        URI parsed = parse(uri);
+        if (parsed == null || !parsed.isAbsolute() || parsed.getFragment() != null) {
             return false;
         }
-        try {
-            URI parsed = new URI(uri);
-            if (!parsed.isAbsolute() || parsed.getFragment() != null || parsed.getHost() == null) {
-                return false;
-            }
-            if ("https".equalsIgnoreCase(parsed.getScheme())) {
+        String scheme = parsed.getScheme().toLowerCase(Locale.ROOT);
+        if ("https".equals(scheme)) {
+            return parsed.getHost() != null;
+        }
+        if ("http".equals(scheme)) {
+            return isLoopback(parsed);
+        }
+        return APP_SCHEME.matcher(scheme).matches() && !BLOCKED_SCHEMES.contains(scheme) && (scheme.contains(".") || parsed.getHost() != null);
+    }
+
+    // Exact match, except loopback redirects where the client picks a free port per run (RFC 8252 7.3)
+    public static boolean redirectUriMatches(String requested, String registered) {
+        if (requested == null || registered == null) {
+            return false;
+        }
+        if (requested.equals(registered)) {
+            return true;
+        }
+        URI a = parse(requested);
+        URI b = parse(registered);
+        return a != null && b != null && isLoopback(a) && isLoopback(b)
+                && a.getScheme().equalsIgnoreCase(b.getScheme())
+                && a.getHost().equalsIgnoreCase(b.getHost())
+                && Objects.equals(a.getRawPath(), b.getRawPath())
+                && Objects.equals(a.getRawQuery(), b.getRawQuery());
+    }
+
+    // What the consent page shows as the destination: the host, or the scheme for host-less app URIs
+    public static String redirectDisplayHost(String uri) {
+        URI parsed = parse(uri);
+        if (parsed == null) {
+            return "";
+        }
+        return parsed.getHost() != null ? parsed.getHost() : parsed.getScheme();
+    }
+
+    // Loopback and app-scheme redirects stay on the user's device; https hosts must be known
+    public static boolean isKnownRedirect(String uri) {
+        URI parsed = parse(uri);
+        if (parsed == null) {
+            return false;
+        }
+        if (!"https".equalsIgnoreCase(parsed.getScheme())) {
+            return true;
+        }
+        String host = parsed.getHost() == null ? "" : parsed.getHost().toLowerCase(Locale.ROOT);
+        for (String known : knownRedirectHosts()) {
+            if (host.equals(known) || host.endsWith("." + known)) {
                 return true;
             }
-            return "http".equalsIgnoreCase(parsed.getScheme()) && LOOPBACK_HOSTS.contains(parsed.getHost().toLowerCase());
-        } catch (Exception e) {
-            return false;
         }
+        return false;
+    }
+
+    private static List<String> knownRedirectHosts() {
+        String configured = System.getenv(KNOWN_REDIRECT_HOSTS_ENV);
+        if (configured == null || configured.trim().isEmpty()) {
+            return DEFAULT_KNOWN_REDIRECT_HOSTS;
+        }
+        List<String> hosts = new ArrayList<>();
+        for (String host : configured.split(",")) {
+            if (!host.trim().isEmpty()) {
+                hosts.add(host.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        return hosts;
+    }
+
+    private static URI parse(String uri) {
+        if (uri == null || uri.isEmpty() || uri.length() > MAX_REDIRECT_URI_LENGTH) {
+            return null;
+        }
+        try {
+            return new URI(uri);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean isLoopback(URI uri) {
+        return "http".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null && LOOPBACK_HOSTS.contains(uri.getHost().toLowerCase(Locale.ROOT));
     }
 
     public static String withParams(String redirectUri, Map<String, String> params) {

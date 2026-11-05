@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +29,7 @@ public class McpOAuthConsentAction extends UserAction {
     private static final String ACCESS_DENIED = "access_denied";
     private static final String SESSION_API_KEY_UTILITY = "utility";
     private static final String INTERACTIVE_LOGIN_REQUIRED_MESSAGE = "Connections can only be approved from a signed-in Akto dashboard session.";
+    private static final String CONFIRM_UNVERIFIED_MESSAGE = "Confirm that you trust this app to continue.";
     private static final String NO_PRODUCT_ACCESS_MESSAGE = "You don't have access to any Akto product in this account. Ask an admin for access.";
 
     // Request params; the fields below are response-only
@@ -37,6 +37,8 @@ public class McpOAuthConsentAction extends UserAction {
     private String requestId;
     @Setter
     private String contextSource;
+    @Setter
+    private boolean confirmUnverified;
 
     private String clientName;
     private String redirectHost;
@@ -44,6 +46,7 @@ public class McpOAuthConsentAction extends UserAction {
     private String userLogin;
     private String redirectUrl;
     private List<String> allowedContexts;
+    private boolean unverifiedRedirect;
 
     public String fetchAuthorizeRequest() {
         McpOAuthGrant request = McpOAuthGrantsDao.instance.find(hashOfRequestId(), McpOAuthGrant.TYPE_REQUEST);
@@ -52,7 +55,8 @@ public class McpOAuthConsentAction extends UserAction {
         }
         McpOAuthClient client = McpOAuthClientsDao.instance.findById(request.getClientId());
         clientName = client == null ? McpOAuthUtils.DEFAULT_CLIENT_NAME : client.getClientName();
-        redirectHost = URI.create(request.getRedirectUri()).getHost();
+        redirectHost = McpOAuthUtils.redirectDisplayHost(request.getRedirectUri());
+        unverifiedRedirect = !McpOAuthUtils.isKnownRedirect(request.getRedirectUri());
         int currentAccountId = Context.accountId.get();
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, currentAccountId));
         accountName = account == null ? String.valueOf(currentAccountId) : account.getName();
@@ -76,6 +80,12 @@ public class McpOAuthConsentAction extends UserAction {
         String chosenContext = contextSource == null ? Context.contextSource.get().name() : contextSource.toUpperCase();
         if (!accessibleContexts().contains(chosenContext)) {
             addActionError("You don't have access to this product in this account.");
+            return ERROR.toUpperCase();
+        }
+        // Unknown https hosts need an explicit confirmation; checked before the single-use request is spent
+        McpOAuthGrant pending = McpOAuthGrantsDao.instance.find(hashOfRequestId(), McpOAuthGrant.TYPE_REQUEST);
+        if (pending != null && !confirmUnverified && !McpOAuthUtils.isKnownRedirect(pending.getRedirectUri())) {
+            addActionError(CONFIRM_UNVERIFIED_MESSAGE);
             return ERROR.toUpperCase();
         }
         McpOAuthGrant request = consumeRequest();
@@ -110,8 +120,9 @@ public class McpOAuthConsentAction extends UserAction {
 
     private boolean isInteractiveSession() {
         Map<String, Object> session = getSession();
-        return session == null
-                || (!Boolean.TRUE.equals(session.get(McpOAuthUtils.SESSION_MCP_TOKEN_AUTH)) && session.get(SESSION_API_KEY_UTILITY) == null);
+        return session != null
+                && !Boolean.TRUE.equals(session.get(McpOAuthUtils.SESSION_MCP_TOKEN_AUTH))
+                && session.get(SESSION_API_KEY_UTILITY) == null;
     }
 
     // Products where the user has a role in this account

@@ -165,6 +165,11 @@ public class UserDetailsFilter implements Filter {
                         httpServletResponse.sendError(403);
                         return;
                     }
+                    // OAuth tokens (client_id claim) get the same endpoint blocklist as API keys
+                    if(claims.getBody().get("client_id") != null && endPointBlockedForApiToken(httpServletRequest.getRequestURI())) {
+                        httpServletResponse.sendError(403);
+                        return;
+                    }
                     session.setAttribute("user", user);
                     session.setAttribute(McpOAuthUtils.SESSION_MCP_TOKEN_AUTH, Boolean.TRUE);
                     session.setAttribute("accountId", accountId);

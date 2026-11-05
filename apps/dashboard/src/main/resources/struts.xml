@@ -18913,7 +18913,7 @@
             <interceptor-ref name="defaultStack" />
 
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*</param>
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*,unverifiedRedirect</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -18927,7 +18927,7 @@
             <interceptor-ref name="defaultStack" />
 
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*</param>
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*,unverifiedRedirect</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -18941,7 +18941,7 @@
             <interceptor-ref name="defaultStack" />
 
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*</param>
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*,unverifiedRedirect</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

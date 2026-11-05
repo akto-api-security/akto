@@ -1,15 +1,11 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Avatar, Banner, Box, Button, Divider, HorizontalStack, LegacyCard, Page, Spinner, Text, VerticalStack } from "@shopify/polaris"
+import { Avatar, Banner, Box, Button, Checkbox, Divider, HorizontalStack, LegacyCard, Page, Spinner, Text, VerticalStack } from "@shopify/polaris"
 import DropdownSearch from "../../components/shared/DropdownSearch"
+import { PRODUCT_LABELS } from "../../components/shared/productLabels"
 import mcpOAuthRequests from "./api"
 
-const CONTEXT_OPTIONS = [
-    { label: "API Security", value: "API" },
-    { label: "Akto ARGUS", value: "AGENTIC" },
-    { label: "Akto ATLAS", value: "ENDPOINT" },
-    { label: "DAST", value: "DAST" },
-]
+const CONTEXT_OPTIONS = Object.entries(PRODUCT_LABELS).map(([value, label]) => ({ label, value }))
 
 const EXPIRED_MESSAGE = "This authorization request is invalid or has expired. Start the connection again from your MCP client."
 
@@ -33,6 +29,7 @@ function McpOAuthConsent() {
     const [error, setError] = useState(requestId ? "" : EXPIRED_MESSAGE)
     const [loading, setLoading] = useState(!!requestId)
     const [pendingAction, setPendingAction] = useState(null)
+    const [confirmUnverified, setConfirmUnverified] = useState(false)
     const submitting = pendingAction !== null
 
     // Hide the Intercom launcher on this screen
@@ -72,7 +69,7 @@ function McpOAuthConsent() {
             return <Box padding="8"><HorizontalStack align="center"><Spinner size="large" accessibilityLabel="Loading connection request" /></HorizontalStack></Box>
         }
         if (error || !info) {
-            return <Banner tone="critical" title="Unable to continue">{error || EXPIRED_MESSAGE}</Banner>
+            return <Banner status="critical" title="Unable to continue">{error || EXPIRED_MESSAGE}</Banner>
         }
         // Only products the user has a role in (re-checked on approve)
         const allowedOptions = CONTEXT_OPTIONS.filter((option) => info.allowedContexts?.includes(option.value))
@@ -87,6 +84,16 @@ function McpOAuthConsent() {
                         </Text>
                     </VerticalStack>
                 </LegacyCard.Section>
+                {info.unverifiedRedirect ? (
+                    <LegacyCard.Section>
+                        <VerticalStack gap="3">
+                            <Banner status="warning" title="Unverified app">
+                                Access will be sent to {info.redirectHost}, which Akto does not recognize. Only continue if you trust it.
+                            </Banner>
+                            <Checkbox label={`I trust ${info.redirectHost}`} checked={confirmUnverified} onChange={setConfirmUnverified} />
+                        </VerticalStack>
+                    </LegacyCard.Section>
+                ) : null}
                 <LegacyCard.Section>
                     <VerticalStack gap="3">
                         <DetailRow label="Signed in as" value={info.userLogin} />
@@ -125,7 +132,7 @@ function McpOAuthConsent() {
                                 <Button fullWidth disabled={submitting && pendingAction !== "deny"} loading={pendingAction === "deny"} onClick={() => submit("deny", () => mcpOAuthRequests.denyAuthorizeRequest(requestId))}>Deny</Button>
                             </Box>
                             <Box width="100%">
-                                <Button fullWidth primary disabled={submitting && pendingAction !== "allow"} loading={pendingAction === "allow"} onClick={() => submit("allow", () => mcpOAuthRequests.approveAuthorizeRequest(requestId, contextSource))}>Allow access</Button>
+                                <Button fullWidth primary disabled={(submitting && pendingAction !== "allow") || (info.unverifiedRedirect && !confirmUnverified)} loading={pendingAction === "allow"} onClick={() => submit("allow", () => mcpOAuthRequests.approveAuthorizeRequest(requestId, contextSource, confirmUnverified))}>Allow access</Button>
                             </Box>
                         </HorizontalStack>
                         <Text as="p" variant="bodySm" color="subdued" alignment="center">

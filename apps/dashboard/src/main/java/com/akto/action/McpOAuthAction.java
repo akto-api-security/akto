@@ -24,6 +24,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.McpOAuthClient;
 import com.akto.dto.McpOAuthGrant;
 import com.akto.dto.User;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.McpOAuthUtils;
 import com.akto.util.McpTokenGenerator;
 import com.mongodb.BasicDBList;
@@ -32,6 +34,8 @@ import com.opensymphony.xwork2.Action;
 
 // Public OAuth 2.1 endpoints (register / authorize / token) used by MCP clients such as Claude
 public class McpOAuthAction implements Action, ServletRequestAware, ServletResponseAware {
+
+    private static final LoggerMaker logger = new LoggerMaker(McpOAuthAction.class, LogDb.DASHBOARD);
 
     private static final String CONSENT_PATH = "/dashboard/mcp-oauth/consent?request_id=";
     private static final String GRANT_AUTH_CODE = "authorization_code";
@@ -49,6 +53,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
     private static final String INVALID_TARGET = "invalid_target";
     private static final String INVALID_CLIENT_METADATA = "invalid_client_metadata";
     private static final String INVALID_REDIRECT_URI = "invalid_redirect_uri";
+    private static final String SERVER_ERROR = "server_error";
     private static final int SECONDS_PER_DAY = 24 * 60 * 60;
 
     private HttpServletRequest servletRequest;
@@ -59,32 +64,63 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         return SUCCESS;
     }
 
+    @FunctionalInterface
+    private interface Handler {
+        void run() throws Exception;
+    }
+
+    // Test seam for the MCP_PUBLIC_URL environment variable
+    protected String configuredResource() {
+        return McpOAuthUtils.configuredResource();
+    }
+
+    // The endpoints exist only when the MCP server URL is configured; unexpected failures answer in OAuth JSON
+    private String handle(Handler handler) throws IOException {
+        if (configuredResource() == null) {
+            servletResponse.sendError(404);
+            return null;
+        }
+        try {
+            handler.run();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "MCP OAuth request failed");
+            if (!servletResponse.isCommitted()) {
+                writeError(500, SERVER_ERROR, "Unable to process the request");
+            }
+        }
+        return null;
+    }
+
     // POST /oauth/register (RFC 7591), public clients only
     public String register() throws IOException {
+        return handle(this::doRegister);
+    }
+
+    private void doRegister() throws IOException {
         if (!isPost()) {
             rejectNonPost();
-            return null;
+            return;
         }
         BasicDBObject body = parseRegistrationBody();
         if (body == null) {
             writeError(400, INVALID_CLIENT_METADATA, "Body must be a JSON object of at most " + McpOAuthUtils.MAX_REGISTER_BODY_CHARS + " characters");
-            return null;
+            return;
         }
 
         List<String> redirectUris = toStringList(body.get(PARAM_REDIRECT_URIS));
         if (redirectUris == null || redirectUris.isEmpty() || redirectUris.size() > McpOAuthUtils.MAX_REDIRECT_URIS) {
             writeError(400, INVALID_REDIRECT_URI, "redirect_uris must be a non-empty list of at most " + McpOAuthUtils.MAX_REDIRECT_URIS);
-            return null;
+            return;
         }
         for (String uri : redirectUris) {
             if (!McpOAuthUtils.isAllowedRedirectUri(uri)) {
-                writeError(400, INVALID_REDIRECT_URI, "redirect_uris must be https, or http on loopback");
-                return null;
+                writeError(400, INVALID_REDIRECT_URI, "redirect_uris must be https, http on loopback, or a reverse-domain app scheme");
+                return;
             }
         }
         if (!isSubset(body.get("grant_types"), GRANT_AUTH_CODE, GRANT_REFRESH) || !isSubset(body.get("response_types"), RESPONSE_TYPE_CODE)) {
             writeError(400, INVALID_CLIENT_METADATA, "Only the authorization_code and refresh_token grants with response type code are supported");
-            return null;
+            return;
         }
 
         int now = Context.now();
@@ -103,20 +139,24 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
                 .append("grant_types", grantTypes)
                 .append("response_types", responseTypes)
                 .append("token_endpoint_auth_method", "none"));
-        return null;
+        return;
     }
 
     // GET /oauth/authorize: parks the request and sends the user to consent
     public String authorize() throws IOException {
+        return handle(this::doAuthorize);
+    }
+
+    private void doAuthorize() throws IOException {
         McpOAuthClient client = McpOAuthClientsDao.instance.findById(param(PARAM_CLIENT_ID));
         String redirectUri = param(PARAM_REDIRECT_URI);
         if (redirectUri == null && client != null && client.getRedirectUris().size() == 1) {
             redirectUri = client.getRedirectUris().get(0);
         }
         // Never redirect to an unverified URI
-        if (client == null || redirectUri == null || !client.getRedirectUris().contains(redirectUri)) {
+        if (client == null || redirectUri == null || !matchesRegistered(client, redirectUri)) {
             servletResponse.sendError(400, "Unknown client or redirect_uri");
-            return null;
+            return;
         }
 
         String state = param("state");
@@ -125,20 +165,20 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         // An oversized state is not echoed back
         if (McpOAuthUtils.exceedsParamLimit(state) || McpOAuthUtils.exceedsParamLimit(resource)) {
             redirectWithError(redirectUri, INVALID_REQUEST, null);
-            return null;
+            return;
         }
         if (!RESPONSE_TYPE_CODE.equals(param("response_type"))) {
             redirectWithError(redirectUri, "unsupported_response_type", state);
-            return null;
+            return;
         }
         if (!McpOAuthUtils.isValidCodeChallenge(codeChallenge) || !CHALLENGE_METHOD_S256.equals(param("code_challenge_method"))) {
             redirectWithError(redirectUri, INVALID_REQUEST, state);
-            return null;
+            return;
         }
-        String configuredResource = McpOAuthUtils.configuredResource();
+        String configuredResource = configuredResource();
         if (!McpOAuthUtils.isResourceAllowed(resource, configuredResource)) {
             redirectWithError(redirectUri, INVALID_TARGET, state);
-            return null;
+            return;
         }
 
         McpOAuthClientsDao.instance.touch(client.getId());
@@ -153,20 +193,24 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         McpOAuthGrantsDao.instance.insert(request);
 
         servletResponse.sendRedirect(CONSENT_PATH + URLEncoder.encode(requestSecret, StandardCharsets.UTF_8));
-        return null;
+        return;
     }
 
     // POST /oauth/token: authorization_code and refresh_token grants
     public String token() throws IOException {
+        return handle(this::doToken);
+    }
+
+    private void doToken() throws IOException {
         if (!isPost()) {
             rejectNonPost();
-            return null;
+            return;
         }
         String grantType = param("grant_type");
         String clientId = param(PARAM_CLIENT_ID);
         if (clientId == null) {
             writeError(400, INVALID_REQUEST, "client_id is required");
-            return null;
+            return;
         }
 
         McpOAuthGrant grant;
@@ -176,34 +220,34 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
             grant = checkRefreshToken(clientId);
         } else {
             writeError(400, "unsupported_grant_type", "Only authorization_code and refresh_token are supported");
-            return null;
+            return;
         }
         if (grant == null) {
-            return null;
+            return;
         }
 
         // Removing a user from the account cuts them off at the next refresh
         User user = UsersDao.instance.findOne("login", grant.getUsername());
         if (user == null || user.getAccounts() == null || !user.getAccounts().containsKey(String.valueOf(grant.getAccountId()))) {
             writeError(400, INVALID_GRANT, "User no longer has access to this account");
-            return null;
+            return;
         }
         String accessToken = McpTokenGenerator.generateOAuthToken(
                 grant.getUsername(), grant.getAccountId(), grant.getContextSource(), grant.getResource(), clientId);
         if (accessToken == null) {
-            writeError(500, "server_error", "Unable to issue token");
-            return null;
+            writeError(500, SERVER_ERROR, "Unable to issue token");
+            return;
         }
         // The refresh token is spent last and atomically, so concurrent refreshes yield one winner
         if (GRANT_REFRESH.equals(grantType)
                 && McpOAuthGrantsDao.instance.consume(McpOAuthUtils.sha256Hex(param(PARAM_REFRESH_TOKEN)), McpOAuthGrant.TYPE_REFRESH) == null) {
             writeError(400, INVALID_GRANT, "Invalid or expired refresh token");
-            return null;
+            return;
         }
         // Keeps a client that is still refreshing from expiring as unused
         McpOAuthClientsDao.instance.touch(clientId);
         respondWithTokens(grant, clientId, accessToken);
-        return null;
+        return;
     }
 
     // Consumed before checking, so a failed attempt burns the code
@@ -294,6 +338,15 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
             return McpOAuthUtils.DEFAULT_CLIENT_NAME;
         }
         return clientName.length() > McpOAuthUtils.MAX_CLIENT_NAME ? clientName.substring(0, McpOAuthUtils.MAX_CLIENT_NAME) : clientName;
+    }
+
+    private static boolean matchesRegistered(McpOAuthClient client, String redirectUri) {
+        for (String registered : client.getRedirectUris()) {
+            if (McpOAuthUtils.redirectUriMatches(redirectUri, registered)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isPost() {

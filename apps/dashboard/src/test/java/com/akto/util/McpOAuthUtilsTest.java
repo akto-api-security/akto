@@ -110,7 +110,7 @@ public class McpOAuthUtilsTest {
         assertTrue(McpOAuthUtils.isAllowedRedirectUri("http://[::1]:8080/cb"));
         assertTrue(McpOAuthUtils.isAllowedRedirectUri("HTTPS://example.com/cb"));
         assertFalse(McpOAuthUtils.isAllowedRedirectUri("http://localhost.evil.example.com/cb"));
-        assertFalse(McpOAuthUtils.isAllowedRedirectUri("custom-scheme://callback"));
+        assertTrue(McpOAuthUtils.isAllowedRedirectUri("custom-scheme://callback"));
     }
 
     @Test
@@ -118,5 +118,51 @@ public class McpOAuthUtilsTest {
         assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", McpOAuthUtils.sha256Hex("abc"));
         // 32 random bytes as unpadded base64url
         assertEquals(43, McpOAuthUtils.newSecret().length());
+    }
+
+    @Test
+    public void appSchemesAreAcceptedAndBrowserExecutableSchemesStayBlocked() {
+        assertTrue(McpOAuthUtils.isAllowedRedirectUri("cursor://anysphere.cursor-mcp/oauth/callback"));
+        assertTrue(McpOAuthUtils.isAllowedRedirectUri("vscode://vscode.github-authentication/did-authenticate"));
+        assertTrue(McpOAuthUtils.isAllowedRedirectUri("com.example.app:/oauth2redirect"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("data:text/html,x"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("file:///etc/passwd"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("vbscript:x"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("blob:https://example.com/id"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("about:blank"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("opaque:payload"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("com.example.app://cb#frag"));
+        assertFalse(McpOAuthUtils.isAllowedRedirectUri("https:///no-host"));
+    }
+
+    @Test
+    public void loopbackRedirectsMatchOnAnyPortButOthersMatchExactly() {
+        assertTrue(McpOAuthUtils.redirectUriMatches("http://localhost:54331/callback", "http://localhost:3118/callback"));
+        assertTrue(McpOAuthUtils.redirectUriMatches("http://127.0.0.1:9/cb?x=1", "http://127.0.0.1:8/cb?x=1"));
+        assertTrue(McpOAuthUtils.redirectUriMatches("http://[::1]:9/cb", "http://[::1]/cb"));
+        assertFalse(McpOAuthUtils.redirectUriMatches("http://localhost:9/other", "http://localhost:8/cb"));
+        assertFalse(McpOAuthUtils.redirectUriMatches("http://127.0.0.1:9/cb", "http://localhost:9/cb"));
+        assertFalse(McpOAuthUtils.redirectUriMatches("https://example.com:444/cb", "https://example.com/cb"));
+        assertTrue(McpOAuthUtils.redirectUriMatches("https://claude.ai/api/mcp/auth_callback", "https://claude.ai/api/mcp/auth_callback"));
+        assertFalse(McpOAuthUtils.redirectUriMatches(null, "https://claude.ai/cb"));
+    }
+
+    @Test
+    public void knownRedirectsSkipTheUnverifiedWarning() {
+        assertTrue(McpOAuthUtils.isKnownRedirect("https://claude.ai/api/mcp/auth_callback"));
+        assertTrue(McpOAuthUtils.isKnownRedirect("https://app.cursor.com/cb"));
+        assertTrue(McpOAuthUtils.isKnownRedirect("http://localhost:6274/cb"));
+        assertTrue(McpOAuthUtils.isKnownRedirect("cursor://anysphere.cursor-mcp/oauth/callback"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://attacker.example.com/cb"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://claude.ai.attacker.example.com/cb"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://notclaude.ai/cb"));
+    }
+
+    @Test
+    public void consentShowsHostOrSchemeForHostlessUris() {
+        assertEquals("claude.ai", McpOAuthUtils.redirectDisplayHost("https://claude.ai/cb"));
+        assertEquals("localhost", McpOAuthUtils.redirectDisplayHost("http://localhost:1/cb"));
+        assertEquals("com.example.app", McpOAuthUtils.redirectDisplayHost("com.example.app:/oauth2redirect"));
+        assertEquals("", McpOAuthUtils.redirectDisplayHost(null));
     }
 }

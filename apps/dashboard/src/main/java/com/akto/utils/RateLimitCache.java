@@ -21,10 +21,11 @@ public class RateLimitCache {
         cacheMap.put(CACHE_TYPE.ANONYMOUS_LOGIN, new ConcurrentHashMap<>());
         cacheMap.put(CACHE_TYPE.ORG_STIGG_DETAILS, new ConcurrentHashMap<>());
         cacheMap.put(CACHE_TYPE.PASSWORD_RESET, new ConcurrentHashMap<>());
+        cacheMap.put(CACHE_TYPE.MCP_OAUTH, new ConcurrentHashMap<>());
     }
 
     public enum CACHE_TYPE {
-        SIGN_IN, SEND_EMAIL, ANONYMOUS_LOGIN, ORG_STIGG_DETAILS, PASSWORD_RESET
+        SIGN_IN, SEND_EMAIL, ANONYMOUS_LOGIN, ORG_STIGG_DETAILS, PASSWORD_RESET, MCP_OAUTH
     }
     public static class IpInfo {
         public Bucket bucket;
