@@ -276,7 +276,7 @@ public class DbLayer {
         updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
         updateList.add(Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
+        updateList.add(expiresAtUpdate(moduleInfo.getModuleType()));
         // lastHeartbeatReceived is a primitive int, so a payload that omits it arrives as 0 —
         // skip the update in that case instead of wiping the stored timestamp.
         if (moduleInfo.getLastHeartbeatReceived() != 0) {
@@ -334,6 +334,13 @@ public class DbLayer {
     private static final String ORGANIZATION_TYPE_KEY = "organizationType";
     // Agents that predate organizationType report the same plan string as accountType.
     private static final String ACCOUNT_TYPE_KEY = "accountType";
+
+    private static Bson expiresAtUpdate(ModuleInfo.ModuleType moduleType) {
+        if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
+            return Updates.unset(ModuleInfo.EXPIRES_AT);
+        }
+        return Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS));
+    }
 
     private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null) {
@@ -589,7 +596,7 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
-                    Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)),
+                    expiresAtUpdate(moduleInfo.getModuleType()),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
