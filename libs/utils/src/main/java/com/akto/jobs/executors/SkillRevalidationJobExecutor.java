@@ -188,6 +188,8 @@ public class SkillRevalidationJobExecutor extends JobExecutor<SkillRevalidationJ
         BasicDBList tagLabels = (BasicDBList) result.get("tagLabels");
         BasicDBObject verdict = (BasicDBObject) result.get("verdict");
         boolean malicious = verdict != null && verdict.getBoolean("isMalicious", false);
+        // 0-5, already banded by cyborg to the verdict and tags; absent from a cyborg that predates it
+        Float riskScore = result.get("riskScore") instanceof Number ? ((Number) result.get("riskScore")).floatValue() : null;
 
         // the latest sample, carrying the new evidence, becomes the only one so the dashboard reads it
         body.put("skill_annotations", result.get("annotations"));
@@ -210,14 +212,17 @@ public class SkillRevalidationJobExecutor extends JobExecutor<SkillRevalidationJ
             throw new Exception("its stored sample could not be updated");
         }
 
-        replaceTags(skill, labels, malicious);
+        replaceTags(skill, labels, malicious, riskScore);
         logger.infoAndAddToDb("Skill revalidated " + skill.getId().getUrl() + " in collection " + skill.getId().getApiCollectionId()
-            + ": malicious=" + malicious + " tags=" + labels);
+            + ": malicious=" + malicious + " riskScore=" + riskScore + " tags=" + labels);
         return true;
     }
 
-    /** The old skill-tags (but not the agent's version= ones) and malicious flag give way to the new ones. */
-    private static void replaceTags(SampleData skill, List<String> labels, boolean malicious) {
+    /**
+     * The old skill-tags (but not the agent's version= ones) and malicious flag give way to the new ones,
+     * and the risk score cyborg gave the skill becomes the endpoint's.
+     */
+    private static void replaceTags(SampleData skill, List<String> labels, boolean malicious, Float riskScore) {
         Bson filter = Filters.and(
             Filters.eq(ApiInfo.ID_API_COLLECTION_ID, skill.getId().getApiCollectionId()),
             Filters.eq(ApiInfo.ID_URL, skill.getId().getUrl()),
@@ -244,6 +249,7 @@ public class SkillRevalidationJobExecutor extends JobExecutor<SkillRevalidationJ
         if (!newTags.isEmpty()) updates.add(Updates.addEachToSet(API_INFO_TAGS_LIST, newTags));
         // the threat score comes from the malicious verdict; the threat sync sets it again for a malicious skill
         if (!malicious) updates.add(Updates.set(ApiInfo.THREAT_SCORE, 0f));
+        if (riskScore != null) updates.add(Updates.set(ApiInfo.RISK_SCORE, riskScore));
         if (!updates.isEmpty()) ApiInfoDao.instance.updateManyNoUpsert(filter, Updates.combine(updates));
     }
 
