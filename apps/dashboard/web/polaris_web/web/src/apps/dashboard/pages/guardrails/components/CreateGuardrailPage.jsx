@@ -67,9 +67,8 @@ import {
 } from './steps';
 import {
     PREDEFINED_CUSTOM_PROMPTS,
-    appendTemplatePrompt,
-    removeTemplatePrompt,
-    selectedTemplateIdsFromPrompt
+    composeLlmPrompt,
+    splitPresetFromPrompt
 } from './predefinedCustomPrompts';
 import "./createGuardrailPage.css";
 
@@ -218,12 +217,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
 
-    // Predefined custom prompts (left-nav step before Custom Guardrails)
-    const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
 
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
+    const [presetPrompts, setPresetPrompts] = useState({});
+    const selectedTemplateIds = Object.keys(presetPrompts);
+    // The preset's prompt is applied on save/test without being shown in the detection instruction box.
+    const effectiveLlmPrompt = composeLlmPrompt(enableLlmPrompt ? llmPrompt : "", presetPrompts);
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [llmCompliance, setLlmCompliance] = useState({});
     const [enableLlmRedaction, setEnableLlmRedaction] = useState(false);
@@ -662,9 +663,9 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setCodeFilterLevel("high");
         setEnableBanCode(false);
         setBanCodeConfidenceScore(0.7);
-        setSelectedTemplateIds([]);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
+        setPresetPrompts({});
         setLlmConfidenceScore(0.5);
         setLlmCompliance({});
         setEnableLlmRedaction(false);
@@ -783,11 +784,12 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
 
         // LLM prompt
         const savedLlmPrompt = policy.llmRule?.userPrompt || "";
-        setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
-        setLlmPrompt(savedLlmPrompt);
+        const { presetPrompts: savedPresetPrompts, customPrompt: savedCustomPrompt } = splitPresetFromPrompt(savedLlmPrompt);
+        setPresetPrompts(policy.llmRule?.enabled ? savedPresetPrompts : {});
+        setEnableLlmPrompt(policy.llmRule?.enabled && !!savedCustomPrompt);
+        setLlmPrompt(savedCustomPrompt);
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
         setLlmCompliance(policy.llmRule?.compliance || {});
-        setSelectedTemplateIds(selectedTemplateIdsFromPrompt(savedLlmPrompt));
 
         // LLM redaction. Must be hydrated here or editing an existing policy saves
         // an empty list back over the stored rules.
@@ -969,8 +971,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         behavior: r.behavior.toLowerCase()
                     })) : [],
                 llmRule: {
-                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
-                    userPrompt: llmPrompt.trim(),
+                    enabled: !!effectiveLlmPrompt,
+                    userPrompt: effectiveLlmPrompt,
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
@@ -1076,17 +1078,15 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const togglePredefinedTemplate = (id) => {
         const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
         if (!template) return;
-
-        const isSelected = selectedTemplateIds.includes(id);
-        if (isSelected) {
-            setSelectedTemplateIds(selectedTemplateIds.filter((t) => t !== id));
-            setLlmPrompt(removeTemplatePrompt(llmPrompt, template));
+        if (id in presetPrompts) {
+            const { [id]: _removed, ...rest } = presetPrompts;
+            setPresetPrompts(rest);
         } else {
-            setSelectedTemplateIds([...selectedTemplateIds, id]);
-            setLlmPrompt(appendTemplatePrompt(llmPrompt, template));
-            setEnableLlmPrompt(true);
+            setPresetPrompts({ ...presetPrompts, [id]: template.prompt });
         }
     };
+
+    const changePresetPrompt = (id, text) => setPresetPrompts((prev) => ({ ...prev, [id]: text }));
 
     const renderStepContent = (stepNumber) => {
         switch (stepNumber) {
@@ -1184,6 +1184,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setLlmRule={setLlmPrompt}
                         selectedTemplateIds={selectedTemplateIds}
                         onToggleTemplate={togglePredefinedTemplate}
+                        presetPrompts={presetPrompts}
+                        onChangePresetPrompt={changePresetPrompt}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
                         enableLlmRedaction={enableLlmRedaction}
@@ -1370,10 +1372,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     .map(r => r.pattern)
                 : [],
             regexPatternsV2,
-            ...(enableLlmPrompt && llmPrompt?.trim() ? {
+            ...(effectiveLlmPrompt ? {
                 llmRule: {
                     enabled: true,
-                    userPrompt: llmPrompt.trim(),
+                    userPrompt: effectiveLlmPrompt,
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }

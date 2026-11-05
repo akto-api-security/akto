@@ -57,7 +57,7 @@ export const CustomGuardrailsConfig = {
         if (selected.length === 1) {
             summaries.push(selected[0].label);
         } else if (selected.length > 1) {
-            summaries.push(`${selected.length} templates selected`);
+            summaries.push(`${selected.length} presets selected`);
         }
         if (enableLlmPrompt && llmPrompt) {
             summaries.push(`LLM: ${llmPrompt.substring(0, 20)}${llmPrompt.length > 20 ? '...' : ''}`);
@@ -87,6 +87,8 @@ const CustomGuardrailsStep = ({
     setLlmRule,
     selectedTemplateIds = [],
     onToggleTemplate,
+    presetPrompts = {},
+    onChangePresetPrompt,
     // LLM rule compliance (controlled by parent)
     llmCompliance,
     setLlmCompliance,
@@ -303,25 +305,12 @@ const CustomGuardrailsStep = ({
                     {enableLlmPrompt && (
                         <Box paddingBlockStart="4" style={{ paddingLeft: '28px' }}>
                             <FormLayout>
-                                <VerticalStack gap="2">
-                                    <Text variant="bodyMd" fontWeight="medium">Predefined prompts</Text>
-                                    <Text variant="bodySm" tone="subdued">
-                                        Select templates to add to the detection instruction. You can edit the full text below.
-                                    </Text>
-                                    {PREDEFINED_CUSTOM_PROMPTS.map((template) => (
-                                        <Checkbox
-                                            key={template.id}
-                                            label={template.label}
-                                            checked={(selectedTemplateIds || []).includes(template.id)}
-                                            onChange={() => onToggleTemplate?.(template.id)}
-                                        />
-                                    ))}
-                                </VerticalStack>
                                 <TextField
                                     label="Detection instruction"
                                     value={llmRule}
                                     onChange={setLlmRule}
                                     multiline={4}
+                                    maxHeight={400}
                                     placeholder="Enter your LLM evaluation prompt here..."
                                     helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
                                 />
@@ -337,6 +326,35 @@ const CustomGuardrailsStep = ({
                         </Box>
                     )}
                 </Box>
+
+                {PREDEFINED_CUSTOM_PROMPTS.map((template) => (
+                    <Box key={template.id}>
+                        <Checkbox
+                            label={
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text as="span">{template.label}</Text>
+                                    <ControlInfoIcon description={template.info} examples={[]} />
+                                </HorizontalStack>
+                            }
+                            checked={selectedTemplateIds.includes(template.id)}
+                            onChange={() => onToggleTemplate?.(template.id)}
+                            helpText={template.description}
+                        />
+                        {selectedTemplateIds.includes(template.id) && (
+                            <Box paddingBlockStart="8" paddingBlockEnd="3" style={{ paddingLeft: '28px' }}>
+                                <TextField
+                                    label={`${template.label} instruction`}
+                                    labelHidden
+                                    value={presetPrompts[template.id] || ""}
+                                    onChange={(value) => onChangePresetPrompt?.(template.id, value)}
+                                    multiline={6}
+                                    maxHeight={140}
+                                    helpText="Edit this instruction to fit your environment."
+                                />
+                            </Box>
+                        )}
+                    </Box>
+                ))}
 
                 {/* LLM Prompt Based Redaction */}
                 <Box>

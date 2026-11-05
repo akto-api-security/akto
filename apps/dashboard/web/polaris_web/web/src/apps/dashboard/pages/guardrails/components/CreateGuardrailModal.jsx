@@ -47,9 +47,8 @@ import func from "@/util/func";
 import { withPermissions } from "@/util/permissions";
 import {
     PREDEFINED_CUSTOM_PROMPTS,
-    appendTemplatePrompt,
-    removeTemplatePrompt,
-    selectedTemplateIdsFromPrompt
+    composeLlmPrompt,
+    splitPresetFromPrompt
 } from './predefinedCustomPrompts';
 
 const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, isEditMode = false }) => {
@@ -110,12 +109,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
 
-    // Predefined custom prompts (left-nav step before Custom Guardrails)
-    const [selectedTemplateIds, setSelectedTemplateIds] = useState([]);
 
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
+    const [presetPrompts, setPresetPrompts] = useState({});
+    const selectedTemplateIds = Object.keys(presetPrompts);
+    // The preset's prompt is applied on save/test without being shown in the detection instruction box.
+    const effectiveLlmPrompt = composeLlmPrompt(enableLlmPrompt ? llmPrompt : "", presetPrompts);
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [enableExternalModel, setEnableExternalModel] = useState(false);
     const [url, setUrl] = useState("");
@@ -397,9 +398,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         setCodeFilterLevel("high");
         setEnableBanCode(false);
         setBanCodeConfidenceScore(0.7);
-        setSelectedTemplateIds([]);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
+        setPresetPrompts({});
         setLlmConfidenceScore(0.5);
         setEnableExternalModel(false);
         setUrl("");
@@ -491,15 +492,16 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
         // LLM prompt
         if (policy.llmRule) {
             const savedLlmPrompt = policy.llmRule.userPrompt || "";
-            setEnableLlmPrompt(policy.llmRule.enabled || !!policy.llmRule.userPrompt);
-            setLlmPrompt(savedLlmPrompt);
+            const { presetPrompts: savedPresetPrompts, customPrompt: savedCustomPrompt } = splitPresetFromPrompt(savedLlmPrompt);
+            setPresetPrompts(savedPresetPrompts);
+            setEnableLlmPrompt((policy.llmRule.enabled || !!policy.llmRule.userPrompt) && !!savedCustomPrompt);
+            setLlmPrompt(savedCustomPrompt);
             setLlmConfidenceScore(policy.llmRule.confidenceScore !== undefined ? policy.llmRule.confidenceScore : 0.5);
-            setSelectedTemplateIds(selectedTemplateIdsFromPrompt(savedLlmPrompt));
         } else {
             setEnableLlmPrompt(false);
             setLlmPrompt("");
+        setPresetPrompts({});
             setLlmConfidenceScore(0.5);
-            setSelectedTemplateIds([]);
         }
 
         // Base Prompt Based Validation (AI Agents)
@@ -643,10 +645,10 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                             behavior: r.behavior.toLowerCase()
                         }))
                     : [],
-                ...(enableLlmPrompt && llmPrompt && llmPrompt.trim() ? {
+                ...(effectiveLlmPrompt ? {
                     llmRule: {
                         enabled: true,
-                        userPrompt: llmPrompt.trim(),
+                        userPrompt: effectiveLlmPrompt,
                         confidenceScore: llmConfidenceScore
                     }
                 } : {}),
@@ -721,17 +723,15 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
     const togglePredefinedTemplate = (id) => {
         const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
         if (!template) return;
-
-        const isSelected = selectedTemplateIds.includes(id);
-        if (isSelected) {
-            setSelectedTemplateIds(selectedTemplateIds.filter((t) => t !== id));
-            setLlmPrompt(removeTemplatePrompt(llmPrompt, template));
+        if (id in presetPrompts) {
+            const { [id]: _removed, ...rest } = presetPrompts;
+            setPresetPrompts(rest);
         } else {
-            setSelectedTemplateIds([...selectedTemplateIds, id]);
-            setLlmPrompt(appendTemplatePrompt(llmPrompt, template));
-            setEnableLlmPrompt(true);
+            setPresetPrompts({ ...presetPrompts, [id]: template.prompt });
         }
     };
+
+    const changePresetPrompt = (id, text) => setPresetPrompts((prev) => ({ ...prev, [id]: text }));
 
     const handleStepClick = (stepNumber) => {
         if (stepNumber === currentStep) {
@@ -929,6 +929,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave, editingPolicy = null, i
                         setLlmRule={setLlmPrompt}
                         selectedTemplateIds={selectedTemplateIds}
                         onToggleTemplate={togglePredefinedTemplate}
+                        presetPrompts={presetPrompts}
+                        onChangePresetPrompt={changePresetPrompt}
                         llmConfidenceScore={llmConfidenceScore}
                         setLlmConfidenceScore={setLlmConfidenceScore}
                         enableExternalModel={enableExternalModel}

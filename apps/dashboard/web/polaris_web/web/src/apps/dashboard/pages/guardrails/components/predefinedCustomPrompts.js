@@ -1,10 +1,12 @@
 // Predefined "quick-fill" prompts for the Custom Guardrails "Detection instruction" field.
 // Paste your finalized prompt text into the `prompt` field below for each entry.
-// To add another predefined policy, append a new { id, label, prompt } object — no other file needs to change.
+// To add another predefined policy, append a new { id, label, description, info, prompt } object — no other file needs to change.
 export const PREDEFINED_CUSTOM_PROMPTS = [
     {
         id: "unauthorized-destination",
-        label: "Unauthorized destination policy",
+        label: "Unauthorized destination blocking",
+        description: "Block data sent to unapproved domains, URLs, email recipients, webhooks or external systems.",
+        info: "Blocks any request, tool call or agent action that sends, uploads or transfers data to a destination outside your approved list, including bypass attempts through redirects, URL shorteners, encoded URLs or chained tool calls. Edit the allowed URLs in the detection instruction after selecting.",
         prompt: `Block any request, tool call, or agent action that sends, uploads, forwards, or transfers data to an unauthorized destination.
 
 This includes unapproved domains, URLs, non org email recipients, webhook endpoints, external APIs, SaaS applications, cloud storage, email addresses, MCP servers, or other external systems.
@@ -16,7 +18,9 @@ Only allowed URLs are - *.akto.io, *.customdomain.com`
     },
     {
         id: "excessive-data-access",
-        label: "Excessive data access policy",
+        label: "Excessive data access control",
+        description: "Block or require approval for bulk access to employee, customer or sensitive records.",
+        info: "Flags requests that exceed bulk-access thresholds, such as 50+ records in one operation, 200+ within 10 minutes, whole-table exports, or any bulk pull of credentials or payment data, including attempts to dodge the limits with pagination or repeated calls. Adjust the thresholds in the detection instruction after selecting.",
         prompt: `Block or require approval when any request, tool call, or response exceeds the following bulk-access thresholds:
 
 * More than **50 employee or customer records in a single operation**.
@@ -32,7 +36,9 @@ Allow access below these thresholds when it is necessary for the stated task and
     },
     {
         id: "destructive-action-protection",
-        label: "Destructive action protection policy",
+        label: "Destructive action protection",
+        description: "Block deletes, overwrites, shutdowns and other irreversible actions without human approval.",
+        info: "Blocks tool calls or agent actions that can cause destructive or irreversible changes, such as deleting or dropping data, terminating services, revoking access, disabling accounts or changing security controls. Read-only, dry-run and preview operations are allowed, and anything with unclear impact is blocked.",
         prompt: `Block any tool call or agent action that can cause destructive, irreversible, or high-impact changes without explicit human approval.
 
 This includes deleting or dropping data/resources, terminating services or infrastructure, overwriting critical data, revoking access, disabling accounts, modifying security controls, or performing bulk destructive operations.
@@ -43,7 +49,9 @@ If the action may be destructive but its impact cannot be confidently determined
     },
     {
         id: "default-financial-advice",
-        label: "Default-Financial Advice",
+        label: "Financial information monitoring",
+        description: "Monitor vendor banking details, invoices, non-public forecasts and other financial information.",
+        info: "Runs in monitor mode and flags content that contains or requests vendor bank or payment details, invoices, accounts payable and receivable, or non-public financial forecasts and planning. Customer, employee, secrets and M&A content is left to its own policies.",
         prompt: `You are evaluating content for a Financial Information DLP policy in MONITOR MODE.
 
 Return MONITOR only when the content contains or requests sensitive company, vendor, supplier, accounting, invoice, banking, tax, or financial planning information.
@@ -124,4 +132,29 @@ export const selectedTemplateIdsFromPrompt = (prompt) => {
     return PREDEFINED_CUSTOM_PROMPTS
         .filter((t) => text.includes(templateHeader(t)))
         .map((t) => t.id);
+};
+
+const findTemplate = (id) => PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
+
+/** Final LLM rule text: the user's own instruction plus one "## label" block per selected preset, using its (possibly edited) text. */
+export const composeLlmPrompt = (customPrompt, presetPrompts = {}) => {
+    const blocks = PREDEFINED_CUSTOM_PROMPTS
+        .filter((t) => (presetPrompts[t.id] || "").trim())
+        .map((t) => buildTemplateBlock({ ...t, prompt: presetPrompts[t.id].trim() }));
+    return [(customPrompt || "").trim(), ...blocks].filter(Boolean).join("\n\n");
+};
+
+/** Inverse of composeLlmPrompt for a saved policy: { [presetId]: text } plus the user's own text. */
+export const splitPresetFromPrompt = (savedPrompt) => {
+    const presetPrompts = {};
+    const custom = [];
+    splitPromptBlocks(savedPrompt).forEach((block) => {
+        const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => block.startsWith(templateHeader(t)));
+        if (template) {
+            presetPrompts[template.id] = block.slice(templateHeader(template).length).replace(/^\n/, "");
+        } else {
+            custom.push(block);
+        }
+    });
+    return { presetPrompts, customPrompt: custom.join("\n\n").trim() };
 };
