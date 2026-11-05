@@ -19,7 +19,11 @@ import com.akto.util.McpOAuthUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 
+import lombok.Getter;
+import lombok.Setter;
+
 // Logged-in user approves or denies an MCP client's pending authorize request
+@Getter
 public class McpOAuthConsentAction extends UserAction {
 
     private static final String EXPIRED_MESSAGE = "This authorization request has expired. Start the connection again from your MCP client.";
@@ -28,7 +32,10 @@ public class McpOAuthConsentAction extends UserAction {
     private static final String INTERACTIVE_LOGIN_REQUIRED_MESSAGE = "Connections can only be approved from a signed-in Akto dashboard session.";
     private static final String NO_PRODUCT_ACCESS_MESSAGE = "You don't have access to any Akto product in this account. Ask an admin for access.";
 
+    // Request parameters; the fields below them are response-only
+    @Setter
     private String requestId;
+    @Setter
     private String contextSource;
 
     private String clientName;
@@ -139,45 +146,5 @@ public class McpOAuthConsentAction extends UserAction {
     private String expired() {
         addActionError(EXPIRED_MESSAGE);
         return ERROR.toUpperCase();
-    }
-
-    public String getRequestId() {
-        return requestId;
-    }
-
-    public void setRequestId(String requestId) {
-        this.requestId = requestId;
-    }
-
-    public String getContextSource() {
-        return contextSource;
-    }
-
-    public void setContextSource(String contextSource) {
-        this.contextSource = contextSource;
-    }
-
-    public String getClientName() {
-        return clientName;
-    }
-
-    public String getRedirectHost() {
-        return redirectHost;
-    }
-
-    public String getAccountName() {
-        return accountName;
-    }
-
-    public String getUserLogin() {
-        return userLogin;
-    }
-
-    public String getRedirectUrl() {
-        return redirectUrl;
-    }
-
-    public List<String> getAllowedContexts() {
-        return allowedContexts;
     }
 }
