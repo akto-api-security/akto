@@ -1138,13 +1138,13 @@ public class Main {
 
                 accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
-                parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
+                List<HttpResponseParams> filteredResponse = parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
 
                 if (UsageMetricUtils.isFeatureAccessGranted(Context.getActualAccountId(), "BEHAVIORAL_ANOMALLY_SEQUENCE")) {
                     SessionAnalyzer sessionAnalyzer = sessionAnalyzerMap.get(accountId);
                     if (sessionAnalyzer != null) {
-                        for (HttpResponseParams httpResponseParams : accWiseResponse) {
+                        for (HttpResponseParams httpResponseParams : filteredResponse) {
                             try {
                                 sessionAnalyzer.process(httpResponseParams);
                             } catch (Exception e) {
