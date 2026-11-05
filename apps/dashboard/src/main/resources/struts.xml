@@ -18896,6 +18896,60 @@
             </result>
         </action>
 
+        <action name="oauth/register" class="com.akto.action.McpOAuthAction" method="register">
+            <interceptor-ref name="defaultStack" />
+        </action>
+
+        <action name="oauth/authorize" class="com.akto.action.McpOAuthAction" method="authorize">
+            <interceptor-ref name="defaultStack" />
+        </action>
+
+        <action name="oauth/token" class="com.akto.action.McpOAuthAction" method="token">
+            <interceptor-ref name="defaultStack" />
+        </action>
+
+        <action name="api/mcpOAuth/fetchAuthorizeRequest" class="com.akto.action.McpOAuthConsentAction" method="fetchAuthorizeRequest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcpOAuth/approveAuthorizeRequest" class="com.akto.action.McpOAuthConsentAction" method="approveAuthorizeRequest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcpOAuth/denyAuthorizeRequest" class="com.akto.action.McpOAuthConsentAction" method="denyAuthorizeRequest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

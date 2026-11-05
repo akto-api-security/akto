@@ -17,12 +17,15 @@ import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
+import com.akto.util.McpOAuthUtils;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -73,7 +76,10 @@ public class UserDetailsFilter implements Filter {
         if (!httpServletRequest.getRequestURI().contains(LOGIN_URI) && !httpServletRequest.getRequestURI().contains("/auth/login") && !httpServletRequest.getRequestURI().contains("api/googleConfig")) {
 
             boolean isSetupLink = "/dashboard/setup".equalsIgnoreCase(httpServletRequest.getRequestURI());
-            String redirectParam = isSetupLink ? "" : ("?redirect_uri="+httpServletRequest.getRequestURI());
+            // Keep the query string so flows like the MCP OAuth consent page survive login
+            String queryString = httpServletRequest.getQueryString();
+            String target = httpServletRequest.getRequestURI() + (queryString == null ? "" : "?" + queryString);
+            String redirectParam = isSetupLink ? "" : ("?redirect_uri=" + URLEncoder.encode(target, StandardCharsets.UTF_8));
             httpServletResponse.sendRedirect(LOGIN_URI+redirectParam);
             return;
         }
@@ -154,15 +160,25 @@ public class UserDetailsFilter implements Filter {
                     Context.contextSource.set(contextSourceEnum);
                     Context.accountId.set(accountId);
                     User user = UsersDao.instance.findOne("login", username);
-                    if(user == null) {
+                    // The accountId claim is only trusted while the user still belongs to that account
+                    if(user == null || user.getAccounts() == null || !user.getAccounts().containsKey(String.valueOf(accountId))) {
                         httpServletResponse.sendError(403);
                         return;
                     }
                     session.setAttribute("user", user);
+                    session.setAttribute(McpOAuthUtils.SESSION_MCP_TOKEN_AUTH, Boolean.TRUE);
                     session.setAttribute("accountId", accountId);
                     setSession(session, username, "false");
                     Context.userId.set(user.getId());
-                    filterChain.doFilter(servletRequest, servletResponse);
+                    try {
+                        filterChain.doFilter(servletRequest, servletResponse);
+                    } finally {
+                        // MCP clients send no cookies, so this session is never reused; end it instead of keeping it for the timeout
+                        try {
+                            session.invalidate();
+                        } catch (IllegalStateException ignored) {
+                        }
+                    }
                     return;
                 } else {
                     httpServletResponse.sendError(403);

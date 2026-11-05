@@ -152,6 +152,7 @@ import RemoteCommands from "../dashboard/pages/settings/remote_commands/RemoteCo
 import RemoteCommandDetail from "../dashboard/pages/settings/remote_commands/RemoteCommandDetail.jsx";
 import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
 import OpenTelemetry from "../dashboard/pages/settings/integrations/OpenTelemetry.jsx";
+import McpOAuthConsent from "../dashboard/pages/mcp_oauth/McpOAuthConsent";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -747,6 +748,10 @@ const router = createBrowserRouter([
             {
                 path: "threat-detection/report/:reportId",
                 element: <ThreatReport/>
+            },
+            {
+                path: "mcp-oauth/consent",
+                element: <McpOAuthConsent/>
             }
         ],
         errorElement: <ErrorComponent/>
