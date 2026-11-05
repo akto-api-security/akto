@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react"
-import { Button, Checkbox, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
+import { Fragment, useEffect, useState } from "react"
+import { Box, Button, Checkbox, Divider, Form, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import func from "@/util/func"
@@ -76,30 +76,41 @@ function McpClients() {
                 <Text as="p" color="subdued">
                     Add the redirect URL of an app you trust. End it with * to allow everything under that path. These are allowed in addition to the built-in list.
                 </Text>
+                <Form onSubmit={addUri}>
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <div style={{ flex: 1 }}>
+                            <TextField
+                                label="Redirect URL"
+                                labelHidden
+                                value={newUri}
+                                onChange={setNewUri}
+                                placeholder="https://app.example.com/oauth/callback"
+                                autoComplete="off"
+                                disabled={saving}
+                            />
+                        </div>
+                        <Button submit loading={saving} disabled={!newUri.trim()}>Add</Button>
+                    </HorizontalStack>
+                </Form>
+                <Divider />
                 {uris.length === 0 ? <Text as="p" color="subdued">No custom URLs yet.</Text> : (
                     <VerticalStack gap="2">
-                        {uris.map((uri) => (
-                            <HorizontalStack key={uri} align="space-between" blockAlign="center" wrap={false} gap="4">
-                                <Text as="span" breakWord>{uri}</Text>
-                                <Button plain destructive disabled={saving} onClick={() => removeUri(uri)}>Remove</Button>
-                            </HorizontalStack>
-                        ))}
+                        <Text as="h3" variant="headingSm">Allowed URLs ({uris.length})</Text>
+                        <LegacyCard>
+                            {uris.map((uri, index) => (
+                                <Fragment key={uri}>
+                                    {index > 0 ? <Divider /> : null}
+                                    <Box padding="3">
+                                        <HorizontalStack align="space-between" blockAlign="center" wrap={false} gap="4">
+                                            <Text as="span" breakWord>{uri}</Text>
+                                            <Button plain destructive disabled={saving} onClick={() => removeUri(uri)}>Remove</Button>
+                                        </HorizontalStack>
+                                    </Box>
+                                </Fragment>
+                            ))}
+                        </LegacyCard>
                     </VerticalStack>
                 )}
-                <HorizontalStack gap="2" blockAlign="end" wrap={false}>
-                    <div style={{ flex: 1 }}>
-                        <TextField
-                            label="Redirect URL"
-                            labelHidden
-                            value={newUri}
-                            onChange={setNewUri}
-                            placeholder="https://app.example.com/oauth/callback"
-                            autoComplete="off"
-                            disabled={saving}
-                        />
-                    </div>
-                    <Button onClick={addUri} loading={saving} disabled={!newUri.trim()}>Add</Button>
-                </HorizontalStack>
             </VerticalStack>
         </LegacyCard>
     )
