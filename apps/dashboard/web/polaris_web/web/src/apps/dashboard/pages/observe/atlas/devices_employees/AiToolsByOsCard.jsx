@@ -56,7 +56,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectB
         token: BROWSER_COLORS[index % BROWSER_COLORS.length],
         color: browserColor(index),
     }));
-    const browserDevices = browserRows.reduce((sum, row) => sum + row.devices, 0);
+    const browserAiDevices = browserRows.reduce((sum, row) => sum + row.count, 0);
     const toolsAvailable = overview?.toolsAvailable !== false;
 
     const body = (
@@ -68,7 +68,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectB
                 <BarRow
                     key={row.os}
                     label={OS_LABELS[row.os] || row.os}
-                    meta={`${formatCount(row.devices)} devices`}
+                    meta={`${formatCount(row.devicesWithTools)} with AI tools`}
                     segments={OS_CATEGORIES.map((category) => ({
                         key: category,
                         label: CATEGORY_LABELS[category],
@@ -83,7 +83,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectB
             {toolsAvailable && browserRows.length > 0 && (
                 <BarRow
                     label="Browsers"
-                    meta={`${formatCount(browserDevices)} browsers`}
+                    meta={`${formatCount(browserAiDevices)} with Browser AI`}
                     segments={browserRows.map((row) => ({
                         key: row.browser,
                         label: row.label,

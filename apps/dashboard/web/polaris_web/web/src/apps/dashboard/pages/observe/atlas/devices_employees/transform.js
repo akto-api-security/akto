@@ -55,7 +55,7 @@ function statSubtexts(deviceStats, discovery) {
         managedDevices, desktopDevices, browserDevices, desktopActive, browserActive, offlineDevices, totalEmployees, unapprovedTeams, unapprovedNoTeam, monitorOnlyDevices,
     } = deviceStats;
     const agentActiveParts = [`${formatCount(desktopActive)} desktop`, `${formatCount(browserActive)} browsers`];
-    if (offlineDevices > 0) agentActiveParts.push(`${formatCount(offlineDevices)} offline 3+ days`);
+    if (offlineDevices > 0) agentActiveParts.push(`${formatCount(offlineDevices)} offline 7+ days`);
     const unapprovedParts = [];
     if (unapprovedTeams > 0) unapprovedParts.push(`Across ${plural(unapprovedTeams, "team")}`);
     if (unapprovedNoTeam > 0) unapprovedParts.push(`${formatCount(unapprovedNoTeam)} ${unapprovedNoTeam === 1 ? "employee" : "employees"} with no team`);

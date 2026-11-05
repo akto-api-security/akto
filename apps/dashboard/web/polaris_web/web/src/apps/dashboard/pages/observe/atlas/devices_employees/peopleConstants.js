@@ -45,7 +45,7 @@ export const CATEGORY_BACKGROUNDS = {
 export const HEALTH_LABELS = {
     healthy: "Healthy",
     outdated: "Outdated agent",
-    offline: "Offline 3+ days",
+    offline: "Offline 7+ days",
 };
 
 export const HEALTH_BACKGROUNDS = {

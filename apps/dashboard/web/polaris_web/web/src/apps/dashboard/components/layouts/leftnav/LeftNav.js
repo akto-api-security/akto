@@ -280,7 +280,7 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_observe_endpoints",
                     },
                     {
-                        label: "Devices & employees",
+                        label: "Devices & Employees",
                         onClick: () => {
                             navigate("/dashboard/observe/devices-employees");
                             handleSelect("dashboard_observe_devices_employees");

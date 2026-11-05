@@ -65,7 +65,7 @@ public class AtlasPeopleService {
 
     public static final List<String> SEVERITIES = Arrays.asList("critical", "high", "medium", "low");
     public static final int VIOLATION_WINDOW_SECONDS = 7 * 24 * 60 * 60;
-    public static final int OFFLINE_SECONDS = 3 * 24 * 60 * 60;
+    public static final int OFFLINE_SECONDS = 7 * 24 * 60 * 60;
     public static final double RISK_MAX = 5.0;
     public static final double HIGH_RISK_SCORE = 4.0;
     public static final int RISK_BUCKETS = 5;
@@ -351,12 +351,15 @@ public class AtlasPeopleService {
         boolean ranged = startTs > 0 || endTs > 0;
         Map<String, DeviceRow> browserRowByName = new HashMap<>();
         Map<String, DeviceRow> browserRowByEmail = new HashMap<>();
+        Map<String, DeviceRow> browserRowById = new HashMap<>();
         for (DeviceRow row : devicesByLowerName.values()) {
             if (!row.extension) continue;
             String nameKey = identityKey(row.name);
             if (!nameKey.isEmpty()) browserRowByName.putIfAbsent(nameKey, row);
             String emailKey = identityKey(localPart(row.username));
             if (!emailKey.isEmpty()) browserRowByEmail.putIfAbsent(emailKey, row);
+            String idKey = identityKey(row.moduleId);
+            if (!idKey.isEmpty()) browserRowById.putIfAbsent(idKey, row);
         }
         Map<String, String> remarksByServiceName = loadServerRemarks();
         for (ApiCollection c : bundle.collections) {
@@ -384,6 +387,7 @@ public class AtlasPeopleService {
                 device = browserRowByName.get(identity);
                 String email = browserEmailOf(c);
                 if (device == null && email != null) device = browserRowByEmail.get(identityKey(localPart(email)));
+                if (device == null) device = browserRowById.get(identity);
                 if (device == null) {
                     unmatchedBrowserIdentities.add(identity);
                     continue;
