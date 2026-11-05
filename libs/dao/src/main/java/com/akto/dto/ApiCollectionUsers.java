@@ -34,6 +34,7 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.testing.custom_groups.CustomApiGroupSync;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
@@ -167,7 +168,7 @@ public class ApiCollectionUsers {
                 Updates.set(ApiCollection.CONDITIONS_STRING, conditions));
     }
 
-    private static Bson getFilters(List<TestingEndpoints> conditions, CollectionType type){
+    public static Bson getFilters(List<TestingEndpoints> conditions, CollectionType type){
         List<Bson> filters = new ArrayList<>();
         List<Bson> orFilters = new ArrayList<>();
         conditions.forEach((condition) -> {
@@ -187,6 +188,11 @@ public class ApiCollectionUsers {
     }
 
     private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
+        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, remove, false);
+    }
+
+    /** @return documents modified when run synchronously, 0 when the updates are only queued */
+    private static long operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove, boolean synchronous) {
         
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
@@ -198,15 +204,23 @@ public class ApiCollectionUsers {
             filtersMap.put(type, finalFilter);
         }
         if(apiCollectionId == AllAPIsGroup.ALL_APIS_GROUP_ID && remove){
-            return;
+            return 0;
         }
-        updateCollectionsForCollectionId(filtersMap, update);
+        return updateCollectionsForCollectionId(filtersMap, update, synchronous);
     }
 
     public static void addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+        addToCollectionsForCollectionId(conditions, apiCollectionId, false);
+    }
+
+    /**
+     * @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them
+     * @return documents modified when run synchronously, 0 when the updates are only queued
+     */
+    public static long addToCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
         Bson update = Updates.addToSet(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.nin(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
+        return operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
     }
 
     public static void removeFromCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
@@ -235,9 +249,17 @@ public class ApiCollectionUsers {
      * {@link #removeFromCollectionsForCollectionId}, which pulls it from everything the conditions do NOT match).
      */
     public static void removeApisFromCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
+        removeApisFromCollectionId(conditions, apiCollectionId, false);
+    }
+
+    /**
+     * @param synchronous run the updates on the calling thread (errors propagate, returns once written) instead of queueing them
+     * @return documents modified when run synchronously, 0 when the updates are only queued
+     */
+    public static long removeApisFromCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, boolean synchronous) {
         Bson update = Updates.pull(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
         Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
-        operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false);
+        return operationForCollectionId(conditions, apiCollectionId, update, matchFilter, false, synchronous);
     }
 
     public static void keepOnlyApiCollectionId(int apiCollectionId) {
@@ -250,7 +272,7 @@ public class ApiCollectionUsers {
         for (CollectionType type : CollectionType.values()) {
             filtersMap.put(type, matchFilter);
         }
-        updateCollectionsForCollectionId(filtersMap, update);
+        updateCollectionsForCollectionId(filtersMap, update, false);
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
@@ -275,31 +297,49 @@ public class ApiCollectionUsers {
         updateApiCollection(conditions, apiCollectionId);
     }
 
-    private static void updateCollectionsForCollectionId(Map<CollectionType, Bson> filtersMap, Bson update) {
+    /**
+     * The cron version of {@link #computeCollectionsForCollectionId}: instead of recomputing the whole group it only
+     * follows what changed since the group's last sync. Creating or editing a group still computes it in full.
+     */
+    public static void syncCollectionsForCollectionId(ApiCollection collection) {
+        if (UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == collection.getId()) {
+            UnauthenticatedEndpoint.updateCollections();
+        } else if (SensitiveDataEndpoints.API_GROUP_ID == collection.getId()) {
+            SensitiveDataEndpoints.updateCollections();
+        } else {
+            new CustomApiGroupSync(collection).run();
+        }
+    }
+
+    private static long updateCollectionsForCollectionId(Map<CollectionType, Bson> filtersMap, Bson update, boolean synchronous) {
+        if (synchronous) {
+            return updateAllCollections(filtersMap, update);
+        }
         int accountId = Context.accountId.get();
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
-
-                Map<CollectionType, MCollection<?>[]> collectionsMap = COLLECTIONS_WITH_API_COLLECTION_ID;
-
-                for (Map.Entry<CollectionType, MCollection<?>[]> collectionsEntry : collectionsMap.entrySet()) {
-
-                    CollectionType type = collectionsEntry.getKey();
-                    MCollection<?>[] collections = collectionsEntry.getValue();
-                    Bson filter = filtersMap.get(type);
-
-                    updateCollections(collections, filter, update);
-                }
-
+                updateAllCollections(filtersMap, update);
             }
         }, 0, TimeUnit.SECONDS);
+        return 0;
     }
 
-    private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
+    private static long updateAllCollections(Map<CollectionType, Bson> filtersMap, Bson update) {
+        long modified = 0;
+        for (Map.Entry<CollectionType, MCollection<?>[]> collectionsEntry : COLLECTIONS_WITH_API_COLLECTION_ID.entrySet()) {
+            modified += updateCollections(collectionsEntry.getValue(), filtersMap.get(collectionsEntry.getKey()), update);
+        }
+        return modified;
+    }
+
+    private static long updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
+        long modified = 0;
         for (MCollection<?> collection : collections) {
             UpdateResult res = collection.getMCollection().updateMany(filter, update);
+            modified += res.getModifiedCount();
         }
+        return modified;
     }
 
     public static void updateCollections(MCollection<?>[] collections, Bson filter, List<Bson> update) {
