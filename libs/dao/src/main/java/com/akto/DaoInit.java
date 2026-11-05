@@ -500,8 +500,6 @@ public class DaoInit {
         AgentTrafficLogDao.instance.createIndicesIfAbsent();
         TestingRunWebhookDao.instance.createIndicesIfAbsent();
         ApiSequencesDao.instance.createIndicesIfAbsent();
-        SequenceCountDao.instance.createIndicesIfAbsent();
-        SequenceModelDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandDao.instance.createIndicesIfAbsent();
         EndpointRemoteCommandExecutionDao.instance.createIndicesIfAbsent();
         EndpointShieldDiagnosticDao.instance.createIndicesIfAbsent();
