@@ -165,4 +165,19 @@ public class McpOAuthUtilsTest {
         assertEquals("com.example.app", McpOAuthUtils.redirectDisplayHost("com.example.app:/oauth2redirect"));
         assertEquals("", McpOAuthUtils.redirectDisplayHost(null));
     }
+
+    @Test
+    public void oauthTokensReachToolEndpointsOnly() {
+        assertTrue(McpOAuthUtils.isToolEndpoint("/api/getAllCollections"));
+        assertTrue(McpOAuthUtils.isToolEndpoint("/api/fetchAllIssues"));
+        assertFalse(McpOAuthUtils.isToolEndpoint("/api/inviteUsers"));
+        assertFalse(McpOAuthUtils.isToolEndpoint("/api/addApiToken"));
+        assertFalse(McpOAuthUtils.isToolEndpoint("/api/fetchApiTokens"));
+        assertFalse(McpOAuthUtils.isToolEndpoint("/api/mcpOAuth/approveAuthorizeRequest"));
+        assertFalse(McpOAuthUtils.isToolEndpoint("/api/getAllCollections/"));
+        assertFalse(McpOAuthUtils.isToolEndpoint("/API/getAllCollections"));
+        assertFalse(McpOAuthUtils.isToolEndpoint("/dashboard/observe/inventory"));
+        assertFalse(McpOAuthUtils.isToolEndpoint(""));
+        assertFalse(McpOAuthUtils.isToolEndpoint(null));
+    }
 }

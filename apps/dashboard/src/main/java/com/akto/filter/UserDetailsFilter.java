@@ -165,8 +165,8 @@ public class UserDetailsFilter implements Filter {
                         httpServletResponse.sendError(403);
                         return;
                     }
-                    // OAuth tokens (client_id claim) get the same endpoint blocklist as API keys
-                    if(claims.getBody().get("client_id") != null && endPointBlockedForApiToken(httpServletRequest.getRequestURI())) {
+                    // OAuth tokens (client_id claim) may only call the APIs the MCP tools use
+                    if(claims.getBody().get("client_id") != null && !McpOAuthUtils.isToolEndpoint(httpServletRequest.getRequestURI())) {
                         httpServletResponse.sendError(403);
                         return;
                     }

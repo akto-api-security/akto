@@ -8,12 +8,15 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 import com.akto.dto.McpOAuthGrant;
@@ -41,6 +44,62 @@ public class McpOAuthUtils {
 
     // Comma-separated override of the redirect hosts shown without an "unverified app" warning
     public static final String KNOWN_REDIRECT_HOSTS_ENV = "MCP_OAUTH_KNOWN_REDIRECT_HOSTS";
+
+    // The only dashboard APIs an OAuth token may call; keep in sync with akto_mcp src/tools/tool-endpoints.json
+    private static final Set<String> MCP_TOOL_ENDPOINTS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "/api/bulkUpdateIssueSeverity",
+            "/api/bulkUpdateIssueStatus",
+            "/api/createCollection",
+            "/api/createGuardrailPolicy",
+            "/api/fetchAgenticAssetsStats",
+            "/api/fetchAgenticUsers",
+            "/api/fetchAgenticViolations",
+            "/api/fetchAggregateMaliciousRequests",
+            "/api/fetchAllDastScans",
+            "/api/fetchAllIssues",
+            "/api/fetchAllPrompts",
+            "/api/fetchApiInfosForCollection",
+            "/api/fetchArgusAgentDetail",
+            "/api/fetchArgusPostureChanges",
+            "/api/fetchArgusPostureDrill",
+            "/api/fetchArgusPostureInsightSummaries",
+            "/api/fetchArgusPostureInsights",
+            "/api/fetchArgusPostureRegenerateStatus",
+            "/api/fetchArgusPostureSummary",
+            "/api/fetchAuditData",
+            "/api/fetchConversationsFromConversationId",
+            "/api/fetchDastScan",
+            "/api/fetchEndpointsCount",
+            "/api/fetchGuardrailData",
+            "/api/fetchGuardrailPolicies",
+            "/api/fetchInsightDetail",
+            "/api/fetchInsightsList",
+            "/api/fetchModuleInfo",
+            "/api/fetchPostureDrill",
+            "/api/fetchPostureSnapshot",
+            "/api/fetchPostureSummary",
+            "/api/fetchSampleData",
+            "/api/fetchSensitiveSampleData",
+            "/api/fetchSkillsData",
+            "/api/fetchSlackWebhooks",
+            "/api/fetchSuspectSampleData",
+            "/api/fetchTestingRunResult",
+            "/api/fetchTestingRunResults",
+            "/api/fetchThreatActors",
+            "/api/fetchThreatApis",
+            "/api/fetchThreatsForActor",
+            "/api/fetchWizIntegration",
+            "/api/getAllCollections",
+            "/api/getAllCollectionsBasic",
+            "/api/getCoverageInfoForCollections",
+            "/api/getIssuesTrend",
+            "/api/getRecentActivities",
+            "/api/getRiskScoreInfo",
+            "/api/getSeveritiesCountPerCollection",
+            "/api/refreshInsightNarrative",
+            "/api/retrieveAllCollectionTests",
+            "/api/startTest",
+            "/api/triggerArgusPostureRegenerate")));
 
     private static final int MAX_REDIRECT_URI_LENGTH = 2048;
     private static final List<String> LOOPBACK_HOSTS = Arrays.asList("localhost", "127.0.0.1", "[::1]");
@@ -218,6 +277,10 @@ public class McpOAuthUtils {
 
     private static boolean isLoopback(URI uri) {
         return "http".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null && LOOPBACK_HOSTS.contains(uri.getHost().toLowerCase(Locale.ROOT));
+    }
+
+    public static boolean isToolEndpoint(String requestUri) {
+        return MCP_TOOL_ENDPOINTS.contains(requestUri);
     }
 
     public static String withParams(String redirectUri, Map<String, String> params) {
