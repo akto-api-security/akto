@@ -73,8 +73,25 @@ public class SequenceCache {
     }
 
     private String resolve(int apiCollectionId, String url, Method method) {
-        String key = apiCollectionId + " " + url + " " + method;
+        String key = apiCollectionId + " " + normalizeUrl(url) + " " + method;
         return requiredBefore.containsKey(key) || watched.contains(key) ? key : null;
+    }
+
+    // Query and trailing slash are dropped on both sides: the catalog keeps "/x/", cleanUrl turns it into "/x"
+    static String normalizeUrl(String url) {
+        if (url == null) return "";
+        int query = url.indexOf('?');
+        if (query >= 0) url = url.substring(0, query);
+        while (url.length() > 1 && url.endsWith("/")) url = url.substring(0, url.length() - 1);
+        return url;
+    }
+
+    // Api key format: "<collectionId> <url> <method>"
+    static String normalizeKey(String apiKey) {
+        int first = apiKey.indexOf(' ');
+        int last = apiKey.lastIndexOf(' ');
+        if (first <= 0 || last <= first) return apiKey;
+        return apiKey.substring(0, first) + " " + normalizeUrl(apiKey.substring(first + 1, last)) + apiKey.substring(last);
     }
 
     private static boolean anySatisfied(List<List<String>> contexts, Map<String, Long> seen, long now) {
@@ -108,8 +125,9 @@ public class SequenceCache {
             for (ApiSequences seq : dataActor.fetchSequenceRules()) {
                 List<String> paths = seq.getPaths();
                 if (paths == null || paths.size() < 2) continue;
-                String next = paths.get(paths.size() - 1);
-                List<String> context = new ArrayList<>(paths.subList(0, paths.size() - 1));
+                String next = normalizeKey(paths.get(paths.size() - 1));
+                List<String> context = new ArrayList<>();
+                for (String api : paths.subList(0, paths.size() - 1)) context.add(normalizeKey(api));
                 rules.computeIfAbsent(next, k -> new ArrayList<>()).add(context);
                 required.addAll(context);
             }
