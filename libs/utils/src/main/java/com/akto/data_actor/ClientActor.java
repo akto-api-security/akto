@@ -1553,10 +1553,16 @@ public class ClientActor extends DataActor {
 
     @Override
     public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName) {
+        return fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, null);
+    }
+
+    @Override
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("miniRuntimeName", miniRuntimeName);
         obj.put("moduleType", moduleType != null ? moduleType.name() : null);
+        obj.put("moduleId", moduleId);
 
         String requestPayload = gson.toJson(obj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAndUpdateModuleForReboot", "", "POST", requestPayload, headers, "");

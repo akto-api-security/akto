@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.metrics.ModuleInfoWorker;
@@ -48,9 +49,22 @@ public class ConfigPoller implements Runnable {
 
     private void pollAndProcessConfig() {
         try {
-            List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(MODULE_TYPE, null);
+            ModuleInfo self = ModuleInfoWorker.getModuleInfo();
+            if (self == null) {
+                return;
+            }
+            String moduleId = self.getId();
+
+            List<ModuleInfo> moduleInfoList = dataActor.fetchAndUpdateModuleForReboot(MODULE_TYPE, null, moduleId);
 
             if (moduleInfoList == null || moduleInfoList.isEmpty()) {
+                return;
+            }
+
+            moduleInfoList = moduleInfoList.stream()
+                    .filter(m -> moduleId.equals(m.getId()))
+                    .collect(Collectors.toList());
+            if (moduleInfoList.isEmpty()) {
                 return;
             }
 
