@@ -178,10 +178,10 @@ public class HomeAction implements Action, SessionAware, ServletResponseAware, S
     private String signupInvitationCode;
     private String signupEmailId;
 
-    // Set by UserDetailsFilter when it bounces a logged-out user here; carried through the Auth0 round trip
+    // Return path set by UserDetailsFilter, carried through the Auth0 state
     private String redirectUri;
 
-    // Setter name is fixed by the request parameter name (redirect_uri)
+    // Name is fixed by the redirect_uri request parameter
     public void setRedirect_uri(String redirectUri) {
         this.redirectUri = redirectUri;
     }

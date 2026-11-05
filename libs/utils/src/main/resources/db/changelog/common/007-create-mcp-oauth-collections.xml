@@ -8,16 +8,7 @@
         http://www.liquibase.org/xml/ns/mongodb
         http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
 
-    <!--
-        MCP OAuth (CommonContextDao, DB: common).
-        mcp_oauth_clients (McpOAuthClientsDao): dynamically registered OAuth clients; lastUsedAt is a
-        BSON Date and the TTL index drops clients unused for 90 days.
-        mcp_oauth_grants (McpOAuthGrantsDao): pending consent requests, authorization codes and refresh
-        tokens, keyed by the SHA-256 of the secret; the TTL index on expiresAt (a BSON Date) removes
-        expired grants.
-        Index names and options mirror each DAO's createIndicesIfAbsent exactly, so these are no-ops
-        where the runtime call already built them.
-    -->
+    <!-- MCP OAuth (common DB). Index names and options mirror the DAOs, so these are no-ops where a DAO already built them. -->
 
     <changeSet id="007-common-create-mcp-oauth-clients" author="akto">
         <preConditions onFail="MARK_RAN">

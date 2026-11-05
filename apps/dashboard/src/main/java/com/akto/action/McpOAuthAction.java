@@ -106,7 +106,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         return null;
     }
 
-    // GET /oauth/authorize: validates the request, parks it, and sends the user to the consent page
+    // GET /oauth/authorize: parks the request and sends the user to consent
     public String authorize() throws IOException {
         McpOAuthClient client = McpOAuthClientsDao.instance.findById(param(PARAM_CLIENT_ID));
         String redirectUri = param(PARAM_REDIRECT_URI);
@@ -156,7 +156,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         return null;
     }
 
-    // POST /oauth/token (form-encoded): authorization_code and refresh_token grants
+    // POST /oauth/token: authorization_code and refresh_token grants
     public String token() throws IOException {
         if (!isPost()) {
             rejectNonPost();
@@ -182,7 +182,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
             return null;
         }
 
-        // Access follows account membership, so removing a user cuts them off at the next refresh
+        // Removing a user from the account cuts them off at the next refresh
         User user = UsersDao.instance.findOne("login", grant.getUsername());
         if (user == null || user.getAccounts() == null || !user.getAccounts().containsKey(String.valueOf(grant.getAccountId()))) {
             writeError(400, INVALID_GRANT, "User no longer has access to this account");
@@ -194,8 +194,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
             writeError(500, "server_error", "Unable to issue token");
             return null;
         }
-        // A refresh token is spent only after everything that can fail has succeeded; the consume is atomic,
-        // so of two concurrent refreshes with the same token only one wins
+        // The refresh token is spent last and atomically, so concurrent refreshes yield one winner
         if (GRANT_REFRESH.equals(grantType)
                 && McpOAuthGrantsDao.instance.consume(McpOAuthUtils.sha256Hex(param(PARAM_REFRESH_TOKEN)), McpOAuthGrant.TYPE_REFRESH) == null) {
             writeError(400, INVALID_GRANT, "Invalid or expired refresh token");
@@ -207,7 +206,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         return null;
     }
 
-    // Single-use: the code is consumed before it is checked, so a failed attempt also burns it
+    // Consumed before checking, so a failed attempt burns the code
     private McpOAuthGrant redeemAuthorizationCode(String clientId) throws IOException {
         String code = param(McpOAuthUtils.PARAM_CODE);
         if (code == null) {
@@ -215,7 +214,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
             return null;
         }
         McpOAuthGrant grant = McpOAuthGrantsDao.instance.consume(McpOAuthUtils.sha256Hex(code), McpOAuthGrant.TYPE_CODE);
-        // redirect_uri may be omitted when authorize defaulted it; if sent it must match
+        // redirect_uri is optional if authorize defaulted it; it must match when sent
         String redirectUri = param(PARAM_REDIRECT_URI);
         if (grant == null || !clientId.equals(grant.getClientId())
                 || (redirectUri != null && !redirectUri.equals(grant.getRedirectUri()))
@@ -226,7 +225,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         return validResource(grant) ? grant : null;
     }
 
-    // Looks the refresh token up without spending it, so a mistaken request does not cost the client its token
+    // Peeks at the refresh token without spending it
     private McpOAuthGrant checkRefreshToken(String clientId) throws IOException {
         String refreshToken = param(PARAM_REFRESH_TOKEN);
         if (refreshToken == null) {
@@ -241,7 +240,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         return validResource(stored) ? stored : null;
     }
 
-    // RFC 8707: a resource sent at the token endpoint must be the one that was authorized
+    // RFC 8707: the resource must match the authorized one
     private boolean validResource(McpOAuthGrant grant) throws IOException {
         if (McpOAuthUtils.isResourceAllowed(param(PARAM_RESOURCE), grant.getResource())) {
             return true;
@@ -269,7 +268,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
 
     // Null when the body is not a JSON object or exceeds the size limit
     private BasicDBObject parseRegistrationBody() throws IOException {
-        // JSON bodies are UTF-8; the servlet default would mangle non-ASCII client names
+        // JSON is UTF-8; the servlet default mangles non-ASCII names
         servletRequest.setCharacterEncoding(StandardCharsets.UTF_8.name());
         StringBuilder body = new StringBuilder();
         char[] buffer = new char[1024];

@@ -28,7 +28,7 @@ public class McpOAuthGrantsDao extends CommonContextDao<McpOAuthGrant> {
     }
 
     public void createIndicesIfAbsent() {
-        // Listing indexes fails on a missing collection, which would silently skip the TTL index
+        // Create the collection first, or the TTL index is silently skipped
         createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
         Bson ttlIndex = Indexes.ascending(McpOAuthGrant.EXPIRES_AT);
         IndexOptions ttlOptions = new IndexOptions()
@@ -41,7 +41,7 @@ public class McpOAuthGrantsDao extends CommonContextDao<McpOAuthGrant> {
         insertOne(grant);
     }
 
-    // Atomic, so codes and refresh tokens are single-use; expiry is checked here as the TTL sweeper lags
+    // Atomic single-use; expiry is checked here because the TTL sweeper lags
     public McpOAuthGrant consume(String secretHash, String type) {
         return getMCollection().findOneAndDelete(Filters.and(
                 Filters.eq(McpOAuthGrant.ID, secretHash),
@@ -49,7 +49,7 @@ public class McpOAuthGrantsDao extends CommonContextDao<McpOAuthGrant> {
                 Filters.gt(McpOAuthGrant.EXPIRES_AT, new Date())));
     }
 
-    // Non-destructive read, used to show the consent page
+    // Non-destructive read for the consent page
     public McpOAuthGrant find(String secretHash, String type) {
         return findOne(Filters.and(
                 Filters.eq(McpOAuthGrant.ID, secretHash),

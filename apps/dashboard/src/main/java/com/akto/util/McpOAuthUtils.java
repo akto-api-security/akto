@@ -27,10 +27,10 @@ public class McpOAuthUtils {
     public static final String PARAM_CODE = "code";
     public static final String PARAM_STATE = "state";
     public static final String PARAM_ERROR = "error";
-    // Set on sessions that were built from an MCP access token (never on interactive logins)
+    // Marks sessions built from an MCP access token
     public static final String SESSION_MCP_TOKEN_AUTH = "mcpTokenAuth";
     public static final String DEFAULT_CLIENT_NAME = "MCP client";
-    // Public URL of the MCP server (RFC 8707 resource); when set, tokens are issued only for it
+    // Public MCP server URL (RFC 8707 resource); tokens are issued only for it
     public static final String MCP_RESOURCE_ENV = "MCP_PUBLIC_URL";
 
     // Must match the context sources the dashboard sends as x-context-source
@@ -49,12 +49,12 @@ public class McpOAuthUtils {
         return value == null || value.trim().isEmpty() ? null : value.trim();
     }
 
-    // A requested resource is fine when absent, when nothing to compare with, or when it equals the expected one
+    // Allowed when absent, when there is nothing to compare with, or when equal
     public static boolean isResourceAllowed(String requested, String expected) {
         return requested == null || expected == null || trimTrailingSlash(requested).equals(trimTrailingSlash(expected));
     }
 
-    // The configured resource is canonical; otherwise keep what the client asked for
+    // The configured resource wins; otherwise keep the client's
     public static String resolveResource(String requested, String configured) {
         return configured != null ? configured : requested;
     }
@@ -91,7 +91,7 @@ public class McpOAuthUtils {
         return value != null && value.length() > MAX_PARAM_LENGTH;
     }
 
-    // Grant keyed by the hash of its secret; callers fill in the remaining fields
+    // Grant keyed by the hash of its secret; callers fill in the rest
     public static McpOAuthGrant newGrant(String type, String secret, int ttlSeconds) {
         McpOAuthGrant grant = new McpOAuthGrant();
         grant.setId(sha256Hex(secret));
@@ -100,7 +100,7 @@ public class McpOAuthUtils {
         return grant;
     }
 
-    // Redirect back to the client with one result parameter (code or error) plus the echoed state
+    // Redirect to the client with a code or error plus the echoed state
     public static String redirectWith(String redirectUri, String state, String key, String value) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put(key, value);

@@ -32,7 +32,7 @@ public class McpOAuthConsentAction extends UserAction {
     private static final String INTERACTIVE_LOGIN_REQUIRED_MESSAGE = "Connections can only be approved from a signed-in Akto dashboard session.";
     private static final String NO_PRODUCT_ACCESS_MESSAGE = "You don't have access to any Akto product in this account. Ask an admin for access.";
 
-    // Request parameters; the fields below them are response-only
+    // Request params; the fields below are response-only
     @Setter
     private String requestId;
     @Setter
@@ -68,7 +68,7 @@ public class McpOAuthConsentAction extends UserAction {
     }
 
     public String approveAuthorizeRequest() {
-        // An access token or API key must not be able to approve a client, or it could mint a long-lived refresh token
+        // Tokens and API keys must not approve clients, or they could mint refresh tokens
         if (!isInteractiveSession()) {
             addActionError(INTERACTIVE_LOGIN_REQUIRED_MESSAGE);
             return ERROR.toUpperCase();
@@ -114,7 +114,7 @@ public class McpOAuthConsentAction extends UserAction {
                 || (!Boolean.TRUE.equals(session.get(McpOAuthUtils.SESSION_MCP_TOKEN_AUTH)) && session.get(SESSION_API_KEY_UTILITY) == null);
     }
 
-    // Products where the user has a role in the current account; NO_ACCESS products are left out
+    // Products where the user has a role in this account
     private List<String> accessibleContexts() {
         int userId = getSUser().getId();
         int currentAccountId = Context.accountId.get();
@@ -122,7 +122,7 @@ public class McpOAuthConsentAction extends UserAction {
         List<String> accessible = new ArrayList<>();
         try {
             for (String name : McpOAuthUtils.CONTEXT_SOURCES) {
-                // The role lookup reads the thread's current context, so evaluate each product in turn
+                // The role lookup uses the thread's context, so set it per product
                 Context.contextSource.set(CONTEXT_SOURCE.valueOf(name));
                 if (!Role.NO_ACCESS.equals(RBACDao.getCurrentRoleForUser(userId, currentAccountId))) {
                     accessible.add(name);

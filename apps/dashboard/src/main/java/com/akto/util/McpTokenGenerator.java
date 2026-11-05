@@ -19,7 +19,7 @@ public class McpTokenGenerator {
     private static final String CLAIM_AUDIENCE = "aud";
     private static final String CLAIM_CLIENT_ID = "client_id";
 
-    // Short-lived token for Ask Akto, scoped to the caller's current account and context
+    // Short-lived Ask Akto token for the current account and context
     public static String generateToken(String username){
         String contextSource = "api";
         int accountId;
@@ -34,7 +34,7 @@ public class McpTokenGenerator {
         return build(username, accountId, contextSource, new HashMap<>(), DEFAULT_TOKEN_MINUTES);
     }
 
-    // OAuth access token for external MCP clients; same shape as above plus audience and client id
+    // OAuth access token: same claims plus audience and client id
     public static String generateOAuthToken(String username, int accountId, String contextSource, String audience, String clientId) {
         Map<String,Object> extraClaims = new HashMap<>();
         if (audience != null && !audience.isEmpty()) {

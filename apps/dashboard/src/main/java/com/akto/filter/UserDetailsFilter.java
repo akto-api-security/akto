@@ -76,7 +76,7 @@ public class UserDetailsFilter implements Filter {
         if (!httpServletRequest.getRequestURI().contains(LOGIN_URI) && !httpServletRequest.getRequestURI().contains("/auth/login") && !httpServletRequest.getRequestURI().contains("api/googleConfig")) {
 
             boolean isSetupLink = "/dashboard/setup".equalsIgnoreCase(httpServletRequest.getRequestURI());
-            // Keep the query string so flows like the MCP OAuth consent page survive login
+            // Keep the query string so the consent page survives login
             String queryString = httpServletRequest.getQueryString();
             String target = httpServletRequest.getRequestURI() + (queryString == null ? "" : "?" + queryString);
             String redirectParam = isSetupLink ? "" : ("?redirect_uri=" + URLEncoder.encode(target, StandardCharsets.UTF_8));
@@ -173,7 +173,7 @@ public class UserDetailsFilter implements Filter {
                     try {
                         filterChain.doFilter(servletRequest, servletResponse);
                     } finally {
-                        // MCP clients send no cookies, so this session is never reused; end it instead of keeping it for the timeout
+                        // MCP clients send no cookies, so end the session instead of keeping it
                         try {
                             session.invalidate();
                         } catch (IllegalStateException ignored) {

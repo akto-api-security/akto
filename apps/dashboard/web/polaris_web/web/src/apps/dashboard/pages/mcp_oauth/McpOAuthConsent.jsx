@@ -35,7 +35,7 @@ function McpOAuthConsent() {
     const [pendingAction, setPendingAction] = useState(null)
     const submitting = pendingAction !== null
 
-    // The dashboard shell loads the Intercom launcher on every page; keep this screen distraction-free
+    // Hide the Intercom launcher on this screen
     useEffect(() => {
         window?.Intercom?.("update", { hide_default_launcher: true })
         return () => window?.Intercom?.("update", { hide_default_launcher: false })
@@ -52,7 +52,7 @@ function McpOAuthConsent() {
             .finally(() => setLoading(false))
     }, [requestId])
 
-    // Both outcomes hand control back to the MCP client through its redirect URL
+    // Both outcomes return to the MCP client via its redirect URL
     const submit = async (actionName, action) => {
         setPendingAction(actionName)
         try {
@@ -74,7 +74,7 @@ function McpOAuthConsent() {
         if (error || !info) {
             return <Banner tone="critical" title="Unable to continue">{error || EXPIRED_MESSAGE}</Banner>
         }
-        // Only products the user has a role in; the server re-checks the choice on approve
+        // Only products the user has a role in (re-checked on approve)
         const allowedOptions = CONTEXT_OPTIONS.filter((option) => info.allowedContexts?.includes(option.value))
         return (
             <LegacyCard>

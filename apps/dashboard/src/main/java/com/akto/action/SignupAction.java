@@ -1307,7 +1307,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
     String companyName, teamName;
     List<String> allEmails;
     String shouldLogin="false";
-    // Dashboard page the user was heading to before logging in (carried in the Auth0 state)
+    // Page the user was heading to before login (from the Auth0 state)
     private String returnPath;
 
 //    public String addSignupInfo() throws IOException {

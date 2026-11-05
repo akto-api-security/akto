@@ -32,7 +32,7 @@ public class McpOAuthClientsDao extends CommonContextDao<McpOAuthClient> {
 
     // Unused registrations clean themselves up
     public void createIndicesIfAbsent() {
-        // Listing indexes fails on a missing collection, which would silently skip the TTL index
+        // Create the collection first, or the TTL index is silently skipped
         createCollectionIfAbsent(getDBName(), getCollName(), new CreateCollectionOptions());
         Bson ttlIndex = Indexes.ascending(McpOAuthClient.LAST_USED_AT);
         IndexOptions ttlOptions = new IndexOptions()
