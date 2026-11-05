@@ -5,10 +5,18 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.Before;
+import org.apache.struts2.json.DefaultJSONWriter;
+import org.apache.struts2.json.JSONUtil;
 import org.junit.Test;
 
 import com.akto.MongoBasedTest;
@@ -136,5 +144,33 @@ public class TestMcpClientSettingsAction extends MongoBasedTest {
 
         action(ALLOWED).deleteMcpAllowedRedirectUri();
         assertFalse(refreshAlive("partner-token"));
+    }
+
+    // The page reads the saved settings from the response; struts' JSON plugin drops nested fields unless the parent is also included
+    @Test
+    public void everyAdminActionReturnsTheSavedSettingsThroughTheStrutsJsonResult() throws Exception {
+        action(ALLOWED).addMcpAllowedRedirectUri();
+        AdminSettingsAction on = new AdminSettingsAction();
+        on.setMcpKnownClientsOnly(true);
+        on.updateMcpKnownClientsOnly();
+        AdminSettingsAction last = action(ALLOWED);
+        last.addMcpAllowedRedirectUri();
+
+        String struts;
+        try (InputStream in = getClass().getResourceAsStream("/struts.xml")) {
+            struts = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        for (String name : new String[] { "updateMcpKnownClientsOnly", "addMcpAllowedRedirectUri", "deleteMcpAllowedRedirectUri" }) {
+            Matcher block = Pattern.compile("<action name=\"api/" + name + "\".*?name=\"includeProperties\">accountSettings([^<]*)</param>", Pattern.DOTALL).matcher(struts);
+            assertTrue(name + " must return accountSettings", block.find());
+            List<Pattern> includes = new ArrayList<>();
+            for (String pattern : ("accountSettings" + block.group(1)).split(",")) {
+                includes.add(Pattern.compile(pattern.trim()));
+            }
+            JSONUtil json = new JSONUtil();
+            json.setWriter(new DefaultJSONWriter());
+            String body = json.serialize(last, null, includes, true, false);
+            assertTrue(name + " -> " + body, body.contains("\"mcpKnownClientsOnly\":true") && body.contains("app.example.com"));
+        }
     }
 }

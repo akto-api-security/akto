@@ -967,7 +967,7 @@ public class AdminSettingsAction extends UserAction {
 
     // Admin switch: unknown https MCP clients can no longer be approved, and clients that are no longer allowed lose their refresh tokens
     public String updateMcpKnownClientsOnly() {
-        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.MCP_KNOWN_CLIENTS_ONLY, mcpKnownClientsOnly));
+        saveMcpSetting(Updates.set(AccountSettings.MCP_KNOWN_CLIENTS_ONLY, mcpKnownClientsOnly));
         McpClientPolicy.load().revokeDisallowedGrants();
         return reloadAccountSettings();
     }
@@ -984,14 +984,19 @@ public class AdminSettingsAction extends UserAction {
             addActionError("At most " + McpClientPolicy.MAX_ALLOWED_URIS + " URLs can be allowed. Remove one first.");
             return ERROR.toUpperCase();
         }
-        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.addToSet(AccountSettings.MCP_ALLOWED_REDIRECT_URIS, uri));
+        saveMcpSetting(Updates.addToSet(AccountSettings.MCP_ALLOWED_REDIRECT_URIS, uri));
         return reloadAccountSettings();
     }
 
     public String deleteMcpAllowedRedirectUri() {
-        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.pull(AccountSettings.MCP_ALLOWED_REDIRECT_URIS, mcpRedirectUri == null ? "" : mcpRedirectUri.trim()));
+        saveMcpSetting(Updates.pull(AccountSettings.MCP_ALLOWED_REDIRECT_URIS, mcpRedirectUri == null ? "" : mcpRedirectUri.trim()));
         McpClientPolicy.load().revokeDisallowedGrants();
         return reloadAccountSettings();
+    }
+
+    // Upsert: an account without a settings document yet must not lose the change silently
+    private void saveMcpSetting(Bson update) {
+        AccountSettingsDao.instance.getMCollection().updateOne(AccountSettingsDao.generateFilter(), update, new UpdateOptions().upsert(true));
     }
 
     private String reloadAccountSettings() {

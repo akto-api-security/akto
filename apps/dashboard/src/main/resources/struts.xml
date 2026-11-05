@@ -18965,7 +18965,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris.*</param>
+                <param name="includeProperties">accountSettings,accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris,accountSettings.mcpAllowedRedirectUris.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -18989,7 +18989,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris.*</param>
+                <param name="includeProperties">accountSettings,accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris,accountSettings.mcpAllowedRedirectUris.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -19013,7 +19013,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris.*</param>
+                <param name="includeProperties">accountSettings,accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris,accountSettings.mcpAllowedRedirectUris.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
