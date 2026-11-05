@@ -407,7 +407,7 @@ public class SkillValidationV3Action extends ActionSupport {
             SkillThreatReporterV3.reportThreat(
                     new SkillThreatReporterV3.SkillRef(skillName, skillDescription, skillContent, agentName,
                             collectionName, requestAuthToken()),
-                    buildThreat(maliciousFinding, maliciousScore, evidence, overview, remediation, owaspCategories,
+                    buildThreat(maliciousFinding, riskScore, evidence, overview, remediation, owaspCategories,
                             threatCategoryIds));
         }
 
@@ -547,7 +547,8 @@ public class SkillValidationV3Action extends ActionSupport {
         return findings.stream().map(f -> f.criteria.getLabel()).distinct().collect(Collectors.toList());
     }
 
-    static SkillThreatReporterV3.Threat buildThreat(Finding maliciousFinding, double maliciousScore, String evidence,
+    /** riskScore is the 0-5 score the revalidation job saves on the skill, so the event carries the same one. */
+    static SkillThreatReporterV3.Threat buildThreat(Finding maliciousFinding, double riskScore, String evidence,
             String overview, String remediation, List<Map<String, String>> owaspCategories,
             List<String> threatCategoryIds) {
         List<Map<String, String>> threatCategories = owaspCategories.stream()
@@ -562,7 +563,7 @@ public class SkillValidationV3Action extends ActionSupport {
         return new SkillThreatReporterV3.Threat(
                 maliciousFinding.criteria.getLabel(),
                 severity,
-                maliciousScore,
+                riskScore,
                 maliciousFinding.reason,
                 evidence,
                 overview,

@@ -94,7 +94,8 @@ public class SkillThreatReporterV3 {
         try {
             post(THREAT_DETECTION_API_URL, body, bearer(skill.authToken));
             logger.infoAndAddToDb("[SkillValidationV3] guardrail activity raised skill=" + skill.skillName
-                    + " tag=" + threat.tag + " severity=" + threat.severity, LogDb.DB_ABS);
+                    + " tag=" + threat.tag + " severity=" + threat.severity + " riskScore=" + threat.riskScore,
+                    LogDb.DB_ABS);
         } catch (Exception e) {
             logger.errorAndAddToDb("[SkillValidationV3] guardrail activity failed skill=" + skill.skillName
                     + ": " + e.getMessage(), LogDb.DB_ABS);
