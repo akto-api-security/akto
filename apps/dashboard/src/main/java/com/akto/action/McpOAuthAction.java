@@ -114,7 +114,7 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         }
         for (String uri : redirectUris) {
             if (!McpOAuthUtils.isAllowedRedirectUri(uri)) {
-                writeError(400, INVALID_REDIRECT_URI, "redirect_uris must be https, http on loopback, or a reverse-domain app scheme");
+                writeError(400, INVALID_REDIRECT_URI, "redirect_uris must be https, http on loopback, or an app scheme such as cursor://");
                 return;
             }
         }
