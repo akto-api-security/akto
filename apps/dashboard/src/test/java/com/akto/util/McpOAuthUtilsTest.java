@@ -148,14 +148,30 @@ public class McpOAuthUtilsTest {
     }
 
     @Test
-    public void knownRedirectsSkipTheUnverifiedWarning() {
+    public void knownRedirectsAreExactUrisNotHostsOrSubdomains() {
         assertTrue(McpOAuthUtils.isKnownRedirect("https://claude.ai/api/mcp/auth_callback"));
-        assertTrue(McpOAuthUtils.isKnownRedirect("https://app.cursor.com/cb"));
+        assertTrue(McpOAuthUtils.isKnownRedirect("https://chatgpt.com/connector_platform_oauth_redirect"));
+        assertTrue(McpOAuthUtils.isKnownRedirect("https://chatgpt.com/connector/oauth/abc123"));
         assertTrue(McpOAuthUtils.isKnownRedirect("http://localhost:6274/cb"));
         assertTrue(McpOAuthUtils.isKnownRedirect("cursor://anysphere.cursor-mcp/oauth/callback"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://claude.ai/some/other/page"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://claude.ai/api/mcp/auth_callback/extra"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://user-content.claude.ai/api/mcp/auth_callback"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://chatgpt.com/connector/oauthx"));
+        assertFalse(McpOAuthUtils.isKnownRedirect("https://app.cursor.com/cb"));
         assertFalse(McpOAuthUtils.isKnownRedirect("https://attacker.example.com/cb"));
         assertFalse(McpOAuthUtils.isKnownRedirect("https://claude.ai.attacker.example.com/cb"));
-        assertFalse(McpOAuthUtils.isKnownRedirect("https://notclaude.ai/cb"));
+    }
+
+    @Test
+    public void requestBindingCookieIsHttpOnlyLaxAndSecureOnlyOverTls() {
+        String hash = McpOAuthUtils.sha256Hex("request-secret");
+        assertEquals("mcp_oauth_" + hash.substring(0, 16), McpOAuthUtils.requestBindingCookieName(hash));
+        String plain = McpOAuthUtils.requestBindingCookie(hash, false);
+        assertTrue(plain.startsWith("mcp_oauth_" + hash.substring(0, 16) + "=" + hash));
+        assertTrue(plain.contains("HttpOnly") && plain.contains("SameSite=Lax") && plain.contains("Max-Age=" + McpOAuthUtils.REQUEST_TTL_SECONDS));
+        assertFalse(plain.contains("Secure"));
+        assertTrue(McpOAuthUtils.requestBindingCookie(hash, true).endsWith("; Secure"));
     }
 
     @Test

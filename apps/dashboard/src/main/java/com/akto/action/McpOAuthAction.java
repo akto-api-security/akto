@@ -192,6 +192,8 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
         request.setResource(McpOAuthUtils.resolveResource(resource, configuredResource));
         McpOAuthGrantsDao.instance.insert(request);
 
+        // Only the browser that started this request can approve it
+        servletResponse.addHeader("Set-Cookie", McpOAuthUtils.requestBindingCookie(McpOAuthUtils.sha256Hex(requestSecret), isSecureRequest()));
         servletResponse.sendRedirect(CONSENT_PATH + URLEncoder.encode(requestSecret, StandardCharsets.UTF_8));
         return;
     }
@@ -347,6 +349,11 @@ public class McpOAuthAction implements Action, ServletRequestAware, ServletRespo
             }
         }
         return false;
+    }
+
+    // TLS is usually terminated in front of the dashboard, so also trust the forwarded protocol
+    private boolean isSecureRequest() {
+        return servletRequest.isSecure() || "https".equalsIgnoreCase(servletRequest.getHeader("X-Forwarded-Proto"));
     }
 
     private boolean isPost() {

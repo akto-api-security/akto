@@ -4,6 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+
+import org.apache.struts2.interceptor.ServletRequestAware;
+
 import com.akto.dao.AccountsDao;
 import com.akto.dao.McpOAuthClientsDao;
 import com.akto.dao.McpOAuthGrantsDao;
@@ -18,17 +23,19 @@ import com.akto.util.McpOAuthUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 
 // Logged-in user approves or denies an MCP client's pending authorize request
 @Getter
-public class McpOAuthConsentAction extends UserAction {
+public class McpOAuthConsentAction extends UserAction implements ServletRequestAware {
 
     private static final String EXPIRED_MESSAGE = "This authorization request has expired. Start the connection again from your MCP client.";
     private static final String ACCESS_DENIED = "access_denied";
     private static final String SESSION_API_KEY_UTILITY = "utility";
     private static final String INTERACTIVE_LOGIN_REQUIRED_MESSAGE = "Connections can only be approved from a signed-in Akto dashboard session.";
+    private static final String NOT_STARTED_HERE_MESSAGE = "This connection was not started in this browser. Start it again from your MCP client.";
     private static final String CONFIRM_UNVERIFIED_MESSAGE = "Confirm that you trust this app to continue.";
     private static final String NO_PRODUCT_ACCESS_MESSAGE = "You don't have access to any Akto product in this account. Ask an admin for access.";
 
@@ -47,14 +54,25 @@ public class McpOAuthConsentAction extends UserAction {
     private String redirectUrl;
     private List<String> allowedContexts;
     private boolean unverifiedRedirect;
+    private String redirectUri;
+    private int clientCreatedAt;
+
+    @Getter(AccessLevel.NONE)
+    private HttpServletRequest servletRequest;
 
     public String fetchAuthorizeRequest() {
         McpOAuthGrant request = McpOAuthGrantsDao.instance.find(hashOfRequestId(), McpOAuthGrant.TYPE_REQUEST);
         if (request == null) {
             return expired();
         }
+        if (!startedInThisBrowser()) {
+            addActionError(NOT_STARTED_HERE_MESSAGE);
+            return ERROR.toUpperCase();
+        }
         McpOAuthClient client = McpOAuthClientsDao.instance.findById(request.getClientId());
         clientName = client == null ? McpOAuthUtils.DEFAULT_CLIENT_NAME : client.getClientName();
+        clientCreatedAt = client == null ? 0 : client.getCreatedAt();
+        redirectUri = request.getRedirectUri();
         redirectHost = McpOAuthUtils.redirectDisplayHost(request.getRedirectUri());
         unverifiedRedirect = !McpOAuthUtils.isKnownRedirect(request.getRedirectUri());
         int currentAccountId = Context.accountId.get();
@@ -75,6 +93,10 @@ public class McpOAuthConsentAction extends UserAction {
         // Tokens and API keys must not approve clients, or they could mint refresh tokens
         if (!isInteractiveSession()) {
             addActionError(INTERACTIVE_LOGIN_REQUIRED_MESSAGE);
+            return ERROR.toUpperCase();
+        }
+        if (!startedInThisBrowser()) {
+            addActionError(NOT_STARTED_HERE_MESSAGE);
             return ERROR.toUpperCase();
         }
         String chosenContext = contextSource == null ? Context.contextSource.get().name() : contextSource.toUpperCase();
@@ -118,6 +140,21 @@ public class McpOAuthConsentAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    // The authorize endpoint sets a cookie in the browser that started the request, so a consent link sent to someone else fails
+    private boolean startedInThisBrowser() {
+        if (servletRequest == null || servletRequest.getCookies() == null) {
+            return false;
+        }
+        String requestHash = hashOfRequestId();
+        String cookieName = McpOAuthUtils.requestBindingCookieName(requestHash);
+        for (Cookie cookie : servletRequest.getCookies()) {
+            if (cookieName.equals(cookie.getName()) && requestHash.equals(cookie.getValue())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isInteractiveSession() {
         Map<String, Object> session = getSession();
         return session != null
@@ -157,5 +194,10 @@ public class McpOAuthConsentAction extends UserAction {
     private String expired() {
         addActionError(EXPIRED_MESSAGE);
         return ERROR.toUpperCase();
+    }
+
+    @Override
+    public void setServletRequest(HttpServletRequest request) {
+        this.servletRequest = request;
     }
 }

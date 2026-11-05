@@ -60,6 +60,7 @@ public class TestMcpOAuthFlow extends MongoBasedTest {
         String body = "";
         String redirect;
         String allow;
+        String cookie;
     }
 
     private static class ConfiguredAction extends McpOAuthAction {
@@ -112,6 +113,7 @@ public class TestMcpOAuthFlow extends MongoBasedTest {
         doAnswer(invocation -> { out.status = invocation.getArgument(0); return null; }).when(response).sendError(anyInt(), anyString());
         doAnswer(invocation -> { out.status = 302; out.redirect = invocation.getArgument(0); return null; }).when(response).sendRedirect(anyString());
         doAnswer(invocation -> { if ("Allow".equals(invocation.getArgument(0))) { out.allow = invocation.getArgument(1); } return null; }).when(response).setHeader(anyString(), anyString());
+        doAnswer(invocation -> { if ("Set-Cookie".equals(invocation.getArgument(0))) { out.cookie = invocation.getArgument(1); } return null; }).when(response).addHeader(anyString(), anyString());
 
         action.setServletRequest(request);
         action.setServletResponse(response);
@@ -201,6 +203,12 @@ public class TestMcpOAuthFlow extends MongoBasedTest {
                 "code_challenge", CHALLENGE, "code_challenge_method", "S256", "state", "s1", "resource", RESOURCE), null);
         assertEquals(302, out.status);
         assertTrue(out.redirect.startsWith("/dashboard/mcp-oauth/consent?request_id="));
+
+        // The consent request is bound to this browser by a cookie derived from the request id
+        String requestId = out.redirect.substring(out.redirect.indexOf("=") + 1);
+        String hash = McpOAuthUtils.sha256Hex(requestId);
+        assertTrue(out.cookie.startsWith(McpOAuthUtils.requestBindingCookieName(hash) + "=" + hash));
+        assertTrue(out.cookie.contains("HttpOnly"));
     }
 
     @Test

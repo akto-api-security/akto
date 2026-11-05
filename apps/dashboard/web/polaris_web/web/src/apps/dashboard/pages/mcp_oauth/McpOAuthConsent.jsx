@@ -9,6 +9,15 @@ const CONTEXT_OPTIONS = Object.entries(PRODUCT_LABELS).map(([value, label]) => (
 
 const EXPIRED_MESSAGE = "This authorization request is invalid or has expired. Start the connection again from your MCP client."
 
+const SECONDS_PER_DAY = 24 * 60 * 60
+
+// A brand-new registration is a signal worth showing next to the destination
+const registeredLabel = (createdAt) => {
+    if (!createdAt) return null
+    const days = Math.floor((Date.now() / 1000 - createdAt) / SECONDS_PER_DAY)
+    return days < 1 ? "Today" : `${days} day${days === 1 ? "" : "s"} ago`
+}
+
 const contextLabel = (value) => CONTEXT_OPTIONS.find((option) => option.value === value)?.label || value
 
 function DetailRow({ label, value }) {
@@ -100,7 +109,13 @@ function McpOAuthConsent() {
                         <Divider />
                         <DetailRow label="Account" value={info.accountName} />
                         <Divider />
-                        <DetailRow label="Redirects to" value={info.redirectHost} />
+                        <DetailRow label="Redirects to" value={info.redirectUri || info.redirectHost} />
+                        {registeredLabel(info.clientCreatedAt) ? (
+                            <>
+                                <Divider />
+                                <DetailRow label="App registered" value={registeredLabel(info.clientCreatedAt)} />
+                            </>
+                        ) : null}
                     </VerticalStack>
                 </LegacyCard.Section>
                 <LegacyCard.Section>

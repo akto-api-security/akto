@@ -42,8 +42,8 @@ public class McpOAuthUtils {
     // Must match the context sources the dashboard sends as x-context-source
     public static final List<String> CONTEXT_SOURCES = Arrays.asList("API", "AGENTIC", "DAST", "ENDPOINT");
 
-    // Comma-separated override of the redirect hosts shown without an "unverified app" warning
-    public static final String KNOWN_REDIRECT_HOSTS_ENV = "MCP_OAUTH_KNOWN_REDIRECT_HOSTS";
+    // Comma-separated override of the https redirect URIs shown without an "unverified app" warning; a trailing * matches a prefix
+    public static final String KNOWN_REDIRECT_URIS_ENV = "MCP_OAUTH_KNOWN_REDIRECT_URIS";
 
     // The only dashboard APIs an OAuth token may call; keep in sync with akto_mcp src/tools/tool-endpoints.json
     private static final Set<String> MCP_TOOL_ENDPOINTS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
@@ -103,7 +103,12 @@ public class McpOAuthUtils {
 
     private static final int MAX_REDIRECT_URI_LENGTH = 2048;
     private static final List<String> LOOPBACK_HOSTS = Arrays.asList("localhost", "127.0.0.1", "[::1]");
-    private static final List<String> DEFAULT_KNOWN_REDIRECT_HOSTS = Arrays.asList("claude.ai", "claude.com", "chatgpt.com", "vscode.dev", "cursor.com");
+    private static final List<String> DEFAULT_KNOWN_REDIRECT_URIS = Arrays.asList(
+            "https://claude.ai/api/mcp/auth_callback",
+            "https://claude.com/api/mcp/auth_callback",
+            "https://chatgpt.com/connector_platform_oauth_redirect",
+            "https://chatgpt.com/connector/oauth/*",
+            "https://vscode.dev/redirect");
     // RFC 8252 7.1 private-use schemes (cursor://, vscode://, com.example.app:/); never schemes a browser would execute or read from disk
     private static final Pattern APP_SCHEME = Pattern.compile("^[a-z][a-z0-9+.-]*$");
     private static final List<String> BLOCKED_SCHEMES = Arrays.asList("javascript", "data", "vbscript", "file", "about", "blob", "filesystem", "view-source", "chrome", "chrome-extension", "moz-extension", "ftp", "ws", "wss");
@@ -232,7 +237,7 @@ public class McpOAuthUtils {
         return parsed.getHost() != null ? parsed.getHost() : parsed.getScheme();
     }
 
-    // Loopback and app-scheme redirects stay on the user's device; https hosts must be known
+    // Loopback and app-scheme redirects stay on the user's device; https redirects must be on the known list
     public static boolean isKnownRedirect(String uri) {
         URI parsed = parse(uri);
         if (parsed == null) {
@@ -241,27 +246,36 @@ public class McpOAuthUtils {
         if (!"https".equalsIgnoreCase(parsed.getScheme())) {
             return true;
         }
-        String host = parsed.getHost() == null ? "" : parsed.getHost().toLowerCase(Locale.ROOT);
-        for (String known : knownRedirectHosts()) {
-            if (host.equals(known) || host.endsWith("." + known)) {
+        for (String known : knownRedirectUris()) {
+            boolean prefix = known.endsWith("*");
+            if (prefix ? uri.startsWith(known.substring(0, known.length() - 1)) : uri.equals(known)) {
                 return true;
             }
         }
         return false;
     }
 
-    private static List<String> knownRedirectHosts() {
-        String configured = System.getenv(KNOWN_REDIRECT_HOSTS_ENV);
+    private static List<String> knownRedirectUris() {
+        String configured = System.getenv(KNOWN_REDIRECT_URIS_ENV);
         if (configured == null || configured.trim().isEmpty()) {
-            return DEFAULT_KNOWN_REDIRECT_HOSTS;
+            return DEFAULT_KNOWN_REDIRECT_URIS;
         }
-        List<String> hosts = new ArrayList<>();
-        for (String host : configured.split(",")) {
-            if (!host.trim().isEmpty()) {
-                hosts.add(host.trim().toLowerCase(Locale.ROOT));
+        List<String> uris = new ArrayList<>();
+        for (String uri : configured.split(",")) {
+            if (!uri.trim().isEmpty()) {
+                uris.add(uri.trim());
             }
         }
-        return hosts;
+        return uris;
+    }
+
+    // The consent request is bound to the browser that started it: the cookie name derives from the request hash
+    public static String requestBindingCookieName(String requestHash) {
+        return "mcp_oauth_" + requestHash.substring(0, 16);
+    }
+
+    public static String requestBindingCookie(String requestHash, boolean secure) {
+        return requestBindingCookieName(requestHash) + "=" + requestHash + "; Path=/; Max-Age=" + REQUEST_TTL_SECONDS + "; HttpOnly; SameSite=Lax" + (secure ? "; Secure" : "");
     }
 
     private static URI parse(String uri) {

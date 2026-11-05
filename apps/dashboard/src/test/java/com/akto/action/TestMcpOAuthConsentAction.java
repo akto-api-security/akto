@@ -5,9 +5,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -57,19 +62,57 @@ public class TestMcpOAuthConsentAction extends MongoBasedTest {
         McpOAuthGrantsDao.instance.insert(request);
     }
 
-    private McpOAuthConsentAction action(Map<String, Object> extraSession) {
+    private static HttpServletRequest requestWith(Cookie... cookies) {
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        when(request.getCookies()).thenReturn(cookies.length == 0 ? null : cookies);
+        return request;
+    }
+
+    // The cookie the authorize endpoint sets in the browser that started the request
+    private static Cookie bindingCookie() {
+        String hash = McpOAuthUtils.sha256Hex(REQUEST_SECRET);
+        return new Cookie(McpOAuthUtils.requestBindingCookieName(hash), hash);
+    }
+
+    private McpOAuthConsentAction action(Map<String, Object> extraSession, HttpServletRequest request) {
         Map<String, Object> session = new HashMap<>();
         session.put("user", user);
         session.putAll(extraSession);
         McpOAuthConsentAction action = new McpOAuthConsentAction();
         action.setSession(session);
+        action.setServletRequest(request);
         action.setRequestId(REQUEST_SECRET);
         action.setContextSource("API");
         return action;
     }
 
+    private McpOAuthConsentAction action(Map<String, Object> extraSession) {
+        return action(extraSession, requestWith(bindingCookie()));
+    }
+
     private boolean requestStillParked() {
         return McpOAuthGrantsDao.instance.find(McpOAuthUtils.sha256Hex(REQUEST_SECRET), McpOAuthGrant.TYPE_REQUEST) != null;
+    }
+
+    @Test
+    public void aConsentLinkOpenedInAnotherBrowserCannotApproveOrBeFetched() {
+        parkRequest(KNOWN_REDIRECT);
+        assertEquals("ERROR", action(new HashMap<>(), requestWith()).approveAuthorizeRequest());
+        assertEquals("ERROR", action(new HashMap<>(), requestWith(new Cookie("mcp_oauth_other", "x"))).approveAuthorizeRequest());
+        assertEquals("ERROR", action(new HashMap<>(), requestWith()).fetchAuthorizeRequest());
+        assertTrue(requestStillParked());
+
+        String wrongValue = McpOAuthUtils.requestBindingCookieName(McpOAuthUtils.sha256Hex(REQUEST_SECRET));
+        assertEquals("ERROR", action(new HashMap<>(), requestWith(new Cookie(wrongValue, "not-the-hash"))).approveAuthorizeRequest());
+        assertTrue(requestStillParked());
+    }
+
+    @Test
+    public void fetchReturnsTheFullRedirectUri() {
+        parkRequest(UNKNOWN_REDIRECT);
+        McpOAuthConsentAction action = action(new HashMap<>());
+        assertEquals("SUCCESS", action.fetchAuthorizeRequest());
+        assertEquals(UNKNOWN_REDIRECT, action.getRedirectUri());
     }
 
     @Test
@@ -127,6 +170,7 @@ public class TestMcpOAuthConsentAction extends MongoBasedTest {
     public void aMissingSessionFailsClosed() {
         parkRequest(KNOWN_REDIRECT);
         McpOAuthConsentAction action = new McpOAuthConsentAction();
+        action.setServletRequest(requestWith(bindingCookie()));
         action.setRequestId(REQUEST_SECRET);
         assertEquals("ERROR", action.approveAuthorizeRequest());
         assertTrue(requestStillParked());
