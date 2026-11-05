@@ -240,6 +240,7 @@ import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.jobs.MatchingJob;
+import com.akto.utils.jobs.MismatchedSampleCleanupScheduler;
 import com.akto.utils.scripts.BackwardCompatibilityUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
@@ -2676,6 +2677,17 @@ public class InitializerListener implements ServletContextListener {
                         } catch (InterruptedException ignored) {}
                     }
                 } while (!connectedToMongo);
+
+                // Dedicated mismatch-cleanup container (MISMATCH_CLEANUP_ENABLED=true): run only the cleanup.
+                // Every other job/cron below is skipped on purpose, since the regular prod dashboard is already
+                // running them against the same Mongo and would otherwise run twice.
+                if (MismatchedSampleCleanupScheduler.isEnabled()) {
+                    MismatchedSampleCleanupScheduler.start();
+                    if (MismatchedSampleCleanupScheduler.isCleanupOnly()) {
+                        logger.warn("[mismatch-cleanup] cleanup-only container: all other dashboard jobs are skipped");
+                        return;
+                    }
+                }
 
                 int now = Context.now();
                 logger.info("[initCheck] gating decision: runJobFunctions=" + runJobFunctions
