@@ -31,13 +31,22 @@ func (s *Source) loginsFirst(results []dbabstractor.FileInspectionResult) []dbab
 	ordered := make([]dbabstractor.FileInspectionResult, 0, len(results))
 	var rest []dbabstractor.FileInspectionResult
 	for _, r := range results {
-		if t, ok := s.lookupTarget(r.RuleID); ok && t.Login != nil {
+		if t, ok := s.resultTarget(r); ok && t.Login != nil {
 			ordered = append(ordered, r)
 		} else {
 			rest = append(rest, r)
 		}
 	}
 	return append(ordered, rest...)
+}
+
+// resultTarget is the parser for a result: from its agent and role when the shield set them, else
+// from the rule guardrails registered.
+func (s *Source) resultTarget(r dbabstractor.FileInspectionResult) (Target, bool) {
+	if r.Agent != "" {
+		return agentTarget(r)
+	}
+	return s.lookupTarget(r.RuleID)
 }
 
 // homeOf is the home of the OS user whose agent produced the result: reported by the shield, or

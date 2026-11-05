@@ -136,16 +136,6 @@ func (s *Source) refreshRules(ctx context.Context) error {
 		}
 	}
 
-	rules, err := s.client.FetchFileInspectionRulesV2()
-	if err != nil {
-		return err
-	}
-	for _, r := range rules {
-		if t, ok := agentTarget(r); ok && r.IDHex != "" {
-			tmpMap[r.IDHex] = t
-		}
-	}
-
 	s.mu.Lock()
 	s.ruleIDToTarget = tmpMap
 	s.mu.Unlock()
@@ -190,6 +180,14 @@ func (s *Source) drainResults(ctx context.Context) error {
 }
 
 func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
+	if r.Agent != "" {
+		target, ok := agentTarget(r)
+		if !ok {
+			return // agent or role without a parser yet
+		}
+		s.processMatches(r, target)
+		return
+	}
 	target, ok := s.lookupTarget(r.RuleID)
 	if !ok {
 		// Result came from a rule we didn't register (e.g. created by another
@@ -206,7 +204,10 @@ func (s *Source) processResult(r dbabstractor.FileInspectionResult) {
 		zap.String("ruleId", r.RuleID),
 		zap.String("agent", target.AgentName),
 		zap.Int("matches", len(r.Matches)))
+	s.processMatches(r, target)
+}
 
+func (s *Source) processMatches(r dbabstractor.FileInspectionResult, target Target) {
 	for _, m := range r.Matches {
 		if m.IsDir != nil && *m.IsDir {
 			continue
