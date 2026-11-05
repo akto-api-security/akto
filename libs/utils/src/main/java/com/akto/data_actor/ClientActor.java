@@ -5172,6 +5172,23 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public OriginalHttpResponse relayRedteamLearnings(String apiName, String requestJson) {
+        try {
+            return ApiExecutor.sendRequestBackOff(buildRelayRedteamLearningsRequest(apiName, requestJson), true, null, false, null);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in relayRedteamLearnings " + apiName + ": " + e, LoggerMaker.LogDb.TESTING);
+            return null;
+        }
+    }
+
+    static OriginalHttpRequest buildRelayRedteamLearningsRequest(String apiName, String requestJson) {
+        if (!REDTEAM_LEARNING_APIS.contains(apiName)) {
+            throw new IllegalArgumentException("not a red-team learning API: " + apiName);
+        }
+        return new OriginalHttpRequest(url + "/" + apiName, "", "POST", requestJson, buildHeaders(), "");
+    }
+
     static OriginalHttpRequest buildFetchAgentModelsRequest() {
         return new OriginalHttpRequest(url + "/fetchAgentModels", "", "POST", "{}", buildHeaders(), "");
     }

@@ -394,6 +394,17 @@ public abstract class DataActor {
      */
     public abstract List<Map<String, Object>> fetchAgentModels();
 
+    /**
+     * Relays a red-team learning request (raw JSON, passed through untouched so ids and numbers keep their exact
+     * values) to the database-abstractor endpoint of the same name, one of REDTEAM_LEARNING_APIS. Returns the
+     * abstractor's response, status and body as they came, or null when it could not be reached.
+     */
+    public abstract OriginalHttpResponse relayRedteamLearnings(String apiName, String requestJson);
+
+    public static final java.util.Set<String> REDTEAM_LEARNING_APIS = java.util.Collections.unmodifiableSet(
+            new java.util.HashSet<>(java.util.Arrays.asList("storeRedteamObservations", "fetchRedteamConsolidationInput",
+                    "saveRedteamProfile", "fetchLatestRedteamProfile")));
+
     public abstract Map<String, String> fetchDeviceUserMap();
 
     public abstract Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap();

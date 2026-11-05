@@ -877,6 +877,12 @@ public class DbActor extends DataActor {
         return new ArrayList<>();
     }
 
+    public OriginalHttpResponse relayRedteamLearnings(String apiName, String requestJson) {
+        // Red-team learnings live behind the database-abstractor (ClientActor); there is no local store, so this is
+        // reported as unreachable rather than answered with an empty result.
+        return null;
+    }
+
     public Map<String, String> fetchDeviceUserMap() {
         return new HashMap<>();
     }

@@ -61,6 +61,9 @@ public class UtilityServer {
             register("/utility/sendLogs", new SendLogsHandler(dataActor), auth);
             register("/utility/fetchAgentModels", new FetchAgentModelsHandler(dataActor), auth);
             register("/utility/ingestTraffic", new TrafficIngestHandler(), auth);
+            for (String apiName : DataActor.REDTEAM_LEARNING_APIS) {
+                register("/utility/" + apiName, new RedteamLearningsHandler(dataActor, apiName), auth);
+            }
             server.setExecutor(null);
             server.start();
             started = true;
