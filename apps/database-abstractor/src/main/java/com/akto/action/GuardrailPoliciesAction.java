@@ -76,4 +76,16 @@ public class GuardrailPoliciesAction extends ActionSupport {
 
         return SUCCESS.toUpperCase();
     }
+
+    private List<String> orgEmailDomains;
+
+    public String fetchOrgEmailDomains() {
+        try {
+            this.orgEmailDomains = DbLayer.fetchOrgEmailDomains();
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching org email domains: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+    }
 }

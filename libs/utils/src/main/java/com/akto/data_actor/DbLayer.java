@@ -276,7 +276,7 @@ public class DbLayer {
         updateList.add(Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()));
         updateList.add(Updates.set(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()));
         updateList.add(Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()));
-        updateList.add(Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)));
+        updateList.add(expiresAtUpdate(moduleInfo.getModuleType()));
         // lastHeartbeatReceived is a primitive int, so a payload that omits it arrives as 0 —
         // skip the update in that case instead of wiping the stored timestamp.
         if (moduleInfo.getLastHeartbeatReceived() != 0) {
@@ -334,6 +334,13 @@ public class DbLayer {
     private static final String ORGANIZATION_TYPE_KEY = "organizationType";
     // Agents that predate organizationType report the same plan string as accountType.
     private static final String ACCOUNT_TYPE_KEY = "accountType";
+
+    private static Bson expiresAtUpdate(ModuleInfo.ModuleType moduleType) {
+        if (moduleType == ModuleInfo.ModuleType.MCP_ENDPOINT_SHIELD) {
+            return Updates.unset(ModuleInfo.EXPIRES_AT);
+        }
+        return Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS));
+    }
 
     private static void syncAgentUserFromModuleInfo(ModuleInfo moduleInfo) {
         if (moduleInfo == null) {
@@ -589,7 +596,7 @@ public class DbLayer {
                     Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                     Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
                     Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
-                    Updates.setOnInsert(ModuleInfo.EXPIRES_AT, new java.util.Date(System.currentTimeMillis() + ModuleInfoDao.MODULE_INFO_TTL_MS)),
+                    expiresAtUpdate(moduleInfo.getModuleType()),
                     Updates.set(ModuleInfo.ADDITIONAL_DATA, moduleInfo.getAdditionalData()),
                     Updates.set(ModuleInfo.MINI_RUNTIME_NAME, moduleInfo.getMiniRuntimeName()),
                     Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived()),
@@ -1210,6 +1217,11 @@ public class DbLayer {
 //    }
 
     public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId) {
+        return fetchStiBasedOnHostHeaders(objectId, 0);
+    }
+
+    /** lastSeenGte > 0 limits the result to host-header STIs seen at or after that timestamp; 0 means all of them. */
+    public static List<SingleTypeInfo> fetchStiBasedOnHostHeaders(ObjectId objectId, int lastSeenGte) {
         List<SingleTypeInfo> results = new ArrayList<>();
         ObjectId currentObjectId = objectId;
         Set<Integer> routingCollectionIds = null;
@@ -1227,6 +1239,9 @@ public class DbLayer {
         // Keep fetching until we get a non-empty list or exhaust documents
         while (results.isEmpty()) {
             Bson filterForHostHeader = SingleTypeInfoDao.filterForHostHeader(-1, false);
+            if (lastSeenGte > 0) {
+                filterForHostHeader = Filters.and(filterForHostHeader, Filters.gte(SingleTypeInfo.LAST_SEEN, lastSeenGte));
+            }
             Bson filterForSkip = currentObjectId == null ? null : Filters.gt("_id", currentObjectId);
             Bson finalFilter = filterForSkip == null ? filterForHostHeader : Filters.and(filterForHostHeader, filterForSkip);
 
@@ -1281,6 +1296,18 @@ public class DbLayer {
         }
 
         return results;
+    }
+
+    /**
+     * How many STIs a full walk of fetchStiBasedOnHostHeaders returns, or -1 if that can't be known cheaply.
+     * For the accounts whose results are filtered in Java after the query the DB count would overstate it.
+     */
+    public static long countStiBasedOnHostHeaders() {
+        Integer accountId = Context.accountId.get();
+        if (accountId != null && (accountId == Constants.ROUTING_SKIP_ACCOUNT_ID || accountId == Constants.MERGED_URLS_FILTER_ACCOUNT_ID)) {
+            return -1;
+        }
+        return SingleTypeInfoDao.instance.getMCollection().countDocuments(SingleTypeInfoDao.filterForHostHeader(-1, false));
     }
 
     private static Set<Integer> getRoutingCollectionIds() {
@@ -4122,6 +4149,23 @@ public class DbLayer {
         }
     }
 
+    // Distinct email domains of this account's users; throws on error so callers keep their old list.
+    public static List<String> fetchOrgEmailDomains() {
+        Set<String> domains = new HashSet<>();
+        List<User> users = UsersDao.instance.findAll(Filters.exists("accounts." + Context.accountId.get()), Projections.include(User.LOGIN));
+        for (User user : users) {
+            String login = user.getLogin();
+            if (login == null || !login.contains("@")) {
+                continue;
+            }
+            String domain = login.substring(login.lastIndexOf('@') + 1).trim().toLowerCase();
+            if (!domain.isEmpty()) {
+                domains.add(domain);
+            }
+        }
+        return new ArrayList<>(domains);
+    }
+
     public static List<String> findDeviceIdsByTags(Map<String, List<String>> tagFilters, Map<String, Boolean> negatedTagFilters,
                                                     List<String> deviceIds, boolean negatedDeviceIds) {
         try {
@@ -4712,15 +4756,23 @@ public class DbLayer {
             updates.add(Updates.setOnInsert(NhiIdentity.LAST_ROTATED_AT, now));
         }
 
-        // Owner: inferred from deviceLabel. Set on insert; backfill for older records
-        // that were created before this field was populated (owner == null).
-        if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
+        // Owner: the scanner sends the signed-in user of the agent that holds the credential
+        // (email). It is the current login, so it always wins. Without an email the owner is
+        // inferred from deviceLabel: set on insert; backfill for older records that were
+        // created before this field was populated (owner == null).
+        NhiIdentity.Owner sentOwner = identity.getOwner();
+        if (sentOwner != null && StringUtils.isNotBlank(sentOwner.getEmail())) {
+            NhiIdentity.Owner o = new NhiIdentity.Owner();
+            o.setEmail(sentOwner.getEmail());
+            o.setName(StringUtils.isNotBlank(sentOwner.getName()) ? sentOwner.getName() : identity.getDeviceLabel());
+            updates.add(Updates.set(NhiIdentity.OWNER, o));
+        } else if (StringUtils.isNotBlank(identity.getDeviceLabel())) {
             if (existing == null) {
-                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                NhiIdentity.Owner o = new NhiIdentity.Owner();
                 o.setName(identity.getDeviceLabel());
                 updates.add(Updates.setOnInsert(NhiIdentity.OWNER, o));
             } else if (existing.getOwner() == null) {
-                com.akto.dto.nhi_governance.NhiIdentity.Owner o = new com.akto.dto.nhi_governance.NhiIdentity.Owner();
+                NhiIdentity.Owner o = new NhiIdentity.Owner();
                 o.setName(identity.getDeviceLabel());
                 updates.add(Updates.set(NhiIdentity.OWNER, o));
             }

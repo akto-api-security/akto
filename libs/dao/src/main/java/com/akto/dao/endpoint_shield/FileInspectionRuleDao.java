@@ -38,5 +38,6 @@ public class FileInspectionRuleDao extends AccountsContextDao<FileInspectionRule
     public void createIndicesIfAbsent() {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionRule.UPDATED_TS}, false);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{FileInspectionRule.PATH}, true);
+        MCollection.createUniqueIndex(getDBName(), getCollName(), new String[]{FileInspectionRule.PATH, FileInspectionRule.AGENT, FileInspectionRule.OS, FileInspectionRule.ROLE}, true);
     }
 }

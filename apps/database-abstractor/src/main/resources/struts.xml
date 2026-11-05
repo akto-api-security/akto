@@ -141,6 +141,18 @@
             </result>
         </action>
 
+        <action name="api/fetchFileInspectionRulesV2" class="com.akto.action.FileInspectionAction" method="fetchFileInspectionRulesV2">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">rules</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/uploadFileInspectionResult" class="com.akto.action.FileInspectionAction" method="uploadFileInspectionResult">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -337,6 +349,16 @@
         </action>
 
         <action name="api/fetchBrowserExtensionConfigsV2" class="com.akto.action.BrowserExtensionConfigAction" method="fetchBrowserExtensionConfigsV2">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchBrowserExtensionConfigsV3" class="com.akto.action.BrowserExtensionConfigAction" method="fetchBrowserExtensionConfigsV3">
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
@@ -590,6 +612,17 @@
         </action>
 
         <action name="api/fetchStiBasedOnHostHeaders" class="com.akto.action.DbAction" method="fetchStiBasedOnHostHeaders">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchStiCountBasedOnHostHeaders" class="com.akto.action.DbAction" method="fetchStiCountBasedOnHostHeaders">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -2602,6 +2635,20 @@
         </result>
       </action>
 
+      <!-- Called only by the dashboard's skill revalidation job -->
+      <action name="api/validateSkillV3" class="com.akto.action.skill_validation_v3.SkillValidationV3Action" method="validateSkillV3">
+        <interceptor-ref name="json"/>
+        <interceptor-ref name="defaultStack"/>
+        <result name="SUCCESS" type="json">
+          <param name="root">validationResult</param>
+        </result>
+        <result name="ERROR" type="json">
+          <param name="statusCode">422</param>
+          <param name="ignoreHierarchy">false</param>
+          <param name="includeProperties">^actionErrors.*</param>
+        </result>
+      </action>
+
          <action name="api/getSlackWebhooks" class="com.akto.action.DbAction" method="fetchSlackWebhooks">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2811,6 +2858,19 @@
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^guardrailPolicies.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchOrgEmailDomains" class="com.akto.action.GuardrailPoliciesAction" method="fetchOrgEmailDomains">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^orgEmailDomains.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

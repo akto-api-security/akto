@@ -125,7 +125,6 @@ public class DbAction extends ActionSupport {
     private static final Set<String> IGNORED_SUB_TYPES = new HashSet<>(Arrays.asList(
         "GENERIC", "FLOAT", "NULL", "INTEGER_32", "FALSE", "TRUE", "INTEGER_64", "UUID", "DICT"
     ));
-
     // Accounts for which tagsList is filtered to only relevant keys
     private static final Set<Integer> TAGS_FILTER_ACCOUNTS = new HashSet<>(Arrays.asList(1736798101, 1718042191, 1759692400));
     private static final Set<String> ALLOWED_TAG_KEYS = new HashSet<>(Arrays.asList(
@@ -1297,7 +1296,40 @@ public class DbAction extends ActionSupport {
     public String bulkWriteSampleData() {
         int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            kafkaUtils.insertData(writesForSampleData, "bulkWriteSampleData", accId);
+            try {
+                Set<Integer> indicesToDelete = new HashSet<>();
+                int i = 0;
+                for (BulkUpdates bulkUpdate : writesForSampleData) {
+                    Map<String, Object> mObj = (Map) bulkUpdate.getFilters().get("_id");
+                    if (mObj != null) {
+                        int apiCollectionId = Integer.valueOf(mObj.get("apiCollectionId").toString());
+                        String url = (String) mObj.get("url");
+                        String method = (String) mObj.get("method");
+                        if (url != null && method != null && !ParamFilter.isNewEntry(accId, apiCollectionId, url,
+                                method, ParamFilter.BLOOM_PARAM_SAMPLE_DATA)) {
+                            indicesToDelete.add(i);
+                        }
+                    }
+                    i++;
+                }
+                if (writesForSampleData != null && !writesForSampleData.isEmpty() && !indicesToDelete.isEmpty()) {
+                    int size = writesForSampleData.size();
+                    List<BulkUpdates> tempWrites = new ArrayList<>();
+                    for (int index = 0; index < size; index++) {
+                        if (!indicesToDelete.contains(index)) {
+                            tempWrites.add(writesForSampleData.get(index));
+                        }
+                    }
+                    writesForSampleData = tempWrites;
+                    loggerMaker.infoAndAddToDb(
+                            String.format("Original writes: %d Final writes: %d", size, writesForSampleData.size()));
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error in ignore sample data updates " + e.toString());
+            }
+            if (writesForSampleData != null && !writesForSampleData.isEmpty()) {
+                kafkaUtils.insertData(writesForSampleData, "bulkWriteSampleData", accId);
+            }
         } else {
             try {
                 loggerMaker.infoAndAddToDb("bulkWriteSampleData called");
@@ -1398,7 +1430,57 @@ public class DbAction extends ActionSupport {
     public String bulkWriteSensitiveSampleData() {
         int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
+            try {
+                Set<Integer> indicesToDelete = new HashSet<>();
+                int i = 0;
+                for (BulkUpdates bulkUpdate : writesForSensitiveSampleData) {
+                    boolean isDeleteWrite = false;
+                    for (String payload : bulkUpdate.getUpdates()) {
+                        Map<String, Object> json = gson.fromJson(payload, Map.class);
+                        if ("delete".equalsIgnoreCase((String) json.get("op"))) {
+                            isDeleteWrite = true;
+                            break;
+                        }
+                    }
+                    if (!isDeleteWrite) {
+                        int apiCollectionId = 0;
+                        String url = null;
+                        String method = null;
+                        for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
+                            if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId")) {
+                                apiCollectionId = Integer.valueOf(entry.getValue().toString());
+                            } else if (entry.getKey().equalsIgnoreCase("_id.url")) {
+                                url = entry.getValue().toString();
+                            } else if (entry.getKey().equalsIgnoreCase("_id.method")) {
+                                method = entry.getValue().toString();
+                            }
+                        }
+                        if (url != null && method != null && apiCollectionId != 0 && !ParamFilter.isNewEntry(accId,
+                                apiCollectionId, url, method, ParamFilter.BLOOM_PARAM_SENSITIVE_SAMPLE_DATA)) {
+                            indicesToDelete.add(i);
+                        }
+                    }
+                    i++;
+                }
+                if (writesForSensitiveSampleData != null && !writesForSensitiveSampleData.isEmpty()
+                        && !indicesToDelete.isEmpty()) {
+                    int size = writesForSensitiveSampleData.size();
+                    List<BulkUpdates> tempWrites = new ArrayList<>();
+                    for (int index = 0; index < size; index++) {
+                        if (!indicesToDelete.contains(index)) {
+                            tempWrites.add(writesForSensitiveSampleData.get(index));
+                        }
+                    }
+                    writesForSensitiveSampleData = tempWrites;
+                    loggerMaker.infoAndAddToDb(String.format("Original writes: %d Final writes: %d", size,
+                            writesForSensitiveSampleData.size()));
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "error in ignore sensitive sample data updates " + e.toString());
+            }
+            if (writesForSensitiveSampleData != null && !writesForSensitiveSampleData.isEmpty()) {
+                kafkaUtils.insertData(writesForSensitiveSampleData, "bulkWriteSensitiveSampleData", accId);
+            }
         } else {
             try {
                 loggerMaker.infoAndAddToDb("bulkWriteSensitiveSampleData called");
@@ -1544,6 +1626,9 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteTrafficMetrics() {
+        if (disableLogWrites) {
+            return Action.SUCCESS.toUpperCase();
+        }
         if (kafkaUtils.isWriteEnabled()) {
             // int accId = Context.accountId.get();
             // kafkaUtils.insertDataTraffic(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
@@ -1740,11 +1825,14 @@ public class DbAction extends ActionSupport {
 //    }
 
     private String lastStiId = null;
+    // request input only (setter, no getter), so it is never echoed in responses. Clients that predate it do not send
+    // it and get every STI, as before
+    private int lastSeenGte = 0;
     public String fetchStiBasedOnHostHeaders() {
         long startTime = System.currentTimeMillis();
         try {
             ObjectId lastTsObjectId = lastStiId != null ? new ObjectId(lastStiId) : null;
-            stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId);
+            stis = DbLayer.fetchStiBasedOnHostHeaders(lastTsObjectId, lastSeenGte);
 
             long duration = System.currentTimeMillis() - startTime;
             if (duration > 5000) {
@@ -1754,6 +1842,17 @@ public class DbAction extends ActionSupport {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchStiBasedOnHostHeaders " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    // -1 when the count can't be known cheaply, see DbLayer.countStiBasedOnHostHeaders
+    public String fetchStiCountBasedOnHostHeaders() {
+        try {
+            count = DbLayer.countStiBasedOnHostHeaders();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchStiCountBasedOnHostHeaders " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -1818,6 +1917,8 @@ public class DbAction extends ActionSupport {
 
     private static final List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
     private static final int STI_LIMIT = 20_000_000;
+    // When true, log-insert and traffic-metrics APIs return success without writing to Kafka/DB.
+    private static final boolean disableLogWrites = Boolean.parseBoolean(System.getenv().getOrDefault("DISABLE_LOG_WRITES", "false"));
     private static final int higherStiLimit = Integer.parseInt(System.getenv().getOrDefault("HIGHER_STI_LIMIT", String.valueOf(5_000_000)));
 
     public String fetchEstimatedDocCount() {
@@ -2078,6 +2179,9 @@ public class DbAction extends ActionSupport {
 
     public String insertRuntimeLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             int accId = Context.accountId.get();
             if (accId == 1733164172) {
                 return Action.SUCCESS.toUpperCase();
@@ -2106,6 +2210,9 @@ public class DbAction extends ActionSupport {
 
     public String insertEndpointShieldLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             LogsEndpointShield dbLog = new LogsEndpointShield(
                 log.getString("agentId"),
                 log.getString("deviceId"),
@@ -3269,6 +3376,9 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             int accId = Context.accountId.get();
             if (accId == 1733164172) {
                 return Action.SUCCESS.toUpperCase();
@@ -3312,6 +3422,9 @@ public class DbAction extends ActionSupport {
 
     public String insertProtectionLog() {
         try {
+            if (disableLogWrites) {
+                return Action.SUCCESS.toUpperCase();
+            }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertProtectionLog(dbLog);
         } catch (Exception e) {
@@ -5843,6 +5956,10 @@ public class DbAction extends ActionSupport {
 
     public void setLastStiId(String lastStiId) {
         this.lastStiId = lastStiId;
+    }
+
+    public void setLastSeenGte(int lastSeenGte) {
+        this.lastSeenGte = lastSeenGte;
     }
 
     public List<DependencyNode> getDependencyNodeList() {
