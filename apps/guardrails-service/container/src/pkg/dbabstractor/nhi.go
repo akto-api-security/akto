@@ -31,6 +31,7 @@ type FileInspectionMatch struct {
 	ContentBlobName  string `json:"contentBlobName"`
 	ContentTruncated bool   `json:"contentTruncated"`
 	ReadError        string `json:"readError"`
+	Role             string `json:"role"` // set by the shield for agent rules
 }
 
 // FileInspectionResult mirrors cyborg's FileInspectionResult — one execution of one
@@ -42,6 +43,8 @@ type FileInspectionResult struct {
 	AgentID      string                `json:"agentId"`
 	DeviceID     string                `json:"deviceId"`
 	DeviceLabel  string                `json:"deviceLabel"`
+	UserHome     string                `json:"userHome"`
+	Agent        string                `json:"agent"` // set by the shield for agent rules
 	ExecutedAt   int                   `json:"executedAt"`
 	Status       string                `json:"status"`
 	ErrorMessage string                `json:"errorMessage"`
