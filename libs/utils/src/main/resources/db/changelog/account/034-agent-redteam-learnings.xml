@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:mongodb="http://www.liquibase.org/xml/ns/mongodb"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd
+        http://www.liquibase.org/xml/ns/mongodb
+        http://www.liquibase.org/xml/ns/mongodb/liquibase-mongodb-latest.xsd">
+
+    <!--
+        Collections and indexes for the red-team learning DAOs (com.akto.dao.redteam_learnings), the
+        createIndicesIfAbsent of AgentRedteamObservationDao, AgentRedteamProfileDao and
+        AgentRedteamTemplateDraftDao.
+
+        agent_redteam_observations holds one small document per finished agentic test conversation,
+        written by the database-abstractor and read back when a run's results are consolidated.
+        - testingRunResultSummaryId_apiCollectionId_url_method_outcome serves counting a run's judged
+          conversations per agent and the per-cell aggregation.
+        - expireAt_ttl is what expires an observation: expireAt is a date written per document, so the
+          TTL is expireAfterSeconds 0 and the stored date decides.
+
+        agent_redteam_profiles holds the versions of what was learned about each agent.
+        - apiCollectionId_url_method_createdAtMs serves an agent's latest version and its history.
+        - testingRunResultSummaryId_batchNo serves the versions written during one run.
+
+        agent_redteam_template_drafts holds suggested test templates. Their _id is a content hash,
+        so a suggestion repeated by a later run is the same document.
+        - apiCollectionId_url_method_status_createdAtMs serves an agent's drafts in one status.
+        - testingRunResultSummaryId serves the drafts one run suggested.
+
+        Index names match the explicit names in the DAOs (and in the database-abstractor's copies),
+        so createIndexIfAbsent treats them as already present.
+    -->
+
+    <changeSet id="034-account-create-agent-redteam-observations" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="agent_redteam_observations"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="agent_redteam_observations"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="agent_redteam_observations"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-agent-redteam-observations-run-identity-outcome-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_redteam_observations"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_redteam_observations">
+            <mongodb:keys>{ "testingRunResultSummaryId": 1, "apiCollectionId": 1, "url": 1, "method": 1, "outcome": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "testingRunResultSummaryId_apiCollectionId_url_method_outcome" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_redteam_observations">
+                <mongodb:keys>{ "testingRunResultSummaryId": 1, "apiCollectionId": 1, "url": 1, "method": 1, "outcome": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-agent-redteam-observations-expire-at-ttl" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_redteam_observations"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_redteam_observations">
+            <mongodb:keys>{ "expireAt": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "expireAt_ttl", "expireAfterSeconds": 0 }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_redteam_observations">
+                <mongodb:keys>{ "expireAt": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-create-agent-redteam-profiles" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="agent_redteam_profiles"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="agent_redteam_profiles"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="agent_redteam_profiles"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-agent-redteam-profiles-identity-created-at-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_redteam_profiles"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_redteam_profiles">
+            <mongodb:keys>{ "apiCollectionId": 1, "url": 1, "method": 1, "createdAtMs": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "apiCollectionId_url_method_createdAtMs" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_redteam_profiles">
+                <mongodb:keys>{ "apiCollectionId": 1, "url": 1, "method": 1, "createdAtMs": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-agent-redteam-profiles-run-batch-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_redteam_profiles"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_redteam_profiles">
+            <mongodb:keys>{ "testingRunResultSummaryId": 1, "batchNo": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "testingRunResultSummaryId_batchNo" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_redteam_profiles">
+                <mongodb:keys>{ "testingRunResultSummaryId": 1, "batchNo": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-create-agent-redteam-template-drafts" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <mongodb:collectionExists collectionName="agent_redteam_template_drafts"/>
+            </not>
+        </preConditions>
+        <mongodb:createCollection collectionName="agent_redteam_template_drafts"/>
+        <rollback>
+            <mongodb:dropCollection collectionName="agent_redteam_template_drafts"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-agent-redteam-template-drafts-identity-status-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_redteam_template_drafts"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_redteam_template_drafts">
+            <mongodb:keys>{ "apiCollectionId": 1, "url": 1, "method": 1, "status": 1, "createdAtMs": -1 }</mongodb:keys>
+            <mongodb:options>{ "name": "apiCollectionId_url_method_status_createdAtMs" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_redteam_template_drafts">
+                <mongodb:keys>{ "apiCollectionId": 1, "url": 1, "method": 1, "status": 1, "createdAtMs": -1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="034-account-agent-redteam-template-drafts-run-index" author="akto">
+        <preConditions onFail="MARK_RAN">
+            <mongodb:collectionExists collectionName="agent_redteam_template_drafts"/>
+        </preConditions>
+        <mongodb:createIndex collectionName="agent_redteam_template_drafts">
+            <mongodb:keys>{ "testingRunResultSummaryId": 1 }</mongodb:keys>
+            <mongodb:options>{ "name": "testingRunResultSummaryId" }</mongodb:options>
+        </mongodb:createIndex>
+        <rollback>
+            <mongodb:dropIndex collectionName="agent_redteam_template_drafts">
+                <mongodb:keys>{ "testingRunResultSummaryId": 1 }</mongodb:keys>
+            </mongodb:dropIndex>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>
