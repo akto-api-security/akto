@@ -169,10 +169,15 @@ export const applyThreatActivityTableFilter = (filterKey, filterValue) => {
 const isMisconfigurationCategory = (filterId) =>
     isEndpointSecurityCategory() && /_(config|settings)_risk$/i.test(filterId || "");
 
-const openActivityPage = (path, filters) => {
+const activityLink = (path, filters) => {
     const params = new URLSearchParams();
     const filterParts = [];
     if (filters.host) filterParts.push(`host__${filters.host}`);
+    // An Atlas discovered tool; the page narrows to its hosts.
+    if (filters.atlasTool) {
+        params.set("tool", filters.atlasTool);
+        if (filters.atlasToolName) params.set("toolName", filters.atlasToolName);
+    }
     let resolvedFilterId = null;
     if (filters.latestAttack) {
         resolvedFilterId = subCategoryToFilterId(filters.latestAttack);
@@ -188,9 +193,10 @@ const openActivityPage = (path, filters) => {
     setTimeRangeParams(params, filters, "startTimestamp", "endTimestamp");
     const categoryParam = getCategoryParam();
     if (categoryParam) params.set("category", categoryParam);
-    const url = `${window.location.origin}${path}?${params.toString()}`;
-    window.open(url, "_blank");
+    return `${path}?${params.toString()}`;
 };
+
+const openActivityPage = (path, filters) => window.open(`${window.location.origin}${activityLink(path, filters)}`, "_blank");
 
 export const openThreatActivityPage = (filters = {}) =>
     openActivityPage("/dashboard/protection/threat-activity", filters);
@@ -198,6 +204,21 @@ export const openThreatActivityPage = (filters = {}) =>
 // Guardrail Activity is the same table on its own route (see LeftNav), so it takes the same filters.
 export const openGuardrailActivityPage = (filters = {}) =>
     openActivityPage("/dashboard/guardrails/activity", filters);
+
+// Drops the filters saved for Guardrail Activity (every tab), so a link into it starts from only its own filters.
+export const clearSavedGuardrailActivityFilters = () => {
+    const { filtersMap, setFiltersMap } = PersistStore.getState();
+    setFiltersMap(Object.fromEntries(Object.entries(filtersMap || {}).filter(([pageKey]) => !pageKey.startsWith("/dashboard/guardrails/activity/"))));
+};
+
+// In-app link to Guardrail Activity, for a same-tab navigate.
+export const guardrailActivityLink = (filters = {}) => activityLink("/dashboard/guardrails/activity", filters);
+
+// Active-tab row count for one Atlas tool, same query as the tab; null on failure.
+export const fetchActiveToolViolationCount = (atlasToolKey, startTimestamp, endTimestamp) =>
+    api.fetchSuspectSampleData(0, [], [], [], [], {}, startTimestamp, endTimestamp, [], 1, "ACTIVE", undefined, undefined, undefined, undefined, undefined, false, [], "exclude", "exclude", undefined, undefined, undefined, false, { atlasToolKey })
+        .then((resp) => resp?.total ?? null)
+        .catch(() => null);
 
 export const openThreatActorsPage = (filters = {}) => {
     const params = new URLSearchParams();

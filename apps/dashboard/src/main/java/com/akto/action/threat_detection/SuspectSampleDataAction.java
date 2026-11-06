@@ -21,8 +21,11 @@ import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -36,6 +39,7 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
+import com.akto.action.AgenticObserveAction;
 import com.akto.action.threat_detection.utils.ThreatDetectionHelper;
 import com.akto.action.threat_detection.utils.ThreatsUtils;
 import com.akto.dao.billing.OrganizationsDao;
@@ -45,6 +49,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.ArgusCollectionScope;
+import com.akto.utils.TtlCache;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 import lombok.Getter;
@@ -57,6 +62,13 @@ import okhttp3.Response;
 import java.util.concurrent.TimeUnit;
 
 public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
+
+  private static final String NO_MATCH_HOST = "__no_match__";
+  // Hosts with events in a window, shared by every tool looked up in it and by a page's list, count and export calls.
+  private static final long EVENT_HOSTS_TTL_MS = 60_000;
+  private static final int EVENT_HOSTS_MAX_ENTRIES = 50;
+  private static final int ATLAS_TOOL_KEY_MAX_LENGTH = 256;
+  private static final TtlCache<String, List<String>> EVENT_HOSTS = new TtlCache<>(EVENT_HOSTS_TTL_MS, EVENT_HOSTS_MAX_ENTRIES);
 
   List<SuspectSampleData> sampleData;
   List<DashboardMaliciousEvent> maliciousEvents;
@@ -89,6 +101,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   @Getter @Setter String deleteMessage;
   @Getter @Setter int deletedCount;
   @Getter @Setter List<String> hosts;
+  // An Atlas discovered tool ("<rowType>|<groupKey>"); narrows the events to the hosts that tool runs on.
+  @Getter @Setter String atlasToolKey;
   @Getter @Setter String latestApiOrigRegex;
   @Getter @Setter Boolean sortBySeverity;
   @Getter @Setter int backfilledGroupKeys;
@@ -177,8 +191,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("label", this.label);
     }
 
-    if (this.hosts != null && !this.hosts.isEmpty()) {
-      filter.put("hosts", this.hosts);
+    List<String> scopedHosts = hostsScopedToAtlasTool();
+    if (scopedHosts != null && !scopedHosts.isEmpty()) {
+      filter.put("hosts", scopedHosts);
     }
 
     if (this.latestApiOrigRegex != null && !this.latestApiOrigRegex.isEmpty()) {
@@ -379,6 +394,45 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       return !this.eventIds.isEmpty();
     }
     return false;
+  }
+
+  // The tool's hosts that have events, matched to the event casing; narrowed by any hosts already picked.
+  private List<String> hostsScopedToAtlasTool() {
+    if (StringUtils.isBlank(this.atlasToolKey)) return this.hosts;
+    Set<String> picked = this.hosts == null ? Collections.<String>emptySet() : new HashSet<>(this.hosts);
+    List<String> scoped = atlasToolEventHosts().stream()
+        .filter(host -> picked.isEmpty() || picked.contains(host)).collect(Collectors.toList());
+    // An empty host list means "no host filter", so no match needs a value that matches nothing.
+    return scoped.isEmpty() ? Collections.singletonList(NO_MATCH_HOST) : scoped;
+  }
+
+  private List<String> atlasToolEventHosts() {
+    int split = this.atlasToolKey.indexOf('|');
+    if (split <= 0 || this.atlasToolKey.length() > ATLAS_TOOL_KEY_MAX_LENGTH) return Collections.emptyList();
+    try {
+      Set<String> toolHosts = new AgenticObserveAction()
+          .fetchAtlasToolHosts(this.atlasToolKey.substring(0, split), this.atlasToolKey.substring(split + 1))
+          .stream().map(host -> host.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+      // An unknown tool never costs a threat-backend call.
+      if (toolHosts.isEmpty()) return Collections.emptyList();
+      return eventHostsInWindow().stream()
+          .filter(host -> toolHosts.contains(host.toLowerCase(Locale.ROOT))).collect(Collectors.toList());
+    } catch (Exception e) {
+      loggerMaker.errorAndAddToDb("Atlas tool host lookup failed: " + e.getMessage());
+      return Collections.emptyList();
+    }
+  }
+
+  private List<String> eventHostsInWindow() {
+    String cacheKey = Context.accountId.get() + "|" + Context.contextSource.get() + "|" + this.startTimestamp + "|" + this.endTimestamp;
+    List<String> cached = EVENT_HOSTS.get(cacheKey);
+    if (cached != null) return cached;
+    List<HostSeverityCount> counts = fetchHostSeverityCounts(this.startTimestamp, this.endTimestamp);
+    List<String> hosts = (counts == null ? Collections.<HostSeverityCount>emptyList() : counts).stream()
+        .map(HostSeverityCount::getHost).filter(host -> host != null).distinct().collect(Collectors.toList());
+    // An empty result may be a failed call, so only a hit is cached.
+    if (!hosts.isEmpty()) EVENT_HOSTS.put(cacheKey, hosts);
+    return hosts;
   }
 
   public String fetchFilters() {
