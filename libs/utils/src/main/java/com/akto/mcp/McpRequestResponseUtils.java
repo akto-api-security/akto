@@ -10,6 +10,7 @@ import static com.akto.util.Constants.X_TRANSPORT_HEADER;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.RawApi;
@@ -38,6 +39,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +56,9 @@ public final class McpRequestResponseUtils {
         McpSchema.METHOD_RESOURCES_READ
     ));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    // Request header on MCP calls Akto builds itself (tools/call per tool in a tools/list) rather than
+    // sees in traffic. A header, not a field, so it survives into sample_data even when values are redacted.
+    public static final String SYNTHETIC_CALL_HEADER = "x-akto-mcp-synthetic";
     private static DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static List<HttpResponseParams> parseMcpResponseParams(HttpResponseParams responseParams) {
@@ -249,6 +254,7 @@ public final class McpRequestResponseUtils {
                 cloned.setPayload("");
                 cloned.setHeaders(Collections.emptyMap());
                 modifyOriginalHttpMessage(cloned, newReqString);
+                markSyntheticCall(cloned);
                 handleMcpMethodCall(new McpJsonRpcModel(
                         McpSchema.JSONRPC_VERSION,
                         McpSchema.METHOD_TOOLS_CALL,
@@ -263,6 +269,35 @@ public final class McpRequestResponseUtils {
         }
 
         return Collections.emptyList();
+    }
+
+    /** Tags a call Akto built itself so auth detection doesn't treat it as real traffic. */
+    public static void markSyntheticCall(HttpResponseParams responseParams) {
+        HttpRequestParams requestParams = responseParams.getRequestParams();
+        // HttpRequestParams.copy() shares the headers map with the original request, so copy before adding
+        Map<String, List<String>> headers = requestParams.getHeaders() == null
+                ? new HashMap<>() : new HashMap<>(requestParams.getHeaders());
+        headers.put(SYNTHETIC_CALL_HEADER, Collections.singletonList("true"));
+        requestParams.setHeaders(headers);
+
+        try {
+            Map<String, Object> orig = JSONUtils.getMap(responseParams.getOrig());
+            Object origHeaders = orig.get("requestHeaders");
+            Map<String, Object> origHeaderMap = origHeaders instanceof String
+                    ? JSONUtils.getMap((String) origHeaders) : JSONUtils.getMap(origHeaders);
+            if (origHeaderMap == null) origHeaderMap = new HashMap<>();
+            origHeaderMap.put(SYNTHETIC_CALL_HEADER, "true");
+            orig.put("requestHeaders", JSONUtils.getString(origHeaderMap));
+            responseParams.setOrig(JSONUtils.getString(orig));
+        } catch (Exception e) {
+            logger.error("Error marking MCP call as synthetic in original message", e);
+        }
+    }
+
+    public static boolean isSyntheticCall(HttpResponseParams responseParams) {
+        if (responseParams == null || responseParams.getRequestParams() == null) return false;
+        Map<String, List<String>> headers = responseParams.getRequestParams().getHeaders();
+        return headers != null && headers.containsKey(SYNTHETIC_CALL_HEADER);
     }
 
     private static void modifyOriginalHttpMessage(HttpResponseParams responseParams, String newRequestPayload) {

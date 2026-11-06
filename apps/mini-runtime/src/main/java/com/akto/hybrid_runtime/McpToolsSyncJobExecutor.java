@@ -250,6 +250,7 @@ public class McpToolsSyncJobExecutor {
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                     if (toolsCallHttpResponseParams != null) {
+                        McpRequestResponseUtils.markSyntheticCall(toolsCallHttpResponseParams);
                         responseParamsList.add(toolsCallHttpResponseParams);
                     }
                 }
@@ -309,6 +310,7 @@ public class McpToolsSyncJobExecutor {
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                     if (readResourceHttpResponseParams != null) {
+                        McpRequestResponseUtils.markSyntheticCall(readResourceHttpResponseParams);
                         responseParamsList.add(readResourceHttpResponseParams);
                     }
                 }
