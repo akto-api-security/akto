@@ -137,8 +137,7 @@ public class AccountConfigurationCache {
             // This will fetch paginated apiInfos with _id, rateLimits fields.
             List<ApiInfo> apiInfos = new ArrayList<>();
 
-            // TEMP local testing: 1000000 added so templates load locally. Remove before commit.
-            if (Arrays.asList(1763355072, 1786100206, 1000000).contains(accountSettings.getId())) {
+            if (Arrays.asList(1763355072, 1786100206).contains(accountSettings.getId())) {
                 apiInfos = dataActor.fetchApiRateLimits(null);
             }
 
