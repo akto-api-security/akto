@@ -271,6 +271,11 @@ public class DbActor extends DataActor {
     }
 
     @Override
+    public List<ModuleInfo> fetchAndUpdateModuleForReboot(ModuleInfo.ModuleType moduleType, String miniRuntimeName, String moduleId, String moduleName) {
+        return DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId, moduleName);
+    }
+
+    @Override
     public void ingestMetricData(List<MetricData> metricData) {
         DbLayer.ingestMetric(metricData);
     }
