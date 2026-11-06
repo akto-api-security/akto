@@ -35,7 +35,7 @@ public class HttpResponseParams {
     // Guardrail result recorded at ingestion (Gateway.recordGuardrailVerdict), as a JSON blob.
     String guardrailVerdict;
     // An MCP call Akto built itself (e.g. a tools/call per tool in a tools/list), not one seen in traffic. In memory only.
-    boolean syntheticMcpCall;
+    public boolean syntheticMcpCall;
 
     public HttpResponseParams() {}
 
@@ -282,13 +282,5 @@ public class HttpResponseParams {
 
     public void setGuardrailVerdict(String guardrailVerdict) {
         this.guardrailVerdict = guardrailVerdict;
-    }
-
-    public boolean isSyntheticMcpCall() {
-        return syntheticMcpCall;
-    }
-
-    public void setSyntheticMcpCall(boolean syntheticMcpCall) {
-        this.syntheticMcpCall = syntheticMcpCall;
     }
 }

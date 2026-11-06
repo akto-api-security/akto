@@ -25,7 +25,7 @@ public class AuthPolicyTest {
     public void testSyntheticMcpCallIsSkipped() {
         // a tools/call Akto built itself carries no client auth, so it must not make the tool UNAUTHENTICATED
         HttpResponseParams httpResponseParams = generateHttpResponseParams(new HashMap<>());
-        httpResponseParams.setSyntheticMcpCall(true);
+        httpResponseParams.syntheticMcpCall = true;
         ApiInfo apiInfo = new ApiInfo(httpResponseParams);
         boolean result = AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
         Assertions.assertFalse(result);
@@ -35,9 +35,9 @@ public class AuthPolicyTest {
     @Test
     public void testRealCallStillUnauthenticatedNextToSyntheticCall() {
         HttpResponseParams synthetic = generateHttpResponseParams(new HashMap<>());
-        synthetic.setSyntheticMcpCall(true);
+        synthetic.syntheticMcpCall = true;
         HttpResponseParams real = generateHttpResponseParams(new HashMap<>());
-        Assertions.assertFalse(real.isSyntheticMcpCall());
+        Assertions.assertFalse(real.syntheticMcpCall);
 
         ApiInfo apiInfo = new ApiInfo(real);
         AuthPolicy.findAuthType(synthetic, apiInfo, null, customAuthTypes);
