@@ -1,12 +1,12 @@
 package com.akto.dto.testing.custom_groups;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import org.bson.Document;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.conversions.Bson;
 
@@ -18,6 +18,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiInfo.AuthType;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -79,7 +80,24 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     public final static int UNAUTHENTICATED_GROUP_ID = 111_111_120;
 
-    private static final Set<AuthType> UNAUTHENTICATED_AUTH_SET = Collections.singleton(AuthType.UNAUTHENTICATED);
+    private static final String UNAUTHENTICATED_AUTH_NAME = AuthType.UNAUTHENTICATED.name();
+
+    /**
+     * An api is unauthenticated when one of the auth type sets found for it is only UNAUTHENTICATED. The sets are read as
+     * plain names, not as the AuthType enum, so a name this code does not know (x-api-key) cannot fail the read.
+     */
+    private static boolean isUnauthenticated(Object allAuthTypesFound) {
+        if (!(allAuthTypesFound instanceof List)) {
+            return false;
+        }
+        for (Object authTypes : (List<?>) allAuthTypesFound) {
+            if (authTypes instanceof List && ((List<?>) authTypes).size() == 1
+                    && UNAUTHENTICATED_AUTH_NAME.equals(((List<?>) authTypes).get(0))) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     /**
      * The group follows api_info (the source of truth for auth types). Auth types only change in runtime upserts, which
@@ -107,16 +125,19 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
                     Filters.lt(ApiInfo.LAST_SEEN, to)
                 );
 
-                try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection().find(filter)
+                try (MongoCursor<Document> cursor = ApiInfoDao.instance.getMCollection().withDocumentClass(Document.class).find(filter)
                         .projection(Projections.include("_id", ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.COLLECTION_IDS, ApiInfo.LAST_SEEN))
                         .batchSize(limit).cursor()) {
                     while (cursor.hasNext()) {
-                        ApiInfo apiInfo = cursor.next();
-                        Set<Set<AuthType>> authTypesFound = apiInfo.getAllAuthTypesFound();
-                        boolean isUnauthenticated = authTypesFound != null && authTypesFound.contains(UNAUTHENTICATED_AUTH_SET);
-                        List<Integer> apiGroupIds = apiInfo.getCollectionIds();
+                        Document apiInfo = cursor.next();
+                        Document id = apiInfo.get("_id", Document.class);
+                        ApiInfoKey key = new ApiInfoKey(((Number) id.get(ApiInfo.ApiInfoKey.API_COLLECTION_ID)).intValue(),
+                                id.getString(ApiInfo.ApiInfoKey.URL), Method.valueOf(id.getString(ApiInfo.ApiInfoKey.METHOD)));
+                        boolean isUnauthenticated = isUnauthenticated(apiInfo.get(ApiInfo.ALL_AUTH_TYPES_FOUND));
+                        List<Integer> apiGroupIds = apiInfo.getList(ApiInfo.COLLECTION_IDS, Integer.class);
                         boolean inGroup = apiGroupIds != null && apiGroupIds.contains(UNAUTHENTICATED_GROUP_ID);
-                        if (!visitor.test(new Candidate(apiInfo.getId(), isUnauthenticated, inGroup, apiInfo.getLastSeen()))) {
+                        Number lastSeen = apiInfo.get(ApiInfo.LAST_SEEN, Number.class);
+                        if (!visitor.test(new Candidate(key, isUnauthenticated, inGroup, lastSeen == null ? 0 : lastSeen.intValue()))) {
                             return;
                         }
                     }
