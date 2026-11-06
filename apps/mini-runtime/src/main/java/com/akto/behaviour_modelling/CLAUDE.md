@@ -5,10 +5,12 @@ to cyborg (`DataActor.writeSequenceCounts`). Cyborg owns persistence and the mod
 by `BEHAVIORAL_ANOMALLY_SEQUENCE`; one `SessionAnalyzer` per account, created in `hybrid_runtime/Main`.
 
 ## Hot path: `SessionAnalyzer.process`
-1. Templatize the URL to an `ApiInfoKey` and drop it if it is not in the catalog.
+1. Resolve the call to its catalog API with `RuntimeUtil.findCatalogUrl`: exact catalog URL first, then the first matching
+   catalog template (query and trailing slash ignored); drop it if neither. Unknown URLs are never added to the catalog.
 2. Session id from `impl/SessionIdentifier`: first present of
    cookie `coulomb_sess` > cookie `IDENTITYSID` > header `cp-session-token` >
-   `sid` claim of the JWT in `cp-sso-ims-token` (payload only, unverified) > first `x-forwarded-for` IP > source IP.
+   `sid` claim of the JWT in `cp-sso-ims-token` (payload only, unverified) > `authorization` header.
+   No IP fallback: calls without any of these are skipped.
    Returned as the first 16 hex chars of SHA-256("<source>:<value>"); raw values are never kept or logged.
    Order is overridable with env `BEHAVIOUR_SESSION_ID_SOURCES`
    (`cookie:<name>`, `header:<name>`, `jwt:<header>:<claim>`, `xff`, `ip`, comma separated).
