@@ -3457,7 +3457,8 @@ public class InitializerListener implements ServletContextListener {
             return;
         }
         int startedAt = Context.now();
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(),
+            Projections.include(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_STATUS_CODE_BACKFILL));
         LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
         int lastBackFill = lastRunInfo == null ? 0 : lastRunInfo.getLastStatusCodeBackfill();
         int since = lastBackFill == 0
