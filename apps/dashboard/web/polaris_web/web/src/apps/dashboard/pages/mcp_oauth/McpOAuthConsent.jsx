@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "react-router-dom"
-import { Avatar, Banner, Box, Button, Checkbox, Divider, HorizontalStack, LegacyCard, Page, Spinner, Text, VerticalStack } from "@shopify/polaris"
+import { Banner, Box, Button, Checkbox, Divider, HorizontalStack, LegacyCard, Spinner, Text, VerticalStack } from "@shopify/polaris"
 import DropdownSearch from "../../components/shared/DropdownSearch"
 import { PRODUCT_LABELS } from "../../components/shared/productLabels"
 import mcpOAuthRequests from "./api"
@@ -9,14 +9,8 @@ const CONTEXT_OPTIONS = Object.entries(PRODUCT_LABELS).map(([value, label]) => (
 
 const EXPIRED_MESSAGE = "This authorization request is invalid or has expired. Start the connection again from your MCP client."
 
-const SECONDS_PER_DAY = 24 * 60 * 60
-
-// A brand-new registration is a signal worth showing next to the destination
-const registeredLabel = (createdAt) => {
-    if (!createdAt) return null
-    const days = Math.floor((Date.now() / 1000 - createdAt) / SECONDS_PER_DAY)
-    return days < 1 ? "Today" : `${days} day${days === 1 ? "" : "s"} ago`
-}
+// Narrow centered card, like other connector consent screens
+const CARD_STYLE = { maxWidth: 480, margin: "0 auto", padding: "64px 16px" }
 
 const contextLabel = (value) => CONTEXT_OPTIONS.find((option) => option.value === value)?.label || value
 
@@ -85,8 +79,8 @@ function McpOAuthConsent() {
         return (
             <LegacyCard>
                 <LegacyCard.Section>
-                    <VerticalStack gap="3" inlineAlign="center">
-                        <Avatar customer name={info.clientName} size="large" />
+                    <VerticalStack gap="4" inlineAlign="center">
+                        <img src="/public/akto_name_with_logo.svg" alt="Akto" height={36} />
                         <Text as="h2" variant="headingLg" alignment="center">Authorize {info.clientName}</Text>
                         <Text as="p" color="subdued" alignment="center">
                             This app wants to use Akto on your behalf. It will have the same permissions as your role in this account.
@@ -104,22 +98,16 @@ function McpOAuthConsent() {
                     </LegacyCard.Section>
                 ) : null}
                 <LegacyCard.Section>
-                    <VerticalStack gap="3">
+                    <VerticalStack gap="4">
                         <DetailRow label="Signed in as" value={info.userLogin} />
                         <Divider />
                         <DetailRow label="Account" value={info.accountName} />
                         <Divider />
                         <DetailRow label="Redirects to" value={info.redirectUri || info.redirectHost} />
-                        {registeredLabel(info.clientCreatedAt) ? (
-                            <>
-                                <Divider />
-                                <DetailRow label="App registered" value={registeredLabel(info.clientCreatedAt)} />
-                            </>
-                        ) : null}
                     </VerticalStack>
                 </LegacyCard.Section>
                 <LegacyCard.Section>
-                    <VerticalStack gap="2">
+                    <VerticalStack gap="3">
                         {allowedOptions.length > 1 ? (
                             <DropdownSearch
                                 id="mcp-oauth-product"
@@ -134,14 +122,13 @@ function McpOAuthConsent() {
                         ) : (
                             <DetailRow label="Product" value={contextLabel(contextSource)} />
                         )}
-                        <Text as="p" variant="bodySm" color="subdued">
-                            {allowedOptions.length > 1 ? "Which Akto product the app works with, limited to those you have access to. " : ""}
-                            To use a different account, switch accounts from the top bar and reload this page.
-                        </Text>
+                        {allowedOptions.length > 1 ? (
+                            <Text as="p" variant="bodySm" color="subdued">Choose the Akto product this app can use.</Text>
+                        ) : null}
                     </VerticalStack>
                 </LegacyCard.Section>
                 <LegacyCard.Section>
-                    <VerticalStack gap="3">
+                    <VerticalStack gap="4">
                         <HorizontalStack gap="3" wrap={false}>
                             <Box width="100%">
                                 <Button fullWidth disabled={submitting && pendingAction !== "deny"} loading={pendingAction === "deny"} onClick={() => submit("deny", () => mcpOAuthRequests.denyAuthorizeRequest(requestId))}>Deny</Button>
@@ -160,9 +147,7 @@ function McpOAuthConsent() {
     }
 
     return (
-        <Page narrowWidth>
-            <Box paddingBlockStart="8" paddingBlockEnd="8">{renderContent()}</Box>
-        </Page>
+        <div style={CARD_STYLE}>{renderContent()}</div>
     )
 }
 
