@@ -35,6 +35,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 import com.akto.metrics.AllMetrics;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
@@ -357,8 +358,15 @@ public class MaliciousTrafficDetectorTask extends AbstractKafkaConsumerTask<byte
 
       } else if (apiFilter.getId().equals(ThreatDetector.SEQUENCE_ANOMALY_FILTER_ID)) {
         if (apiCollectionId != 0) {
-          URLTemplate sequenceTemplate = matchedTemplate != null ? matchedTemplate : threatDetector.findMatchingUrlTemplate(responseParam);
-          String sequenceUrl = sequenceTemplate != null ? sequenceTemplate.getTemplateString() : urlForAggregation;
+          // Same order as the catalog: exact catalog URL, then catalog template
+          Map<String, Set<URLMethods.Method>> catalogUrls = accountConfig != null ? accountConfig.getApiInfoUrlToMethods() : null;
+          List<URLTemplate> catalogTemplates = accountConfig != null && accountConfig.getApiCollectionUrlTemplates() != null
+              ? accountConfig.getApiCollectionUrlTemplates().get(apiCollectionId) : null;
+          String sequenceUrl = RuntimeUtil.findCatalogUrl(url, method, catalogUrl -> {
+            Set<URLMethods.Method> methods = catalogUrls == null ? null : catalogUrls.get(apiCollectionId + ":" + catalogUrl);
+            return methods != null && methods.contains(method);
+          }, catalogTemplates);
+          if (sequenceUrl == null) sequenceUrl = urlForAggregation;
           hasPassedFilter = sequenceCache.checkSequenceAnomaly(responseParam, apiCollectionId, sequenceUrl, method);
         }
       } else {
