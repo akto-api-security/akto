@@ -818,6 +818,10 @@ public class DbActor extends DataActor {
     }
 
     @Override
+    public void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
+    }
+
+    @Override
     public void writeApiSequences(List<ApiSequences> apiSequencesList) {
         if (apiSequencesList == null || apiSequencesList.isEmpty())
             return;

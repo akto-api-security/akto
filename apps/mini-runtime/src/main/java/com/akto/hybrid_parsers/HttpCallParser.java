@@ -535,7 +535,7 @@ public class HttpCallParser {
         return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
     }
 
-    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
+    public List<HttpResponseParams> syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
@@ -559,7 +559,7 @@ public class HttpCallParser {
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         executeCatalogSync(syncImmediately, fetchAllSTI, isHarOrPcap, syncThresh);
-
+        return filteredResponseParams;
     }
 
     private void executeCatalogSync(boolean syncImmediately, boolean fetchAllSTI, boolean isHarOrPcap, int syncThresh) {

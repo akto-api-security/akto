@@ -1,418 +1,311 @@
 package com.akto.behaviour_modelling;
 
-import com.akto.behaviour_modelling.impl.IpBasedIdentifier;
-import com.akto.behaviour_modelling.impl.RawCountAccumulator;
-import com.akto.behaviour_modelling.model.TransitionKey;
-import com.akto.behaviour_modelling.model.WindowSnapshot;
+import com.akto.behaviour_modelling.core.UserIdentifier;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbActor;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiInfoCatalog;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.PolicyCatalog;
+import com.akto.dto.SequenceCount;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
+import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
-// Disabled because it's need either dbActor or client Actor
-@Disabled
 public class SessionAnalyzerTest {
 
     private static final int COLLECTION_ID = 1001;
+    private static final int HOUR_START = 1_760_000_400; // multiple of 3600
+    private static final long DAY_MS = 24 * 3600 * 1000L;
 
     private AktoPolicyNew aktoPolicyNew;
-    private final AtomicReference<WindowSnapshot> capturedSnapshot = new AtomicReference<>();
+    private final List<SequenceCount> sent = new ArrayList<>();
+    private final AtomicLong clockMs = new AtomicLong(HOUR_START * 1000L);
+    private SessionAnalyzer analyzer;
 
-    @BeforeEach
-    public void setUp() throws Exception {
-        aktoPolicyNew = new AktoPolicyNew();
-        capturedSnapshot.set(null);
-        seedDefaultCatalog();
+    private final UserIdentifier ipIdentifier = HttpResponseParams::getSourceIP;
+
+    // APICatalogSync's static init reads deactivated collections through the DataActor; keep it offline.
+    @BeforeAll
+    public static void stubDataActor() throws Exception {
+        Field instance = DataActorFactory.class.getDeclaredField("INSTANCE");
+        instance.setAccessible(true);
+        instance.set(null, new DbActor() {
+            @Override
+            public List<Integer> fetchDeactivatedCollections() {
+                return new ArrayList<>();
+            }
+
+            @Override
+            public ApiCollection findApiCollectionByName(String name) {
+                return null;
+            }
+        });
     }
 
-    private void seedDefaultCatalog() {
+    @BeforeEach
+    public void setUp() {
+        aktoPolicyNew = new AktoPolicyNew();
         Map<URLStatic, PolicyCatalog> strictUrls = new HashMap<>();
         Map<URLTemplate, PolicyCatalog> templateUrls = new HashMap<>();
-
-        addStrict(strictUrls, "GET", "/products");
-        addStrict(strictUrls, "POST", "/cart/add");
-        addStrict(strictUrls, "POST", "/checkout");
+        for (String url : Arrays.asList("/a", "/b", "/c", "/d")) {
+            addStrict(strictUrls, "GET", url);
+        }
         addTemplate(templateUrls, "GET", "/products/123");
-
         ApiInfoCatalog catalog = new ApiInfoCatalog(strictUrls, templateUrls, new ArrayList<>());
         Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
         catalogMap.put(COLLECTION_ID, catalog);
         aktoPolicyNew.setApiInfoCatalogMap(catalogMap);
+        sent.clear();
+        analyzer = build(ipIdentifier);
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────────
-
-    private SessionAnalyzer buildAnalyzer() {
-        SequenceAnalyzerConfig config = new SequenceAnalyzerConfig(
-                2,
-                10 * 60 * 1000L,
-                new IpBasedIdentifier(),
-                RawCountAccumulator::new,
-                snapshot -> capturedSnapshot.set(snapshot),
-                aktoPolicyNew
-        );
-        return new SessionAnalyzer(config);
+    @AfterEach
+    public void tearDown() {
+        analyzer.shutdown();
     }
 
-    private HttpResponseParams record(String method, String url, String sourceIp) {
-        return record(method, url, sourceIp, COLLECTION_ID);
-    }
-
-    private HttpResponseParams record(String method, String url, String sourceIp, int collectionId) {
-        HttpRequestParams req = new HttpRequestParams(method, url, "", new HashMap<>(), "", collectionId);
-        HttpResponseParams resp = new HttpResponseParams(
-                "", 200, "", new HashMap<>(), "", req, 0, "0", false,
-                HttpResponseParams.Source.OTHER, "", "");
-        resp.setSourceIP(sourceIp);
-        return resp;
+    private SessionAnalyzer build(UserIdentifier identifier) {
+        return new SessionAnalyzer(new SequenceAnalyzerConfig(
+                SequenceAnalyzerConfig.DEFAULT_N_MAX, SequenceAnalyzerConfig.DEFAULT_MAX_HISTORY,
+                SequenceAnalyzerConfig.DEFAULT_SESSION_IDLE_MS, DAY_MS, DAY_MS,
+                identifier, sent::addAll, aktoPolicyNew, clockMs::get));
     }
 
     private static void addStrict(Map<URLStatic, PolicyCatalog> map, String method, String url) {
         URLMethods.Method m = URLMethods.Method.fromString(method);
-        map.put(new URLStatic(url, m), new PolicyCatalog(new ApiInfo(
-                new ApiInfoKey(COLLECTION_ID, url, m)), null));
+        map.put(new URLStatic(url, m), new PolicyCatalog(new ApiInfo(new ApiInfoKey(COLLECTION_ID, url, m)), null));
     }
 
     private static void addTemplate(Map<URLTemplate, PolicyCatalog> map, String method, String rawUrl) {
         URLMethods.Method m = URLMethods.Method.fromString(method);
         URLTemplate tmpl = APICatalogSync.tryParamteresingUrl(new URLStatic(rawUrl, m), false);
-        if (tmpl == null) return;
-        map.put(tmpl, new PolicyCatalog(new ApiInfo(
-                new ApiInfoKey(COLLECTION_ID, tmpl.getTemplateString(), m)), null));
+        map.put(tmpl, new PolicyCatalog(new ApiInfo(new ApiInfoKey(COLLECTION_ID, tmpl.getTemplateString(), m)), null));
     }
 
-    @SuppressWarnings("unchecked")
-    private static void setEnv(String key, String value) throws Exception {
-        Map<String, String> env = System.getenv();
-        java.lang.reflect.Field field = env.getClass().getDeclaredField("m");
-        field.setAccessible(true);
-        ((Map<String, String>) field.get(env)).put(key, value);
+    private static HttpResponseParams record(String url, String sourceIp, int timeSec) {
+        HttpRequestParams req = new HttpRequestParams("GET", url, "", new HashMap<>(), "", COLLECTION_ID);
+        HttpResponseParams resp = new HttpResponseParams("", 200, "", new HashMap<>(), "", req, timeSec, "0",
+                false, HttpResponseParams.Source.OTHER, "", sourceIp);
+        resp.setSourceIP(sourceIp);
+        return resp;
     }
 
-    private WindowSnapshot flushAndCapture(SessionAnalyzer analyzer) throws InterruptedException {
-        analyzer.triggerWindowEnd();
-        // Flush is async — give CompletableFuture a moment to land.
-        for (int i = 0; i < 50 && capturedSnapshot.get() == null; i++) {
-            Thread.sleep(10);
+    private static String k(String url) {
+        return new ApiInfoKey(COLLECTION_ID, url, URLMethods.Method.GET).toString();
+    }
+
+    private static String seq(int bucket, String next, String... context) {
+        List<String> ctx = new ArrayList<>();
+        for (String c : context) ctx.add(k(c));
+        return bucket + "|" + ctx + "->" + k(next);
+    }
+
+    private Map<String, Long> flushed() {
+        analyzer.triggerFlush();
+        Map<String, Long> out = new HashMap<>();
+        for (SequenceCount sc : sent) {
+            Assertions.assertEquals(COLLECTION_ID, sc.getApiCollectionId());
+            Assertions.assertEquals(0, sc.getBucketStart() % 3600);
+            out.merge(sc.getBucketStart() + "|" + sc.getContext() + "->" + sc.getNext(), sc.getCount(), Long::sum);
         }
-        return capturedSnapshot.get();
+        sent.clear();
+        return out;
     }
 
-    private ApiInfoKey key(String method, String url) {
-        return key(method, url, COLLECTION_ID);
+    private static Map<String, Long> expected(String... keys) {
+        Map<String, Long> m = new HashMap<>();
+        for (String key : keys) m.merge(key, 1L, Long::sum);
+        return m;
     }
-
-    private ApiInfoKey key(String method, String url, int collectionId) {
-        return new ApiInfoKey(collectionId, url, URLMethods.Method.fromString(method));
-    }
-
-    private TransitionKey transition(String fromMethod, String fromUrl, String toMethod, String toUrl) {
-        return new TransitionKey(new ApiInfoKey[]{key(fromMethod, fromUrl), key(toMethod, toUrl)});
-    }
-
-    // ── Test 1: Templatization + known-API filtering ───────────────────────────
 
     @Test
-    public void test1_templatizationAndUnknownApiFiltering() throws InterruptedException {
-        SessionAnalyzer analyzer = buildAnalyzer();
+    public void countsOrderZeroOneTwo() {
+        int t = HOUR_START + 10;
+        analyzer.process(record("/a", "1.1.1.1", t));
+        analyzer.process(record("/b", "1.1.1.1", t + 1));
+        analyzer.process(record("/c", "1.1.1.1", t + 2));
 
-        // Two records with different numeric IDs → same templatized key
-        analyzer.process(record("GET", "/products/111", "1.1.1.1"));
-        analyzer.process(record("GET", "/products/222", "1.1.1.1"));
-        // Unknown API → should be dropped silently
-        analyzer.process(record("GET", "/unknown/path", "1.1.1.1"));
-
-        WindowSnapshot snapshot = flushAndCapture(analyzer);
-        Assertions.assertNotNull(snapshot, "Snapshot should not be null");
-
-        // Both /products/111 and /products/222 must collapse to one templatized key
-        Assertions.assertEquals(1, snapshot.getApiCounts().size(),
-                "Only one templatized API key expected");
-
-        ApiInfoKey expected = key("GET", "/products/INTEGER");
-        Long count = snapshot.getApiCounts().get(expected);
-        Assertions.assertNotNull(count, "Templatized key not found in snapshot");
-        Assertions.assertEquals(2L, count, "Both numeric variants should map to count=2");
-
-        // Two consecutive calls to /products/INTEGER produce a self-loop transition
-        Assertions.assertEquals(1, snapshot.getTransitionCounts().size(),
-                "Exactly one self-loop transition expected");
-        TransitionKey selfLoop = transition("GET", "/products/INTEGER", "GET", "/products/INTEGER");
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(selfLoop),
-                "Self-loop count should be 1");
-
-        // Unknown API was dropped — not present in either map
-        ApiInfoKey unknown = key("GET", "/unknown/path");
-        Assertions.assertFalse(snapshot.getApiCounts().containsKey(unknown),
-                "Unknown API should have been dropped");
-
-        analyzer.shutdown();
+        Assertions.assertEquals(expected(
+                seq(HOUR_START, "/a"),
+                seq(HOUR_START, "/b"), seq(HOUR_START, "/b", "/a"),
+                seq(HOUR_START, "/c"), seq(HOUR_START, "/c", "/b"), seq(HOUR_START, "/c", "/a", "/b")
+        ), flushed());
     }
 
-    // ── Test 2: Transition accumulation across multiple users ──────────────────
-
     @Test
-    public void test2_transitionAggregationAcrossUsers() throws InterruptedException {
-        SessionAnalyzer analyzer = buildAnalyzer();
+    public void consecutiveRepeatsCollapse() {
+        int t = HOUR_START + 10;
+        analyzer.process(record("/a", "1.1.1.1", t));
+        analyzer.process(record("/a", "1.1.1.1", t + 1));
+        analyzer.process(record("/products/1", "1.1.1.1", t + 2));
+        analyzer.process(record("/products/2", "1.1.1.1", t + 3));
+        analyzer.process(record("/b", "1.1.1.1", t + 4));
 
-        // User A: GET /products → POST /cart/add
-        analyzer.process(record("GET", "/products", "user-a"));
-        analyzer.process(record("POST", "/cart/add", "user-a"));
-
-        // User B: same transition
-        analyzer.process(record("GET", "/products", "user-b"));
-        analyzer.process(record("POST", "/cart/add", "user-b"));
-
-        // User C: different transition
-        analyzer.process(record("GET", "/products", "user-c"));
-        analyzer.process(record("POST", "/checkout", "user-c"));
-
-        WindowSnapshot snapshot = flushAndCapture(analyzer);
-        Assertions.assertNotNull(snapshot);
-
-        Assertions.assertEquals(3L, snapshot.getApiCounts().get(key("GET", "/products")));
-        Assertions.assertEquals(2L, snapshot.getApiCounts().get(key("POST", "/cart/add")));
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("POST", "/checkout")));
-
-        TransitionKey toCart = transition("GET", "/products", "POST", "/cart/add");
-        Assertions.assertEquals(2L, snapshot.getTransitionCounts().get(toCart));
-
-        TransitionKey toCheckout = transition("GET", "/products", "POST", "/checkout");
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(toCheckout));
-
-        analyzer.shutdown();
+        Assertions.assertEquals(expected(
+                seq(HOUR_START, "/a"),
+                seq(HOUR_START, "/products/INTEGER"), seq(HOUR_START, "/products/INTEGER", "/a"),
+                seq(HOUR_START, "/b"), seq(HOUR_START, "/b", "/products/INTEGER"),
+                seq(HOUR_START, "/b", "/a", "/products/INTEGER")
+        ), flushed());
     }
 
-    // ── Test 3: Window boundary — no cross-window transitions ─────────────────
+    @Test
+    public void unknownApiIgnored() {
+        analyzer.process(record("/unknown", "1.1.1.1", HOUR_START + 1));
+        Assertions.assertTrue(flushed().isEmpty());
+        Assertions.assertEquals(0, analyzer.activeSessionCount());
+    }
 
     @Test
-    public void test3_windowBoundaryIsolation() throws InterruptedException {
-        SessionAnalyzer analyzer = buildAnalyzer();
+    public void separateSessionsDoNotMix() {
+        int t = HOUR_START + 10;
+        analyzer.process(record("/a", "1.1.1.1", t));
+        analyzer.process(record("/c", "2.2.2.2", t + 1));
+        analyzer.process(record("/b", "1.1.1.1", t + 2));
+        analyzer.process(record("/d", "2.2.2.2", t + 3));
 
-        // Window N: user-a calls GET /products only (deque = [GET /products])
-        analyzer.process(record("GET", "/products", "user-a"));
+        Assertions.assertEquals(expected(
+                seq(HOUR_START, "/a"), seq(HOUR_START, "/b"), seq(HOUR_START, "/b", "/a"),
+                seq(HOUR_START, "/c"), seq(HOUR_START, "/d"), seq(HOUR_START, "/d", "/c")
+        ), flushed());
+        Assertions.assertEquals(2, analyzer.activeSessionCount());
+    }
 
-        Thread.sleep(100);
-        WindowSnapshot windowN = flushAndCapture(analyzer);
-        Assertions.assertNotNull(windowN, "Window N snapshot should not be null");
-        Assertions.assertEquals(1L, windowN.getApiCounts().get(key("GET", "/products")));
-        Assertions.assertTrue(windowN.getTransitionCounts().isEmpty(),
-                "No transitions in window N — only one call");
+    @Test
+    public void idleGapStartsFreshHistory() {
+        int t = HOUR_START + 10;
+        analyzer.process(record("/a", "1.1.1.1", t));
+        analyzer.process(record("/b", "1.1.1.1", t + 600));
+        analyzer.process(record("/c", "1.1.1.1", t + 600 + 601));
 
-        capturedSnapshot.set(null);
-        // Window N+1: same user calls POST /checkout
-        // Deque was lazily reset at window boundary — no transition should fire.
-        analyzer.process(record("POST", "/checkout", "user-a"));
+        Assertions.assertEquals(expected(
+                seq(HOUR_START, "/a"), seq(HOUR_START, "/b"), seq(HOUR_START, "/b", "/a"),
+                seq(HOUR_START, "/c")
+        ), flushed());
+    }
 
-        WindowSnapshot windowN1 = flushAndCapture(analyzer);
-        Assertions.assertNotNull(windowN1, "Window N+1 snapshot should not be null");
-        Assertions.assertEquals(1L, windowN1.getApiCounts().get(key("POST", "/checkout")));
+    @Test
+    public void evictionRemovesIdleSessions() {
+        int t = HOUR_START + 10;
+        clockMs.set(t * 1000L);
+        analyzer.process(record("/a", "1.1.1.1", t));
+        analyzer.process(record("/a", "2.2.2.2", t));
+        clockMs.set((t + 700) * 1000L);
+        analyzer.process(record("/b", "3.3.3.3", t + 700));
 
-        System.out.println("DEBUG test3: windowN1 transitionCounts = " + windowN1.getTransitionCounts());
-        System.out.println("DEBUG test3: windowN1 transitionCounts.isEmpty() = " + windowN1.getTransitionCounts().isEmpty());
-        if (!windowN1.getTransitionCounts().isEmpty()) {
-            windowN1.getTransitionCounts().forEach((k, v) ->
-                System.out.println("DEBUG test3: transition = " + k + ", count = " + v));
+        analyzer.triggerEviction();
+        Assertions.assertEquals(1, analyzer.activeSessionCount());
+
+        clockMs.set((t + 700 + 601) * 1000L);
+        analyzer.triggerEviction();
+        Assertions.assertEquals(0, analyzer.activeSessionCount());
+    }
+
+    @Test
+    public void evictionFollowsEventTimeDuringBacklog() {
+        int t = HOUR_START + 10;
+        clockMs.set((t + 5 * 3600) * 1000L);
+        analyzer.process(record("/a", "1.1.1.1", t));
+        analyzer.triggerEviction();
+        Assertions.assertEquals(1, analyzer.activeSessionCount());
+
+        clockMs.addAndGet(601 * 1000L);
+        analyzer.triggerEviction();
+        Assertions.assertEquals(0, analyzer.activeSessionCount());
+    }
+
+    @Test
+    public void flushSpansTwoHours() {
+        int t = HOUR_START + 3600 - 60;
+        int nextHour = HOUR_START + 3600;
+        analyzer.process(record("/a", "1.1.1.1", t));
+        analyzer.process(record("/b", "1.1.1.1", t + 120));
+
+        Assertions.assertEquals(expected(
+                seq(HOUR_START, "/a"),
+                seq(nextHour, "/b"), seq(nextHour, "/b", "/a")
+        ), flushed());
+    }
+
+    @Test
+    public void flushResetsCountsAndKeepsHistory() {
+        int t = HOUR_START + 10;
+        analyzer.process(record("/a", "1.1.1.1", t));
+        flushed();
+        analyzer.process(record("/b", "1.1.1.1", t + 1));
+        Assertions.assertEquals(expected(seq(HOUR_START, "/b"), seq(HOUR_START, "/b", "/a")), flushed());
+        Assertions.assertTrue(flushed().isEmpty());
+    }
+
+    @Test
+    public void noTopNTruncation() {
+        int t = HOUR_START + 10;
+        for (int i = 0; i < 1500; i++) {
+            analyzer.process(record("/a", "10.0." + (i / 256) + "." + (i % 256), t));
         }
-
-        Assertions.assertTrue(windowN1.getTransitionCounts().isEmpty(),
-                "No cross-window transition expected — deque must reset on window boundary");
-
-        analyzer.shutdown();
-    }
-
-    // ── Test 7: Multiple collections isolation ─────────────────────────────────
-
-    @Test
-    public void test7_multipleCollectionsIsolation() throws InterruptedException {
-        // Seed catalog for both collections BEFORE building analyzer
-        Map<URLStatic, PolicyCatalog> strictUrls1 = new HashMap<>();
-        Map<URLTemplate, PolicyCatalog> templateUrls1 = new HashMap<>();
-        addStrict(strictUrls1, "GET", "/products");
-        addTemplate(templateUrls1, "GET", "/products/123");
-
-        ApiInfoCatalog catalog1 = new ApiInfoCatalog(strictUrls1, templateUrls1, new ArrayList<>());
-
-        Map<URLStatic, PolicyCatalog> strictUrls2 = new HashMap<>();
-        Map<URLTemplate, PolicyCatalog> templateUrls2 = new HashMap<>();
-        addStrict(strictUrls2, "POST", "/orders");
-        addTemplate(templateUrls2, "POST", "/orders/456");
-
-        ApiInfoCatalog catalog2 = new ApiInfoCatalog(strictUrls2, templateUrls2, new ArrayList<>());
-
-        Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
-        catalogMap.put(1001, catalog1);
-        catalogMap.put(1002, catalog2);
-        aktoPolicyNew.setApiInfoCatalogMap(catalogMap);
-
-
-        // Build analyzer AFTER setting up the dual-collection catalog
-        SessionAnalyzer analyzer = buildAnalyzer();
-
-        // Collection 1001: GET /products
-        analyzer.process(record("GET", "/products", "user-a", 1001));
-        analyzer.process(record("GET", "/products/111", "user-a", 1001));
-
-        // Collection 1002: POST /orders
-        analyzer.process(record("POST", "/orders", "user-b", 1002));
-        analyzer.process(record("POST", "/orders/789", "user-b", 1002));
-
-        WindowSnapshot snapshot = flushAndCapture(analyzer);
-        Assertions.assertNotNull(snapshot);
-
-        // Collection 1001: /products → /products/INTEGER
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("GET", "/products", 1001)),
-                "Collection 1001: GET /products count should be 1");
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("GET", "/products/INTEGER", 1001)),
-                "Collection 1001: GET /products/INTEGER count should be 1");
-        TransitionKey trans1 = new TransitionKey(new ApiInfoKey[]{
-                key("GET", "/products", 1001), key("GET", "/products/INTEGER", 1001)});
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(trans1),
-                "Collection 1001: transition /products → /products/INTEGER should be 1");
-
-        // Collection 1002: /orders → /orders/INTEGER
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("POST", "/orders", 1002)),
-                "Collection 1002: POST /orders count should be 1");
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("POST", "/orders/INTEGER", 1002)),
-                "Collection 1002: POST /orders/INTEGER count should be 1");
-        TransitionKey trans2 = new TransitionKey(new ApiInfoKey[]{
-                key("POST", "/orders", 1002), key("POST", "/orders/INTEGER", 1002)});
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(trans2),
-                "Collection 1002: transition /orders → /orders/INTEGER should be 1");
-
-        // Overall counts
-        Assertions.assertEquals(4, snapshot.getApiCounts().size(),
-                "Should have 4 total API entries across both collections");
-        Assertions.assertEquals(2, snapshot.getTransitionCounts().size(),
-                "Should have 2 total transitions across both collections");
-
-        analyzer.shutdown();
-
-        // Reset catalog to default for subsequent tests
-        seedDefaultCatalog();
-    }
-
-    // ── Test 8: Rapid user scale-up ────────────────────────────────────────────
-
-    @Test
-    public void test8_rapidUserScaleUp() throws InterruptedException {
-        SessionAnalyzer analyzer = buildAnalyzer();
-
-        // Feed 1000 unique users, each making 2 calls (A → B transition)
-        for (int i = 0; i < 1000; i++) {
-            String userId = "user-" + i;
-            analyzer.process(record("GET", "/products", userId));
-            analyzer.process(record("POST", "/cart/add", userId));
+        Set<String> sessions = new HashSet<>();
+        for (int i = 0; i < 1500; i++) {
+            String ip = "10.0." + (i / 256) + "." + (i % 256);
+            String[] path = (i % 2 == 0) ? new String[]{"/b", "/c", "/d"} : new String[]{"/c", "/b", "/d"};
+            for (String p : path) analyzer.process(record(p, ip, t + 1));
+            sessions.add(ip);
         }
+        Assertions.assertEquals(1500, sessions.size());
+        Map<String, Long> out = flushed();
+        Assertions.assertEquals(1500L, out.get(seq(HOUR_START, "/a")));
+        Assertions.assertEquals(750L, out.get(seq(HOUR_START, "/d", "/b", "/c")));
+        Assertions.assertEquals(750L, out.get(seq(HOUR_START, "/d", "/c", "/b")));
 
-        WindowSnapshot snapshot = flushAndCapture(analyzer);
-        Assertions.assertNotNull(snapshot);
-
-        // 1000 unique users × 1 call to /products = 1000
-        Assertions.assertEquals(1000L, snapshot.getApiCounts().get(key("GET", "/products")));
-        // 1000 unique users × 1 call to /cart/add = 1000
-        Assertions.assertEquals(1000L, snapshot.getApiCounts().get(key("POST", "/cart/add")));
-        // 1000 unique users × 1 transition = 1000
-        TransitionKey trans = transition("GET", "/products", "POST", "/cart/add");
-        Assertions.assertEquals(1000L, snapshot.getTransitionCounts().get(trans));
-
+        // > 1000 distinct sequences are all sent
+        sent.clear();
         analyzer.shutdown();
+        analyzer = build(ipIdentifier);
+        int distinct = 0;
+        for (int hour = 0; hour < 400; hour++) {
+            int ht = HOUR_START + hour * 3600 + 1;
+            analyzer.process(record("/a", "1.1.1.1", ht));
+            analyzer.process(record("/b", "1.1.1.1", ht + 1));
+            analyzer.process(record("/c", "1.1.1.1", ht + 2));
+            distinct += 6;
+        }
+        Assertions.assertEquals(distinct, flushed().size());
     }
 
-    // ── Test 10: API method separation ─────────────────────────────────────────
-
     @Test
-    public void test10_apiMethodSeparation() throws InterruptedException {
-        // Seed catalog with same URL, different methods
-        Map<URLStatic, PolicyCatalog> strictUrls = new HashMap<>();
-        Map<URLTemplate, PolicyCatalog> templateUrls = new HashMap<>();
-
-        addStrict(strictUrls, "GET", "/api/users");
-        addStrict(strictUrls, "POST", "/api/users");
-        addTemplate(templateUrls, "PUT", "/api/users/123");
-
-        ApiInfoCatalog catalog = new ApiInfoCatalog(strictUrls, templateUrls, new ArrayList<>());
-        Map<Integer, ApiInfoCatalog> catalogMap = new HashMap<>();
-        catalogMap.put(COLLECTION_ID, catalog);
-        aktoPolicyNew.setApiInfoCatalogMap(catalogMap);
-
-        SessionAnalyzer analyzer = buildAnalyzer();
-
-        // Same user, different methods on same URL path
-        analyzer.process(record("GET", "/api/users", "user-a"));
-        analyzer.process(record("POST", "/api/users", "user-a"));
-        analyzer.process(record("PUT", "/api/users/456", "user-a"));
-
-        WindowSnapshot snapshot = flushAndCapture(analyzer);
-        Assertions.assertNotNull(snapshot);
-
-        // Each method is a separate key
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("GET", "/api/users")));
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("POST", "/api/users")));
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("PUT", "/api/users/INTEGER")));
-
-        // Transitions respect method boundaries
-        TransitionKey getToPost = transition("GET", "/api/users", "POST", "/api/users");
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(getToPost));
-
-        TransitionKey postToPut = transition("POST", "/api/users", "PUT", "/api/users/INTEGER");
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(postToPut));
-
-        analyzer.shutdown();
-    }
-
-    // ── Test 12: Per-user deque independence ───────────────────────────────────
-
-    @Test
-    public void test12_perUserDequeIndependence() throws InterruptedException {
-        SessionAnalyzer analyzer = buildAnalyzer();
-
-        // User A: builds full deque context (3 calls)
-        analyzer.process(record("GET", "/products", "user-a"));
-        analyzer.process(record("GET", "/products/111", "user-a"));
-        analyzer.process(record("POST", "/cart/add", "user-a"));
-
-        // User B: only 1 call (insufficient deque context)
-        analyzer.process(record("POST", "/checkout", "user-b"));
-
-        WindowSnapshot snapshot = flushAndCapture(analyzer);
-        Assertions.assertNotNull(snapshot);
-
-        // All 4 APIs counted
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("GET", "/products")));
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("GET", "/products/INTEGER")));
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("POST", "/cart/add")));
-        Assertions.assertEquals(1L, snapshot.getApiCounts().get(key("POST", "/checkout")));
-
-        // User A emitted 2 transitions (products→products/INTEGER, products/INTEGER→cart/add)
-        TransitionKey aTransition1 = transition("GET", "/products", "GET", "/products/INTEGER");
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(aTransition1));
-
-        TransitionKey aTransition2 = transition("GET", "/products/INTEGER", "POST", "/cart/add");
-        Assertions.assertEquals(1L, snapshot.getTransitionCounts().get(aTransition2));
-
-        // User B: only 1 call, no context = no transition emitted
-        // Total transitions should be exactly 2 (not 3)
-        Assertions.assertEquals(2, snapshot.getTransitionCounts().size(),
-                "User B's single call should not emit a transition");
-
-        analyzer.shutdown();
+    public void flushedJsonShape() {
+        analyzer.process(record("/a", "1.1.1.1", HOUR_START + 1));
+        analyzer.process(record("/b", "1.1.1.1", HOUR_START + 2));
+        analyzer.triggerFlush();
+        SequenceCount order1 = null;
+        for (SequenceCount sc : sent) if (sc.getContext().size() == 1) order1 = sc;
+        Assertions.assertNotNull(order1);
+        BasicDBObject body = new BasicDBObject("sequenceCounts", Collections.singletonList(order1));
+        Assertions.assertEquals("{\"sequenceCounts\":[{\"apiCollectionId\":1001,\"context\":[\"1001 /a GET\"],"
+                + "\"next\":\"1001 /b GET\",\"bucketStart\":" + HOUR_START + ",\"count\":1}]}", new Gson().toJson(body));
     }
 }
