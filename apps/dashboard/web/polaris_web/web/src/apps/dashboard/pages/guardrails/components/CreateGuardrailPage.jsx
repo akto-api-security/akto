@@ -65,6 +65,11 @@ import {
     ExceptionsStep,
     ExceptionsConfig
 } from './steps';
+import {
+    PREDEFINED_CUSTOM_PROMPTS,
+    composeLlmPrompt,
+    splitPresetFromPrompt
+} from './predefinedCustomPrompts';
 import "./createGuardrailPage.css";
 
 // Store service keys so new devices are covered automatically via service-key matching in enforcement.
@@ -212,9 +217,14 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
     const [enableBanCode, setEnableBanCode] = useState(false);
     const [banCodeConfidenceScore, setBanCodeConfidenceScore] = useState(0.7);
 
+
     // Step 6: Custom Guardrails
     const [enableLlmPrompt, setEnableLlmPrompt] = useState(false);
     const [llmPrompt, setLlmPrompt] = useState("");
+    const [presetPrompts, setPresetPrompts] = useState({});
+    const selectedTemplateIds = Object.keys(presetPrompts);
+    // The preset's prompt is applied on save/test without being shown in the detection instruction box.
+    const effectiveLlmPrompt = composeLlmPrompt(enableLlmPrompt ? llmPrompt : "", presetPrompts);
     const [llmConfidenceScore, setLlmConfidenceScore] = useState(0.5);
     const [llmCompliance, setLlmCompliance] = useState({});
     const [enableLlmRedaction, setEnableLlmRedaction] = useState(false);
@@ -334,6 +344,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         codeFilterLevel,
         enableBanCode,
         banCodeConfidenceScore,
+        // Predefined custom prompts
+        selectedTemplateIds,
         // Step 6
         enableLlmPrompt,
         llmPrompt,
@@ -653,6 +665,7 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setBanCodeConfidenceScore(0.7);
         setEnableLlmPrompt(false);
         setLlmPrompt("");
+        setPresetPrompts({});
         setLlmConfidenceScore(0.5);
         setLlmCompliance({});
         setEnableLlmRedaction(false);
@@ -770,8 +783,11 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setEnableRegexPatterns(hasRegexPatterns);
 
         // LLM prompt
-        setEnableLlmPrompt(policy.llmRule?.enabled && !!policy.llmRule?.userPrompt);
-        setLlmPrompt(policy.llmRule?.userPrompt || "");
+        const savedLlmPrompt = policy.llmRule?.userPrompt || "";
+        const { presetPrompts: savedPresetPrompts, customPrompt: savedCustomPrompt } = splitPresetFromPrompt(savedLlmPrompt);
+        setPresetPrompts(policy.llmRule?.enabled ? savedPresetPrompts : {});
+        setEnableLlmPrompt(policy.llmRule?.enabled && !!savedCustomPrompt);
+        setLlmPrompt(savedCustomPrompt);
         setLlmConfidenceScore(policy.llmRule?.confidenceScore ?? 0.5);
         setLlmCompliance(policy.llmRule?.compliance || {});
 
@@ -955,8 +971,8 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         behavior: r.behavior.toLowerCase()
                     })) : [],
                 llmRule: {
-                    enabled: enableLlmPrompt && !!llmPrompt.trim(),
-                    userPrompt: llmPrompt.trim(),
+                    enabled: !!effectiveLlmPrompt,
+                    userPrompt: effectiveLlmPrompt,
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 },
@@ -1059,6 +1075,19 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
         setCurrentStep(stepNumber);
     };
 
+    const togglePredefinedTemplate = (id) => {
+        const template = PREDEFINED_CUSTOM_PROMPTS.find((t) => t.id === id);
+        if (!template) return;
+        if (id in presetPrompts) {
+            const { [id]: _removed, ...rest } = presetPrompts;
+            setPresetPrompts(rest);
+        } else {
+            setPresetPrompts({ ...presetPrompts, [id]: template.prompt });
+        }
+    };
+
+    const changePresetPrompt = (id, text) => setPresetPrompts((prev) => ({ ...prev, [id]: text }));
+
     const renderStepContent = (stepNumber) => {
         switch (stepNumber) {
             case 1:
@@ -1153,6 +1182,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                         setEnableLlmPrompt={setEnableLlmPrompt}
                         llmRule={llmPrompt}
                         setLlmRule={setLlmPrompt}
+                        selectedTemplateIds={selectedTemplateIds}
+                        onToggleTemplate={togglePredefinedTemplate}
+                        presetPrompts={presetPrompts}
+                        onChangePresetPrompt={changePresetPrompt}
                         llmCompliance={llmCompliance}
                         setLlmCompliance={setLlmCompliance}
                         enableLlmRedaction={enableLlmRedaction}
@@ -1339,10 +1372,10 @@ const CreateGuardrailPage = ({ onClose, onSave, editingPolicy = null, isEditMode
                     .map(r => r.pattern)
                 : [],
             regexPatternsV2,
-            ...(enableLlmPrompt && llmPrompt?.trim() ? {
+            ...(effectiveLlmPrompt ? {
                 llmRule: {
                     enabled: true,
-                    userPrompt: llmPrompt.trim(),
+                    userPrompt: effectiveLlmPrompt,
                     confidenceScore: llmConfidenceScore,
                     compliance: llmCompliance && Object.keys(llmCompliance).length > 0 ? llmCompliance : undefined
                 }

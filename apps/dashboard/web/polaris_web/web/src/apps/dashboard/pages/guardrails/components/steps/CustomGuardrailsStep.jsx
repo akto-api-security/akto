@@ -5,6 +5,7 @@ import ControlInfoIcon from "../ControlInfoIcon";
 import ComplianceMappingTags, { buildComplianceMap } from "../ComplianceMappingTags";
 import guardrailApi from "../../api";
 import { CUSTOM_GUARDRAILS_DESCRIPTIONS } from "../../guardrailDescriptions";
+import { PREDEFINED_CUSTOM_PROMPTS } from "../predefinedCustomPrompts";
 
 // URL validation function
 const validateUrl = (url) => {
@@ -50,8 +51,14 @@ export const CustomGuardrailsConfig = {
         };
     },
 
-    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url, enableLlmRedaction, redactionRules }) => {
+    getSummary: ({ enableLlmPrompt, llmPrompt, enableExternalModel, url, enableLlmRedaction, redactionRules, selectedTemplateIds }) => {
         const summaries = [];
+        const selected = PREDEFINED_CUSTOM_PROMPTS.filter((t) => (selectedTemplateIds || []).includes(t.id));
+        if (selected.length === 1) {
+            summaries.push(selected[0].label);
+        } else if (selected.length > 1) {
+            summaries.push(`${selected.length} presets selected`);
+        }
         if (enableLlmPrompt && llmPrompt) {
             summaries.push(`LLM: ${llmPrompt.substring(0, 20)}${llmPrompt.length > 20 ? '...' : ''}`);
         }
@@ -78,6 +85,10 @@ const CustomGuardrailsStep = ({
     setEnableLlmPrompt,
     llmRule,
     setLlmRule,
+    selectedTemplateIds = [],
+    onToggleTemplate,
+    presetPrompts = {},
+    onChangePresetPrompt,
     // LLM rule compliance (controlled by parent)
     llmCompliance,
     setLlmCompliance,
@@ -299,6 +310,7 @@ const CustomGuardrailsStep = ({
                                     value={llmRule}
                                     onChange={setLlmRule}
                                     multiline={4}
+                                    maxHeight={400}
                                     placeholder="Enter your LLM evaluation prompt here..."
                                     helpText="This prompt will be used to evaluate whether content should be blocked. Be specific about what you want to detect."
                                 />
@@ -314,6 +326,35 @@ const CustomGuardrailsStep = ({
                         </Box>
                     )}
                 </Box>
+
+                {PREDEFINED_CUSTOM_PROMPTS.map((template) => (
+                    <Box key={template.id}>
+                        <Checkbox
+                            label={
+                                <HorizontalStack gap="1" blockAlign="center">
+                                    <Text as="span">{template.label}</Text>
+                                    <ControlInfoIcon description={template.info} examples={[]} />
+                                </HorizontalStack>
+                            }
+                            checked={selectedTemplateIds.includes(template.id)}
+                            onChange={() => onToggleTemplate?.(template.id)}
+                            helpText={template.description}
+                        />
+                        {selectedTemplateIds.includes(template.id) && (
+                            <Box paddingBlockStart="8" paddingBlockEnd="3" style={{ paddingLeft: '28px' }}>
+                                <TextField
+                                    label={`${template.label} instruction`}
+                                    labelHidden
+                                    value={presetPrompts[template.id] || ""}
+                                    onChange={(value) => onChangePresetPrompt?.(template.id, value)}
+                                    multiline={6}
+                                    maxHeight={140}
+                                    helpText="Edit this instruction to fit your environment."
+                                />
+                            </Box>
+                        )}
+                    </Box>
+                ))}
 
                 {/* LLM Prompt Based Redaction */}
                 <Box>

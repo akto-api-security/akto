@@ -157,32 +157,48 @@ const ServerSettingsStep = ({
     );
 
 
-    // A selected/excluded value not currently in the live options list (e.g. offline right now) still needs a row so it renders checked, not silently invisible.
-    // The wildcard sentinel isn't a real value — never give it its own row.
+    // A selected/excluded value not currently in the live options list (offline, or a typed custom)
+    // still needs a row so it renders checked. Prefer condition.values so a just-added custom appears
+    // before the selected* sync effect runs. The Include-all sentinel never gets its own row.
     const withMissingSelected = (options, selected) => {
         const known = new Set(options.map(o => o.value));
-        const missing = (selected || []).filter(v => v !== ALL_VALUES_SENTINEL && !known.has(v)).map(v => ({ value: v, label: v }));
+        const missing = [];
+        const seenMissing = new Set();
+        for (const v of selected || []) {
+            if (v === ALL_VALUES_SENTINEL || known.has(v) || seenMissing.has(v)) continue;
+            seenMissing.add(v);
+            missing.push({ value: v, label: v });
+        }
         return missing.length ? [...options, ...missing] : options;
     };
 
+    // Union selected* (synced) with live condition.values so a just-created custom shows before the sync effect.
+    // Dedupe: after sync both sources hold the same ids and must not yield two list rows.
+    const unionSelected = (...lists) => [...new Set(lists.flat().filter(Boolean))];
+    const conditionValuesFor = (type) =>
+        agenticConditions.filter(c => c.type === type).flatMap(c => c.values || []);
+
     // Atlas: filterCollections() already groups by service/platform key — use directly.
     // Argus: raw per-device list with disabled state for block mode.
+    const mcpSelected = unionSelected(selectedMcpServers, conditionValuesFor('MCP_SERVER'));
+    const agentSelected = unionSelected(selectedAgentServers, conditionValuesFor('AGENT'));
+    const llmSelected = unionSelected(selectedBrowserLlms, conditionValuesFor('LLM'));
     const mcpOptions = isAtlas
-        ? sortSelectedFirst(withMissingSelected(mcpServers || [], selectedMcpServers), selectedMcpServers)
+        ? sortSelectedFirst(withMissingSelected(mcpServers || [], mcpSelected), selectedMcpServers)
         : sortSelectedFirst(
-            withMissingSelected(isBlockMode ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (mcpServers || []), selectedMcpServers),
+            withMissingSelected(isBlockMode ? (mcpServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (mcpServers || []), mcpSelected),
             selectedMcpServers
           );
     const agentOptions = isAtlas
-        ? sortSelectedFirst(withMissingSelected(agentServers || [], selectedAgentServers), selectedAgentServers)
+        ? sortSelectedFirst(withMissingSelected(agentServers || [], agentSelected), selectedAgentServers)
         : sortSelectedFirst(
-            withMissingSelected(isBlockMode ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (agentServers || []), selectedAgentServers),
+            withMissingSelected(isBlockMode ? (agentServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (agentServers || []), agentSelected),
             selectedAgentServers
           );
     const llmOptions = isAtlas
-        ? sortSelectedFirst(withMissingSelected(browserLlmServers || [], selectedBrowserLlms), selectedBrowserLlms)
+        ? sortSelectedFirst(withMissingSelected(browserLlmServers || [], llmSelected), selectedBrowserLlms)
         : sortSelectedFirst(
-            withMissingSelected(isBlockMode ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (browserLlmServers || []), selectedBrowserLlms),
+            withMissingSelected(isBlockMode ? (browserLlmServers || []).map(s => ({ ...s, disabled: !s.isInline })) : (browserLlmServers || []), llmSelected),
             selectedBrowserLlms
           );
 
@@ -199,10 +215,11 @@ const ServerSettingsStep = ({
     );
 
 
+    // Never disable types for an empty discovered list — custom-only scope must stay possible.
     const agenticTypeOptions = [
-        { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT', disabled: agentOptions.length === 0 },
-        { label: `${mcpOptions.length > 1 ? 'MCP Servers' : 'MCP Server'} [${mcpOptions.length}]`, value: 'MCP_SERVER', disabled: mcpOptions.length === 0 },
-        { label: `LLM${llmOptions.length > 1 ? 's' : ''} [${llmOptions.length}]`, value: 'LLM', disabled: llmOptions.length === 0 },
+        { label: `${agentOptions.length > 1 ? 'AI Agents' : 'AI Agent'} [${agentOptions.length}]`, value: 'AGENT' },
+        { label: `${mcpOptions.length > 1 ? 'MCP Servers' : 'MCP Server'} [${mcpOptions.length}]`, value: 'MCP_SERVER' },
+        { label: `LLM${llmOptions.length > 1 ? 's' : ''} [${llmOptions.length}]`, value: 'LLM' },
     ];
 
 
@@ -233,16 +250,24 @@ const ServerSettingsStep = ({
         // incorrectly clear every pre-selected value from a loaded policy.
         if (!(mcpServers?.length || agentServers?.length || browserLlmServers?.length)) return;
         // The Include wildcard sentinel isn't a real server value — never filter it out here.
+        // Keep values absent from the discovered list (custom entries); only strip
+        // discovered non-inline assets that block mode cannot enforce.
+        const keepIfCustomOrInline = (val, list) => {
+            if (val === ALL_VALUES_SENTINEL) return true;
+            const found = (list || []).find(s => s.value === val);
+            if (!found) return true;
+            return !!found.isInline;
+        };
         if (selectedMcpServers?.length > 0) {
-            const compatible = selectedMcpServers.filter(val => val === ALL_VALUES_SENTINEL || (mcpServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedMcpServers.filter(val => keepIfCustomOrInline(val, mcpServers));
             if (compatible.length !== selectedMcpServers.length) setSelectedMcpServers(compatible);
         }
         if (selectedAgentServers?.length > 0) {
-            const compatible = selectedAgentServers.filter(val => val === ALL_VALUES_SENTINEL || (agentServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedAgentServers.filter(val => keepIfCustomOrInline(val, agentServers));
             if (compatible.length !== selectedAgentServers.length) setSelectedAgentServers(compatible);
         }
         if (selectedBrowserLlms?.length > 0) {
-            const compatible = selectedBrowserLlms.filter(val => val === ALL_VALUES_SENTINEL || (browserLlmServers || []).find(s => s.value === val && s.isInline));
+            const compatible = selectedBrowserLlms.filter(val => keepIfCustomOrInline(val, browserLlmServers));
             if (compatible.length !== selectedBrowserLlms.length) setSelectedBrowserLlms(compatible);
         }
     }, [policyBehaviour, mcpServers?.length, agentServers?.length, browserLlmServers?.length]);
@@ -305,7 +330,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} />
+                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} allowCustomValues />
                                         </Box>
                                     )}
                                 </VerticalStack>
@@ -431,7 +456,7 @@ const ServerSettingsStep = ({
                                     />
                                     {!applyToAllServers && (
                                         <Box paddingInlineStart="6">
-                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} />
+                                            <ConditionRows conditions={agenticConditions} typeOptions={agenticTypeOptions} dispatch={agenticDispatch} operator="OR" showError={showConditionError} getNegationProps={agenticNegationProps} getOptionsForType={getOptionsForType} allowCustomValues />
                                             {hasIncompatibleServers && (
                                                 <Banner tone="info">
                                                     Some agentic assets are disabled. Block mode requires servers running in inline (sync) mode.
