@@ -1,9 +1,12 @@
 package com.akto.utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.List;
+import java.util.Set;
 
 import org.bson.conversions.Bson;
 
@@ -44,27 +47,41 @@ import static com.akto.jobs.utils.Utils.getRiskScoreValueFromSeverityScore;
 public class RiskScoreOfCollections {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreOfCollections.class, LogDb.DASHBOARD);;
 
-    private Map<ApiInfoKey, Float> getSeverityScoreMap(List<TestingRunIssues> issues){
-        // Method to calculate severity Score for the apiInfo on the basis of HIGH, LOW, MEDIUM
+    private static final class SeverityBundle {
+        final Map<ApiInfoKey, Float> severityScoreMap;
+        final Map<ApiInfoKey, List<String>> issueNamesMap;
+        SeverityBundle(Map<ApiInfoKey, Float> severityScoreMap, Map<ApiInfoKey, List<String>> issueNamesMap) {
+            this.severityScoreMap = severityScoreMap;
+            this.issueNamesMap = issueNamesMap;
+        }
+    }
+
+    private SeverityBundle getSeverityBundle(List<TestingRunIssues> issues){
+        // Severity score for the apiInfo on the basis of HIGH, LOW, MEDIUM, plus subcategory names
+        // for the riskScoreFactors detail line written next to riskScore.
         Map<ApiInfoKey, Float> severityScoreMap = new HashMap<>();
+        Map<ApiInfoKey, Set<String>> issueNamesAcc = new HashMap<>();
 
         for(TestingRunIssues issue: issues){
+            if (issue == null || issue.getId() == null || issue.getId().getApiInfoKey() == null) continue;
             String severity = issue.getSeverity().toString();
             float severityScore = (float) calculateRiskValueForSeverity(severity);
             ApiInfoKey apiInfoKey = issue.getId().getApiInfoKey();
-            if(severityScoreMap.isEmpty() || !severityScoreMap.containsKey(apiInfoKey)){
-                severityScoreMap.put(apiInfoKey, severityScore);
-            }else{
-                float prev = severityScoreMap.get(apiInfoKey);
-                severityScore += prev;
-                severityScoreMap.put(apiInfoKey, severityScore);
+            severityScoreMap.merge(apiInfoKey, severityScore, Float::sum);
+            String subCategory = issue.getId().getTestSubCategory();
+            if (subCategory != null && !subCategory.isEmpty()) {
+                issueNamesAcc.computeIfAbsent(apiInfoKey, k -> new LinkedHashSet<>()).add(subCategory);
             }
         }
 
-        return severityScoreMap;
+        Map<ApiInfoKey, List<String>> issueNamesMap = new HashMap<>();
+        for (Map.Entry<ApiInfoKey, Set<String>> e : issueNamesAcc.entrySet()) {
+            issueNamesMap.put(e.getKey(), new ArrayList<>(e.getValue()));
+        }
+        return new SeverityBundle(severityScoreMap, issueNamesMap);
     }
 
-    private Map<ApiInfoKey, Float> getUpdatedApiInfosMap(int timeStampFilter){
+    private SeverityBundle getUpdatedApiInfosMap(int timeStampFilter){
         List<ApiInfoKey> updatedApiInfoKeys = new ArrayList<>();
 
         // get freshly updated testing run issues here
@@ -77,12 +94,12 @@ public class RiskScoreOfCollections {
             issues = TestingRunIssuesDao.instance.findAll(filters, projections);   
         } catch (Exception e) {
             e.printStackTrace();
-            return new HashMap<>();
+            return new SeverityBundle(new HashMap<>(), new HashMap<>());
         }
 
         // after getting issues, get updated apiinfokeys related to that issues only
         if(issues == null || issues.size() == 0){
-            return new HashMap<>();
+            return new SeverityBundle(new HashMap<>(), new HashMap<>());
         }
         for(TestingRunIssues issue: issues){
             TestingIssuesId issueId = issue.getId();
@@ -93,7 +110,7 @@ public class RiskScoreOfCollections {
         
 
         if(updatedApiInfoKeys == null || updatedApiInfoKeys.size() == 0){
-            return new HashMap<>();
+            return new SeverityBundle(new HashMap<>(), new HashMap<>());
         }
 
         loggerMaker.debugAndAddToDb("Updating severity score for " + updatedApiInfoKeys.size() + " apis at timestamp " + Context.now() , LogDb.DASHBOARD);
@@ -111,11 +128,10 @@ public class RiskScoreOfCollections {
         }
 
         if(updatedIssues == null || updatedIssues.size() == 0){
-            return new HashMap<>();
+            return new SeverityBundle(new HashMap<>(), new HashMap<>());
         }
 
-        Map<ApiInfoKey, Float> severityScoreMap = getSeverityScoreMap(updatedIssues); 
-        return severityScoreMap;
+        return getSeverityBundle(updatedIssues);
     }
 
     private static boolean checkForSensitive(List<String> subTypes){
@@ -147,7 +163,8 @@ public class RiskScoreOfCollections {
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
         ArrayList<WriteModel<ApiInfo>> bulkUpdatesForApiInfo = new ArrayList<>();
 
-        Map<ApiInfoKey, Float> severityScoreMap = getUpdatedApiInfosMap(timeStampFilter);
+        SeverityBundle bundle = getUpdatedApiInfosMap(timeStampFilter);
+        Map<ApiInfoKey, Float> severityScoreMap = bundle.severityScoreMap;
         // after getting the severityScoreMap, we write that in DB
         if(severityScoreMap != null){
             severityScoreMap.forEach((apiInfoKey, severityScore)->{
@@ -155,6 +172,10 @@ public class RiskScoreOfCollections {
                 ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
                 boolean isSensitive = apiInfo != null ? apiInfo.getIsSensitive() : false;
                 float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(severityScore));
+                List<ApiInfo.RiskScoreFactor> factors = apiInfo == null ? Collections.emptyList()
+                        : RiskScoreExplainer.buildFactors(apiInfo, isSensitive, severityScore,
+                                bundle.issueNamesMap.get(apiInfoKey), null);
+                int now = Context.now();
 
                 if (apiInfo != null) {
                     if (apiInfo.getRiskScore() != riskScore) {
@@ -164,7 +185,9 @@ public class RiskScoreOfCollections {
                 
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
-                    Updates.set(ApiInfo.RISK_SCORE, riskScore)
+                    Updates.set(ApiInfo.RISK_SCORE, riskScore),
+                    Updates.set(ApiInfo.RISK_SCORE_FACTORS, factors),
+                    Updates.set(ApiInfo.LAST_CALCULATED_TIME, now)
                 );
                 bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filter, update,new UpdateOptions()));
             });
@@ -206,10 +229,17 @@ public class RiskScoreOfCollections {
                 if(apiInfo == null){
                     continue;
                 }
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(apiInfo.getSeverityScore()));
+                List<String> subTypes = (List<String>) basicDBObject.get("subTypes");
+                float severityScore = apiInfo.getSeverityScore();
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, isSensitive, getRiskScoreValueFromSeverityScore(severityScore));
+                List<ApiInfo.RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(
+                        apiInfo, isSensitive, severityScore, null, isSensitive ? subTypes : null);
+                int now = Context.now();
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.IS_SENSITIVE, isSensitive),
-                    Updates.set(ApiInfo.RISK_SCORE, riskScore)
+                    Updates.set(ApiInfo.RISK_SCORE, riskScore),
+                    Updates.set(ApiInfo.RISK_SCORE_FACTORS, factors),
+                    Updates.set(ApiInfo.LAST_CALCULATED_TIME, now)
                 );
                 bulkUpdatesForApiInfo.add(new UpdateManyModel<>(filterQSampleData, update, new UpdateOptions()));
             } catch (Exception e) {
@@ -271,19 +301,32 @@ public class RiskScoreOfCollections {
             Filters.exists(ApiInfo.LAST_CALCULATED_TIME, false),
             Filters.lte(ApiInfo.LAST_CALCULATED_TIME, timeStamp)
         );
-        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN, ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE);
+        // discoveredTimestamp + threatScore must be loaded — without them the daily pass drops the
+        // +1 new / +1 threat contributions and rewrites riskScore too low until the next severity
+        // or sensitive cron.
+        Bson projection = Projections.include("_id", ApiInfo.API_ACCESS_TYPES, ApiInfo.LAST_SEEN,
+                ApiInfo.SEVERITY_SCORE, ApiInfo.IS_SENSITIVE, ApiInfo.COLLECTION_IDS, ApiInfo.RISK_SCORE,
+                ApiInfo.DISCOVERED_TIMESTAMP, ApiInfo.THREAT_SCORE);
 
         RiskScoreTestingEndpointsUtils riskScoreTestingEndpointsUtils = new RiskScoreTestingEndpointsUtils();
 
-        // create a set for severityScore
-        Map<ApiInfoKey, Float> initialSeverityScoreMap = getUpdatedApiInfosMap(0);
+        // Open-issue severity for every endpoint in this batch (missing key = no open issues → +0).
+        SeverityBundle severityBundle = getUpdatedApiInfosMap(0);
+        Map<ApiInfoKey, Float> initialSeverityScoreMap = severityBundle.severityScoreMap;
         while(count < 100){
             List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(filter,0, limit, Sorts.descending(ApiInfo.LAST_CALCULATED_TIME), projection);
             for(ApiInfo apiInfo: apiInfos){
-                float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), getRiskScoreValueFromSeverityScore(initialSeverityScoreMap.getOrDefault(apiInfo.getId(), (float) 0)));
+                float severityScore = initialSeverityScoreMap.getOrDefault(apiInfo.getId(), 0f);
+                float riskScore = ApiInfoDao.getRiskScore(apiInfo, apiInfo.getIsSensitive(), getRiskScoreValueFromSeverityScore(severityScore));
+                List<ApiInfo.RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(
+                        apiInfo, apiInfo.getIsSensitive(), severityScore,
+                        severityBundle.issueNamesMap.get(apiInfo.getId()), null);
+                int now = Context.now();
                 Bson update = Updates.combine(
                     Updates.set(ApiInfo.RISK_SCORE, riskScore),
-                    Updates.set(ApiInfo.LAST_CALCULATED_TIME, Context.now())
+                    Updates.set(ApiInfo.SEVERITY_SCORE, severityScore),
+                    Updates.set(ApiInfo.RISK_SCORE_FACTORS, factors),
+                    Updates.set(ApiInfo.LAST_CALCULATED_TIME, now)
                 );
                 Bson filterQ = ApiInfoDao.getFilter(apiInfo.getId());
                 

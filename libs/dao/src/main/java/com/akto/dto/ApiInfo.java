@@ -50,6 +50,10 @@ public class ApiInfo {
     public static final String RISK_SCORE = "riskScore";
     private float riskScore;
 
+    // Written with riskScore by RiskScoreOfCollections — labeled point lines for the tooltip.
+    public static final String RISK_SCORE_FACTORS = "riskScoreFactors";
+    private List<RiskScoreFactor> riskScoreFactors;
+
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
@@ -105,6 +109,16 @@ public class ApiInfo {
 
         private String key;
         private String value;
+    }
+
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class RiskScoreFactor {
+        private float points;
+        private String label;
+        private String detail;
     }
 
     public static class MessageFieldEntry {
@@ -403,8 +417,8 @@ public class ApiInfo {
 
         if (that.lastCalculatedTime > this.lastCalculatedTime) {
             this.lastCalculatedTime = that.lastCalculatedTime;
+            this.riskScoreFactors = that.riskScoreFactors;
         }
-        
 
         for (String k: that.violations.keySet()) {
             if (this.violations.get(k) == null || that.violations.get(k) > this.violations.get(k)) {
@@ -678,6 +692,14 @@ public class ApiInfo {
 
     public void setRiskScore(float riskScore) {
         this.riskScore = riskScore;
+    }
+
+    public List<RiskScoreFactor> getRiskScoreFactors() {
+        return riskScoreFactors;
+    }
+
+    public void setRiskScoreFactors(List<RiskScoreFactor> riskScoreFactors) {
+        this.riskScoreFactors = riskScoreFactors;
     }
 
     public int getLastCalculatedTime() {

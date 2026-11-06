@@ -2,8 +2,11 @@ package com.akto.utils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -13,6 +16,7 @@ import org.junit.Test;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.ApiInfo.RiskScoreFactor;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 
@@ -45,27 +49,28 @@ public class TestRiskScoreExplainer {
     }
 
     @Test
-    public void fullStackSumsToSixWithFiveLines() {
+    public void threatPublicSensitiveHighSeverityIsFiveWithFourLines() {
+        // Threat suppresses the "new" point, so the real full stack is 5, not 6 — and never invents
+        // an "Other factors" residual.
         ApiInfo info = baseInfo();
-        // New (+1) is suppressed when threat is set — so for a true "full" additive stack we need
-        // no threat and all other flags, OR threat without new. Plan case: new + public + sensitive
-        // + threat + high severity. Threat suppresses new, so live formula = 1+1+1+2 = 5.
-        // Exercise the five-line path: public + sensitive + threat + high + residual-to-6 via stored.
         info.setApiAccessTypes(Collections.singleton(ApiAccessType.PUBLIC));
         info.setIsSensitive(true);
         info.setThreatScore(1f);
         info.setSeverityScore(100f);
-        info.setRiskScore(6f);
+        info.setRiskScore(5f);
 
-        List<BasicDBObject> factors = RiskScoreExplainer.explain(info, 6f);
-        assertEquals(5, factors.size());
-        assertTrue(hasLabel(factors, "Publicly accessible"));
-        assertTrue(hasLabel(factors, "Sensitive data in responses"));
-        assertTrue(hasLabel(factors, "Guardrail or threat activity"));
-        assertTrue(hasLabel(factors, "High or critical open test findings"));
-        assertTrue(hasLabel(factors, "Other factors"));
-        assertEquals(6f, sumPoints(factors), 0.01f);
-        assertFalse(hasLabel(factors, "Discovered in the last 30 days"));
+        List<RiskScoreFactor> persisted = RiskScoreExplainer.buildFactors(info, true, 100f, null, null);
+        assertEquals(4, persisted.size());
+        RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(info, 5f);
+        assertEquals(4, explanation.factors.size());
+        assertNull(explanation.note);
+        assertFalse(hasLabel(explanation.factors, "Other factors"));
+        assertFalse(hasLabel(explanation.factors, "Discovered in the last 30 days"));
+        assertTrue(hasLabel(explanation.factors, "Publicly accessible"));
+        assertTrue(hasLabel(explanation.factors, "Sensitive data in responses"));
+        assertTrue(hasLabel(explanation.factors, "Guardrail or threat activity"));
+        assertTrue(hasLabel(explanation.factors, "High or critical open test findings"));
+        assertEquals(5f, sumPoints(explanation.factors), 0.01f);
     }
 
     @Test
@@ -77,13 +82,9 @@ public class TestRiskScoreExplainer {
         info.setSeverityScore(100f);
         info.setRiskScore(5f);
 
-        List<BasicDBObject> factors = RiskScoreExplainer.buildFactors(info);
+        List<RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(info, true, 100f, null, null);
         assertEquals(4, factors.size());
-        assertTrue(hasLabel(factors, "Discovered in the last 30 days"));
-        assertTrue(hasLabel(factors, "Publicly accessible"));
-        assertTrue(hasLabel(factors, "Sensitive data in responses"));
-        assertTrue(hasLabel(factors, "High or critical open test findings"));
-        assertEquals(5f, sumPoints(factors), 0.01f);
+        assertEquals(5f, factors.stream().map(RiskScoreFactor::getPoints).reduce(0f, Float::sum), 0.01f);
     }
 
     @Test
@@ -92,10 +93,11 @@ public class TestRiskScoreExplainer {
         info.setSeverityScore(1f);
         info.setRiskScore(0.5f);
 
-        List<BasicDBObject> factors = RiskScoreExplainer.explain(info, 0.5f);
-        assertEquals(1, factors.size());
-        assertEquals("Low open test findings", factors.get(0).getString("label"));
-        assertEquals(0.5f, ((Number) factors.get(0).get("points")).floatValue(), 0.01f);
+        RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(info, 0.5f);
+        assertEquals(1, explanation.factors.size());
+        assertEquals("Low open test findings", explanation.factors.get(0).getString("label"));
+        assertEquals(0.5f, ((Number) explanation.factors.get(0).get("points")).floatValue(), 0.01f);
+        assertNull(explanation.note);
     }
 
     @Test
@@ -105,11 +107,9 @@ public class TestRiskScoreExplainer {
         info.setThreatScore(2.5f);
         info.setRiskScore(1f);
 
-        List<BasicDBObject> factors = RiskScoreExplainer.buildFactors(info);
+        List<RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(info, false, 0f, null, null);
         assertEquals(1, factors.size());
-        assertTrue(hasLabel(factors, "Guardrail or threat activity"));
-        assertFalse(hasLabel(factors, "Discovered in the last 30 days"));
-        assertEquals(1f, sumPoints(factors), 0.01f);
+        assertEquals("Guardrail or threat activity", factors.get(0).getLabel());
     }
 
     @Test
@@ -119,18 +119,61 @@ public class TestRiskScoreExplainer {
         info.setIsSensitive(true);
         info.setRiskScore(1f);
 
-        List<BasicDBObject> factors = RiskScoreExplainer.explain(info, 1f);
-        assertEquals(1, factors.size());
-        assertTrue(hasLabel(factors, "Sensitive data in responses"));
+        RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(info, 1f);
+        assertEquals(1, explanation.factors.size());
+        assertTrue(hasLabel(explanation.factors, "Sensitive data in responses"));
     }
 
     @Test
     public void mediumSeverityLabel() {
         ApiInfo info = baseInfo();
-        info.setSeverityScore(10f);
-        List<BasicDBObject> factors = RiskScoreExplainer.buildFactors(info);
+        List<RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(info, false, 10f, null, null);
         assertEquals(1, factors.size());
-        assertEquals("Medium open test findings", factors.get(0).getString("label"));
-        assertEquals(1f, ((Number) factors.get(0).get("points")).floatValue(), 0.01f);
+        assertEquals("Medium open test findings", factors.get(0).getLabel());
+        assertEquals(1f, factors.get(0).getPoints(), 0.01f);
+    }
+
+    @Test
+    public void savedListIsReturnedUnchanged() {
+        ApiInfo info = baseInfo();
+        info.setRiskScore(5f);
+        info.setLastCalculatedTime(1_700_000_000);
+        info.setRiskScoreFactors(Arrays.asList(
+                new RiskScoreFactor(1f, "Publicly accessible", null),
+                new RiskScoreFactor(2f, "High or critical open test findings", "BOLA, SQLi"),
+                new RiskScoreFactor(1f, "Sensitive data in responses", "EMAIL"),
+                new RiskScoreFactor(1f, "Guardrail or threat activity", null)
+        ));
+        // Live fields would only support 0 — saved list must win.
+        RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(info, 5f);
+        assertEquals(4, explanation.factors.size());
+        assertNull(explanation.note);
+        assertEquals(5f, sumPoints(explanation.factors), 0.01f);
+        assertEquals("BOLA, SQLi", explanation.factors.get(1).getString("detail"));
+    }
+
+    @Test
+    public void shortfallAddsNoteWithoutInventingPoints() {
+        ApiInfo info = baseInfo();
+        info.setApiAccessTypes(Collections.singleton(ApiAccessType.PUBLIC));
+        info.setThreatScore(1f);
+        info.setRiskScore(5f);
+        info.setLastCalculatedTime(1_700_000_000);
+        // No saved list — live factors = 2, badge = 5.
+        RiskScoreExplainer.Explanation explanation = RiskScoreExplainer.explain(info, 5f);
+        assertEquals(2, explanation.factors.size());
+        assertEquals(2f, sumPoints(explanation.factors), 0.01f);
+        assertFalse(hasLabel(explanation.factors, "Other factors"));
+        assertNotNull(explanation.note);
+        assertTrue(explanation.note.contains("before explanations were saved"));
+    }
+
+    @Test
+    public void severityDetailNamesOpenFindings() {
+        ApiInfo info = baseInfo();
+        List<RiskScoreFactor> factors = RiskScoreExplainer.buildFactors(
+                info, false, 100f, Arrays.asList("BOLA", "SQLi", "XSS"), null);
+        assertEquals(1, factors.size());
+        assertEquals("BOLA, SQLi, XSS", factors.get(0).getDetail());
     }
 }

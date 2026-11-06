@@ -218,7 +218,8 @@ function ChildrenTable({ parentRowId, children, rowType, misconfiguredChildId, o
                 case "riskScoreComp":
                     return transform.wrapRiskScoreTooltip(
                         <Badge status={transform.getStatus(childRiskScore)} size="small">{childRiskScore}</Badge>,
-                        childRiskScore, child.baseRiskScore, child.baseRiskScoreReason
+                        childRiskScore, child.baseRiskScore, child.baseRiskScoreReason,
+                        child.riskScoreFactors, child.riskScoreNote
                     );
                 case "sensitiveSubTypes":
                     return transform.prettifySubtypes(child.sensitiveInRespTypes || []);
@@ -360,7 +361,8 @@ function shapeEndpointRow(row, { rowType, onOpenBundle }) {
         pluginScopeComp: rowType === "plugin" ? (row.pluginScope || "-") : "-",
         riskScoreComp: transform.wrapRiskScoreTooltip(
             <Badge status={transform.getStatus(riskScore)} size="small">{riskScore}</Badge>,
-            riskScore, row.baseRiskScore, row.baseRiskScoreReason
+            riskScore, row.baseRiskScore, row.baseRiskScoreReason,
+            row.riskScoreFactors, row.riskScoreNote
         ),
         sensitiveSubTypes: transform.prettifySubtypes(row.sensitiveInRespTypes || []),
         lastTraffic: func.prettifyEpoch(row.lastSeenEpoch || 0),
@@ -392,17 +394,30 @@ export default function AgenticAssetDevicesPage() {
     // two places this exact asset's device breakdown is shown, so the header should read the same
     // regardless of which one a click landed on.
     const [description, setDescription] = useState("");
+    const [assetRisk, setAssetRisk] = useState({ score: null, factors: [], note: null });
 
-    const pageTitle = useMemo(() => (
-        <VerticalStack gap="1">
-            <TitleWithInfo
-                tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
-                titleText={assetType ? `${assetType} - ${assetName}` : assetName}
-                docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
-            />
-            {description && <Text variant="bodyMd">{description}</Text>}
-        </VerticalStack>
-    ), [assetType, assetName, description]);
+    const pageTitle = useMemo(() => {
+        const titleLabel = assetType ? `${assetType} - ${assetName}` : assetName;
+        const riskBadge = assetRisk.score
+            ? transform.wrapRiskScoreTooltip(
+                <Badge status={transform.getStatus(assetRisk.score)} size="small">{assetRisk.score}</Badge>,
+                assetRisk.score, null, null, assetRisk.factors, assetRisk.note
+            )
+            : null;
+        return (
+            <VerticalStack gap="1">
+                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                    <TitleWithInfo
+                        tooltipContent={`Viewing devices for ${assetType || "asset"} ${assetName}`}
+                        titleText={titleLabel}
+                        docsUrl="https://ai-security-docs.akto.io/agentic-ai-discovery/get-started"
+                    />
+                    {riskBadge}
+                </HorizontalStack>
+                {description && <Text variant="bodyMd">{description}</Text>}
+            </VerticalStack>
+        );
+    }, [assetType, assetName, description, assetRisk]);
 
     // Same "Explore mode" primaryAction ApiCollections.jsx always shows next to its title —
     // generic query-explorer shortcut, not scoped to this asset, kept only for header parity.
@@ -461,6 +476,11 @@ export default function AgenticAssetDevicesPage() {
                 const detail = settledValue(detailSettled, {});
                 collectionIdsRef.current = detail?.collectionIds || [];
                 setDescription(detail?.description || "");
+                setAssetRisk({
+                    score: detail?.riskScore ?? null,
+                    factors: detail?.riskScoreFactors || [],
+                    note: detail?.riskScoreNote || null,
+                });
                 setPluginBundle(rowType === "plugin" ? {
                     mcpServers: detail?.pluginMcpServers || [],
                     mcpServerCollectionIds: detail?.pluginMcpServerCollectionIds || {},
@@ -469,7 +489,13 @@ export default function AgenticAssetDevicesPage() {
                 } : null);
                 setOwningPluginName(rowType !== "plugin" ? (detail?.owningPluginName || null) : null);
             } catch {
-                if (!cancelled) { collectionIdsRef.current = []; setDescription(""); setPluginBundle(null); setOwningPluginName(null); }
+                if (!cancelled) {
+                    collectionIdsRef.current = [];
+                    setDescription("");
+                    setAssetRisk({ score: null, factors: [], note: null });
+                    setPluginBundle(null);
+                    setOwningPluginName(null);
+                }
             } finally {
                 if (!cancelled) { setLoading(false); setRefreshKey((k) => k + 1); }
             }
