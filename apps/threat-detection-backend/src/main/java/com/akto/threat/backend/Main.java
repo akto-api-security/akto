@@ -14,6 +14,7 @@ import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.dao.ApiDistributionDataDao;
 import com.akto.threat.backend.service.MaliciousEventService;
+import com.akto.threat.backend.service.ResponseRuleEngine;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
@@ -90,6 +91,7 @@ public class Main {
 
     MaliciousEventService maliciousEventService =
         new MaliciousEventService(internalKafkaConfig, MaliciousEventDao.instance);
+    ResponseRuleEngine.getInstance().init(maliciousEventService);
 
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
     ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);

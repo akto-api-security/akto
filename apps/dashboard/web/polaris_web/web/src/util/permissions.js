@@ -103,6 +103,7 @@ const PAGE_REQUIRES = {
     '/dashboard/protection/threat-policy': 'api/fetchThreatComplianceInfos',
     '/dashboard/guardrails/activity': 'api/fetchSuspectSampleData',
     '/dashboard/guardrails/policies': 'api/fetchGuardrailPolicies',
+    '/dashboard/guardrails/response-rules': 'api/fetchGuardrailResponseRules',
     '/dashboard/guardrails/misconfigurations': 'api/fetchConfigFieldPolicies',
     '/dashboard/settings/users': 'api/getTeamData',
     '/dashboard/settings/threat-configuration': 'api/fetchThreatConfiguration',

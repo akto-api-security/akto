@@ -12,6 +12,7 @@ import com.akto.threat.backend.dao.ActorInfoDao;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
+import com.akto.threat.backend.service.ResponseRuleEngine;
 import com.akto.threat.backend.utils.SplunkEvent;
 import com.akto.util.ThreatDetectionConstants;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -167,6 +168,8 @@ public class FlushMessagesToDB {
 
             // Upsert actor_info table for optimized listThreatActors queries
             upsertActorInfo(accountId, event);
+
+            ResponseRuleEngine.getInstance().onEventSaved(accountId, event);
         }
         break;
       default:

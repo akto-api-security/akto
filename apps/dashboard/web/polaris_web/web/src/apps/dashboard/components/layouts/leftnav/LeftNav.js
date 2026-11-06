@@ -628,6 +628,16 @@ export default function LeftNav() {
                             selected: leftNavSelected === "dashboard_guardrails_policies",
                             }] : []),
                         ...((dashboardCategory === "Endpoint Security") ? [{
+                            label: "Response Rules",
+                            requires: pageRequires("/dashboard/guardrails/response-rules"),
+                            onClick: () => {
+                                navigate("/dashboard/guardrails/response-rules");
+                                handleSelect("dashboard_guardrails_response_rules");
+                                setActive("active");
+                            },
+                            selected: leftNavSelected === "dashboard_guardrails_response_rules",
+                            }] : []),
+                        ...((dashboardCategory === "Endpoint Security") ? [{
                             label: "Misconfigurations",
                             requires: pageRequires("/dashboard/guardrails/misconfigurations"),
                             badge: <Badge status="info">Beta</Badge>,
