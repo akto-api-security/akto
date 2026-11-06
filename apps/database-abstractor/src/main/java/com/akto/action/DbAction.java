@@ -696,7 +696,7 @@ public class DbAction extends ActionSupport {
 
     public String fetchAndUpdateModuleForReboot() {
         try {
-            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId);
+            moduleInfoList = DbLayer.fetchAndUpdateModuleForReboot(moduleType, miniRuntimeName, moduleId, moduleName);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchAndUpdateModuleForReboot " + e.toString());
             return Action.ERROR.toUpperCase();
