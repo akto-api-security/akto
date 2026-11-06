@@ -364,6 +364,10 @@ export default {
             hasInlineLlm: resp?.assetHasInlineLlm || false,
             inlineToolNames: resp?.assetInlineToolNames || [],
             mcpComponentCount: resp?.assetMcpComponentCount || 0,
+            // Asset-level risk badge next to "AI Agent - Cursor" on the legacy devices page.
+            riskScore: resp?.assetRiskScore ?? null,
+            riskScoreFactors: resp?.assetRiskScoreFactors || [],
+            riskScoreNote: resp?.assetRiskScoreNote || null,
         }
     },
     // Batch form of fetchAgenticAssetDetail, scoped to just mcpServers/mcpServerCollectionIds/

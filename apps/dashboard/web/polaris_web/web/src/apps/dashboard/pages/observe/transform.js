@@ -1,5 +1,5 @@
 import func from "@/util/func";
-import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip } from "@shopify/polaris";
+import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
@@ -423,10 +423,31 @@ const transform = {
         }
     },
 
-    // Suppressed when either score is 0/falsy — a "0" risk-score badge showing a non-zero base
-    // score (or vice versa) in its tooltip reads as contradictory, so both have to be meaningfully
-    // non-zero before the extra context is worth surfacing.
-    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason){
+    // Prefer riskScoreFactors (saved with the score, or rebuilt live) when present. Fall back to
+    // the older baseRiskScoreReason string used on inventory / collection pages. riskScoreNote is
+    // an honest shortfall message when no saved list exists yet — never invents points.
+    wrapRiskScoreTooltip(badge, riskScore, baseRiskScore, baseRiskScoreReason, riskScoreFactors, riskScoreNote){
+        if (riskScore && ((Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) || riskScoreNote)) {
+            return (
+                <Tooltip dismissOnMouseOut content={
+                    <Box>
+                        <VerticalStack gap="1">
+                            <Text variant="bodyMd" fontWeight="semibold">Highest-risk endpoint in this asset</Text>
+                            {(riskScoreFactors || []).map((factor, index) => (
+                                <Text key={index} variant="bodyMd">
+                                    {factor.points} → {factor.label}{factor.detail ? ` (${factor.detail})` : ""}
+                                </Text>
+                            ))}
+                            {riskScoreNote ? (
+                                <Text variant="bodyMd" color="subdued">{riskScoreNote}</Text>
+                            ) : null}
+                        </VerticalStack>
+                    </Box>
+                }>
+                    {badge}
+                </Tooltip>
+            );
+        }
         if(!baseRiskScoreReason || !riskScore || !baseRiskScore) return badge;
         return (
             <Tooltip dismissOnMouseOut content={

@@ -1186,7 +1186,15 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     const cacheAge = Date.now() - (cached?.ts || 0);
 
     if (cacheAge <= SKILL_RISK_CACHE_TTL_MS && cached?.ts > 0) {
-        return { skillScoreMap: cached.data || {}, maliciousSkills: new Set(cached.maliciousSkills || []), maliciousSkillKeys: new Set(cached.maliciousSkillKeys || []), misconfiguredSkills: new Set(cached.misconfiguredSkills || []), misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []) };
+        return {
+            skillScoreMap: cached.data || {},
+            skillScoreFactorsMap: cached.skillScoreFactorsMap || {},
+            skillScoreNotesMap: cached.skillScoreNotesMap || {},
+            maliciousSkills: new Set(cached.maliciousSkills || []),
+            maliciousSkillKeys: new Set(cached.maliciousSkillKeys || []),
+            misconfiguredSkills: new Set(cached.misconfiguredSkills || []),
+            misconfiguredCollectionIds: new Set(cached.misconfiguredCollectionIds || []),
+        };
     }
 
     let resp;
@@ -1200,13 +1208,24 @@ export async function fetchAndCacheSkillApiData(collectionIds, { api, PersistSto
     // scoped `<collectionId>|<skillName>` keys, same format skillCollectionKey produces, so this stays
     // a single query instead of reintroducing the old per-collection fetchApiInfosForCollection N+1.
     const skillScoreMap = resp?.skillScoreMap || {};
+    const skillScoreFactorsMap = resp?.skillScoreFactorsMap || {};
+    const skillScoreNotesMap = resp?.skillScoreNotesMap || {};
     const maliciousSkills = new Set(resp?.maliciousSkills || []);
     const maliciousSkillKeys = new Set(resp?.maliciousSkillKeys || []);
     const misconfiguredSkills = new Set(resp?.misconfiguredSkills || []);
     const misconfiguredCollectionIds = new Set(resp?.misconfiguredCollectionIds || []);
 
-    PersistStore.getState().setSkillRiskScoreCache({ data: skillScoreMap, maliciousSkills: [...maliciousSkills], maliciousSkillKeys: [...maliciousSkillKeys], misconfiguredSkills: [...misconfiguredSkills], misconfiguredCollectionIds: [...misconfiguredCollectionIds], ts: Date.now() });
-    return { skillScoreMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
+    PersistStore.getState().setSkillRiskScoreCache({
+        data: skillScoreMap,
+        skillScoreFactorsMap,
+        skillScoreNotesMap,
+        maliciousSkills: [...maliciousSkills],
+        maliciousSkillKeys: [...maliciousSkillKeys],
+        misconfiguredSkills: [...misconfiguredSkills],
+        misconfiguredCollectionIds: [...misconfiguredCollectionIds],
+        ts: Date.now(),
+    });
+    return { skillScoreMap, skillScoreFactorsMap, skillScoreNotesMap, maliciousSkills, maliciousSkillKeys, misconfiguredSkills, misconfiguredCollectionIds };
 }
 
 // Promise.allSettled helpers — a page's mount batch must degrade per-member, never blank the page.
