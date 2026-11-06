@@ -235,6 +235,7 @@ import com.akto.utils.crons.SyncCron;
 import com.akto.utils.crons.TokenGeneratorCron;
 import com.akto.utils.crons.UpdateSensitiveInfoInApiInfo;
 import com.akto.utils.crons.AgentBasePromptDetectionCron;
+import com.akto.utils.crons.McpToolDescriptionCron;
 import com.akto.utils.crons.OktaUserSyncCron;
 import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.DeactivateCollections;
@@ -295,6 +296,7 @@ public class InitializerListener implements ServletContextListener {
     TokenGeneratorCron tokenGeneratorCron = new TokenGeneratorCron();
     UpdateSensitiveInfoInApiInfo updateSensitiveInfoInApiInfo = new UpdateSensitiveInfoInApiInfo();
     AgentBasePromptDetectionCron agentBasePromptDetectionCron = new AgentBasePromptDetectionCron();
+    McpToolDescriptionCron mcpToolDescriptionCron = new McpToolDescriptionCron();
     OktaUserSyncCron oktaUserSyncCron = new OktaUserSyncCron();
 
     private static String domain = null;
@@ -2702,6 +2704,8 @@ public class InitializerListener implements ServletContextListener {
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     logger.warn("Started test template scheduler", LogDb.DASHBOARD);
                     setUpTestEditorTemplatesScheduler();
+                    logger.warn("Started MCP tool description scheduler", LogDb.DASHBOARD);
+                    mcpToolDescriptionCron.setUpMcpToolDescriptionScheduler();
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
