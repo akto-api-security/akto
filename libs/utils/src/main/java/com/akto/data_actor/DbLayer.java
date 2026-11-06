@@ -4861,7 +4861,7 @@ public class DbLayer {
     }
 
     public static void writeSequenceCounts(List<SequenceCount> sequenceCounts) {
-        SequenceModelDao.instance.writeSequenceCounts(sequenceCounts);
+        ApiSequencesDao.instance.incrementSequences(sequenceCounts);
     }
 
 }

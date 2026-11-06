@@ -31,7 +31,6 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.dao.ApiSequencesDao;
-import com.akto.dao.SequenceModelDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.notifications.CustomWebhook;
@@ -1034,9 +1033,19 @@ public class DbAction extends ActionSupport {
             return Action.SUCCESS.toUpperCase();
         }
         try {
-            SequenceModelDao.instance.writeSequenceCounts(sequenceCounts);
+            ApiSequencesDao.instance.incrementSequences(sequenceCounts);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in writeSequenceCounts: " + e.getMessage());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchSequenceRules() {
+        try {
+            apiSequencesList = ApiSequencesDao.instance.findSequenceRules();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchSequenceRules: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
