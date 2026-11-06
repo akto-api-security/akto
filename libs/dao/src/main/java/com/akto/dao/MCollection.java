@@ -67,6 +67,9 @@ public abstract class MCollection<T> {
     }
 
     public MongoCollection<T> getMCollection() {
+        if (LogsMongo.isRouted(this)) {
+            return LogsMongo.getMCollection(this);
+        }
         return getMCollection(getDBName(), getCollName(), getClassT());
     }
 

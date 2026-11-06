@@ -1,6 +1,7 @@
 package com.akto.dao.monitoring;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.LogsMongo;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiSequences;
@@ -32,6 +33,9 @@ public class EndpointShieldLogsDao extends AccountsContextDao<EndpointShieldLog>
     }
 
     public void createIndicesIfAbsent() {
+        // collections live in the separate logs Mongo (LOG_MONGO_CONN); created/indexed there by the log pipeline consumer
+        if (LogsMongo.isRouted(this)) return;
+
         boolean exists = false;
         String dbName = Context.accountId.get()+"";
         MongoDatabase db = clients[0].getDatabase(dbName);
