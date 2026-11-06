@@ -6,6 +6,7 @@ import com.akto.util.http_util.CoreHTTPClient;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.servlet.http.HttpServletRequest;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -13,13 +14,15 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.apache.struts2.ServletActionContext;
 
 /**
- * Raises the guardrail activity for a skill that V3 finds malicious: a MaliciousEvent on host =
+ * Raises the guardrail activity for a skill found malicious (by V3, or by V2 for the agent): a MaliciousEvent on host =
  * collectionName, endpoint /skills/{skillName}, context ENDPOINT, the same event the endpoint-shield agent
  * sends, which is what SkillsRiskScoreSyncCron matches to mark the endpoint malicious.
  *
- * Nothing is ingested from here: the dashboard's revalidation job writes the result onto the stored skill.
+ * Nothing is ingested from here: V3's caller writes the result onto the stored skill, and V2 ingests it
+ * through SkillPublisher.
  */
 public class SkillThreatReporterV3 {
 
@@ -40,7 +43,7 @@ public class SkillThreatReporterV3 {
     static final String ENDPOINT_SOURCE = "ENDPOINT";
 
     /** Everything about one skill that the event needs. */
-    static final class SkillRef {
+    public static final class SkillRef {
         final String skillName;
         final String skillDescription;
         final String skillContent;
@@ -48,7 +51,7 @@ public class SkillThreatReporterV3 {
         final String collectionName;
         final String authToken;
 
-        SkillRef(String skillName, String skillDescription, String skillContent, String agentName,
+        public SkillRef(String skillName, String skillDescription, String skillContent, String agentName,
                 String collectionName, String authToken) {
             this.skillName = skillName;
             this.skillDescription = skillDescription;
@@ -64,7 +67,7 @@ public class SkillThreatReporterV3 {
     }
 
     /** The guardrail activity for a skill that cleared the malicious bar. */
-    static final class Threat {
+    public static final class Threat {
         final String tag;
         final String severity;
         final double riskScore;
@@ -89,15 +92,15 @@ public class SkillThreatReporterV3 {
 
     private SkillThreatReporterV3() {}
 
-    static void reportThreat(SkillRef skill, Threat threat) {
+    public static void reportThreat(SkillRef skill, Threat threat) {
         String body = buildThreatBody(skill, threat, System.currentTimeMillis() / 1000).toString();
         try {
             post(THREAT_DETECTION_API_URL, body, bearer(skill.authToken));
-            logger.infoAndAddToDb("[SkillValidationV3] guardrail activity raised skill=" + skill.skillName
+            logger.infoAndAddToDb("[SkillValidation] guardrail activity raised skill=" + skill.skillName
                     + " tag=" + threat.tag + " severity=" + threat.severity + " riskScore=" + threat.riskScore,
                     LogDb.DB_ABS);
         } catch (Exception e) {
-            logger.errorAndAddToDb("[SkillValidationV3] guardrail activity failed skill=" + skill.skillName
+            logger.errorAndAddToDb("[SkillValidation] guardrail activity failed skill=" + skill.skillName
                     + ": " + e.getMessage(), LogDb.DB_ABS);
         }
     }
@@ -182,6 +185,17 @@ public class SkillThreatReporterV3 {
         event.put("successfulExploit", true);
 
         return new JSONObject().put("maliciousEvent", event);
+    }
+
+    /** The caller's Authorization header, read on the request thread. */
+    public static String requestAuthToken() {
+        try {
+            HttpServletRequest request = ServletActionContext.getRequest();
+            String token = request == null ? null : request.getHeader("Authorization");
+            return token == null ? "" : token.trim();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     static String bearer(String token) {
