@@ -85,6 +85,9 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     public final static int UNAUTHENTICATED_GROUP_ID = 111_111_120;
 
+    // MCP tools are left out of the group above; the cron keeps them in their own group
+    public final static int UNAUTHENTICATED_MCP_TOOLS_GROUP_ID = 111_111_122;
+
     public static void updateCollections(){
         ApiCollectionUsers.reset(UNAUTHENTICATED_GROUP_ID);
 

@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.RBAC;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
@@ -226,9 +227,12 @@ public class UsersCollectionsList {
         );
         switch (source) {
             case MCP:
-                finalFilter = Filters.and(
-                    Filters.exists(ApiCollection.TAGS_STRING),
-                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG))
+                finalFilter = Filters.or(
+                    Filters.and(
+                        Filters.exists(ApiCollection.TAGS_STRING),
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG))
+                    ),
+                    Filters.eq(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID)
                 );
                 break;
             case GEN_AI:
@@ -249,6 +253,7 @@ public class UsersCollectionsList {
                     ),
                     Filters.nor(getEndpointSourceFilter())
                 );
+                finalFilter = Filters.or(finalFilter, Filters.eq(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID));
                 break;
             case DAST:
                 finalFilter = Filters.and(
@@ -263,6 +268,8 @@ public class UsersCollectionsList {
                 );
                 break;
             default:
+                // the MCP tools group has no tags, but its apis are MCP tools, so it belongs to the MCP views only
+                finalFilter = Filters.and(finalFilter, Filters.ne(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID));
                 break;
         }
         MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
