@@ -234,22 +234,17 @@ function GuardrailPolicies() {
 
     useEffect(() => {
         const prefill = location.state?.topicGuardrailPrefill;
-        if (!prefill) return;
-        setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
-        setIsEditMode(false);
-        setIsPreset(true);
-        setCreateInitialStep(2);
+        // The Atlas discovery flyout opens the empty create page; Close goes back to where it came from.
+        if (!prefill && !location.state?.openCreateGuardrail) return;
+        if (prefill) {
+            setEditingPolicy({ ...prefill, deniedTopics: prefill.deniedTopics || [] });
+            setIsEditMode(false);
+            setIsPreset(true);
+            setCreateInitialStep(2);
+        }
         setShowCreateModal(true);
         setOpenedViaDeepLink(true);
         // Clear router state, keep existing query params (e.g. filters) intact.
-        navigate(location.pathname + location.search, { replace: true, state: {} });
-    }, [location.state, location.pathname, location.search, navigate]);
-
-    // The Atlas discovery flyout opens the empty create page; Close goes back to where it came from.
-    useEffect(() => {
-        if (!location.state?.openCreateGuardrail) return;
-        setShowCreateModal(true);
-        setOpenedViaDeepLink(true);
         navigate(location.pathname + location.search, { replace: true, state: {} });
     }, [location.state, location.pathname, location.search, navigate]);
 

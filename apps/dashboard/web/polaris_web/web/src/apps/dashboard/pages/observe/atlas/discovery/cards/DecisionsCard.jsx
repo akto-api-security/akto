@@ -6,7 +6,7 @@ import ActionChip from "../../shared/ActionChip";
 import discoveryApi from "../discoveryApi";
 import DiscoveryCard from "../shared/DiscoveryCard";
 import ToolAvatar from "../shared/ToolAvatar";
-import { SUBTITLES } from "../constants";
+import { LOAD_STATE, SUBTITLES } from "../constants";
 
 const PAGE_SIZE_SETTLE_MS = 300;
 
@@ -40,10 +40,10 @@ function DecisionRow({ row, pending, onOpen, onApprove, onBlock }) {
 }
 
 // Tools that still need a decision, a page at a time; pageSize is how many rows fit the card.
-export default function DecisionsCard({ startTimestamp, endTimestamp, deviceScope, refreshKey, pageSize: measuredPageSize, pending, onOpen, onApprove, onBlock }) {
+export default function DecisionsCard({ deviceScope, refreshKey, pageSize: measuredPageSize, pending, onOpen, onApprove, onBlock }) {
     const [pageSize, setPageSize] = useState(0);
-    // A new range, scope or page size starts again from the first page, in the same render (no fetch at the old page).
-    const filterKey = `${startTimestamp}|${endTimestamp}|${deviceScope}|${pageSize}`;
+    // A new scope or page size starts again from the first page, in the same render (no fetch at the old page).
+    const filterKey = `${deviceScope}|${pageSize}`;
     const [pageState, setPageState] = useState({ filterKey, page: 0 });
     const page = pageState.filterKey === filterKey ? pageState.page : 0;
     const setPage = (next) => setPageState({ filterKey, page: next });
@@ -63,11 +63,11 @@ export default function DecisionsCard({ startTimestamp, endTimestamp, deviceScop
     }, [measuredPageSize]);
 
     useEffect(() => {
-        // Fetch only once the size is known and has settled, so a changed range or scope costs one request.
+        // Fetch only once the size is known and has settled, so a changed scope costs one request.
         if (!pageSize || pageSize !== measuredPageSize) return undefined;
         let ignore = false;
         setFailedKey("");
-        discoveryApi.fetchAtlasDecisions({ startTimestamp, endTimestamp, deviceScope, skip: page * pageSize, limit: pageSize })
+        discoveryApi.fetchAtlasDecisions({ deviceScope, skip: page * pageSize, limit: pageSize })
             .then((response) => {
                 if (ignore) return;
                 // The last row of the last page was just decided: go back to the page that still has rows.
@@ -76,9 +76,9 @@ export default function DecisionsCard({ startTimestamp, endTimestamp, deviceScop
             })
             .catch(() => { if (!ignore) setFailedKey(requestKey); });
         return () => { ignore = true; };
-    }, [startTimestamp, endTimestamp, deviceScope, refreshKey, page, pageSize, measuredPageSize]);
+    }, [deviceScope, refreshKey, page, pageSize, measuredPageSize]);
 
-    // Rows fetched for another range, scope or size are not shown.
+    // Rows fetched for another scope or size are not shown.
     const current = data?.filterKey === filterKey ? data : null;
     const rows = current?.rows || [];
     const total = current?.total || 0;
@@ -87,7 +87,7 @@ export default function DecisionsCard({ startTimestamp, endTimestamp, deviceScop
     const from = shownPage * pageSize + 1;
     // A failed page turn must not look like the previous page loaded fine.
     const pageFailed = failed && current?.page !== page;
-    const status = current && !pageFailed ? "ready" : failed ? "error" : "loading";
+    const status = current && !pageFailed ? LOAD_STATE.READY : failed ? LOAD_STATE.ERROR : LOAD_STATE.LOADING;
     return (
         <DiscoveryCard
             flush
@@ -96,7 +96,7 @@ export default function DecisionsCard({ startTimestamp, endTimestamp, deviceScop
             subtitle={SUBTITLES.decisions}
             status={status}
             empty={rows.length === 0}
-            emptyText="Every discovered tool has been reviewed."
+            emptyText="No risky or new tools need a decision."
         >
             {rows.map((row) => (
                 <Box key={row.key} paddingBlockStart="2" paddingBlockEnd="2" paddingInlineStart="4" paddingInlineEnd="4" borderBlockStartWidth="1" borderColor="border-subdued">

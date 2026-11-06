@@ -9,14 +9,17 @@ import com.akto.service.atlas.AtlasAssetStatus;
 import com.akto.service.atlas.AtlasAssetStatusService;
 import com.akto.service.atlas.AtlasDeviceScope;
 import com.akto.service.atlas.AtlasDiscoveryService;
+import com.akto.service.atlas.AtlasPeople;
 import com.akto.service.atlas.AtlasToolRow;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
 import com.akto.utils.ArgusCollectionScope;
+import com.akto.utils.TtlCache;
 import com.mongodb.BasicDBObject;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.HashMap;
@@ -24,39 +27,34 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class AtlasDiscoveryAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AtlasDiscoveryAction.class, LogDb.DASHBOARD);
 
-    // Range ends are rounded to this, so repeated loads of the same range share one cached insights bundle.
-    private static final int CACHE_BUCKET_SECONDS = 300;
+    // The insights bundle is keyed by its time range, so the range end is rounded up to share one cached bundle across loads.
+    private static final int BUNDLE_BUCKET_SECONDS = 300;
     private static final int MAX_STATUS_UPDATE_KEYS = 100;
     private static final int MAX_PAGE_SIZE = 500;
     private static final int DEFAULT_PAGE_SIZE = 50;
     private static final long DEVICE_CACHE_TTL_MS = 60_000;
-    private static final Map<Integer, CachedDevices> DEVICE_CACHE = new ConcurrentHashMap<>();
+    private static final int DEVICE_CACHE_MAX_ENTRIES = 1000;
+    private static final String TOOL_NOT_FOUND = "Tool not found";
+    private static final TtlCache<Integer, DeviceSnapshot> DEVICE_CACHE = new TtlCache<>(DEVICE_CACHE_TTL_MS, DEVICE_CACHE_MAX_ENTRIES);
 
     private final InsightService insightService = new InsightService();
     private final AtlasAssetStatusService statusService = new AtlasAssetStatusService();
 
-    private static final class CachedDevices {
-        final Map<String, Map<String, String>> devices;
-        // Endpoint Shield page rows: {all, browser}.
-        final int[] shieldRows;
-        final long loadedAtMs;
-
-        CachedDevices(Map<String, Map<String, String>> devices, int[] shieldRows, long loadedAtMs) {
-            this.devices = devices;
-            this.shieldRows = shieldRows;
-            this.loadedAtMs = loadedAtMs;
-        }
+    /** Endpoint Shield device metadata and the page's row counts (all rows, and the browser ones). */
+    @Value
+    private static class DeviceSnapshot {
+        Map<String, Map<String, String>> devices;
+        int shieldRows;
+        int shieldBrowserRows;
     }
 
-    @Getter @Setter private int startTimestamp;
-    @Getter @Setter private int endTimestamp;
     @Getter @Setter private String deviceScope;
     @Getter @Setter private List<String> assetKeys;
     @Getter @Setter private String assetKey;
@@ -71,70 +69,32 @@ public class AtlasDiscoveryAction extends UserAction {
     @Getter private BasicDBObject response = new BasicDBObject();
 
     public String fetchAtlasDiscoveryOverview() {
-        try {
-            AtlasDiscoveryService service = buildService();
-            if (service != null) response = new BasicDBObject(service.buildOverview());
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error building Atlas discovery overview: " + e.getMessage());
-            addActionError("Failed to load the agentic discovery overview");
-            return ERROR.toUpperCase();
-        }
+        return serve("Failed to load the agentic discovery overview", AtlasDiscoveryService::buildOverview);
     }
 
     // One page of the "needs a decision" list; the card asks for as many rows as fit its height.
     public String fetchAtlasDecisions() {
-        try {
-            AtlasDiscoveryService service = buildService();
-            if (service == null) return SUCCESS.toUpperCase();
-            response = new BasicDBObject(service.pageDecisions(Math.max(skip, 0), limit <= 0 ? DEFAULT_PAGE_SIZE : Math.min(limit, MAX_PAGE_SIZE)));
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error listing Atlas decisions: " + e.getMessage());
-            addActionError("Failed to load the tools that need a decision");
-            return ERROR.toUpperCase();
-        }
+        return serve("Failed to load the tools that need a decision", service -> service.pageDecisions(skip, pageSize()));
     }
 
     // Filterable, sortable, paged list of discovered tools; backs the CSV export.
     public String fetchAtlasTools() {
-        try {
-            AtlasDiscoveryService service = buildService();
-            if (service == null) return SUCCESS.toUpperCase();
+        return serve("Failed to load the discovered tools", service -> {
             AtlasDiscoveryService.Query query = new AtlasDiscoveryService.Query();
             query.setCategory(category);
             query.setStatus(status);
             query.setText(queryValue);
             query.setSortKey(sortKey);
             query.setSortOrder(sortOrder);
-            query.setSkip(Math.max(skip, 0));
-            query.setLimit(limit <= 0 ? DEFAULT_PAGE_SIZE : Math.min(limit, MAX_PAGE_SIZE));
-            response = new BasicDBObject(service.pageTools(query));
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error listing Atlas discovered tools: " + e.getMessage());
-            addActionError("Failed to load the discovered tools");
-            return ERROR.toUpperCase();
-        }
+            query.setSkip(skip);
+            query.setLimit(pageSize());
+            return service.pageTools(query);
+        });
     }
 
     // One tool for the flyout: its row, top employees and connections.
     public String fetchAtlasToolDetail() {
-        try {
-            AtlasDiscoveryService service = buildService();
-            if (service == null) return SUCCESS.toUpperCase();
-            Map<String, Object> detail = StringUtils.isBlank(assetKey) ? null : service.detail(assetKey);
-            if (detail == null) {
-                addActionError("Tool not found");
-                return ERROR.toUpperCase();
-            }
-            response = new BasicDBObject(detail);
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error loading Atlas tool detail: " + e.getMessage());
-            addActionError("Failed to load the tool");
-            return ERROR.toUpperCase();
-        }
+        return serve("Failed to load the tool", service -> StringUtils.isBlank(assetKey) ? null : service.detail(assetKey));
     }
 
     public String updateAtlasAssetStatus() {
@@ -152,7 +112,7 @@ public class AtlasDiscoveryAction extends UserAction {
             }
             // Only keys that match a discovered tool are written; anything else is ignored.
             Set<String> selected = new HashSet<>(assetKeys);
-            List<AtlasToolRow> chosen = new AgenticObserveAction().fetchAtlasToolRows().stream()
+            List<AtlasToolRow> chosen = toolRows().stream()
                     .filter(row -> selected.contains(AtlasAssetStatusService.toolKey(row.getRowType(), row.getGroupKey())))
                     .collect(Collectors.toList());
             int updated = statusService.updateStatus(chosen, target, user.getLogin());
@@ -165,43 +125,68 @@ public class AtlasDiscoveryAction extends UserAction {
         }
     }
 
+    // Runs one read over the discovery service; users restricted to some collections get an empty page, an unknown tool an error.
+    private String serve(String failureMessage, Function<AtlasDiscoveryService, Map<String, Object>> read) {
+        try {
+            AtlasDiscoveryService service = buildService();
+            if (service == null) return SUCCESS.toUpperCase();
+            Map<String, Object> result = read.apply(service);
+            if (result == null) {
+                addActionError(TOOL_NOT_FOUND);
+                return ERROR.toUpperCase();
+            }
+            response = new BasicDBObject(result);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Atlas discovery: " + failureMessage + ": " + e.getMessage());
+            addActionError(failureMessage);
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private int pageSize() {
+        return limit <= 0 ? DEFAULT_PAGE_SIZE : Math.min(limit, MAX_PAGE_SIZE);
+    }
+
+    private static List<AtlasToolRow> toolRows() {
+        return new AgenticObserveAction().fetchAtlasToolRows();
+    }
+
     // Null for users restricted to some collections: employee-level data is account-wide, so they get an empty page.
     private AtlasDiscoveryService buildService() {
         if (ArgusCollectionScope.isLimited(getSUser())) return null;
         int now = Context.now();
-        // Never in the future, and rounded up so the newest traffic is in range.
-        int end = bucketUp(endTimestamp > 0 ? Math.min(endTimestamp, now) : now);
-        int start = Math.min(Math.max(startTimestamp, 0) / CACHE_BUCKET_SECONDS * CACHE_BUCKET_SECONDS, end);
-        InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx(start, end));
-        CachedDevices shield = loadDevices();
-        Map<String, Map<String, String>> devices = shield.devices;
-        List<AtlasToolRow> rows = AtlasDeviceScope.apply(
-                new AgenticObserveAction().fetchAtlasToolRows(), deviceScope, AtlasDeviceScope.browserDevices(devices));
-        int managedDevices = shield.shieldRows[0] == 0 ? bundle.deviceIdToUsername.size() : AtlasDeviceScope.countDevices(shield.shieldRows[0], shield.shieldRows[1], deviceScope);
-        return new AtlasDiscoveryService(rows, statusService.loadDecisions(), bundle.allowlistNamesLower,
-                bundle.deviceIdToUsername, teamByUser(bundle), managedDevices, start, end, now);
+        InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx(now));
+        DeviceSnapshot shield = loadDevices();
+        List<AtlasToolRow> allRows = toolRows();
+        List<AtlasToolRow> rows = AtlasDeviceScope.apply(allRows, deviceScope, AtlasDeviceScope.browserDevices(shield.getDevices()));
+        // Decisions do not depend on the device scope; malicious skills are looked up by name.
+        Map<String, AtlasAssetStatus> decisions = new HashMap<>(statusService.loadDecisions());
+        decisions.putAll(statusService.loadSkillDecisions(allRows));
+        int managedDevices = shield.getShieldRows() == 0
+                ? bundle.deviceIdToUsername.size()
+                : AtlasDeviceScope.countDevices(shield.getShieldRows(), shield.getShieldBrowserRows(), deviceScope);
+        return new AtlasDiscoveryService(rows, decisions, bundle.allowlistNamesLower,
+                new AtlasPeople(bundle.deviceIdToUsername, teamByUser(bundle)), managedDevices, now);
     }
 
     // Every endpoint-shield module is read, so share one read per account across the requests of a page load.
-    private static CachedDevices loadDevices() {
-        long nowMs = System.currentTimeMillis();
-        DEVICE_CACHE.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * DEVICE_CACHE_TTL_MS);
+    private static DeviceSnapshot loadDevices() {
         Integer account = Context.accountId.get();
-        CachedDevices cached = DEVICE_CACHE.get(account);
-        if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < DEVICE_CACHE_TTL_MS) return cached;
-        // Read outside the map's lock; two concurrent loads at worst both read and the later put wins.
-        cached = new CachedDevices(ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), ModuleInfoDao.instance.countEndpointShieldRows(), System.currentTimeMillis());
-        DEVICE_CACHE.put(account, cached);
-        return cached;
+        DeviceSnapshot cached = DEVICE_CACHE.get(account);
+        if (cached != null) return cached;
+        // Read outside any lock; two concurrent loads at worst both read and the later put wins.
+        int[] shieldRows = ModuleInfoDao.instance.countEndpointShieldRows();
+        DeviceSnapshot snapshot = new DeviceSnapshot(ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), shieldRows[0], shieldRows[1]);
+        DEVICE_CACHE.put(account, snapshot);
+        return snapshot;
     }
 
-    private static int bucketUp(int timestamp) {
-        return (timestamp + CACHE_BUCKET_SECONDS - 1) / CACHE_BUCKET_SECONDS * CACHE_BUCKET_SECONDS;
-    }
-
-    private InsightContext buildCtx(int start, int end) {
+    // Atlas reads only the bundle's account-wide data, so a short window keeps its range-scoped reads cheap; the end is shared across loads.
+    private InsightContext buildCtx(int now) {
         Integer userId = Context.userId.get();
-        return new InsightContext(Context.accountId.get(), userId == null ? 0 : userId, Context.contextSource.get(), start, end);
+        int end = (now + BUNDLE_BUCKET_SECONDS - 1) / BUNDLE_BUCKET_SECONDS * BUNDLE_BUCKET_SECONDS;
+        return new InsightContext(Context.accountId.get(), userId == null ? 0 : userId, Context.contextSource.get(), end - BUNDLE_BUCKET_SECONDS, end);
     }
 
     private static Map<String, String> teamByUser(InsightDataBundle bundle) {

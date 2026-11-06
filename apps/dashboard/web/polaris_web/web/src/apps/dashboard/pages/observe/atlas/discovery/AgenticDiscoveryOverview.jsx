@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
-import useElementHeight from "@/apps/dashboard/components/shared/useElementHeight";
+import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
 import func from "@/util/func";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS } from "../devices_employees/constants";
-import { ATLAS_DISCOVERY_CHAT_SCOPE, SUBTITLES } from "./constants";
+import { ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, LOAD_STATE, SUBTITLES } from "./constants";
 import discoveryApi from "./discoveryApi";
 import { agentMcpMatrix, decisionsPageSize, teamMatrix } from "./transform";
 import DiscoveryHeaderActions from "./shared/DiscoveryHeaderActions";
@@ -31,60 +31,63 @@ function teamCellHeightFor(agentMatrix, teamsMatrix) {
     return Math.min(TEAM_CELL_HEIGHT.max, Math.max(TEAM_CELL_HEIGHT.min, matched));
 }
 
-const STATUS_LOADING = "loading";
-const STATUS_ERROR = "error";
-const STATUS_READY = "ready";
-
 function AgenticDiscoveryOverview() {
     const filters = useDiscoveryFilters();
-    const { startTimestamp, endTimestamp, deviceScope } = filters;
-    const filterKey = `${startTimestamp}|${endTimestamp}|${deviceScope}`;
+    const { deviceScope } = filters;
     const [data, setData] = useState(null);
-    // The filters `data` was fetched for; the decisions list waits for data of the current ones.
-    const [dataFilterKey, setDataFilterKey] = useState("");
-    // The filters whose overview failed to load; a new range or scope starts clean.
-    const [failedFilterKey, setFailedFilterKey] = useState("");
-    const failed = failedFilterKey === filterKey;
+    // The scope `data` was fetched for; the decisions list waits for data of the current one.
+    const [dataScope, setDataScope] = useState("");
+    // The scope whose overview failed to load; a new scope starts clean.
+    const [failedScope, setFailedScope] = useState("");
+    const failed = failedScope === deviceScope;
     const [refreshKey, setRefreshKey] = useState(0);
     const [openRow, setOpenRow] = useState(null);
     const { exportTools, exporting } = useToolsExport(filters);
-    const [sideColumnRef, sideColumnHeight] = useElementHeight();
+    const [sideColumnRef, { height: sideColumnHeight }] = useElementSize();
     const loadedFor = useRef("");
     const dataRef = useRef(null);
     dataRef.current = data;
 
     useEffect(() => {
         let ignore = false;
-        // A new range or scope starts from spinners; a refresh after a decision keeps the cards on screen.
-        if (loadedFor.current !== filterKey) {
-            loadedFor.current = filterKey;
+        // A new scope starts from spinners; a refresh after a decision keeps the cards on screen.
+        if (loadedFor.current !== deviceScope) {
+            loadedFor.current = deviceScope;
             setData(null);
         }
-        discoveryApi.fetchAtlasDiscoveryOverview(startTimestamp, endTimestamp, deviceScope)
+        discoveryApi.fetchAtlasDiscoveryOverview(deviceScope)
             .then((response) => {
                 if (ignore) return;
                 setData(response || {});
-                setDataFilterKey(filterKey);
-                setFailedFilterKey("");
+                setDataScope(deviceScope);
+                setFailedScope("");
             })
             .catch(() => {
                 if (ignore) return;
                 // A failed refresh keeps the cards that are already on screen.
-                if (!dataRef.current) setFailedFilterKey(filterKey);
+                if (!dataRef.current) setFailedScope(deviceScope);
                 func.setToast(true, true, "Failed to load agentic discovery");
             });
         return () => { ignore = true; };
-    }, [startTimestamp, endTimestamp, deviceScope, refreshKey]);
+    }, [deviceScope, refreshKey]);
 
     const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
     const { update, pending } = useAssetStatusUpdate(refresh);
 
     // Each card has its own state: one failed section must not blank the page.
     const statusOf = (name) => {
-        if (failed) return STATUS_ERROR;
-        if (!data) return STATUS_LOADING;
-        return data.unavailableSources?.includes(name) || data[name] === undefined ? STATUS_ERROR : STATUS_READY;
+        if (failed) return LOAD_STATE.ERROR;
+        if (!data) return LOAD_STATE.LOADING;
+        return data.unavailableSources?.includes(name) || data[name] === undefined ? LOAD_STATE.ERROR : LOAD_STATE.READY;
     };
+
+    // A question another card sends to the Ask bar: a new id asks again, and the bar scrolls into view.
+    const [askRequest, setAskRequest] = useState(null);
+    const askRef = useRef(null);
+    const askAtlas = useCallback((question) => {
+        setAskRequest((current) => ({ id: (current?.id || 0) + 1, question }));
+        askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, []);
 
     const closeFlyout = useCallback(() => setOpenRow(null), []);
     // A tool may not exist in the new device scope, so its flyout would only show an error.
@@ -98,33 +101,31 @@ function AgenticDiscoveryOverview() {
         <AssetFlyout
             key="flyout"
             row={openRow}
-            startTimestamp={startTimestamp}
-            endTimestamp={endTimestamp}
             deviceScope={deviceScope}
             refreshKey={refreshKey}
             onClose={closeFlyout}
             onUpdated={refresh}
         />,
-        <AskBar key="ask" label="Ask Atlas" placeholder={ASK_ATLAS_PLACEHOLDER} suggestions={ASK_ATLAS_SUGGESTIONS} chatScope={ATLAS_DISCOVERY_CHAT_SCOPE} />,
+        <div key="ask" ref={askRef}>
+            <AskBar label="Ask Atlas" placeholder={ASK_ATLAS_PLACEHOLDER} suggestions={ASK_ATLAS_SUGGESTIONS} chatScope={ATLAS_DISCOVERY_CHAT_SCOPE} request={askRequest} />
+        </div>,
         <StatTiles key="tiles" tiles={data?.tiles} />,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
             <DecisionsCard
-                startTimestamp={startTimestamp}
-                endTimestamp={endTimestamp}
                 deviceScope={deviceScope}
                 refreshKey={refreshKey}
-                pageSize={(data && dataFilterKey === filterKey) || failed ? decisionsPageSize(sideColumnHeight) : 0}
+                pageSize={(data && dataScope === deviceScope) || failed ? decisionsPageSize(sideColumnHeight) : 0}
                 pending={pending}
                 onOpen={setOpenRow}
-                onApprove={(row) => update([{ key: row.key, status: row.status }], "APPROVED", row.name)}
-                onBlock={(row) => update([{ key: row.key, status: row.status }], "BLOCKED", row.name)}
+                onApprove={(row) => update([{ key: row.key, status: row.status }], ASSET_STATUS.APPROVED, row.name)}
+                onBlock={(row) => update([{ key: row.key, status: row.status }], ASSET_STATUS.BLOCKED, row.name)}
             />
             <div>
                 {/* Measured: the decisions list fits as many rows as this column is tall. */}
                 <div ref={sideColumnRef}>
                     <VerticalStack gap="4">
                         <AdoptionCard rows={data?.adoption} status={statusOf("adoption")} onOpen={setOpenRow} />
-                        <RiskyConfigsCard rows={data?.riskyConfigs} status={statusOf("riskyConfigs")} />
+                        <RiskyConfigsCard rows={data?.riskyConfigs} status={statusOf("riskyConfigs")} onAsk={askAtlas} />
                     </VerticalStack>
                 </div>
             </div>

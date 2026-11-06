@@ -12,9 +12,9 @@ import ToolAvatar from "../shared/ToolAvatar";
 import useAssetStatusUpdate from "../shared/useAssetStatusUpdate";
 import useToolCapabilities from "../useToolCapabilities";
 import {
-    ATLAS_DISCOVERY_CHAT_SCOPE, CAPABILITY_TITLES, CATEGORY_LABELS, FLYOUT_ASK_ENABLED, GUARDRAIL_POLICIES_PATH, HIGH_RISK_LEVELS, INSTALL_METHODS, VIOLATION_WINDOW_LABEL, VIOLATION_WINDOW_SECONDS,
+    ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, CAPABILITY_TITLES, CATEGORY_LABELS, GUARDRAIL_POLICIES_PATH, HIGH_RISK_LEVELS, INSTALL_METHODS, LOAD_STATE, VIOLATION_WINDOW_LABEL, VIOLATION_WINDOW_SECONDS,
 } from "../constants";
-import { capabilityTags, formatDate, signalsOf } from "../transform";
+import { capabilityTags, formatDate, plural, signalsOf } from "../transform";
 
 // Last 7 days ending on the next quarter hour, so tools opened close together share one server lookup.
 const violationWindow = () => {
@@ -22,7 +22,6 @@ const violationWindow = () => {
     return { startTimestamp: end - VIOLATION_WINDOW_SECONDS, endTimestamp: end };
 };
 
-const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 const askSuggestions = (name) => [`Who installed ${name} first?`, `What did ${name} access this week?`, `Is there an approved alternative to ${name}?`];
 
 function statsOf(detail) {
@@ -82,11 +81,11 @@ const employeeRows = (detail) => (detail.users || []).map((user) => ({
     icon: <Avatar size="extraSmall" name={user.username} initials={func.initials(user.username)} />,
     label: user.username,
     sub: user.team,
-    trailing: <Text as="span" variant="bodySm" color="subdued">{plural(user.devices, "device")}</Text>,
+    trailing: <Text as="span" variant="bodySm" color="subdued">{user.lastUsed > 0 ? func.prettifyEpoch(user.lastUsed) : "—"}</Text>,
 }));
 
 // Flyout for one discovered tool; row is its list row ({ key, name, status, ... }) or null when closed.
-export default function AssetFlyout({ row, startTimestamp, endTimestamp, deviceScope, refreshKey, onClose, onUpdated }) {
+export default function AssetFlyout({ row, deviceScope, refreshKey, onClose, onUpdated }) {
     const navigate = useNavigate();
     const [fetched, setDetail] = useState(null);
     const [failed, setFailed] = useState(false);
@@ -119,33 +118,33 @@ export default function AssetFlyout({ row, startTimestamp, endTimestamp, deviceS
             return undefined;
         }
         let ignore = false;
-        // Another tool starts from a spinner; a refresh after an action keeps the open flyout (and its Ask chat).
+        // Another tool starts from a spinner; a refresh after an action keeps the open flyout.
         if (loadedKey.current !== key) {
             loadedKey.current = key;
             setDetail(null);
         }
         setFailed(false);
-        discoveryApi.fetchAtlasToolDetail(key, startTimestamp, endTimestamp, deviceScope)
+        discoveryApi.fetchAtlasToolDetail(key, deviceScope)
             .then((response) => { if (!ignore) setDetail(response); })
             .catch(() => { if (!ignore) setFailed(true); });
         return () => { ignore = true; };
-    }, [key, startTimestamp, endTimestamp, deviceScope, refreshKey]);
+    }, [key, deviceScope, refreshKey]);
 
     const status = detail?.status || row?.status;
     const change = (next) => update([{ key, status }], next, row.name);
     // Rows from the overview cards are always reviewable; table rows say so.
     const governable = detail ? detail.governable : row?.governable !== false;
     const actions = row && governable && [
-        status === "APPROVED"
+        status === ASSET_STATUS.APPROVED
             ? { label: "Create guardrail policy", primary: true, onClick: () => navigate(GUARDRAIL_POLICIES_PATH, { state: { openCreateGuardrail: true } }) }
-            : { label: "Approve", primary: true, disabled: pending, onClick: () => change("APPROVED") },
-        status !== "BLOCKED" && { label: "Block", disabled: pending, onClick: () => change("BLOCKED") },
-        status !== "UNDER_REVIEW" && { label: "Mark under review", disabled: pending, onClick: () => change("UNDER_REVIEW") },
+            : { label: "Approve", primary: true, disabled: pending, onClick: () => change(ASSET_STATUS.APPROVED) },
+        status !== ASSET_STATUS.BLOCKED && { label: "Block", disabled: pending, onClick: () => change(ASSET_STATUS.BLOCKED) },
+        status !== ASSET_STATUS.UNDER_REVIEW && { label: "Mark under review", disabled: pending, onClick: () => change(ASSET_STATUS.UNDER_REVIEW) },
     ].filter(Boolean);
 
-    let loadState = "ready";
-    if (failed && !detail) loadState = "error";
-    else if (!detail) loadState = "loading";
+    let loadState = LOAD_STATE.READY;
+    if (failed && !detail) loadState = LOAD_STATE.ERROR;
+    else if (!detail) loadState = LOAD_STATE.LOADING;
 
     return (
         <AtlasFlyout
@@ -158,7 +157,7 @@ export default function AssetFlyout({ row, startTimestamp, endTimestamp, deviceS
             status={loadState}
             errorText="This tool is unavailable right now."
             actions={actions}
-            askBar={FLYOUT_ASK_ENABLED && row && (
+            askBar={row && (
                 <AskBar
                     key={key}
                     showInput={false}

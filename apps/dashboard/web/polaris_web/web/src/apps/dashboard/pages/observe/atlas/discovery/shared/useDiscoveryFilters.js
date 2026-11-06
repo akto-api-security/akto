@@ -4,22 +4,14 @@ import discoveryApi from "../discoveryApi";
 import { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../constants";
 import { toCsvLines } from "../transform";
 
-// Zero asks the backend for all time, up to now.
-const ALL_TIME = 0;
-
-// Device scope for the overview and its CSV export; the range is always all time.
+// Device scope for the overview and its CSV export.
 export default function useDiscoveryFilters() {
     const [deviceScope, setDeviceScope] = useState(DEVICE_SCOPES[0].value);
-    return {
-        deviceScope,
-        setDeviceScope,
-        startTimestamp: ALL_TIME,
-        endTimestamp: ALL_TIME,
-    };
+    return { deviceScope, setDeviceScope };
 }
 
 // CSV of every tool in scope, fetched a page at a time.
-export function useToolsExport({ startTimestamp, endTimestamp, deviceScope }) {
+export function useToolsExport({ deviceScope }) {
     const [exporting, setExporting] = useState(false);
     const exportTools = async () => {
         setExporting(true);
@@ -27,7 +19,7 @@ export function useToolsExport({ startTimestamp, endTimestamp, deviceScope }) {
             const rows = [];
             let total = 0;
             for (let skip = 0; skip < EXPORT_ROW_LIMIT; skip += EXPORT_PAGE_SIZE) {
-                const response = await discoveryApi.fetchAtlasTools({ startTimestamp, endTimestamp, deviceScope, skip, limit: EXPORT_PAGE_SIZE });
+                const response = await discoveryApi.fetchAtlasTools({ deviceScope, skip, limit: EXPORT_PAGE_SIZE });
                 const page = response?.tools || [];
                 total = response?.total || 0;
                 rows.push(...page);

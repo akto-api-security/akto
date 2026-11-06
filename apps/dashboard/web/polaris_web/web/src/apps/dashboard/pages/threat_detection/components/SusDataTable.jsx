@@ -286,8 +286,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   const location = useLocation();
   const navigate = useNavigate();
   // An Atlas tool picked on the discovery overview; its events only.
-  const atlasToolKey = new URLSearchParams(location.search).get("tool") || "";
-  const atlasToolName = new URLSearchParams(location.search).get("toolName") || atlasToolKey;
+  const searchParams = new URLSearchParams(location.search);
+  const atlasToolKey = searchParams.get("tool") || "";
+  const atlasToolName = searchParams.get("toolName") || atlasToolKey;
   const clearAtlasTool = () => {
     const params = new URLSearchParams(location.search);
     params.delete("tool");
@@ -591,6 +592,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
 
   // Helper function to validate filter requirements for bulk operations
   const validateFiltersForBulkOperation = (operationType = 'operation') => {
+    // Filter-based bulk calls cannot carry the tool filter, so they would reach rows outside it.
+    if (atlasToolKey) {
+      func.setToast(true, true, 'Remove the Tool filter to run bulk actions on filtered events. Select rows to act on them directly.');
+      return false;
+    }
+
     // Check if both URL and Attack Type filters are present
     if (!currentFilters.url || currentFilters.url.length === 0 ||
         !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {

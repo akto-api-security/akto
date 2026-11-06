@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import { Box, HorizontalStack, Text } from "@shopify/polaris";
 import { LABEL_GAP_PX, placeLabels } from "./bubbleLabels";
-import useElementWidth from "./useElementWidth";
+import useElementSize from "./useElementSize";
 import "./BubblePlot.css";
 
-const GRID_COLOR = "#F1F2F3";
+const GRID_COLOR = "var(--p-color-bg-hover)";
 const TIP_CHAR_PX = 7;
 const TIP_PAD_PX = 16;
 
@@ -31,7 +31,7 @@ const onActivate = (action) => (event) => {
 
 // Circles on a positioned grid; bubbles: [{ key, x, y, radius, fill, stroke, tip, label, priority, onClick }]
 export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabels, tickLabels, zone }) {
-    const [plotRef, width] = useElementWidth();
+    const [plotRef, { width }] = useElementSize();
     // Names are placed once the plot's width is known, so none covers another name or circle.
     const labelSides = useMemo(() => placeLabels(bubbles, width, height), [bubbles, width, height]);
     return (

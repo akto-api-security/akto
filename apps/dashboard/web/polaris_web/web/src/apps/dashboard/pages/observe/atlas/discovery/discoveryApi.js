@@ -1,14 +1,14 @@
 import request from "@/util/request";
 
 export default {
-    async fetchAtlasDiscoveryOverview(startTimestamp, endTimestamp, deviceScope) {
+    async fetchAtlasDiscoveryOverview(deviceScope) {
         return await request({
             url: '/api/fetchAtlasDiscoveryOverview',
             method: 'post',
-            data: { startTimestamp, endTimestamp, deviceScope }
+            data: { deviceScope }
         })
     },
-    // One page of the "needs a decision" list: { startTimestamp, endTimestamp, deviceScope, skip, limit }.
+    // One page of the "needs a decision" list: { deviceScope, skip, limit }.
     async fetchAtlasDecisions(params) {
         return await request({
             url: '/api/fetchAtlasDecisions',
@@ -16,7 +16,7 @@ export default {
             data: params
         })
     },
-    // Paged, filterable tool list.
+    // Paged, filterable tool list: { deviceScope, skip, limit }.
     async fetchAtlasTools(params) {
         return await request({
             url: '/api/fetchAtlasTools',
@@ -25,11 +25,11 @@ export default {
         })
     },
     // One tool for the flyout: its row, top employees, connections and violation counts.
-    async fetchAtlasToolDetail(assetKey, startTimestamp, endTimestamp, deviceScope) {
+    async fetchAtlasToolDetail(assetKey, deviceScope) {
         return await request({
             url: '/api/fetchAtlasToolDetail',
             method: 'post',
-            data: { assetKey, startTimestamp, endTimestamp, deviceScope }
+            data: { assetKey, deviceScope }
         })
     },
     async updateAtlasAssetStatus(assetKeys, status) {

@@ -1,12 +1,12 @@
 import { getRiskLevel } from "@/apps/dashboard/pages/observe/agentic/agenticPageBuilders";
-import { BUBBLE_STYLE, CAPABILITY_TAGS, CATEGORY_LABELS, DECISIONS_PAGING, MAX_NODE_LABEL, SIGNAL_META, STATUS_META } from "./constants";
+import { ASSET_STATUS, BUBBLE_STYLE, CAPABILITY_TAGS, CATEGORY_LABELS, DECISIONS_PAGING, MAX_NODE_LABEL, SIGNAL_META, STATUS_META } from "./constants";
 
 const BAD = "bad";
 const PERCENT_MAX = 100;
 // Unreviewed tools at or above this risk get their name drawn next to the bubble.
 const LABEL_MIN_RISK = 4;
-const TOPO_STATUS = { UNAPPROVED: BAD, UNDER_REVIEW: "review", APPROVED: "ok", BLOCKED: "neutral" };
-const CHAIN_HEADS = ["Devices and teams", "AI tools", "MCP servers"];
+export const TOPO_STATUS = { UNAPPROVED: BAD, UNDER_REVIEW: "review", APPROVED: "ok", BLOCKED: "neutral" };
+const CHAIN_HEADS = ["Teams", "AI tools", "MCP servers"];
 // Team -> external, AI tool -> agent, MCP server -> mcp: the node styles AssetTopologyGraph already knows.
 const CHAIN_CATEGORIES = ["external", "agent", "mcp"];
 
@@ -48,7 +48,7 @@ function jitterOf(name) {
     return (hash / 1000 - BAND_CENTER) * 2 * MAX_JITTER;
 }
 
-const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
+export const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
 // Rows of the decisions list that fit in `availableHeight` px; 0 until the height is known.
 export function decisionsPageSize(availableHeight) {
     if (!availableHeight) return 0;
@@ -95,7 +95,7 @@ export function bubblePoints(rows, axisMax, onOpen) {
             fill: BUBBLE_STYLE[row.status].fill,
             stroke: BUBBLE_STYLE[row.status].stroke,
             tip: `${row.name}: ${plural(row.devices, "device")}, ${plural(row.employees, "employee")}, ${STATUS_META[row.status].label}, risk ${row.riskScore || 0}`,
-            label: row.status !== "APPROVED" && row.riskScore >= LABEL_MIN_RISK ? row.name : null,
+            label: row.status !== ASSET_STATUS.APPROVED && row.riskScore >= LABEL_MIN_RISK ? row.name : null,
             priority: row.riskScore || 0,
             onClick: () => onOpen(row),
         };
@@ -121,7 +121,7 @@ export function chainModel(chain) {
 }
 
 export function agentMcpMatrix(matrix) {
-    const columns = matrix.servers.map((server) => ({ label: server.name, danger: server.status === "UNAPPROVED" }));
+    const columns = matrix.servers.map((server) => ({ label: server.name, danger: server.status === ASSET_STATUS.UNAPPROVED }));
     const rows = matrix.rows.map((row) => ({ label: row.name, cells: row.cells }));
     return { columns, rows, max: Math.max(1, ...rows.flatMap((row) => row.cells)) };
 }

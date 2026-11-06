@@ -9,8 +9,8 @@ const format = (count) => (count === undefined || count === null ? EMPTY_VALUE :
 function subLine(id, tile) {
     if (tile.count === 0) return { text: "None found" };
     if (id === "browser" && tile.personalAccounts > 0) return { text: `${format(tile.personalAccounts)} personal accounts`, critical: true };
-    // Skills and plugins cannot be approved or blocked here, so there is no review line, just the count.
-    if (id === "skills") return { text: "" };
+    // Only malicious skills are put up for a decision, so that is the one line a skills tile can carry.
+    if (id === "skills") return tile.malicious > 0 ? { text: `${format(tile.malicious)} flagged malicious`, critical: true } : { text: "" };
     return tile.unapproved > 0 ? { text: `${format(tile.unapproved)} need a decision`, critical: true } : { text: "All approved" };
 }
 
@@ -32,7 +32,7 @@ export default function StatTiles({ tiles }) {
     items.push({
         title: "Devices with AI",
         isComp: true,
-        data: <Tile value={format(tiles?.devicesWithAi)} sub={tiles ? `of ${format(tiles.managedDevices)} managed` : ""} />,
+        data: <Tile value={format(tiles?.devicesWithAi)} />,
     });
     return <SummaryCardInfo summaryItems={items} />;
 }

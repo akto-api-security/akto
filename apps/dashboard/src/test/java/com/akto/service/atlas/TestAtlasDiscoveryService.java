@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -43,8 +44,8 @@ public class TestAtlasDiscoveryService {
     }
 
     private static AtlasDiscoveryService service(List<AtlasToolRow> rows, Map<String, AtlasAssetStatus> decisions, Set<String> allowlist) {
-        return new AtlasDiscoveryService(rows, decisions, allowlist, users("d1", "user.one", "d2", "user.two"),
-                users("user.one", "Platform"), 10, 0, NOW, NOW);
+        return new AtlasDiscoveryService(rows, decisions, allowlist, new AtlasPeople(users("d1", "user.one", "d2", "user.two"),
+                users("user.one", "Platform")), 10, NOW);
     }
 
     @SuppressWarnings("unchecked")
@@ -64,8 +65,11 @@ public class TestAtlasDiscoveryService {
         assertEquals(AtlasAssetStatus.UNAPPROVED, statuses.resolve(agent, decisions, Collections.emptySet()));
 
         decisions.put("ai-agent|sample-agent", AtlasAssetStatus.UNDER_REVIEW);
-        assertEquals(AtlasAssetStatus.APPROVED, statuses.resolve(agent, decisions, allowlist));
+        // A hand-set review beats the allowlist; an untouched (unapproved) row does not.
+        assertEquals(AtlasAssetStatus.UNDER_REVIEW, statuses.resolve(agent, decisions, allowlist));
         assertEquals(AtlasAssetStatus.UNDER_REVIEW, statuses.resolve(agent, decisions, Collections.emptySet()));
+        decisions.put("ai-agent|sample-agent", AtlasAssetStatus.UNAPPROVED);
+        assertEquals(AtlasAssetStatus.APPROVED, statuses.resolve(agent, decisions, allowlist));
 
         decisions.put("ai-agent|sample-agent", AtlasAssetStatus.BLOCKED);
         assertEquals(AtlasAssetStatus.BLOCKED, statuses.resolve(agent, decisions, allowlist));
@@ -102,7 +106,6 @@ public class TestAtlasDiscoveryService {
         assertEquals(1, adoption.size());
         assertEquals(2, adoption.get(0).get("employees"));
         assertEquals(3, adoption.get(0).get("devices"));
-        assertEquals(Long.valueOf(100L), adoption.get(0).get("percent"));
     }
 
     @Test
@@ -121,20 +124,128 @@ public class TestAtlasDiscoveryService {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void trendBucketsSpanTheRangeAndSplitByCurrentStatus() {
+    public void trendIsTheLastTwelveWeeksSplitByCurrentStatus() {
         List<AtlasToolRow> rows = Arrays.asList(
                 tool("agent", "agent-a", 1, NOW - 3 * DAY, "d1"),
-                tool("agent", "agent-b", 1, NOW - 10 * DAY, "d1"));
+                tool("agent", "agent-b", 1, NOW - 10 * DAY, "d1"),
+                tool("agent", "agent-old", 1, NOW - 100 * DAY, "d1"));
         Map<String, AtlasAssetStatus> decisions = new HashMap<>();
         decisions.put("ai-agent|agent-b", AtlasAssetStatus.APPROVED);
 
         List<Map<String, Object>> weeks = (List<Map<String, Object>>) service(rows, decisions, Collections.emptySet())
                 .buildOverview().get("newToolsTrend");
 
-        // All time starts at the oldest first-seen (10 days back), so one period per day.
-        assertEquals(10, weeks.size());
-        assertEquals(1, weeks.get(0).get("APPROVED"));
-        assertEquals(1, weeks.get(7).get("UNAPPROVED"));
+        assertEquals(12, weeks.size());
+        assertEquals(NOW - 12 * 7 * DAY, weeks.get(0).get("periodStart"));
+        // The last week holds the tool seen 3 days ago, the one before it the tool seen 10 days ago; older tools are out.
+        assertEquals(1, weeks.get(11).get("UNAPPROVED"));
+        assertEquals(1, weeks.get(10).get("APPROVED"));
+        assertEquals(0, weeks.get(0).get("UNAPPROVED"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void adoptionCountsOnlyEmployeesActiveInTheLastThirtyDays() {
+        AtlasToolRow agent = tool("agent", "agent-a", 1, NOW - 90 * DAY, "d1", "d2");
+        agent.getDeviceLastSeen().put("d1", NOW - DAY);
+        agent.getDeviceLastSeen().put("d2", NOW - 40 * DAY);
+        AtlasToolRow idle = tool("agent", "agent-idle", 1, NOW - 90 * DAY, "d1", "d2");
+        idle.getDeviceLastSeen().put("d1", NOW - 50 * DAY);
+        idle.getDeviceLastSeen().put("d2", NOW - 60 * DAY);
+        Map<String, Object> overview = service(Arrays.asList(agent, idle), new HashMap<>(), Collections.emptySet()).buildOverview();
+
+        List<Map<String, Object>> adoption = (List<Map<String, Object>>) overview.get("adoption");
+        assertEquals(1, adoption.size());
+        assertEquals("agent-a", adoption.get(0).get("name"));
+        assertEquals(1, adoption.get(0).get("employees"));
+        assertEquals(2, adoption.get(0).get("devices"));
+
+        // Only user.one is tagged (Platform) and used a tool recently, so the team's agents share is 1 of 1.
+        List<Map<String, Object>> teams = (List<Map<String, Object>>) section(overview, "teamCategoryMatrix").get("rows");
+        assertEquals(Long.valueOf(100L), ((List<Long>) teams.get(0).get("percents")).get(0));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void managedDevicesIsTheEndpointShieldCountEvenWhenFewerThanDevicesWithAi() {
+        AtlasToolRow agent = tool("agent", "agent-a", 1, NOW, "d1", "d2");
+        AtlasDiscoveryService service = new AtlasDiscoveryService(Collections.singletonList(agent), new HashMap<>(), Collections.emptySet(),
+                new AtlasPeople(users("d1", "user.one", "d2", "user.two"), users("user.one", "Platform")), 1, NOW);
+        Map<String, Object> tiles = section(service.buildOverview(), "tiles");
+
+        assertEquals(2, tiles.get("devicesWithAi"));
+        assertEquals(1, tiles.get("managedDevices"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void onlyMaliciousSkillsNeedADecision() {
+        AtlasToolRow clean = tool("skill", "clean-skill", 1, NOW, "d1");
+        AtlasToolRow flagged = tool("skill", "flagged-skill", 1, NOW, "d1");
+        flagged.setMalicious(true);
+        AtlasToolRow decided = tool("skill", "decided-skill", 1, NOW, "d1");
+        decided.setMalicious(true);
+        Map<String, AtlasAssetStatus> decisions = new HashMap<>();
+        decisions.put("AGENT_SKILL|decided-skill", AtlasAssetStatus.BLOCKED);
+        Map<String, Object> overview = service(Arrays.asList(clean, flagged, decided), decisions, Collections.emptySet()).buildOverview();
+
+        List<Map<String, Object>> pending = (List<Map<String, Object>>) section(overview, "decisions").get("rows");
+        assertEquals(1, pending.size());
+        assertEquals("flagged-skill", pending.get(0).get("name"));
+        assertTrue(((String) pending.get(0).get("why")).contains("Flagged as malicious"));
+
+        Map<String, Object> skills = ((List<Map<String, Object>>) section(overview, "tiles").get("categories")).stream()
+                .filter(category -> "skills".equals(category.get("id"))).findFirst().get();
+        assertEquals(3, skills.get("count"));
+        assertEquals(2, skills.get("malicious"));
+        // Skills stay out of the inventory status counts.
+        assertEquals(0, section(overview, "statusCounts").get("total"));
+        assertFalse(AtlasAssetStatusService.canDecide(clean));
+        assertTrue(AtlasAssetStatusService.canDecide(flagged));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void decisionsListRiskFirstThenMaliciousThenSpread() {
+        AtlasToolRow scoredSkill = tool("skill", "scored-skill", 3.5, NOW, "d1");
+        scoredSkill.setMalicious(true);
+        AtlasToolRow scoredAgent = tool("agent", "scored-agent", 3, NOW, "d1", "d2");
+        AtlasToolRow unscoredSkill = tool("skill", "unscored-skill", 0, NOW, "d1");
+        unscoredSkill.setMalicious(true);
+        AtlasToolRow widespread = tool("agent", "widespread-agent", 0, NOW, "d1", "d2", "d3");
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) service(Arrays.asList(widespread, unscoredSkill, scoredAgent, scoredSkill),
+                new HashMap<>(), Collections.emptySet()).pageDecisions(0, 10).get("rows");
+
+        assertEquals(Arrays.asList("scored-skill", "scored-agent", "unscored-skill", "widespread-agent"),
+                rows.stream().map(row -> row.get("name")).collect(Collectors.toList()));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void decisionsKeepOnlyRiskyNewOrMaliciousTools() {
+        AtlasToolRow fresh = tool("agent", "fresh-agent", 0, NOW - DAY, "d1");
+        AtlasToolRow riskyOld = tool("agent", "risky-old-agent", 2, NOW - 30 * DAY, "d1");
+        AtlasToolRow flagged = tool("skill", "flagged-skill", 0, NOW - 30 * DAY, "d1");
+        flagged.setMalicious(true);
+        AtlasToolRow quietOld = tool("agent", "quiet-old-agent", 0, NOW - 30 * DAY, "d1", "d2");
+        Map<String, Object> page = service(Arrays.asList(quietOld, flagged, riskyOld, fresh), new HashMap<>(), Collections.emptySet()).pageDecisions(0, 10);
+
+        assertEquals(3, page.get("total"));
+        assertEquals(Arrays.asList("risky-old-agent", "flagged-skill", "fresh-agent"),
+                ((List<Map<String, Object>>) page.get("rows")).stream().map(row -> row.get("name")).collect(Collectors.toList()));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void tilesFollowTheCategoryOrder() {
+        List<AtlasToolRow> rows = Arrays.asList(tool("agent", "agent-a", 1, NOW, "d1"), tool("service", "server-a", 1, NOW, "d1"));
+        List<Map<String, Object>> categories = (List<Map<String, Object>>) section(
+                service(rows, new HashMap<>(), Collections.emptySet()).buildOverview(), "tiles").get("categories");
+
+        assertEquals(Arrays.asList("agents", "mcp", "browser", "skills"),
+                categories.stream().map(category -> category.get("id")).collect(Collectors.toList()));
+        assertEquals(1, categories.get(0).get("count"));
+        assertEquals(1, categories.get(1).get("count"));
     }
 
     @Test
@@ -225,14 +336,24 @@ public class TestAtlasDiscoveryService {
         assertEquals(1, AtlasDeviceScope.countDevices(2, 1, "desktop"));
         assertEquals(2, AtlasDeviceScope.countDevices(2, 1, "all"));
         assertTrue(AtlasDeviceScope.apply(Collections.singletonList(tool("agent", "agent-b", 1, NOW, "browser-one")), "desktop", browsers).isEmpty());
+
+        agent.getDeviceLastSeen().put("desk-one", NOW);
+        agent.getDeviceLastSeen().put("browser-one", NOW - DAY);
+        assertEquals(Collections.singletonMap("desk-one", NOW), desktop(rows, browsers).getDeviceLastSeen());
+        // A scoped copy keeps every other field of the row.
+        assertEquals("agent-a", desktop(rows, browsers).getName());
+        assertEquals(agent.getRiskScore(), desktop(rows, browsers).getRiskScore(), 0);
+    }
+
+    private static AtlasToolRow desktop(List<AtlasToolRow> rows, Set<String> browsers) {
+        return AtlasDeviceScope.apply(rows, "desktop", browsers).get(0);
     }
 
     @Test
-    public void agentsAndLocalRuntimesGetTheirOwnCategories() {
+    public void agentRowsAreAgents() {
         for (String agent : Arrays.asList("cursor", "claude-vs-code", "authorized-agent", "geminicli")) {
-            assertEquals(agent, "agents", AtlasDiscoveryService.categoryOf(tool("agent", agent, 1, NOW, "d1")));
+            assertEquals(agent, "agents", AtlasCategory.of(tool("agent", agent, 1, NOW, "d1")));
         }
-        assertEquals("local", AtlasDiscoveryService.categoryOf(tool("agent", "ollama", 1, NOW, "d1")));
     }
 
     @Test
@@ -281,32 +402,41 @@ public class TestAtlasDiscoveryService {
 
     @Test
     @SuppressWarnings("unchecked")
-    public void supplyChainCountsEachDeviceOncePerTeam() {
-        // Both tools run on the same two devices: d1 belongs to a team, d2 has none.
+    public void topEmployeesAreTheMostRecentlyActiveFirst() {
+        AtlasToolRow agent = tool("agent", "agent-a", 1, NOW - 90 * DAY, "d1", "d2");
+        agent.getDeviceLastSeen().put("d1", NOW - 40 * DAY);
+        agent.getDeviceLastSeen().put("d2", NOW - DAY);
+        List<Map<String, Object>> users = (List<Map<String, Object>>) service(Collections.singletonList(agent), new HashMap<>(), Collections.emptySet())
+                .detail("agent|agent-a").get("users");
+
+        assertEquals("user.two", users.get(0).get("username"));
+        assertEquals(NOW - DAY, users.get(0).get("lastUsed"));
+        assertEquals("user.one", users.get(1).get("username"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void supplyChainCountsEachDeviceOncePerTeamAndSkipsUntaggedDevices() {
+        // Both tools run on the same two devices: d1 belongs to a team, d2 has none and is left out.
         AtlasToolRow first = tool("agent", "agent-a", 1, NOW, "d1", "d2");
         AtlasToolRow second = tool("agent", "agent-b", 1, NOW, "d1", "d2");
         Map<String, Object> chain = section(service(Arrays.asList(first, second), new HashMap<>(), Collections.emptySet()).buildOverview(), "supplyChain");
 
         List<Map<String, Object>> teamNodes = ((List<List<Map<String, Object>>>) chain.get("columns")).get(0);
-        assertEquals(2, teamNodes.size());
-        for (Map<String, Object> node : teamNodes) assertEquals(1, node.get("devices"));
+        assertEquals(1, teamNodes.size());
+        assertEquals(1, teamNodes.get(0).get("devices"));
+        assertFalse("".equals(teamNodes.get(0).get("label")));
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    public void graphsLeaveOutServersLastSeenBeforeTheRange() {
-        // The agent is current and lists two servers; one was last seen well before the range starts.
+    public void graphsListServersWithTheirStatus() {
         AtlasToolRow agent = tool("agent", "agent-a", 1, NOW, "d1");
-        agent.getMcpDevices().put("server-new", new HashSet<>(Collections.singletonList("d1")));
-        agent.getMcpDevices().put("server-old", new HashSet<>(Collections.singletonList("d1")));
-        AtlasToolRow current = tool("service", "server-new", 1, NOW, "d1");
-        AtlasToolRow stale = tool("service", "server-old", 1, NOW, "d1");
-        stale.setLastSeen(NOW - 10 * DAY);
+        agent.getMcpDevices().put("Server-New", new HashSet<>(Collections.singletonList("d1")));
+        AtlasToolRow server = tool("service", "server-new", 1, NOW, "d1");
         Map<String, AtlasAssetStatus> decisions = new HashMap<>();
         decisions.put("mcp-server|server-new", AtlasAssetStatus.BLOCKED);
-        AtlasDiscoveryService service = new AtlasDiscoveryService(Arrays.asList(agent, current, stale), decisions, Collections.emptySet(),
-                users("d1", "user.one"), users("user.one", "Platform"), 10, NOW - DAY, NOW, NOW);
-        Map<String, Object> overview = service.buildOverview();
+        Map<String, Object> overview = service(Arrays.asList(agent, server), decisions, Collections.emptySet()).buildOverview();
 
         List<Map<String, Object>> columns = (List<Map<String, Object>>) section(overview, "agentMcpMatrix").get("servers");
         assertEquals(1, columns.size());
@@ -316,6 +446,7 @@ public class TestAtlasDiscoveryService {
         List<Map<String, Object>> serverNodes = ((List<List<Map<String, Object>>>) section(overview, "supplyChain").get("columns")).get(2);
         assertEquals(1, serverNodes.size());
         assertEquals("server-new", serverNodes.get(0).get("label"));
+        assertEquals("BLOCKED", serverNodes.get(0).get("status"));
     }
 
     @Test

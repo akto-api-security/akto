@@ -1,18 +1,19 @@
 import "./MatrixHeatmap.css";
 
-const PURPLE_SCALE = ["#F4EEFF", "#E5D7FF", "#B38CFF", "#8051FF", "#6200EA"];
-const RED_SCALE = ["#FFF4F4", "#FED3D1", "#FD8A7B", "#E0442A", "#B01E00"];
-const EMPTY_COLORS = { background: "#FAFAFB", color: "#C9CCCF" };
-const DARK_TEXT = "#202223";
-const DARK_FROM_STEP = 3;
+// Cell colours light to dark, and which steps the legend bar blends between.
+const PURPLE_SCALE = { cells: ["#F4EEFF", "#E5D7FF", "#B38CFF", "#8051FF", "#6200EA"], barSteps: [0, 2, 4] };
+const RED_SCALE = { cells: ["#FFF4F4", "#FED3D1", "#FD8A7B", "#E0442A", "#B01E00"], barSteps: [1, 2, 4] };
+const LIGHT_TEXT_FROM_STEP = 3;
 const EMPTY_CELL_TEXT = "–";
 
-// Shade by sqrt of the value, so small values stay visible next to large ones.
+// Shade by sqrt of the value, so small values stay visible next to large ones; null for an empty cell.
 function shade(value, max, scale) {
-    if (!value) return EMPTY_COLORS;
-    const step = Math.min(scale.length - 1, Math.floor(Math.sqrt(value / max) * scale.length));
-    return { background: scale[step], color: step >= DARK_FROM_STEP ? "#fff" : DARK_TEXT };
+    if (!value) return null;
+    const step = Math.min(scale.cells.length - 1, Math.floor(Math.sqrt(value / max) * scale.cells.length));
+    return { background: scale.cells[step], lightText: step >= LIGHT_TEXT_FROM_STEP };
 }
+
+const barVars = (scale) => Object.fromEntries(scale.barSteps.map((step, index) => [`--bar-stop-${index}`, scale.cells[step]]));
 
 // Row x column grid shaded by value; max is the darkest value.
 export default function MatrixHeatmap({
@@ -40,8 +41,8 @@ export default function MatrixHeatmap({
             </div>
             {showScale && (
                 <div className="matrix-heatmap__scale">
-                    <ScaleKey label={scaleLabel} format={format} max={max} />
-                    {columns.some((column) => column.danger) && <ScaleKey label={dangerScaleLabel} format={format} max={max} danger />}
+                    <ScaleKey label={scaleLabel} format={format} max={max} scale={PURPLE_SCALE} />
+                    {columns.some((column) => column.danger) && <ScaleKey label={dangerScaleLabel} format={format} max={max} scale={RED_SCALE} />}
                 </div>
             )}
         </div>
@@ -49,12 +50,12 @@ export default function MatrixHeatmap({
 }
 
 // A light-to-dark bar from 0 to the darkest value, with an optional label.
-function ScaleKey({ label, format, max, danger }) {
+function ScaleKey({ label, format, max, scale }) {
     return (
         <span className={`matrix-heatmap__scale-key${label ? " matrix-heatmap__scale-key--labelled" : ""}`}>
             {label && <span className="matrix-heatmap__scale-label">{label}</span>}
             <span>{format(0)}</span>
-            <span className={`matrix-heatmap__scale-bar${danger ? " matrix-heatmap__scale-bar--danger" : ""}`} />
+            <span className="matrix-heatmap__scale-bar" style={barVars(scale)} />
             <span>{format(max)}</span>
         </span>
     );
@@ -74,16 +75,16 @@ function RowCells({ row, columns, max, format, tipUnit, emptyText }) {
         <>
             <span className="matrix-heatmap__row">{row.label}</span>
             {row.cells.map((value, index) => {
-                const { background, color } = shade(value, max, columns[index].danger ? RED_SCALE : PURPLE_SCALE);
+                const shading = shade(value, max, columns[index].danger ? RED_SCALE : PURPLE_SCALE);
                 const tip = `${row.label} · ${columns[index].label}: ${tipValue(value || 0, format, tipUnit)}`;
                 return (
                     <div
                         key={index}
-                        className={`matrix-heatmap__cell${tipEdge(index, columns.length)}`}
+                        className={`matrix-heatmap__cell${shading ? "" : " matrix-heatmap__cell--empty"}${shading?.lightText ? " matrix-heatmap__cell--light-text" : ""}${tipEdge(index, columns.length)}`}
                         role="img"
                         aria-label={tip}
                         data-tip={tip}
-                        style={{ "--cell-bg": background, "--cell-fg": color }}
+                        style={shading ? { "--cell-bg": shading.background } : undefined}
                     >
                         {value ? format(value) : emptyText}
                     </div>

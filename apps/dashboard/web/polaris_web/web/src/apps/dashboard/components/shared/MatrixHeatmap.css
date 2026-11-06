@@ -1,5 +1,13 @@
 /* Row x column heatmap. Layout values arrive as CSS custom properties from MatrixHeatmap.jsx. */
 .matrix-heatmap {
+    /* Colours defined once; the cell and legend-bar shades come from MatrixHeatmap.jsx. */
+    --tip-bg: var(--p-color-text, #202223);
+    --tip-fg: var(--p-color-text-on-color, #fff);
+    --cell-text: var(--p-color-text, #202223);
+    --cell-text-light: var(--p-color-text-on-color, #fff);
+    --empty-bg: #FAFAFB;
+    --empty-fg: #C9CCCF;
+    --danger-text: #8E1F0B;
     overflow-x: auto;
     /* Room inside the scroll box for the hover text above the first row. */
     padding-top: 32px;
@@ -25,7 +33,7 @@
 }
 
 .matrix-heatmap__column--danger {
-    color: #8E1F0B;
+    color: var(--danger-text);
     font-weight: 600;
 }
 
@@ -44,8 +52,17 @@
     height: var(--cell-height);
     border-radius: 4px;
     background: var(--cell-bg);
-    color: var(--cell-fg);
+    color: var(--cell-text);
     font-weight: 500;
+}
+
+.matrix-heatmap__cell--light-text {
+    color: var(--cell-text-light);
+}
+
+.matrix-heatmap__cell--empty {
+    background: var(--empty-bg);
+    color: var(--empty-fg);
 }
 
 .matrix-heatmap__scale {
@@ -69,7 +86,7 @@
     width: 120px;
     height: 8px;
     border-radius: 4px;
-    background: linear-gradient(90deg, #F4EEFF, #B38CFF, #6200EA);
+    background: linear-gradient(90deg, var(--bar-stop-0), var(--bar-stop-1), var(--bar-stop-2));
 }
 
 .matrix-heatmap__scale-label {
@@ -82,10 +99,6 @@
     width: 72px;
 }
 
-.matrix-heatmap__scale-bar--danger {
-    background: linear-gradient(90deg, #FED3D1, #FD8A7B, #B01E00);
-}
-
 /* Instant hover text (the native title attribute waits about a second). */
 .matrix-heatmap__cell:hover::after {
     content: attr(data-tip);
@@ -96,8 +109,8 @@
     z-index: 10;
     padding: 4px 8px;
     border-radius: 6px;
-    background: #202223;
-    color: #fff;
+    background: var(--tip-bg);
+    color: var(--tip-fg);
     font-size: 12px;
     white-space: nowrap;
     pointer-events: none;

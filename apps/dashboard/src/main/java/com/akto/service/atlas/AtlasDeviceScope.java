@@ -44,8 +44,9 @@ public final class AtlasDeviceScope {
         for (AtlasToolRow row : rows) {
             Set<String> devices = inScope(row.getDeviceIds(), wantBrowser, browserDevices);
             if (devices.isEmpty()) continue;
-            AtlasToolRow copy = copyOf(row);
+            AtlasToolRow copy = row.toBuilder().build();
             copy.setDeviceIds(devices);
+            copy.setDeviceLastSeen(lastSeenIn(row.getDeviceLastSeen(), devices));
             Map<String, Set<String>> mcpDevices = new HashMap<>();
             for (Map.Entry<String, Set<String>> e : row.getMcpDevices().entrySet()) {
                 Set<String> serverDevices = inScope(e.getValue(), wantBrowser, browserDevices);
@@ -74,35 +75,20 @@ public final class AtlasDeviceScope {
         }
     }
 
+    private static Map<String, Integer> lastSeenIn(Map<String, Integer> lastSeen, Set<String> devices) {
+        Map<String, Integer> kept = new HashMap<>();
+        for (String device : devices) {
+            Integer seen = lastSeen.get(device);
+            if (seen != null) kept.put(device, seen);
+        }
+        return kept;
+    }
+
     private static Set<String> inScope(Set<String> devices, boolean wantBrowser, Set<String> browserDevices) {
         Set<String> kept = new HashSet<>();
         for (String device : devices) {
             if (browserDevices.contains(device.toLowerCase(Locale.ROOT)) == wantBrowser) kept.add(device);
         }
         return kept;
-    }
-
-    private static AtlasToolRow copyOf(AtlasToolRow row) {
-        AtlasToolRow copy = new AtlasToolRow();
-        copy.setGroupKey(row.getGroupKey());
-        copy.setRowType(row.getRowType());
-        copy.setName(row.getName());
-        copy.setClientType(row.getClientType());
-        copy.setVendorName(row.getVendorName());
-        copy.setRiskReason(row.getRiskReason());
-        copy.setRiskScore(row.getRiskScore());
-        copy.setFirstSeen(row.getFirstSeen());
-        copy.setLastSeen(row.getLastSeen());
-        copy.setPersonal(row.isPersonal());
-        copy.setLocalMcp(row.isLocalMcp());
-        copy.setMisconfigured(row.isMisconfigured());
-        copy.setMisconfiguredDevices(row.getMisconfiguredDevices());
-        copy.setPersonalDevices(row.getPersonalDevices());
-        copy.setMisconfiguredDeviceIds(row.getMisconfiguredDeviceIds());
-        copy.setPersonalDeviceIds(row.getPersonalDeviceIds());
-        copy.setMalicious(row.isMalicious());
-        copy.setRawValues(row.getRawValues());
-        copy.setCapabilityCollectionIds(row.getCapabilityCollectionIds());
-        return copy;
     }
 }

@@ -1,15 +1,16 @@
 import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import { LOAD_STATE } from "../constants";
 import "./discovery.css";
 
 // Card frame with loading/error/empty states; flush drops body padding, fill pins a footer to the bottom, center middles the body.
 export default function DiscoveryCard({ title, subtitle, legend, status, empty, emptyText, flush, fill, center, children }) {
     let body = children;
     let isMessage = false;
-    if (status === "loading") {
+    if (status === LOAD_STATE.LOADING) {
         body = <SpinnerCentered />;
         isMessage = true;
-    } else if (status === "error") {
+    } else if (status === LOAD_STATE.ERROR) {
         body = <Text as="p" color="subdued">This section is unavailable right now.</Text>;
         isMessage = true;
     } else if (empty) {

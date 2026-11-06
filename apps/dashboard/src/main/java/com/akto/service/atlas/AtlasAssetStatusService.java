@@ -1,9 +1,14 @@
 package com.akto.service.atlas;
 
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.McpAuditInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
+import com.akto.utils.TtlCache;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
@@ -26,7 +31,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -42,35 +46,30 @@ public class AtlasAssetStatusService {
 
     private static final int PAGE_SIZE = 1000;
     private static final long CACHE_TTL_MS = 60_000;
+    private static final int CACHE_MAX_ENTRIES = 1000;
     private static final String CONDITIONALLY_APPROVED = "Conditionally Approved";
     private static final String KEY_SEPARATOR = "|";
+    private static final String SKILL_URL_PREFIX = "/skills/";
     private static final List<String> AUDIT_TYPES = Arrays.asList(
             Constants.AKTO_MCP_SERVER_TAG, Constants.AKTO_AI_AGENT_TAG, Constants.AKTO_BROWSER_LLM_TAG);
     // Strongest decision wins when several rows describe one tool; a server's tool rows follow it.
     private static final List<String> TOOL_AUDIT_TYPES = Arrays.asList(
             Constants.AKTO_MCP_TOOLS_TAG, Constants.AKTO_MCP_RESOURCES_TAG, Constants.AKTO_MCP_PROMPTS_TAG);
     private static final int CASCADE_BATCH_SIZE = 1000;
+    private static final int MAX_SKILL_DECISION_NAMES = 1000;
+    private static final LoggerMaker logger = new LoggerMaker(AtlasAssetStatusService.class, LogDb.DASHBOARD);
     private static final List<AtlasAssetStatus> PRECEDENCE = Arrays.asList(
             AtlasAssetStatus.BLOCKED, AtlasAssetStatus.APPROVED, AtlasAssetStatus.UNDER_REVIEW, AtlasAssetStatus.UNAPPROVED);
 
-    private static final Map<String, CachedDecisions> CACHE = new ConcurrentHashMap<>();
+    private static final TtlCache<String, Map<String, AtlasAssetStatus>> CACHE = new TtlCache<>(CACHE_TTL_MS, CACHE_MAX_ENTRIES);
     private static final AtomicLong GENERATION = new AtomicLong();
 
-    private static class CachedDecisions {
-        final Map<String, AtlasAssetStatus> decisions;
-        final long loadedAtMs;
-
-        CachedDecisions(Map<String, AtlasAssetStatus> decisions, long loadedAtMs) {
-            this.decisions = decisions;
-            this.loadedAtMs = loadedAtMs;
-        }
-    }
-
-    // Skills and plugins are approved through their own flow, so they have no audit type here.
+    // Plugins have no decision rows; skills do, but only the malicious ones are put up for a decision.
     public static String auditTypeOf(String rowType) {
         if (ROW_TYPE_AGENT.equals(rowType)) return Constants.AKTO_AI_AGENT_TAG;
         if (ROW_TYPE_LLM.equals(rowType)) return Constants.AKTO_BROWSER_LLM_TAG;
         if (ROW_TYPE_SERVICE.equals(rowType)) return Constants.AKTO_MCP_SERVER_TAG;
+        if (ROW_TYPE_SKILL.equals(rowType)) return McpAuditInfo.TYPE_AGENT_SKILL;
         return null;
     }
 
@@ -78,36 +77,39 @@ public class AtlasAssetStatusService {
         return rowType + KEY_SEPARATOR + groupKey;
     }
 
+    // Agents, MCP servers and browser apps are all reviewed; skills and plugins are not part of the inventory status.
     public static boolean isGovernable(String rowType) {
-        return auditTypeOf(rowType) != null;
+        return ROW_TYPE_AGENT.equals(rowType) || ROW_TYPE_LLM.equals(rowType) || ROW_TYPE_SERVICE.equals(rowType);
+    }
+
+    /** Whether the tool can be approved or blocked: every governable tool, and a skill only once it is flagged malicious. */
+    public static boolean canDecide(AtlasToolRow tool) {
+        return isGovernable(tool.getRowType()) || (ROW_TYPE_SKILL.equals(tool.getRowType()) && tool.isMalicious());
     }
 
     public AtlasAssetStatus resolve(AtlasToolRow tool, Map<String, AtlasAssetStatus> decisions, Set<String> allowlistNamesLower) {
         String type = auditTypeOf(tool.getRowType());
         AtlasAssetStatus decided = type == null ? null : decisions.get(decisionKey(type, tool.getGroupKey()));
-        if (decided == AtlasAssetStatus.BLOCKED || decided == AtlasAssetStatus.APPROVED) return decided;
-        if (isAllowlisted(tool, allowlistNamesLower)) return AtlasAssetStatus.APPROVED;
-        return decided != null ? decided : AtlasAssetStatus.UNAPPROVED;
+        // Any decision someone made wins over the allowlist; only a tool nobody touched falls back to it.
+        if (decided != null && decided != AtlasAssetStatus.UNAPPROVED) return decided;
+        return isAllowlisted(tool, allowlistNamesLower) ? AtlasAssetStatus.APPROVED : AtlasAssetStatus.UNAPPROVED;
     }
 
     public Map<String, AtlasAssetStatus> loadDecisions() {
         String cacheKey = Context.accountId.get() + "_" + Context.contextSource.get();
-        // Drop long-expired entries (never one being refreshed) so the map stays bounded.
-        long nowMs = System.currentTimeMillis();
-        CACHE.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * CACHE_TTL_MS);
-        CachedDecisions cached = CACHE.get(cacheKey);
-        if (cached != null && System.currentTimeMillis() - cached.loadedAtMs < CACHE_TTL_MS) return cached.decisions;
-        // Read outside the map's lock. A write that lands meanwhile bumps the generation, so a snapshot read before it is not cached.
+        Map<String, AtlasAssetStatus> cached = CACHE.get(cacheKey);
+        if (cached != null) return cached;
+        // A write that lands while reading bumps the generation, so a snapshot read before it is not cached.
         long generation = GENERATION.get();
-        cached = new CachedDecisions(readDecisions(), System.currentTimeMillis());
-        if (GENERATION.get() == generation) CACHE.put(cacheKey, cached);
-        return cached.decisions;
+        Map<String, AtlasAssetStatus> decisions = readDecisions();
+        if (GENERATION.get() == generation) CACHE.put(cacheKey, decisions);
+        return decisions;
     }
 
     public static void invalidate() {
         GENERATION.incrementAndGet();
         String prefix = Context.accountId.get() + "_";
-        CACHE.keySet().removeIf(key -> key.startsWith(prefix));
+        CACHE.removeKeysIf(key -> key.startsWith(prefix));
     }
 
     /** Applies a decision to every selected tool; returns how many tools were updated. */
@@ -119,10 +121,11 @@ public class AtlasAssetStatusService {
         try {
             List<AtlasToolRow> servers = new ArrayList<>();
             for (AtlasToolRow tool : tools) {
+                if (!canDecide(tool)) continue;
                 String type = auditTypeOf(tool.getRowType());
-                if (type == null) continue;
                 if (Constants.AKTO_MCP_SERVER_TAG.equals(type)) servers.add(tool);
                 else updateRows(tool, type, status, decision);
+                if (ROW_TYPE_SKILL.equals(tool.getRowType())) setSkillBlocked(tool, status == AtlasAssetStatus.BLOCKED);
                 updated++;
             }
             if (!servers.isEmpty()) serverCollectionIds.addAll(updateServerRows(servers, status, decision));
@@ -138,7 +141,31 @@ public class AtlasAssetStatusService {
     // A failed read throws, so it is never cached as "every tool is unapproved".
     private Map<String, AtlasAssetStatus> readDecisions() {
         Map<String, AtlasAssetStatus> decisions = new HashMap<>();
-        Bson filter = Filters.and(Filters.in(McpAuditInfo.TYPE, AUDIT_TYPES), contextSourceFilter(Context.contextSource.get()));
+        readInto(decisions, Filters.and(Filters.in(McpAuditInfo.TYPE, AUDIT_TYPES), contextSourceFilter(Context.contextSource.get())));
+        return decisions;
+    }
+
+    /** Decisions on the malicious skills among the tools, read by name so the many other skill rows are never scanned. */
+    public Map<String, AtlasAssetStatus> loadSkillDecisions(Collection<AtlasToolRow> tools) {
+        Set<String> names = new HashSet<>();
+        int skills = 0;
+        for (AtlasToolRow tool : tools) {
+            if (!ROW_TYPE_SKILL.equals(tool.getRowType()) || !tool.isMalicious()) continue;
+            if (++skills > MAX_SKILL_DECISION_NAMES) continue;
+            // The audit row may differ in case from the skill group's name; names are matched exactly, so look up both spellings.
+            names.add(tool.getGroupKey());
+            names.add(tool.getGroupKey().toLowerCase(Locale.ROOT));
+        }
+        if (skills > MAX_SKILL_DECISION_NAMES) logger.warnAndAddToDb("Atlas discovery: " + skills + " malicious skills, decisions read for the first " + MAX_SKILL_DECISION_NAMES);
+        Map<String, AtlasAssetStatus> decisions = new HashMap<>();
+        if (names.isEmpty()) return decisions;
+        readInto(decisions, Filters.and(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
+                Filters.in(McpAuditInfo.RESOURCE_NAME, names), contextSourceFilter(Context.contextSource.get())));
+        return decisions;
+    }
+
+    // Pages the matching rows by _id and keeps the strongest decision per tool.
+    private void readInto(Map<String, AtlasAssetStatus> decisions, Bson filter) {
         Bson projection = Projections.include(McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME, McpAuditInfo.REMARKS, McpAuditInfo.MARKED_BY);
         ObjectId lastId = null;
         while (true) {
@@ -151,9 +178,17 @@ public class AtlasAssetStatusService {
                 // A row Atlas created for a server has the bare name, which can itself have dots (e.g. "mcp.example.com").
                 decisions.merge(decisionKey(row.getType(), row.getResourceName()), rowStatus, AtlasAssetStatusService::stronger);
             }
-            if (rows.size() < PAGE_SIZE) return decisions;
+            if (rows.size() < PAGE_SIZE) return;
             lastId = rows.get(rows.size() - 1).getId();
         }
+    }
+
+    // Same api_info flag the Agentic assets page sets when it blocks a skill, so the decision reaches the skill's collections.
+    private static void setSkillBlocked(AtlasToolRow skill, boolean blocked) {
+        if (skill.getCollectionIds().isEmpty()) return;
+        ApiInfoDao.instance.updateMany(
+                Filters.and(Filters.in(ApiInfo.ID_API_COLLECTION_ID, skill.getCollectionIds()), Filters.eq(ApiInfo.ID_URL, SKILL_URL_PREFIX + skill.getGroupKey())),
+                Updates.set(ApiInfo.IS_SKILL_BLOCKED, blocked));
     }
 
     // MCP servers are stored per host ("<device>.<agent>.<name>"); agents and browser apps by their own name.

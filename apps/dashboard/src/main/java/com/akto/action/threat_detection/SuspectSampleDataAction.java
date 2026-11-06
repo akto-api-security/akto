@@ -29,7 +29,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
@@ -50,6 +49,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.utils.ArgusCollectionScope;
+import com.akto.utils.TtlCache;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 import lombok.Getter;
@@ -68,17 +68,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   private static final long EVENT_HOSTS_TTL_MS = 60_000;
   private static final int EVENT_HOSTS_MAX_ENTRIES = 50;
   private static final int ATLAS_TOOL_KEY_MAX_LENGTH = 256;
-  private static final Map<String, CachedHosts> EVENT_HOSTS = new ConcurrentHashMap<>();
-
-  private static final class CachedHosts {
-    final List<String> hosts;
-    final long loadedAtMs;
-
-    CachedHosts(List<String> hosts, long loadedAtMs) {
-      this.hosts = hosts;
-      this.loadedAtMs = loadedAtMs;
-    }
-  }
+  private static final TtlCache<String, List<String>> EVENT_HOSTS = new TtlCache<>(EVENT_HOSTS_TTL_MS, EVENT_HOSTS_MAX_ENTRIES);
 
   List<SuspectSampleData> sampleData;
   List<DashboardMaliciousEvent> maliciousEvents;
@@ -434,17 +424,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   private List<String> eventHostsInWindow() {
-    long nowMs = System.currentTimeMillis();
-    EVENT_HOSTS.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * EVENT_HOSTS_TTL_MS);
-    if (EVENT_HOSTS.size() >= EVENT_HOSTS_MAX_ENTRIES) EVENT_HOSTS.clear();
     String cacheKey = Context.accountId.get() + "|" + Context.contextSource.get() + "|" + this.startTimestamp + "|" + this.endTimestamp;
-    CachedHosts cached = EVENT_HOSTS.get(cacheKey);
-    if (cached != null && nowMs - cached.loadedAtMs < EVENT_HOSTS_TTL_MS) return cached.hosts;
+    List<String> cached = EVENT_HOSTS.get(cacheKey);
+    if (cached != null) return cached;
     List<HostSeverityCount> counts = fetchHostSeverityCounts(this.startTimestamp, this.endTimestamp);
     List<String> hosts = (counts == null ? Collections.<HostSeverityCount>emptyList() : counts).stream()
         .map(HostSeverityCount::getHost).filter(host -> host != null).distinct().collect(Collectors.toList());
     // An empty result may be a failed call, so only a hit is cached.
-    if (!hosts.isEmpty()) EVENT_HOSTS.put(cacheKey, new CachedHosts(hosts, nowMs));
+    if (!hosts.isEmpty()) EVENT_HOSTS.put(cacheKey, hosts);
     return hosts;
   }
 

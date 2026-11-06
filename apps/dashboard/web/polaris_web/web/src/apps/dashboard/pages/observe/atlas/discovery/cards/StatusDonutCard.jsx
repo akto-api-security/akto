@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { Box, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import DonutChart from "@/apps/dashboard/components/shared/DonutChart";
-import Pressable from "@/apps/dashboard/pages/dashboard/ask/components/Pressable";
 import DiscoveryCard from "../shared/DiscoveryCard";
-import { STATUS_META, STATUS_ORDER } from "../constants";
+import StatusToggle from "../shared/StatusToggle";
+import { CATEGORY_LABELS, STATUS_META, STATUS_ORDER } from "../constants";
 import "../shared/discovery.css";
 
 const DONUT_SIZE = 160;
@@ -12,6 +12,8 @@ const INNER_SIZE = "65%";
 const DONUT_MARGIN = 20;
 const COUNT_COLUMN_WIDTH = "40px";
 const PERCENT_COLUMN_WIDTH = "44px";
+// The categories the donut covers, named as on the tiles at the top of the page.
+const COVERED_CATEGORIES = [CATEGORY_LABELS.agents, CATEGORY_LABELS.mcp, CATEGORY_LABELS.browser].join(", ");
 
 // DonutChart wants { label: { text: count, color } }; a picked status leaves only its slice.
 const donutData = (counts, selected) => Object.fromEntries(STATUS_ORDER.filter((key) => !selected || key === selected).map((key) => [
@@ -20,31 +22,21 @@ const donutData = (counts, selected) => Object.fromEntries(STATUS_ORDER.filter((
 ]));
 
 function LegendRow({ statusKey, count, total, dimmed, selected, onClick }) {
-    const row = (
-        <Box padding="1">
-            <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
-                <HorizontalStack gap="3" blockAlign="center" wrap={false}>
-                    <span className="discovery-swatch" style={{ "--swatch-color": STATUS_META[statusKey].color }} />
-                    <Text as="span">{STATUS_META[statusKey].label}</Text>
-                </HorizontalStack>
-                <HorizontalStack gap="2" blockAlign="center" wrap={false}>
-                    <Box minWidth={COUNT_COLUMN_WIDTH}><Text as="p" fontWeight="semibold" alignment="end">{count}</Text></Box>
-                    <Box minWidth={PERCENT_COLUMN_WIDTH}><Text as="p" color="subdued" alignment="end">{Math.round((100 * count) / total)}%</Text></Box>
-                </HorizontalStack>
-            </HorizontalStack>
-        </Box>
-    );
     return (
-        <Pressable
-            onClick={onClick}
-            accessibilityLabel={`Show only ${STATUS_META[statusKey].label}, ${count} tools`}
-            aria-pressed={selected}
-            hoverBackground="bg-subdued"
-            borderRadius="2"
-            opacity={dimmed ? "0.5" : undefined}
-        >
-            {row}
-        </Pressable>
+        <StatusToggle onClick={onClick} accessibilityLabel={`Show only ${STATUS_META[statusKey].label}, ${count} tools`} selected={selected} dimmed={dimmed}>
+            <Box padding="1">
+                <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
+                    <HorizontalStack gap="3" blockAlign="center" wrap={false}>
+                        <span className="discovery-swatch" style={{ "--swatch-color": STATUS_META[statusKey].color }} />
+                        <Text as="span">{STATUS_META[statusKey].label}</Text>
+                    </HorizontalStack>
+                    <HorizontalStack gap="2" blockAlign="center" wrap={false}>
+                        <Box minWidth={COUNT_COLUMN_WIDTH}><Text as="p" fontWeight="semibold" alignment="end">{count}</Text></Box>
+                        <Box minWidth={PERCENT_COLUMN_WIDTH}><Text as="p" color="subdued" alignment="end">{Math.round((100 * count) / total)}%</Text></Box>
+                    </HorizontalStack>
+                </HorizontalStack>
+            </Box>
+        </StatusToggle>
     );
 }
 
@@ -55,7 +47,7 @@ export default function StatusDonutCard({ counts, status }) {
     return (
         <DiscoveryCard
             title="Inventory by status"
-            subtitle={counts ? `${total} AI tools discovered` : undefined}
+            subtitle={counts ? `${total} across ${COVERED_CATEGORIES}` : undefined}
             status={status}
             empty={total === 0}
             emptyText="No tools discovered yet."
