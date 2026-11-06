@@ -95,6 +95,7 @@ import SignUpWithSSO from "../signup/components/SignUpWithSSO";
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
 import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
+import McpClients from "../dashboard/pages/settings/mcp_clients/McpClients";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
@@ -153,6 +154,7 @@ import RemoteCommands from "../dashboard/pages/settings/remote_commands/RemoteCo
 import RemoteCommandDetail from "../dashboard/pages/settings/remote_commands/RemoteCommandDetail.jsx";
 import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
 import OpenTelemetry from "../dashboard/pages/settings/integrations/OpenTelemetry.jsx";
+import McpOAuthConsent from "../dashboard/pages/mcp_oauth/McpOAuthConsent";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -709,6 +711,10 @@ const router = createBrowserRouter([
                         element: <AuditLogs/>
                     },
                     {
+                        path: 'mcp-clients',
+                        element: <McpClients/>
+                    },
+                    {
                         path: 'undo-demerge-apis',
                         element: <UndoDemergedApis/>
                     },
@@ -752,6 +758,10 @@ const router = createBrowserRouter([
             {
                 path: "threat-detection/report/:reportId",
                 element: <ThreatReport/>
+            },
+            {
+                path: "mcp-oauth/consent",
+                element: <McpOAuthConsent/>
             }
         ],
         errorElement: <ErrorComponent/>

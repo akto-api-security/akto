@@ -1030,6 +1030,53 @@
             </result>
         </action>
 
+        <action name="api/triggerSkillRevalidation" class="com.akto.action.monitoring.SkillRevalidationAction" method="triggerSkillRevalidation">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User triggered revalidation of Endpoint Shield skills</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchSkillRevalidationJob" class="com.akto.action.monitoring.SkillRevalidationAction" method="fetchSkillRevalidationJob">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+
+            <result name="SUCCESS" type="json"/>
+
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/getAgentLogs" class="com.akto.action.monitoring.EndpointShieldAgentAction" method="fetchAgentLogs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -9064,6 +9111,48 @@
             </result>
             <result name="SUCCESS" type="json">
                 <param name="includeProperties">^rule.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateFileInspectionRule" class="com.akto.action.endpoint_shield.FileInspectionRuleAction" method="updateFileInspectionRule">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated a file inspection rule</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^rule.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/restoreFileInspectionDefaults" class="com.akto.action.endpoint_shield.FileInspectionRuleAction" method="restoreFileInspectionDefaults">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User restored default agent files</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^createdCount.*,^existingCount.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -18913,6 +19002,132 @@
             </result>
             <result name="UNAUTHORIZED" type="json">
                 <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="oauth/register" class="com.akto.action.McpOAuthAction" method="register">
+            <interceptor-ref name="defaultStack" />
+        </action>
+
+        <action name="oauth/authorize" class="com.akto.action.McpOAuthAction" method="authorize">
+            <interceptor-ref name="defaultStack" />
+        </action>
+
+        <action name="oauth/token" class="com.akto.action.McpOAuthAction" method="token">
+            <interceptor-ref name="defaultStack" />
+        </action>
+
+        <action name="api/mcpOAuth/fetchAuthorizeRequest" class="com.akto.action.McpOAuthConsentAction" method="fetchAuthorizeRequest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*,unverifiedRedirect,redirectUri,clientCreatedAt</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcpOAuth/approveAuthorizeRequest" class="com.akto.action.McpOAuthConsentAction" method="approveAuthorizeRequest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*,unverifiedRedirect,redirectUri,clientCreatedAt</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcpOAuth/denyAuthorizeRequest" class="com.akto.action.McpOAuthConsentAction" method="denyAuthorizeRequest">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">clientName,redirectHost,accountName,userLogin,contextSource,redirectUrl,allowedContexts.*,unverifiedRedirect,redirectUri,clientCreatedAt</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateMcpKnownClientsOnly" class="com.akto.action.AdminSettingsAction" method="updateMcpKnownClientsOnly">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User changed whether only known MCP clients can connect</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">accountSettings,accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris,accountSettings.mcpAllowedRedirectUris.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addMcpAllowedRedirectUri" class="com.akto.action.AdminSettingsAction" method="addMcpAllowedRedirectUri">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User allowed an MCP client redirect URL</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">accountSettings,accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris,accountSettings.mcpAllowedRedirectUris.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteMcpAllowedRedirectUri" class="com.akto.action.AdminSettingsAction" method="deleteMcpAllowedRedirectUri">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User removed an allowed MCP client redirect URL</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">accountSettings,accountSettings.mcpKnownClientsOnly,accountSettings.mcpAllowedRedirectUris,accountSettings.mcpAllowedRedirectUris.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>

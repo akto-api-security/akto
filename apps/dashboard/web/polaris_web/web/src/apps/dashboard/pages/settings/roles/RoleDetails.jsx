@@ -16,8 +16,8 @@ import { roleDetailsUrl, CreateRoleModal } from "./Roles";
 import { usePermissions } from "@/util/permissions";
 import Dropdown from "../../../components/layouts/Dropdown";
 import InfoTooltipIcon from "../../../components/shared/InfoTooltipIcon";
+import { PRODUCT_LABELS } from "../../../components/shared/productLabels";
 
-const PRODUCT_LABELS = { API: 'API Security', AGENTIC: 'Akto ARGUS', ENDPOINT: 'Akto ATLAS', DAST: 'DAST' }
 
 // an empty feature map means a self-hosted deployment, where everything is granted
 function isThreatFeatureGranted() {

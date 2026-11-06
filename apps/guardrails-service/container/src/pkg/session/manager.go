@@ -690,9 +690,9 @@ Assistant response, the only evidence available so far, note it explicitly if th
 %s`, currentItem, rules)
 }
 
-// GenerateAndUpdateSummary asks agent-guard (POST {SCANNER_API_URL}/guardrails/llm/async) for an
-// updated session summary. It runs in the background after the turn is tracked, so it uses the
-// async route with its larger reply ceiling.
+// GenerateAndUpdateSummary asks agent-guard (POST {SCANNER_API_URL}/guardrails/llm/session) for an
+// updated session summary. It runs in the background after the turn is tracked, with the larger
+// reply ceiling, and always on the core model since the summary feeds the next turn's verdict.
 // isRequest: true for user requests, false for system responses
 func (sm *SessionManager) GenerateAndUpdateSummary(ctx context.Context, sessionID string, currentItem string, isRequest bool) error {
 	currentItem = strings.TrimSpace(currentItem)
@@ -704,7 +704,7 @@ func (sm *SessionManager) GenerateAndUpdateSummary(ctx context.Context, sessionI
 	existingSummary, _ := sm.GetSessionSummary(sessionID)
 	prompt := buildSummarizationPrompt(existingSummary, currentItem, isRequest)
 
-	content, err := mcp.CallGuardrailsLLMAsync(ctx, prompt)
+	content, err := mcp.CallGuardrailsSessionLLM(ctx, prompt)
 	if err != nil {
 		return fmt.Errorf("failed to generate session summary: %w", err)
 	}

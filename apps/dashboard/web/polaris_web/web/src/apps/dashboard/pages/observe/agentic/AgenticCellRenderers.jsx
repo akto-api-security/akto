@@ -5,6 +5,7 @@ import { getRiskStatus } from "./agenticPageBuilders";
 import AssetIcon from "./AssetIcon";
 import { TypeBadge } from "@/apps/dashboard/components/tables/rows/AgGridRow";
 import MisconfiguredBadge from "./MisconfiguredBadge";
+import SkillTagBadges from "./SkillTagBadges";
 import "../../../components/layouts/style.css";
 import { LegendDot } from "./AgenticStatsCard";
 
@@ -87,6 +88,7 @@ export function AssetNameCellRenderer({ data }) {
             {showLocalMcp && <Badge size="small" status="critical">Local MCP Server</Badge>}
             {showMisconfigured && <MisconfiguredBadge deviceCount={data.misconfiguredDeviceCount} />}
             {showMalicious && <Badge size="small" status="critical">Malicious</Badge>}
+            {isSkill && <SkillTagBadges tags={data.skillTags} />}
         </HorizontalStack>
     );
 }
