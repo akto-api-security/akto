@@ -5,7 +5,6 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.KeyTypes;
-import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 
 import com.mongodb.BasicDBObject;
@@ -82,7 +81,7 @@ public class AuthPolicy {
 
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
         // Akto built this MCP call itself, so its headers say nothing about how the tool is really called
-        if (McpRequestResponseUtils.isSyntheticCall(httpResponseParams)) return false;
+        if (httpResponseParams.isSyntheticMcpCall()) return false;
 
         Set<Set<String>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();

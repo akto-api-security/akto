@@ -7,7 +7,6 @@ import com.akto.dto.McpReconResult;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.mcp.McpSchema;
 import com.akto.util.Constants;
 import com.akto.utils.McpScanResult;
@@ -520,7 +519,7 @@ public class McpReconSyncJobExecutor {
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                 if (toolsCallHttpResponseParams != null) {
-                    McpRequestResponseUtils.markSyntheticCall(toolsCallHttpResponseParams);
+                    toolsCallHttpResponseParams.setSyntheticMcpCall(true);
                     responseParamsList.add(toolsCallHttpResponseParams);
                 }
             }
@@ -555,7 +554,7 @@ public class McpReconSyncJobExecutor {
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                 if (readResourceHttpResponseParams != null) {
-                    McpRequestResponseUtils.markSyntheticCall(readResourceHttpResponseParams);
+                    readResourceHttpResponseParams.setSyntheticMcpCall(true);
                     responseParamsList.add(readResourceHttpResponseParams);
                 }
             }
