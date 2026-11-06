@@ -677,7 +677,10 @@ public class HttpCallParser {
                 incTrafficMetrics(totalRequestsKey,1);
             }
 
-            boolean cond = HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
+            // WebSocket traffic (handshake and frames, all 101) bypasses HTTP-specific filters (status codes, content-types)
+            boolean isWebSocket = "WEBSOCKET".equals(httpResponseParam.getType());
+
+            boolean cond = isWebSocket || HttpResponseParams.validHttpResponseCode(httpResponseParam.getStatusCode());
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.POSTMAN) && httpResponseParam.getStatusCode() <= 0) {
                 cond = true;
             }
@@ -693,7 +696,7 @@ public class HttpCallParser {
             }
 
             // check for garbage points here
-            if(redundantUrlsList != null && !redundantUrlsList.isEmpty()){
+            if(!isWebSocket && redundantUrlsList != null && !redundantUrlsList.isEmpty()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(), pattern)){
                     continue;
                 }

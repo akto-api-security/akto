@@ -60,6 +60,10 @@ public class ApiInfoBulkUpdate {
             // response codes
             subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
 
+            if (apiInfo.getIsConnectionString()) {
+                subUpdates.add(Updates.set(ApiInfo.IS_CONNECTION_STRING, true));
+            }
+
             // api type
             subUpdates.add(Updates.setOnInsert(ApiInfo.API_TYPE, apiInfo.getApiType()));
 
