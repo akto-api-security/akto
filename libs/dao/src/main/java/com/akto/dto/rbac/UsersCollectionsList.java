@@ -268,8 +268,6 @@ public class UsersCollectionsList {
                 );
                 break;
             default:
-                // the MCP tools group has no tags, but its apis are MCP tools, so it belongs to the MCP views only
-                finalFilter = Filters.and(finalFilter, Filters.ne(Constants.ID, UnauthenticatedEndpoint.UNAUTHENTICATED_MCP_TOOLS_GROUP_ID));
                 break;
         }
         MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
