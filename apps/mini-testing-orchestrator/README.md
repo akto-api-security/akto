@@ -17,7 +17,7 @@ metrics port (9400) next to `/metrics` (`OrchestratorControl` in [apps/mini-test
 | `POST /drain` | stop claiming test runs; waits up to 2s for an in-flight poll, then replies whether the pod holds a run |
 | `POST /undrain` | resume claiming |
 
-Every request carries `X-Akto-Orchestrator-Token`. A drain lapses on the pod
+Every request carries `X-Akto-Orchestrator-Token`. By default the token is derived on both sides from the database abstractor token they already receive, so the helm chart renders no random secret and GitOps tools such as Argo CD see a stable manifest. A drain lapses on the pod
 after `ORCHESTRATOR_DRAIN_TTL_SECONDS` (default 120) unless renewed, so a pod
 never stays out of service if the orchestrator dies mid-scale-down.
 
@@ -113,7 +113,7 @@ orchestrator doesn't see how many test runs are queued.
 | `SUMMARY_EVERY` | `5m` | |
 | `POD_STATUS_PORT` | `9400` | |
 | `POD_STATUS_TIMEOUT` | `3s` | |
-| `CONTROL_TOKEN` | empty | must match the pods' `ORCHESTRATOR_TOKEN` |
+| `CONTROL_TOKEN` | derived | token for the pods' control endpoints; must match their `ORCHESTRATOR_TOKEN`. When empty, both sides derive the same token from `DATABASE_ABSTRACTOR_SERVICE_TOKEN` (HMAC-SHA256 of a fixed label), so no shared secret has to be generated or distributed. One of the two is required: without a token the orchestrator refuses to start, and pods refuse every caller |
 | `LEADER_ELECTION` | `true` | Lease-based, so two replicas never act at once |
 | `LEASE_NAME` | `mini-testing-orchestrator` | |
 | `POD_NAME` | hostname | leader identity |
