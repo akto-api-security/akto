@@ -236,6 +236,10 @@ public class SkillEvidenceV3 {
             return parts.get(part).name;
         }
 
+        int partCount() {
+            return parts.size();
+        }
+
         /** Line number of {@code line} inside its own part, 0-based. */
         int lineInPart(int line) {
             return line - partStartLines[partOfLine(line)];
