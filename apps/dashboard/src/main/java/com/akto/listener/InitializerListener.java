@@ -3438,73 +3438,126 @@ public class InitializerListener implements ServletContextListener {
         logger.warnAndAddToDb("Finished running back fill discovered for accountId: "  + Context.accountId.get() + " in: " + (Context.now() - startTime) + " seconds");
     }
 
+    // apis seen this long before the last back fill are looked at again, so apis written late by a runtime are not missed
+    private static final int STATUS_CODE_BACKFILL_OVERLAP_SECONDS = 60 * 60;
+    private static final int STATUS_CODE_BACKFILL_BATCH_SIZE = 100;
+    // how far back the first run of an account (no last back fill time) looks
+    private static final int STATUS_CODE_BACKFILL_FIRST_RUN_DAYS = 3;
+    // the back fill reads from a secondary (the primary only takes its writes); the overlap covers the replication lag
+    private static final ReadPreference STATUS_CODE_BACKFILL_READ_PREFERENCE = ReadPreference.secondaryPreferred();
+
+    /**
+     * Fills the response codes and api type of the apis that have no api type, using their sample data.
+     * It only looks at apis seen since the last back fill of the account, so it does nothing when no new traffic came in.
+     * The first run of an account (no last back fill time) covers the last 3 days.
+     */
     private static void backFillStatusCodeType() {
         int accountId = Context.accountId.get();
         if(accountId == 1718042191 || accountId == 1736798101){
             return;
         }
-        long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.API_TYPE, false));
-        if (count == 0) {
-            logger.warnAndAddToDb("No need to run backFillStatusCodeType");
-            return;
+        int startedAt = Context.now();
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
+        int lastBackFill = lastRunInfo == null ? 0 : lastRunInfo.getLastStatusCodeBackfill();
+        int since = lastBackFill == 0
+            ? startedAt - STATUS_CODE_BACKFILL_FIRST_RUN_DAYS * Constants.ONE_DAY_TIMESTAMP
+            : Math.max(lastBackFill - STATUS_CODE_BACKFILL_OVERLAP_SECONDS, 0);
+
+        List<Integer> collectionIds = new ArrayList<>();
+        for (ApiCollection apiCollection : ApiCollectionsDao.instance.getMCollection()
+                .withReadPreference(STATUS_CODE_BACKFILL_READ_PREFERENCE).find().projection(Projections.include("_id"))) {
+            collectionIds.add(apiCollection.getId());
         }
 
-        logger.warnAndAddToDb("Running backFillStatusCodeType for accountId: " + Context.accountId.get());
+        int apisChecked = 0;
+        int sampleDocsRead = 0;
+        for (int i = 0; i < collectionIds.size(); i += 1000) {
+            List<Integer> chunk = collectionIds.subList(i, Math.min(i + 1000, collectionIds.size()));
+            Bson filter = Filters.and(
+                Filters.in(ApiInfo.ID_API_COLLECTION_ID, chunk),
+                Filters.gte(ApiInfo.LAST_SEEN, since),
+                Filters.exists(ApiInfo.API_TYPE, false)
+            );
 
-        List<SampleData> sampleDataList = new ArrayList<>();
-        Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
-        int skip = 0;
-        int startTime = Context.now();
-        do {
-            sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, 100, sort);
-            skip += sampleDataList.size();
-            List<ApiInfo> apiInfoList = new ArrayList<>();
-            for (SampleData sampleData: sampleDataList) {
-                Key id = sampleData.getId();
-                List<String> samples = sampleData.getSamples();
-                if (samples == null || samples.isEmpty()) continue;
-                ApiInfo apiInfo = new ApiInfo(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
-                apiInfo.setResponseCodes(new ArrayList<>());
-                for (String sample: samples) {
-                    try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-
-                        int statusCode = httpResponseParams.getStatusCode();
-                        if (!apiInfo.getResponseCodes().contains(statusCode)) {
-                            apiInfo.getResponseCodes().add(statusCode);
-                        }
-
-                        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
-                        apiInfo.setApiType(apiType);
-                    } catch (Exception e) {
-                        continue;
+            List<ApiInfo.ApiInfoKey> batch = new ArrayList<>();
+            try (MongoCursor<ApiInfo> cursor = ApiInfoDao.instance.getMCollection()
+                    .withReadPreference(STATUS_CODE_BACKFILL_READ_PREFERENCE).find(filter)
+                    .projection(Projections.include("_id")).batchSize(STATUS_CODE_BACKFILL_BATCH_SIZE).cursor()) {
+                while (cursor.hasNext()) {
+                    batch.add(cursor.next().getId());
+                    if (batch.size() >= STATUS_CODE_BACKFILL_BATCH_SIZE) {
+                        sampleDocsRead += backFillStatusCodeTypeOfApis(batch);
+                        apisChecked += batch.size();
+                        batch.clear();
                     }
                 }
-                apiInfoList.add(apiInfo);
+            }
+            if (!batch.isEmpty()) {
+                sampleDocsRead += backFillStatusCodeTypeOfApis(batch);
+                apisChecked += batch.size();
+            }
+        }
+
+        // saved only when the run went through, so a failed run is repeated from the same point
+        AccountSettingsDao.instance.getMCollection().updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.LAST_STATUS_CODE_BACKFILL, startedAt),
+            new UpdateOptions().upsert(true));
+
+        logger.info("AccountId: " + accountId + " backfill-status-code-type: since=" + since
+            + (lastBackFill == 0 ? " (no last back fill, last " + STATUS_CODE_BACKFILL_FIRST_RUN_DAYS + " days)" : "")
+            + ", apis without api type checked=" + apisChecked + ", sample docs read=" + sampleDocsRead
+            + ", took=" + (Context.now() - startedAt) + " s");
+    }
+
+    /** Reads the sample data of the given apis and writes their response codes and api type. @return how many sample docs were read */
+    private static int backFillStatusCodeTypeOfApis(List<ApiInfo.ApiInfoKey> apiInfoKeys) {
+        List<Bson> sampleFilters = new ArrayList<>();
+        for (ApiInfo.ApiInfoKey key : apiInfoKeys) {
+            sampleFilters.add(SampleDataDao.filterForSampleData(key.getApiCollectionId(), key.getUrl(), key.getMethod()));
+        }
+        List<SampleData> sampleDataList = SampleDataDao.instance.getMCollection()
+            .withReadPreference(STATUS_CODE_BACKFILL_READ_PREFERENCE).find(Filters.or(sampleFilters)).into(new ArrayList<>());
+
+        List<WriteModel<ApiInfo>> updates = new ArrayList<>();
+        for (SampleData sampleData: sampleDataList) {
+            Key id = sampleData.getId();
+            List<String> samples = sampleData.getSamples();
+            if (samples == null || samples.isEmpty()) continue;
+            ApiInfo apiInfo = new ApiInfo(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
+            apiInfo.setResponseCodes(new ArrayList<>());
+            for (String sample: samples) {
+                try {
+                    HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
+
+                    int statusCode = httpResponseParams.getStatusCode();
+                    if (!apiInfo.getResponseCodes().contains(statusCode)) {
+                        apiInfo.getResponseCodes().add(statusCode);
+                    }
+
+                    ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+                    apiInfo.setApiType(apiType);
+                } catch (Exception e) {
+                    continue;
+                }
             }
 
-            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-            for (ApiInfo apiInfo: apiInfoList) {
-                List<Bson> subUpdates = new ArrayList<>();
-
-                // response codes
-                subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
-
-                // api type
-                subUpdates.add(Updates.set(ApiInfo.API_TYPE, apiInfo.getApiType()));
-                updates.add(
-                        new UpdateOneModel<>(
-                                ApiInfoDao.getFilter(apiInfo.getId()),
-                                Updates.combine(subUpdates),
-                                new UpdateOptions().upsert(false)
-                        )
-                );
-            }
-            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
-
-        } while (!sampleDataList.isEmpty());
-
-        logger.warnAndAddToDb("Finished running backFillStatusCodeType for accountId: " + Context.accountId.get() + " in: " + (Context.now() - startTime) + " seconds");
+            List<Bson> subUpdates = new ArrayList<>();
+            // response codes
+            subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
+            // api type
+            subUpdates.add(Updates.set(ApiInfo.API_TYPE, apiInfo.getApiType()));
+            updates.add(
+                    new UpdateOneModel<>(
+                            ApiInfoDao.getFilter(apiInfo.getId()),
+                            Updates.combine(subUpdates),
+                            new UpdateOptions().upsert(false)
+                    )
+            );
+        }
+        if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
+        return sampleDataList.size();
     }
 
     private static void dropLastCronRunInfoField(BackwardCompatibility backwardCompatibility){
