@@ -6,13 +6,13 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiInfoCatalog;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SequenceCount;
-import com.akto.dto.type.APICatalog;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
-import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.RuntimeUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,19 +62,17 @@ public class SessionAnalyzer {
         AktoPolicyNew aktoPolicyNew = config.getAktoPolicyNew();
         ApiInfoKey apiKey = AktoPolicyNew.generateFromHttpResponseParams(record, aktoPolicyNew.isMergeUrlsOnVersions());
 
-        // Check apiInfoCatalogMap directly: getApiInfoFromMap() inserts unknown URLs.
+        // Same order as the catalog (exact URL, then template) without getApiInfoFromMap(), which inserts unknown URLs
         ApiInfoCatalog apiInfoCatalog = aktoPolicyNew.getApiInfoCatalogMap().get(apiKey.getApiCollectionId());
         if (apiInfoCatalog == null) return;
-
-        boolean known;
-        if (APICatalog.isTemplateUrl(apiKey.getUrl())) {
-            URLTemplate urlTemplate = APICatalogSync.createUrlTemplate(apiKey.getUrl(), apiKey.getMethod());
-            known = apiInfoCatalog.getTemplateURLToMethods().containsKey(urlTemplate);
-        } else {
-            known = apiInfoCatalog.getStrictURLToMethods().containsKey(
-                    new URLStatic(apiKey.getUrl(), apiKey.getMethod()));
-        }
-        if (!known) return;
+        Map<URLStatic, ?> strictUrls = apiInfoCatalog.getStrictURLToMethods();
+        Map<URLTemplate, ?> templateUrls = apiInfoCatalog.getTemplateURLToMethods();
+        Method method = apiKey.getMethod();
+        String catalogUrl = RuntimeUtil.findCatalogUrl(apiKey.getUrl(), method,
+                url -> strictUrls != null && strictUrls.containsKey(new URLStatic(url, method)),
+                templateUrls == null ? null : templateUrls.keySet());
+        if (catalogUrl == null) return;
+        apiKey = new ApiInfoKey(apiKey.getApiCollectionId(), catalogUrl, method);
 
         String sessionId = config.getUserIdentifier().extractUserId(record);
         if (sessionId == null) return;
