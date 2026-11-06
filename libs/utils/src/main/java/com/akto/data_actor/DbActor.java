@@ -881,6 +881,11 @@ public class DbActor extends DataActor {
         return new HashMap<>();
     }
 
+    @Override
+    public String fetchWebSocketConnectionUrl(int collectionId) throws Exception {
+        return DbLayer.fetchWebSocketConnectionUrl(collectionId);
+    }
+    
     public Map<String, Map<String, ClaudeDesktopInfo>> fetchDeviceClaudeDesktopInfoMap() {
         return new HashMap<>();
     }

@@ -300,7 +300,7 @@ public class Executor {
                         requestAttempted = true;
                         long sendStart = System.nanoTime();
                         try {
-                            testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                            testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK, apiInfoKey.getApiCollectionId());
                         } finally {
                             // finally, not a bare statement after the call: a send that times out or
                             // gets interrupted (e.g. by the 300s task-timeout's future.cancel(true))
@@ -393,6 +393,10 @@ public class Executor {
     }
 
     public void overrideTestUrl(RawApi rawApi, TestingRunConfig testingRunConfig) {
+        // a WebSocket request's url is its message type; ApiExecutor applies the override to the connection URL
+        if (rawApi.getRequest() != null && rawApi.getRequest().getProtocolType() == com.akto.dto.OriginalHttpRequest.ProtocolType.WEBSOCKET) {
+            return;
+        }
         try {
             String url = "";
             List<String> originalHostHeaders = rawApi.getRequest().getHeaders().getOrDefault(_HOST, new ArrayList<>());

@@ -392,7 +392,8 @@ public class YamlNodeExecutor extends NodeExecutor {
 
             int tsBeforeReq = Context.nowInMillis();
             OriginalHttpResponse testResponse = ApiExecutor.sendRequest(
-                    testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK
+                    testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK,
+                    apiInfoKey != null ? apiInfoKey.getApiCollectionId() : 0
             );
 
             if (apiInfoKey != null && memory != null) {

@@ -114,6 +114,11 @@ public class WebSocketMessageParser {
                     if (messageTypeObj != null) {
                         return messageTypeObj.toString();
                     }
+                    // event-style frames: {"event":"user_query","data":{...}}
+                    Object eventObj = payloadMap.get("event");
+                    if (eventObj != null) {
+                        return eventObj.toString();
+                    }
                 } catch (Exception e) {
                     // If full JSON fails, try to extract "type" field using regex
                     // This handles fragmented frames where payload is partial JSON
@@ -127,6 +132,11 @@ public class WebSocketMessageParser {
                     java.util.regex.Matcher msgTypeMatcher = msgTypePattern.matcher(payload);
                     if (msgTypeMatcher.find()) {
                         return msgTypeMatcher.group(1);
+                    }
+
+                    java.util.regex.Matcher eventMatcher = java.util.regex.Pattern.compile("\"event\"\\s*:\\s*\"([^\"]+)\"").matcher(payload);
+                    if (eventMatcher.find()) {
+                        return eventMatcher.group(1);
                     }
                 }
             }

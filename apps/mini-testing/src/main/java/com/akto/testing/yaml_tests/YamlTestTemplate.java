@@ -32,6 +32,7 @@ public class YamlTestTemplate extends SecurityTestTemplate {
     @Override
     public boolean filter() {
         // loggerMaker.infoAndAddToDb("filter started" + logId, LogDb.TESTING);
+        
         List<String> authHeaders = AuthValidator.getHeaders(this.auth, this.authMechanism, this.customAuthTypes);
         // loggerMaker.infoAndAddToDb("found authHeaders " + authHeaders + " " + logId, LogDb.TESTING);
         if (authHeaders != null && authHeaders.size() > 0) {
@@ -45,6 +46,13 @@ public class YamlTestTemplate extends SecurityTestTemplate {
                 return false;
             }
         }
+        // WebSocket (protocolType set by buildFromSampleMessage): auth handled above, on the handshake
+        // headers and frame payload like any request; the selection filters run on the event payload
+        if (isWebSocketMessage(this.rawApi)) {
+            loggerMaker.infoAndAddToDb("WebSocket with events detected, filtering on event payload for " + logId, LogDb.TESTING);
+            return filterWebSocketEvents();
+        }
+
         // no filteration when template allowed for smart testing
         boolean templateAllowsAutomated = varMap.containsKey("agenticTestingAllowed") && Boolean.TRUE.equals(varMap.get("agenticTestingAllowed"));
         if(templateAllowsAutomated){
@@ -62,13 +70,68 @@ public class YamlTestTemplate extends SecurityTestTemplate {
             TestPhaseTimer.addFilter(System.nanoTime() - filterStart);
         }
     }
+    
+    private boolean isWebSocketMessage(RawApi rawApi) {
+        if (rawApi == null || rawApi.getRequest() == null) return false;
+        return rawApi.getRequest().getProtocolType() == com.akto.dto.OriginalHttpRequest.ProtocolType.WEBSOCKET;
+    }
+
+    private boolean filterWebSocketEvents() {
+        try {
+
+            RawApi wsRawApi = buildWebSocketFilterRawApi();
+            if (wsRawApi == null) {
+                loggerMaker.infoAndAddToDb("WebSocket filterRawApi could not be built, skipping " + logId, LogDb.TESTING);
+                return false;
+            }
+
+            ApiInfo.ApiInfoKey wsApiInfoKey = new ApiInfo.ApiInfoKey(
+                this.getApiInfoKey().getApiCollectionId(),
+                this.getApiInfoKey().getUrl(),
+                com.akto.dto.type.URLMethods.Method.POST
+            );
+            boolean isValid = TestPlugin.validateFilter(this.getFilterNode(), wsRawApi, wsApiInfoKey, this.varMap, this.logId);
+            loggerMaker.infoAndAddToDb("WebSocket filter result: " + isValid + " for " + logId, LogDb.TESTING);
+            return isValid;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error filtering WebSocket events: " + e.getMessage(), LogDb.TESTING);
+            return false;
+        }
+    }
+
+
+    private RawApi buildWebSocketFilterRawApi() {
+        try {
+            String eventPayload = this.rawApi.getRequest().getBody();
+            boolean emptyBody = (eventPayload == null || eventPayload.isEmpty() || "{}".equals(eventPayload.trim()));
+            if (emptyBody && !this.rawApi.getRequest().isConnectionString()) {
+
+                loggerMaker.infoAndAddToDb("WS filter: no event payload found in request body for " + logId, LogDb.TESTING);
+                return null;
+            }
+
+
+            RawApi wsRawApi = this.rawApi.copy();
+
+            wsRawApi.getRequest().setMethod("POST");
+
+            loggerMaker.infoAndAddToDb("WS filter RawApi - method: POST, status: "
+                + wsRawApi.getResponse().getStatusCode()
+                + ", body(100): " + eventPayload.substring(0, Math.min(100, eventPayload.length())), LogDb.TESTING);
+
+            return wsRawApi;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building WebSocket filter RawApi: " + e.getMessage(), LogDb.TESTING);
+            return null;
+        }
+    }
 
 
     @Override
     public boolean checkAuthBeforeExecution(boolean debug, List<TestingRunResult.TestLog> testLogs) {
         if (this.auth != null && this.auth.getAuthenticated() != null && this.auth.getAuthenticated() == true) {
             // loggerMaker.infoAndAddToDb("running noAuth check " + logId, LogDb.TESTING);
-            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs);
+            ExecutionResult res = AuthValidator.checkAuth(this.auth, this.rawApi.copy(), this.testingRunConfig, this.customAuthTypes, debug, testLogs, this.apiInfoKey.getApiCollectionId());
             if(res.getSuccess()) {
                 OriginalHttpResponse resp = res.getResponse();
                 String respBody = resp.getBody().toLowerCase();

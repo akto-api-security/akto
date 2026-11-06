@@ -1239,6 +1239,22 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    String connectionUrl;
+
+    public String fetchWebSocketApiInfosWithUrls() {
+        try {
+            connectionUrl = DbLayer.fetchWebSocketConnectionUrl(apiCollectionId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchWebSocketApiInfosWithUrls " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getConnectionUrl() {
+        return connectionUrl;
+    }
+
     public String fetchEndpointLogicalGroup() {
         try {
             endpointLogicalGroup = DbLayer.fetchEndpointLogicalGroup(logicalGroupName);
