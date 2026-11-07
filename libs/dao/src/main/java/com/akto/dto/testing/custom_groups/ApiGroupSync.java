@@ -223,7 +223,7 @@ public abstract class ApiGroupSync {
         int syncStartedAt = Context.now();
 
         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(),
-                Projections.include(AccountSettings.LAST_UPDATED_CRON_INFO + "." + LastCronRunInfo.GROUP_SYNC_TIMES + "." + groupId()));
+                Projections.include(AccountSettings.LAST_UPDATED_CRON_INFO));
         LastCronRunInfo lastRunInfo = accountSettings == null ? null : accountSettings.getLastUpdatedCronInfo();
         Integer lastSync = lastRunInfo == null || lastRunInfo.getGroupSyncTimes() == null
                 ? null : lastRunInfo.getGroupSyncTimes().get(String.valueOf(groupId()));
