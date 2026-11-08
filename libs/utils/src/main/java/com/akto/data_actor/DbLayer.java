@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
@@ -3386,13 +3387,43 @@ public class DbLayer {
 
 
     public static void ingestMetricsData(List<MetricData> metricData) {
+        storeMetricsData(metricData);
+        forwardMetricsData(metricData);
+    }
+
+    /**
+     * Optional storage override, installed once at startup by the cyborg web app when the log pipeline is on
+     * (LOG_PIPELINE_ACCOUNTS non-empty): the override decides per account whether metrics go to Kafka (consumer persists them in the logs DB) or are stored directly.
+     * Null (the default) = legacy behaviour: write to this process's own Mongo. Covers every in-process caller,
+     * e.g. the scheduled traffic-collector metrics job in AllMetrics, not only the HTTP handler.
+     */
+    public static volatile Consumer<List<MetricData>> metricsStoreOverride = null;
+
+    /** Persist only (cleanup + insert). The log pipeline consumer does the equivalent against the logs DB. */
+    public static void storeMetricsData(List<MetricData> metricData) {
+        Consumer<List<MetricData>> override = metricsStoreOverride;
+        if (override != null) {
+            override.accept(metricData);
+            return;
+        }
+        storeMetricsDataDirect(metricData);
+    }
+
+    /** Legacy storage: write to this process's own Mongo. */
+    public static void storeMetricsDataDirect(List<MetricData> metricData) {
         // First check if cleanup should be performed
         if (MetricDataDao.instance.shouldPerformCleanup()) {
             long deletedCount = MetricDataDao.instance.deleteOldMetrics();
             loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
         }
         MetricDataDao.instance.insertMany(metricData);
+    }
 
+    /**
+     * Forward only (New Relic / OpenTelemetry / Akto infra). Reads the integration settings from the MAIN db,
+     * so it must keep running in the API request path even when storage goes through the log pipeline.
+     */
+    public static void forwardMetricsData(List<MetricData> metricData) {
         int accountId = Context.accountId.get();
         boolean forwardToNewRelic = NewRelicIntegrationDao.instance.findOne(new BasicDBObject()) != null;
         boolean forwardToOpenTelemetry = OpenTelemetryIntegrationDao.instance.findOne(new BasicDBObject()) != null;

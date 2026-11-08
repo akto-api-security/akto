@@ -1,0 +1,9 @@
+.git
+**/target
+**/node_modules
+**/.idea
+**/*.iml
+log-pipeline-dev/.build
+log-pipeline-dev/.keys
+log-pipeline-prod/.env
+start-cyborg.sh

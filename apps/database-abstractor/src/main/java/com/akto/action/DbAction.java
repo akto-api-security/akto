@@ -77,6 +77,7 @@ import com.akto.dto.ApiSequences;
 import com.akto.dto.SequenceCount;
 import com.akto.dto.DeviceDomainConfig;
 import com.akto.log.LoggerMaker;
+import com.akto.logpipeline.LogPipeline;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
@@ -1703,6 +1704,10 @@ public class DbAction extends ActionSupport {
         if (disableLogWrites) {
             return Action.SUCCESS.toUpperCase();
         }
+        if (LogPipeline.isEnabledForCurrentAccount()) {
+            LogPipeline.publishTrafficMetrics(Context.accountId.get(), writesForTrafficMetrics);
+            return Action.SUCCESS.toUpperCase();
+        }
         if (kafkaUtils.isWriteEnabled()) {
             // int accId = Context.accountId.get();
             // kafkaUtils.insertDataTraffic(writesForTrafficMetrics, "bulkWriteTrafficMetrics", accId);
@@ -2269,6 +2274,12 @@ public class DbAction extends ActionSupport {
             }
 
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                // Log pipeline on: hand off to Kafka (non-blocking, drops on failure). The consumer writes to the logs DB.
+                LogPipeline.publishLog(LogPipeline.RUNTIME_LOG, accId, dbLog, shouldPersistRuntimeLog(dbLog));
+                return Action.SUCCESS.toUpperCase();
+            }
+
             DbLayer.insertRuntimeLog(dbLog);
 
             if(shouldPersistRuntimeLog(dbLog)){
@@ -2309,7 +2320,9 @@ public class DbAction extends ActionSupport {
             // Producer mode: hand off to Kafka and return immediately so the API request
             // isn't blocked on a Mongo insert. The consumer service writes it to Mongo async.
             // Non-Kafka mode: fall back to a direct (w:1) Mongo write.
-            if (kafkaUtils.isWriteEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishEndpointShieldLog(Context.accountId.get(), dbLog);
+            } else if (kafkaUtils.isWriteEnabled()) {
                 kafkaUtils.insertEndpointShieldLog(dbLog, Context.accountId.get());
             } else {
                 DbLayer.insertEndpointShieldLog(dbLog);
@@ -2385,7 +2398,12 @@ public class DbAction extends ActionSupport {
             // return; the consumer already batches these into one insertMany per
             // poll (KafkaUtils.flushEndpointShieldLogs). Otherwise write them in a
             // single round trip with the existing bulk DbLayer method.
-            if (kafkaUtils.isWriteEnabled()) {
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                int accountId = Context.accountId.get();
+                for (LogsEndpointShield dbLog : dbLogs) {
+                    LogPipeline.publishEndpointShieldLog(accountId, dbLog);
+                }
+            } else if (kafkaUtils.isWriteEnabled()) {
                 int accountId = Context.accountId.get();
                 for (LogsEndpointShield dbLog : dbLogs) {
                     kafkaUtils.insertEndpointShieldLog(dbLog, accountId);
@@ -2433,6 +2451,10 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.ANALYSER_LOG, accId, dbLog, false);
+                return Action.SUCCESS.toUpperCase();
+            }
             DbLayer.insertAnalyserLog(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertAnalyserLog " + e.toString());
@@ -3440,6 +3462,8 @@ public class DbAction extends ActionSupport {
     public String ingestMetricsData() {
         try {
             // Then ingest the new metrics
+            // storage: legacy Mongo write, or Kafka -> logs DB when the log pipeline is on (DbLayer.metricsStoreOverride);
+            // forwarding (New Relic / OTel) always runs here because it reads the integration settings from the main DB
             DbLayer.ingestMetricsData(metricData);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in ingestMetricsData: " + e.getMessage());
@@ -3474,6 +3498,10 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
 
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.TESTING_LOG, accId, dbLog, false);
+                return Action.SUCCESS.toUpperCase();
+            }
             DbLayer.insertTestingLog(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingLog " + e.toString());
@@ -3485,6 +3513,10 @@ public class DbAction extends ActionSupport {
     public String insertAgenticTestingLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.AGENTIC_TESTING_LOG, Context.accountId.get(), dbLog, false);
+                return Action.SUCCESS.toUpperCase();
+            }
             DbLayer.insertAgenticTestingLog(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertAgenticTestingLog " + e.toString());
@@ -3500,6 +3532,10 @@ public class DbAction extends ActionSupport {
                 return Action.SUCCESS.toUpperCase();
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.PROTECTION_LOG, Context.accountId.get(), dbLog, false);
+                return Action.SUCCESS.toUpperCase();
+            }
             DbLayer.insertProtectionLog(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertProtectionLog " + e.toString());
@@ -4285,6 +4321,10 @@ public class DbAction extends ActionSupport {
     public String insertDataIngestionLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.DATA_INGESTION_LOG, Context.accountId.get(), dbLog, false);
+                return Action.SUCCESS.toUpperCase();
+            }
             DbLayer.insertDataIngestionLog(dbLog);
         } catch (Exception e) {
             e.printStackTrace();
@@ -4393,6 +4433,10 @@ public class DbAction extends ActionSupport {
     public String insertPuppeteerLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.PUPPETEER_LOG, Context.accountId.get(), dbLog, false);
+                return Action.SUCCESS.toUpperCase();
+            }
             PupeteerLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertPuppeteerLog " + e.toString());
@@ -4404,6 +4448,10 @@ public class DbAction extends ActionSupport {
     public String insertSmartTestingLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.SMART_TESTING_LOG, Context.accountId.get(), dbLog, false);
+                return Action.SUCCESS.toUpperCase();
+            }
             SmartTestingLogsDao.instance.insertOne(dbLog);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertSmartTestingLog " + e.toString());
@@ -4420,6 +4468,12 @@ public class DbAction extends ActionSupport {
     public String insertDastLog() {
         try {
             int accountId = Context.accountId.get();
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                // consumer creates the capped collection in the logs DB; nothing to ensure on the main DB
+                LogPipeline.publishLog(LogPipeline.DAST_LOG, accountId,
+                        new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp")), false);
+                return Action.SUCCESS.toUpperCase();
+            }
             // Self-healing: guarantees dast_logs is created CAPPED (bounded size/doc count) before
             // the first write for this account, whether the account is brand new (also covered by
             // DaoInit.createIndices()) or predates this endpoint — an uncapped collection here would
@@ -4447,6 +4501,11 @@ public class DbAction extends ActionSupport {
     public String insertMiniTestingOrchestratorLog() {
         try {
             int accountId = Context.accountId.get();
+            if (LogPipeline.isEnabledForCurrentAccount()) {
+                LogPipeline.publishLog(LogPipeline.MINI_TESTING_ORCHESTRATOR_LOG, accountId,
+                        new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp")), false);
+                return Action.SUCCESS.toUpperCase();
+            }
             if (miniTestingOrchestratorLogsReady.add(accountId)) {
                 try {
                     MiniTestingOrchestratorLogsDao.instance.createIndicesIfAbsent();

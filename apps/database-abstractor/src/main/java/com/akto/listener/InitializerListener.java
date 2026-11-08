@@ -15,6 +15,8 @@ import com.akto.dao.BrowserExtensionConfigCommonDao;
 import com.akto.dao.TestingRunWebhookDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.data_actor.DbLayer;
+import com.akto.logpipeline.LogPipeline;
 import com.akto.merging.Cron;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.CyborgMetricsConfig;
@@ -40,6 +42,17 @@ public class InitializerListener implements ServletContextListener {
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
         DictionaryFilter.readDictionaryBinary();
+
+        if (LogPipeline.isEnabled()) {
+            // log pipeline on for some accounts: their metrics_data goes via Kafka -> logs DB, the rest is stored as before
+            DbLayer.metricsStoreOverride = m -> {
+                if (LogPipeline.isEnabledForCurrentAccount()) {
+                    LogPipeline.publishMetricsData(Context.accountId.get(), m);
+                } else {
+                    DbLayer.storeMetricsDataDirect(m);
+                }
+            };
+        }
 
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         String triggerMergingCron = System.getenv("TRIGGER_MERGING_CRON");
