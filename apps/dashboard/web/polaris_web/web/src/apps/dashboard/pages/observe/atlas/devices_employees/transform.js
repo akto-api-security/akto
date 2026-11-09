@@ -66,7 +66,7 @@ function statSubtexts(deviceStats, discovery) {
     return {
         managedDevices: managedParts.length ? { text: managedParts.join(" · ") } : null,
         agentActive: agentActiveParts.length ? { text: agentActiveParts.join(" · "), color: offlineDevices > 0 ? "critical" : undefined } : null,
-        devicesWithAiTools: discovery && managedDevices > 0 ? { text: `${Math.round((100 * discovery.devicesCount) / managedDevices)}% of fleet` } : null,
+        devicesWithAiTools: discovery && managedDevices > 0 ? { text: `${Math.min(100, Math.round((100 * discovery.devicesCount) / managedDevices))}% of fleet` } : null,
         employeesUsingAi: totalEmployees != null ? { text: `of ${formatCount(totalEmployees)}` } : null,
         devicesWithUnapprovedTools: unapprovedParts.length ? { text: unapprovedParts.join(" · "), color: "critical" } : null,
         monitorOnlyDevices: monitorOnlyDevices != null ? { text: "Not blocking violations", color: "critical" } : null,
@@ -330,6 +330,19 @@ const transform = {
     employeeAiToolCount: (employee) => (employee.deviceDetails || []).reduce(
         (total, device) => total + device.toolCount - (device.toolsByCategory?.mcp || 0), 0),
     pluginCount: (tools) => tools.filter((tool) => tool.plugin).length,
+    assetDeviceOptions: (detail) => {
+        const seen = new Set();
+        const options = [];
+        (detail.deviceDetails || []).forEach((device) => {
+            if (!(device.toolCount > 0 || device.skillCount > 0)) return;
+            const firstHost = (device.tools || []).map((tool) => tool.hostName).find(Boolean);
+            const value = firstHost ? firstHost.split(".")[0] : (device.extension ? "" : device.name);
+            if (!value || seen.has(value)) return;
+            seen.add(value);
+            options.push({ label: device.label || device.name || value, value });
+        });
+        return options;
+    },
     flyoutHosts: (detail, isDevice) => {
         const devices = isDevice ? [detail] : detail.deviceDetails || [];
         const hostNames = [...new Set(devices.flatMap((device) => (device.tools || []).map((tool) => tool.hostName)).filter(Boolean))];
@@ -342,6 +355,7 @@ const transform = {
         atlasQuery: searchString,
         teams: filters.teams,
         tagPairs: filters.tags,
+        violationSeverities: filters.violationSeverities,
         atlasOs: filters.osList,
         atlasBrowsers: filters.browserList,
         toolCategories: filters.categories,

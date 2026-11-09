@@ -110,6 +110,8 @@ export const SEVERITY_SEGMENTS = [
     { key: "low", name: "Low", color: "#D1D5DB" },
 ];
 
+export const TREND_MONTH_WIDTH = 84;
+
 export const FLYOUT_GRAPH_LIMIT = 8;
 export const FLYOUT_GRAPH_STEP = 16;
 
@@ -148,6 +150,7 @@ export const FILTER_OPTION_LABELS = {
 export const EMPTY_PEOPLE_FILTERS = {
     teams: [],
     tags: [],
+    violationSeverities: [],
     osList: [],
     browserList: [],
     categories: [],

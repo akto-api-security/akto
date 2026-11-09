@@ -77,6 +77,7 @@ function toggleChip(chipKey, filters, onFiltersChange) {
 function appliedTags(filters) {
     const tags = [];
     filters.teams.forEach((team) => tags.push({ key: `team-${team}`, label: `Team: ${team}`, clear: { teams: filters.teams.filter((x) => x !== team) } }));
+    filters.violationSeverities.forEach((severity) => tags.push({ key: `severity-${severity}`, label: `Violations: ${capitalize(severity)}`, clear: { violationSeverities: filters.violationSeverities.filter((x) => x !== severity) } }));
     filters.tags.forEach((tag) => tags.push({ key: `tag-${tag}`, label: `Tag: ${tag}`, clear: { tags: filters.tags.filter((x) => x !== tag) } }));
     filters.osList.forEach((os) => tags.push({ key: `os-${os}`, label: osLabel(os) || os, clear: { osList: filters.osList.filter((x) => x !== os) } }));
     filters.browserList.forEach((browser) => tags.push({ key: `browser-${browser}`, label: capitalize(browser), clear: { browserList: filters.browserList.filter((x) => x !== browser) } }));

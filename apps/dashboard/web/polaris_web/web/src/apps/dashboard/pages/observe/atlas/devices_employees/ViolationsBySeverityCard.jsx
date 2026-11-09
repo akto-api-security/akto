@@ -6,11 +6,11 @@ import { SEVERITY_SEGMENTS } from "./peopleConstants";
 const CHART_SIZE = 180;
 const SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"];
 
-function ViolationsBySeverityCard({ counts }) {
+function ViolationsBySeverityCard({ counts, onSelect }) {
     const { data, total, titleColor } = useMemo(() => {
-        const segments = SEVERITY_SEGMENTS.map(({ key, name, color }) => ({ name, y: counts?.[key] || 0, color }));
+        const segments = SEVERITY_SEGMENTS.map(({ key, name, color }) => ({ name, key, y: counts?.[key] || 0, color }));
         const chartData = {};
-        segments.forEach(({ name, y, color }) => { chartData[name] = { text: y, color }; });
+        segments.forEach(({ name, key, y, color }) => { chartData[name] = { text: y, color, filterValue: key }; });
         const worst = SEVERITY_ORDER.find((name) => chartData[name].text > 0);
         return {
             data: chartData,
@@ -25,7 +25,7 @@ function ViolationsBySeverityCard({ counts }) {
                 <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
                 <HorizontalStack align="center">
                     <Box width={`${CHART_SIZE}px`}>
-                        <DonutChart data={data} title={total} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} />
+                        <DonutChart data={data} title={total} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} onSegmentClick={onSelect} />
                     </Box>
                 </HorizontalStack>
                 <HorizontalStack gap="3" wrap align="center">

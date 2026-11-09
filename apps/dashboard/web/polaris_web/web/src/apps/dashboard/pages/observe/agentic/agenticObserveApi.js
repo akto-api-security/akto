@@ -16,6 +16,15 @@ function extractRuleViolated(metadata) {
     }
 }
 
+function extractBehaviour(metadata) {
+    if (!metadata) return "";
+    try {
+        return JSON.parse(metadata).behaviour || "";
+    } catch {
+        return "";
+    }
+}
+
 function normalizeEvent(e) {
     return {
         host:         e.host || "",
@@ -32,6 +41,8 @@ function normalizeEvent(e) {
         sessionId:    e.sessionId || "",
         ruleViolated: extractRuleViolated(e.metadata),
         method:       e.method || "",
+        subCategory:  e.subCategory || "",
+        behaviour:    extractBehaviour(e.metadata),
     };
 }
 

@@ -1,4 +1,5 @@
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
+import { isEndpointSecurityCategory } from "@/apps/main/labelHelper";
 import { 
     ASSET_TAG_KEYS,
     ROW_TYPES,
@@ -43,6 +44,11 @@ export const AGENTIC_ASSETS_PATH = '/dashboard/observe/agentic-assets';
 export const AGENTIC_ASSETS_LEGACY_PATH = '/dashboard/observe/agentic-assets-legacy';
 export const USERS_AND_DEVICES_PATH = '/dashboard/observe/users-and-devices';
 export const DEVICE_ENDPOINTS_PATH = '/dashboard/observe/endpoints';
+export const ATLAS_DEVICES_EMPLOYEES_PATH = '/dashboard/observe/devices-employees';
+export function deviceDeepLink(deviceId) {
+    const base = isEndpointSecurityCategory() ? ATLAS_DEVICES_EMPLOYEES_PATH : DEVICE_ENDPOINTS_PATH;
+    return deviceId ? `${base}?device=${encodeURIComponent(deviceId)}` : base;
+}
 export const AGENTIC_OBSERVE_BACK_PATHS = [
     AGENTIC_ASSETS_PATH,
     AGENTIC_ASSETS_LEGACY_PATH,

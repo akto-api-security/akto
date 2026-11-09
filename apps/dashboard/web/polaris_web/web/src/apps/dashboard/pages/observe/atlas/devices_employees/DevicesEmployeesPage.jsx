@@ -1,19 +1,18 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button, Card, HorizontalGrid } from "@shopify/polaris";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Button, HorizontalGrid } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import observeApi from "../../api";
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards";
 import AskBar from "../../../../components/shared/AskBar";
-import { EndpointBrowserTrendChart } from "../../agentic/TrendCharts";
 import { fetchAgenticViolationCountsByHost } from "../../agentic/agenticObserveApi";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
 import AgentHealthCard from "./AgentHealthCard";
 import AiToolsByOsCard from "./AiToolsByOsCard";
 import PeopleTable from "./PeopleTable";
 import RiskHistogramCard from "./RiskHistogramCard";
+import ScrollableTrendCard from "./ScrollableTrendCard";
 import ViolationsBySeverityCard from "./ViolationsBySeverityCard";
 import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
@@ -31,7 +30,6 @@ function DevicesEmployeesPage() {
     const [filters, setFilters] = useState(EMPTY_PEOPLE_FILTERS);
     const [search, setSearch] = useState("");
     const [refreshKey, setRefreshKey] = useState(0);
-    const navigate = useNavigate();
     const [discovery, setDiscovery] = useState(null);
     const [openTarget, setOpenTarget] = useState(null);
     const [exporting, setExporting] = useState(false);
@@ -123,6 +121,16 @@ function DevicesEmployeesPage() {
         setOpenTarget({ kind, id });
     }, [tab, showTable]);
     const closePerson = useCallback(() => setOpenTarget(null), []);
+    const deepLinkHandled = useRef(false);
+    useEffect(() => {
+        if (deepLinkHandled.current) return;
+        deepLinkHandled.current = true;
+        const params = new URLSearchParams(window.location.search);
+        const device = params.get("device");
+        const employee = params.get("employee") || params.get("user");
+        if (device) openPerson("device", device);
+        else if (employee) openPerson("employee", employee);
+    }, [openPerson]);
 
     const exportTable = async () => {
         const requestName = tab === "employees" ? "fetchAtlasEmployees" : "fetchAtlasDevices";
@@ -145,13 +153,10 @@ function DevicesEmployeesPage() {
     };
 
     const onSelectStat = (id) => {
-        if (id === "devicesWithAiTools" || id === "employeesUsingAi") {
-            navigate("/dashboard/observe/users-and-devices");
-            return;
-        }
         const target = transform.statCardTarget(id);
         if (target) toggleView(target.tab, target.filters);
     };
+    const onSelectSeverity = (severity) => toggleView("devices", { violationSeverities: [severity] });
     const onSelectMode = (mode) => toggleView("devices", { guardrailModes: [mode] });
     const onSelectBucket = (index) => toggleView("employees", {
         riskMin: index * RISK_BUCKET_WIDTH,
@@ -203,14 +208,8 @@ function DevicesEmployeesPage() {
                     />
                 </HorizontalGrid>,
                 <HorizontalGrid key="trend-cards" columns={{ xs: "1fr", md: "2fr 1fr" }} gap="4">
-                    <Card padding="0">
-                        <EndpointBrowserTrendChart
-                            osTrend={trendStats?.osTrend || {}}
-                            browserTrend={trendStats?.browserTrend || {}}
-                            monthLabels={trendStats?.monthLabels || []}
-                        />
-                    </Card>
-                    <ViolationsBySeverityCard counts={severityCounts} />
+                    <ScrollableTrendCard trend={trendStats} />
+                    <ViolationsBySeverityCard counts={severityCounts} onSelect={onSelectSeverity} />
                 </HorizontalGrid>,
                 <PeopleTable
                     key="people-table"

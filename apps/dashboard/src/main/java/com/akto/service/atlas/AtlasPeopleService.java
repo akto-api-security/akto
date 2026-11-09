@@ -255,6 +255,7 @@ public class AtlasPeopleService {
         public List<String> guardrailModes;
         public List<String> teams;
         public List<String> tagPairs;
+        public List<String> violationSeverities;
         public boolean hasUnapproved;
         public boolean usesPersonal;
         public boolean agentIssues;
@@ -762,6 +763,7 @@ public class AtlasPeopleService {
         if ("device".equals(kind)) {
             DeviceRow device = snapshot.devicesByLowerName.get(id);
             if (device == null) device = snapshot.devicesByLowerName.get(id.toLowerCase(Locale.ROOT));
+            if (device == null) device = findDeviceByAlias(snapshot, id);
             return device == null ? null : device.toDetailMap();
         }
         for (EmployeeRow employee : snapshot.employees) {
@@ -810,12 +812,24 @@ public class AtlasPeopleService {
         return trend;
     }
 
+    private static DeviceRow findDeviceByAlias(Snapshot snapshot, String id) {
+        String idKey = identityKey(id);
+        for (DeviceRow device : snapshot.devices) {
+            if (device.name.equalsIgnoreCase(id)) return device;
+            if (device.extension && !idKey.isEmpty() && identityKey(device.name).equals(idKey)) return device;
+            for (ToolRow tool : device.tools) {
+                if (tool.hostName != null && tool.hostName.split("\\.")[0].equalsIgnoreCase(id)) return device;
+            }
+        }
+        return null;
+    }
+
     public boolean isModulePageable(PeopleQuery query) {
         String sortKey = query.sortKey == null ? "" : query.sortKey;
         boolean moduleSort = sortKey.isEmpty() || "lastHeartbeat".equals(sortKey) || "name".equals(sortKey) || "agentVersion".equals(sortKey);
         boolean noJoinFilter = (query.text == null || query.text.trim().isEmpty())
                 && !notEmpty(query.osList) && !notEmpty(query.browserList) && !notEmpty(query.categories) && !notEmpty(query.healthStates)
-                && !notEmpty(query.guardrailModes) && !notEmpty(query.teams) && !notEmpty(query.tagPairs)
+                && !notEmpty(query.guardrailModes) && !notEmpty(query.teams) && !notEmpty(query.tagPairs) && !notEmpty(query.violationSeverities)
                 && !query.hasUnapproved && !query.usesPersonal && !query.agentIssues
                 && query.riskMin <= 0 && query.riskMax >= RISK_MAX;
         return moduleSort && noJoinFilter;
@@ -856,6 +870,7 @@ public class AtlasPeopleService {
             if (deviceFiltered && devices.stream().noneMatch(device -> matchesDeviceFilters(device, query))) continue;
             if (!employeeMatchesAllTerms(employee, devices, terms)) continue;
             if (notEmpty(query.teams) && employee.teams.stream().noneMatch(query.teams::contains)) continue;
+            if (notEmpty(query.violationSeverities) && query.violationSeverities.stream().noneMatch(severity -> employee.violationsBySeverity.getOrDefault(severity, 0) > 0)) continue;
             if (query.usesAi && employee.toolCount == 0) continue;
             if (query.hasUnapproved && employee.unapprovedTools == 0) continue;
             if (query.usesPersonal && employee.personalAccounts == 0) continue;
@@ -887,6 +902,7 @@ public class AtlasPeopleService {
         }
         if (notEmpty(query.healthStates) && !query.healthStates.contains(device.health)) return false;
         if (notEmpty(query.guardrailModes) && !query.guardrailModes.contains(device.guardrailMode)) return false;
+        if (notEmpty(query.violationSeverities) && query.violationSeverities.stream().noneMatch(severity -> device.violationsBySeverity.getOrDefault(severity, 0) > 0)) return false;
         if (notEmpty(query.tagPairs) && device.tags.stream().noneMatch(tag -> query.tagPairs.contains(tagPair(tag)))) return false;
         if (notEmpty(query.categories)) {
             for (String category : query.categories) {

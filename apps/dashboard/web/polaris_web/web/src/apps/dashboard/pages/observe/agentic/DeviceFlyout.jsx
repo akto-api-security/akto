@@ -14,7 +14,7 @@ import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolati
 import { buildAgentBuiltinToolsFromStis } from "./agenticPageBuilders";
 import { TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 import api from "../api";
-import { extractEndpointId } from "./constants";
+import { extractEndpointId, deviceDeepLink } from "./constants";
 import func from "@/util/func";
 import settingsApi from "../../settings/api";
 import "../../../components/layouts/style.css";
@@ -518,7 +518,7 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
                                 // Open endpoints page with this specific device's flyout pre-opened
                                 const deviceId = device.path?.[0] || device.deviceId;
                                 handleClick = deviceId
-                                    ? () => { window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`; }
+                                    ? () => { window.location.href = deviceDeepLink(deviceId); }
                                     : undefined;
                             } else if (f.type === "malicious_skill") {
                                 const maliciousAgents = agents.filter(a => a.isMalicious);
@@ -613,7 +613,7 @@ export function AgenticsTab({ deviceId }) {
 // claudeDeviceIds always includes this device's own id (not just hosts already seen ending in
 // ".claude") so an orphan claude-config-scanner event still attributes correctly even if no real
 // Claude collection has been seen for this device yet — matches the original client-side filter.
-export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange, onViolationClick }) {
+export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange, onViolationClick, columnDefs = VIOLATIONS_COL_DEFS }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         if (!hostNames.length && !deviceId) {
             return Promise.resolve({ value: [], total: 0 });
@@ -661,7 +661,7 @@ export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTim
     return (
         <AgGridTable
             key={deviceId}
-            columnDefs={VIOLATIONS_COL_DEFS}
+            columnDefs={columnDefs}
             defaultColDef={GRID_DEFAULT_COL}
             onServerFetch={onServerFetch}
             serverSideRowModel

@@ -10,6 +10,7 @@ import { buildAgenticObserveChatMetadata, selectConfigViolationRows, summarizeVi
 import api from "../api";
 import func from "@/util/func";
 import OverviewTab from "./OverviewTab";
+import { deviceDeepLink } from "./constants";
 import ViolationsTab from "./ViolationsTab";
 import McpComponentsView from "./McpComponentsView";
 import AgentComponentsView from "./AgentComponentsView";
@@ -55,7 +56,7 @@ function DevicesTab({ asset, enrichMaps = {}, startTimestamp, endTimestamp }) {
     const handleRowClick = useCallback((e) => {
         if (!e.data) return;
         const deviceId = e.data.deviceId || e.data.endpoint;
-        window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`;
+        window.location.href = deviceDeepLink(deviceId);
     }, []);
 
     // Server-side paginated — scoped to this one asset's own apiCollectionIds (cheap), never the

@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Box, Button, Divider, HorizontalStack, Tabs, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Select, Tabs, Text, VerticalStack } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
@@ -11,11 +11,13 @@ import DetailGrid from "../../agentic/DetailGrid";
 import AssetTopologyGraph from "../../agentic/AssetTopologyGraph";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
 import AskBar from "../../../../components/shared/AskBar";
-import { openViolationInGuardrailViolations } from "../../agentic/agenticObserveApi";
+import LocalStore from "../../../../../main/LocalStorageStore";
+import { openViolationInGuardrailViolations, openViolationInThreatActivity } from "../../agentic/agenticObserveApi";
 import { RiskFactorRow } from "../../agentic/RiskFactorRow";
 import { AgenticsTab, UserAnalysisSection, ViolationsTab, computeRiskFactors } from "../../agentic/DeviceFlyout";
 import { ATLAS_CHAT_SCOPE, ATLAS_DEVICE_QUESTIONS, ATLAS_EMPLOYEE_QUESTIONS } from "./constants";
 import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel } from "./peopleConstants";
+import { ATLAS_VIOLATION_COLUMNS } from "./ViolationColumns";
 import transform from "./transform";
 
 const FLYOUT_WIDTH = 760;
@@ -65,7 +67,22 @@ function employeeDetails(employee) {
     ];
 }
 
-const openViolation = (row) => openViolationInGuardrailViolations({ refId: row.refId, filterId: row.filterId });
+const openViolation = (row) => (LocalStore.getState().guardrailViolationsNewLayout
+    ? openViolationInGuardrailViolations({ refId: row.refId, filterId: row.filterId })
+    : openViolationInThreatActivity(row));
+
+function EmployeeAssets({ options }) {
+    const [selected, setSelected] = useState(options[0]?.value);
+    if (!options.length) return <Box padding="4"><Text as="p" color="subdued">No agentic assets discovered.</Text></Box>;
+    return (
+        <>
+            <Box padding="3">
+                <Select label="Device" labelInline options={options} value={selected} onChange={setSelected} />
+            </Box>
+            <AgenticsTab deviceId={selected} />
+        </>
+    );
+}
 
 const SEVERITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
 
@@ -222,7 +239,7 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
     const questions = (isDevice ? ATLAS_DEVICE_QUESTIONS : ATLAS_EMPLOYEE_QUESTIONS).map((question) => question.replace("{name}", displayName));
     const tabs = !ready ? [] : [
         { id: "overview", content: "Overview" },
-        ...(isDevice ? [{ id: "assets", content: "Agentic Assets" }] : []),
+        { id: "assets", content: "Agentic Assets" },
         { id: "violations", content: `Violations (${violationsTotal ?? detail.violationCount ?? 0})` },
     ];
     const activeTab = tabs[selectedTab]?.id;
@@ -281,13 +298,15 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
                         </VerticalStack>
                     </Box>
                 )}
-                {ready && activeTab === "assets" && (deviceId && (detail.toolCount > 0 || detail.skillCount > 0) ? <AgenticsTab deviceId={deviceId} /> : <Box padding="4"><Text as="p" color="subdued">No agentic assets discovered.</Text></Box>)}
+                {ready && activeTab === "assets" && isDevice && (deviceId && (detail.toolCount > 0 || detail.skillCount > 0) ? <AgenticsTab deviceId={deviceId} /> : <Box padding="4"><Text as="p" color="subdued">No agentic assets discovered.</Text></Box>)}
+                {ready && activeTab === "assets" && !isDevice && <EmployeeAssets key={target.id} options={transform.assetDeviceOptions(detail)} />}
                 {ready && activeTab === "violations" && (
                     <ViolationsTab
                         hostNames={hostNames}
                         deviceId={deviceId}
                         onTotalChange={setViolationsTotal}
                         onViolationClick={openViolation}
+                        columnDefs={ATLAS_VIOLATION_COLUMNS}
                     />
                 )}
             </Box>
