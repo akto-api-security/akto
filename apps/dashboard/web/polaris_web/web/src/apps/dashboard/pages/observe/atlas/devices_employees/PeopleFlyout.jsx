@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Box, Button, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Badge, Box, Button, Divider, HorizontalStack, Tabs, Text, VerticalStack } from "@shopify/polaris";
 import { useNavigate } from "react-router-dom";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
@@ -12,16 +12,15 @@ import AssetTopologyGraph from "../../agentic/AssetTopologyGraph";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
 import AskBar from "../../../../components/shared/AskBar";
 import { openViolationInGuardrailViolations } from "../../agentic/agenticObserveApi";
-import {
-    ATLAS_CHAT_SCOPE, ATLAS_DEVICE_QUESTIONS, ATLAS_EMPLOYEE_QUESTIONS,
-} from "./constants";
-import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS } from "./peopleConstants";
+import { RiskFactorRow } from "../../agentic/RiskFactorRow";
+import { AgenticsTab, UserAnalysisSection, ViolationsTab, computeRiskFactors } from "../../agentic/DeviceFlyout";
+import { ATLAS_CHAT_SCOPE, ATLAS_DEVICE_QUESTIONS, ATLAS_EMPLOYEE_QUESTIONS } from "./constants";
+import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel } from "./peopleConstants";
 import transform from "./transform";
 
 const FLYOUT_WIDTH = 760;
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`;
-const viewViolations = (username) => () => openViolationInGuardrailViolations({ actor: username });
 const lastSeen = (epoch) => (epoch ? func.prettifyEpoch(epoch) : "Never");
 
 function deviceStats(device) {
@@ -50,7 +49,7 @@ function deviceDetails(device) {
         { label: "Owner", value: device.owner },
         { label: "Atlas agent", value: [device.agentVersion, HEALTH_LABELS[device.health]].filter(Boolean).join(" · ") },
         { label: "Guardrail mode", value: MODE_LABELS[device.guardrailMode] || device.guardrailMode, isWarning: device.guardrailMode === "monitor" },
-        { label: "Operating system", value: OS_LABELS[device.os] || device.os },
+        { label: "Operating system", value: osLabel(device.os) || "—" },
         { label: "Personal AI accounts", value: device.personalAccounts ? `${device.personalAccounts} detected` : "None", isWarning: device.personalAccounts > 0 },
         { label: "Last check-in", value: lastSeen(device.lastHeartbeat) },
     ];
@@ -64,6 +63,38 @@ function employeeDetails(employee) {
         { label: "Unapproved tools", value: employee.unapprovedTools ? String(employee.unapprovedTools) : "None", isWarning: employee.unapprovedTools > 0 },
         { label: "Last active", value: lastSeen(employee.lastActive) },
     ];
+}
+
+const openViolation = (row) => openViolationInGuardrailViolations({ refId: row.refId, filterId: row.filterId });
+
+const SEVERITY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
+
+function riskFactorsOf(detail, isDevice) {
+    const subject = isDevice
+        ? detail
+        : { violations: detail.violations, hasPersonalAccount: detail.personalAccounts > 0 };
+    const factors = computeRiskFactors(subject, []);
+    if (isDevice && detail.hasMisconfiguredConfig) {
+        factors.push({ severity: "high", title: "Misconfigured config", description: "Contains misconfigured config", type: "misconfigured_config" });
+    }
+    return factors.sort((a, b) => (SEVERITY_RANK[a.severity] ?? 99) - (SEVERITY_RANK[b.severity] ?? 99));
+}
+
+function RiskAnalysis({ factors, onOpenViolations }) {
+    if (!factors.length) return null;
+    return (
+        <VerticalStack gap="2">
+            <Text as="h3" variant="headingSm">Risk analysis</Text>
+            <VerticalStack gap="0">
+                {factors.map((factor, index) => (
+                    <Fragment key={factor.type + factor.severity + index}>
+                        {index > 0 && <Divider />}
+                        <RiskFactorRow factor={factor} onClick={factor.type === "violation" ? onOpenViolations : undefined} />
+                    </Fragment>
+                ))}
+            </VerticalStack>
+        </VerticalStack>
+    );
 }
 
 function ActionButton({ action }) {
@@ -87,21 +118,7 @@ function DeviceActions({ device, onOpen, onUpdated }) {
     const actions = [
         ...(outdated ? [{ label: "Update Atlas agent", primary: true, onClick: updateAgent }] : []),
         ...(device.unapprovedTools > 0 ? [{ label: "Review unapproved tools", primary: !outdated, onClick: () => navigate("/dashboard/observe/audit") }] : []),
-        ...(device.owner ? [
-            { label: "Open owner", onClick: () => onOpen("employee", device.owner) },
-            { label: "View violations", plain: true, onClick: viewViolations(device.owner) },
-        ] : []),
-    ];
-    return (
-        <HorizontalStack gap="2" blockAlign="center">
-            {actions.map((action) => <ActionButton key={action.label} action={action} />)}
-        </HorizontalStack>
-    );
-}
-
-function EmployeeActions({ employee }) {
-    const actions = [
-        { label: "View violations", primary: true, onClick: viewViolations(employee.username) },
+        ...(device.owner ? [{ label: "Open owner", onClick: () => onOpen("employee", device.owner) }] : []),
     ];
     return (
         <HorizontalStack gap="2" blockAlign="center">
@@ -163,6 +180,8 @@ function Footprint({ kind, detail }) {
 function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
     const [detail, setDetail] = useState(null);
     const [status, setStatus] = useState("loading");
+    const [selectedTab, setSelectedTab] = useState(0);
+    const [violationsTotal, setViolationsTotal] = useState(null);
     const isDevice = target?.kind === "device";
 
     useEffect(() => {
@@ -170,6 +189,8 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
         let ignore = false;
         setStatus("loading");
         setDetail(null);
+        setSelectedTab(0);
+        setViolationsTotal(null);
         settingRequests.fetchAtlasPersonDetail({ deviceScope, atlasKind: target.kind, atlasId: target.id })
             .then((response) => {
                 if (ignore) return;
@@ -189,21 +210,30 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
         return () => window.removeEventListener("keydown", closeOnEscape);
     }, [target, onClose]);
 
+    const ready = status === "ready" && detail;
+    const { hostNames, deviceId } = useMemo(() => (ready ? transform.flyoutHosts(detail, isDevice) : { hostNames: [], deviceId: undefined }), [ready, detail, isDevice]);
+
     if (!target) return null;
 
-    const ready = status === "ready" && detail;
     const subtitle = !ready ? undefined : isDevice
-        ? `${OS_LABELS[detail.os] || detail.os} · ${detail.owner || "No owner"}`
+        ? [osLabel(detail.os), detail.owner || "No owner"].filter(Boolean).join(" · ")
         : `${(detail.teams || []).join(", ") || "No team"} · ${plural(detail.deviceCount, "device")}`;
     const displayName = ready ? (detail.label || detail.name || detail.username || target.id) : target.id;
     const questions = (isDevice ? ATLAS_DEVICE_QUESTIONS : ATLAS_EMPLOYEE_QUESTIONS).map((question) => question.replace("{name}", displayName));
+    const tabs = !ready ? [] : [
+        { id: "overview", content: "Overview" },
+        ...(isDevice ? [{ id: "assets", content: "Agentic Assets" }] : []),
+        { id: "violations", content: `Violations (${violationsTotal ?? detail.violationCount ?? 0})` },
+    ];
+    const activeTab = tabs[selectedTab]?.id;
+    const riskFactors = ready ? riskFactorsOf(detail, isDevice) : [];
 
     return (
-        <>
-            <AgenticFlyoutShell
-                show
-                width={FLYOUT_WIDTH}
-                header={
+        <AgenticFlyoutShell
+            show
+            width={FLYOUT_WIDTH}
+            header={
+                <>
                     <FlyoutBreadcrumb
                         items={[{ label: displayName, badge: ready && !isDevice && detail.riskScore ? detail.riskScore : undefined }]}
                         onClose={onClose}
@@ -211,33 +241,57 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
                     >
                         {ready && isDevice && <Badge size="small" status={HEALTH_BADGE_STATUS[detail.health]}>{HEALTH_LABELS[detail.health]}</Badge>}
                     </FlyoutBreadcrumb>
-                }
-            >
-                <Box style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
+                    {ready && (
+                        <>
+                            <Box paddingInlineStart="1" paddingInlineEnd="1">
+                                <Tabs tabs={tabs} selected={selectedTab} onSelect={setSelectedTab} />
+                            </Box>
+                            <Divider />
+                        </>
+                    )}
+                </>
+            }
+        >
+            <Box style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+                {!ready && (
                     <Box padding="4">
                         {status === "loading" && <SpinnerCentered />}
                         {status === "error" && <Text as="p" color="subdued">Details for {target.id} could not be loaded.</Text>}
-                        {ready && (
-                            <VerticalStack gap="5">
-                                {isDevice
-                                    ? <DeviceActions device={detail} onOpen={onOpen} onUpdated={onUpdated} />
-                                    : <EmployeeActions employee={detail} />}
-                                <AskBar
-                                    key={`${target.kind}:${target.id}`}
-                                    label="Ask Atlas"
-                                    placeholder={`Ask Atlas about ${target.id}`}
-                                    suggestions={questions}
-                                    chatScope={ATLAS_CHAT_SCOPE}
-                                />
-                                <SummaryCardInfo summaryItems={isDevice ? deviceStats(detail) : employeeStats(detail)} />
-                                <Footprint key={`${target.kind}:${target.id}`} kind={target.kind} detail={detail} />
-                                <DetailGrid items={isDevice ? deviceDetails(detail) : employeeDetails(detail)} labelWidth="160px" />
-                            </VerticalStack>
-                        )}
                     </Box>
-                </Box>
-            </AgenticFlyoutShell>
-        </>
+                )}
+                {ready && activeTab === "overview" && (
+                    <Box padding="4">
+                        <VerticalStack gap="5">
+                            {isDevice && <DeviceActions device={detail} onOpen={onOpen} onUpdated={onUpdated} />}
+                            <AskBar
+                                key={`${target.kind}:${target.id}`}
+                                label="Ask Atlas"
+                                placeholder={`Ask Atlas about ${target.id}`}
+                                suggestions={questions}
+                                chatScope={ATLAS_CHAT_SCOPE}
+                            />
+                            <SummaryCardInfo summaryItems={isDevice ? deviceStats(detail) : employeeStats(detail)} />
+                            <Footprint key={`${target.kind}:${target.id}`} kind={target.kind} detail={detail} />
+                            <RiskAnalysis factors={riskFactors} onOpenViolations={() => setSelectedTab(tabs.findIndex((tab) => tab.id === "violations"))} />
+                            <DetailGrid items={isDevice ? deviceDetails(detail) : employeeDetails(detail)} labelWidth="160px" />
+                            <UserAnalysisSection
+                                key={`${target.kind}:${target.id}`}
+                                username={isDevice ? detail.owner : detail.username}
+                            />
+                        </VerticalStack>
+                    </Box>
+                )}
+                {ready && activeTab === "assets" && (deviceId && (detail.toolCount > 0 || detail.skillCount > 0) ? <AgenticsTab deviceId={deviceId} /> : <Box padding="4"><Text as="p" color="subdued">No agentic assets discovered.</Text></Box>)}
+                {ready && activeTab === "violations" && (
+                    <ViolationsTab
+                        hostNames={hostNames}
+                        deviceId={deviceId}
+                        onTotalChange={setViolationsTotal}
+                        onViolationClick={openViolation}
+                    />
+                )}
+            </Box>
+        </AgenticFlyoutShell>
     );
 }
 

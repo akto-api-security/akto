@@ -27,8 +27,9 @@ export const OS_LABELS = {
     macos: "macOS",
     windows: "Windows",
     linux: "Linux",
-    unknown: "Unknown OS",
 };
+
+export const osLabel = (os) => OS_LABELS[os] || "";
 
 export const CATEGORY_LABELS = {
     agents: "Agents & CLIs",
@@ -99,8 +100,15 @@ export const DEVICE_CHIPS = [
 
 export const SEARCH_HINTS = {
     employees: "Search employees, devices, teams or tools. Narrow with user:, device:, team:, tool:",
-    devices: "Search devices, owners, OS or tools. Narrow with owner:, os:, health:, mode:, version:, tool:",
+    devices: "Search devices, owners, OS or tools. Narrow with owner:, os:, health:, mode:, version:, tool:, tag:",
 };
+
+export const SEVERITY_SEGMENTS = [
+    { key: "critical", name: "Critical", color: "#DC2626" },
+    { key: "high", name: "High", color: "#F97316" },
+    { key: "medium", name: "Medium", color: "#EAB308" },
+    { key: "low", name: "Low", color: "#D1D5DB" },
+];
 
 export const FLYOUT_GRAPH_LIMIT = 8;
 export const FLYOUT_GRAPH_STEP = 16;
@@ -123,11 +131,12 @@ export const FILTER_LABELS = {
     healthStates: "Agent",
     guardrailModes: "Guardrail mode",
     categories: "Tool type",
+    tags: "Tag",
 };
 
 export const LIST_FILTERS = {
     employees: ["teams", "osBrowser", "categories"],
-    devices: ["osBrowser", "healthStates", "guardrailModes", "categories"],
+    devices: ["osBrowser", "healthStates", "guardrailModes", "categories", "tags"],
 };
 
 export const FILTER_OPTION_LABELS = {
@@ -138,6 +147,7 @@ export const FILTER_OPTION_LABELS = {
 
 export const EMPTY_PEOPLE_FILTERS = {
     teams: [],
+    tags: [],
     osList: [],
     browserList: [],
     categories: [],

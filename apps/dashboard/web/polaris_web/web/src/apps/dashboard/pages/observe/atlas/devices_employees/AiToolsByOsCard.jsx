@@ -3,7 +3,7 @@ import Pressable from "../../../dashboard/ask/components/Pressable";
 import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { LegendDot } from "../../agentic/AgenticStatsCard";
 import SegmentBar from "../../../../components/shared/SegmentBar";
-import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, CATEGORY_ORDER, OS_LABELS, tokenVar } from "./peopleConstants";
+import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, CATEGORY_ORDER, osLabel, tokenVar } from "./peopleConstants";
 import transform from "./transform";
 
 const OS_CATEGORIES = ["agents", "mcp"];
@@ -67,7 +67,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectB
             {toolsAvailable && osRows.map((row) => (
                 <BarRow
                     key={row.os}
-                    label={OS_LABELS[row.os] || row.os}
+                    label={osLabel(row.os)}
                     meta={`${formatCount(row.devicesWithTools)} with AI tools`}
                     segments={OS_CATEGORIES.map((category) => ({
                         key: category,
@@ -75,7 +75,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectB
                         count: row.toolsByCategory[category] || 0,
                         color: tokenVar(CATEGORY_BACKGROUNDS[category]),
                         lightText: DARK_CATEGORIES.includes(category),
-                        tooltip: `${CATEGORY_LABELS[category]} on ${OS_LABELS[row.os] || row.os}: ${devicesLabel(row.toolsByCategory[category] || 0)}`,
+                        tooltip: `${CATEGORY_LABELS[category]} on ${osLabel(row.os)}: ${devicesLabel(row.toolsByCategory[category] || 0)}`,
                     }))}
                     onSegmentClick={(category) => onSelect(row.os, category)}
                 />

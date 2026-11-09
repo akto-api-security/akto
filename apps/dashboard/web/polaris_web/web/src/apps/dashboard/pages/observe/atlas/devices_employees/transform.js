@@ -2,7 +2,7 @@ import { Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    CATEGORY_LABELS, CATEGORY_ORDER, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, OS_LABELS, STAT_CARDS, STAT_EMPTY_VALUE,
+    CATEGORY_LABELS, CATEGORY_ORDER, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
 } from "./peopleConstants";
 
 const ALL_CATEGORIES = ["agents", "mcp", "browser"];
@@ -34,8 +34,9 @@ const CSV_COLUMNS = {
     ],
     devices: [
         ["Device", (row) => row.label || row.name],
-        ["OS/Browser", (row) => (row.extension ? row.browser : OS_LABELS[row.os] || row.os)],
+        ["OS/Browser", (row) => (row.extension ? row.browser : osLabel(row.os))],
         ["Owner", (row) => row.owner],
+        ["Tags", (row) => (row.tags || []).map((tag) => `${tag.key}=${tag.value}`)],
         ["Atlas agent", (row) => HEALTH_LABELS[row.health] || row.health],
         ["Agent version", (row) => row.agentVersion],
         ["Guardrail mode", (row) => MODE_LABELS[row.guardrailMode] || row.guardrailMode],
@@ -146,7 +147,7 @@ function footprintModel(root, devices, heads, view) {
     visibleDevices.shown.forEach((device, deviceIndex) => {
         const deviceId = withDevices ? `device-${deviceIndex}` : "root";
         if (withDevices) {
-            deviceNodes.push({ id: deviceId, category: "external", label: device.name, sub: `${OS_LABELS[device.os] || device.os} · ${HEALTH_LABELS[device.health] || device.health}`, status: device.health === "healthy" ? "neutral" : "review" });
+            deviceNodes.push({ id: deviceId, category: "external", label: device.name, sub: [osLabel(device.os), HEALTH_LABELS[device.health] || device.health].filter(Boolean).join(" · "), status: device.health === "healthy" ? "neutral" : "review" });
             link("root", deviceId, "ok");
         }
         const tools = device.tools || [];
@@ -292,7 +293,8 @@ const transform = {
     statCardTarget: (id) => STAT_CARD_TARGETS[id],
     filterOptions: (overview) => ({
         teams: overview?.teamOptions || [],
-        osBrowser: [...(overview?.osMatrix || []).map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`)],
+        tags: overview?.tagOptions || [],
+        osBrowser: [...(overview?.osMatrix || []).filter((row) => row.os !== "unknown").map((row) => `os:${row.os}`), ...(overview?.browserMatrix || []).map((row) => `browser:${row.browser}`)],
         healthStates: HEALTH_ORDER.filter((state) => (overview?.agentHealth?.[state] || 0) > 0),
         guardrailModes: Object.keys(MODE_LABELS).filter((mode) => (overview?.guardrailModes?.[mode] || 0) > 0),
         categories: CATEGORY_ORDER.filter((category) => (overview?.categoryTotals?.[category] || 0) > 0),
@@ -323,15 +325,23 @@ const transform = {
         return { ...view, skills };
     },
     footprintGraph: (kind, detail, view) => (kind === "device"
-        ? footprintModel({ label: detail.name, sub: OS_LABELS[detail.os] || detail.os }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"], view)
+        ? footprintModel({ label: detail.name, sub: osLabel(detail.os) }, [detail], ["Device", "AI tools", "MCP servers, plugins and skills"], view)
         : footprintModel({ label: detail.username, sub: (detail.teams || []).join(", ") || "Employee", devicesColumn: true }, detail.deviceDetails || [], ["Employee", "Devices", "AI tools", "MCP servers, plugins and skills"], view)),
     employeeAiToolCount: (employee) => (employee.deviceDetails || []).reduce(
         (total, device) => total + device.toolCount - (device.toolsByCategory?.mcp || 0), 0),
     pluginCount: (tools) => tools.filter((tool) => tool.plugin).length,
+    flyoutHosts: (detail, isDevice) => {
+        const devices = isDevice ? [detail] : detail.deviceDetails || [];
+        const hostNames = [...new Set(devices.flatMap((device) => (device.tools || []).map((tool) => tool.hostName)).filter(Boolean))];
+        const prefix = hostNames.length ? hostNames[0].split(".")[0] : "";
+        const deviceId = isDevice ? (prefix || (detail.extension ? undefined : detail.name)) : undefined;
+        return { hostNames, deviceId };
+    },
     peopleParams: (deviceScope, filters, searchString) => ({
         deviceScope,
         atlasQuery: searchString,
         teams: filters.teams,
+        tagPairs: filters.tags,
         atlasOs: filters.osList,
         atlasBrowsers: filters.browserList,
         toolCategories: filters.categories,

@@ -7,18 +7,19 @@ import Pressable from "../../../dashboard/ask/components/Pressable";
 import settingRequests from "../../../settings/api";
 import {
     AgentCellRenderer, CountCellRenderer, DeviceCellRenderer, EmployeeCellRenderer, GuardrailModeCellRenderer,
-    LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
+    LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, FlagsCellRenderer, TagsCellRenderer, TeamsCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, OS_LABELS, PEOPLE_TABLE_HEIGHT, RISK_MAX, SEARCH_HINTS,
+    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_HEIGHT, RISK_MAX, SEARCH_HINTS,
 } from "./peopleConstants";
 import transform from "./transform";
 
-const DEFAULT_COL_DEF = { sortable: true, resizable: false, filter: false, suppressHeaderMenuButton: true, cellStyle: { display: "flex", alignItems: "center" } };
+const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false, cellStyle: { display: "flex", alignItems: "center" } };
 const ROW_HEIGHT = 48;
 
-const EMPLOYEE_COLUMNS = [
+const employeeColumns = (dataOptions) => [
     { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer },
+    { field: "teams", headerName: "Team", flex: 1, minWidth: 140, sortable: false, cellRenderer: TeamsCellRenderer, ...setFilter(dataOptions.teams, (value) => value), filterValueGetter: (params) => params.data?.teams || [] },
     { field: "deviceCount", headerName: "Devices", width: 100, cellRenderer: CountCellRenderer },
     { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
     { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
@@ -28,18 +29,28 @@ const EMPLOYEE_COLUMNS = [
     { field: "lastActive", headerName: "Last active", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
 
-const DEVICE_COLUMNS = [
+const deviceColumns = (dataOptions) => [
     { field: "name", headerName: "Device", flex: 2, minWidth: 220, cellRenderer: DeviceCellRenderer },
-    { field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer },
+    {
+        field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer,
+        ...setFilter(dataOptions.osBrowser, osBrowserLabel),
+        filterValueGetter: (params) => (params.data ? (params.data.extension ? `browser:${params.data.browser || "other"}` : `os:${params.data.os}`) : null),
+    },
     { field: "owner", headerName: "Owner", flex: 1, minWidth: 140, cellRenderer: OwnerCellRenderer },
-    { field: "health", headerName: "Atlas agent", flex: 1.5, minWidth: 220, cellRenderer: AgentCellRenderer },
-    { field: "guardrailMode", headerName: "Guardrail mode", width: 150, cellRenderer: GuardrailModeCellRenderer },
+    { field: "hasPersonalAccount", headerName: "Flags", flex: 1.4, minWidth: 260, sortable: false, cellRenderer: FlagsCellRenderer },
+    { field: "tags", headerName: "Tags", flex: 1.2, minWidth: 220, sortable: false, cellRenderer: TagsCellRenderer, ...setFilter(dataOptions.tags, (value) => value), filterValueGetter: (params) => (params.data?.tags || []).map((tag) => `${tag.key}=${tag.value}`) },
+    { field: "health", headerName: "Atlas agent", flex: 1.5, minWidth: 220, cellRenderer: AgentCellRenderer, ...setFilter(dataOptions.healthStates, (value) => HEALTH_LABELS[value] || value) },
+    { field: "guardrailMode", headerName: "Guardrail mode", width: 150, cellRenderer: GuardrailModeCellRenderer, ...setFilter(dataOptions.guardrailModes, (value) => MODE_LABELS[value] || value) },
     { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
     { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
     { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
     { field: "riskScore", headerName: "Risk", width: 90, cellRenderer: RiskCellRenderer },
     { field: "lastHeartbeat", headerName: "Last check-in", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
+
+function setFilter(values, format) {
+    return { filter: "agSetColumnFilter", filterParams: { values: values || [], valueFormatter: (params) => format(params.value) } };
+}
 
 function isMonitorOnly(filters) {
     return filters.guardrailModes.length === 1 && filters.guardrailModes[0] === "monitor";
@@ -66,7 +77,8 @@ function toggleChip(chipKey, filters, onFiltersChange) {
 function appliedTags(filters) {
     const tags = [];
     filters.teams.forEach((team) => tags.push({ key: `team-${team}`, label: `Team: ${team}`, clear: { teams: filters.teams.filter((x) => x !== team) } }));
-    filters.osList.forEach((os) => tags.push({ key: `os-${os}`, label: OS_LABELS[os] || os, clear: { osList: filters.osList.filter((x) => x !== os) } }));
+    filters.tags.forEach((tag) => tags.push({ key: `tag-${tag}`, label: `Tag: ${tag}`, clear: { tags: filters.tags.filter((x) => x !== tag) } }));
+    filters.osList.forEach((os) => tags.push({ key: `os-${os}`, label: osLabel(os) || os, clear: { osList: filters.osList.filter((x) => x !== os) } }));
     filters.browserList.forEach((browser) => tags.push({ key: `browser-${browser}`, label: capitalize(browser), clear: { browserList: filters.browserList.filter((x) => x !== browser) } }));
     filters.categories.forEach((category) => tags.push({ key: `cat-${category}`, label: CATEGORY_LABELS[category] || category, clear: { categories: filters.categories.filter((x) => x !== category) } }));
     if (!isMonitorOnly(filters)) {
@@ -123,7 +135,7 @@ const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
 function osBrowserLabel(value) {
     const [type, name] = value.split(":");
-    return type === "os" ? (OS_LABELS[name] || name) : capitalize(name);
+    return type === "os" ? (osLabel(name) || name) : capitalize(name);
 }
 
 function filterOptions(field, dataOptions) {
@@ -138,6 +150,39 @@ function splitOsBrowser(values) {
     const pick = (type) => values.filter((value) => value.startsWith(`${type}:`)).map((value) => value.slice(type.length + 1));
     return { osList: pick("os"), browserList: pick("browser") };
 }
+
+const COLUMN_FILTER_FIELDS = {
+    employees: { teams: "teams" },
+    devices: { osBrowser: "os", healthStates: "health", guardrailModes: "guardrailMode", tags: "tags" },
+};
+
+function columnFilterValues(filters) {
+    return {
+        teams: filters.teams,
+        osBrowser: selectedOsBrowser(filters),
+        healthStates: filters.healthStates,
+        guardrailModes: filters.guardrailModes,
+        tags: filters.tags,
+    };
+}
+
+function modelFromFilters(tab, filters) {
+    const values = columnFilterValues(filters);
+    const model = {};
+    Object.entries(COLUMN_FILTER_FIELDS[tab]).forEach(([key, column]) => {
+        if (values[key].length) model[column] = { filterType: "set", values: values[key] };
+    });
+    return model;
+}
+
+function filtersFromModel(tab, model) {
+    const picked = (column) => model[column]?.values || [];
+    return tab === "employees"
+        ? { teams: picked("teams") }
+        : { ...splitOsBrowser(picked("os")), healthStates: picked("health"), guardrailModes: picked("guardrailMode"), tags: picked("tags") };
+}
+
+const sameValues = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
 function FilterRow({ tab, filters, onFiltersChange, dataOptions }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
@@ -196,6 +241,14 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
             .finally(() => setLoading(false));
     }, [deviceScope, filters, isEmployees]);
 
+    const columnDefs = useMemo(() => (isEmployees ? employeeColumns(dataOptions) : deviceColumns(dataOptions)), [isEmployees, dataOptions]);
+    const initialState = useMemo(() => ({ filter: { filterModels: modelFromFilters(tab, filters) } }), [tab, filters]);
+    const onColumnFilterChanged = useCallback((event) => {
+        const patch = filtersFromModel(tab, event.api.getFilterModel());
+        if (Object.keys(patch).every((key) => sameValues(patch[key], filters[key]))) return;
+        onFiltersChange(patch);
+    }, [tab, filters, onFiltersChange]);
+
     const selectedId = selected?.kind === (isEmployees ? "employee" : "device") ? selected.id : null;
     const getRowStyle = useCallback(({ data }) => {
         const id = isEmployees ? data?.username : data?.key;
@@ -215,7 +268,9 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 key={gridKey}
                 rowData={rows}
                 loading={loading}
-                columnDefs={isEmployees ? EMPLOYEE_COLUMNS : DEVICE_COLUMNS}
+                columnDefs={columnDefs}
+                initialState={initialState}
+                onFilterChanged={onColumnFilterChanged}
                 defaultColDef={DEFAULT_COL_DEF}
                 onServerFetch={onServerFetch}
                 filterStateUrl={`/dashboard/observe/devices-employees/${tab}`}
@@ -227,7 +282,6 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 domLayout="normal"
                 rowHeight={ROW_HEIGHT}
                 noOuterBorder
-                sideBar={false}
                 context={{ violationsAvailable, riskAvailable }}
                 onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.key)}
                 gridRef={gridRef}

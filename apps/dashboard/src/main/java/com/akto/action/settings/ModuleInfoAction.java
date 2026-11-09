@@ -115,7 +115,9 @@ public class ModuleInfoAction extends UserAction {
     @Setter private double riskMin;
     @Setter private double riskMax = AtlasPeopleService.RISK_MAX;
     @Setter private List<String> teams;
+    @Setter private List<String> tagPairs;
     @Getter private Map<String, Object> atlasOverview;
+    @Getter private Map<String, Object> atlasTrend;
     @Getter private List<Map<String, Object>> atlasRows;
     @Getter private long atlasTotal;
     @Setter private String atlasKind;
@@ -445,6 +447,7 @@ public class ModuleInfoAction extends UserAction {
         query.usesAi = usesAi;
         query.guardrailModes = guardrailModes;
         query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(java.util.stream.Collectors.toList());
+        query.tagPairs = tagPairs;
         query.riskMin = riskMin;
         query.riskMax = riskMax;
         query.sortKey = sortKey;
@@ -463,6 +466,49 @@ public class ModuleInfoAction extends UserAction {
         } catch (Exception e) {
             statsLogger.error("fetchAtlasOverview failed: " + e.getMessage());
             addActionError("Unable to load the Atlas overview");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    private static final String FIRST_SEEN_FIELD = "firstSeenTs";
+
+    private Map<String, Integer> loadFirstSeenByGroup() {
+        Document startedTs = new Document("$cond", Arrays.asList(
+                new Document("$gt", Arrays.asList(ifNullExpr(ModuleInfo.STARTED_TS, 0), 0)),
+                "$" + ModuleInfo.STARTED_TS,
+                null));
+        List<Bson> pipeline = Arrays.asList(
+                Aggregates.match(atlasModuleFilter()),
+                Aggregates.group(endpointShieldGroupId(), Accumulators.min(FIRST_SEEN_FIELD, startedTs)));
+        Map<String, Integer> firstSeen = new HashMap<>();
+        try (MongoCursor<Document> cursor = ModuleInfoDao.instance.getMCollection().aggregate(pipeline, Document.class).allowDiskUse(true).cursor()) {
+            while (cursor.hasNext()) {
+                Document group = cursor.next();
+                Document id = group.get("_id", Document.class);
+                Number ts = (Number) group.get(FIRST_SEEN_FIELD);
+                if (id != null && ts != null) firstSeen.put(firstSeenKey(id.getString(ModuleInfo.NAME), id.getString("os")), ts.intValue());
+            }
+        }
+        return firstSeen;
+    }
+
+    private static String firstSeenKey(String name, String os) {
+        return (name == null ? "" : name) + "|" + (os == null ? "" : os);
+    }
+
+    public String fetchAtlasTrend() {
+        atlasTrend = new HashMap<>();
+        if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
+        try {
+            int now = Context.now();
+            Map<String, Integer> firstSeen = loadFirstSeenByGroup();
+            List<Document> rows = loadEndpointShieldDeviceRows(now);
+            for (Document row : rows) row.append(FIRST_SEEN_FIELD, firstSeen.getOrDefault(firstSeenKey(row.getString("deviceName"), row.getString("os")), 0));
+            atlasTrend = atlasPeopleService.trend(rows, startTimestamp, endTimestamp, now);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            statsLogger.error("fetchAtlasTrend failed: " + e.getMessage());
+            addActionError("Unable to load the device trend");
             return ERROR.toUpperCase();
         }
     }

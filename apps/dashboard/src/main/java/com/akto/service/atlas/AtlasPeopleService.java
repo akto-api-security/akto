@@ -1,5 +1,6 @@
 package com.akto.service.atlas;
 
+import com.akto.action.AgenticObserveAction;
 import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.McpAuditInfoDao;
@@ -73,6 +74,7 @@ public class AtlasPeopleService {
     private static final String STATUS_ACTIVE = "active";
     private static final String ALERT_ONLY_BEHAVIOUR = "alert";
     private static final String TEAM_TAG_KEY = "team";
+    private static final String MISCONFIGURED_TAG_KEY = "misconfigured-config";
     private static final String UNKNOWN_USERNAME_PLACEHOLDER = "not-available";
     private static final String BROWSER_HOST_MARKER = "chrome";
     private static final String BROWSER_USER_EMAIL_TAG = "browser-user-email";
@@ -101,6 +103,7 @@ public class AtlasPeopleService {
         public String category;
         public boolean approved;
         public boolean personal;
+        public boolean misconfigured;
         public double riskScore;
         public String plugin;
         public boolean orphan;
@@ -120,6 +123,7 @@ public class AtlasPeopleService {
             row.put("category", category);
             row.put("approved", approved);
             row.put("personal", personal);
+            row.put("misconfigured", misconfigured);
             row.put("riskScore", riskScore);
             return row;
         }
@@ -146,6 +150,8 @@ public class AtlasPeopleService {
         public int unapprovedTools;
         public int unapprovedSkills;
         public int personalAccounts;
+        public boolean misconfigured;
+        public final List<Map<String, String>> tags = new ArrayList<>();
         public double riskScore;
 
         public DeviceRow() {
@@ -177,6 +183,9 @@ public class AtlasPeopleService {
             row.put("unapprovedTools", unapprovedTools);
             row.put("unapprovedSkills", unapprovedSkills);
             row.put("personalAccounts", personalAccounts);
+            row.put("hasPersonalAccount", personalAccounts > 0);
+            row.put("hasMisconfiguredConfig", misconfigured);
+            row.put("tags", tags);
             row.put("violations", violationsBySeverity);
             row.put("violationCount", sum(violationsBySeverity));
             row.put("riskScore", riskScore);
@@ -245,6 +254,7 @@ public class AtlasPeopleService {
         public List<String> healthStates;
         public List<String> guardrailModes;
         public List<String> teams;
+        public List<String> tagPairs;
         public boolean hasUnapproved;
         public boolean usesPersonal;
         public boolean agentIssues;
@@ -291,6 +301,20 @@ public class AtlasPeopleService {
             DeviceRow device = toDeviceRow(module, latestVersionByOs, now);
             if (snapshot.devicesByLowerName.containsKey(device.key)) device.key = device.key + "|" + device.moduleId;
             snapshot.devicesByLowerName.put(device.key, device);
+        }
+
+        if (bundle != null && bundle.userTags != null) {
+            for (DeviceRow device : snapshot.devicesByLowerName.values()) {
+                List<DeviceTag> tags = bundle.userTags.get(device.username);
+                if (tags == null) continue;
+                for (DeviceTag tag : tags) {
+                    if (tag == null || tag.getKey() == null || tag.getValue() == null) continue;
+                    Map<String, String> entry = new LinkedHashMap<>();
+                    entry.put("key", tag.getKey());
+                    entry.put("value", tag.getValue());
+                    device.tags.add(entry);
+                }
+            }
         }
 
         if (bundle == null) {
@@ -382,6 +406,7 @@ public class AtlasPeopleService {
             tool.category = categoryOf(c, parts);
             tool.approved = isSanctioned(c, bundle.allowlistNamesLower, remarksByServiceName);
             tool.personal = InsightUtil.isPersonalAccount(c);
+            tool.misconfigured = InsightUtil.hasTagValue(c, MISCONFIGURED_TAG_KEY, "true");
             tool.plugin = AgenticObserveUtil.getPluginName(c);
             tool.orphan = c.getHostName().contains(AgenticObserveUtil.NOT_ATTACHED_VALUE);
             if (browser) {
@@ -403,6 +428,7 @@ public class AtlasPeopleService {
             }
 
             device.tools.add(tool);
+            if (tool.misconfigured) device.misconfigured = true;
             devicesByHost.put(c.getHostName().toLowerCase(Locale.ROOT), device);
             if (tool.plugin != null) {
                 tool.category = CAT_PLUGIN;
@@ -711,6 +737,9 @@ public class AtlasPeopleService {
         Set<String> teamOptions = new java.util.TreeSet<>();
         for (EmployeeRow employee : snapshot.employees) teamOptions.addAll(employee.teams);
         overview.put("teamOptions", new ArrayList<>(teamOptions));
+        Set<String> tagOptions = new java.util.TreeSet<>();
+        for (DeviceRow device : snapshot.devices) for (Map<String, String> tag : device.tags) tagOptions.add(tagPair(tag));
+        overview.put("tagOptions", new ArrayList<>(tagOptions));
         overview.put("deviceCount", snapshot.devices.size());
         overview.put("employeeCount", snapshot.employees.size());
         overview.put("agentHealth", health);
@@ -746,12 +775,47 @@ public class AtlasPeopleService {
         return null;
     }
 
+    private static final List<String> TREND_OS_KEYS = Arrays.asList("mac", "windows", "linux", "unknown");
+    private static final List<String> TREND_BROWSER_KEYS = Arrays.asList("chrome", "firefox", "edge", "safari", "other");
+
+    public Map<String, Object> trend(List<Document> moduleRows, int startTs, int endTs, int now) {
+        Map<String, List<Integer>> osFirstSeen = new HashMap<>();
+        Map<String, List<Integer>> browserFirstSeen = new HashMap<>();
+        List<Integer> all = new ArrayList<>();
+        for (Document row : moduleRows) {
+            DeviceRow device = toDeviceRow(row, new HashMap<>(), now);
+            Number firstSeen = (Number) row.get("firstSeenTs");
+            int ts = firstSeen == null ? 0 : firstSeen.intValue();
+            all.add(ts);
+            if (device.extension) {
+                String browser = TREND_BROWSER_KEYS.contains(device.browser) ? device.browser : "other";
+                browserFirstSeen.computeIfAbsent(browser, key -> new ArrayList<>()).add(ts);
+            } else {
+                String os = OS_MAC.equals(device.os) ? "mac" : OS_WINDOWS.equals(device.os) ? "windows" : OS_LINUX.equals(device.os) ? "linux" : "unknown";
+                osFirstSeen.computeIfAbsent(os, key -> new ArrayList<>()).add(ts);
+            }
+        }
+        int end = endTs > 0 ? endTs : now;
+        List<AgenticObserveAction.MonthSlot> slots = AgenticObserveAction.buildWindowSlots(startTs, endTs, AgenticObserveAction.earliestTs(all));
+        List<String> labels = new ArrayList<>();
+        for (AgenticObserveAction.MonthSlot slot : slots) labels.add(slot.label);
+        Map<String, Object> osTrend = new LinkedHashMap<>();
+        for (String key : TREND_OS_KEYS) osTrend.put(key, AgenticObserveAction.cumulativeCounts(osFirstSeen.getOrDefault(key, new ArrayList<>()), slots, end));
+        Map<String, Object> browserTrend = new LinkedHashMap<>();
+        for (String key : TREND_BROWSER_KEYS) browserTrend.put(key, AgenticObserveAction.cumulativeCounts(browserFirstSeen.getOrDefault(key, new ArrayList<>()), slots, end));
+        Map<String, Object> trend = new LinkedHashMap<>();
+        trend.put("monthLabels", labels);
+        trend.put("osTrend", osTrend);
+        trend.put("browserTrend", browserTrend);
+        return trend;
+    }
+
     public boolean isModulePageable(PeopleQuery query) {
         String sortKey = query.sortKey == null ? "" : query.sortKey;
         boolean moduleSort = sortKey.isEmpty() || "lastHeartbeat".equals(sortKey) || "name".equals(sortKey) || "agentVersion".equals(sortKey);
         boolean noJoinFilter = (query.text == null || query.text.trim().isEmpty())
                 && !notEmpty(query.osList) && !notEmpty(query.browserList) && !notEmpty(query.categories) && !notEmpty(query.healthStates)
-                && !notEmpty(query.guardrailModes) && !notEmpty(query.teams)
+                && !notEmpty(query.guardrailModes) && !notEmpty(query.teams) && !notEmpty(query.tagPairs)
                 && !query.hasUnapproved && !query.usesPersonal && !query.agentIssues
                 && query.riskMin <= 0 && query.riskMax >= RISK_MAX;
         return moduleSort && noJoinFilter;
@@ -823,6 +887,7 @@ public class AtlasPeopleService {
         }
         if (notEmpty(query.healthStates) && !query.healthStates.contains(device.health)) return false;
         if (notEmpty(query.guardrailModes) && !query.guardrailModes.contains(device.guardrailMode)) return false;
+        if (notEmpty(query.tagPairs) && device.tags.stream().noneMatch(tag -> query.tagPairs.contains(tagPair(tag)))) return false;
         if (notEmpty(query.categories)) {
             for (String category : query.categories) {
                 if (device.toolsByCategory.getOrDefault(category, 0) > 0) return true;
@@ -847,6 +912,17 @@ public class AtlasPeopleService {
         return terms;
     }
 
+    private static String tagPair(Map<String, String> tag) {
+        return tag.get("key") + "=" + tag.get("value");
+    }
+
+    private static boolean anyTagContains(DeviceRow device, String value) {
+        for (Map<String, String> tag : device.tags) {
+            if (contains(tagPair(tag), value)) return true;
+        }
+        return false;
+    }
+
     private static boolean deviceMatchesAllTerms(DeviceRow device, List<String[]> terms) {
         for (String[] term : terms) {
             if (!deviceMatchesTerm(device, term[0], term[1])) return false;
@@ -857,7 +933,7 @@ public class AtlasPeopleService {
     private static boolean deviceMatchesTerm(DeviceRow device, String key, String value) {
         if (key == null) {
             return contains(device.name, value) || contains(device.username, value) || contains(device.os, value)
-                    || contains(device.version, value) || anyToolContains(device, value);
+                    || contains(device.version, value) || anyToolContains(device, value) || anyTagContains(device, value);
         }
         switch (key) {
             case "device": return contains(device.name, value);
@@ -868,6 +944,7 @@ public class AtlasPeopleService {
             case "mode": return contains(device.guardrailMode, value);
             case "version": return contains(device.version, value);
             case "tool": return anyToolContains(device, value);
+            case "tag": return anyTagContains(device, value);
             case "category": return hasCategory(device, value);
             default: return false;
         }

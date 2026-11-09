@@ -2,8 +2,9 @@ import { Avatar, Badge, HorizontalStack, Text, Tooltip } from "@shopify/polaris"
 import func from "@/util/func";
 import AgGridRow from "../../../../components/tables/rows/AgGridRow";
 import { OsIcon } from "../../agentic/DeviceEndpoints";
+import MisconfiguredBadge from "../../agentic/MisconfiguredBadge";
 import { RiskScoreCellRenderer, ViolationsCellRenderer as SeverityViolationsCellRenderer } from "../../agentic/AgenticCellRenderers";
-import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, MODE_LABELS, OS_ICON_KEYS, OS_LABELS } from "./peopleConstants";
+import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, MODE_LABELS, OS_ICON_KEYS, osLabel } from "./peopleConstants";
 
 function Unavailable({ what }) {
     return (
@@ -36,10 +37,43 @@ export function DeviceCellRenderer({ data }) {
     return <AgGridRow icon={icon} label={data.label || data.name} isBold />;
 }
 
+export function FlagsCellRenderer({ data }) {
+    if (!data || (!data.hasPersonalAccount && !data.hasMisconfiguredConfig)) return null;
+    return (
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+            {data.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}
+            {data.hasMisconfiguredConfig && <MisconfiguredBadge />}
+        </HorizontalStack>
+    );
+}
+
+export function TeamsCellRenderer({ value }) {
+    return <Text as="span" color={value?.length ? undefined : "subdued"} truncate>{value?.length ? value.join(", ") : "—"}</Text>;
+}
+
+const MAX_VISIBLE_TAGS = 2;
+
+export function TagsCellRenderer({ value }) {
+    if (!value || value.length === 0) return null;
+    const rest = value.slice(MAX_VISIBLE_TAGS);
+    return (
+        <HorizontalStack gap="1" wrap={false} blockAlign="center">
+            {value.slice(0, MAX_VISIBLE_TAGS).map((tag, index) => (
+                <Badge key={`${tag.key}-${index}`} size="small" status="info">{`${tag.key}=${tag.value}`}</Badge>
+            ))}
+            {rest.length > 0 && (
+                <Tooltip content={rest.map((tag) => `${tag.key}=${tag.value}`).join(", ")} dismissOnMouseOut>
+                    <Badge size="small" status="info">{`+${rest.length}`}</Badge>
+                </Tooltip>
+            )}
+        </HorizontalStack>
+    );
+}
+
 export function OsCellRenderer({ data }) {
     if (!data) return null;
     if (data.extension) return <AgGridRow icon={<BrowserIcon browser={data.browser} />} label={browserLabel(data.browser)} />;
-    return <AgGridRow icon={<OsIcon os={OS_ICON_KEYS[data.os]} />} label={OS_LABELS[data.os] || data.os} />;
+    return <AgGridRow icon={<OsIcon os={OS_ICON_KEYS[data.os]} />} label={osLabel(data.os) || "—"} />;
 }
 
 export function OwnerCellRenderer({ value }) {

@@ -1,17 +1,20 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, HorizontalGrid } from "@shopify/polaris";
+import { Button, Card, HorizontalGrid } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import observeApi from "../../api";
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards";
 import AskBar from "../../../../components/shared/AskBar";
+import { EndpointBrowserTrendChart } from "../../agentic/TrendCharts";
+import { fetchAgenticViolationCountsByHost } from "../../agentic/agenticObserveApi";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
 import AgentHealthCard from "./AgentHealthCard";
 import AiToolsByOsCard from "./AiToolsByOsCard";
 import PeopleTable from "./PeopleTable";
 import RiskHistogramCard from "./RiskHistogramCard";
+import ViolationsBySeverityCard from "./ViolationsBySeverityCard";
 import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
 import {
@@ -32,6 +35,31 @@ function DevicesEmployeesPage() {
     const [discovery, setDiscovery] = useState(null);
     const [openTarget, setOpenTarget] = useState(null);
     const [exporting, setExporting] = useState(false);
+    const [trendStats, setTrendStats] = useState(null);
+    const [severityCounts, setSeverityCounts] = useState(null);
+
+    useEffect(() => {
+        let ignore = false;
+        settingRequests.fetchAtlasTrend({ deviceScope })
+            .then((res) => {
+                if (!ignore) setTrendStats(res?.atlasTrend || null);
+            })
+            .catch(() => {
+                if (!ignore) func.setToast(true, true, "Failed to load trend data");
+            });
+        return () => { ignore = true; };
+    }, [deviceScope, refreshKey]);
+
+    useEffect(() => {
+        let ignore = false;
+        fetchAgenticViolationCountsByHost({ startTimestamp: 0, endTimestamp: 0 }).then((byHost) => {
+            if (ignore) return;
+            const sums = { critical: 0, high: 0, medium: 0, low: 0 };
+            Object.values(byHost).forEach((hostCounts) => Object.keys(sums).forEach((severity) => { sums[severity] += hostCounts[severity] || 0; }));
+            setSeverityCounts(sums);
+        });
+        return () => { ignore = true; };
+    }, [refreshKey]);
 
     useEffect(() => {
         let ignore = false;
@@ -72,6 +100,7 @@ function DevicesEmployeesPage() {
         return () => { ignore = true; };
     }, [deviceScope, refreshKey]);
 
+    const filterOptions = useMemo(() => transform.filterOptions(overview), [overview]);
     const patchFilters = useCallback((patch) => setFilters((previous) => ({ ...previous, ...patch })), []);
     const showTable = useCallback((nextTab, patch = {}) => {
         setTab(nextTab);
@@ -173,6 +202,16 @@ function DevicesEmployeesPage() {
                         onSelectHighRisk={() => toggleView("employees", { riskMin: HIGH_RISK_THRESHOLD })}
                     />
                 </HorizontalGrid>,
+                <HorizontalGrid key="trend-cards" columns={{ xs: "1fr", md: "2fr 1fr" }} gap="4">
+                    <Card padding="0">
+                        <EndpointBrowserTrendChart
+                            osTrend={trendStats?.osTrend || {}}
+                            browserTrend={trendStats?.browserTrend || {}}
+                            monthLabels={trendStats?.monthLabels || []}
+                        />
+                    </Card>
+                    <ViolationsBySeverityCard counts={severityCounts} />
+                </HorizontalGrid>,
                 <PeopleTable
                     key="people-table"
                     tab={tab}
@@ -188,7 +227,7 @@ function DevicesEmployeesPage() {
                     riskAvailable={overview?.riskAvailable}
                     onOpen={openPerson}
                     selected={openTarget}
-                    filterOptions={transform.filterOptions(overview)}
+                    filterOptions={filterOptions}
                 />,
                 <PeopleFlyout
                     key="people-flyout"

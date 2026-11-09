@@ -919,6 +919,13 @@ const settingRequests = {
             data: { deviceScope, startTimestamp, endTimestamp }
         })
     },
+    async fetchAtlasTrend({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasTrend',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
     async fetchAtlasEmployees(params = {}) {
         return await request({
             url: '/api/fetchAtlasEmployees',
