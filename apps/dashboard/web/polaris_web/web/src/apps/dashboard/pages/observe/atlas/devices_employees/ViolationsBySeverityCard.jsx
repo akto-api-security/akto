@@ -6,7 +6,7 @@ import { SEVERITY_SEGMENTS, formatNumber } from "./peopleConstants";
 const CHART_SIZE = 180;
 const SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"];
 
-function ViolationsBySeverityCard({ counts, onSelect }) {
+function ViolationsBySeverityCard({ counts, status, onSelect }) {
     const { data, total, titleColor } = useMemo(() => {
         const segments = SEVERITY_SEGMENTS.map(({ key, name, color }) => ({ name, key, y: counts?.[key] || 0, color }));
         const chartData = {};
@@ -18,6 +18,17 @@ function ViolationsBySeverityCard({ counts, onSelect }) {
             titleColor: worst ? chartData[worst].color : undefined,
         };
     }, [counts]);
+
+    if (status === "error") {
+        return (
+            <Card padding="4">
+                <VerticalStack gap="2">
+                    <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
+                    <Text as="p" color="subdued">Violation counts could not be loaded.</Text>
+                </VerticalStack>
+            </Card>
+        );
+    }
 
     return (
         <Card padding="4">

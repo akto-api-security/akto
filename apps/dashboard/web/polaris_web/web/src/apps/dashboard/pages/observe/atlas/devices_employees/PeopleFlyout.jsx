@@ -119,20 +119,20 @@ function ActionButton({ action }) {
     return <Button primary={action.primary} plain={action.plain} onClick={action.onClick}>{action.label}</Button>;
 }
 
-function DeviceActions({ device, onOpen, onUpdated }) {
+function DeviceActions({ device, onOpen, onUpdated, queued }) {
     const navigate = useNavigate();
     const updateAgent = () => {
         func.showConfirmationModal(`Update the Atlas agent on ${device.name} to the latest version? It picks up the change on its next reboot.`, "Update", async () => {
             try {
                 await settingRequests.bulkUpdateModuleEnvAndReboot([device.moduleId], { UPDATE_TO_LATEST_VERSION: "true" });
                 func.setToast(true, false, `Atlas agent update queued for ${device.name}`);
-                onUpdated();
+                onUpdated([device.moduleId]);
             } catch (error) {
                 func.setToast(true, true, "Failed to trigger the agent update");
             }
         });
     };
-    const outdated = device.health === "outdated";
+    const outdated = device.health === "outdated" && !queued;
     const actions = [
         ...(outdated ? [{ label: "Update Atlas agent", primary: true, onClick: updateAgent }] : []),
         ...(device.unapprovedTools > 0 ? [{ label: "Review unapproved tools", primary: !outdated, onClick: () => navigate("/dashboard/observe/audit") }] : []),
@@ -196,7 +196,7 @@ function Footprint({ kind, detail }) {
     );
 }
 
-function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
+function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated, queuedIds = [] }) {
     const [detail, setDetail] = useState(null);
     const [status, setStatus] = useState("loading");
     const [selectedTab, setSelectedTab] = useState(0);
@@ -281,7 +281,7 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
                 {ready && activeTab === "overview" && (
                     <Box padding="4">
                         <VerticalStack gap="5">
-                            {isDevice && <DeviceActions device={detail} onOpen={onOpen} onUpdated={onUpdated} />}
+                            {isDevice && <DeviceActions device={detail} onOpen={onOpen} onUpdated={onUpdated} queued={queuedIds.includes(detail.moduleId)} />}
                             <AskBar
                                 key={`${target.kind}:${target.id}`}
                                 label="Ask Atlas"

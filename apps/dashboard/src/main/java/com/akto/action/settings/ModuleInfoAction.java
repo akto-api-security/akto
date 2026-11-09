@@ -48,6 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class ModuleInfoAction extends UserAction {
     private List<ModuleInfo> moduleInfos;
@@ -135,7 +136,6 @@ public class ModuleInfoAction extends UserAction {
     private static final String AD_USERNAME = ModuleInfo.ADDITIONAL_DATA + ".username";
     private static final String AD_OS = ModuleInfo.ADDITIONAL_DATA + ".os";
     private static final String AD_BROWSER_NAME = ModuleInfo.ADDITIONAL_DATA + ".browserName";
-    private static final String AD_PLATFORM = ModuleInfo.ADDITIONAL_DATA + ".platform";
     private static final String AD_PROVIDER = ModuleInfo.ADDITIONAL_DATA + ".provider";
     private static final String AD_CURRENT_STATUS = ModuleInfo.ADDITIONAL_DATA + ".currentStatus";
     // "Last deployed" = start of the latest deployment attempt (installStartedTs, written by
@@ -360,7 +360,7 @@ public class ModuleInfoAction extends UserAction {
         );
     }
 
-    // Runs the grouped pipeline with optional sort, skip and limit so the Devices tab can page in Mongo.
+    // Runs the grouped pipeline with optional sort, skip and limit (used by the agents list and the Atlas snapshot load).
     private List<ModuleInfo> aggregateEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses, Bson sort, int skip, int limit) {
         List<Bson> pipeline = new ArrayList<>(endpointShieldGroupedStages(filter, groupId, now, statuses));
         pipeline.add(Aggregates.project(Projections.exclude(ORIG_ID_FIELD)));
@@ -410,11 +410,14 @@ public class ModuleInfoAction extends UserAction {
         return Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope));
     }
 
-    // Loads every grouped device row (no paging) for the snapshot.
+    // Loads every grouped device row (no paging) for the snapshot, each with its first-seen time.
     private List<Document> loadEndpointShieldDeviceRows(int now) {
+        Map<String, Integer> firstSeen = loadFirstSeenByGroup();
         List<Document> rows = new ArrayList<>();
         for (ModuleInfo module : aggregateEndpointShieldModules(atlasModuleFilter(), endpointShieldGroupId(), now, null, null, 0, 0)) {
-            rows.add(toAtlasModuleRow(module));
+            Document row = toAtlasModuleRow(module);
+            row.append(FIRST_SEEN_FIELD, firstSeen.getOrDefault(firstSeenKey(row.get("deviceName"), row.get("os")), 0));
+            rows.add(row);
         }
         return rows;
     }
@@ -456,9 +459,9 @@ public class ModuleInfoAction extends UserAction {
         query.agentActive = agentActive;
         query.usesAi = usesAi;
         query.guardrailModes = guardrailModes;
-        query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(java.util.stream.Collectors.toList());
+        query.teams = teams == null ? null : teams.stream().map(team -> team.trim().toLowerCase()).collect(Collectors.toList());
         query.tagPairs = tagPairs;
-        query.violationSeverities = violationSeverities == null ? null : violationSeverities.stream().map(severity -> severity.trim().toLowerCase()).collect(java.util.stream.Collectors.toList());
+        query.violationSeverities = violationSeverities == null ? null : violationSeverities.stream().map(severity -> severity.trim().toLowerCase()).collect(Collectors.toList());
         query.riskMin = riskMin;
         query.riskMax = riskMax;
         query.sortKey = sortKey;
@@ -499,26 +502,22 @@ public class ModuleInfoAction extends UserAction {
                 Document group = cursor.next();
                 Document id = group.get("_id", Document.class);
                 Number ts = (Number) group.get(FIRST_SEEN_FIELD);
-                if (id != null && ts != null) firstSeen.put(firstSeenKey(id.getString(ModuleInfo.NAME), id.getString("os")), ts.intValue());
+                if (id != null && ts != null) firstSeen.put(firstSeenKey(id.get(ModuleInfo.NAME), id.get("os")), ts.intValue());
             }
         }
         return firstSeen;
     }
 
-    private static String firstSeenKey(String name, String os) {
-        return (name == null ? "" : name) + "|" + (os == null ? "" : os);
+    private static String firstSeenKey(Object name, Object os) {
+        return (name == null ? "" : String.valueOf(name)) + "|" + (os == null ? "" : String.valueOf(os));
     }
 
-    // Devices-over-time series for the trend chart, from module_info first-seen dates.
+    // Devices-over-time series for the trend chart, from the snapshot's first-seen dates.
     public String fetchAtlasTrend() {
         atlasTrend = new HashMap<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
         try {
-            int now = Context.now();
-            Map<String, Integer> firstSeen = loadFirstSeenByGroup();
-            List<Document> rows = loadEndpointShieldDeviceRows(now);
-            for (Document row : rows) row.append(FIRST_SEEN_FIELD, firstSeen.getOrDefault(firstSeenKey(row.getString("deviceName"), row.getString("os")), 0));
-            atlasTrend = atlasPeopleService.trend(rows, startTimestamp, endTimestamp, now);
+            atlasTrend = atlasPeopleService.trend(loadAtlasSnapshot(), startTimestamp, endTimestamp, Context.now());
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             statsLogger.error("fetchAtlasTrend failed: " + e.getMessage());
@@ -543,18 +542,13 @@ public class ModuleInfoAction extends UserAction {
         }
     }
 
-    // Devices tab: paged in Mongo when the query allows it, otherwise from the snapshot.
+    // Devices tab: filtered, sorted and paged from the cached snapshot.
     public String fetchAtlasDevices() {
         atlasRows = new ArrayList<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
         try {
-            AtlasPeopleService.PeopleQuery query = buildPeopleQuery();
-            if (atlasPeopleService.isModulePageable(query)) {
-                fetchAtlasDevicesPage(query);
-                return SUCCESS.toUpperCase();
-            }
             long[] total = new long[1];
-            atlasRows = atlasPeopleService.pageDevices(loadAtlasSnapshot(), query, total);
+            atlasRows = atlasPeopleService.pageDevices(loadAtlasSnapshot(), buildPeopleQuery(), total);
             atlasTotal = total[0];
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -562,31 +556,6 @@ public class ModuleInfoAction extends UserAction {
             addActionError("Unable to load devices");
             return ERROR.toUpperCase();
         }
-    }
-
-    // Mongo-paged Devices path: builds a mini snapshot for just the requested page of rows.
-    private void fetchAtlasDevicesPage(AtlasPeopleService.PeopleQuery query) {
-        int now = Context.now();
-        Bson filter = atlasModuleFilter();
-        Bson groupId = endpointShieldGroupId();
-        List<String> statuses = query.agentActive ? Arrays.asList(STATUS_ACTIVE) : null;
-        String sortField = "name".equals(query.sortKey) ? NAME_LOWER_FIELD
-                : "agentVersion".equals(query.sortKey) ? ModuleInfo.CURRENT_VERSION : ModuleInfo.LAST_HEARTBEAT_RECEIVED;
-        Bson sort = Sorts.orderBy(query.sortOrder >= 0 ? Sorts.ascending(sortField) : Sorts.descending(sortField), Sorts.ascending(ModuleInfoDao.ID));
-        atlasTotal = countEndpointShieldModules(filter, groupId, now, statuses);
-        List<Document> rows = new ArrayList<>();
-        for (ModuleInfo module : aggregateEndpointShieldModules(filter, groupId, now, statuses, sort, query.skip, query.limit)) {
-            rows.add(toAtlasModuleRow(module));
-        }
-        InsightContext ctx = buildInsightContext();
-        InsightDataBundle bundle = null;
-        try {
-            bundle = insightService.getOrLoadBundle(ctx);
-        } catch (Exception e) {
-            statsLogger.error("atlas page insights bundle failed: " + e.getMessage());
-        }
-        AtlasPeopleService.Snapshot page = atlasPeopleService.build(rows, bundle, loadLatestVersionByOs(), now, startTimestamp, endTimestamp);
-        atlasRows = atlasPeopleService.deviceRows(page);
     }
 
     // Stat card totals (managed devices, active agents, unapproved, monitor-only) from the snapshot.

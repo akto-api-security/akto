@@ -12,10 +12,10 @@ const HEALTH_TOOLTIP = "Offline: no heartbeat for 7+ days. Outdated: older than 
 const HEALTH_BAR_HEIGHT = "12px";
 const MODE_BAR_HEIGHT = "8px";
 
-function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectHealth, onSelectMode, onUpdated }) {
+function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectHealth, onSelectMode, onUpdated, queuedIds = [] }) {
     const health = overview?.agentHealth || {};
     const modes = overview?.guardrailModes || {};
-    const outdatedModuleIds = overview?.outdatedModuleIds || [];
+    const outdatedModuleIds = (overview?.outdatedModuleIds || []).filter((moduleId) => !queuedIds.includes(moduleId));
     const outdatedCount = outdatedModuleIds.length;
 
     const updateOutdated = () => {
@@ -25,7 +25,7 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
             try {
                 await settingRequests.bulkUpdateModuleEnvAndReboot(outdatedModuleIds, { UPDATE_TO_LATEST_VERSION: "true" });
                 func.setToast(true, false, `${outdatedCount} ${agentWord} queued to update to the latest version.`);
-                onUpdated();
+                onUpdated(outdatedModuleIds);
             } catch (error) {
                 func.setToast(true, true, "Failed to trigger update to latest version");
             }
@@ -67,6 +67,9 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
                 <Box>
                     <Button onClick={updateOutdated}>{`Update ${outdatedCount} outdated agent${outdatedCount > 1 ? "s" : ""}`}</Button>
                 </Box>
+            )}
+            {queuedIds.length > 0 && (
+                <Text as="p" variant="bodySm" color="subdued">{`${queuedIds.length} agent${queuedIds.length > 1 ? "s" : ""} queued to update on next reboot`}</Text>
             )}
         </VerticalStack>
     );

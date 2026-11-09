@@ -60,7 +60,7 @@ export function TopoNode({ data }) {
                             </Box>
                             <HorizontalStack gap={1} blockAlign="center">
                                 {typeof IconComponent === "string"
-                                    ? <Avatar source={IconComponent} size="extraSmall" />
+                                    ? <Avatar source={IconComponent} size="extraSmall" shape="square" />
                                     : <Icon source={IconComponent} />
                                 }
                                 <Box width={component.category === "ai-model" ? "140px" : "110px"}>

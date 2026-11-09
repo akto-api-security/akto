@@ -211,7 +211,7 @@ function FilterRow({ tab, filters, onFiltersChange, dataOptions }) {
     );
 }
 
-function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, refreshKey, search, onSearchChange, violationsAvailable, riskAvailable, onOpen, selected, filterOptions: dataOptions }) {
+function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, counts, search, onSearchChange, violationsAvailable, riskAvailable, onOpen, selected, filterOptions: dataOptions }) {
     const isEmployees = tab === "employees";
     const gridRef = useRef(null);
     const [rows, setRows] = useState([]);
@@ -258,8 +258,8 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     useEffect(() => { gridRef.current?.api?.redrawRows(); }, [selectedId]);
 
     const gridKey = useMemo(
-        () => `${tab}-${deviceScope}-${refreshKey}-${JSON.stringify(filters)}`,
-        [tab, deviceScope, refreshKey, filters]
+        () => `${tab}-${deviceScope}-${JSON.stringify(filters)}`,
+        [tab, deviceScope, filters]
     );
 
     return (

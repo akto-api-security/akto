@@ -10,7 +10,6 @@ import AskBar from "../../../../components/shared/AskBar";
 import { EndpointBrowserTrendChart } from "../../agentic/TrendCharts";
 import LocalStore from "../../../../../main/LocalStorageStore";
 import NewLayoutTooltip from "../../agentic/NewLayoutTooltip";
-import { fetchAgenticViolationCountsByHost } from "../../agentic/agenticObserveApi";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
 import AgentHealthCard from "./AgentHealthCard";
 import AiToolsByOsCard from "./AiToolsByOsCard";
@@ -35,12 +34,13 @@ function DevicesEmployeesPage() {
     const [tab, setTab] = useState("employees");
     const [filters, setFilters] = useState(EMPTY_PEOPLE_FILTERS);
     const [search, setSearch] = useState("");
-    const [refreshKey, setRefreshKey] = useState(0);
     const [discovery, setDiscovery] = useState(null);
     const [openTarget, setOpenTarget] = useState(null);
     const [exporting, setExporting] = useState(false);
     const [trendStats, setTrendStats] = useState(null);
     const [severityCounts, setSeverityCounts] = useState(null);
+    const [severityStatus, setSeverityStatus] = useState("loading");
+    const [queuedModuleIds, setQueuedModuleIds] = useState([]);
 
     useEffect(() => {
         let ignore = false;
@@ -52,18 +52,25 @@ function DevicesEmployeesPage() {
                 if (!ignore) func.setToast(true, true, "Failed to load trend data");
             });
         return () => { ignore = true; };
-    }, [deviceScope, refreshKey]);
+    }, [deviceScope]);
 
     useEffect(() => {
         let ignore = false;
-        fetchAgenticViolationCountsByHost({ startTimestamp: 0, endTimestamp: 0 }).then((byHost) => {
-            if (ignore) return;
-            const sums = { critical: 0, high: 0, medium: 0, low: 0 };
-            Object.values(byHost).forEach((hostCounts) => Object.keys(sums).forEach((severity) => { sums[severity] += hostCounts[severity] || 0; }));
-            setSeverityCounts(sums);
-        });
+        observeApi.fetchHostSeverityCounts(0, 0)
+            .then((rows) => {
+                if (ignore) return;
+                const sums = { critical: 0, high: 0, medium: 0, low: 0 };
+                rows.forEach((hostCounts) => Object.keys(sums).forEach((severity) => { sums[severity] += hostCounts[severity] || 0; }));
+                setSeverityCounts(sums);
+                setSeverityStatus("ready");
+            })
+            .catch(() => {
+                if (ignore) return;
+                setSeverityStatus("error");
+                func.setToast(true, true, "Failed to load violation counts");
+            });
         return () => { ignore = true; };
-    }, [refreshKey]);
+    }, []);
 
     useEffect(() => {
         let ignore = false;
@@ -75,7 +82,7 @@ function DevicesEmployeesPage() {
                 if (!ignore) func.setToast(true, true, "Failed to load device stats");
             });
         return () => { ignore = true; };
-    }, [deviceScope, refreshKey]);
+    }, [deviceScope]);
 
     useEffect(() => {
         let ignore = false;
@@ -87,7 +94,7 @@ function DevicesEmployeesPage() {
                 if (!ignore) func.setToast(true, true, "Failed to load AI discovery counts");
             });
         return () => { ignore = true; };
-    }, [refreshKey]);
+    }, []);
 
     useEffect(() => {
         let ignore = false;
@@ -102,7 +109,7 @@ function DevicesEmployeesPage() {
                 if (!ignore) setOverviewStatus("error");
             });
         return () => { ignore = true; };
-    }, [deviceScope, refreshKey]);
+    }, [deviceScope]);
 
     useEffect(() => {
         if (!newLayout) navigate("/dashboard/observe/users-and-devices", { replace: true });
@@ -120,7 +127,7 @@ function DevicesEmployeesPage() {
         setSearch("");
         setFilters({ ...EMPTY_PEOPLE_FILTERS, ...patch });
     }, []);
-    const refreshAll = useCallback(() => setRefreshKey((key) => key + 1), []);
+    const markQueued = useCallback((moduleIds) => setQueuedModuleIds((previous) => [...new Set([...previous, ...moduleIds])]), []);
     const toggleView = (nextTab, patch = {}) => {
         const sameView = tab === nextTab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...patch }) === JSON.stringify(filters);
         showTable(nextTab, sameView ? {} : patch);
@@ -208,7 +215,8 @@ function DevicesEmployeesPage() {
                         activeMode={activeMode}
                         onSelectHealth={(state) => toggleView("devices", { healthStates: [state] })}
                         onSelectMode={onSelectMode}
-                        onUpdated={refreshAll}
+                        onUpdated={markQueued}
+                        queuedIds={queuedModuleIds}
                     />
                     <AiToolsByOsCard
                         overview={overview}
@@ -234,7 +242,7 @@ function DevicesEmployeesPage() {
                             monthLabels={trendStats?.monthLabels || []}
                         />
                     </Card>
-                    <ViolationsBySeverityCard counts={severityCounts} onSelect={onSelectSeverity} />
+                    <ViolationsBySeverityCard counts={severityCounts} status={severityStatus} onSelect={onSelectSeverity} />
                 </HorizontalGrid>,
                 <PeopleTable
                     key="people-table"
@@ -244,7 +252,6 @@ function DevicesEmployeesPage() {
                     onFiltersChange={patchFilters}
                     deviceScope={deviceScope}
                     counts={{ employees: overview?.employeeCount, devices: overview?.deviceCount }}
-                    refreshKey={refreshKey}
                     search={search}
                     onSearchChange={setSearch}
                     violationsAvailable={overview?.violationsAvailable}
@@ -259,7 +266,8 @@ function DevicesEmployeesPage() {
                     deviceScope={deviceScope}
                     onClose={closePerson}
                     onOpen={openPerson}
-                    onUpdated={refreshAll}
+                    onUpdated={markQueued}
+                        queuedIds={queuedModuleIds}
                 />,
             ]}
         />

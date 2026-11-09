@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -87,6 +89,7 @@ public class AtlasPeopleService {
     private static final Pattern VERSION = Pattern.compile("^v?(\\d+)\\.(\\d+)\\.(\\d+)");
 
     private static final Map<String, CachedSnapshot> CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, CompletableFuture<Snapshot>> IN_FLIGHT = new ConcurrentHashMap<>();
 
     private static class CachedSnapshot {
         final Snapshot snapshot;
@@ -144,6 +147,8 @@ public class AtlasPeopleService {
         public String username = "";
         public String version;
         public int lastHeartbeat;
+        public int firstSeen;
+        public String primaryKey;
         public boolean extension;
         public String health = HEALTH_HEALTHY;
         public String guardrailMode = MODE_NONE;
@@ -278,14 +283,26 @@ public class AtlasPeopleService {
         public int limit = 50;
     }
 
-    // Returns the cached snapshot for the key, rebuilding it when it is older than CACHE_TTL_MS.
+    // Returns the cached snapshot for the key; on a miss one caller builds it (outside any map lock) and concurrent callers wait for that build.
     public Snapshot getOrBuild(String key, Supplier<Snapshot> loader) {
         CACHE.values().removeIf(entry -> System.currentTimeMillis() - entry.loadedAtMs >= CACHE_TTL_MS);
-        CachedSnapshot cached = CACHE.compute(key, (k, existing) -> {
-            if (existing != null && System.currentTimeMillis() - existing.loadedAtMs < CACHE_TTL_MS) return existing;
-            return new CachedSnapshot(loader.get(), System.currentTimeMillis());
-        });
-        return cached.snapshot;
+        CachedSnapshot cached = CACHE.get(key);
+        if (cached != null) return cached.snapshot;
+        CompletableFuture<Snapshot> mine = new CompletableFuture<>();
+        CompletableFuture<Snapshot> running = IN_FLIGHT.putIfAbsent(key, mine);
+        if (running != null) return running.join();
+        try {
+            cached = CACHE.get(key);
+            Snapshot built = cached != null ? cached.snapshot : loader.get();
+            if (cached == null) CACHE.put(key, new CachedSnapshot(built, System.currentTimeMillis()));
+            mine.complete(built);
+            return built;
+        } catch (RuntimeException e) {
+            mine.completeExceptionally(e);
+            throw e;
+        } finally {
+            IN_FLIGHT.remove(key, mine);
+        }
     }
 
     // Latest released shield version per OS from the account's endpoint shield settings; used to flag outdated agents.
@@ -309,9 +326,14 @@ public class AtlasPeopleService {
                           int now, int startTs, int endTs) {
         Snapshot snapshot = new Snapshot();
         snapshot.latestVersionByOs.putAll(latestVersionByOs);
-        for (Document module : moduleRows) {
+        List<Document> newestFirst = new ArrayList<>(moduleRows);
+        newestFirst.sort(Comparator.comparingInt((Document module) -> module.get("lastHeartbeatReceived") instanceof Number ? ((Number) module.get("lastHeartbeatReceived")).intValue() : 0).reversed());
+        for (Document module : newestFirst) {
             DeviceRow device = toDeviceRow(module, latestVersionByOs, now);
-            if (snapshot.devicesByLowerName.containsKey(device.key)) device.key = device.key + "|" + device.moduleId;
+            if (snapshot.devicesByLowerName.containsKey(device.key)) {
+                device.primaryKey = device.key;
+                device.key = device.key + "|" + device.moduleId;
+            }
             snapshot.devicesByLowerName.put(device.key, device);
         }
 
@@ -348,6 +370,7 @@ public class AtlasPeopleService {
             if (snapshot.violationsAvailable) addViolations(snapshot.devicesByLowerName, snapshot.devicesByHost, bundle);
         }
 
+        shareDataAcrossSameNameDevices(snapshot.devicesByLowerName);
         snapshot.devices.addAll(snapshot.devicesByLowerName.values());
         snapshot.employees.addAll(buildEmployees(snapshot.devices, bundle));
         Set<String> unapprovedTeams = new HashSet<>();
@@ -358,6 +381,23 @@ public class AtlasPeopleService {
         }
         snapshot.unapprovedTeams = unapprovedTeams.size();
         return snapshot;
+    }
+
+    // Same-name devices (e.g. one host reporting two OSes) cannot be told apart in collections, so they show the same tools, risk and violations as the most recently seen one.
+    private static void shareDataAcrossSameNameDevices(Map<String, DeviceRow> devicesByLowerName) {
+        for (DeviceRow device : devicesByLowerName.values()) {
+            DeviceRow primary = device.primaryKey == null ? null : devicesByLowerName.get(device.primaryKey);
+            if (primary == null) continue;
+            device.tools.addAll(primary.tools);
+            device.toolsByCategory.putAll(primary.toolsByCategory);
+            device.violationsBySeverity.putAll(primary.violationsBySeverity);
+            device.skillNames.addAll(primary.skillNames);
+            device.unapprovedTools = primary.unapprovedTools;
+            device.unapprovedSkills = primary.unapprovedSkills;
+            device.personalAccounts = primary.personalAccounts;
+            device.misconfigured = primary.misconfigured;
+            device.riskScore = primary.riskScore;
+        }
     }
 
     // Turns one grouped module_info row into a DeviceRow and derives extension, OS and health (offline after OFFLINE_SECONDS).
@@ -372,6 +412,8 @@ public class AtlasPeopleService {
         device.username = isRealUsername(username) ? username.trim() : "";
         Number heartbeat = (Number) module.get("lastHeartbeatReceived");
         device.lastHeartbeat = heartbeat == null ? 0 : heartbeat.intValue();
+        Number firstSeen = (Number) module.get("firstSeenTs");
+        device.firstSeen = firstSeen == null ? 0 : firstSeen.intValue();
         device.extension = module.getString("browserName") != null
                 || (device.version != null && device.version.contains("extension"));
         device.key = device.extension ? "ext|" + device.name : device.name.toLowerCase(Locale.ROOT);
@@ -758,10 +800,10 @@ public class AtlasPeopleService {
         List<Integer> histogramList = new ArrayList<>();
         for (int count : histogram) histogramList.add(count);
 
-        Set<String> teamOptions = new java.util.TreeSet<>();
+        Set<String> teamOptions = new TreeSet<>();
         for (EmployeeRow employee : snapshot.employees) teamOptions.addAll(employee.teams);
         overview.put("teamOptions", new ArrayList<>(teamOptions));
-        Set<String> tagOptions = new java.util.TreeSet<>();
+        Set<String> tagOptions = new TreeSet<>();
         for (DeviceRow device : snapshot.devices) for (Map<String, String> tag : device.tags) tagOptions.add(tagPair(tag));
         overview.put("tagOptions", new ArrayList<>(tagOptions));
         overview.put("deviceCount", snapshot.devices.size());
@@ -805,14 +847,12 @@ public class AtlasPeopleService {
     private static final List<String> TREND_BROWSER_KEYS = Arrays.asList("chrome", "firefox", "edge", "safari", "other");
 
     // Cumulative device counts by OS and browser, bucketed by each group's earliest startedTs (first seen).
-    public Map<String, Object> trend(List<Document> moduleRows, int startTs, int endTs, int now) {
+    public Map<String, Object> trend(Snapshot snapshot, int startTs, int endTs, int now) {
         Map<String, List<Integer>> osFirstSeen = new HashMap<>();
         Map<String, List<Integer>> browserFirstSeen = new HashMap<>();
         List<Integer> all = new ArrayList<>();
-        for (Document row : moduleRows) {
-            DeviceRow device = toDeviceRow(row, new HashMap<>(), now);
-            Number firstSeen = (Number) row.get("firstSeenTs");
-            int ts = firstSeen == null ? 0 : firstSeen.intValue();
+        for (DeviceRow device : snapshot.devices) {
+            int ts = device.firstSeen;
             all.add(ts);
             if (device.extension) {
                 String browser = TREND_BROWSER_KEYS.contains(device.browser) ? device.browser : "other";
@@ -850,25 +890,7 @@ public class AtlasPeopleService {
         return null;
     }
 
-    // True when sort and filters can run in Mongo without joins, so the Devices tab can page in the database.
-    public boolean isModulePageable(PeopleQuery query) {
-        String sortKey = query.sortKey == null ? "" : query.sortKey;
-        boolean moduleSort = sortKey.isEmpty() || "lastHeartbeat".equals(sortKey) || "name".equals(sortKey) || "agentVersion".equals(sortKey);
-        boolean noJoinFilter = (query.text == null || query.text.trim().isEmpty())
-                && !notEmpty(query.osList) && !notEmpty(query.browserList) && !notEmpty(query.categories) && !notEmpty(query.healthStates)
-                && !notEmpty(query.guardrailModes) && !notEmpty(query.teams) && !notEmpty(query.tagPairs) && !notEmpty(query.violationSeverities)
-                && !query.hasUnapproved && !query.usesPersonal && !query.agentIssues
-                && query.riskMin <= 0 && query.riskMax >= RISK_MAX;
-        return moduleSort && noJoinFilter;
-    }
-
-    public List<Map<String, Object>> deviceRows(Snapshot snapshot) {
-        List<Map<String, Object>> rows = new ArrayList<>();
-        for (DeviceRow device : snapshot.devices) rows.add(device.toMap());
-        return rows;
-    }
-
-    // Filters, sorts and slices the in-memory device list; used when the query needs joined data.
+    // Filters, sorts and slices the snapshot's device list; this is the Devices tab's data source.
     public List<Map<String, Object>> pageDevices(Snapshot snapshot, PeopleQuery query, long[] totalOut) {
         List<String[]> terms = parseTerms(query.text);
         List<DeviceRow> matching = new ArrayList<>();
@@ -879,9 +901,13 @@ public class AtlasPeopleService {
             if (query.agentActive && !STATUS_ACTIVE.equals(device.status)) continue;
             if (query.hasUnapproved && device.unapprovedTools == 0) continue;
             if (query.usesPersonal && device.personalAccounts == 0) continue;
+            if (query.usesAi && device.toolCount() == 0) continue;
+            if (query.riskMin > 0 && device.riskScore < query.riskMin) continue;
+            if (query.riskMax < RISK_MAX && device.riskScore >= query.riskMax) continue;
+            if (notEmpty(query.teams) && deviceTeams(device).stream().noneMatch(query.teams::contains)) continue;
             matching.add(device);
         }
-        matching.sort(deviceComparator(query));
+        matching.sort(deviceComparator(query).thenComparing(device -> device.key));
         totalOut[0] = matching.size();
         List<Map<String, Object>> page = new ArrayList<>();
         for (DeviceRow device : slice(matching, query)) page.add(device.toMap());
@@ -957,6 +983,14 @@ public class AtlasPeopleService {
             }
         }
         return terms;
+    }
+
+    private static List<String> deviceTeams(DeviceRow device) {
+        List<String> teams = new ArrayList<>();
+        for (Map<String, String> tag : device.tags) {
+            if (TEAM_TAG_KEY.equals(tag.get("key")) && tag.get("value") != null) teams.add(tag.get("value").trim().toLowerCase(Locale.ROOT));
+        }
+        return teams;
     }
 
     private static String tagPair(Map<String, String> tag) {
