@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import javax.script.ScriptContext;
@@ -13,8 +14,6 @@ import javax.script.SimpleScriptContext;
 
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.billing.FeatureAccess;
@@ -23,6 +22,9 @@ import com.akto.dto.testing.TestingRunConfig.StreamingRequestConfig;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.scripts.TestScriptProvider;
+import com.akto.testing.scripts.TestScriptProviders;
+import com.akto.testing.scripts.TestScriptResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -30,21 +32,23 @@ public class ApiExecutorUtil {
 
     private static final String EXECUTE_ONCE_PER_CONVERSATION = "executeOncePerConversation = true";
     private static final String FEATURE_TEST_PRE_SCRIPT = "TEST_PRE_SCRIPT";
-    private static final int SCRIPT_CACHE_TTL_SECONDS = 5 * 60;
     private static final int CONVERSATION_STATE_TTL_SECONDS = 60 * 60;
     private static final String CONVERSATION_STATE = "conversationState";
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutorUtil.class, LogDb.TESTING);
-    private static final DataActor dataActor = DataActorFactory.fetchInstance();
-
-    private static Map<String, Integer> lastFetchedMap = new HashMap<>();
-    private static Map<String, TestScript> testScriptMap = new HashMap<>();
+    /** Picks the run's script per TestingRunConfig ids; created lazily so tests can install a stub first. */
+    private static volatile TestScriptResolver resolver;
 
     /** When true, getCachedScript skips the SaaS feature gate (unit tests only). */
     private static volatile boolean bypassFeatureCheckForTest = false;
 
-    private static String scriptCacheKey(int accountId, TestScript.Type type) {
-        return accountId + "_" + (type != null ? type.name() : "ANY");
+    private static TestScriptResolver resolver() {
+        TestScriptResolver r = resolver;
+        if (r == null) {
+            r = new TestScriptResolver(TestScriptProviders.cachedRemote());
+            resolver = r;
+        }
+        return r;
     }
 
     /** Cache of script results per conversationId when executeOncePerConversation = true. */
@@ -97,25 +101,33 @@ public class ApiExecutorUtil {
     }
 
     /**
-     * Installs PRE/POST scripts for unit tests and bypasses the SaaS feature gate.
-     * Call {@link #resetForTest()} in tearDown. Pass null to leave a type unset without
-     * hitting DataActor (an empty script entry is cached for the TTL window).
+     * Installs PRE/POST scripts for unit tests as the account's default scripts (what a config with no
+     * script ids runs) and bypasses the SaaS feature gate. Never touches DataActor.
+     * Call {@link #resetForTest()} in tearDown. Pass null to leave a type unset.
      */
     static void installScriptsForTest(String preRequestJs, String postRequestJs) {
         bypassFeatureCheckForTest = true;
-        int accountId = Context.getActualAccountId();
-        cacheScriptForTest(accountId, TestScript.Type.PRE_REQUEST, preRequestJs);
-        cacheScriptForTest(accountId, TestScript.Type.POST_REQUEST, postRequestJs);
+        final TestScript pre = testScript(TestScript.Type.PRE_REQUEST, preRequestJs);
+        final TestScript post = testScript(TestScript.Type.POST_REQUEST, postRequestJs);
+        resolver = new TestScriptResolver(new TestScriptProvider() {
+            @Override
+            public TestScript findById(String id) {
+                return null;
+            }
+
+            @Override
+            public TestScript findDefault(TestScript.Type type) {
+                return type == TestScript.Type.PRE_REQUEST ? pre : post;
+            }
+        });
     }
 
-    private static void cacheScriptForTest(int accountId, TestScript.Type type, String javascript) {
-        String key = scriptCacheKey(accountId, type);
+    private static TestScript testScript(TestScript.Type type, String javascript) {
         if (javascript == null || javascript.isEmpty()) {
-            testScriptMap.put(key, null);
-        } else {
-            testScriptMap.put(key, new TestScript("test-" + type.name(), javascript, type, "test", Context.now()));
+            return null;
         }
-        lastFetchedMap.put(key, Context.now());
+        int now = Context.now();
+        return new TestScript("test-" + type.name(), TestScript.defaultNameFor(type), javascript, type, "test", "test", now, now);
     }
 
     /** Clears conversation/script caches and disables the test feature bypass. */
@@ -123,32 +135,23 @@ public class ApiExecutorUtil {
         bypassFeatureCheckForTest = false;
         conversationStateMap.clear();
         conversationScriptCache.clear();
-        testScriptMap.clear();
-        lastFetchedMap.clear();
+        resolver = null;
     }
 
     /**
-     * Returns the script JavaScript for the given type, using 5-min cache. Returns null if feature not granted, or no script.
+     * The JavaScript of the script this run selected for the given phase (see ScriptSelection), or null
+     * if the feature is not granted or the run has no script. A read failure propagates to the caller's
+     * catch, which logs it and runs the request without a script; failures are never cached.
      */
-    private static String getCachedScript(int accountId, TestScript.Type type) {
+    private static String getCachedScript(TestingRunConfig testingRunConfig, int accountId, TestScript.Type type) {
         if (!bypassFeatureCheckForTest) {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, FEATURE_TEST_PRE_SCRIPT);
             if (!featureAccess.getIsGranted()) {
                 return null;
             }
         }
-        String cacheKey = scriptCacheKey(accountId, type);
-        TestScript testScript = testScriptMap.getOrDefault(cacheKey, null);
-        int lastTestScriptFetched = lastFetchedMap.getOrDefault(cacheKey, 0);
-        if (Context.now() - lastTestScriptFetched > SCRIPT_CACHE_TTL_SECONDS) {
-            testScript = dataActor.fetchTestScript(type);
-            lastFetchedMap.put(cacheKey, Context.now());
-            testScriptMap.put(cacheKey, testScript);
-        }
-        if (testScript == null || testScript.getJavascript() == null || testScript.getJavascript().isEmpty()) {
-            return null;
-        }
-        return testScript.getJavascript();
+        Optional<TestScript> testScript = resolver().resolve(testingRunConfig, type);
+        return testScript.map(TestScript::getJavascript).orElse(null);
     }
 
     /**
@@ -176,7 +179,7 @@ public class ApiExecutorUtil {
         }
         try {
             int accountId = Context.getActualAccountId();
-            String script = getCachedScript(accountId, TestScript.Type.PRE_REQUEST);
+            String script = getCachedScript(testingRunConfig, accountId, TestScript.Type.PRE_REQUEST);
             if (script == null) {
                 return originalHttpRequest.getBody();
             }
@@ -357,7 +360,7 @@ public class ApiExecutorUtil {
         }
         try {
             int accountId = Context.getActualAccountId();
-            String script = getCachedScript(accountId, TestScript.Type.POST_REQUEST);
+            String script = getCachedScript(testingRunConfig, accountId, TestScript.Type.POST_REQUEST);
             if (script == null) {
                 return response;
             }

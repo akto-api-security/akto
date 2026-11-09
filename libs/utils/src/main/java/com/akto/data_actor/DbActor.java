@@ -704,6 +704,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchTestScript(type);
     }
 
+    public TestScript fetchTestScriptById(String id){
+        return DbLayer.fetchTestScriptById(id);
+    }
+
     public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod){
         return DbLayer.findDependencyNodes(apiCollectionId, url, method, reqMethod);
     }

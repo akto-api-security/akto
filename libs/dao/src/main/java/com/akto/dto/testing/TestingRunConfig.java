@@ -33,7 +33,7 @@ public class TestingRunConfig {
     private List<String> testSuiteIds;
 
     // null = use default-test-{type} script, "" = explicitly no script, otherwise a TestScript id.
-    // Interpret only through ScriptSelection.
+    // Interpret only through ScriptSelection. Needs getter/setter: ClientActor decodes with the BSON POJO codec.
     public static final String PRE_REQUEST_SCRIPT_ID = "preRequestScriptId";
     private String preRequestScriptId;
     public static final String POST_REQUEST_SCRIPT_ID = "postRequestScriptId";

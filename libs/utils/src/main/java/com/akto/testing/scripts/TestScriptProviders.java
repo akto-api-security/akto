@@ -1,25 +1,40 @@
 package com.akto.testing.scripts;
 
+import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActorFactory;
+
 /**
- * Wires the provider chain for runtimes that read Mongo directly (dashboard, apps/testing):
- * library first, legacy store only when the library has nothing (accounts not migrated yet).
+ * Provider wiring for mini-testing. Mirrors TestScriptProviders in the main akto repo:
+ * database()      - Mongo reads (DbLayer, when this process talks to Mongo directly): library, then legacy.
+ * cachedRemote()  - the testing hot path: DataActor reads behind the bounded TTL cache, keyed by the
+ *                   actual account id (mini-testing's ApiExecutorUtil uses Context.getActualAccountId()).
  */
 public final class TestScriptProviders {
 
     private static final TestScriptProvider DATABASE =
         new FallbackTestScriptProvider(new LibraryTestScriptProvider(), new LegacyTestScriptAdapter());
 
-    private static final TestScriptProvider CACHED_DATABASE = new CachingTestScriptProvider(DATABASE);
+    private static volatile TestScriptProvider cachedRemote;
 
     private TestScriptProviders() {}
 
-    /** Uncached; for request paths that must see the latest state (e.g. the database-abstractor). */
     public static TestScriptProvider database() {
         return DATABASE;
     }
 
-    /** Cached for the testing hot path; script edits become visible within the cache TTL. */
-    public static TestScriptProvider cachedDatabase() {
-        return CACHED_DATABASE;
+    public static TestScriptProvider cachedRemote() {
+        if (cachedRemote == null) {
+            synchronized (TestScriptProviders.class) {
+                if (cachedRemote == null) {
+                    cachedRemote = new CachingTestScriptProvider(
+                        new RemoteTestScriptProvider(DataActorFactory.fetchInstance()),
+                        CachingTestScriptProvider.DEFAULT_MAX_ENTRIES,
+                        CachingTestScriptProvider.DEFAULT_TTL_SECONDS,
+                        Context::now,
+                        Context::getActualAccountId);
+                }
+            }
+        }
+        return cachedRemote;
     }
 }
