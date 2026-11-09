@@ -230,15 +230,18 @@ public class Executor {
         boolean verifyFindings = TestingConfigurations.getInstance().isRunAutomatedTests();
         String verificationSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
         RawApi verificationBaseline = null;
+        String smartTestingSkipReason = null;
 
 
         if (runAutomatedPentest) {
             String testSubType = varMap.containsKey("testSubType") ? varMap.get("testSubType").toString() : "unknown";
             RawApi preparedForPentest = applyPreRequestScript(origRawApi, testingRunConfig);
             PentestExecutionResult pentestResult =
-                    automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType);
+                    automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType,
+                            TestingConfigurations.getInstance().getAutomatedTestsCustomPrompt());
             List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
             aiSummaryTraces = pentestResult.getAiSummaryTraces();
+            smartTestingSkipReason = pentestResult.getSkipReason();
             if (automatedAgenticResults != null && !automatedAgenticResults.isEmpty()) {
                 requestAttempted = true;
                 String originalMessage = origRawApi.getOriginalMessage();
@@ -380,6 +383,8 @@ public class Executor {
             } else if (allRequestsSkippedDueToMatch) {
                 // All requests were skipped because test payload matches original
                 error_messages.add(TestError.NO_REQUEST_ATTEMPTED.getMessage());
+            } else if (smartTestingSkipReason != null && !smartTestingSkipReason.isEmpty()) {
+                error_messages.add("Smart testing skipped: " + smartTestingSkipReason);
             } else {
                 error_messages.add(TestError.NO_API_REQUEST.getMessage());
             }

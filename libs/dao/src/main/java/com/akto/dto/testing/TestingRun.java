@@ -76,6 +76,9 @@ public class TestingRun {
 
     public static final String RUN_AUTOMATED_TESTS = "runAutomatedTests";
     private boolean runAutomatedTests = false;
+    // Free text for smart testing (values to use, or to look up), sent with each smart test as userPrompt.
+    public static final String AUTOMATED_TESTS_CUSTOM_PROMPT = "automatedTestsCustomPrompt";
+    private String automatedTestsCustomPrompt;
 
     public TestingRun() { }
 
@@ -260,6 +263,14 @@ public class TestingRun {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public String getAutomatedTestsCustomPrompt() {
+        return automatedTestsCustomPrompt;
+    }
+
+    public void setAutomatedTestsCustomPrompt(String automatedTestsCustomPrompt) {
+        this.automatedTestsCustomPrompt = automatedTestsCustomPrompt;
     }
 
     public DashboardContext getDashboardContext() {

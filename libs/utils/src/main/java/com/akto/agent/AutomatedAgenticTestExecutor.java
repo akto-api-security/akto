@@ -51,13 +51,29 @@ public class AutomatedAgenticTestExecutor {
             .callTimeout(2, TimeUnit.MINUTES)
             .build();
 
+    private final String baseUrl;
+
+    public AutomatedAgenticTestExecutor() {
+        this(BASE_URL);
+    }
+
+    // The smart testing service's address; tests point it at a local server.
+    AutomatedAgenticTestExecutor(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
     public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType) {
+        return executeAgenticTest(testReq, testSubType, null);
+    }
+
+    /** userPrompt: the run's custom prompt for smart testing (values to use or to look up); null sends none. */
+    public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType, String userPrompt) {
         try {
-            String body = buildRequestBody(testReq, testSubType);
+            String body = buildRequestBody(testReq, testSubType, userPrompt);
             RequestBody requestBody = RequestBody.create(body, MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
-                    .url(BASE_URL + EXECUTE_ENDPOINT)
+                    .url(baseUrl + EXECUTE_ENDPOINT)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json");
@@ -100,7 +116,8 @@ public class AutomatedAgenticTestExecutor {
                     result.setResultTypeAgentic(true);
                     results.add(result);
                 }
-                return new PentestExecutionResult(results, aiSummaryTraces);
+                String skipReason = root.path("skipped").asBoolean(false) && root.hasNonNull("skipReason") ? root.get("skipReason").asText() : null;
+                return new PentestExecutionResult(results, aiSummaryTraces, skipReason);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: error executing agentic test: " + e.getMessage());
@@ -122,7 +139,7 @@ public class AutomatedAgenticTestExecutor {
             RequestBody requestBody = RequestBody.create(objectMapper.writeValueAsString(payload), MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
-                    .url(BASE_URL + VERIFY_ENDPOINT)
+                    .url(baseUrl + VERIFY_ENDPOINT)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json");
@@ -181,6 +198,10 @@ public class AutomatedAgenticTestExecutor {
     }
 
     private String buildRequestBody(RawApi testReq, String testSubType) throws Exception {
+        return buildRequestBody(testReq, testSubType, null);
+    }
+
+    private String buildRequestBody(RawApi testReq, String testSubType, String userPrompt) throws Exception {
         OriginalHttpRequest req = testReq.getRequest();
         OriginalHttpResponse resp = testReq.getResponse();
 
@@ -211,6 +232,9 @@ public class AutomatedAgenticTestExecutor {
             digestAuth.put("username", req.getDigestAuthUsername());
             digestAuth.put("password", req.getDigestAuthPassword());
             payload.put("digestAuth", digestAuth);
+        }
+        if (userPrompt != null && !userPrompt.trim().isEmpty()) {
+            payload.put("userPrompt", userPrompt.trim());
         }
 
         return objectMapper.writeValueAsString(payload);
