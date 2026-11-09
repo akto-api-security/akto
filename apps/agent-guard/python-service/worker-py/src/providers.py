@@ -1341,11 +1341,10 @@ async def startup_self_check() -> None:
     """Run a check for every entry in the actually-configured cascade
     concurrently; never raises — failures are logged, not propagated, so a
     bad model never blocks boot."""
-    from constants import get_default_config, pod_model_configs
+    from constants import get_default_config, pod_model_config
 
-    entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", []) + [
-        e for cfg in pod_model_configs().values() for e in cfg["modelConfigs"]
-    ]
+    entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", [])
+    entries = entries + (pod_model_config() or {}).get("modelConfigs", [])
     logger.info(f"[StartupCheck] checking {len(entries)} configured cascade entries")
     await asyncio.gather(*(_startup_check_entry(e) for e in entries), return_exceptions=True)
     logger.info("[StartupCheck] done")

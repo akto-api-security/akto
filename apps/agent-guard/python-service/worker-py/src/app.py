@@ -16,7 +16,7 @@ import metrics_push
 import providers
 import reachback
 import scan_diag
-from constants import get_default_config, get_enrichment_config, pod_model_configs
+from constants import get_default_config, get_enrichment_config, pod_model_config
 from model_map import build_arbiter
 from scan_handler import scan_payload, scanners_metadata
 from settings import settings
@@ -55,7 +55,7 @@ async def lifespan(_: FastAPI):
     settings.init_from_env()
     cascade_backpressure.configure_from_env()
     scan_diag.log_startup_banner()
-    pod_model_configs()  # resolve + log this pod's PER_POD_MODEL_CONFIGS_JSON entry at boot
+    pod_model_config()  # resolve + log this pod's PER_POD_MODEL_CONFIGS_JSON entry at boot
     push_task = asyncio.create_task(metrics_push.run_forever())
     # Non-blocking: readiness/health checks aren't held up by a slow endpoint,
     # and one bad model can't stall the whole process from booting. Set

@@ -89,52 +89,45 @@ def _pod_index(pod_name: str) -> int | None:
 
 
 @functools.lru_cache(maxsize=4)
-def _resolve_pod_model_configs(raw_json: str, pod_name: str) -> dict[str, dict[str, Any]]:
+def _resolve_pod_model_config(raw_json: str, pod_name: str) -> dict[str, Any] | None:
     """Parse PER_POD_MODEL_CONFIGS_JSON once per (value, pod), logging the outcome once.
-    Any problem logs an error and yields {} so the pod keeps the shared default — never
+    Any problem logs an error and yields None so the pod keeps the shared default — never
     another pod's entry."""
     if not raw_json.strip():
-        return {}
+        return None
     try:
         entries = json.loads(raw_json)
     except Exception as exc:
         logger.error(f"[constants] {_PER_POD_ENV} parse failed ({exc}); using the shared default")
-        return {}
+        return None
     if not isinstance(entries, list):
         logger.error(f"[constants] {_PER_POD_ENV} must be a JSON list; using the shared default")
-        return {}
+        return None
     index = _pod_index(pod_name)
-    if index is None or index >= len(entries) or not isinstance(entries[index], dict):
+    cfg = entries[index] if index is not None and index < len(entries) else None
+    if not (isinstance(cfg, dict) and cfg.get("modelConfigs")):
         logger.error(
-            f"[constants] {_PER_POD_ENV}: no usable entry for POD_NAME={pod_name!r} "
+            f"[constants] {_PER_POD_ENV}: no entry with modelConfigs for POD_NAME={pod_name!r} "
             f"(index {index}, {len(entries)} entries); using the shared default"
         )
-        return {}
-    chosen: dict[str, dict[str, Any]] = {}
-    for key, cfg in entries[index].items():
-        scanner = canonical_scanner(key)
-        if scanner not in PER_POD_CONFIG_SCANNERS:
-            allowed = sorted(PER_POD_CONFIG_SCANNERS)
-            logger.error(f"[constants] {_PER_POD_ENV}[{index}]: {key!r} not in {allowed}; ignored")
-        elif not (isinstance(cfg, dict) and cfg.get("modelConfigs")):
-            logger.error(f"[constants] {_PER_POD_ENV}[{index}].{key} has no modelConfigs; ignored")
-        else:
-            chosen[scanner] = cfg
+        return None
     fields = ("modelRole", "provider", "model", "baseUrl")
-    summary = {s: [tuple(e.get(f) for f in fields) for e in cfg["modelConfigs"]] for s, cfg in chosen.items()}
-    logger.info(f"[constants] pod {pod_name} uses {_PER_POD_ENV}[{index}]: {summary}")
-    return chosen
+    summary = [tuple(e.get(f) for f in fields) for e in cfg["modelConfigs"]]
+    scanners = sorted(PER_POD_CONFIG_SCANNERS)
+    logger.info(f"[constants] pod {pod_name} uses {_PER_POD_ENV}[{index}] for {scanners}: {summary}")
+    return cfg
 
 
-def pod_model_configs() -> dict[str, dict[str, Any]]:
-    """This pod's own default config per PER_POD_CONFIG_SCANNERS scanner ({} when unset)."""
-    return _resolve_pod_model_configs(settings.PER_POD_MODEL_CONFIGS_JSON, settings.POD_NAME)
+def pod_model_config() -> dict[str, Any] | None:
+    """This pod's own default config for PER_POD_CONFIG_SCANNERS (None when unset)."""
+    return _resolve_pod_model_config(settings.PER_POD_MODEL_CONFIGS_JSON, settings.POD_NAME)
 
 
 def get_scanner_default_config(scanner_name: str) -> dict[str, Any]:
     """The fallback config for a request with no modelConfigs: this pod's own entry for
-    the scanner when PER_POD_MODEL_CONFIGS_JSON has one, else get_default_config."""
-    return pod_model_configs().get(scanner_name) or get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+    PER_POD_CONFIG_SCANNERS when PER_POD_MODEL_CONFIGS_JSON has one, else get_default_config."""
+    pod_cfg = pod_model_config() if scanner_name in PER_POD_CONFIG_SCANNERS else None
+    return pod_cfg or get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
 
 
 # Routing tables — the single source of truth for which backend handles a scan.

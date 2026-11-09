@@ -47,8 +47,8 @@ falling back onto the core model. Logs carry `source=enrichment|default` on
 
 ## Per-pod model config (`PER_POD_MODEL_CONFIGS_JSON`)
 
-Lets each pod run **PromptInjection** and **Toxicity** on its own model config, e.g. to pin
-pod N to GPU endpoint N. Kubernetes only: run agent-guard as a **StatefulSet** and expose the
+Lets each pod run **PromptInjection** and **Toxicity** on its own model config (one config
+per pod drives both scanners), e.g. to pin pod N to GPU endpoint N. Kubernetes only: run agent-guard as a **StatefulSet** and expose the
 pod name, so pods are `agent-guard-0`, `agent-guard-1`, … and each knows its index:
 
 ```yaml
@@ -56,20 +56,19 @@ env:
 - name: POD_NAME
   valueFrom: { fieldRef: { fieldPath: metadata.name } }
 - name: PER_POD_MODEL_CONFIGS_JSON   # entry N is used by the pod ending in -N
-  value: '[{"PromptInjection": {"modelConfigs": [...]}, "Toxicity": {"modelConfigs": [...]}},
-           {"PromptInjection": {"modelConfigs": [...]}, "Toxicity": {"modelConfigs": [...]}}]'
+  value: '[{"modelConfigs": [...]}, {"modelConfigs": [...]}]'
 ```
 
-Each value has the same shape as `DEFAULT_MODEL_CONFIG_JSON`; set a per-entry `baseUrl` /
+Each entry has the same shape as `DEFAULT_MODEL_CONFIG_JSON`; set a per-entry `baseUrl` /
 `model` to point at that pod's endpoint. Precedence for those two scanners (verdict and
 `enrichment: "reason"`): request/policy `modelConfigs` → this pod's entry →
 `DEFAULT_MODEL_CONFIG_JSON` (`ENRICHMENT_MODEL_CONFIG_JSON` still wins for the reason call).
 Other scanners always use `DEFAULT_MODEL_CONFIG_JSON`.
 
 At boot each pod logs `[constants] pod <name> uses PER_POD_MODEL_CONFIGS_JSON[N]: ...`. If
-the pod has no index (Deployment, no `POD_NAME`), the index is past the end of the list, or
-the JSON is invalid, an error is logged and the pod uses `DEFAULT_MODEL_CONFIG_JSON` — never
-another pod's entry. Keep `replicas` ≤ the number of entries (and no HPA).
+the pod has no index (Deployment, no `POD_NAME`), the index is past the end of the list, its
+entry has no `modelConfigs`, or the JSON is invalid, an error is logged and the pod uses
+`DEFAULT_MODEL_CONFIG_JSON` — never another pod's entry. Keep `replicas` ≤ the number of entries (and no HPA).
 
 ## Docker-only vs Cloudflare-only keys
 
