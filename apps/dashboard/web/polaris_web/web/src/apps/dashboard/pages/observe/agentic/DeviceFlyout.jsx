@@ -21,7 +21,7 @@ import "../../../components/layouts/style.css";
 
 // ─── Risk factor computation ───────────────────────────────────────────────────
 
-function computeRiskFactors(device, agents) {
+export function computeRiskFactors(device, agents) {
     const factors = [];
     const sevLabels = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
 
@@ -292,7 +292,7 @@ function TopologyGraph({ device, agents, agentDetails = new Map(), agentTools = 
 
 // ─── User analysis section ─────────────────────────────────────────────────────
 
-function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
+export function UserAnalysisSection({ username, startTimestamp, endTimestamp }) {
     const [analysis, setAnalysis] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -563,7 +563,7 @@ const AGENTS_COL_DEFS = buildAgentsColDefs();
 // Server-side paginated — reuses the same fetchDeviceEndpointsSummary(parentDeviceId) endpoint
 // the main Endpoints grid's own tree-expand rows already call (AgenticObserveAction.java's
 // buildDeviceChildren, now paginated/sorted/searched there too, so both call sites benefit).
-function AgenticsTab({ deviceId }) {
+export function AgenticsTab({ deviceId }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         const mongoOrder = sortOrder ? -sortOrder : -1; // AG-Grid asc/desc convention is inverted vs Mongo
         return api.fetchDeviceEndpointsSummary({
@@ -613,7 +613,7 @@ function AgenticsTab({ deviceId }) {
 // claudeDeviceIds always includes this device's own id (not just hosts already seen ending in
 // ".claude") so an orphan claude-config-scanner event still attributes correctly even if no real
 // Claude collection has been seen for this device yet — matches the original client-side filter.
-function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange }) {
+export function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp, onTotalChange, onViolationClick, columnDefs = VIOLATIONS_COL_DEFS }) {
     const onServerFetch = useCallback(({ sortKey, sortOrder, skip, limit, searchString }) => {
         if (!hostNames.length && !deviceId) {
             return Promise.resolve({ value: [], total: 0 });
@@ -655,13 +655,13 @@ function ViolationsTab({ hostNames = [], deviceId, startTimestamp, endTimestamp,
 
     const handleViolationClick = useCallback((e) => {
         if (!e.data) return;
-        openViolationInThreatActivity(e.data);
-    }, []);
+        (onViolationClick || openViolationInThreatActivity)(e.data);
+    }, [onViolationClick]);
 
     return (
         <AgGridTable
             key={deviceId}
-            columnDefs={VIOLATIONS_COL_DEFS}
+            columnDefs={columnDefs}
             defaultColDef={GRID_DEFAULT_COL}
             onServerFetch={onServerFetch}
             serverSideRowModel

@@ -3765,9 +3765,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     private static final String[] MONTH_ABBR = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
 
-    private static final class MonthSlot {
-        final int boundary;
-        final String label;
+    public static final class MonthSlot {
+        public final int boundary;
+        public final String label;
         MonthSlot(int boundary, String label) { this.boundary = boundary; this.label = label; }
     }
 
@@ -3777,7 +3777,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     // Mirrors buildWindowSlots exactly: windowStart>0 spans [windowStart, windowEnd] months;
     // windowStart<=0 (all-time) anchors at the earliest data point (or 365 days back if none).
-    private static List<MonthSlot> buildWindowSlots(int windowStart, int windowEnd, int dataMinTs) {
+    public static List<MonthSlot> buildWindowSlots(int windowStart, int windowEnd, int dataMinTs) {
         int nowSec = (int) (System.currentTimeMillis() / 1000);
         int end = windowEnd > 0 ? windowEnd : nowSec;
         int startSec = windowStart > 0 ? windowStart : (dataMinTs > 0 ? dataMinTs : end - 365 * 86400);
@@ -3800,7 +3800,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
     // Mirrors cumulativeCounts: a true cumulative running total — items before the first slot seed
     // the baseline so the line ends at the true grand total, not just in-window additions.
-    private static int[] cumulativeCounts(List<Integer> timestamps, List<MonthSlot> slots, int end) {
+    public static int[] cumulativeCounts(List<Integer> timestamps, List<MonthSlot> slots, int end) {
         int n = slots.size();
         int firstBoundary = slots.get(0).boundary;
         int baseline = 0;
@@ -3820,7 +3820,7 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return counts;
     }
 
-    private static int earliestTs(List<Integer> timestamps) {
+    public static int earliestTs(List<Integer> timestamps) {
         int min = Integer.MAX_VALUE;
         for (Integer ts : timestamps) if (ts != null && ts > 0 && ts < min) min = ts;
         return min == Integer.MAX_VALUE ? 0 : min;
