@@ -83,7 +83,7 @@ import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dao.testing.config.TestScriptsDao;
+import com.akto.testing.scripts.TestScriptProviders;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
@@ -3631,8 +3631,16 @@ public class DbLayer {
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 
+    /** The default-test-{type} script (legacy store until the account is migrated), or null. */
     public static TestScript fetchTestScript(TestScript.Type type){
-        return TestScriptsDao.instance.fetchTestScript(type);
+        if (type == null) {
+            return null;
+        }
+        return TestScriptProviders.database().findDefault(type);
+    }
+
+    public static TestScript fetchTestScriptById(String id){
+        return TestScriptProviders.database().findById(id);
     }
 
     public static List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod) {
