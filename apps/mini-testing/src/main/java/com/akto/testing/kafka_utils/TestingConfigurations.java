@@ -28,6 +28,7 @@ public class TestingConfigurations {
     private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
     private boolean doNotMarkIssuesAsFixed;
     private boolean runAutomatedTests;
+    private String automatedTestsCustomPrompt;
     private String dashboardContext;
 
     private TestingConfigurations() {
@@ -126,6 +127,14 @@ public class TestingConfigurations {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public String getAutomatedTestsCustomPrompt() {
+        return automatedTestsCustomPrompt;
+    }
+
+    public void setAutomatedTestsCustomPrompt(String automatedTestsCustomPrompt) {
+        this.automatedTestsCustomPrompt = automatedTestsCustomPrompt;
     }
 
     public String getDashboardContext() {

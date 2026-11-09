@@ -393,6 +393,7 @@ public class TestExecutor {
 
         // init the singleton class here
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests(), testingRun.getDoNotMarkIssuesAsFixed(), testingRun.getRunAutomatedTests());
+        TestingConfigurations.getInstance().setAutomatedTestsCustomPrompt(testingRun.getAutomatedTestsCustomPrompt());
         TestingConfigurations.getInstance().setDashboardContext(
                 testingRun.getDashboardContext() != null ? testingRun.getDashboardContext().toString() : null);
 

@@ -52,8 +52,13 @@ public class AutomatedAgenticTestExecutor {
             .build();
 
     public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType) {
+        return executeAgenticTest(testReq, testSubType, null);
+    }
+
+    /** userPrompt: the run's custom prompt for smart testing (values to use or to look up); null sends none. */
+    public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType, String userPrompt) {
         try {
-            String body = buildRequestBody(testReq, testSubType);
+            String body = buildRequestBody(testReq, testSubType, userPrompt);
             RequestBody requestBody = RequestBody.create(body, MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
@@ -100,7 +105,8 @@ public class AutomatedAgenticTestExecutor {
                     result.setResultTypeAgentic(true);
                     results.add(result);
                 }
-                return new PentestExecutionResult(results, aiSummaryTraces);
+                String skipReason = root.path("skipped").asBoolean(false) && root.hasNonNull("skipReason") ? root.get("skipReason").asText() : null;
+                return new PentestExecutionResult(results, aiSummaryTraces, skipReason);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("AutomatedAgenticTestExecutor: error executing agentic test: " + e.getMessage());
@@ -181,6 +187,10 @@ public class AutomatedAgenticTestExecutor {
     }
 
     private String buildRequestBody(RawApi testReq, String testSubType) throws Exception {
+        return buildRequestBody(testReq, testSubType, null);
+    }
+
+    private String buildRequestBody(RawApi testReq, String testSubType, String userPrompt) throws Exception {
         OriginalHttpRequest req = testReq.getRequest();
         OriginalHttpResponse resp = testReq.getResponse();
 
@@ -211,6 +221,9 @@ public class AutomatedAgenticTestExecutor {
             digestAuth.put("username", req.getDigestAuthUsername());
             digestAuth.put("password", req.getDigestAuthPassword());
             payload.put("digestAuth", digestAuth);
+        }
+        if (userPrompt != null && !userPrompt.trim().isEmpty()) {
+            payload.put("userPrompt", userPrompt.trim());
         }
 
         return objectMapper.writeValueAsString(payload);
