@@ -175,6 +175,8 @@ public class StartTestAction extends UserAction {
     private boolean sendMsTeamsAlert = false;
     private boolean doNotMarkIssuesAsFixed = false;
     private boolean runAutomatedTests = false;
+    private String automatedTestsCustomPrompt;
+    private static final int MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS = 2000;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -283,6 +285,9 @@ public class StartTestAction extends UserAction {
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
         testingRun.setRunAutomatedTests(this.runAutomatedTests);
+        if (this.runAutomatedTests && StringUtils.isNotBlank(this.automatedTestsCustomPrompt)) {
+            testingRun.setAutomatedTestsCustomPrompt(StringUtils.left(this.automatedTestsCustomPrompt.trim(), MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS));
+        }
         return testingRun;
     }
 
@@ -2199,6 +2204,14 @@ public class StartTestAction extends UserAction {
 
     public boolean getRunAutomatedTests() {
         return runAutomatedTests;
+    }
+
+    public void setAutomatedTestsCustomPrompt(String automatedTestsCustomPrompt) {
+        this.automatedTestsCustomPrompt = automatedTestsCustomPrompt;
+    }
+
+    public String getAutomatedTestsCustomPrompt() {
+        return automatedTestsCustomPrompt;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {
