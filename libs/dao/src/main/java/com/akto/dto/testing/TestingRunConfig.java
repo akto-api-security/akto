@@ -32,6 +32,13 @@ public class TestingRunConfig {
 
     private List<String> testSuiteIds;
 
+    // null = use default-test-{type} script, "" = explicitly no script, otherwise a TestScript id.
+    // Interpret only through ScriptSelection.
+    public static final String PRE_REQUEST_SCRIPT_ID = "preRequestScriptId";
+    private String preRequestScriptId;
+    public static final String POST_REQUEST_SCRIPT_ID = "postRequestScriptId";
+    private String postRequestScriptId;
+
     public static final String AUTO_TICKETING_DETAILS = "autoTicketingDetails";
 
     private AutoTicketingDetails autoTicketingDetails;
@@ -153,6 +160,14 @@ public class TestingRunConfig {
             this.testRoleId = that.testRoleId;
         }
 
+        if (this.preRequestScriptId == null) {
+            this.preRequestScriptId = that.preRequestScriptId;
+        }
+
+        if (this.postRequestScriptId == null) {
+            this.postRequestScriptId = that.postRequestScriptId;
+        }
+
         this.cleanUp = that.cleanUp;
     }
     
@@ -187,6 +202,22 @@ public class TestingRunConfig {
 
     public void setCleanUp(boolean cleanUp) {
         this.cleanUp = cleanUp;
+    }
+
+    public String getPreRequestScriptId() {
+        return preRequestScriptId;
+    }
+
+    public void setPreRequestScriptId(String preRequestScriptId) {
+        this.preRequestScriptId = preRequestScriptId;
+    }
+
+    public String getPostRequestScriptId() {
+        return postRequestScriptId;
+    }
+
+    public void setPostRequestScriptId(String postRequestScriptId) {
+        this.postRequestScriptId = postRequestScriptId;
     }
 
     public List<String> getTestSuiteIds() {
