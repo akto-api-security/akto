@@ -203,8 +203,7 @@ export default function Header() {
     );
 
 
-    // const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
-    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/Halloween-white.svg" : "/public/Halloween-purple.svg";
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const { agenticSecurityGranted, endpointSecurityGranted, dastGranted, mcpSecurityGranted } = func.getStiggFeatureGrants();
     const dashboardInsightsGranted = func.checkLocal() || func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
 

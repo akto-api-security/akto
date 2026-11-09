@@ -210,6 +210,8 @@ function Dashboard() {
     // Onboarding flow disabled - kept false so the no-access banner logic below is unchanged.
     // const isOnboardingRoute = location.pathname.includes('/onboarding')
     const isOnboardingRoute = false
+    // Standalone consent screen: no support widgets
+    const isMcpOAuthRoute = location.pathname.includes('/mcp-oauth')
 
     return (
         <div className={`dashboard ${isAskAiRoute ? 'ask-ai-route' : ''}`}>
@@ -270,7 +272,7 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || /* onboarding disabled */ location.pathname.includes("summary") || location.pathname.includes("report")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || /* onboarding disabled */ location.pathname.includes("summary") || location.pathname.includes("report") || isMcpOAuthRoute) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
                 <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {
@@ -278,7 +280,7 @@ function Dashboard() {
                     }}><Text variant="bodyMd">Book a call</Text></Button>
                 </Banner>
             </div> : null}
-            {window.TRIAL_MSG && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || /* onboarding disabled */ location.pathname.includes("summary")) ?<div className="call-banner">
+            {window.TRIAL_MSG && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || /* onboarding disabled */ location.pathname.includes("summary") || isMcpOAuthRoute) ?<div className="call-banner">
                 <Banner hideIcon={true}>
                     <Text variant="bodyMd">{window.TRIAL_MSG}</Text>
                 </Banner>

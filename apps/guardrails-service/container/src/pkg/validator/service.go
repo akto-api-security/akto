@@ -1550,14 +1550,73 @@ func (s *Service) reportAndBlockPublicShare(params *models.ValidateRequestParams
 	}
 }
 
+func isAlertBehaviour(behaviour string) bool {
+	return mcp.ParseBehaviour(behaviour) == mcp.BehaviourAlert
+}
+
+// partitionAlertPolicies separates the alert-behaviour policies, whose guard-check hits are
+// reported but never enforced, from the ones that can stop the request.
+func partitionAlertPolicies(policies []types.Policy) (enforcing, alerting []types.Policy) {
+	for _, p := range policies {
+		if isAlertBehaviour(p.Behaviour) {
+			alerting = append(alerting, p)
+		} else {
+			enforcing = append(enforcing, p)
+		}
+	}
+	return enforcing, alerting
+}
+
+// guardReport carries what a guard-check threat report needs, from either validate path.
+type guardReport struct {
+	payload, ip, path, method, statusCode, contextSource, host, sessionID string
+	headers                                                               map[string]string
+	skipThreat                                                            bool
+}
+
+// reportAlertGuardChecks runs the personal-account and public-share guard checks for alert
+// policies: a hit is reported to threat activity and the request carries on.
+func (s *Service) reportAlertGuardChecks(alerting []types.Policy, tag, fullRequest string, r guardReport) {
+	if len(alerting) == 0 {
+		return
+	}
+	alert := string(mcp.BehaviourAlert)
+	if name, hit := s.resolvePersonalAccountBlock(alerting, tag, fullRequest, r.path, r.sessionID); hit {
+		s.reportPersonalAccountThreat(r.payload, r.headers, r.ip, r.path, r.method, r.statusCode, r.contextSource, r.host,
+			r.sessionID, name, alert, severityForPolicy(alerting, name), personalAccountReason(alert), r.skipThreat)
+	}
+	if name, hit := s.resolvePublicShareBlock(alerting, r.path, r.method, r.payload, r.sessionID); hit {
+		s.reportPublicShareThreat(r.payload, r.headers, r.ip, r.path, r.method, r.statusCode, r.contextSource, r.host,
+			r.sessionID, name, alert, severityForPolicy(alerting, name), publicShareReason(alert), r.skipThreat)
+	}
+}
+
 // checkBlockedHost evaluates the request against cached blocked-host rules via the mcp library.
 // Returns a block ValidationResult on a match, or nil to allow.
 func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID string, policies []types.Policy) *mcp.ValidationResult {
+	policyName, matchedPattern, ok := s.matchBlockedHost(params, valCtx, policies)
+	if !ok {
+		return nil
+	}
+	s.logger.Warn("ValidateRequest - blocking request via blocked-host policy",
+		zap.String("path", params.Path),
+		zap.String("method", params.Method),
+		zap.String("host", extractHostHeader(valCtx.RequestHeaders)),
+		zap.String("pattern", matchedPattern),
+		zap.String("policy", policyName),
+		zap.String("sessionID", sessionID),
+		zap.String("requestID", requestID))
+	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviourForPolicy(policies, policyName))
+}
+
+// matchBlockedHost returns the policy and pattern of the first blocked-host rule, among the
+// given policies, that the request matches.
+func (s *Service) matchBlockedHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, policies []types.Policy) (policyName, matchedPattern string, ok bool) {
 	s.cache.mu.RLock()
 	allRules := s.cache.blockedHosts
 	s.cache.mu.RUnlock()
 	if len(allRules) == 0 {
-		return nil
+		return "", "", false
 	}
 
 	// Narrow to rules from policies applicable to this server.
@@ -1572,7 +1631,7 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 		}
 	}
 	if len(scoped) == 0 {
-		return nil
+		return "", "", false
 	}
 
 	reqHost := extractHostHeader(valCtx.RequestHeaders)
@@ -1584,20 +1643,7 @@ func (s *Service) checkBlockedHost(params *models.ValidateRequestParams, valCtx 
 		zap.Int("ruleCount", len(scoped)),
 		zap.Strings("patterns", mcp.BlockedHostPatterns(scoped)))
 
-	policyName, matchedPattern, blocked := mcp.CheckBlockedHosts(valCtx.Tag, reqHost, params.Path, params.ContextSource, scoped)
-	if !blocked {
-		return nil
-	}
-
-	s.logger.Warn("ValidateRequest - blocking request via blocked-host policy",
-		zap.String("path", params.Path),
-		zap.String("method", params.Method),
-		zap.String("host", reqHost),
-		zap.String("pattern", matchedPattern),
-		zap.String("policy", policyName),
-		zap.String("sessionID", sessionID),
-		zap.String("requestID", requestID))
-	return s.reportAndBlockHost(params, valCtx, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviourForPolicy(policies, policyName))
+	return mcp.CheckBlockedHosts(valCtx.Tag, reqHost, params.Path, params.ContextSource, scoped)
 }
 
 // behaviourForPolicy returns the configured behaviour (lowercased) for the named policy,
@@ -1630,14 +1676,22 @@ func severityForPolicy(policies []types.Policy, policyName string) string {
 }
 
 func (s *Service) reportAndBlockHost(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID, requestID, policyName, matchedPattern, behaviour string) *mcp.ValidationResult {
-	reason := "Request blocked by guardrail policy (blocked host pattern: " + matchedPattern + ")"
-	metadata := types.ThreatMetadata{
+	return s.reportAndBlock(params, valCtx, payloadToValidate, sessionID, requestID, blockedHostMetadata(policyName, matchedPattern, behaviour), behaviour)
+}
+
+// blockedHostMetadata is worded to match the behaviour, like personalAccountReason.
+func blockedHostMetadata(policyName, matchedPattern, behaviour string) types.ThreatMetadata {
+	verb := "Request blocked"
+	if isAlertBehaviour(behaviour) {
+		verb = "Request alerted"
+	}
+	reason := verb + " by guardrail policy (blocked host pattern: " + matchedPattern + ")"
+	return types.ThreatMetadata{
 		PolicyName:   policyName,
 		RuleViolated: "BlockedHost",
 		Severity:     "HIGH",
 		Reason:       reason,
 	}
-	return s.reportAndBlock(params, valCtx, payloadToValidate, sessionID, requestID, metadata, behaviour)
 }
 
 // reportAndBlock tracks the block on the session, reports the threat and returns a block result.
@@ -1647,7 +1701,20 @@ func (s *Service) reportAndBlock(params *models.ValidateRequestParams, valCtx *m
 		s.sessionMgr.TrackResponse(sessionID, requestID, reason, true)
 		s.sessionMgr.UpdateBlockedReason(sessionID, reason)
 	}
+	s.reportGuardThreat(params, valCtx, payloadToValidate, sessionID, metadata, behaviour)
 
+	return &mcp.ValidationResult{
+		Allowed:         false,
+		Modified:        false,
+		ModifiedPayload: payloadToValidate,
+		Reason:          reason,
+		Metadata:        metadata,
+		Behaviour:       behaviour,
+	}
+}
+
+// reportGuardThreat reports a guard-check hit to threat activity, without enforcing it.
+func (s *Service) reportGuardThreat(params *models.ValidateRequestParams, valCtx *mcp.ValidationContext, payloadToValidate, sessionID string, metadata types.ThreatMetadata, behaviour string) {
 	if !params.EffectiveSkipThreat() {
 		go func() {
 			if err := mcp.ReportThreat(
@@ -1670,15 +1737,6 @@ func (s *Service) reportAndBlock(params *models.ValidateRequestParams, valCtx *m
 				s.logger.Warn("Failed to report threat for blocked host", zap.Error(err))
 			}
 		}()
-	}
-
-	return &mcp.ValidationResult{
-		Allowed:         false,
-		Modified:        false,
-		ModifiedPayload: payloadToValidate,
-		Reason:          reason,
-		Metadata:        metadata,
-		Behaviour:       behaviour,
 	}
 }
 
@@ -2411,14 +2469,28 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 	// Check account-type guardrail after server filtering so the policy's server
 	// selection is respected (a personal-account policy scoped to server A should
 	// not block requests arriving on server B).
-	if policyName, blocked := s.resolvePersonalAccountBlock(policies, valCtx.Tag, valCtx.FullRequest, params.Path, sessionID); blocked {
+	// Alert policies never stop the request: their guard-check hits are reported here and the
+	// checks below enforce only the policies that can block.
+	enforcing, alerting := partitionAlertPolicies(policies)
+	s.reportAlertGuardChecks(alerting, valCtx.Tag, valCtx.FullRequest, guardReport{
+		payload: payloadBare, ip: params.IP, path: params.Path, method: params.Method,
+		statusCode: params.StatusCode, contextSource: params.ContextSource,
+		host: extractHostHeader(valCtx.RequestHeaders), sessionID: sessionID,
+		headers: valCtx.RequestHeaders, skipThreat: params.EffectiveSkipThreat(),
+	})
+	if policyName, matchedPattern, hit := s.matchBlockedHost(params, valCtx, alerting); hit {
+		s.reportGuardThreat(params, valCtx, payloadBare, sessionID,
+			blockedHostMetadata(policyName, matchedPattern, string(mcp.BehaviourAlert)), string(mcp.BehaviourAlert))
+	}
+
+	if policyName, blocked := s.resolvePersonalAccountBlock(enforcing, valCtx.Tag, valCtx.FullRequest, params.Path, sessionID); blocked {
 		result := s.reportAndBlockPersonalAccount(ctx, params, payloadBare, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName), severityForPolicy(policies, policyName))
 		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadBare, sessionID)
 		return result, activityID, nil
 	}
 
 	// Public-share guardrail: block a share request that sets public visibility.
-	if policyName, blocked := s.resolvePublicShareBlock(policies, params.Path, params.Method, payloadBare, sessionID); blocked {
+	if policyName, blocked := s.resolvePublicShareBlock(enforcing, params.Path, params.Method, payloadBare, sessionID); blocked {
 		result := s.reportAndBlockPublicShare(params, payloadBare, sessionID, requestID, policyName, behaviourForPolicy(policies, policyName), severityForPolicy(policies, policyName))
 		result, activityID := s.pendingIfHumanApproval(ctx, result, policies, valCtx, params, payloadBare, sessionID)
 		return result, activityID, nil
@@ -2426,7 +2498,7 @@ func (s *Service) ValidateRequest(ctx context.Context, params *models.ValidateRe
 
 	// Host blocklist (block-only). Evaluated after server filtering so only rules from
 	// policies scoped to this server are considered.
-	if blockResult := s.checkBlockedHost(params, valCtx, payloadBare, sessionID, requestID, policies); blockResult != nil {
+	if blockResult := s.checkBlockedHost(params, valCtx, payloadBare, sessionID, requestID, enforcing); blockResult != nil {
 		blockResult, activityID := s.pendingIfHumanApproval(ctx, blockResult, policies, valCtx, params, payloadBare, sessionID)
 		return blockResult, activityID, nil
 	}
@@ -2821,6 +2893,8 @@ func (s *Service) ValidateRequestWithPolicy(
 		SessionID:     sessionID,
 		SkipThreat:    skipThreat,
 		AllowedLists:  mcpAllowedHostList,
+		// The playground shows what the policy detects, so an alert policy's verdict comes back.
+		InlineAlerts: true,
 	}
 
 	// Log detailed filter information
@@ -3050,7 +3124,13 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			// Personal-account guardrail — shared with ValidateRequest via
 			// resolvePersonalAccountBlock so the inline and ingest paths enforce it
 			// identically. Blocking here bypasses the normal payload processing below.
-			if policyName, blocked := s.resolvePersonalAccountBlock(itemPolicies, data.Tag, valCtx.FullRequest, data.Path, ""); blocked {
+			enforcing, alerting := partitionAlertPolicies(itemPolicies)
+			s.reportAlertGuardChecks(alerting, data.Tag, valCtx.FullRequest, guardReport{
+				payload: reqPayload, ip: data.IP, path: data.Path, method: data.Method,
+				statusCode: data.StatusCode, contextSource: itemContextSource, host: mcpServerName,
+				headers: reqHeaders, skipThreat: skipThreat,
+			})
+			if policyName, blocked := s.resolvePersonalAccountBlock(enforcing, data.Tag, valCtx.FullRequest, data.Path, ""); blocked {
 				behaviour := behaviourForPolicy(itemPolicies, policyName)
 				severity := severityForPolicy(itemPolicies, policyName)
 				blockReason := personalAccountReason(behaviour)
@@ -3075,7 +3155,7 @@ func (s *Service) ValidateBatch(ctx context.Context, batchData []models.IngestDa
 			}
 
 			// Public-share guardrail — shared with ValidateRequest via resolvePublicShareBlock.
-			if policyName, blocked := s.resolvePublicShareBlock(itemPolicies, data.Path, data.Method, reqPayload, ""); blocked {
+			if policyName, blocked := s.resolvePublicShareBlock(enforcing, data.Path, data.Method, reqPayload, ""); blocked {
 				behaviour := behaviourForPolicy(itemPolicies, policyName)
 				severity := severityForPolicy(itemPolicies, policyName)
 				blockReason := publicShareReason(behaviour)

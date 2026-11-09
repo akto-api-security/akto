@@ -1251,6 +1251,21 @@ const settingRequests = {
             data: {moduleIds, envData}
         })
     },
+    // Akto users only: validates the agents' stored skills again in a dashboard job
+    triggerSkillRevalidation(agentIds) {
+        return request({
+            url: '/api/triggerSkillRevalidation',
+            method: 'post',
+            data: {agentIds}
+        })
+    },
+    fetchSkillRevalidationJob() {
+        return request({
+            url: '/api/fetchSkillRevalidationJob',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchFilterYamlTemplate() {
         return request({
             url: '/api/fetchFilterYamlTemplate',
@@ -1332,18 +1347,28 @@ const settingRequests = {
     fetchFileInspectionRules() {
         return request({ url: '/api/fetchFileInspectionRules', method: 'post', data: {} })
     },
-    addFileInspectionRule(path, existenceOnly, maxDepth) {
+    addFileInspectionRule(path, existenceOnly, maxDepth, agent, os, role) {
         return request({
             url: '/api/addFileInspectionRule',
             method: 'post',
-            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0 }
+            data: { path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
         })
     },
-    deleteFileInspectionRule(path) {
+    updateFileInspectionRule(ruleId, path, existenceOnly, maxDepth, agent, os, role) {
+        return request({
+            url: '/api/updateFileInspectionRule',
+            method: 'post',
+            data: { ruleId, path, existenceOnly: !!existenceOnly, maxDepth: maxDepth ?? 0, agent, os, role }
+        })
+    },
+    restoreFileInspectionDefaults() {
+        return request({ url: '/api/restoreFileInspectionDefaults', method: 'post', data: {} })
+    },
+    deleteFileInspectionRule(ruleId) {
         return request({
             url: '/api/deleteFileInspectionRule',
             method: 'post',
-            data: { path }
+            data: { ruleId }
         })
     },
     fetchFileInspectionResults(ruleId) {
@@ -1460,6 +1485,27 @@ const settingRequests = {
             url: '/api/cancelEndpointRemoteCommand',
             method: 'post',
             data: { commandId }
+        })
+    },
+    updateMcpKnownClientsOnly(mcpKnownClientsOnly) {
+        return request({
+            url: '/api/updateMcpKnownClientsOnly',
+            method: 'post',
+            data: { mcpKnownClientsOnly }
+        })
+    },
+    addMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/addMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
+        })
+    },
+    deleteMcpAllowedRedirectUri(mcpRedirectUri) {
+        return request({
+            url: '/api/deleteMcpAllowedRedirectUri',
+            method: 'post',
+            data: { mcpRedirectUri }
         })
     }
 }
