@@ -51,6 +51,17 @@ public class AutomatedAgenticTestExecutor {
             .callTimeout(2, TimeUnit.MINUTES)
             .build();
 
+    private final String baseUrl;
+
+    public AutomatedAgenticTestExecutor() {
+        this(BASE_URL);
+    }
+
+    // The smart testing service's address; tests point it at a local server.
+    AutomatedAgenticTestExecutor(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
+
     public PentestExecutionResult executeAgenticTest(RawApi testReq, String testSubType) {
         return executeAgenticTest(testReq, testSubType, null);
     }
@@ -62,7 +73,7 @@ public class AutomatedAgenticTestExecutor {
             RequestBody requestBody = RequestBody.create(body, MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
-                    .url(BASE_URL + EXECUTE_ENDPOINT)
+                    .url(baseUrl + EXECUTE_ENDPOINT)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json");
@@ -128,7 +139,7 @@ public class AutomatedAgenticTestExecutor {
             RequestBody requestBody = RequestBody.create(objectMapper.writeValueAsString(payload), MediaType.parse("application/json"));
 
             Request.Builder requestBuilder = new Request.Builder()
-                    .url(BASE_URL + VERIFY_ENDPOINT)
+                    .url(baseUrl + VERIFY_ENDPOINT)
                     .post(requestBody)
                     .addHeader("Content-Type", "application/json")
                     .addHeader("Accept", "application/json");
