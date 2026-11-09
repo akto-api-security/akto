@@ -33,6 +33,11 @@ function McpOAuthConsent() {
     const [loading, setLoading] = useState(!!requestId)
     const [pendingAction, setPendingAction] = useState(null)
     const [confirmUnverified, setConfirmUnverified] = useState(false)
+    const [accountId, setAccountId] = useState(null)
+    const [accountError, setAccountError] = useState("")
+    const [switching, setSwitching] = useState(false)
+    // Bumped when a switch fails, so the account dropdown snaps back to the account in use
+    const [accountDropdownResets, setAccountDropdownResets] = useState(0)
     const submitting = pendingAction !== null
 
     // Hide the Intercom launcher on this screen
@@ -41,16 +46,33 @@ function McpOAuthConsent() {
         return () => window?.Intercom?.("update", { hide_default_launcher: false })
     }, [])
 
+    const applyInfo = (resp) => {
+        setInfo(resp)
+        setContextSource(resp.contextSource || "API")
+        setAccountId(resp.accountId)
+    }
+
     useEffect(() => {
         if (!requestId) return
         mcpOAuthRequests.fetchAuthorizeRequest(requestId)
-            .then((resp) => {
-                setInfo(resp)
-                setContextSource(resp.contextSource || "API")
-            })
+            .then(applyInfo)
             .catch((err) => setError(err?.response?.data?.actionErrors?.[0] || EXPIRED_MESSAGE))
             .finally(() => setLoading(false))
     }, [requestId])
+
+    // The products on offer depend on the account, so switching reloads them
+    const switchAccount = (newAccountId) => {
+        if (newAccountId === accountId) return
+        setAccountError("")
+        setSwitching(true)
+        mcpOAuthRequests.fetchAuthorizeRequest(requestId, newAccountId)
+            .then(applyInfo)
+            .catch((err) => {
+                setAccountError(err?.response?.data?.actionErrors?.[0] || EXPIRED_MESSAGE)
+                setAccountDropdownResets((count) => count + 1)
+            })
+            .finally(() => setSwitching(false))
+    }
 
     // Both outcomes return to the MCP client via its redirect URL
     const submit = async (actionName, action) => {
@@ -101,7 +123,24 @@ function McpOAuthConsent() {
                     <VerticalStack gap="4">
                         <DetailRow label="Signed in as" value={info.userLogin} />
                         <Divider />
-                        <DetailRow label="Account" value={info.accountName} />
+                        {info.accounts?.length > 1 ? (
+                            <VerticalStack gap="2">
+                                <DropdownSearch
+                                    key={`account-${accountId}-${accountDropdownResets}`}
+                                    id="mcp-oauth-account"
+                                    label="Account"
+                                    placeholder="Select an account"
+                                    optionsList={info.accounts.map((account) => ({ label: account.name, value: account.id }))}
+                                    setSelected={switchAccount}
+                                    preSelected={[accountId]}
+                                    value={info.accountName}
+                                    disabled={switching || submitting}
+                                />
+                                {accountError ? <Banner status="critical">{accountError}</Banner> : null}
+                            </VerticalStack>
+                        ) : (
+                            <DetailRow label="Account" value={info.accountName} />
+                        )}
                         <Divider />
                         <DetailRow label="Redirects to" value={info.redirectUri || info.redirectHost} />
                     </VerticalStack>
@@ -110,6 +149,7 @@ function McpOAuthConsent() {
                     <VerticalStack gap="3">
                         {allowedOptions.length > 1 ? (
                             <DropdownSearch
+                                key={`product-${accountId}`}
                                 id="mcp-oauth-product"
                                 label="Product"
                                 placeholder="Select a product"
@@ -131,10 +171,10 @@ function McpOAuthConsent() {
                     <VerticalStack gap="4">
                         <HorizontalStack gap="3" wrap={false}>
                             <Box width="100%">
-                                <Button fullWidth disabled={submitting && pendingAction !== "deny"} loading={pendingAction === "deny"} onClick={() => submit("deny", () => mcpOAuthRequests.denyAuthorizeRequest(requestId))}>Deny</Button>
+                                <Button fullWidth disabled={switching || (submitting && pendingAction !== "deny")} loading={pendingAction === "deny"} onClick={() => submit("deny", () => mcpOAuthRequests.denyAuthorizeRequest(requestId))}>Deny</Button>
                             </Box>
                             <Box width="100%">
-                                <Button fullWidth primary disabled={(submitting && pendingAction !== "allow") || (info.unverifiedRedirect && !confirmUnverified)} loading={pendingAction === "allow"} onClick={() => submit("allow", () => mcpOAuthRequests.approveAuthorizeRequest(requestId, contextSource, confirmUnverified))}>Allow access</Button>
+                                <Button fullWidth primary disabled={switching || (submitting && pendingAction !== "allow") || (info.unverifiedRedirect && !confirmUnverified)} loading={pendingAction === "allow"} onClick={() => submit("allow", () => mcpOAuthRequests.approveAuthorizeRequest(requestId, contextSource, confirmUnverified, accountId))}>Allow access</Button>
                             </Box>
                         </HorizontalStack>
                         <Text as="p" variant="bodySm" color="subdued" alignment="center">

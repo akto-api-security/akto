@@ -1,8 +1,10 @@
 package com.akto.action;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
@@ -18,13 +20,17 @@ import com.akto.dto.Account;
 import com.akto.dto.McpOAuthClient;
 import com.akto.dto.McpOAuthGrant;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.User;
+import com.akto.dto.UserAccountEntry;
 import com.akto.util.Constants;
 import com.akto.util.McpClientPolicy;
 import com.akto.util.McpOAuthUtils;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -40,6 +46,7 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
     private static final String NOT_APPROVED_MESSAGE = "Your admin only allows approved MCP clients, and %s is not approved. Ask an admin to allow it.";
     private static final String CONFIRM_UNVERIFIED_MESSAGE = "Confirm that you trust this app to continue.";
     private static final String NO_PRODUCT_ACCESS_MESSAGE = "You don't have access to any Akto product in this account. Ask an admin for access.";
+    private static final String ACCOUNT_NOT_ALLOWED_MESSAGE = "You don't have access to this account.";
 
     // Request params; the fields below are response-only
     @Setter
@@ -48,6 +55,9 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
     private String contextSource;
     @Setter
     private boolean confirmUnverified;
+    // The account to connect; the response returns the one in use (defaults to the session's account)
+    @Setter
+    private Integer accountId;
 
     private String clientName;
     private String redirectHost;
@@ -58,11 +68,64 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
     private boolean unverifiedRedirect;
     private String redirectUri;
     private int clientCreatedAt;
+    private List<AccountOption> accounts;
+
+    @Getter
+    @AllArgsConstructor
+    public static class AccountOption {
+        private int id;
+        private String name;
+    }
 
     @Getter(AccessLevel.NONE)
     private HttpServletRequest servletRequest;
 
     public String fetchAuthorizeRequest() {
+        return inChosenAccount(this::loadAuthorizeRequest);
+    }
+
+    public String approveAuthorizeRequest() {
+        return inChosenAccount(this::approveRequest);
+    }
+
+    // Runs with the chosen account as the request's account, so the policy, roles and name all belong to it
+    private String inChosenAccount(Supplier<String> body) {
+        Integer original = Context.accountId.get();
+        Integer target = accountId != null ? accountId : original;
+        if (target == null || !belongsToAccount(target)) {
+            addActionError(ACCOUNT_NOT_ALLOWED_MESSAGE);
+            return ERROR.toUpperCase();
+        }
+        accountId = target;
+        Context.accountId.set(target);
+        try {
+            return body.get();
+        } finally {
+            Context.accountId.set(original);
+        }
+    }
+
+    private boolean belongsToAccount(int id) {
+        User user = getSUser();
+        Map<String, UserAccountEntry> userAccounts = user == null ? null : user.getAccounts();
+        return userAccounts != null && userAccounts.containsKey(String.valueOf(id));
+    }
+
+    // The accounts the user can pick from, by name
+    private List<AccountOption> accountOptions() {
+        List<Integer> ids = new ArrayList<>();
+        for (UserAccountEntry entry : getSUser().getAccounts().values()) {
+            ids.add(entry.getAccountId());
+        }
+        List<AccountOption> options = new ArrayList<>();
+        for (Account account : AccountsDao.instance.findAll(Filters.in(Constants.ID, ids), Projections.include("name"))) {
+            options.add(new AccountOption(account.getId(), account.getName() == null ? String.valueOf(account.getId()) : account.getName()));
+        }
+        options.sort(Comparator.comparing(AccountOption::getName, String.CASE_INSENSITIVE_ORDER));
+        return options;
+    }
+
+    private String loadAuthorizeRequest() {
         McpOAuthGrant request = McpOAuthGrantsDao.instance.find(hashOfRequestId(), McpOAuthGrant.TYPE_REQUEST);
         if (request == null) {
             return expired();
@@ -86,6 +149,7 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
         Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, currentAccountId));
         accountName = account == null ? String.valueOf(currentAccountId) : account.getName();
         userLogin = getSUser().getLogin();
+        accounts = accountOptions();
         allowedContexts = accessibleContexts();
         if (allowedContexts.isEmpty()) {
             addActionError(NO_PRODUCT_ACCESS_MESSAGE);
@@ -96,7 +160,7 @@ public class McpOAuthConsentAction extends UserAction implements ServletRequestA
         return SUCCESS.toUpperCase();
     }
 
-    public String approveAuthorizeRequest() {
+    private String approveRequest() {
         // Tokens and API keys must not approve clients, or they could mint refresh tokens
         if (!isInteractiveSession()) {
             addActionError(INTERACTIVE_LOGIN_REQUIRED_MESSAGE);
