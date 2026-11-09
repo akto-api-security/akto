@@ -12,6 +12,7 @@ public enum Resource {
     TEST_EDITOR,
     TEST_RESULTS,
     TEST_ROLE,
+    TEST_SCRIPT,
     TESTING_RUN,
     TRACES_CONTENT,
     USER_ACCESS,

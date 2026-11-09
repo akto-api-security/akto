@@ -1,134 +1,125 @@
 package com.akto.action.testing;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import java.util.List;
 
 import org.apache.commons.lang3.NotImplementedException;
-import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
+import com.akto.audit_logs_util.Audit;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.User;
+import com.akto.dto.audit_logs.Operation;
+import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.testing.config.TestScript;
-import com.akto.util.DashboardMode;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Updates;
+import com.akto.dto.testing.config.TestScriptSummary;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.service.scripts.TestScriptException;
+import com.akto.service.scripts.TestScriptService;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
+import lombok.Setter;
+
+/** Request handling for the pre/post request script library. Rules live in TestScriptService. */
 public class ScriptAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ScriptAction.class, LogDb.DASHBOARD);
+
+    private final TestScriptService testScriptService = new TestScriptService();
 
     @Override
     public String execute() throws Exception {
         throw new NotImplementedException();
     }
 
-    private TestScript testScript;
+    // request
+    @Getter @Setter
+    private String scriptId;
+    @Setter
+    private String name;
+    @Setter
     private String scriptType;
+    @Setter
+    private String javascript;
 
-    boolean aktoUser(){
-        User user = getSUser();
+    // response
+    @Getter
+    private TestScript testScript;
+    @Getter
+    private List<TestScriptSummary> scripts;
 
-        if(user==null || user.getLogin()==null || user.getLogin().isEmpty()){
-            return false;
+    public String fetchAllScripts() {
+        try {
+            this.scripts = testScriptService.listSummaries();
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            return unexpected(e, "fetchAllScripts", "Failed to load scripts");
         }
-
-        if(user.getLogin().contains("@akto.io")){
-            return true;
-        }
-        return false;
     }
 
-    private static final Set<Integer> whiteListedAccounts = new HashSet<>(Arrays.asList(
-        1764738582,
-        1789954857
-    ));
-
-    boolean isWhiteListedAccount(){
-        int accountId = Context.accountId.get();
-        return whiteListedAccounts.contains(accountId);
+    public String fetchScript() {
+        try {
+            this.testScript = testScriptService.get(this.scriptId);
+            return Action.SUCCESS.toUpperCase();
+        } catch (TestScriptException e) {
+            return rejected(e);
+        } catch (Exception e) {
+            return unexpected(e, "fetchScript", "Failed to load script");
+        }
     }
 
     public String addScript() {
-
-        if (DashboardMode.isSaasDeployment() && !(aktoUser() || isWhiteListedAccount()) ) {
-            return Action.ERROR.toUpperCase();
+        try {
+            User user = getSUser();
+            testScriptService.requireWriteAccess(user, Context.accountId.get());
+            this.testScript = testScriptService.create(this.name, this.scriptType, this.javascript, loginOf(user));
+            return Action.SUCCESS.toUpperCase();
+        } catch (TestScriptException e) {
+            return rejected(e);
+        } catch (Exception e) {
+            return unexpected(e, "addScript", "Failed to create script");
         }
-
-        if (this.testScript == null || this.testScript.getJavascript() == null) {
-            return Action.ERROR.toUpperCase();
-        }
-
-        TestScript.Type type = resolveScriptType(this.testScript.getType(), this.scriptType, TestScript.Type.PRE_REQUEST);
-        TestScriptsDao.instance.insertOne(
-            new TestScript(
-                UUID.randomUUID().toString(),
-                this.testScript.getJavascript(),
-                type,
-                getSUser().getLogin(),
-                Context.now()
-            )
-        );
-
-        return Action.SUCCESS.toUpperCase();
-    }
-    
-    public String fetchScript() {
-        TestScript.Type type = resolveScriptType(this.testScript != null ? this.testScript.getType() : null, this.scriptType, TestScript.Type.PRE_REQUEST);
-        this.testScript = TestScriptsDao.instance.fetchTestScript(type);
-        return Action.SUCCESS.toUpperCase();
     }
 
-    private static TestScript.Type resolveScriptType(TestScript.Type fromTestScript, String scriptTypeStr, TestScript.Type defaultType) {
-        if (fromTestScript != null) {
-            return fromTestScript;
-        }
-        if (scriptTypeStr != null && !scriptTypeStr.isEmpty()) {
-            try {
-                return TestScript.Type.valueOf(scriptTypeStr);
-            } catch (IllegalArgumentException e) {
-                return defaultType;
-            }
-        }
-        return defaultType;
-    }
-    
     public String updateScript() {
-
-        if (DashboardMode.isSaasDeployment() && !(aktoUser() || isWhiteListedAccount()) ) {
-            return Action.ERROR.toUpperCase();
+        try {
+            User user = getSUser();
+            testScriptService.requireWriteAccess(user, Context.accountId.get());
+            this.testScript = testScriptService.updateJavascript(this.scriptId, this.javascript, loginOf(user));
+            return Action.SUCCESS.toUpperCase();
+        } catch (TestScriptException e) {
+            return rejected(e);
+        } catch (Exception e) {
+            return unexpected(e, "updateScript", "Failed to update script");
         }
-        
-        if (this.testScript == null || this.testScript.getJavascript() == null) {
-            return Action.ERROR.toUpperCase();
+    }
+
+    @Audit(description = "User deleted a test script", resource = Resource.TEST_SCRIPT, operation = Operation.DELETE, metadataGenerators = {"getScriptId"})
+    public String deleteScript() {
+        try {
+            testScriptService.requireWriteAccess(getSUser(), Context.accountId.get());
+            testScriptService.delete(this.scriptId);
+            return Action.SUCCESS.toUpperCase();
+        } catch (TestScriptException e) {
+            return rejected(e);
+        } catch (Exception e) {
+            return unexpected(e, "deleteScript", "Failed to delete script");
         }
-
-        Bson filterQ = Filters.eq("_id", testScript.getId());
-        Bson updateQ =
-            Updates.combine(
-                Updates.set(TestScript.JAVASCRIPT, this.testScript.getJavascript()),
-                Updates.set(TestScript.AUTHOR, getSUser().getLogin()),
-                Updates.set(TestScript.LAST_UPDATED_AT, Context.now())
-            );
-        TestScriptsDao.instance.updateOne(filterQ, updateQ);
-        return Action.SUCCESS.toUpperCase();
-    }
-    
-    public TestScript getTestScript() {
-        return testScript;
     }
 
-    public void setTestScript(TestScript testScript) {
-        this.testScript = testScript;
+    private String rejected(TestScriptException e) {
+        addActionError(e.getMessage());
+        return Action.ERROR.toUpperCase();
     }
 
-    public String getScriptType() {
-        return scriptType;
+    private String unexpected(Exception e, String operation, String userMessage) {
+        loggerMaker.errorAndAddToDb(e, "error in " + operation + " for script " + this.scriptId);
+        addActionError(userMessage);
+        return Action.ERROR.toUpperCase();
     }
 
-    public void setScriptType(String scriptType) {
-        this.scriptType = scriptType;
+    private static String loginOf(User user) {
+        return user == null ? null : user.getLogin();
     }
 }
