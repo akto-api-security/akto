@@ -55,15 +55,6 @@ public class TestScriptsDao extends AccountsContextDao<TestScript> {
         );
     }
 
-    /**
-     * @deprecated The pre-library one-script-per-type read, kept only so existing callers compile until
-     * they move to the TestScriptProvider chain. Reads the legacy store exactly as before.
-     */
-    @Deprecated
-    public TestScript fetchTestScript(TestScript.Type type) {
-        return type == null ? null : TestCollectionPropertiesDao.instance.findLegacyTestScript(type);
-    }
-
     @Override
     public String getCollName() {
         return COLLECTION_NAME;
