@@ -6,8 +6,10 @@ env var (see get_default_config) so two workers sharing this code can run
 different model maps; BUILTIN_DEFAULT_CONFIG is the last-resort fallback.
 """
 
+import functools
 import json
 import logging
+import re
 from typing import Any
 
 from settings import settings
@@ -77,6 +79,64 @@ def get_default_config(raw_json: str = "") -> dict[str, Any]:
     return _parse_deployment_config(raw_json) or BUILTIN_DEFAULT_CONFIG
 
 
+_PER_POD_ENV = "PER_POD_MODEL_CONFIGS_JSON"
+
+
+def _pod_index(pod_name: str) -> int | None:
+    """The StatefulSet ordinal a pod name ends in (agent-guard-2 → 2), else None."""
+    match = re.search(r"-(\d+)$", pod_name)
+    return int(match.group(1)) if match else None
+
+
+@functools.lru_cache(maxsize=4)
+def _resolve_pod_model_configs(raw_json: str, pod_name: str) -> dict[str, dict[str, Any]]:
+    """Parse PER_POD_MODEL_CONFIGS_JSON once per (value, pod), logging the outcome once.
+    Any problem logs an error and yields {} so the pod keeps the shared default — never
+    another pod's entry."""
+    if not raw_json.strip():
+        return {}
+    try:
+        entries = json.loads(raw_json)
+    except Exception as exc:
+        logger.error(f"[constants] {_PER_POD_ENV} parse failed ({exc}); using the shared default")
+        return {}
+    if not isinstance(entries, list):
+        logger.error(f"[constants] {_PER_POD_ENV} must be a JSON list; using the shared default")
+        return {}
+    index = _pod_index(pod_name)
+    if index is None or index >= len(entries) or not isinstance(entries[index], dict):
+        logger.error(
+            f"[constants] {_PER_POD_ENV}: no usable entry for POD_NAME={pod_name!r} "
+            f"(index {index}, {len(entries)} entries); using the shared default"
+        )
+        return {}
+    chosen: dict[str, dict[str, Any]] = {}
+    for key, cfg in entries[index].items():
+        scanner = canonical_scanner(key)
+        if scanner not in PER_POD_CONFIG_SCANNERS:
+            allowed = sorted(PER_POD_CONFIG_SCANNERS)
+            logger.error(f"[constants] {_PER_POD_ENV}[{index}]: {key!r} not in {allowed}; ignored")
+        elif not (isinstance(cfg, dict) and cfg.get("modelConfigs")):
+            logger.error(f"[constants] {_PER_POD_ENV}[{index}].{key} has no modelConfigs; ignored")
+        else:
+            chosen[scanner] = cfg
+    fields = ("modelRole", "provider", "model", "baseUrl")
+    summary = {s: [tuple(e.get(f) for f in fields) for e in cfg["modelConfigs"]] for s, cfg in chosen.items()}
+    logger.info(f"[constants] pod {pod_name} uses {_PER_POD_ENV}[{index}]: {summary}")
+    return chosen
+
+
+def pod_model_configs() -> dict[str, dict[str, Any]]:
+    """This pod's own default config per PER_POD_CONFIG_SCANNERS scanner ({} when unset)."""
+    return _resolve_pod_model_configs(settings.PER_POD_MODEL_CONFIGS_JSON, settings.POD_NAME)
+
+
+def get_scanner_default_config(scanner_name: str) -> dict[str, Any]:
+    """The fallback config for a request with no modelConfigs: this pod's own entry for
+    the scanner when PER_POD_MODEL_CONFIGS_JSON has one, else get_default_config."""
+    return pod_model_configs().get(scanner_name) or get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+
+
 # Routing tables — the single source of truth for which backend handles a scan.
 # BanCode is LLM-judged (code detection via the Gemma arbiter), not the old
 # heuristic — see GEMMA_ONLY_SCANNERS for why it skips the Qwen tier.
@@ -93,6 +153,9 @@ GEMMA_ONLY_SCANNERS = {"BanCode", "Password"}
 # holds regardless of caller (policy modelConfigs, or a direct /scan hit with no
 # config at all), not just the Go gateway's own hardcode.
 SINGLE_MODEL_SCANNERS = {"Password"}
+# Scanners whose default modelConfigs may differ per pod (PER_POD_MODEL_CONFIGS_JSON) —
+# e.g. pin each pod to its own GPU endpoint. A request's own modelConfigs still wins.
+PER_POD_CONFIG_SCANNERS = {"PromptInjection", "Toxicity"}
 
 
 def _gemma_arbiter_provider() -> str:

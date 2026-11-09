@@ -19,8 +19,8 @@ from constants import (
     SUPPORTED_SCANNERS,
     apply_scanner_response_format,
     canonical_scanner,
-    get_default_config,
     get_enrichment_config,
+    get_scanner_default_config,
     single_model_config,
     strip_qwen_tier,
 )
@@ -29,7 +29,6 @@ from model_map import build_arbiter
 from prompts import build_reason_prompt
 from remote_scanner import scan_anonymize
 from scanners import scan_local
-from settings import settings
 
 ScheduleFn = Callable[[Coroutine[Any, Any, None]], None]
 
@@ -66,14 +65,14 @@ async def _generate_reason(payload: dict) -> dict:
     """Explain an already-decided block: one call to the FINAL_ARBITER entry, asking
     only for the reason — not a fresh verdict. Every scanner shares this one prompt.
     ENRICHMENT_MODEL_CONFIG_JSON, when set, wins over the policy's modelConfigs so the
-    core model is kept for verdicts; unset, the policy's (else the default) config is used."""
+    core model is kept for verdicts; unset, the policy's (else this pod's / the default) config is used."""
     scanner_name = canonical_scanner(payload.get("scanner_name", ""))
     text = payload.get("text", "")
     model_configs = (get_enrichment_config() or {}).get("modelConfigs")
     if not model_configs:
         model_configs = (payload.get("config") or {}).get("modelConfigs")
     if not model_configs:
-        model_configs = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)["modelConfigs"]
+        model_configs = get_scanner_default_config(scanner_name)["modelConfigs"]
     provider = build_arbiter(model_configs)
     if provider is None:
         return shape_response(scanner_name, True, 0.0, text, {"reason": ""})
@@ -135,7 +134,7 @@ async def scan_payload(
 
     if scanner_name in CASCADE_SCANNERS:
         if not config.get("modelConfigs"):
-            default_cfg = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON)
+            default_cfg = get_scanner_default_config(scanner_name)
             config = {**default_cfg, **config, "modelConfigs": default_cfg["modelConfigs"]}
         if scanner_name in SINGLE_MODEL_SCANNERS:
             config = {**config, "modelConfigs": single_model_config()}

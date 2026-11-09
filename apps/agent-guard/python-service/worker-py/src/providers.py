@@ -1297,7 +1297,8 @@ def build_provider_from_config(entry: dict[str, Any]) -> LLMProvider | None:
 # ── Startup self-check ───────────────────────────────────────────────────────
 # Fires one real, minimal request at each provider ACTUALLY configured in the
 # cascade (DEFAULT_MODEL_CONFIG_JSON, falling back to the same built-in
-# default a real request would use) right after process boot and logs
+# default a real request would use, plus this pod's PER_POD_MODEL_CONFIGS_JSON
+# entry) right after process boot and logs
 # PASS/FAIL immediately — a signal within seconds of deploy, not whenever the
 # first real scan happens to hit that exact role.
 #
@@ -1340,9 +1341,11 @@ async def startup_self_check() -> None:
     """Run a check for every entry in the actually-configured cascade
     concurrently; never raises — failures are logged, not propagated, so a
     bad model never blocks boot."""
-    from constants import get_default_config
+    from constants import get_default_config, pod_model_configs
 
-    entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", [])
+    entries = get_default_config(settings.DEFAULT_MODEL_CONFIG_JSON).get("modelConfigs", []) + [
+        e for cfg in pod_model_configs().values() for e in cfg["modelConfigs"]
+    ]
     logger.info(f"[StartupCheck] checking {len(entries)} configured cascade entries")
     await asyncio.gather(*(_startup_check_entry(e) for e in entries), return_exceptions=True)
     logger.info("[StartupCheck] done")
