@@ -570,25 +570,39 @@ export default {
             data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
-    fetchScript(scriptType = 'PRE_REQUEST') {
+    fetchAllScripts() {
+        return request({
+            url: '/api/fetchAllScripts',
+            method: 'post',
+            data: {}
+        })
+    },
+    fetchScript(scriptId) {
         return request({
             url: '/api/fetchScript',
             method: 'post',
-            data: { scriptType }
+            data: { scriptId }
         })
     },
-    addScript({ javascript, scriptType = 'PRE_REQUEST' }) {
+    addScript({ name, scriptType, javascript }) {
         return request({
             url: '/api/addScript',
             method: 'post',
-            data: { testScript: { javascript, type: scriptType } }
+            data: { name, scriptType, javascript }
         })
     },
-    updateScript(id, javascript) {
+    updateScript(scriptId, javascript) {
         return request({
             url: '/api/updateScript',
             method: 'post',
-            data: {testScript:{id, javascript}}
+            data: { scriptId, javascript }
+        })
+    },
+    deleteScript(scriptId) {
+        return request({
+            url: '/api/deleteScript',
+            method: 'post',
+            data: { scriptId }
         })
     },
     updateDeltaTimeForSummaries(deltaTimeForScheduledSummaries){

@@ -20,6 +20,7 @@ import settingsApi from "../../settings/api";
 import { usePermissions, whenAllowed } from "@/util/permissions";
 import {getCategoriesBasedOnDashboardCategory, filterSubCategoriesBasedOnCategories } from "../../test_editor/tests_table/categoryUtil";
 import AllowedAction from "../../../components/shared/AllowedAction";
+import { SCRIPT_TYPES, defaultSelectionForType } from "../../testing/scripts/scriptTypes";
 
 const initialAutoTicketingDetails = {
     shouldCreateTickets: false,
@@ -51,6 +52,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         authMechanismPresent: false,
         testRoleLabel: "No test role selected",
         testRoleId: "",
+        // undefined until the library loads; an unset id makes the backend use the default script
+        preRequestScriptId: undefined,
+        postRequestScriptId: undefined,
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
@@ -66,6 +70,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     const [testRun, setTestRun] = useState({
         ...initialState
     })
+    const [scriptsState, setScriptsState] = useState({ enabled: false, failed: false, scripts: [] })
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [loading, setLoading] = useState(true)
     const [testRolesArr, setTestRolesArr] = useState([])
@@ -203,6 +208,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         })
         testRoles.unshift({ "label": "No test role selected", "value": "" })
         setTestRolesArr(testRoles)
+        await loadScripts()
         const { selectedCategory, mapCategoryToSubcategory } = populateMapCategoryToSubcategory(businessLogicSubcategories)
         // Store all tests
         const processMapCategoryToSubcategory = {}
@@ -300,6 +306,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                     maxConcurrentRequests: testIdConfig.maxConcurrentRequests,
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
+                    preRequestScriptId: testIdConfig?.testingRunConfig?.preRequestScriptId ?? null,
+                    postRequestScriptId: testIdConfig?.testingRunConfig?.postRequestScriptId ?? null,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label,
                     runTypeLabel: func.getRunTypeLabel(testRunType, testIdConfig?.periodInSeconds),
@@ -608,7 +616,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed, runAutomatedTests } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed, runAutomatedTests, preRequestScriptId, postRequestScriptId } = testRun
+        const scriptSelection = { preRequestScriptId, postRequestScriptId }
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
@@ -657,11 +666,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, scriptSelection)
         } else if (isMultiCollection) {
-            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests)
+            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests, scriptSelection)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, scriptSelection)
         }
 
         setActive(false)
@@ -675,6 +684,24 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
 
         func.setToast(true, false, <div data-testid="test_run_created_message">{forwardLink}</div>)
 
+    }
+
+    async function loadScripts() {
+        if (!func.checkForFeatureSaas("TEST_PRE_SCRIPT") || !canCall('api/fetchAllScripts')) return
+        try {
+            const resp = await testingApi.fetchAllScripts()
+            const scripts = resp?.scripts || []
+            setScriptsState({ enabled: true, failed: false, scripts })
+            // new runs preselect the default script; an existing config's stored value is kept as is
+            setTestRun(prev => ({
+                ...prev,
+                preRequestScriptId: prev.preRequestScriptId === undefined ? defaultSelectionForType(scripts, SCRIPT_TYPES.PRE_REQUEST) : prev.preRequestScriptId,
+                postRequestScriptId: prev.postRequestScriptId === undefined ? defaultSelectionForType(scripts, SCRIPT_TYPES.POST_REQUEST) : prev.postRequestScriptId,
+            }))
+        } catch (e) {
+            // ids stay unset, so the run keeps today's behaviour (default scripts); the form says so
+            setScriptsState({ enabled: true, failed: true, scripts: [] })
+        }
     }
 
     function getLabel(objList, value) {
@@ -842,6 +869,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
             generateLabelForJiraIntegration={generateLabelForJiraIntegration}
             miniTestingServiceNames={miniTestingServiceNames}
             slackChannels={slackChannels}
+            scriptsState={scriptsState}
         />
     )
 

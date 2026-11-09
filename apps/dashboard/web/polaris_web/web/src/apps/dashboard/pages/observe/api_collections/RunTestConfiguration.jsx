@@ -1,12 +1,14 @@
 import React, { useEffect, useReducer, useState } from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack } from '@shopify/polaris';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack, Text } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import ScriptSelectDropdown from '../../testing/scripts/ScriptSelectDropdown';
+import { SCRIPT_TYPES } from '../../testing/scripts/scriptTypes';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, maxAgentTokensOptions, isAgenticCategory, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration, scriptsState}) => {
     console.log("isAgenticCategory in config", isAgenticCategory)
     const reducer = (state, action) => {
         switch (action.type) {
@@ -203,6 +205,24 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             }));
                         }} />
             </HorizontalGrid>
+            {scriptsState?.enabled && (scriptsState.failed ? (
+                <Text as="p" color="subdued">Scripts could not be loaded, so this run will use the default scripts (default-test-pre / default-test-post) if they exist.</Text>
+            ) : (
+                <HorizontalGrid gap={"4"} columns={"3"}>
+                    <ScriptSelectDropdown
+                        type={SCRIPT_TYPES.PRE_REQUEST}
+                        scripts={scriptsState.scripts}
+                        value={testRun.preRequestScriptId}
+                        onChange={(scriptId) => setTestRun(prev => ({ ...prev, preRequestScriptId: scriptId }))}
+                    />
+                    <ScriptSelectDropdown
+                        type={SCRIPT_TYPES.POST_REQUEST}
+                        scripts={scriptsState.scripts}
+                        value={testRun.postRequestScriptId}
+                        onChange={(scriptId) => setTestRun(prev => ({ ...prev, postRequestScriptId: scriptId }))}
+                    />
+                </HorizontalGrid>
+            ))}
             {isAgenticCategory && (
                 <HorizontalGrid gap={"4"} columns={"3"}>
                     <Dropdown

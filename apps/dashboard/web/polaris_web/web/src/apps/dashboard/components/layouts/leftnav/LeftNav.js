@@ -410,7 +410,17 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_testing_test_suite",
-                    }
+                    },
+                    ...(func.checkForFeatureSaas("TEST_PRE_SCRIPT") ? [{
+                        label: "Scripts",
+                        onClick: () => {
+                            navigate("/dashboard/testing/scripts");
+                            handleSelect("dashboard_testing_scripts");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_testing_scripts",
+                        requires: pageRequires("/dashboard/testing/scripts"),
+                    }] : []),
                 ],
                 key: "4",
             }] : []),

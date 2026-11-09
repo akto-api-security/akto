@@ -102,6 +102,7 @@ import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPa
 import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
 import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/ConfigureIgnoredEventsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
+import ScriptsPage from "../dashboard/pages/testing/scripts/ScriptsPage";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import Datadog from "../dashboard/pages/settings/integrations/Datadog";
@@ -231,6 +232,10 @@ const router = createBrowserRouter([
                             {
                               path:"test-suite",
                               element:<TestSuite/>
+                            },
+                            {
+                              path:"scripts",
+                              element:<ScriptsPage/>
                             }
                         ]
                     },
