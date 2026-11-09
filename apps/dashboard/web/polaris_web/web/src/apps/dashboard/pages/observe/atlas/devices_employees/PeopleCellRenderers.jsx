@@ -3,8 +3,8 @@ import func from "@/util/func";
 import AgGridRow from "../../../../components/tables/rows/AgGridRow";
 import { OsIcon } from "../../agentic/DeviceEndpoints";
 import MisconfiguredBadge from "../../agentic/MisconfiguredBadge";
-import { RiskScoreCellRenderer, ViolationsCellRenderer as SeverityViolationsCellRenderer } from "../../agentic/AgenticCellRenderers";
-import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, MODE_LABELS, OS_ICON_KEYS, osLabel } from "./peopleConstants";
+import { RiskScoreCellRenderer, SeverityBadge } from "../../agentic/AgenticCellRenderers";
+import { BROWSER_ICONS, GENERIC_BROWSER_ICON, HEALTH_BADGE_STATUS, HEALTH_LABELS, MODE_LABELS, OS_ICON_KEYS, formatNumber, osLabel } from "./peopleConstants";
 
 function Unavailable({ what }) {
     return (
@@ -81,16 +81,22 @@ export function OwnerCellRenderer({ value }) {
 }
 
 export function CountCellRenderer({ value }) {
-    return <Text as="span" color={value ? undefined : "subdued"}>{value ?? 0}</Text>;
+    return <Text as="span" color={value ? undefined : "subdued"}>{formatNumber(value)}</Text>;
 }
 
 export function UnapprovedCellRenderer({ value }) {
-    return <Text as="span" color={value ? "critical" : "subdued"} fontWeight={value ? "semibold" : "regular"}>{value ?? 0}</Text>;
+    return <Text as="span" color={value ? "critical" : "subdued"} fontWeight={value ? "semibold" : "regular"}>{formatNumber(value)}</Text>;
 }
 
 export function ViolationsCellRenderer(params) {
     if (params.context?.violationsAvailable === false) return <Unavailable what="Violation" />;
-    return <SeverityViolationsCellRenderer {...params} />;
+    const parts = ["critical", "high", "medium", "low"].filter((severity) => params.value?.[severity] > 0);
+    if (!parts.length) return <Text as="span" color="subdued">-</Text>;
+    return (
+        <HorizontalStack gap="1" blockAlign="center" wrap={false}>
+            {parts.map((severity) => <SeverityBadge key={severity} severity={severity}>{formatNumber(params.value[severity])}</SeverityBadge>)}
+        </HorizontalStack>
+    );
 }
 
 export function RiskCellRenderer(params) {

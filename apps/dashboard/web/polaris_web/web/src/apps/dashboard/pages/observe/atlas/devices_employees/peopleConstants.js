@@ -112,6 +112,8 @@ export const SEVERITY_SEGMENTS = [
 
 export const TREND_MONTH_WIDTH = 84;
 
+export const formatNumber = (value) => Number(value ?? 0).toLocaleString("en-US");
+
 export const FLYOUT_GRAPH_LIMIT = 8;
 export const FLYOUT_GRAPH_STEP = 16;
 

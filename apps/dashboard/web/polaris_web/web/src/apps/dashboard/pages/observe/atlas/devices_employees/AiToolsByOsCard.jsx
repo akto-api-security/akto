@@ -1,7 +1,6 @@
 import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
-import Pressable from "../../../dashboard/ask/components/Pressable";
 import InfoCard from "../../../dashboard/new_components/InfoCard";
-import { LegendDot } from "../../agentic/AgenticStatsCard";
+import { BreakdownChip } from "../../agentic/AgenticStatsCard";
 import SegmentBar from "../../../../components/shared/SegmentBar";
 import { CATEGORY_BACKGROUNDS, CATEGORY_LABELS, CATEGORY_ORDER, osLabel, tokenVar } from "./peopleConstants";
 import transform from "./transform";
@@ -17,37 +16,19 @@ const browserColor = (index) => tokenVar(BROWSER_COLORS[index % BROWSER_COLORS.l
 const devicesLabel = (count) => `${count.toLocaleString("en-US")} ${count === 1 ? "device" : "devices"}`;
 const formatCount = (count) => count.toLocaleString("en-US");
 
-function BarRow({ label, meta, segments, onSegmentClick }) {
+function BarRow({ label, meta, segments, onSegmentClick, activeKey }) {
     return (
         <VerticalStack gap="1">
             <HorizontalStack align="space-between" blockAlign="center">
                 <Text as="span" fontWeight="semibold">{label}</Text>
                 <Text as="span" variant="bodySm" color="subdued">{meta}</Text>
             </HorizontalStack>
-            <SegmentBar segments={segments} height={OS_BAR_HEIGHT} showLabels onSegmentClick={onSegmentClick} />
+            <SegmentBar segments={segments} height={OS_BAR_HEIGHT} showLabels onSegmentClick={onSegmentClick} activeKey={activeKey} />
         </VerticalStack>
     );
 }
 
-function LegendItem({ color, label, count, active, onClick }) {
-    return (
-        <Pressable
-            accessibilityLabel={label}
-            onClick={onClick}
-            background={active ? "bg-primary-subdued-hover" : undefined}
-            hoverBackground="bg-subdued"
-            borderRadius="2"
-            padding="1"
-        >
-            <HorizontalStack gap="1" blockAlign="center" wrap={false}>
-                <LegendDot color={color} />
-                <Text as="span" variant="bodySm" color={active ? undefined : "subdued"}>{label} · {count.toLocaleString("en-US")}</Text>
-            </HorizontalStack>
-        </Pressable>
-    );
-}
-
-function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectBrowser, onSelectCategory }) {
+function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSelect, onSelectBrowser, onSelectCategory }) {
     const osRows = (overview?.osMatrix || []).filter((row) => row.os !== "unknown");
     const browserRows = (overview?.browserMatrix || []).map((row, index) => ({
         ...row,
@@ -58,6 +39,8 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectB
     }));
     const browserAiDevices = browserRows.reduce((sum, row) => sum + row.count, 0);
     const toolsAvailable = overview?.toolsAvailable !== false;
+    const activeCategorySet = new Set(activeCategory ? [activeCategory] : []);
+    const activeBrowserSet = new Set(activeBrowser ? [activeBrowser] : []);
 
     const body = (
         <VerticalStack gap="4">
@@ -93,27 +76,24 @@ function AiToolsByOsCard({ overview, status, activeCategory, onSelect, onSelectB
                         tooltip: `${row.label}: ${devicesLabel(row.count)} with Browser AI`,
                     }))}
                     onSegmentClick={(browser) => onSelectBrowser(browser, "browser")}
+                    activeKey={activeBrowser}
                 />
             )}
-            <HorizontalStack gap="3" wrap>
+            <HorizontalStack gap="1" wrap>
                 {CATEGORY_ORDER.map((category) => (
-                    <LegendItem
+                    <BreakdownChip
                         key={category}
-                        color={tokenVar(CATEGORY_BACKGROUNDS[category])}
-                        label={CATEGORY_LABELS[category]}
-                        count={overview?.categoryTotals?.[category] || 0}
-                        active={activeCategory === category}
-                        onClick={() => onSelectCategory(category)}
+                        b={{ key: category, label: CATEGORY_LABELS[category], count: overview?.categoryTotals?.[category] || 0, color: tokenVar(CATEGORY_BACKGROUNDS[category]) }}
+                        activeFilter={activeCategorySet}
+                        onFilterClick={onSelectCategory}
                     />
                 ))}
                 {browserRows.map((row) => (
-                    <LegendItem
+                    <BreakdownChip
                         key={row.browser}
-                        color={row.color}
-                        label={row.label}
-                        count={row.count}
-                        active={false}
-                        onClick={() => onSelectBrowser(row.browser, "browser")}
+                        b={{ key: row.browser, label: row.label, count: row.count, color: row.color }}
+                        activeFilter={activeBrowserSet}
+                        onFilterClick={(browser) => onSelectBrowser(browser, "browser")}
                     />
                 ))}
             </HorizontalStack>

@@ -2,8 +2,9 @@ import { Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    CATEGORY_LABELS, CATEGORY_ORDER, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
+    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
 } from "./peopleConstants";
+import { getDomainForFavicon } from "../../agentic/mcpClientHelper";
 
 const ALL_CATEGORIES = ["agents", "mcp", "browser"];
 
@@ -131,6 +132,15 @@ function moreNode(id, category, count, noun) {
     return { id, category, label: `+${count} more ${noun}`, sub: "Select to show more", status: "neutral" };
 }
 
+const faviconUrl = (name) => {
+    const domain = getDomainForFavicon(name);
+    return domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=64` : undefined;
+};
+
+const deviceIcon = (device) => (device.extension
+    ? BROWSER_ICONS[device.browser] || GENERIC_BROWSER_ICON
+    : OS_ICON_KEYS[device.os] ? `/public/os-${OS_ICON_KEYS[device.os]}.svg` : undefined);
+
 function footprintModel(root, devices, heads, view) {
     const withDevices = !!root.devicesColumn;
     const edges = [];
@@ -147,7 +157,7 @@ function footprintModel(root, devices, heads, view) {
     visibleDevices.shown.forEach((device, deviceIndex) => {
         const deviceId = withDevices ? `device-${deviceIndex}` : "root";
         if (withDevices) {
-            deviceNodes.push({ id: deviceId, category: "external", label: device.name, sub: [osLabel(device.os), HEALTH_LABELS[device.health] || device.health].filter(Boolean).join(" · "), status: device.health === "healthy" ? "neutral" : "review" });
+            deviceNodes.push({ id: deviceId, category: "external", iconSrc: deviceIcon(device), label: device.name, sub: [osLabel(device.os), HEALTH_LABELS[device.health] || device.health].filter(Boolean).join(" · "), status: device.health === "healthy" ? "neutral" : "review" });
             link("root", deviceId, "ok");
         }
         const tools = device.tools || [];
@@ -157,10 +167,10 @@ function footprintModel(root, devices, heads, view) {
             return parentTool ? `tool-${parentTool.collectionId}` : deviceId;
         };
         agents.forEach((tool) => {
-            agentNodes.push({ id: `tool-${tool.collectionId}`, category: "agent", label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: deviceId });
+            agentNodes.push({ id: `tool-${tool.collectionId}`, category: "agent", iconSrc: faviconUrl(tool.name), label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: deviceId });
         });
         tools.filter((tool) => tool.category === "mcp" && !tool.plugin).forEach((tool) => {
-            mcpNodes.push({ id: `tool-${tool.collectionId}`, category: "mcp", label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: parentOf(tool) });
+            mcpNodes.push({ id: `tool-${tool.collectionId}`, category: "mcp", iconSrc: faviconUrl(tool.name), label: tool.name, sub: toolSub(tool), status: toolStatus(tool), parent: parentOf(tool) });
         });
         tools.filter((tool) => tool.plugin).forEach((tool) => {
             const id = `plugin-${tool.collectionId}`;
@@ -267,7 +277,7 @@ function footprintLayout(model, highlight) {
                 draggable: false,
                 position: { x, y: layout.headHeight + (rowIndex + offset) * layout.rowHeight },
                 style: lit && !lit.has(node.id) ? { opacity: layout.dimmedOpacity } : undefined,
-                data: { component: { category: node.category, type: node.sub || "Select to list", label: node.label, status: node.status, selected: highlight === node.id } },
+                data: { component: { category: node.category, iconSrc: node.iconSrc, type: node.sub || "Select to list", label: node.label, status: node.status, selected: highlight === node.id } },
             });
         });
     });

@@ -5,7 +5,6 @@ import { findParentAgents } from "./AssetTopologyGraph";
 import AssetTopologyGraph from "./AssetTopologyGraph";
 import { RiskFactorRow } from "./RiskFactorRow";
 import DetailGrid from "./DetailGrid";
-import { deviceDeepLink } from "./constants";
 import "../../../components/layouts/style.css";
 
 const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -181,8 +180,8 @@ export default function OverviewTab({ asset, onTabChange, assetDevices = {}, age
                                     const devices = assetDevices[asset.id] || [];
                                     const firstDevice = devices[0];
                                     handleClick = firstDevice
-                                        ? () => { window.location.href = deviceDeepLink(firstDevice.deviceId); }
-                                        : () => { window.location.href = deviceDeepLink(); };
+                                        ? () => { window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(firstDevice.deviceId)}`; }
+                                        : () => { window.location.href = "/dashboard/observe/endpoints"; };
                                 } else if (f.type === "malicious_skill") {
                                     handleClick = () => { window.location.href = `/dashboard/observe/agentic-assets?asset=${encodeURIComponent(asset.name || asset.id)}`; };
                                 } else {

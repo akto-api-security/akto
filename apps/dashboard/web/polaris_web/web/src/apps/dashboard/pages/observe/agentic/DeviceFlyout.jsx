@@ -14,7 +14,7 @@ import agenticObserveApi, { buildAgenticObserveChatMetadata, fetchAgenticViolati
 import { buildAgentBuiltinToolsFromStis } from "./agenticPageBuilders";
 import { TOOL_EDGE_COLOR, useMcpTools, withToolRows } from "./topologyTools";
 import api from "../api";
-import { extractEndpointId, deviceDeepLink } from "./constants";
+import { extractEndpointId } from "./constants";
 import func from "@/util/func";
 import settingsApi from "../../settings/api";
 import "../../../components/layouts/style.css";
@@ -518,7 +518,7 @@ function OverviewTab({ device, agents, collections, onTabChange, startTimestamp,
                                 // Open endpoints page with this specific device's flyout pre-opened
                                 const deviceId = device.path?.[0] || device.deviceId;
                                 handleClick = deviceId
-                                    ? () => { window.location.href = deviceDeepLink(deviceId); }
+                                    ? () => { window.location.href = `/dashboard/observe/endpoints?device=${encodeURIComponent(deviceId)}`; }
                                     : undefined;
                             } else if (f.type === "malicious_skill") {
                                 const maliciousAgents = agents.filter(a => a.isMalicious);

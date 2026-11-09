@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button, HorizontalGrid } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
@@ -6,6 +7,8 @@ import settingRequests from "../../../settings/api";
 import observeApi from "../../api";
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards";
 import AskBar from "../../../../components/shared/AskBar";
+import LocalStore from "../../../../../main/LocalStorageStore";
+import NewLayoutTooltip from "../../agentic/NewLayoutTooltip";
 import { fetchAgenticViolationCountsByHost } from "../../agentic/agenticObserveApi";
 import SummaryCardInfo from "../../../../components/shared/SummaryCardInfo";
 import AgentHealthCard from "./AgentHealthCard";
@@ -23,6 +26,9 @@ import transform from "./transform";
 
 function DevicesEmployeesPage() {
     const deviceScope = DEVICE_SCOPES[0].value;
+    const navigate = useNavigate();
+    const newLayout = LocalStore((state) => state.agenticNewLayout);
+    const setAgenticNewLayout = LocalStore((state) => state.setAgenticNewLayout);
     const [stats, setStats] = useState(null);
     const [overview, setOverview] = useState(null);
     const [overviewStatus, setOverviewStatus] = useState("loading");
@@ -98,6 +104,15 @@ function DevicesEmployeesPage() {
         return () => { ignore = true; };
     }, [deviceScope, refreshKey]);
 
+    useEffect(() => {
+        if (!newLayout) navigate("/dashboard/observe/users-and-devices", { replace: true });
+    }, [navigate, newLayout]);
+    const handleLayoutToggle = useCallback((value) => {
+        const checked = value === true;
+        setAgenticNewLayout(checked);
+        if (!checked) navigate("/dashboard/observe/users-and-devices");
+    }, [navigate, setAgenticNewLayout]);
+
     const filterOptions = useMemo(() => transform.filterOptions(overview), [overview]);
     const patchFilters = useCallback((patch) => setFilters((previous) => ({ ...previous, ...patch })), []);
     const showTable = useCallback((nextTab, patch = {}) => {
@@ -113,7 +128,9 @@ function DevicesEmployeesPage() {
     const onDevicesTab = tab === "devices";
     const activeHealth = onDevicesTab && filters.healthStates.length === 1 ? filters.healthStates[0] : null;
     const activeMode = onDevicesTab && filters.guardrailModes.length === 1 ? filters.guardrailModes[0] : null;
-    const activeCategory = onDevicesTab && filters.osList.length === 0 && filters.browserList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
+    const singleCategory = onDevicesTab && filters.osList.length === 0 && filters.categories.length === 1 ? filters.categories[0] : null;
+    const activeBrowser = singleCategory === "browser" && filters.browserList.length === 1 ? filters.browserList[0] : null;
+    const activeCategory = filters.browserList.length === 0 || singleCategory === "browser" ? singleCategory : null;
 
     const openPerson = useCallback((kind, id) => {
         const nextTab = kind === "employee" ? "employees" : "devices";
@@ -170,6 +187,7 @@ function DevicesEmployeesPage() {
             isFirstPage
             secondaryActions={
                 <>
+                    <NewLayoutTooltip checked={newLayout} onChange={handleLayoutToggle} />
                     <Button icon={ExportMinor} onClick={exportTable} loading={exporting}>Export</Button>
                 </>
             }
@@ -196,6 +214,7 @@ function DevicesEmployeesPage() {
                         overview={overview}
                         status={overviewStatus}
                         activeCategory={activeCategory}
+                        activeBrowser={activeBrowser}
                         onSelectCategory={(category) => toggleView("devices", { categories: [category] })}
                         onSelect={(os, category) => toggleView("devices", { osList: [os], categories: [category] })}
                         onSelectBrowser={(browser, category) => toggleView("devices", { browserList: [browser], categories: [category] })}

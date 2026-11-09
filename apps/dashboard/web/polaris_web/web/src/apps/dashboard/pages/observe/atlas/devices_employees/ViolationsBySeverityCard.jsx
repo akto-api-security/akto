@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import DonutChart from "../../../../components/shared/DonutChart";
-import { SEVERITY_SEGMENTS } from "./peopleConstants";
+import { SEVERITY_SEGMENTS, formatNumber } from "./peopleConstants";
 
 const CHART_SIZE = 180;
 const SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"];
@@ -25,14 +25,14 @@ function ViolationsBySeverityCard({ counts, onSelect }) {
                 <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
                 <HorizontalStack align="center">
                     <Box width={`${CHART_SIZE}px`}>
-                        <DonutChart data={data} title={total} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} onSegmentClick={onSelect} />
+                        <DonutChart data={data} title={formatNumber(total)} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} onSegmentClick={onSelect} />
                     </Box>
                 </HorizontalStack>
                 <HorizontalStack gap="3" wrap align="center">
                     {Object.entries(data).map(([name, { text, color }]) => (
                         <HorizontalStack key={name} gap="1" blockAlign="center">
                             <Box className="agentic-dot" style={{ "--dot-color": color }} />
-                            <Text variant="bodySm" color="subdued">{name} ({text})</Text>
+                            <Text variant="bodySm" color="subdued">{name} ({formatNumber(text)})</Text>
                         </HorizontalStack>
                     ))}
                 </HorizontalStack>

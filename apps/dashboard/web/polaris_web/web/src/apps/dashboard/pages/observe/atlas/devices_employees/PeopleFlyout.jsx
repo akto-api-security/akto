@@ -16,7 +16,7 @@ import { openViolationInGuardrailViolations, openViolationInThreatActivity } fro
 import { RiskFactorRow } from "../../agentic/RiskFactorRow";
 import { AgenticsTab, UserAnalysisSection, ViolationsTab, computeRiskFactors } from "../../agentic/DeviceFlyout";
 import { ATLAS_CHAT_SCOPE, ATLAS_DEVICE_QUESTIONS, ATLAS_EMPLOYEE_QUESTIONS } from "./constants";
-import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel } from "./peopleConstants";
+import { FOOTPRINT_LEGEND, HEALTH_BADGE_STATUS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, formatNumber, osLabel } from "./peopleConstants";
 import { ATLAS_VIOLATION_COLUMNS } from "./ViolationColumns";
 import transform from "./transform";
 
@@ -28,21 +28,21 @@ const lastSeen = (epoch) => (epoch ? func.prettifyEpoch(epoch) : "Never");
 function deviceStats(device) {
     const mcpCount = device.toolsByCategory?.mcp || 0;
     return [
-        { title: "AI tools", data: device.toolCount - mcpCount },
-        { title: "MCP servers", data: mcpCount },
-        { title: "Skills", data: device.skillCount },
-        { title: "Plugins", data: transform.pluginCount(device.tools || []) },
-        { title: "Unapproved", data: device.unapprovedTools, color: device.unapprovedTools ? "critical" : undefined },
+        { title: "AI tools", data: formatNumber(device.toolCount - mcpCount) },
+        { title: "MCP servers", data: formatNumber(mcpCount) },
+        { title: "Skills", data: formatNumber(device.skillCount) },
+        { title: "Plugins", data: formatNumber(transform.pluginCount(device.tools || [])) },
+        { title: "Unapproved", data: formatNumber(device.unapprovedTools), color: device.unapprovedTools ? "critical" : undefined },
     ];
 }
 
 function employeeStats(employee) {
     return [
         { title: "Risk score", data: employee.riskScore, color: employee.riskScore >= HIGH_RISK_THRESHOLD ? "critical" : undefined },
-        { title: "Devices", data: employee.deviceCount },
-        { title: "AI tools", data: transform.employeeAiToolCount(employee) },
-        { title: "Skills", data: employee.skillCount },
-        { title: "Violations (7d)", data: employee.violationCount },
+        { title: "Devices", data: formatNumber(employee.deviceCount) },
+        { title: "AI tools", data: formatNumber(transform.employeeAiToolCount(employee)) },
+        { title: "Skills", data: formatNumber(employee.skillCount) },
+        { title: "Violations (7d)", data: formatNumber(employee.violationCount) },
     ];
 }
 
@@ -94,6 +94,7 @@ function riskFactorsOf(detail, isDevice) {
     if (isDevice && detail.hasMisconfiguredConfig) {
         factors.push({ severity: "high", title: "Misconfigured config", description: "Contains misconfigured config", type: "misconfigured_config" });
     }
+    factors.forEach((factor) => { factor.title = factor.title.replace(/^\d+/, formatNumber); });
     return factors.sort((a, b) => (SEVERITY_RANK[a.severity] ?? 99) - (SEVERITY_RANK[b.severity] ?? 99));
 }
 
@@ -157,6 +158,7 @@ function Footprint({ kind, detail }) {
         setHighlight((current) => (current === node.id ? null : node.id));
     }, [model]);
     const clearHighlight = useCallback(() => setHighlight(null), []);
+    const hasGraph = detail.toolCount > 0 || detail.skillCount > 0;
     const resetView = useCallback(() => {
         setView(transform.defaultFootprintView());
         setHighlight(null);
@@ -169,7 +171,7 @@ function Footprint({ kind, detail }) {
                     {!transform.isDefaultFootprintView(view) && <Button plain onClick={resetView}>Reset view</Button>}
                 </HorizontalStack>
             </HorizontalStack>
-            {detail.toolCount > 0 || detail.skillCount > 0 ? (
+            {hasGraph ? (
                 <VerticalStack gap="3">
                     <AssetTopologyGraph
                         nodes={graph.nodes}
@@ -240,7 +242,7 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated }) {
     const tabs = !ready ? [] : [
         { id: "overview", content: "Overview" },
         { id: "assets", content: "Agentic Assets" },
-        { id: "violations", content: `Violations (${violationsTotal ?? detail.violationCount ?? 0})` },
+        { id: "violations", content: `Violations (${formatNumber(violationsTotal ?? detail.violationCount)})` },
     ];
     const activeTab = tabs[selectedTab]?.id;
     const riskFactors = ready ? riskFactorsOf(detail, isDevice) : [];

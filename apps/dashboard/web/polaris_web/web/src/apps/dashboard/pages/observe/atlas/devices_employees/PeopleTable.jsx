@@ -243,7 +243,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     }, [deviceScope, filters, isEmployees]);
 
     const columnDefs = useMemo(() => (isEmployees ? employeeColumns(dataOptions) : deviceColumns(dataOptions)), [isEmployees, dataOptions]);
-    const initialState = useMemo(() => ({ filter: { filterModels: modelFromFilters(tab, filters) } }), [tab, filters]);
+    const initialState = useMemo(() => ({ filter: { filterModel: modelFromFilters(tab, filters) } }), [tab, filters]);
     const onColumnFilterChanged = useCallback((event) => {
         const patch = filtersFromModel(tab, event.api.getFilterModel());
         if (Object.keys(patch).every((key) => sameValues(patch[key], filters[key]))) return;

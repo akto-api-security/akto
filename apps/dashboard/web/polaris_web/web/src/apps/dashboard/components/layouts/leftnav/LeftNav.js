@@ -278,15 +278,6 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_endpoints",
-                    },
-                    {
-                        label: "Devices & Employees",
-                        onClick: () => {
-                            navigate("/dashboard/observe/devices-employees");
-                            handleSelect("dashboard_observe_devices_employees");
-                            setActive("active");
-                        },
-                        selected: leftNavSelected === "dashboard_observe_devices_employees",
                     }] : [{
                         label: "Collections",
                         onClick: () => {

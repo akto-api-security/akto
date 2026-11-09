@@ -35,10 +35,10 @@ function makeTrendConfig(trends, monthLabels, seriesDefs) {
             labels:{ style:{fontSize:"11px",color:"#8C9196"}, step: tickInterval },
             lineColor:"#DFE3E8", tickColor:"transparent",
         },
-        yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"}},gridLineColor:"#F1F2F3",allowDecimals:false,min:0},
+        yAxis:{title:null,labels:{style:{fontSize:"11px",color:"#8C9196"},formatter(){return Number(this.value).toLocaleString("en-US")}},gridLineColor:"#F1F2F3",allowDecimals:false,min:0},
         legend:{enabled:true,align:"left",verticalAlign:"bottom",layout:"horizontal",itemStyle:{fontSize:"12px",fontWeight:"400",color:"#6D7175"},symbolRadius:4,margin:8,y:8},
-        tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"}},
-        plotOptions:{ areaspline:{ marker:{enabled:false}, lineWidth:2, fillOpacity:0.08 }, series:{ connectNulls:true } },
+        tooltip:{shared:true,backgroundColor:"white",borderColor:"#DFE3E8",borderRadius:8,style:{fontSize:"12px"},pointFormatter(){return `<span style="color:${this.color}">\u25CF</span> ${this.series.name}: <b>${Number(this.y).toLocaleString("en-US")}</b><br/>`}},
+        plotOptions:{ areaspline:{ marker:{enabled:false,symbol:"circle",states:{hover:{enabled:true,symbol:"circle",radius:4}}}, lineWidth:2, fillOpacity:0.08 }, series:{ connectNulls:true } },
         series,
     };
 }

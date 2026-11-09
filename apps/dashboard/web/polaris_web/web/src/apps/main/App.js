@@ -137,7 +137,6 @@ import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticAssetDevicesPage from "../dashboard/pages/observe/agentic/AgenticAssetDevicesPage.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
-import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
 import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
 import AgenticDashboard from "../dashboard/pages/dashboard/AgenticDashboard.jsx";
@@ -265,10 +264,6 @@ const router = createBrowserRouter([
                             },
                             {
                                 path: "endpoints",
-                                element: <DeviceEndpoints/>
-                            },
-                            {
-                                path: "devices-employees",
                                 element: <DevicesEmployeesPage/>
                             },
                             {
