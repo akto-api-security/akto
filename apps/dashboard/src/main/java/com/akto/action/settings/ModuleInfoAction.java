@@ -100,6 +100,7 @@ public class ModuleInfoAction extends UserAction {
     @Setter private String deviceScope;
     private static final LoggerMaker statsLogger = new LoggerMaker(ModuleInfoAction.class, LogDb.DASHBOARD);
     private final InsightService insightService = new InsightService();
+    // Builds and caches the Atlas Devices & Employees snapshot; every fetchAtlas* action delegates to it.
     private final AtlasPeopleService atlasPeopleService = new AtlasPeopleService();
     @Setter private String atlasQuery;
     @Setter private List<String> atlasOs;
@@ -212,6 +213,7 @@ public class ModuleInfoAction extends UserAction {
 
     // A physical host can show up as multiple ModuleInfo docs per {name, os} (reinstall/reconnect) — this
     // is the dedup key used to collapse those down to one row per host.
+    // One logical device per {name, os}; the Devices table, stats and trend all group the same way.
     private static Bson endpointShieldGroupId() {
         return new Document(ModuleInfo.NAME, "$" + ModuleInfo.NAME).append("os", "$" + AD_OS);
     }
@@ -308,6 +310,7 @@ public class ModuleInfoAction extends UserAction {
     private static final String SCOPE_DESKTOP = "desktop";
     private static final String SCOPE_BROWSER = "browser";
 
+    // Desktop means no browserName and no 'extension' version, browser is the opposite, anything else means all.
     private static Bson endpointShieldScopeFilter(String scope) {
         Bson isExtension = Filters.or(
                 Filters.exists(AD_BROWSER_NAME, true),
@@ -324,6 +327,7 @@ public class ModuleInfoAction extends UserAction {
                 Context.contextSource.get(), windowEnd - AtlasPeopleService.VIOLATION_WINDOW_SECONDS, windowEnd);
     }
 
+    // Picks the newest deployment per device group and computes live status; shared by the agents list and Atlas.
     private static List<Bson> endpointShieldGroupedStages(Bson filter, Bson groupId, int now, List<String> statuses) {
         return Arrays.asList(
                 Aggregates.match(filter),
@@ -356,6 +360,7 @@ public class ModuleInfoAction extends UserAction {
         );
     }
 
+    // Runs the grouped pipeline with optional sort, skip and limit so the Devices tab can page in Mongo.
     private List<ModuleInfo> aggregateEndpointShieldModules(Bson filter, Bson groupId, int now, List<String> statuses, Bson sort, int skip, int limit) {
         List<Bson> pipeline = new ArrayList<>(endpointShieldGroupedStages(filter, groupId, now, statuses));
         pipeline.add(Aggregates.project(Projections.exclude(ORIG_ID_FIELD)));
@@ -387,6 +392,7 @@ public class ModuleInfoAction extends UserAction {
         return result == null ? 0 : ((Number) result.get("total")).longValue();
     }
 
+    // Flattens a grouped ModuleInfo into the plain row AtlasPeopleService.build expects.
     private static Document toAtlasModuleRow(ModuleInfo module) {
         Map<String, Object> additional = module.getAdditionalData() == null ? new HashMap<>() : module.getAdditionalData();
         return new Document("deviceName", module.getName())
@@ -404,6 +410,7 @@ public class ModuleInfoAction extends UserAction {
         return Filters.and(buildEndpointShieldFilter(), endpointShieldScopeFilter(deviceScope));
     }
 
+    // Loads every grouped device row (no paging) for the snapshot.
     private List<Document> loadEndpointShieldDeviceRows(int now) {
         List<Document> rows = new ArrayList<>();
         for (ModuleInfo module : aggregateEndpointShieldModules(atlasModuleFilter(), endpointShieldGroupId(), now, null, null, 0, 0)) {
@@ -417,6 +424,7 @@ public class ModuleInfoAction extends UserAction {
         return AtlasPeopleService.latestVersionByOs(settings == null ? null : settings.getEndpointShieldSettings());
     }
 
+    // Returns the cached Atlas snapshot, loading device rows and the insights bundle on a miss.
     private AtlasPeopleService.Snapshot loadAtlasSnapshot() {
         int now = Context.now();
         InsightContext ctx = buildInsightContext();
@@ -434,6 +442,7 @@ public class ModuleInfoAction extends UserAction {
     }
 
 
+    // Copies the request parameters (filters, search, sort, paging) into a PeopleQuery.
     private AtlasPeopleService.PeopleQuery buildPeopleQuery() {
         AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
         query.text = atlasQuery;
@@ -459,6 +468,7 @@ public class ModuleInfoAction extends UserAction {
         return query;
     }
 
+    // Chart data and filter options for the Atlas page.
     public String fetchAtlasOverview() {
         atlasOverview = new HashMap<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
@@ -474,6 +484,7 @@ public class ModuleInfoAction extends UserAction {
 
     private static final String FIRST_SEEN_FIELD = "firstSeenTs";
 
+    // Earliest positive startedTs per device group, i.e. when its first heartbeat row was inserted.
     private Map<String, Integer> loadFirstSeenByGroup() {
         Document startedTs = new Document("$cond", Arrays.asList(
                 new Document("$gt", Arrays.asList(ifNullExpr(ModuleInfo.STARTED_TS, 0), 0)),
@@ -498,6 +509,7 @@ public class ModuleInfoAction extends UserAction {
         return (name == null ? "" : name) + "|" + (os == null ? "" : os);
     }
 
+    // Devices-over-time series for the trend chart, from module_info first-seen dates.
     public String fetchAtlasTrend() {
         atlasTrend = new HashMap<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
@@ -515,6 +527,7 @@ public class ModuleInfoAction extends UserAction {
         }
     }
 
+    // Paged Employees tab; always served from the in-memory snapshot.
     public String fetchAtlasEmployees() {
         atlasRows = new ArrayList<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
@@ -530,6 +543,7 @@ public class ModuleInfoAction extends UserAction {
         }
     }
 
+    // Devices tab: paged in Mongo when the query allows it, otherwise from the snapshot.
     public String fetchAtlasDevices() {
         atlasRows = new ArrayList<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
@@ -550,6 +564,7 @@ public class ModuleInfoAction extends UserAction {
         }
     }
 
+    // Mongo-paged Devices path: builds a mini snapshot for just the requested page of rows.
     private void fetchAtlasDevicesPage(AtlasPeopleService.PeopleQuery query) {
         int now = Context.now();
         Bson filter = atlasModuleFilter();
@@ -574,6 +589,7 @@ public class ModuleInfoAction extends UserAction {
         atlasRows = atlasPeopleService.deviceRows(page);
     }
 
+    // Stat card totals (managed devices, active agents, unapproved, monitor-only) from the snapshot.
     public String fetchEndpointShieldStats() {
         deviceStats = new HashMap<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
@@ -587,6 +603,7 @@ public class ModuleInfoAction extends UserAction {
         }
     }
 
+    // Flyout detail for one device or employee.
     public String fetchAtlasPersonDetail() {
         atlasDetail = new HashMap<>();
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();

@@ -65,7 +65,9 @@ public class AtlasPeopleService {
     public static final List<String> OS_ORDER = Arrays.asList(OS_MAC, OS_WINDOWS, OS_LINUX, OS_UNKNOWN);
 
     public static final List<String> SEVERITIES = Arrays.asList("critical", "high", "medium", "low");
+    // Violation counts on devices and employees cover this many seconds (7 days).
     public static final int VIOLATION_WINDOW_SECONDS = 7 * 24 * 60 * 60;
+    // A device with no heartbeat for this long is shown as Offline.
     public static final int OFFLINE_SECONDS = 7 * 24 * 60 * 60;
     public static final double RISK_MAX = 5.0;
     public static final double HIGH_RISK_SCORE = 4.0;
@@ -80,6 +82,7 @@ public class AtlasPeopleService {
     private static final String BROWSER_USER_EMAIL_TAG = "browser-user-email";
     private static final Pattern ACCOUNT_SLOT_SUFFIX = Pattern.compile("-u\\d+$");
     private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-z0-9]");
+    // How long a built snapshot is reused before the next request rebuilds it.
     private static final long CACHE_TTL_MS = 60_000;
     private static final Pattern VERSION = Pattern.compile("^v?(\\d+)\\.(\\d+)\\.(\\d+)");
 
@@ -95,6 +98,7 @@ public class AtlasPeopleService {
         }
     }
 
+    // One AI tool (agent, MCP server, browser LLM, plugin or skill owner) found in an api_collection on a device.
     public static class ToolRow {
         public int collectionId;
         public String hostName;
@@ -129,6 +133,7 @@ public class AtlasPeopleService {
         }
     }
 
+    // One heartbeat row (desktop shield or browser extension) from module_info plus its joined tools, risk, violations and guardrail mode.
     public static class DeviceRow {
         public String name;
         public String browser = "";
@@ -202,6 +207,7 @@ public class AtlasPeopleService {
         }
     }
 
+    // An employee is a distinct username across devices; counts are summed over their devices and risk is the maximum.
     public static class EmployeeRow {
         public String username;
         public final List<String> deviceNames = new ArrayList<>();
@@ -233,6 +239,7 @@ public class AtlasPeopleService {
         }
     }
 
+    // Everything the Atlas page needs for one account, built once and cached for CACHE_TTL_MS.
     public static class Snapshot {
         public final List<DeviceRow> devices = new ArrayList<>();
         public final Map<String, DeviceRow> devicesByLowerName = new LinkedHashMap<>();
@@ -247,6 +254,7 @@ public class AtlasPeopleService {
         public final Set<String> unmatchedBrowserIdentities = new HashSet<>();
     }
 
+    // Filters, search, sort and paging sent by the frontend for the Devices and Employees tables.
     public static class PeopleQuery {
         public String text;
         public List<String> osList;
@@ -270,6 +278,7 @@ public class AtlasPeopleService {
         public int limit = 50;
     }
 
+    // Returns the cached snapshot for the key, rebuilding it when it is older than CACHE_TTL_MS.
     public Snapshot getOrBuild(String key, Supplier<Snapshot> loader) {
         CACHE.values().removeIf(entry -> System.currentTimeMillis() - entry.loadedAtMs >= CACHE_TTL_MS);
         CachedSnapshot cached = CACHE.compute(key, (k, existing) -> {
@@ -279,6 +288,7 @@ public class AtlasPeopleService {
         return cached.snapshot;
     }
 
+    // Latest released shield version per OS from the account's endpoint shield settings; used to flag outdated agents.
     public static Map<String, String> latestVersionByOs(EndpointShieldSettings settings) {
         Map<String, String> latest = new HashMap<>();
         if (settings == null || settings.getPlatforms() == null) return latest;
@@ -294,6 +304,7 @@ public class AtlasPeopleService {
         return latest;
     }
 
+    // Joins module_info rows with collections (tools), risk, guardrail modes and violations into one snapshot.
     public Snapshot build(List<Document> moduleRows, InsightDataBundle bundle, Map<String, String> latestVersionByOs,
                           int now, int startTs, int endTs) {
         Snapshot snapshot = new Snapshot();
@@ -349,6 +360,7 @@ public class AtlasPeopleService {
         return snapshot;
     }
 
+    // Turns one grouped module_info row into a DeviceRow and derives extension, OS and health (offline after OFFLINE_SECONDS).
     private static DeviceRow toDeviceRow(Document module, Map<String, String> latestVersionByOs, int now) {
         DeviceRow device = new DeviceRow();
         device.name = module.getString("deviceName") == null ? "" : module.getString("deviceName");
@@ -374,6 +386,7 @@ public class AtlasPeopleService {
         return device;
     }
 
+    // Attaches api_collections tagged source=ENDPOINT to devices: desktop by host prefix, browser by identity, email tag or id.
     private static void addTools(Map<String, DeviceRow> devicesByLowerName, Map<String, DeviceRow> devicesByHost, Set<String> unmatchedBrowserIdentities, InsightDataBundle bundle, int startTs, int endTs) {
         boolean ranged = startTs > 0 || endTs > 0;
         Map<String, DeviceRow> browserRowByName = new HashMap<>();
@@ -476,6 +489,7 @@ public class AtlasPeopleService {
         return at < 0 ? value : value.substring(0, at);
     }
 
+    // Lowercases and strips non-alphanumerics so browser collection prefixes can match extension names and emails.
     static String identityKey(String value) {
         return value == null ? "" : NON_ALPHANUMERIC.matcher(value.toLowerCase(Locale.ROOT)).replaceAll("");
     }
@@ -498,6 +512,7 @@ public class AtlasPeopleService {
         return CAT_AGENTS;
     }
 
+    // A tool is approved when its governance bucket is sanctioned or its name is on the allowlist.
     public static boolean isSanctioned(ApiCollection c, Set<String> allowlistNamesLower, Map<String, String> remarksByServiceName) {
         GovernanceBucket bucket = InsightUtil.governanceBucket(c, allowlistNamesLower, remarksByServiceName);
         if (bucket == GovernanceBucket.SANCTIONED) return true;
@@ -508,6 +523,7 @@ public class AtlasPeopleService {
                 || (serviceName != null && McpAuditInfo.REMARKS_APPROVED.equals(remarksByServiceName.get(serviceName.toLowerCase(Locale.ROOT))));
     }
 
+    // Names of skills marked approved in mcp_audit_info.
     private static Set<String> loadApprovedSkillNames() {
         Bson filter = Filters.and(
                 Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
@@ -520,6 +536,7 @@ public class AtlasPeopleService {
         return approved;
     }
 
+    // Service-name to remarks map from mcp_audit_info, used when deciding approval.
     private static Map<String, String> loadServerRemarks() {
         Bson filter = Filters.and(
                 Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
@@ -545,6 +562,7 @@ public class AtlasPeopleService {
                 Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
     }
 
+    // Device risk is the max stored api_info.riskScore over its tools' collections; violations are not an input here.
     private static void addRiskScores(Iterable<DeviceRow> devices) {
         List<Integer> collectionIds = new ArrayList<>();
         for (DeviceRow device : devices) {
@@ -559,6 +577,7 @@ public class AtlasPeopleService {
         }
     }
 
+    // Enforce if any active covering policy blocks, Monitor if every covering policy only alerts, None if no policy covers the device.
     private static void addGuardrailModes(Iterable<DeviceRow> devices, InsightDataBundle bundle) {
         List<GuardrailPolicies> activePolicies = new ArrayList<>();
         for (GuardrailPolicies policy : bundle.policies) {
@@ -579,6 +598,7 @@ public class AtlasPeopleService {
         }
     }
 
+    // Adds threat-backend severity counts per host (last VIOLATION_WINDOW_SECONDS) to the matching device.
     private static void addViolations(Map<String, DeviceRow> devicesByLowerName, Map<String, DeviceRow> devicesByHost, InsightDataBundle bundle) {
         for (HostSeverityCount counts : bundle.hostSeverityCounts) {
             if (counts.getHost() == null) continue;
@@ -595,6 +615,7 @@ public class AtlasPeopleService {
         }
     }
 
+    // Groups devices by lowercase username into employees and attaches team tags from agent_users.
     private static List<EmployeeRow> buildEmployees(List<DeviceRow> devices, InsightDataBundle bundle) {
         Map<String, EmployeeRow> byUsername = new LinkedHashMap<>();
         for (DeviceRow device : devices) {
@@ -630,6 +651,7 @@ public class AtlasPeopleService {
         return new ArrayList<>(byUsername.values());
     }
 
+    // Totals for the six stat cards (managed, active, unapproved, monitor-only and so on) from the snapshot.
     public Map<String, Object> stats(Snapshot snapshot) {
         long desktop = 0, browsers = 0, desktopActive = 0, browserActive = 0, offline = 0;
         long unapproved = 0, monitorOnly = 0;
@@ -691,6 +713,7 @@ public class AtlasPeopleService {
         return rows;
     }
 
+    // Chart data: agent health, guardrail modes, AI tools by OS and browser, risk histogram and filter options.
     public Map<String, Object> overview(Snapshot snapshot) {
         Map<String, Object> overview = new LinkedHashMap<>();
         Map<String, Integer> health = new LinkedHashMap<>();
@@ -758,6 +781,7 @@ public class AtlasPeopleService {
         return overview;
     }
 
+    // Full detail including tools for the flyout; devices resolve by key, name or host prefix, employees by username.
     public Map<String, Object> detail(Snapshot snapshot, String kind, String id) {
         if (id == null) return null;
         if ("device".equals(kind)) {
@@ -780,6 +804,7 @@ public class AtlasPeopleService {
     private static final List<String> TREND_OS_KEYS = Arrays.asList("mac", "windows", "linux", "unknown");
     private static final List<String> TREND_BROWSER_KEYS = Arrays.asList("chrome", "firefox", "edge", "safari", "other");
 
+    // Cumulative device counts by OS and browser, bucketed by each group's earliest startedTs (first seen).
     public Map<String, Object> trend(List<Document> moduleRows, int startTs, int endTs, int now) {
         Map<String, List<Integer>> osFirstSeen = new HashMap<>();
         Map<String, List<Integer>> browserFirstSeen = new HashMap<>();
@@ -812,6 +837,7 @@ public class AtlasPeopleService {
         return trend;
     }
 
+    // Fallback lookup for deep links: device name, browser identity, or a collection host prefix.
     private static DeviceRow findDeviceByAlias(Snapshot snapshot, String id) {
         String idKey = identityKey(id);
         for (DeviceRow device : snapshot.devices) {
@@ -824,6 +850,7 @@ public class AtlasPeopleService {
         return null;
     }
 
+    // True when sort and filters can run in Mongo without joins, so the Devices tab can page in the database.
     public boolean isModulePageable(PeopleQuery query) {
         String sortKey = query.sortKey == null ? "" : query.sortKey;
         boolean moduleSort = sortKey.isEmpty() || "lastHeartbeat".equals(sortKey) || "name".equals(sortKey) || "agentVersion".equals(sortKey);
@@ -841,6 +868,7 @@ public class AtlasPeopleService {
         return rows;
     }
 
+    // Filters, sorts and slices the in-memory device list; used when the query needs joined data.
     public List<Map<String, Object>> pageDevices(Snapshot snapshot, PeopleQuery query, long[] totalOut) {
         List<String[]> terms = parseTerms(query.text);
         List<DeviceRow> matching = new ArrayList<>();
@@ -860,6 +888,7 @@ public class AtlasPeopleService {
         return page;
     }
 
+    // Filters, sorts and slices the employee list; device filters match if any of the employee's devices match.
     public List<Map<String, Object>> pageEmployees(Snapshot snapshot, PeopleQuery query, long[] totalOut) {
         List<String[]> terms = parseTerms(query.text);
         boolean deviceFiltered = notEmpty(query.osList) || notEmpty(query.browserList) || notEmpty(query.categories)
@@ -894,6 +923,7 @@ public class AtlasPeopleService {
         return devices;
     }
 
+    // Applies the structured filters (OS or browser, health, mode, category, tags, violation severity) to one device.
     private static boolean matchesDeviceFilters(DeviceRow device, PeopleQuery query) {
         if (notEmpty(query.osList) || notEmpty(query.browserList)) {
             boolean osMatch = !device.extension && notEmpty(query.osList) && query.osList.contains(device.os);
@@ -913,6 +943,7 @@ public class AtlasPeopleService {
         return true;
     }
 
+    // Splits search text into key:value terms (owner:, os:, tag: and so on) and plain terms.
     static List<String[]> parseTerms(String text) {
         List<String[]> terms = new ArrayList<>();
         if (text == null) return terms;
@@ -1015,6 +1046,7 @@ public class AtlasPeopleService {
         return values != null && !values.isEmpty();
     }
 
+    // Applies skip and limit from the query to an already filtered and sorted list.
     private static <T> List<T> slice(List<T> rows, PeopleQuery query) {
         int from = Math.min(Math.max(query.skip, 0), rows.size());
         int to = from + Math.min(Math.max(query.limit, 1), rows.size() - from);
@@ -1065,6 +1097,7 @@ public class AtlasPeopleService {
         return total;
     }
 
+    // Filters out empty and placeholder usernames so they don't become employees.
     public static boolean isRealUsername(String username) {
         return username != null && !username.trim().isEmpty()
                 && !UNKNOWN_USERNAME_PLACEHOLDER.equalsIgnoreCase(username.trim());
@@ -1090,6 +1123,7 @@ public class AtlasPeopleService {
         return 0;
     }
 
+    // Maps module_info os and platform strings to macos, windows, linux or unknown.
     static String normalizeOs(String os, String platform) {
         String value = (os != null ? os : platform != null ? platform : "").toLowerCase(Locale.ROOT);
         if (value.startsWith("mac") || value.contains("darwin")) return OS_MAC;
