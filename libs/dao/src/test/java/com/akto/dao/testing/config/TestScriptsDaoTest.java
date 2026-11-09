@@ -1,6 +1,7 @@
 package com.akto.dao.testing.config;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -12,6 +13,8 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.utils.MongoBasedTest;
 import com.mongodb.MongoWriteException;
@@ -23,7 +26,9 @@ public class TestScriptsDaoTest extends MongoBasedTest {
         Context.accountId.set(ACCOUNT_ID);
         TestScriptsDao.instance.getMCollection().drop();
         TestCollectionPropertiesDao.instance.getMCollection().drop();
+        TestingRunConfigDao.instance.getMCollection().drop();
         TestScriptsDao.instance.createIndicesIfAbsent();
+        TestingRunConfigDao.instance.createIndicesIfAbsent();
     }
 
     private static TestScript script(String id, String name, TestScript.Type type, int updatedAt) {
@@ -90,5 +95,25 @@ public class TestScriptsDaoTest extends MongoBasedTest {
         assertNull(pre.getName());
         assertNull(TestCollectionPropertiesDao.instance.findLegacyTestScript(TestScript.Type.POST_REQUEST));
         assertThrows(IllegalArgumentException.class, () -> TestCollectionPropertiesDao.instance.findLegacyTestScript(null));
+    }
+
+    @Test
+    public void referenceCheckMatchesPreOrPostOnly() {
+        TestingRunConfig pre = new TestingRunConfig();
+        pre.setId(1);
+        pre.setPreRequestScriptId("p1");
+        TestingRunConfig post = new TestingRunConfig();
+        post.setId(2);
+        post.setPostRequestScriptId("q1");
+        post.setPreRequestScriptId(TestScript.NO_SCRIPT);
+        TestingRunConfigDao.instance.insertOne(pre);
+        TestingRunConfigDao.instance.insertOne(post);
+
+        assertTrue(TestingRunConfigDao.instance.existsReferenceToScript("p1"));
+        assertTrue(TestingRunConfigDao.instance.existsReferenceToScript("q1"));
+        assertFalse(TestingRunConfigDao.instance.existsReferenceToScript("unknown"));
+        // "" means "no script", never a reference
+        assertFalse(TestingRunConfigDao.instance.existsReferenceToScript(TestScript.NO_SCRIPT));
+        assertFalse(TestingRunConfigDao.instance.existsReferenceToScript(null));
     }
 }
