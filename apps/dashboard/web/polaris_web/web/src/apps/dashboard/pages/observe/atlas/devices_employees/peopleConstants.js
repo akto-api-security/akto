@@ -110,7 +110,6 @@ export const SEVERITY_SEGMENTS = [
     { key: "low", name: "Low", color: "#D1D5DB" },
 ];
 
-export const TREND_MONTH_WIDTH = 84;
 
 export const formatNumber = (value) => Number(value ?? 0).toLocaleString("en-US");
 

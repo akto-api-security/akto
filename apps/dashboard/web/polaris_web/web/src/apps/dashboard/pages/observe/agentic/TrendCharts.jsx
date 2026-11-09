@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Box, VerticalStack, Text } from "@shopify/polaris";
 import Highcharts from "highcharts";
 import HighchartsReact from "highcharts-react-official";
@@ -43,12 +43,22 @@ function makeTrendConfig(trends, monthLabels, seriesDefs) {
     };
 }
 
-function TrendChartCard({ title, options }) {
+const TREND_MONTH_WIDTH = 84;
+
+function TrendChartCard({ title, options, minChartWidth }) {
+    const scrollRef = useRef(null);
+    useEffect(() => {
+        if (minChartWidth && scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }, [minChartWidth]);
     return (
         <Box padding="4">
             <VerticalStack gap="2">
                 <Text variant="headingMd" fontWeight="semibold">{title}</Text>
-                <HighchartsReact highcharts={Highcharts} options={options} />
+                <Box ref={scrollRef} overflowX={minChartWidth ? "auto" : undefined}>
+                    <Box key={minChartWidth} minWidth={minChartWidth ? `${minChartWidth}px` : undefined}>
+                        <HighchartsReact highcharts={Highcharts} options={options} />
+                    </Box>
+                </Box>
             </VerticalStack>
         </Box>
     );
@@ -63,7 +73,7 @@ export function EndpointBrowserTrendChart({ osTrend = {}, browserTrend = {}, mon
         () => makeTrendConfig(null, monthLabels, seriesDefs),
         [seriesDefs, monthLabels]
     );
-    return <TrendChartCard title="Endpoints & Browser Extensions Over Time" options={options} />;
+    return <TrendChartCard title="Endpoints & Browser Extensions Over Time" options={options} minChartWidth={monthLabels.length * TREND_MONTH_WIDTH} />;
 }
 
 export default TrendChartCard;

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, HorizontalGrid } from "@shopify/polaris";
+import { Button, Card, HorizontalGrid } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import observeApi from "../../api";
 import PageWithMultipleCards from "../../../../components/layouts/PageWithMultipleCards";
 import AskBar from "../../../../components/shared/AskBar";
+import { EndpointBrowserTrendChart } from "../../agentic/TrendCharts";
 import LocalStore from "../../../../../main/LocalStorageStore";
 import NewLayoutTooltip from "../../agentic/NewLayoutTooltip";
 import { fetchAgenticViolationCountsByHost } from "../../agentic/agenticObserveApi";
@@ -15,7 +16,6 @@ import AgentHealthCard from "./AgentHealthCard";
 import AiToolsByOsCard from "./AiToolsByOsCard";
 import PeopleTable from "./PeopleTable";
 import RiskHistogramCard from "./RiskHistogramCard";
-import ScrollableTrendCard from "./ScrollableTrendCard";
 import ViolationsBySeverityCard from "./ViolationsBySeverityCard";
 import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
@@ -227,7 +227,13 @@ function DevicesEmployeesPage() {
                     />
                 </HorizontalGrid>,
                 <HorizontalGrid key="trend-cards" columns={{ xs: "1fr", md: "2fr 1fr" }} gap="4">
-                    <ScrollableTrendCard trend={trendStats} />
+                    <Card padding="0">
+                        <EndpointBrowserTrendChart
+                            osTrend={trendStats?.osTrend || {}}
+                            browserTrend={trendStats?.browserTrend || {}}
+                            monthLabels={trendStats?.monthLabels || []}
+                        />
+                    </Card>
                     <ViolationsBySeverityCard counts={severityCounts} onSelect={onSelectSeverity} />
                 </HorizontalGrid>,
                 <PeopleTable
