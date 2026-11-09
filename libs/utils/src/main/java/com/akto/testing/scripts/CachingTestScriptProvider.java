@@ -80,4 +80,3 @@ public class CachingTestScriptProvider implements TestScriptProvider {
         return script;
     }
 }
-''
