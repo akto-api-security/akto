@@ -12,6 +12,7 @@ import com.akto.dto.audit_logs.Operation;
 import com.akto.dto.audit_logs.Resource;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.config.TestScriptSummary;
+import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.service.scripts.TestScriptException;
@@ -51,6 +52,7 @@ public class ScriptAction extends UserAction {
 
     public String fetchAllScripts() {
         try {
+            InitializerListener.ensureTestScriptsMigrated();
             this.scripts = testScriptService.listSummaries();
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
