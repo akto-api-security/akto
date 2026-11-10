@@ -133,7 +133,7 @@ export const FILTER_LABELS = {
     osBrowser: "OS/Browser",
     healthStates: "Agent",
     guardrailModes: "Guardrail mode",
-    categories: "Tool type",
+    categories: "Asset type",
     tags: "Tag",
 };
 
