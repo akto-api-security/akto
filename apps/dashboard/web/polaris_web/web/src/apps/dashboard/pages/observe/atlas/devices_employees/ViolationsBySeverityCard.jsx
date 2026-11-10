@@ -1,10 +1,22 @@
 import { useMemo } from "react";
 import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import TitleWithInfo from "../../../../components/shared/TitleWithInfo";
+import transform from "./transform";
 import DonutChart from "../../../../components/shared/DonutChart";
 import { SEVERITY_SEGMENTS, formatNumber } from "./peopleConstants";
 
 const CHART_SIZE = 180;
 const SEVERITY_ORDER = ["Critical", "High", "Medium", "Low"];
+const TOOLTIP = "Guardrail violations across managed devices, grouped by severity. Click a segment to filter the table by that severity.";
+
+const heading = (
+    <VerticalStack gap="1">
+        <HorizontalStack>
+            <TitleWithInfo titleText="Violations by Severity" tooltipContent={transform.tooltip(TOOLTIP)} textProps={{ variant: "headingMd", fontWeight: "semibold" }} />
+        </HorizontalStack>
+        <Text as="p" color="subdued">Guardrail violations across managed devices</Text>
+    </VerticalStack>
+);
 
 function ViolationsBySeverityCard({ counts, status, onSelect }) {
     const { data, total, titleColor } = useMemo(() => {
@@ -21,9 +33,9 @@ function ViolationsBySeverityCard({ counts, status, onSelect }) {
 
     if (status === "error") {
         return (
-            <Card padding="4">
-                <VerticalStack gap="2">
-                    <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
+            <Card padding="5">
+                <VerticalStack gap="5">
+                    {heading}
                     <Text as="p" color="subdued">Violation counts could not be loaded.</Text>
                 </VerticalStack>
             </Card>
@@ -31,22 +43,24 @@ function ViolationsBySeverityCard({ counts, status, onSelect }) {
     }
 
     return (
-        <Card padding="4">
-            <VerticalStack gap="2">
-                <Text variant="headingMd" fontWeight="semibold">Violations by Severity</Text>
-                <HorizontalStack align="center">
-                    <Box width={`${CHART_SIZE}px`}>
-                        <DonutChart data={data} title={formatNumber(total)} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} onSegmentClick={onSelect} />
-                    </Box>
-                </HorizontalStack>
-                <HorizontalStack gap="3" wrap align="center">
-                    {Object.entries(data).map(([name, { text, color }]) => (
-                        <HorizontalStack key={name} gap="1" blockAlign="center">
-                            <Box className="agentic-dot" style={{ "--dot-color": color }} />
-                            <Text variant="bodySm" color="subdued">{name} ({formatNumber(text)})</Text>
-                        </HorizontalStack>
-                    ))}
-                </HorizontalStack>
+        <Card padding="5">
+            <VerticalStack gap="5">
+                {heading}
+                <VerticalStack gap="2">
+                    <HorizontalStack align="center">
+                        <Box width={`${CHART_SIZE}px`}>
+                            <DonutChart data={data} title={formatNumber(total)} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} onSegmentClick={onSelect} />
+                        </Box>
+                    </HorizontalStack>
+                    <HorizontalStack gap="3" wrap align="center">
+                        {Object.entries(data).map(([name, { text, color }]) => (
+                            <HorizontalStack key={name} gap="1" blockAlign="center">
+                                <Box className="agentic-dot" style={{ "--dot-color": color }} />
+                                <Text variant="bodySm" color="subdued">{name} ({formatNumber(text)})</Text>
+                            </HorizontalStack>
+                        ))}
+                    </HorizontalStack>
+                </VerticalStack>
             </VerticalStack>
         </Card>
     );

@@ -1,8 +1,8 @@
-import { Text, VerticalStack } from "@shopify/polaris";
+import { Box, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
+    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
 } from "./peopleConstants";
 import { getDomainForFavicon } from "../../agentic/mcpClientHelper";
 
@@ -78,7 +78,7 @@ function statValue(value, subtext) {
     return (
         <VerticalStack gap="1">
             <Text as="p" variant="heading2xl">{formatCount(value)}</Text>
-            {subtext && <Text as="p" variant="bodySm" color={subtext.color || "subdued"}>{subtext.text}</Text>}
+            {subtext && <Text as="p" variant="bodySm" fontWeight="medium" color={subtext.color || "subdued"}>{subtext.text}</Text>}
         </VerticalStack>
     );
 }
@@ -301,6 +301,11 @@ function footprintLayout(model, highlight) {
 const transform = {
     footprintLayout,
     statCardTarget: (id) => STAT_CARD_TARGETS[id],
+    tooltip: (text) => <Box width="350px">{text}</Box>,
+    activeStatCard: (tab, filters, clickedId) => Object.keys(STAT_CARD_TARGETS).find((id) => {
+        const target = STAT_CARD_TARGETS[id];
+        return (Object.keys(target.filters).length > 0 || id === clickedId) && target.tab === tab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...target.filters }) === JSON.stringify(filters);
+    }),
     filterOptions: (overview) => ({
         teams: overview?.teamOptions || [],
         tags: overview?.tagOptions || [],
@@ -309,7 +314,7 @@ const transform = {
         guardrailModes: Object.keys(MODE_LABELS).filter((mode) => (overview?.guardrailModes?.[mode] || 0) > 0),
         categories: CATEGORY_ORDER.filter((category) => (overview?.categoryTotals?.[category] || 0) > 0),
     }),
-    buildStatItems: (deviceStats, onSelect, discovery) => {
+    buildStatItems: (deviceStats, onSelect, discovery, activeId) => {
         const subtexts = deviceStats ? statSubtexts(deviceStats, discovery) : {};
         const values = { ...deviceStats, devicesWithAiTools: discovery?.devicesCount, employeesUsingAi: discovery?.usersCount };
         return STAT_CARDS.map((card) => ({
@@ -317,6 +322,7 @@ const transform = {
             isComp: true,
             data: statValue(values[card.id], subtexts[card.id]),
             onClick: () => onSelect(card.id),
+            selected: card.id === activeId,
         }));
     },
     cardBody: (status, body) => {

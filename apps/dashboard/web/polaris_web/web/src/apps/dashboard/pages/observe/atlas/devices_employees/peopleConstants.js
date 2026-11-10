@@ -40,7 +40,7 @@ export const CATEGORY_LABELS = {
 export const CATEGORY_BACKGROUNDS = {
     agents: "bg-magic-strong",
     mcp: "bg-magic-active",
-    browser: "bg-magic-hover",
+    browser: "bg-interactive",
 };
 
 export const HEALTH_LABELS = {

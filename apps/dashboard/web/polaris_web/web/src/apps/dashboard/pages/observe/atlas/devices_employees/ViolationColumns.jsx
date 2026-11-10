@@ -43,6 +43,6 @@ export const ATLAS_VIOLATION_COLUMNS = [
     { field: "title", headerName: "Policy", flex: 1.2, minWidth: 180, sortable: false, cellRenderer: PolicyCellRenderer, cellStyle: CENTERED },
     { field: "ruleViolated", headerName: "Detected", flex: 1, minWidth: 120, sortable: false, valueGetter: detectedValue, cellRenderer: DetectedCellRenderer, cellStyle: CENTERED },
     { field: "behaviour", headerName: "Action", width: 110, sortable: false, cellRenderer: ActionCellRenderer, cellStyle: CENTERED },
-    { field: "url", headerName: "Target", flex: 1.8, minWidth: 240, sortable: false, cellRenderer: TargetCellRenderer, cellStyle: CENTERED },
+    { field: "url", headerName: "Target", flex: 1.8, minWidth: 300, sortable: false, cellRenderer: TargetCellRenderer, cellStyle: { ...CENTERED, whiteSpace: "nowrap" } },
     { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: SeverityCellRenderer, cellStyle: CENTERED },
 ];
