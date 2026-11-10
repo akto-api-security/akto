@@ -1360,7 +1360,7 @@ function HomeDashboard() {
             </Scrollable>
         }
         title="New Domains"
-        titleToolTip="Recently discovered or added domains containing APIs. Shows test coverage for each new domain."
+        titleToolTip={"Recently discovered or added domains containing " + mapLabel('APIs', getDashboardCategory()) + ". Shows test coverage for each new domain."}
         linkText="Increase test coverage"
         linkUrl="/dashboard/observe/inventory"
         minHeight="344px"
@@ -1461,7 +1461,7 @@ function HomeDashboard() {
                 </Box>
             }
             title="Top Threat Categories"
-            titleToolTip="Most common types of security threats detected across your APIs"
+            titleToolTip={"Most common types of security threats detected across your " + mapLabel('APIs', getDashboardCategory())}
             linkText="View all categories"
             linkUrl="/dashboard/protection/threat-dashboard"
         />

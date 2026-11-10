@@ -3,6 +3,7 @@ import BarGraph from "../../../../components/charts/BarGraph";
 import InfoCard from "../../../dashboard/new_components/InfoCard";
 import { HIGH_RISK_THRESHOLD, MEDIUM_RISK_THRESHOLD, RISK_BUCKET_WIDTH, RISK_COLORS, RISK_EXPLANATION } from "./peopleConstants";
 import transform from "./transform";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const BAR_WIDTH = 36;
 const CHART_OPTIONS = {
@@ -28,7 +29,7 @@ function RiskHistogramCard({ overview, status, onSelectBucket, onSelectHighRisk 
 
     const body = (
         <VerticalStack gap="2">
-            <Text as="p" color="subdued">Highest API risk score (0 to 5) across each employee's AI tools</Text>
+            <Text as="p" color="subdued">Highest {mapLabel('API', getDashboardCategory())} risk score (0 to 5) across each employee's AI tools</Text>
             {overview?.riskAvailable === false && (
                 <Text as="p" variant="bodySm" color="critical">Risk scores are unavailable right now.</Text>
             )}

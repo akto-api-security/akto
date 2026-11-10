@@ -5,11 +5,10 @@ import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
-import api from "./api";
 import GetPrettifyEndpoint, { MethodBox } from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
 import CollectionTagsList from "./api_collections/component/CollectionTagsList";
-import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isMCPSecurityCategory, isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory, isDastCategory } from "../../../main/labelHelper";
+import { CATEGORY_ENDPOINT_SECURITY, getDashboardCategory, isAgenticSecurityCategory, isApiSecurityCategory, isDastCategory, isEndpointSecurityCategory, isMCPSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import { CollectionIcon } from "../../components/shared/CollectionIcon";
 
 const standardHeaders = [
@@ -53,7 +52,7 @@ const apiDetailsHeaders = [
         value: 'apiCollectionName',
         itemOrder: 3,
         icon: DynamicSourceMinor,
-        iconTooltip: "Api collection name"
+        iconTooltip: mapLabel('Api', getDashboardCategory()) + " collection name"
     },
     {
         text: 'Tags',
@@ -87,7 +86,7 @@ const apiDetailsHeaders = [
         icon: InfoMinor,
         itemOrder: 3,
         showFilter: true, 
-        iconTooltip: "Access type of the API"
+        iconTooltip: "Access type of the " + mapLabel('API', getDashboardCategory())
     },
     {
         text: 'Auth Type',
@@ -95,21 +94,21 @@ const apiDetailsHeaders = [
         icon: LockMinor,
         itemOrder: 3,
         showFilter: true,
-        iconTooltip: "Auth type of the API"
+        iconTooltip: "Auth type of the " + mapLabel('API', getDashboardCategory())
     },
     {
         text: "Discovered",
         value: 'added',
         icon: ClockMinor,
         itemOrder: 3,
-        iconTooltip: "Discovered time of API"
+        iconTooltip: "Discovered time of " + mapLabel('API', getDashboardCategory())
     },
     {
         text: 'Changes',
         value: 'changes',
         icon: InfoMinor,
         itemOrder: 3,
-        iconTooltip: "Changes in API"
+        iconTooltip: "Changes in " + mapLabel('API', getDashboardCategory())
     },
     {
         text: "",

@@ -4,6 +4,7 @@ import BannerLayout from '../../../../components/banners/BannerLayout'
 import { COLLECTIONS_VIDEO_LENGTH, COLLECTIONS_VIDEO_THUMBNAIL, COLLECTIONS_VIDEO_URL } from '../../../../../main/onboardingData'
 import quickStartFunc from "../../../quick_start/transform"
 import "../api_inventory.css"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function CollectionsPageBanner() {
 
@@ -34,7 +35,7 @@ function CollectionsPageBanner() {
     return(
         <BannerLayout 
             title={"Upload your traffic to get started"}
-            text={"Akto Discovers API inventory by connecting to your source of traffic. Connect a traffic connector to get started."}
+            text={"Akto Discovers " + mapLabel('API', getDashboardCategory()) + " inventory by connecting to your source of traffic. Connect a traffic connector to get started."}
             buttonText={"Go to Quickstart"}
             buttonUrl={"/dashboard/quick-start"}
             bodyComponent={iconComponent}

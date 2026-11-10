@@ -691,7 +691,7 @@ const transform = {
             </List>
           )
           break;
-        case "API endpoints affected":
+        case this.getAffectedEndpointsTitle():
           if (affectedEndpoints == null || affectedEndpoints == undefined || affectedEndpoints.length == 0) {
             return;
           }
@@ -909,6 +909,11 @@ const transform = {
     return transform.enrichWithRunStatus(rows, statusSummaries);
   },
 
+  // Shared by getInfoSectionsHeaders and the fillMoreInformation switch, which keys on the title
+  getAffectedEndpointsTitle() {
+    return mapLabel('API endpoints', getDashboardCategory()) + " affected"
+  },
+
   getInfoSectionsHeaders() {
     let moreInfoSections = [
       {
@@ -943,7 +948,7 @@ const transform = {
       },
       {
         icon: MarketingMajor,
-        title: mapLabel('API endpoints', getDashboardCategory()) + " affected",
+        title: this.getAffectedEndpointsTitle(),
         content: "",
         tooltipContent: "Affecting endpoints in your inventory for the same test"
       },
@@ -1368,12 +1373,12 @@ const transform = {
       {
         title: "Sensitive Data",
         value: <TextComp value={sensitiveData} />,
-        tooltipContent: "Sensitive parameters detected in API data"
+        tooltipContent: "Sensitive parameters detected in " + mapLabel('API', getDashboardCategory()) + " data"
       },
       {
         title: "Detected",
         value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />,
-        tooltipContent: "Discovered time of the API"
+        tooltipContent: "Discovered time of the " + mapLabel('API', getDashboardCategory())
       }
     ]
 
