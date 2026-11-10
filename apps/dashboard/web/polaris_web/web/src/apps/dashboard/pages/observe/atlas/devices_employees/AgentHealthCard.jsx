@@ -45,7 +45,10 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
 
     const body = (
         <VerticalStack gap="4">
-            <Text as="p" color="subdued">{`${(overview?.deviceCount || 0).toLocaleString("en-US")} managed devices`}</Text>
+            <HorizontalStack gap="2" blockAlign="baseline">
+                <Text as="p" variant="heading2xl">{(overview?.deviceCount || 0).toLocaleString("en-US")}</Text>
+                <Text as="p" color="subdued">managed devices</Text>
+            </HorizontalStack>
             <VerticalStack gap="3">
                 <SegmentBar segments={healthSegments} height={BAR_HEIGHT} showLabels onSegmentClick={onSelectHealth} activeKey={activeHealth} />
                 <HorizontalStack gap="1" wrap>
