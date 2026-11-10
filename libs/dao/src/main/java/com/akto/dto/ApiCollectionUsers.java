@@ -33,6 +33,7 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
+import com.akto.dto.testing.custom_groups.UnauthenticatedMcpToolsGroup;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
@@ -230,6 +231,11 @@ public class ApiCollectionUsers {
 
         if(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID == apiCollectionId){
             UnauthenticatedEndpoint.updateCollections();
+            return;
+        }
+
+        if(UnauthenticatedMcpToolsGroup.GROUP_ID == apiCollectionId){
+            UnauthenticatedMcpToolsGroup.updateCollections();
             return;
         }
 
