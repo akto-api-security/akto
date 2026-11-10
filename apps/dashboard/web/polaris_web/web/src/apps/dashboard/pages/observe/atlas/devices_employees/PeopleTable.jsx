@@ -306,7 +306,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 suppressRowClickSelection
                 onSelectionChanged={(event) => setSelectedRows(event.api.getSelectedRows())}
                 bulkActionCount={selectedRows.length}
-                bulkActions={[{ content: "Edit device tags", onAction: openTagModal, requires: "api/bulkUpdateUserDeviceTag" }]}
+                bulkActions={[{ label: "Edit device tags", onAction: openTagModal, requires: "api/bulkUpdateUserDeviceTag" }]}
                 onClearBulk={() => gridRef.current?.api?.deselectAll()}
             />
             {tagNames && (
