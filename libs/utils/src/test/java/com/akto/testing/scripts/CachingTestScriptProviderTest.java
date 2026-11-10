@@ -40,6 +40,27 @@ public class CachingTestScriptProviderTest {
     }
 
     @Test
+    public void preAndPostOfOneAccountAreCachedSeparately() {
+        StubTestScriptProvider delegate = new StubTestScriptProvider();
+        delegate.defaults.put(TestScript.Type.PRE_REQUEST, StubTestScriptProvider.script("def-pre", TestScript.Type.PRE_REQUEST, "pre();"));
+        delegate.defaults.put(TestScript.Type.POST_REQUEST, StubTestScriptProvider.script("def-post", TestScript.Type.POST_REQUEST, "post();"));
+        delegate.byId.put("chosen-pre", StubTestScriptProvider.script("chosen-pre", TestScript.Type.PRE_REQUEST, "a();"));
+        delegate.byId.put("chosen-post", StubTestScriptProvider.script("chosen-post", TestScript.Type.POST_REQUEST, "b();"));
+        CachingTestScriptProvider provider = cache(delegate, 100);
+
+        // fill every key, then read each again from the cache, interleaved
+        for (int round = 0; round < 2; round++) {
+            assertEquals("def-pre", provider.findDefault(TestScript.Type.PRE_REQUEST).getId());
+            assertEquals("def-post", provider.findDefault(TestScript.Type.POST_REQUEST).getId());
+            assertEquals("chosen-pre", provider.findById("chosen-pre").getId());
+            assertEquals("chosen-post", provider.findById("chosen-post").getId());
+        }
+        assertEquals(2, delegate.defaultCalls);
+        assertEquals(2, delegate.byIdCalls);
+        assertEquals(4, provider.size());
+    }
+
+    @Test
     public void exceptionsAreNeverCached() {
         StubTestScriptProvider delegate = new StubTestScriptProvider();
         delegate.failWith = new IllegalStateException("db down");
