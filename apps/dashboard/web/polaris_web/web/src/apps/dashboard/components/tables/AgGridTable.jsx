@@ -347,7 +347,7 @@ export default function AgGridTable({
 
     // Custom pagination bar — only rendered in the non-SSRM server mode; SSRM uses AG Grid's own footer.
     const serverPaginationBar = isServerMode && !useSSRM && query.total > 0 ? (
-        <Box padding="2">
+        <Box padding="2" borderBlockStartWidth="1" borderColor="border-subdued">
             <HorizontalGrid columns="1fr auto 1fr" gap="4" alignItems="center">
                 <Box />
                 <Pagination
