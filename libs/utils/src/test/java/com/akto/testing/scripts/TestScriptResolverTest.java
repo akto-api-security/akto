@@ -70,6 +70,22 @@ public class TestScriptResolverTest {
     }
 
     @Test
+    public void runWithPreAndPostThroughTheCacheGetsEachPhaseItsOwnScript() {
+        provider.defaults.put(TestScript.Type.POST_REQUEST, StubTestScriptProvider.script("def-post", TestScript.Type.POST_REQUEST, "post();"));
+        TestScriptResolver cachedResolver = new TestScriptResolver(
+            new CachingTestScriptProvider(provider, 100, 300, () -> 1000, () -> 1));
+
+        TestingRunConfig defaults = config(null, null);
+        TestingRunConfig chosen = config("chosen", "a-post");
+        for (int round = 0; round < 2; round++) {
+            assertEquals("def-pre", cachedResolver.resolve(defaults, TestScript.Type.PRE_REQUEST).get().getId());
+            assertEquals("def-post", cachedResolver.resolve(defaults, TestScript.Type.POST_REQUEST).get().getId());
+            assertEquals("chosen", cachedResolver.resolve(chosen, TestScript.Type.PRE_REQUEST).get().getId());
+            assertEquals("a-post", cachedResolver.resolve(chosen, TestScript.Type.POST_REQUEST).get().getId());
+        }
+    }
+
+    @Test
     public void providerFailurePropagates() {
         provider.failWith = new IllegalStateException("db down");
         assertThrows(IllegalStateException.class, () -> resolver.resolve(config(null, null), TestScript.Type.PRE_REQUEST));
