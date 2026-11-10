@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
-import { Box, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
-import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor } from "@shopify/polaris-icons";
+import { Box, Button, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
+import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor, MaximizeMajor, MinimizeMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
@@ -35,17 +35,22 @@ export function topoIcon(category) {
     }
 }
 
+const TOPO_STATUS_BORDERS = { bad: "#D72C0D", review: "#E4C300" };
+const TOPO_SELECTED_BORDER = "#6200EA";
+
 export function TopoNode({ data }) {
     const { component } = data;
     const colors = topoColors(component.category);
-    const IconComponent = topoIcon(component.category);
+    const borderColor = component.selected ? TOPO_SELECTED_BORDER : TOPO_STATUS_BORDERS[component.status] || colors.borderColor;
+    const borderWidth = component.selected ? 2 : 1;
+    const IconComponent = component.iconSrc || topoIcon(component.category);
     const isDevice = component.category === "external";
 
     return (
         <>
             {!isDevice && <Handle type="target" position={Position.Left} />}
             <Card padding={0}>
-                <Box style={{ border: `1px solid ${colors.borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
+                <Box style={{ border: `${borderWidth}px solid ${borderColor}`, borderRadius: "8px", backgroundColor: colors.backgroundColor }}>
                     <Box padding={3}>
                         <VerticalStack gap={1}>
                             <Box width="150px">
@@ -55,7 +60,7 @@ export function TopoNode({ data }) {
                             </Box>
                             <HorizontalStack gap={1} blockAlign="center">
                                 {typeof IconComponent === "string"
-                                    ? <Avatar source={IconComponent} size="extraSmall" />
+                                    ? <Avatar source={IconComponent} size="extraSmall" shape="square" />
                                     : <Icon source={IconComponent} />
                                 }
                                 <Box width={component.category === "ai-model" ? "140px" : "110px"}>
@@ -73,7 +78,11 @@ export function TopoNode({ data }) {
     );
 }
 
-export const TOPO_NODE_TYPES = { topoNode: TopoNode };
+export function TopoHead({ data }) {
+    return <Text variant="bodySm" fontWeight="semibold" color="subdued">{data.label}</Text>;
+}
+
+export const TOPO_NODE_TYPES = { topoNode: TopoNode, topoHead: TopoHead };
 
 const NODE_H = 84;
 const GRAPH_H = 300;
@@ -82,9 +91,9 @@ const FOCUS_ZOOM = 1;
 
 // Opens centred on the asset the flyout is actually about (the device on Endpoints, the agent/MCP
 // on Agentic Assets) instead of a fitView that shrinks everything to fit the widest branch.
-function centerOnFocus(api, nodes, focusId) {
+function centerOnFocus(api, nodes, focusId, fitPadding = 0.2) {
     const target = nodes.find(n => n.id === focusId);
-    if (!target) { api.fitView({ padding: 0.2 }); return; }
+    if (!target) { api.fitView({ padding: fitPadding }); return; }
     // getNode returns the store's copy, which carries the *measured* box — the node's width comes
     // from TopoNode's label widths, so hardcoding it here would drift the moment those change.
     const measured = api.getNode?.(focusId);
@@ -125,7 +134,7 @@ function buildDeviceItems(devices, deviceCount) {
     return items;
 }
 
-export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId }) {
+export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTreeData = [], agenticFlatData = [], inlineComponents = [], nodes: externalNodes, edges: externalEdges, height: externalHeight, focusNodeId, onNodeClick, onPaneClick, fitKey, fitPadding }) {
     // Each MCP's own tools, keyed by collection id — the extra hop the Endpoints graph shows.
     // Only for our own layout; a caller that supplies nodes reserves its own tool rows.
     const mcpCollectionIds = useMemo(() => {
@@ -274,22 +283,36 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
     // Re-centres on every graph change, not just init — the flyouts' detail and tool fetches land
     // after the first render, and the view should still be on the focus node once they do.
     const flow = useRef(null);
+    const containerRef = useRef(null);
+    const [fullscreen, setFullscreen] = useState(false);
     useEffect(() => {
-        if (flow.current) centerOnFocus(flow.current, nodes, focusId);
-    }, [nodes, focusId]);
+        const sync = () => setFullscreen(document.fullscreenElement === containerRef.current);
+        document.addEventListener("fullscreenchange", sync);
+        return () => document.removeEventListener("fullscreenchange", sync);
+    }, []);
+    const toggleFullscreen = useCallback(() => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else containerRef.current?.requestFullscreen();
+    }, []);
+    const recenterOn = fitKey !== undefined ? fitKey : nodes;
+    useEffect(() => {
+        if (flow.current) centerOnFocus(flow.current, nodes, focusId, fitPadding);
+    }, [recenterOn, focusId, fullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
-        <Box style={{ height, borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
+        <Box ref={containerRef} style={{ height: fullscreen ? "100vh" : height, position: "relative", borderRadius: 8, border: "1px solid #E1E5E9", overflow: "hidden", background: "#F8FAFC" }}>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={TOPO_NODE_TYPES}
-                onInit={api => { flow.current = api; centerOnFocus(api, nodes, focusId); }}
+                onInit={api => { flow.current = api; centerOnFocus(api, nodes, focusId, fitPadding); }}
                 minZoom={0.2}
                 maxZoom={4}
                 nodesDraggable={true}
                 nodesConnectable={false}
-                elementsSelectable={false}
+                elementsSelectable={!!onNodeClick}
+                onNodeClick={onNodeClick}
+                onPaneClick={onPaneClick}
                 zoomOnScroll
                 zoomOnPinch
                 panOnDrag
@@ -298,6 +321,11 @@ export default function AssetTopologyGraph({ asset, assetDevices = {}, agenticTr
                 <Background color="#E1E5E9" gap={16} />
                 <Controls showInteractive={false} />
             </ReactFlow>
+            <Box position="absolute" insetBlockStart="2" insetInlineEnd="2" zIndex="5">
+                <Tooltip content={fullscreen ? "Exit full screen" : "Full screen"} dismissOnMouseOut>
+                    <Button size="slim" icon={fullscreen ? MinimizeMajor : MaximizeMajor} onClick={toggleFullscreen} accessibilityLabel={fullscreen ? "Exit full screen" : "Full screen"} />
+                </Tooltip>
+            </Box>
         </Box>
     );
 }

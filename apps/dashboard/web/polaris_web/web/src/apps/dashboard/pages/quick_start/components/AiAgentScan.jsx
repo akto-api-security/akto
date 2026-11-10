@@ -4,6 +4,7 @@ import { useState } from 'react'
 import api from '../api';
 import func from "@/util/func"
 import TestRoleDropdown from '../../../components/shared/TestRoleDropdown';
+import MiniTestingSelector from './MiniTestingSelector';
 
 const MAX_HEADERS = 5
 
@@ -20,6 +21,8 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
     const [customResponseBody, setCustomResponseBody] = useState('')
     const [customResponseStatusCode, setCustomResponseStatusCode] = useState('200')
     const [responseHeaders, setResponseHeaders] = useState([])
+    const [useMiniTesting, setUseMiniTesting] = useState(false)
+    const [miniTestingName, setMiniTestingName] = useState('')
 
     function updateHeaderRow(setList, index, field, val) {
         setList(prev => {
@@ -69,9 +72,11 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                 ? parseInt(customResponseStatusCode, 10)
                 : null
             const customResponseHeadersToSend = useCustomResponse ? headersArrayToObject(responseHeaders) : null
+            const miniTestingNameToSend = useMiniTesting && !useCustomResponse ? (miniTestingName || null) : null
             await api.importFromUrl(
                 url, testRoleToSend, requestBodyToSend || null, customHeaders, collectionNameToSend,
-                customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend
+                customResponseBodyToSend, customResponseStatusCodeToSend, customResponseHeadersToSend,
+                miniTestingNameToSend
             )
             func.setToast(true, false, "AI agent imported successfully.")
             setUrl('')
@@ -85,6 +90,8 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             setCustomResponseBody('')
             setCustomResponseStatusCode('200')
             setResponseHeaders([])
+            setUseMiniTesting(false)
+            setMiniTestingName('')
         } finally {
             setLoading(false)
         }
@@ -187,6 +194,16 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                         </Box>
                     )}
                 </VerticalStack>
+
+                {!useCustomResponse && (
+                    <MiniTestingSelector
+                        id="ai-agent-mini-testing"
+                        enabled={useMiniTesting}
+                        setEnabled={setUseMiniTesting}
+                        selected={miniTestingName}
+                        setSelected={setMiniTestingName}
+                    />
+                )}
 
                 <Checkbox
                     label="Use custom response (skip live call)"

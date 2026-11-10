@@ -36,6 +36,7 @@ import com.akto.threat.backend.dto.ParamEnumerationConfigDTO;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.util.ThreatDetectionConstants;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
+import com.mongodb.MongoExecutionTimeoutException;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
@@ -1516,7 +1517,8 @@ public class ThreatActorService {
     hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
 
     List<FetchTopNDataResponse.TopHostData> topHosts = new ArrayList<>();
-    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, hostPipeline).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, hostPipeline)
+        .maxTime(evaluationModeConditions.isEmpty() ? 0 : ThreatUtils.REGEX_MAX_TIME_MS, java.util.concurrent.TimeUnit.MILLISECONDS).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         topHosts.add(
@@ -1525,6 +1527,8 @@ public class ThreatActorService {
                 .setAttacks(doc.getInteger("attacks", 0))
                 .build());
       }
+    } catch (MongoExecutionTimeoutException e) {
+      loggerMaker.errorAndAddToDb("Top hosts exceeded " + ThreatUtils.REGEX_MAX_TIME_MS + "ms, returning none: " + e.getMessage(), LoggerMaker.LogDb.THREAT_DETECTION);
     }
 
     return FetchTopNDataResponse.newBuilder()

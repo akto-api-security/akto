@@ -153,11 +153,15 @@ function VulnerabilityEvidence({ segments: locatedSegments, evidenceLine }) {
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine, onPageChange} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata, redactHeaders = [], isWebSocket: isWebSocketProp, onAddAsSearchFilter, showDetectionReason = false, evidenceLine, onPageChange, isAPISampleData = false} = props;
 
     const visibleSamples = useMemo(
-      () => (sampleData || []).filter((sample) => !func.isUndecodedBrotliSample(sample)),
-      [sampleData]
+      () => {
+        const list = sampleData || []
+        if (!isAPISampleData) return list
+        return list.filter((sample) => !func.isUndecodedBrotliSample(sample))
+      },
+      [sampleData, isAPISampleData]
     )
 
     const [page, setPage] = useState(0);

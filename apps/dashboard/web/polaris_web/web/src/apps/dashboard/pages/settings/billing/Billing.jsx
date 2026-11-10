@@ -4,9 +4,6 @@ import {
   CustomerPortalProvider,
   CustomerUsageData,
   PaymentDetailsSection,
-  SubscriptionsOverview,
-  AddonsList,
-  Promotions,
   InvoicesSection
 } from '@stigg/react-sdk'
 
@@ -92,9 +89,6 @@ function Billing() {
             <Box>
                 <CustomerPortalProvider>
                     <CustomerUsageData />
-                    <SubscriptionsOverview />
-                    <AddonsList/>
-                    <Promotions/>
                     <InvoicesSection/>
                 </CustomerPortalProvider>
             </Box>

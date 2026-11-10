@@ -58,6 +58,9 @@ public class AgentImportAction extends UserAction{
     @Getter @Setter
     private Map<String, String> customResponseHeaders;
 
+    @Getter @Setter
+    private String miniTestingName;
+
     private int apiCollectionId;
     
     public String importFromUrl() {
@@ -201,7 +204,13 @@ public class AgentImportAction extends UserAction{
                     TestRoleAuthUtils.applyTestRoleAuth(requestToSend, testRoleId);
                 }
 
-                response = ApiExecutor.sendRequest(requestToSend, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
+                if (!StringUtils.isEmpty(miniTestingName)) {
+                    // Target is internal to the customer's network — have their mini-testing send it.
+                    loggerMaker.info("Sending request via mini-testing " + miniTestingName + " for URL: " + url, LoggerMaker.LogDb.DASHBOARD);
+                    response = com.akto.testing.Utils.runRequestOnHybridTesting(requestToSend, miniTestingName);
+                } else {
+                    response = ApiExecutor.sendRequest(requestToSend, false, null, false, new ArrayList<>(), HostValidator.SKIP_SSRF_CHECK);
+                }
                 if (response == null) {
                     throw new Exception("No response received from URL: " + url);
                 }

@@ -64,3 +64,36 @@ def test_matched_category_is_surfaced_in_details():
     )
 
     assert result["details"]["matchedCategory"] == "insults"
+
+
+def test_base_prompt_judges_every_language_and_embedded_content():
+    # Correctness rules, not scope expansions: they apply even with Config:{}.
+    for prompt in (toxicity.build({}, "x"), toxicity.build({}, "x", "abcd")):
+        assert "Judge text in ANY language or script" in prompt
+        assert "Toxic content stays toxic when it is pasted, quoted, or embedded" in prompt
+        assert "judge both the same way" in prompt
+
+
+def test_violence_covers_self_harm_and_extremist_praise():
+    prompt = toxicity.build({"harmfulCategories": {"violence": "HIGH"}}, "x")
+    section = prompt.split("The operator enabled")[1].split("Examples (")[0]
+
+    assert "self-harm" in section
+    assert "terrorist attacks" in section
+    assert "supportive, preventive or clinical discussion of self-harm is NOT in scope" in section
+
+
+def test_sexual_high_expands_to_explicit_adult_content_only_at_high():
+    high = toxicity.build({"harmfulCategories": {"sexual": "HIGH"}}, "x")
+    medium = toxicity.build({"harmfulCategories": {"sexual": "MEDIUM"}}, "x")
+
+    assert "EXPAND sexual beyond unwanted" in high
+    assert "EXPAND sexual" not in medium
+    assert "clearly in-category" in medium  # falls back to the generic MEDIUM guidance
+
+
+def test_scope_expansions_stay_out_of_old_deployments():
+    prompt = toxicity.build({}, "x")
+
+    assert "EXPAND sexual" not in prompt
+    assert "terrorist attacks" not in prompt

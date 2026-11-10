@@ -16,6 +16,7 @@ const initialState = {
     lastEndpointEpoch: 0,
     agenticNewLayout: false,
     guardrailViolationsNewLayout: false,
+    expandCollectionTags: false,
 };
 
 let localStore = (set) => ({
@@ -74,6 +75,14 @@ let localStore = (set) => ({
             set({ guardrailViolationsNewLayout });
         } catch (error) {
             console.error("Error setting guardrailViolationsNewLayout:", error);
+        }
+    },
+
+    setExpandCollectionTags: (expandCollectionTags) => {
+        try {
+            set({ expandCollectionTags });
+        } catch (error) {
+            console.error("Error setting expandCollectionTags:", error);
         }
     },
 
