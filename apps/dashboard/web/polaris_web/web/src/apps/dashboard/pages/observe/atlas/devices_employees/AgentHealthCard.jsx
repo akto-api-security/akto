@@ -9,8 +9,9 @@ import transform from "./transform";
 
 const HEALTH_TOOLTIP = "Offline: no heartbeat for 7+ days. Outdated: older than the latest release for the device's OS.";
 
-const HEALTH_BAR_HEIGHT = "12px";
-const MODE_BAR_HEIGHT = "8px";
+const BAR_HEIGHT = "22px";
+const LIGHT_TEXT_HEALTH = ["healthy", "offline"];
+const LIGHT_TEXT_MODES = ["enforce"];
 
 function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectHealth, onSelectMode, onUpdated, queuedIds = [] }) {
     const health = overview?.agentHealth || {};
@@ -33,10 +34,10 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
     };
 
     const healthSegments = HEALTH_ORDER.map((key) => ({
-        key, label: HEALTH_LABELS[key], count: health[key] || 0, color: tokenVar(HEALTH_BACKGROUNDS[key]),
+        key, label: HEALTH_LABELS[key], count: health[key] || 0, color: tokenVar(HEALTH_BACKGROUNDS[key]), lightText: LIGHT_TEXT_HEALTH.includes(key),
     }));
     const modeSegments = MODE_ORDER.map((key) => ({
-        key, label: MODE_LABELS[key], count: modes[key] || 0, color: tokenVar(MODE_BACKGROUNDS[key]),
+        key, label: MODE_LABELS[key], count: modes[key] || 0, color: tokenVar(MODE_BACKGROUNDS[key]), lightText: LIGHT_TEXT_MODES.includes(key),
     }));
 
     const activeHealthSet = new Set(activeHealth ? [activeHealth] : []);
@@ -46,7 +47,7 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
         <VerticalStack gap="4">
             <Text as="p" color="subdued">{`${(overview?.deviceCount || 0).toLocaleString("en-US")} managed devices`}</Text>
             <VerticalStack gap="3">
-                <SegmentBar segments={healthSegments} height={HEALTH_BAR_HEIGHT} onSegmentClick={onSelectHealth} activeKey={activeHealth} />
+                <SegmentBar segments={healthSegments} height={BAR_HEIGHT} showLabels onSegmentClick={onSelectHealth} activeKey={activeHealth} />
                 <HorizontalStack gap="1" wrap>
                     {healthSegments.map((segment) => (
                         <BreakdownChip key={segment.key} b={segment} activeFilter={activeHealthSet} onFilterClick={onSelectHealth} />
@@ -56,7 +57,7 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
             <Divider />
             <VerticalStack gap="2">
                 <Text as="h4" variant="headingSm">Guardrail mode</Text>
-                <SegmentBar segments={modeSegments} height={MODE_BAR_HEIGHT} onSegmentClick={onSelectMode} activeKey={activeMode} />
+                <SegmentBar segments={modeSegments} height={BAR_HEIGHT} showLabels onSegmentClick={onSelectMode} activeKey={activeMode} />
                 <HorizontalStack gap="1" wrap>
                     {modeSegments.map((segment) => (
                         <BreakdownChip key={segment.key} b={segment} activeFilter={activeModeSet} onFilterClick={onSelectMode} />
