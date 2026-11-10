@@ -94,6 +94,7 @@ const PAGE_REQUIRES = {
     '/dashboard/testing/roles': 'api/fetchTestRoles',
     '/dashboard/testing/user-config': 'api/fetchAuthMechanismData',
     '/dashboard/testing/test-suite': 'api/fetchAllTestSuites',
+    '/dashboard/testing/scripts': 'api/fetchAllScripts',
     '/dashboard/reports/issues': 'api/fetchAllIssues',
     '/dashboard/reports/threat': 'api/fetchThreatComplianceInfos',
     '/dashboard/protection/threat-dashboard': 'api/fetchThreatCategoryCount',

@@ -19,6 +19,8 @@ import com.akto.dao.monitoring.EndpointShieldLogsDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dao.testing.TestingRunConfigDao;
+import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.AgentConversationDao;
 import com.akto.dao.testing.AgentConversationResultDao;
@@ -524,6 +526,8 @@ public class DaoInit {
         TrafficMetricsDao.instance.createIndicesIfAbsent();
         SensitiveDataCountDao.instance.createIndicesIfAbsent();
         TestRolesDao.instance.createIndicesIfAbsent();
+        TestScriptsDao.instance.createIndicesIfAbsent();
+        TestingRunConfigDao.instance.createIndicesIfAbsent();
         UsersDao.instance.createIndicesIfAbsent();
         AccountsDao.instance.createIndexIfAbsent();
 

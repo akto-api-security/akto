@@ -1593,6 +1593,9 @@ const transform = {
     return {
       configsAdvancedSettings: settings,
       testRoleId: testRun.testRoleId,
+      // null/undefined = leave the stored script unchanged; "" = no script; otherwise a script id
+      preRequestScriptId: testRun.preRequestScriptId ?? null,
+      postRequestScriptId: testRun.postRequestScriptId ?? null,
       testSubCategoryList: testSuiteIds?.length === 0 ? selectedTests : [],
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
