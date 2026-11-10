@@ -364,9 +364,7 @@ export default {
             hasInlineLlm: resp?.assetHasInlineLlm || false,
             inlineToolNames: resp?.assetInlineToolNames || [],
             mcpComponentCount: resp?.assetMcpComponentCount || 0,
-            // Asset-level risk badge next to "AI Agent - Cursor" on the legacy devices page. Only set
-            // when the server returned a score: the new-layout flyout spreads this over the table row
-            // ({ ...row, ...detail }), so a null here would wipe the row's own riskScore and hide the badge.
+            // Asset-level risk badge next to "AI Agent - Cursor" on the legacy devices page.
             ...(resp?.assetRiskScore != null ? {
                 riskScore: resp.assetRiskScore,
                 riskScoreFactors: resp?.assetRiskScoreFactors || [],

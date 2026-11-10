@@ -1,9 +1,7 @@
 import { Badge, Box, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 
-// Max the scoring formula can reach (ApiInfoDao.getRiskScore): 1 new/threat + 1 public + 1 sensitive + 2 severity.
 const MAX_RISK_SCORE = 5;
 
-// Status comes from observeFunc.getStatus, so band label and meter colour always match the table badge.
 const BAND_LABELS = { critical: "Critical", attention: "High", warning: "Medium", info: "Low", success: "None" };
 const METER_COLORS = {
     critical: "bg-critical-strong",
@@ -13,46 +11,11 @@ const METER_COLORS = {
     success: "bg-success-strong",
 };
 
-// The four inputs of the formula, mirroring RiskScoreExplainer.buildFactors. `labels` are the factor
-// labels the backend can emit for the slot; `absent` is the muted row shown when the slot scored 0.
-const FACTOR_SLOTS = [
-    {
-        key: "findings",
-        labels: {
-            "High or critical open test findings": "Serious weaknesses found by security tests",
-            "Medium open test findings": "Moderate weaknesses found by security tests",
-            "Low open test findings": "Minor weaknesses found by security tests",
-        },
-        absent: "No open test findings",
-    },
-    {
-        key: "public",
-        labels: { "Publicly accessible": "Reachable from outside your network" },
-        absent: "Not publicly accessible",
-    },
-    {
-        key: "sensitive",
-        labels: { "Sensitive data in responses": "Responses contain personal or confidential data" },
-        absent: "No sensitive data in responses",
-    },
-    {
-        key: "recent",
-        labels: {
-            "Discovered in the last 30 days": "Recently added to your inventory",
-            "Guardrail or threat activity": "Suspicious activity detected on this endpoint",
-        },
-        absent: "Not discovered in the last 30 days",
-    },
-];
-
 const MAX_DETAIL_NAMES = 2;
 const ACRONYMS = new Set(["ssrf", "bola", "bfla", "idor", "xss", "sql", "sqli", "nosql", "jwt", "api", "cors", "csrf", "xxe", "rce", "lfi", "rfi", "pii", "ssn", "id", "mcp", "llm", "ai", "url", "http", "https", "ssl", "tls", "dos", "cve"]);
 
 const formatPoints = (points) => Number(Number(points || 0).toFixed(1));
 
-const findSlot = (label) => FACTOR_SLOTS.find((slot) => slot.labels[label]);
-
-// Backend details are raw ids ("SSRF_ON_FILE_UPLOAD", "EMAIL") and may end with "(+N more)".
 const prettifyName = (name) => {
     if (!/^[A-Z0-9_ ]+$/.test(name) && !name.includes("_")) return name;
     const words = name.replace(/_/g, " ").trim().split(/\s+/).map((w) => w.toLowerCase());
@@ -70,7 +33,6 @@ function prettifyDetail(detail) {
     return hidden > 0 ? `${shown} +${hidden} more` : shown;
 }
 
-// One block of the 5-block meter; fill is 0..1 so a score like 3.5 half-fills the fourth block.
 function MeterBlock({ fill, color }) {
     return (
         <Box width="22px" minHeight="8px" background="bg-strong" borderRadius="1" overflowX="hidden">
@@ -90,17 +52,15 @@ function RiskMeter({ score, status }) {
     );
 }
 
-function FactorRow({ points, label, explanation, detail, muted }) {
-    const textColor = muted ? "subdued" : undefined;
+function FactorRow({ points, label, detail }) {
     return (
         <HorizontalStack gap="3" wrap={false} blockAlign="start">
             <Box minWidth="44px">
-                <Text variant="bodyMd" fontWeight={muted ? "regular" : "semibold"} color={textColor} alignment="end">{`+${formatPoints(points)}`}</Text>
+                <Text variant="bodyMd" fontWeight="semibold" alignment="end">{`+${formatPoints(points)}`}</Text>
             </Box>
             <VerticalStack gap="0">
-                <Text variant="bodyMd" color={textColor}>{label}</Text>
+                <Text variant="bodyMd">{label}</Text>
                 {detail ? <Text variant="bodySm" color="subdued">{detail}</Text> : null}
-                {explanation ? <Text variant="bodySm" color="subdued">{explanation}</Text> : null}
             </VerticalStack>
         </HorizontalStack>
     );
@@ -108,12 +68,6 @@ function FactorRow({ points, label, explanation, detail, muted }) {
 
 export default function RiskScoreTooltipContent({ riskScore, status, factors, note }) {
     const applied = [...(factors || [])].sort((a, b) => (b.points || 0) - (a.points || 0));
-
-    // Muted "doesn't apply" rows only when the list is complete (no shortfall note) and every label is
-    // one we know — otherwise we'd be guessing what is missing.
-    const canShowMissing = !note && applied.length > 0 && applied.every((f) => findSlot(f.label));
-    const appliedSlots = new Set(applied.map((f) => findSlot(f.label)?.key));
-    const missing = canShowMissing ? FACTOR_SLOTS.filter((slot) => !appliedSlots.has(slot.key)) : [];
 
     return (
         <Box width="350px" paddingBlockStart="1" paddingBlockEnd="1">
@@ -134,15 +88,8 @@ export default function RiskScoreTooltipContent({ riskScore, status, factors, no
                     <Box borderBlockStartWidth="1" borderColor="border-subdued" paddingBlockStart="3">
                         <VerticalStack gap="3">
                             {applied.map((factor, index) => (
-                                <FactorRow
-                                    key={index}
-                                    points={factor.points}
-                                    label={factor.label}
-                                    detail={prettifyDetail(factor.detail)}
-                                    explanation={findSlot(factor.label)?.labels[factor.label]}
-                                />
+                                <FactorRow key={index} points={factor.points} label={factor.label} detail={prettifyDetail(factor.detail)} />
                             ))}
-                            {missing.map((slot) => <FactorRow key={slot.key} points={0} label={slot.absent} muted />)}
                         </VerticalStack>
                     </Box>
                 ) : null}
