@@ -93,6 +93,11 @@ public class HttpCallParser {
 
     private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191, 1759692400);
 
+    // Accounts for which loopback hosts (127.0.0.1[:port], ::1) are normalized to localhost so that
+    // they form host-named collections instead of falling into the vxlan bucket. Gated per-account
+    // so the behaviour is opt-in and a no-op everywhere else.
+    private static final List<Integer> LOOPBACK_HOST_NORMALIZATION_ACCOUNTS = Arrays.asList(1760499072);
+
     /** HttpResponseParams.direction: "1" = inbound (callee side), "2" = outbound (caller side). */
     public static final String DIRECTION_OUTBOUND = "2";
 
@@ -389,7 +394,10 @@ public class HttpCallParser {
         }
         // Loopback IPs (127.0.0.1[:port], ::1) are not valid hostnames, so without this they would
         // fall into the vxlan collection instead of a host-named one. Map them to "localhost".
-        baseHostname = normalizeLoopbackHost(baseHostname);
+        // Gated per-account (opt-in); a no-op for every other account.
+        if (LOOPBACK_HOST_NORMALIZATION_ACCOUNTS.contains(Context.getActualAccountId())) {
+            baseHostname = normalizeLoopbackHost(baseHostname);
+        }
 
         if (tagsMap == null) {
             return baseHostname;
