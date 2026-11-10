@@ -174,6 +174,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
+import com.akto.dto.testing.custom_groups.UnauthenticatedMcpToolsGroup;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -2029,6 +2030,26 @@ public class InitializerListener implements ServletContextListener {
 
     }
 
+    /** Like createUnauthenticatedApiGroup, for MCP tools; only for accounts that have MCP servers. */
+    public static void createUnauthenticatedMcpToolsGroup() {
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(
+                Filters.eq("_id", UnauthenticatedMcpToolsGroup.GROUP_ID));
+        if (collection != null || !UnauthenticatedMcpToolsGroup.hasMcpServers()) {
+            return;
+        }
+
+        logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated mcp tools group.", LogDb.DASHBOARD);
+        ApiCollection group = new ApiCollection(UnauthenticatedMcpToolsGroup.GROUP_ID,
+                UnauthenticatedMcpToolsGroup.GROUP_NAME, Context.now(), new HashSet<>(), null, 0, false, false);
+        group.setAutomated(true);
+        group.setType(ApiCollection.Type.API_GROUP);
+        List<TestingEndpoints> conditions = new ArrayList<>();
+        conditions.add(new UnauthenticatedEndpoint());
+        group.setConditions(conditions);
+
+        ApiCollectionsDao.instance.insertOne(group);
+    }
+
     public static void createAllApisGroup() {
         ApiCollection collection = ApiCollectionsDao.instance
                 .findOne(Filters.eq("_id", 111111121));
@@ -2639,6 +2660,7 @@ public class InitializerListener implements ServletContextListener {
     private static void syncApiGroups(int accountId, Set<Integer> accountsWithRecentUserLogin) {
         // for every account, not only the ones with the api group feature
         runSafely("creating the unauthenticated api group", accountId, InitializerListener::createUnauthenticatedApiGroup);
+        runSafely("creating the unauthenticated mcp tools group", accountId, InitializerListener::createUnauthenticatedMcpToolsGroup);
 
         // the all apis group is not behind the feature, only dormant accounts are left out
         if (!DormantAccountFilter.isDormant(accountId, accountsWithRecentUserLogin)) {

@@ -79,6 +79,9 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     public final static int UNAUTHENTICATED_GROUP_ID = 111_111_120;
 
+    // MCP tools are left out of the group above; they have their own group (UnauthenticatedMcpToolsGroup)
+    public final static int UNAUTHENTICATED_MCP_TOOLS_GROUP_ID = 111_111_122;
+
     private static final Set<AuthType> UNAUTHENTICATED_AUTH_SET = Collections.singleton(AuthType.UNAUTHENTICATED);
 
     /**
