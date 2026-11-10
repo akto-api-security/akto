@@ -4138,6 +4138,22 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Setter
+    String testScriptId;
+    public String fetchTestScriptById() {
+        if (testScriptId == null || testScriptId.isEmpty()) {
+            addActionError("testScriptId is required");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            testScript = DbLayer.fetchTestScriptById(testScriptId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTestScriptById " + testScriptId);
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     List<String> testSuiteId;
     List<String> testSuiteTestSubCategories;
     public String findTestSubCategoriesByTestSuiteId() {
