@@ -49,7 +49,7 @@ function ViolationsBySeverityCard({ counts, status, onSelect }) {
                 <VerticalStack gap="2">
                     <HorizontalStack align="center">
                         <Box width={`${CHART_SIZE}px`}>
-                            <DonutChart data={data} title={formatNumber(total)} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} onSegmentClick={onSelect} />
+                            <DonutChart data={data} title={formatNumber(total)} subtitle="Violations" size={CHART_SIZE} pieInnerSize="55%" titleColor={titleColor} titleWeight="500" onSegmentClick={onSelect} />
                         </Box>
                     </HorizontalStack>
                     <HorizontalStack gap="3" wrap align="center">

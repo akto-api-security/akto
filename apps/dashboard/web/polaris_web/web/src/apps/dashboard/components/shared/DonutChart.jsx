@@ -7,7 +7,7 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSegmentClick, titleColor}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle, navUrlBuilder, invertTextSizes, onSegmentClick, titleColor, titleWeight}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -50,7 +50,7 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, sub
                     )
                     .css({
                         fontSize: invertTextSizes ? '12px' : '20px',
-                        fontWeight: invertTextSizes ? 'normal' : '400',
+                        fontWeight: titleWeight || (invertTextSizes ? 'normal' : '400'),
                         color: titleColor || (invertTextSizes ? '#666' : undefined),
                         textAlign: 'center'
                     })

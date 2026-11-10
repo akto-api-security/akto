@@ -33,20 +33,20 @@ const employeeColumns = (dataOptions) => [
 
 const deviceColumns = (dataOptions) => [
     { field: "name", headerName: "Device", flex: 2, minWidth: 340, cellRenderer: DeviceCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
+    { field: "owner", headerName: "Owner", flex: 1, minWidth: 140, cellRenderer: OwnerCellRenderer },
+    { field: "riskScore", headerName: "Risk", width: 90, cellRenderer: RiskCellRenderer },
+    { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
+    { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
+    { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
     {
         field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer,
         ...setFilter(dataOptions.osBrowser, osBrowserLabel),
         filterValueGetter: (params) => (params.data ? (params.data.extension ? `browser:${params.data.browser || "other"}` : `os:${params.data.os}`) : null),
     },
-    { field: "owner", headerName: "Owner", flex: 1, minWidth: 140, cellRenderer: OwnerCellRenderer },
     { field: "hasPersonalAccount", headerName: "Flags", flex: 1.4, minWidth: 260, sortable: false, cellRenderer: FlagsCellRenderer },
     { field: "tags", headerName: "Tags", flex: 1.2, minWidth: 220, sortable: false, cellRenderer: TagsCellRenderer, ...setFilter(dataOptions.tags, (value) => value), filterValueGetter: (params) => (params.data?.tags || []).map((tag) => `${tag.key}=${tag.value}`) },
     { field: "health", headerName: "Atlas agent", flex: 1.5, minWidth: 220, cellRenderer: AgentCellRenderer, ...setFilter(dataOptions.healthStates, (value) => HEALTH_LABELS[value] || value) },
     { field: "guardrailMode", headerName: "Guardrail mode", width: 150, cellRenderer: GuardrailModeCellRenderer, ...setFilter(dataOptions.guardrailModes, (value) => MODE_LABELS[value] || value) },
-    { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
-    { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
-    { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
-    { field: "riskScore", headerName: "Risk", width: 90, cellRenderer: RiskCellRenderer },
     { field: "lastHeartbeat", headerName: "Last check-in", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
 
