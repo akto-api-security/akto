@@ -254,8 +254,11 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     const onColumnFilterChanged = useCallback((event) => {
         const patch = filtersFromModel(tab, event.api.getFilterModel());
         if (Object.keys(patch).every((key) => sameValues(patch[key], filters[key]))) return;
+        const values = columnFilterValues(filters);
+        const allSelected = Object.keys(COLUMN_FILTER_FIELDS[tab]).some((key) => values[key].length > 0 && values[key].length === (dataOptions[key] || []).length);
+        if (allSelected && Object.values(patch).every((value) => value.length === 0)) return;
         onFiltersChange(patch);
-    }, [tab, filters, onFiltersChange]);
+    }, [tab, filters, dataOptions, onFiltersChange]);
 
     const selectedId = selected?.kind === (isEmployees ? "employee" : "device") ? selected.id : null;
     const getRowStyle = useCallback(({ data }) => {
