@@ -177,6 +177,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
+import com.akto.dto.testing.custom_groups.UnauthenticatedMcpToolsGroup;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
@@ -1978,6 +1979,32 @@ public class InitializerListener implements ServletContextListener {
     public static void createFirstUnauthenticatedApiGroup(){
         createUnauthenticatedApiGroup();
         createAllApisGroup();
+        try {
+            createUnauthenticatedMcpToolsGroup();
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "AccountId: " + Context.accountId.get() + " error while syncing unauthenticated mcp tools group: " + e.getMessage(), LogDb.DASHBOARD);
+        }
+    }
+
+    /** Creates the group for accounts with MCP servers, then keeps its members in step with api_info. */
+    public static void createUnauthenticatedMcpToolsGroup() {
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(
+                Filters.eq("_id", UnauthenticatedMcpToolsGroup.GROUP_ID));
+        if (collection == null) {
+            if (!UnauthenticatedMcpToolsGroup.hasMcpServers()) {
+                return;
+            }
+            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated mcp tools group.", LogDb.DASHBOARD);
+            ApiCollection group = new ApiCollection(UnauthenticatedMcpToolsGroup.GROUP_ID,
+                    UnauthenticatedMcpToolsGroup.GROUP_NAME, Context.now(), new HashSet<>(), null, 0, false, false);
+            group.setAutomated(true);
+            group.setType(ApiCollection.Type.API_GROUP);
+            List<TestingEndpoints> conditions = new ArrayList<>();
+            conditions.add(new UnauthenticatedEndpoint());
+            group.setConditions(conditions);
+            ApiCollectionsDao.instance.insertOne(group);
+        }
+        UnauthenticatedMcpToolsGroup.updateCollections();
     }
 
     public static void createRiskScoreApiGroup(int id, String name, RiskScoreTestingEndpoints.RiskScoreGroupType riskScoreGroupType) {
