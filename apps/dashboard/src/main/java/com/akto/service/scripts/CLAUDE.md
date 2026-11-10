@@ -102,6 +102,18 @@ flowchart LR
 - The SSE path applies the post script twice (pre-existing; not changed here).
 - Deploy order: cyborg, then dashboard, then mini-testing. Mini-testing calling `fetchTestScriptById`
   on an old cyborg gets a 404 -> exception -> request runs without the script (logged, not cached).
+- Old mini-testing builds against the new cyborg (dashboard and cyborg are upgraded everywhere first;
+  mini-testing rolls out per customer):
+
+  | Mini-testing build | Calls | Gets |
+  |---|---|---|
+  | current | `fetchTestScriptById` / typed `fetchTestScript` | the run's chosen script |
+  | 2026-03-15 to before the library (`81fcf26d7b`+) | typed `fetchTestScript` (POST) | `default-test-{type}` (legacy until migrated) |
+  | before 2026-03-15 | untyped `fetchTestScript` (GET) | `default-test-pre`, run as its pre-request script (`TestScript.typeForUntypedRequest`) |
+
+  Old builds ignore per-run choices: a run that picked another script or "No script" still runs the
+  default scripts on an old mini-testing. The request carries no run context, so cyborg cannot fix
+  this; the module has to be upgraded. Edits to `default-test-*` reach old builds within their cache TTL.
 - Mini-testing script fetches use `sendRequestBackOff` (1+2+5 s). Kept deliberately: a blip that
   ended in "no script" would run that request unsigned (possible false negative); during a cyborg
   outage each uncached lookup waits up to ~8 s instead.
