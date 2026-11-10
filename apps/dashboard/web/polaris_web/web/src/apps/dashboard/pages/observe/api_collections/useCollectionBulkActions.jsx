@@ -7,6 +7,7 @@ import settingRequests from "../../settings/api"
 import SearchableResourceList from "../../../components/shared/SearchableResourceList"
 import ResourceListModal from "../../../components/shared/ResourceListModal"
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 /**
  * The bulk actions that apply to any set of API collections — deactivate/reactivate, delete,
@@ -46,7 +47,7 @@ export default function useCollectionBulkActions({ rowOf, getTags, onDone, onTag
         await (currentIsOutOfTestingScopeVal !== null
                 ? apiFunction(collectionIdList, currentIsOutOfTestingScopeVal)
                 : apiFunction(collectionIdListObj)).then(() => {
-            func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
+            func.setToast(true, false, `${collectionIdList.length} ${mapLabel('API', getDashboardCategory())} collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
         }).catch((error) => {
             func.setToast(true, true, error.message || 'Something went wrong!')
         })

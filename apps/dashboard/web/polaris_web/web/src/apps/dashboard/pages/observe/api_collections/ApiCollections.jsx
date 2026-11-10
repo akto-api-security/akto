@@ -183,7 +183,7 @@ const headers = [
         filterKey: "envType",
         showFilter: true,
         textValue: 'envType',
-        tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
+        tooltipContent: (<Text variant="bodySm">Tags for an {mapLabel('API', getDashboardCategory())} collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
     ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? [{
         title: "Access Type",
@@ -1109,7 +1109,7 @@ function ApiCollections(props) {
             actions.push({
                 content: `Delete collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => {
-                    const deleteConfirmationMessage = `Are you sure, you want to delete these untracked API collection${func.addPlurality(selectedResources.length)}? This will remove them from the untracked list.`
+                    const deleteConfirmationMessage = `Are you sure, you want to delete these untracked ${mapLabel('API', getDashboardCategory())} collection${func.addPlurality(selectedResources.length)}? This will remove them from the untracked list.`
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleUntrackedDelete(selectedResources))
                 },
                 requires: 'api/deleteUntrackedCollections'
@@ -1935,7 +1935,7 @@ function ApiCollections(props) {
                         <TitleWithInfo
                             tooltipContent={activeFilterTitle
                                 ? `Viewing collections filtered by ${activeFilterTitle}`
-                                : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                                : "Akto automatically groups similar " + mapLabel('APIs', getDashboardCategory()) + " into meaningful collections based on their subdomain names. "}
                             titleText={pageTitle}
                             docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                         />

@@ -97,7 +97,7 @@ const headings = [
         title:"Access Type",
         showFilter: true,
         type: CellType.TEXT,
-        tooltipContent: "Access type of the API. It can be public, private, partner"
+        tooltipContent: "Access type of the " + mapLabel('API', getDashboardCategory()) + ". It can be public, private, partner"
     },
     {
         text: 'Auth Type',
@@ -105,7 +105,7 @@ const headings = [
         value: 'auth_type',
         showFilter: true,
         textValue: 'authTypeTag',
-        tooltipContent: "Authentication type of the API."
+        tooltipContent: "Authentication type of the " + mapLabel('API', getDashboardCategory()) + "."
     }] : []),
     {
         text: 'Sensitive params in response',
@@ -178,7 +178,7 @@ const headings = [
         textValue: "description",
         title: "Description",
         filterKey: "description",
-        tooltipContent: "Description of the API",
+        tooltipContent: "Description of the " + mapLabel('API', getDashboardCategory()),
     },
     { title: '', type: CellType.ACTION }
 ]
@@ -909,7 +909,7 @@ function ApiEndpoints(props) {
 
     function computeApiGroup() {
         api.computeCustomCollections(pageTitle);
-        func.setToast(true, false, "API group is being computed.")
+        func.setToast(true, false, mapLabel('API group', getDashboardCategory()) + " is being computed.")
     }
 
     function redactCheckBoxClicked(){
@@ -943,9 +943,9 @@ function ApiEndpoints(props) {
     
     
         api.deleteApis(apiObjects).then(resp => {
-            func.setToast(true, false, "APIs deleted successfully. Refresh to see the changes.")
+            func.setToast(true, false, mapLabel('APIs', getDashboardCategory()) + " deleted successfully. Refresh to see the changes.")
         }).catch (err => {
-            func.setToast(true, true, "There was some error deleting the APIs. Please contact support@akto.io for assistance")
+            func.setToast(true, true, "There was some error deleting the " + mapLabel('APIs', getDashboardCategory()) + ". Please contact support@akto.io for assistance")
         })
     }
 
@@ -1254,7 +1254,7 @@ function ApiEndpoints(props) {
             };
         }
         return {
-            headingText: "Discover APIs to get started",
+            headingText: "Discover " + mapLabel('APIs', getDashboardCategory()) + " to get started",
             description: "Your " + mapLabel('API', getDashboardCategory()) + " collection is currently empty. Import " + mapLabel('APIs', getDashboardCategory()) + " from other collections now."
         };
     }
@@ -1556,7 +1556,7 @@ function ApiEndpoints(props) {
         })
 
         if (mergedApis.length === 0) {
-            func.setToast(true, true, "No merged APIs selected. Only merged APIs can be de-merged.")
+            func.setToast(true, true, "No merged " + mapLabel('APIs', getDashboardCategory()) + " selected. Only merged " + mapLabel('APIs', getDashboardCategory()) + " can be de-merged.")
             return
         }
 
@@ -1579,14 +1579,14 @@ function ApiEndpoints(props) {
 
         api.bulkDeMergeApis(apiObjects).then(resp => {
             setDeMergingInProgress(false)
-            func.setToast(true, false, `Successfully de-merged ${apiObjects.length} API(s). Refresh to see the changes.`)
+            func.setToast(true, false, `Successfully de-merged ${apiObjects.length} ${mapLabel('API', getDashboardCategory())}(s). Refresh to see the changes.`)
             // Optionally refresh the data
             setTimeout(() => {
                 fetchData()
             }, 1000)
         }).catch(err => {
             setDeMergingInProgress(false)
-            func.setToast(true, true, "There was an error de-merging the APIs. Please try again or contact support@akto.io")
+            func.setToast(true, true, "There was an error de-merging the " + mapLabel('APIs', getDashboardCategory()) + ". Please try again or contact support@akto.io")
         })
     }
 
@@ -1824,7 +1824,7 @@ function ApiEndpoints(props) {
             key="redact-modal-1"
         >
             <Modal.Section>
-                <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your API Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
+                <Text>When enabled, existing sample payload values for this collection will be deleted, and data in all the future payloads for this collection will be redacted. Please note that your {mapLabel('API', getDashboardCategory())} Inventory, Sensitive data etc. will be intact. We will simply be deleting the sample payload values.</Text>
             </Modal.Section>
         </Modal>
     )
@@ -2224,7 +2224,7 @@ function ApiEndpoints(props) {
                                                 <div style={{ cursor: isApiGroup && canCall('api/editCollectionName') ? 'pointer' : 'default' }} onClick={isApiGroup && canCall('api/editCollectionName') ? () => { setIsEditing(true); } : undefined}>
                                                     <TitleWithInfo
                                                         titleComp={<TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />}
-                                                        tooltipContent={isApiGroup ? "This API group is computed periodically" : null}
+                                                        tooltipContent={isApiGroup ? "This " + mapLabel('API group', getDashboardCategory()) + " is computed periodically" : null}
                                                     />
                                                 </div>
                                             }

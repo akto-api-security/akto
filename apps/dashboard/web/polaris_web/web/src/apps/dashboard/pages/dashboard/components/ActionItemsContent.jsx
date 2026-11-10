@@ -167,9 +167,9 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
 
             createActionItem('12', 'P2', 'Build remediation playbooks for common issues', `${urlsByIssuesTotalCount} common vulnerability types detected that can benefit from standardized remediation steps`, "Security & DevOps", "Low", urlsByIssuesTotalCount, ACTION_ITEM_TYPES.BUILD_REMEDIATION_PLAYBOOKS, jiraTicketUrlMap, handleJiraIntegration, "Reduces response time and improves fix consistency across teams"),
 
-            createActionItem('13', 'P1', 'Investigate verbose error messages or stack traces', `${vemVulnerableApisCount} APIs leaking debug information in responses.`, "Development", "Medium", vemVulnerableApisCount, ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES, jiraTicketUrlMap, handleJiraIntegration, "Can disclose sensitive implementation details to attackers"),
+            createActionItem('13', 'P1', 'Investigate verbose error messages or stack traces', `${vemVulnerableApisCount} ${mapLabel('APIs', getDashboardCategory())} leaking debug information in responses.`, "Development", "Medium", vemVulnerableApisCount, ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES, jiraTicketUrlMap, handleJiraIntegration, "Can disclose sensitive implementation details to attackers"),
 
-            createActionItem('14', 'P2', 'Verify security headers on API responses', `${mhhVulnerableApisCount} Ensure headers like HSTS, X-Frame-Options, etc. are present.`, "DevOps / Security", "Low", mhhVulnerableApisCount, ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS, jiraTicketUrlMap, handleJiraIntegration, "Hardens APIs against clickjacking and other browser-based attacks")
+            createActionItem('14', 'P2', 'Verify security headers on ' + mapLabel('API', getDashboardCategory()) + ' responses', `${mhhVulnerableApisCount} Ensure headers like HSTS, X-Frame-Options, etc. are present.`, "DevOps / Security", "Low", mhhVulnerableApisCount, ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS, jiraTicketUrlMap, handleJiraIntegration, "Hardens " + mapLabel('APIs', getDashboardCategory()) + " against clickjacking and other browser-based attacks")
         ];
 
         const filteredItems = items.filter(item => item.count > 0);

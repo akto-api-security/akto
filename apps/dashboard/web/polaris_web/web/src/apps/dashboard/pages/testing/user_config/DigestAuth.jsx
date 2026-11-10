@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import TestingStore from "../testingStore";
 import { Divider, LegacyCard, TextField, VerticalStack, Text, FormLayout, Select } from "@shopify/polaris";
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 function DigestAuth(props) {
     const { setInformation } = props;
@@ -78,7 +79,7 @@ function DigestAuth(props) {
                 <LegacyCard.Section>
                     <VerticalStack gap="4">
                         <Text color="subdued">
-                            Configure digest authentication credentials for API testing. 
+                            Configure digest authentication credentials for {mapLabel('API', getDashboardCategory())} {mapLabel('testing', getDashboardCategory())}. 
                             Digest auth uses a challenge-response mechanism with cryptographic hashing.
                         </Text>
                         

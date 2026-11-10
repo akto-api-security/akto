@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api';
 import FlowGraphLayout from './FlowGraphLayout';
 import { createCustomEdge, createCustomNode } from './FlowGraphComponents';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const initialNodes = [];
 const initialEdges = [];
@@ -113,14 +114,14 @@ function SequencesFlow({ apiCollectionId }) {
   return (
     <FlowGraphLayout
       loading={loading}
-      loadingMessage="Loading API sequences..."
+      loadingMessage={"Loading " + mapLabel('API', getDashboardCategory()) + " sequences..."}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       defaultEdgeType="sequencesEdge"
-      emptyMessage="No API sequences found for this collection"
-      bannerTitle="API Sequences Overview"
+      emptyMessage={"No " + mapLabel('API', getDashboardCategory()) + " sequences found for this collection"}
+      bannerTitle={mapLabel('API', getDashboardCategory()) + " Sequences Overview"}
       bannerStats={bannerStats}
       showData={apiSequences.length > 0}
     />
