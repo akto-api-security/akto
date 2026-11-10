@@ -38,9 +38,9 @@ export const CATEGORY_LABELS = {
 };
 
 export const CATEGORY_BACKGROUNDS = {
-    agents: "bg-magic-strong",
-    mcp: "bg-magic-active",
-    browser: "bg-interactive",
+    agents: "bg-inverse-hover",
+    mcp: "bg-strong-active",
+    browser: "bg-inverse-active",
 };
 
 export const HEALTH_LABELS = {
@@ -87,7 +87,7 @@ export const EMPLOYEE_CHIPS = [
     { key: "usesAi", label: "Uses AI tools" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
-    { key: "highRisk", label: "Risk 4+" },
+    { key: "highRisk", label: "Has risk 4+" },
 ];
 
 export const DEVICE_CHIPS = [

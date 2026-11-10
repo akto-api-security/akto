@@ -1,6 +1,7 @@
-import { Badge, Box, Text } from "@shopify/polaris";
+import { Badge, Box, HorizontalStack, Text } from "@shopify/polaris";
 import { SeverityBadge } from "../../agentic/AgenticCellRenderers";
-import GetPrettifyEndpoint from "../../GetPrettifyEndpoint";
+import { MethodBox } from "../../GetPrettifyEndpoint";
+import observeFunc from "../../transform";
 
 const CENTERED = { display: "flex", alignItems: "center" };
 
@@ -26,7 +27,16 @@ function ActionCellRenderer({ value }) {
 function TargetCellRenderer({ data }) {
     if (!data) return null;
     if (!data.url) return <Text variant="bodySm" color="subdued">-</Text>;
-    return <GetPrettifyEndpoint method={data.method} url={data.url} isNew={false} maxWidth="100%" />;
+    return (
+        <Box width="100%" overflowX="hidden">
+            <HorizontalStack gap="1" wrap={false} blockAlign="center">
+                <MethodBox method={data.method} url={data.url} />
+                <Box minWidth="0" width="100%">
+                    <Text variant="bodyMd" fontWeight="medium" truncate>{observeFunc.getTruncatedUrl(data.url)}</Text>
+                </Box>
+            </HorizontalStack>
+        </Box>
+    );
 }
 
 function SeverityCellRenderer({ data }) {
@@ -39,10 +49,10 @@ const detectedValue = (params) => {
 };
 
 export const ATLAS_VIOLATION_COLUMNS = [
-    { field: "time", headerName: "Time", width: 120, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { ...CENTERED, fontSize: 12, color: "#6D7175" } },
-    { field: "title", headerName: "Policy", flex: 1.2, minWidth: 180, sortable: false, cellRenderer: PolicyCellRenderer, cellStyle: CENTERED },
-    { field: "ruleViolated", headerName: "Detected", flex: 1, minWidth: 120, sortable: false, valueGetter: detectedValue, cellRenderer: DetectedCellRenderer, cellStyle: CENTERED },
-    { field: "behaviour", headerName: "Action", width: 110, sortable: false, cellRenderer: ActionCellRenderer, cellStyle: CENTERED },
-    { field: "url", headerName: "Target", flex: 1.8, minWidth: 300, sortable: false, cellRenderer: TargetCellRenderer, cellStyle: { ...CENTERED, whiteSpace: "nowrap" } },
-    { field: "severity", headerName: "Severity", width: 110, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: SeverityCellRenderer, cellStyle: CENTERED },
+    { field: "time", headerName: "Time", width: 140, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellStyle: { ...CENTERED, fontSize: 12, color: "#6D7175" } },
+    { field: "title", headerName: "Policy", flex: 1.2, minWidth: 110, sortable: false, cellRenderer: PolicyCellRenderer, cellStyle: CENTERED },
+    { field: "ruleViolated", headerName: "Detected", flex: 0.9, minWidth: 90, sortable: false, valueGetter: detectedValue, cellRenderer: DetectedCellRenderer, cellStyle: CENTERED },
+    { field: "severity", headerName: "Severity", width: 95, suppressHeaderMenuButton: true, suppressHeaderFilterButton: true, cellRenderer: SeverityCellRenderer, cellStyle: CENTERED },
+    { field: "behaviour", headerName: "Action", width: 100, sortable: false, cellRenderer: ActionCellRenderer, cellStyle: CENTERED },
+    { field: "url", headerName: "Target", flex: 2.2, minWidth: 150, sortable: false, cellRenderer: TargetCellRenderer, cellStyle: CENTERED },
 ];

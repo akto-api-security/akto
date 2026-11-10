@@ -7,13 +7,14 @@ import transform from "./transform";
 
 const OS_CATEGORIES = ["agents", "mcp"];
 const DARK_CATEGORIES = ["agents"];
+const DARK_TEXT_OS = ["linux"];
 const BROWSER_COLORS = ["bg-info-strong", "bg-success-strong", "bg-caution-strong", "bg-info"];
 const LIGHT_TEXT_BROWSER_COLORS = ["bg-info-strong", "bg-success-strong"];
 const OS_BAR_HEIGHT = "22px";
 const OS_COLORS = {
     macos: ["bg-magic-strong", "bg-magic-active"],
     windows: ["bg-interactive", "bg-interactive-subdued-active"],
-    linux: ["bg-success-strong", "bg-success"],
+    linux: ["bg-caution-strong", "bg-caution"],
 };
 
 const browserLabel = (browser) => browser.charAt(0).toUpperCase() + browser.slice(1);
@@ -65,7 +66,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSe
                         label: CATEGORY_LABELS[category],
                         count: row.toolsByCategory[category] || 0,
                         color: tokenVar(OS_COLORS[row.os]?.[index] || CATEGORY_BACKGROUNDS[category]),
-                        lightText: DARK_CATEGORIES.includes(category),
+                        lightText: DARK_CATEGORIES.includes(category) && !DARK_TEXT_OS.includes(row.os),
                         tooltip: `${CATEGORY_LABELS[category]} on ${osLabel(row.os)}: ${devicesLabel(row.toolsByCategory[category] || 0)}`,
                     }))}
                     onSegmentClick={(category) => onSelect(row.os, category)}
