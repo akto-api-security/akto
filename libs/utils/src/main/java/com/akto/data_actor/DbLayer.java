@@ -3631,12 +3631,12 @@ public class DbLayer {
         return TestingRunResultSummariesDao.instance.count(filter);
     }
 
-    /** The default-test-{type} script (legacy store until the account is migrated), or null. */
+    /**
+     * The default-test-{type} script (legacy store until the account is migrated), or null. A request
+     * with no type comes from a pre-2026-03-15 mini-testing build and means the pre-request script.
+     */
     public static TestScript fetchTestScript(TestScript.Type type){
-        if (type == null) {
-            return null;
-        }
-        return TestScriptProviders.database().findDefault(type);
+        return TestScriptProviders.database().findDefault(TestScript.typeForUntypedRequest(type));
     }
 
     public static TestScript fetchTestScriptById(String id){
