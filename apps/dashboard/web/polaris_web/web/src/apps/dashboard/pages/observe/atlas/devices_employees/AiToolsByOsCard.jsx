@@ -46,7 +46,7 @@ function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSe
         <VerticalStack gap="4">
             {!toolsAvailable && <Text as="p" color="subdued">Tool data is unavailable right now.</Text>}
             {toolsAvailable && osRows.length === 0 && browserRows.length === 0 && <Text as="p" color="subdued">No managed devices in this scope.</Text>}
-            {toolsAvailable && <Text as="p" color="subdued">Devices with each type of AI tool, by operating system and browser</Text>}
+            {toolsAvailable && <Text as="p" color="subdued">AI tools by operating system and browser</Text>}
             {toolsAvailable && osRows.map((row) => (
                 <BarRow
                     key={row.os}
@@ -79,24 +79,28 @@ function AiToolsByOsCard({ overview, status, activeCategory, activeBrowser, onSe
                     activeKey={activeBrowser}
                 />
             )}
-            <HorizontalStack gap="1" wrap>
-                {CATEGORY_ORDER.map((category) => (
-                    <BreakdownChip
-                        key={category}
-                        b={{ key: category, label: CATEGORY_LABELS[category], count: overview?.categoryTotals?.[category] || 0, color: tokenVar(CATEGORY_BACKGROUNDS[category]) }}
-                        activeFilter={activeCategorySet}
-                        onFilterClick={onSelectCategory}
-                    />
-                ))}
-                {browserRows.map((row) => (
-                    <BreakdownChip
-                        key={row.browser}
-                        b={{ key: row.browser, label: row.label, count: row.count, color: row.color }}
-                        activeFilter={activeBrowserSet}
-                        onFilterClick={(browser) => onSelectBrowser(browser, "browser")}
-                    />
-                ))}
-            </HorizontalStack>
+            <VerticalStack gap="1">
+                <HorizontalStack gap="1" wrap>
+                    {CATEGORY_ORDER.map((category) => (
+                        <BreakdownChip
+                            key={category}
+                            b={{ key: category, label: CATEGORY_LABELS[category], count: overview?.categoryTotals?.[category] || 0, color: tokenVar(CATEGORY_BACKGROUNDS[category]) }}
+                            activeFilter={activeCategorySet}
+                            onFilterClick={onSelectCategory}
+                        />
+                    ))}
+                </HorizontalStack>
+                <HorizontalStack gap="1" wrap>
+                    {browserRows.map((row) => (
+                        <BreakdownChip
+                            key={row.browser}
+                            b={{ key: row.browser, label: row.label, count: row.count, color: row.color }}
+                            activeFilter={activeBrowserSet}
+                            onFilterClick={(browser) => onSelectBrowser(browser, "browser")}
+                        />
+                    ))}
+                </HorizontalStack>
+            </VerticalStack>
         </VerticalStack>
     );
 
