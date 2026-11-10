@@ -17,9 +17,10 @@ import transform from "./transform";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false, cellStyle: { display: "flex", alignItems: "center" } };
 const ROW_HEIGHT = 48;
+const tagOwner = (row) => row.username || row.owner;
 
 const employeeColumns = (dataOptions) => [
-    { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer },
+    { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
     { field: "teams", headerName: "Team", flex: 1, minWidth: 140, sortable: false, cellRenderer: TeamsCellRenderer, ...setFilter(dataOptions.teams, (value) => value), filterValueGetter: (params) => params.data?.teams || [] },
     { field: "deviceCount", headerName: "Devices", width: 100, cellRenderer: CountCellRenderer },
     { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
@@ -268,7 +269,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     useEffect(() => { setSelectedRows([]); }, [gridKey]);
 
     const openTagModal = () => {
-        const owners = [...new Set(selectedRows.map((row) => row.owner).filter(Boolean))];
+        const owners = [...new Set(selectedRows.map(tagOwner).filter(Boolean))];
         if (owners.length === 0) {
             func.setToast(true, true, "The selected devices have no owner to tag");
             return;
@@ -301,17 +302,17 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.key)}
                 gridRef={gridRef}
                 getRowStyle={getRowStyle}
-                rowSelection={isEmployees ? undefined : "multiple"}
+                rowSelection="multiple"
                 suppressRowClickSelection
                 onSelectionChanged={(event) => setSelectedRows(event.api.getSelectedRows())}
                 bulkActionCount={selectedRows.length}
-                bulkActions={isEmployees ? [] : [{ content: "Edit device tags", onAction: openTagModal, requires: "api/bulkUpdateUserDeviceTag" }]}
+                bulkActions={[{ content: "Edit device tags", onAction: openTagModal, requires: "api/bulkUpdateUserDeviceTag" }]}
                 onClearBulk={() => gridRef.current?.api?.deselectAll()}
             />
             {tagNames && (
                 <EditDeviceTagsModal
                     usernames={tagNames}
-                    rows={selectedRows.map((row) => ({ id: row.owner, groupName: row.owner, tags: row.tags }))}
+                    rows={selectedRows.map((row) => ({ id: tagOwner(row), groupName: tagOwner(row), tags: row.tags }))}
                     onClose={() => setTagNames(null)}
                     onSaved={() => { setTagNames(null); setRefreshKey((key) => key + 1); }}
                 />
