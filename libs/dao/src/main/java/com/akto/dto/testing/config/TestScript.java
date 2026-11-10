@@ -85,6 +85,15 @@ public class TestScript {
         throw new IllegalArgumentException("No default script for type " + type);
     }
 
+    /**
+     * The type an untyped script request means. Mini-testing builds from before post-request scripts
+     * (pre 2026-03-15) call the database-abstractor's fetchTestScript with no type and run the result
+     * as their pre-request script, so no type means PRE_REQUEST.
+     */
+    public static Type typeForUntypedRequest(Type requested) {
+        return requested != null ? requested : Type.PRE_REQUEST;
+    }
+
     public static boolean isDefaultName(String name) {
         return DEFAULT_PRE_NAME.equals(name) || DEFAULT_POST_NAME.equals(name);
     }
