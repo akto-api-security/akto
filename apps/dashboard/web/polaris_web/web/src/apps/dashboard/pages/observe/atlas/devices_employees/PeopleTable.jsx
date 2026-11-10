@@ -12,6 +12,7 @@ import {
 import {
     CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_HEIGHT, RISK_MAX, SEARCH_HINTS,
 } from "./peopleConstants";
+import EditDeviceTagsModal from "../../agentic/EditDeviceTagsModal";
 import transform from "./transform";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false, cellStyle: { display: "flex", alignItems: "center" } };
@@ -30,7 +31,7 @@ const employeeColumns = (dataOptions) => [
 ];
 
 const deviceColumns = (dataOptions) => [
-    { field: "name", headerName: "Device", flex: 2, minWidth: 220, cellRenderer: DeviceCellRenderer },
+    { field: "name", headerName: "Device", flex: 2, minWidth: 220, cellRenderer: DeviceCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
     {
         field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer,
         ...setFilter(dataOptions.osBrowser, osBrowserLabel),
@@ -216,6 +217,9 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     const gridRef = useRef(null);
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedRows, setSelectedRows] = useState([]);
+    const [tagNames, setTagNames] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0);
     const tabs = [
         { id: "employees", content: "Employees", badge: counts.employees != null ? counts.employees.toLocaleString("en-US") : undefined },
         { id: "devices", content: "Devices", badge: counts.devices != null ? counts.devices.toLocaleString("en-US") : undefined },
@@ -258,9 +262,19 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     useEffect(() => { gridRef.current?.api?.redrawRows(); }, [selectedId]);
 
     const gridKey = useMemo(
-        () => `${tab}-${deviceScope}-${JSON.stringify(filters)}`,
-        [tab, deviceScope, filters]
+        () => `${tab}-${deviceScope}-${JSON.stringify(filters)}-${refreshKey}`,
+        [tab, deviceScope, filters, refreshKey]
     );
+    useEffect(() => { setSelectedRows([]); }, [gridKey]);
+
+    const openTagModal = () => {
+        const owners = [...new Set(selectedRows.map((row) => row.owner).filter(Boolean))];
+        if (owners.length === 0) {
+            func.setToast(true, true, "The selected devices have no owner to tag");
+            return;
+        }
+        setTagNames(owners);
+    };
 
     return (
         <Box background="bg" borderRadius="3" borderWidth="1" borderColor="border-subdued">
@@ -287,8 +301,21 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.key)}
                 gridRef={gridRef}
                 getRowStyle={getRowStyle}
-                rowSelection={undefined}
+                rowSelection={isEmployees ? undefined : "multiple"}
+                suppressRowClickSelection
+                onSelectionChanged={(event) => setSelectedRows(event.api.getSelectedRows())}
+                bulkActionCount={selectedRows.length}
+                bulkActions={isEmployees ? [] : [{ content: "Edit device tags", onAction: openTagModal, requires: "api/bulkUpdateUserDeviceTag" }]}
+                onClearBulk={() => gridRef.current?.api?.deselectAll()}
             />
+            {tagNames && (
+                <EditDeviceTagsModal
+                    usernames={tagNames}
+                    rows={selectedRows.map((row) => ({ id: row.owner, groupName: row.owner, tags: row.tags }))}
+                    onClose={() => setTagNames(null)}
+                    onSaved={() => { setTagNames(null); setRefreshKey((key) => key + 1); }}
+                />
+            )}
         </Box>
     );
 }

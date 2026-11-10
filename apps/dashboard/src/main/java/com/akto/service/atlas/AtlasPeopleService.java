@@ -346,6 +346,7 @@ public class AtlasPeopleService {
                     Map<String, String> entry = new LinkedHashMap<>();
                     entry.put("key", tag.getKey());
                     entry.put("value", tag.getValue());
+                    entry.put("source", tag.getSource());
                     device.tags.add(entry);
                 }
             }
