@@ -5,6 +5,7 @@ import { Divider, LegacyCard, Text, TextField, VerticalStack } from '@shopify/po
 import PasswordTextField from '../../../components/layouts/PasswordTextField'
 import func from "@/util/func"
 import { usePermissions, whenAllowed } from "@/util/permissions"
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 const AzureBoards = () => {
     
@@ -66,7 +67,7 @@ const AzureBoards = () => {
     )
 
 
-    let cardContent = "Seamlessly enhance your web application security with Azure DevOps Boards. Create Azure Boards work items for api vulnerability issues and view them on the tap of a button"
+    let cardContent = "Seamlessly enhance your web application security with Azure DevOps Boards. Create Azure Boards work items for " + mapLabel('API', getDashboardCategory()) + " vulnerability issues and view them on the tap of a button"
 
     return (
         <IntegrationsLayout title= "Azure Boards" cardContent={cardContent} component={AzureBoardsCard} docsUrl="https://docs.akto.io/traffic-connections/postman" readOnly={!canCall('api/addAzureBoardsIntegration')}/> 

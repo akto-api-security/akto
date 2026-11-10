@@ -1122,7 +1122,7 @@ const AgenticDashboard = () => {
                 subTitleComponent={<Text alignment='center' color='subdued'>No {mapLabel('API Discovery', getDashboardCategory())} data available for the selected time period</Text>}
                 itemId='api-discovery-pie'
                 onRemoveComponent={removeComponent}
-                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered APIs categorized by shadow, sensitive, no auth, and normal'}
+                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered ' + mapLabel('APIs', getDashboardCategory()) + ' categorized by shadow, sensitive, no auth, and normal'}
             />
         ) : (
             <CustomPieChart
@@ -1131,7 +1131,7 @@ const AgenticDashboard = () => {
                 graphData={apiDiscoveryData}
                 itemId='api-discovery-pie'
                 onRemoveComponent={removeComponent}
-                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered APIs categorized by shadow, sensitive, no auth, and normal'}
+                tooltipContent={dashboardCategory === 'AGENTIC' ? 'Distribution of discovered agentic components including AI agents, MCP servers, and LLMs' : 'Distribution of discovered ' + mapLabel('APIs', getDashboardCategory()) + ' categorized by shadow, sensitive, no auth, and normal'}
                 onSegmentClick={handleApiDiscoveryPieClick}
             />
         ),

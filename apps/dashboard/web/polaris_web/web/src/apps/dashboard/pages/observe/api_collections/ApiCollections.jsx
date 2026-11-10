@@ -75,7 +75,7 @@ const headers = [
             filterKey: "splitApiCollectionName",
             textValue: 'splitApiCollectionName',
             showFilter: true,
-            titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel('API collection name', getDashboardCategory())} />
+            titleWithTooltip: <HeadingWithTooltip content={"These " + mapLabel('API group', getDashboardCategory()) + "s are computed periodically"} title={mapLabel('API collection name', getDashboardCategory())} />
         },
         {
             title: "Endpoint ID",
@@ -104,7 +104,7 @@ const headers = [
         filterKey: "displayName",
         textValue: 'displayName',
         showFilter: true,
-        titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel("API collection name", getDashboardCategory())} />
+        titleWithTooltip: <HeadingWithTooltip content={"These " + mapLabel('API group', getDashboardCategory()) + "s are computed periodically"} title={mapLabel("API collection name", getDashboardCategory())} />
     }]),
     {
         title: mapLabel("Total endpoints", getDashboardCategory()),

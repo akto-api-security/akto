@@ -920,7 +920,7 @@ const transform = {
         icon: RiskMajor,
         title: "Impact",
         content: "",
-        tooltipContent: 'The impact of the test on apis in general scenario.'
+        tooltipContent: 'The impact of the test on ' + mapLabel('APIs', getDashboardCategory()) + ' in general scenario.'
       },
       {
         icon: CollectionsMajor,
@@ -1353,22 +1353,22 @@ const transform = {
         value: (
           <GetPrettifyEndpoint methodBoxWidth="38px" maxWidth="180px" method={apiInfo.id.method} url={apiInfo.id.url} />
         ),
-        tooltipContent: "Name of the api on which test is run"
+        tooltipContent: "Name of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: 'Hostname',
         value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />,
-        tooltipContent: "Hostname of the api on which test is run"
+        tooltipContent: "Hostname of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: "Auth type",
         value: <TextComp value={(auth_type || "").toLowerCase()} />,
-        tooltipContent: "Authentication type of the api on which test is run"
+        tooltipContent: "Authentication type of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: "Access type",
         value: <TextComp value={access_type} />,
-        tooltipContent: "Access type of the api on which test is run"
+        tooltipContent: "Access type of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: "Sensitive Data",
