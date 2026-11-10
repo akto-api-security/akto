@@ -2,6 +2,7 @@ import React from "react";
 import { Box, HorizontalStack, VerticalStack, Text, Link, Button, Divider } from "@shopify/polaris";
 import { MobileCancelMajor } from "@shopify/polaris-icons";
 import { RiskPill } from "./AgenticCellRenderers";
+import observeFunc from "../transform";
 
 // ─── FlyoutBreadcrumb ─────────────────────────────────────────────────────────
 // Shared breadcrumb header used across DeviceFlyout and AgenticAssetFlyout.
@@ -40,7 +41,10 @@ export default function FlyoutBreadcrumb({ items = [], onClose, children, subtit
                                                 {item.label}
                                             </Text>
                                         )}
-                                        {item.badge != null && <RiskPill score={item.badge} />}
+                                        {item.badge != null && observeFunc.wrapRiskScoreTooltip(
+                                            <RiskPill score={item.badge} />,
+                                            item.badge, null, null, item.badgeFactors, item.badgeNote,
+                                        )}
                                     </React.Fragment>
                                 );
                             })}

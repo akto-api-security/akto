@@ -269,8 +269,8 @@ export default function AgenticAssetFlyout({
                 <>
                     <FlyoutBreadcrumb
                         items={topNav
-                            ? [{ label: asset.name, badge: asset.riskScore, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]
-                            : [{ label: asset.name, badge: asset.riskScore }]
+                            ? [{ label: asset.name, badge: asset.riskScore, badgeFactors: asset.riskScoreFactors, badgeNote: asset.riskScoreNote, onClick: topNav[0]?.onClick }, ...topNav.slice(1)]
+                            : [{ label: asset.name, badge: asset.riskScore, badgeFactors: asset.riskScoreFactors, badgeNote: asset.riskScoreNote }]
                         }
                         onClose={onClose}
                         subtitle={!topNav ? asset.description : null}

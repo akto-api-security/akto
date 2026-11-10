@@ -1,6 +1,7 @@
 import func from "@/util/func";
 import { Badge, Box, Button, HorizontalStack, Icon, Text, Tooltip, VerticalStack } from "@shopify/polaris";
 import PersistStore from "../../../main/PersistStore";
+import RiskScoreTooltipContent from "./RiskScoreTooltipContent";
 import TooltipText from "../../components/shared/TooltipText";
 import StyledEndpoint from "./api_collections/component/StyledEndpoint"
 import CopyEndpoint from "./api_collections/component/CopyEndpoint"
@@ -430,19 +431,12 @@ const transform = {
         if (riskScore && ((Array.isArray(riskScoreFactors) && riskScoreFactors.length > 0) || riskScoreNote)) {
             return (
                 <Tooltip dismissOnMouseOut content={
-                    <Box>
-                        <VerticalStack gap="1">
-                            <Text variant="bodyMd" fontWeight="semibold">Highest-risk endpoint in this asset</Text>
-                            {(riskScoreFactors || []).map((factor, index) => (
-                                <Text key={index} variant="bodyMd">
-                                    {factor.points} → {factor.label}{factor.detail ? ` (${factor.detail})` : ""}
-                                </Text>
-                            ))}
-                            {riskScoreNote ? (
-                                <Text variant="bodyMd" color="subdued">{riskScoreNote}</Text>
-                            ) : null}
-                        </VerticalStack>
-                    </Box>
+                    <RiskScoreTooltipContent
+                        riskScore={Number(riskScore)}
+                        status={transform.getStatus(Number(riskScore))}
+                        factors={riskScoreFactors}
+                        note={riskScoreNote}
+                    />
                 }>
                     {badge}
                 </Tooltip>

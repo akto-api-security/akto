@@ -715,7 +715,7 @@ export default function DeviceFlyout({ device, agents, show, onClose, onAgentCli
             header={
                 <>
                     <FlyoutBreadcrumb
-                        items={[{ label: device.username && device.username !== "-" ? device.username : device.endpoint, badge: device.riskScore }]}
+                        items={[{ label: device.username && device.username !== "-" ? device.username : device.endpoint, badge: device.riskScore, badgeFactors: device.riskScoreFactors, badgeNote: device.riskScoreNote }]}
                         onClose={onClose}
                     />
                     <Box paddingInlineStart="1" paddingInlineEnd="1">
