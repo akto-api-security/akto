@@ -4171,7 +4171,7 @@
             <interceptor-ref name="defaultStack"/>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param> 
+                <param name="accessType">READ_WRITE</param> 
                 <param name="actionDescription">User toggled collections testing scope status</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
@@ -11004,7 +11004,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_EDITOR</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved common test template</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -12621,7 +12622,8 @@
             </interceptor-ref>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User scheduled a code analysis run</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -14963,7 +14965,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted extra API info from collections</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15008,7 +15011,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted non-host API data from collections</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15030,7 +15034,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User cleared temporary retain flags on collections</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15674,7 +15679,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated agent subprocess</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -15702,7 +15708,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated discovery agent run state</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -15819,7 +15826,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User saved source code vulnerabilities</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -15849,7 +15857,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">AI_AGENTS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created sensitive response data types</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
@@ -18428,7 +18437,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User created a Jira ticket</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
