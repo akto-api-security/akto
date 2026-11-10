@@ -104,7 +104,7 @@ function AtlasGuardrailsOverview() {
             .then((resp) => { if (!cancelled) setTriage(resp); })
             .catch(() => { if (!cancelled) setTriage(null); });
         setDecisions(null);
-        guardrailsApi.fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp, Intl.DateTimeFormat().resolvedOptions().timeZone)
+        guardrailsApi.fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setDecisions(resp); })
             .catch(() => { if (!cancelled) setDecisions(null); });
         return () => { cancelled = true; };
@@ -121,7 +121,7 @@ function AtlasGuardrailsOverview() {
             <TriageStatusCard triage={{ statuses: triage?.statuses || [], staleCriticalUnassigned: triage?.staleCriticalUnassigned || 0, staleAfterHours: triage?.staleAfterHours }} periodDays={triage?.periodDays} onStatusClick={openActivity} onAssign={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
-            <DecisionsTrendCard bars={decisions?.bars || []} intervalTitle={decisions?.intervalTitle} periodDays={decisions?.periodDays} />
+            <DecisionsTrendCard decisions={decisions} />
             <PolicyViolationsCard policies={data.byPolicy} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">

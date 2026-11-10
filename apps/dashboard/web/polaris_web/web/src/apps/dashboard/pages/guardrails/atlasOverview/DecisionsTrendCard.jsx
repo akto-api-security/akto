@@ -15,15 +15,17 @@ const X_AXIS = {
     gridLineWidth: 0,
 };
 
-export default function DecisionsTrendCard({ bars, intervalTitle, periodDays }) {
+const GRANULARITY_TITLE = { D: "Daily", W: "Weekly", M: "Monthly" };
+
+export default function DecisionsTrendCard({ decisions }) {
     const data = [...SERIES].reverse().map((s) => ({
         name: s.name,
         color: s.color,
-        data: bars.map((b) => [b.start, b[s.key]]),
+        data: decisions?.[s.key] || [],
     }));
-    const subtitle = intervalTitle
-        ? `${intervalTitle}${periodDays ? `, last ${periodDays} ${periodDays === 1 ? "day" : "days"}` : ""}`
-        : "";
+    const title = GRANULARITY_TITLE[decisions?.granularity];
+    const days = decisions?.periodDays;
+    const subtitle = title ? `${title}${days ? `, last ${days} ${days === 1 ? "day" : "days"}` : ""}` : "";
     const legend = (
         <HorizontalStack gap="3">
             {SERIES.map((s) => (

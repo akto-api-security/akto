@@ -20,7 +20,6 @@ public class AtlasGuardrailUtils {
     static final int TRIAGE_TARGET_HOURS = 4;
     static final String BEHAVIOUR_BLOCK = "block";
     static final String BEHAVIOUR_APPROVAL = "approval";
-    static final int DECISION_TARGET_BARS = 30;
     private static final String UNASSIGNED_OWNER = "__unassigned__";
     private static final String CONFIG_ENDPOINT_SEGMENT = "/config/";
 

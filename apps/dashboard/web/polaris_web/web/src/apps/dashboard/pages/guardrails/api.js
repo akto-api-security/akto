@@ -197,11 +197,11 @@ export default {
         return resp
     },
 
-    async fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp, timeZone) {
+    async fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp) {
         const resp = await request({
             url: '/api/fetchAtlasGuardrailsOverviewDecisions',
             method: 'post',
-            data: { startTimestamp, endTimestamp, timeZone }
+            data: { startTimestamp, endTimestamp }
         })
         return resp
     },
