@@ -18,8 +18,7 @@ const STAT_CARD_TARGETS = {
 };
 
 const FOOTPRINT_LAYOUT = { nodeWidth: 176, columnGap: 40, rowHeight: 84, headHeight: 40, viewWidth: 696, minHeight: 200, dimmedOpacity: 0.3, dimmedEdgeOpacity: 0.07 };
-const FOOTPRINT_EDGE_COLOR = "#B38CFF";
-const FOOTPRINT_RISKY_EDGE_COLOR = "#E0442A";
+const FOOTPRINT_EDGE_COLOR = "#E1E3E5";
 
 const CSV_COLUMNS = {
     employees: [
@@ -264,7 +263,6 @@ function footprintLayout(model, highlight) {
     const layout = FOOTPRINT_LAYOUT;
     const lit = highlight ? connectedIds(model.edges, highlight) : null;
     const tallest = Math.max(1, ...model.columns.map((column) => column.length));
-    const statusOf = new Map(model.columns.flat().map((node) => [node.id, node.status]));
     const nodes = [];
     model.columns.forEach((column, columnIndex) => {
         const x = columnIndex * (layout.nodeWidth + layout.columnGap);
@@ -282,14 +280,13 @@ function footprintLayout(model, highlight) {
         });
     });
     const edges = model.edges.map((edge) => {
-        const risky = statusOf.get(edge.source) === "bad" || statusOf.get(edge.target) === "bad";
         const edgeLit = !lit || (lit.has(edge.source) && lit.has(edge.target));
         return {
             id: `e-${edge.source}-${edge.target}`,
             source: edge.source,
             target: edge.target,
             type: "default",
-            style: { stroke: risky ? FOOTPRINT_RISKY_EDGE_COLOR : FOOTPRINT_EDGE_COLOR, strokeWidth: risky ? 2 : 1.5, opacity: edgeLit ? 1 : layout.dimmedEdgeOpacity },
+            style: { stroke: FOOTPRINT_EDGE_COLOR, strokeWidth: 1.5, opacity: edgeLit ? 1 : layout.dimmedEdgeOpacity },
         };
     });
     const contentWidth = model.columns.length * layout.nodeWidth + (model.columns.length - 1) * layout.columnGap;
