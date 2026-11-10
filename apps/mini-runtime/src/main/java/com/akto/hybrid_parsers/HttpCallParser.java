@@ -361,12 +361,35 @@ public class HttpCallParser {
         return getHostnameForCollection(responseParam, parseTagsMap(responseParam.getTags()));
     }
 
+    // Loopback addresses: "127.0.0.1" (optionally with a port, e.g. "127.0.0.1:2424") and IPv6 "::1".
+    private static final Pattern LOOPBACK_HOST_PATTERN =
+        Pattern.compile("^(?:127\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}|\\[?::1\\]?)(:\\d+)?$");
+
+    /**
+     * Loopback IP hosts (e.g. "127.0.0.1:2424") are not valid hostnames per
+     * {@link RuntimeUtil#isValidHostname(String)} (they contain no letters), so they would never
+     * take the host-collection path in {@link #useHostCondition} and would instead be bucketed into
+     * the vxlan-based collection. Rewriting them to "localhost" (preserving any port) lets such
+     * traffic get its own host-named collection. Only the collection-naming path uses this; the
+     * in-process block list ({@link #IGNORE_HOST_NAMES}) is intentionally left untouched.
+     */
+    static String normalizeLoopbackHost(String hostName) {
+        if (hostName == null) return null;
+        Matcher m = LOOPBACK_HOST_PATTERN.matcher(hostName.trim());
+        if (!m.matches()) return hostName;
+        String port = m.group(1);
+        return port == null ? "localhost" : "localhost" + port;
+    }
+
     public static String getHostnameForCollection(HttpResponseParams responseParam, Map<String, String> tagsMap) {
         // Get base hostname from headers
         String baseHostname = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
         if (baseHostname == null || baseHostname.isEmpty()) {
             return baseHostname;
         }
+        // Loopback IPs (127.0.0.1[:port], ::1) are not valid hostnames, so without this they would
+        // fall into the vxlan collection instead of a host-named one. Map them to "localhost".
+        baseHostname = normalizeLoopbackHost(baseHostname);
 
         if (tagsMap == null) {
             return baseHostname;
