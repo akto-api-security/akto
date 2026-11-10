@@ -905,6 +905,48 @@ const settingRequests = {
             data: { skip, limit, sortKey, sortOrder, hostnames, usernames, deviceIds, oses, browserNames, agentVersions, statuses, providers, queryValue, startTimestamp, endTimestamp }
         })
     },
+    async fetchEndpointShieldStats({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchEndpointShieldStats',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasOverview({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasOverview',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasTrend({ deviceScope = "all", startTimestamp = 0, endTimestamp = 0 } = {}) {
+        return await request({
+            url: '/api/fetchAtlasTrend',
+            method: 'post',
+            data: { deviceScope, startTimestamp, endTimestamp }
+        })
+    },
+    async fetchAtlasEmployees(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasEmployees',
+            method: 'post',
+            data: params
+        })
+    },
+    async fetchAtlasPersonDetail({ deviceScope = "all", atlasKind, atlasId }) {
+        return await request({
+            url: '/api/fetchAtlasPersonDetail',
+            method: 'post',
+            data: { deviceScope, atlasKind, atlasId }
+        })
+    },
+    async fetchAtlasDevices(params = {}) {
+        return await request({
+            url: '/api/fetchAtlasDevices',
+            method: 'post',
+            data: params
+        })
+    },
     async fetchEndpointShieldFilterOptions() {
         return await request({
             url: '/api/fetchEndpointShieldFilterOptions',

@@ -60,6 +60,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         cleanUpTestingResources: false,
         doNotMarkIssuesAsFixed: false,
         runAutomatedTests: false,
+        automatedTestsCustomPrompt: "",
         autoTicketingDetails: initialAutoTicketingDetails,
         miniTestingServiceNames: [],
         slackChannel: ""
@@ -328,6 +329,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                     doNotMarkIssuesAsFixed: testIdConfig?.doNotMarkIssuesAsFixed ?? false,
                     cleanUpTestingResources: testIdConfig?.testingRunConfig?.cleanUp ?? false,
                     runAutomatedTests: testIdConfig?.runAutomatedTests ?? false,
+                    automatedTestsCustomPrompt: testIdConfig?.automatedTestsCustomPrompt ?? "",
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -616,7 +618,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed, runAutomatedTests, preRequestScriptId, postRequestScriptId } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed, runAutomatedTests,automatedTestsCustomPrompt, preRequestScriptId, postRequestScriptId } = testRun
         const scriptSelection = { preRequestScriptId, postRequestScriptId }
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
@@ -666,11 +668,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, scriptSelection)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, automatedTestsCustomPrompt, scriptSelection)
         } else if (isMultiCollection) {
-            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests, scriptSelection)
+            await observeApi.scheduleTestForMultipleCollections(apiCollectionIds, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, runAutomatedTests, automatedTestsCustomPrompt, scriptSelection)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, scriptSelection)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceNames && miniTestingServiceNames.length > 0 ? miniTestingServiceNames : null), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails, doNotMarkIssuesAsFixed, maxAgentTokens, runAutomatedTests, automatedTestsCustomPrompt, scriptSelection)
         }
 
         setActive(false)

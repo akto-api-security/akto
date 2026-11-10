@@ -15,7 +15,7 @@ export function LegendDot({ color }) {
     return <Box className="agentic-dot" style={{ "--dot-color": color }} />;
 }
 
-function BreakdownChip({ b, activeFilter, onFilterClick }) {
+export function BreakdownChip({ b, activeFilter, onFilterClick }) {
     const active = activeFilter?.has(b.key ?? b.label);
     return (
         <Box
