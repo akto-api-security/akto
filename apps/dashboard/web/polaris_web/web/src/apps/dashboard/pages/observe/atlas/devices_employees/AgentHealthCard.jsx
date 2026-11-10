@@ -1,4 +1,4 @@
-import { Box, Button, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
 import InfoCard from "../../../dashboard/new_components/InfoCard";
@@ -45,11 +45,11 @@ function AgentHealthCard({ overview, status, activeHealth, activeMode, onSelectH
 
     const body = (
         <VerticalStack gap="4">
-            <HorizontalStack gap="2" blockAlign="baseline">
-                <Text as="p" variant="heading2xl">{(overview?.deviceCount || 0).toLocaleString("en-US")}</Text>
-                <Text as="p" color="subdued">managed devices</Text>
-            </HorizontalStack>
-            <VerticalStack gap="3">
+            <VerticalStack gap="2">
+                <HorizontalStack gap="2" blockAlign="center">
+                    <Text as="h4" variant="headingSm">Managed devices</Text>
+                    <Badge>{(overview?.deviceCount || 0).toLocaleString("en-US")}</Badge>
+                </HorizontalStack>
                 <SegmentBar segments={healthSegments} height={BAR_HEIGHT} showLabels onSegmentClick={onSelectHealth} activeKey={activeHealth} />
                 <HorizontalStack gap="1" wrap>
                     {healthSegments.map((segment) => (
