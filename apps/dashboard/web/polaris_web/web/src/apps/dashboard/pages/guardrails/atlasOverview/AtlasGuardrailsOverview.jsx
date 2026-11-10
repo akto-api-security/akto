@@ -18,9 +18,12 @@ import TopAssetsCard from "./TopAssetsCard";
 import guardrailOverviewMock from "./guardrailOverviewMock";
 import guardrailsApi from "../api";
 import { formatDurationMs } from "../../observe/llm/constants";
+import { getGuardrailRuleGroupHeading } from "../../threat_detection/constants/guardrailRuleDefinitions";
 
 const POLICIES_PATH = "/dashboard/guardrails/policies";
 const EMPTY_VALUE = "—";
+const POLICY_ROWS = 8;
+const MISCONFIGURED_LABEL = "Misconfigured settings";
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : Number(n).toLocaleString();
@@ -31,6 +34,20 @@ function formatTriageDuration(seconds) {
     if (days === 0) return formatDurationMs(seconds * 1000);
     const rest = seconds % 86400;
     return rest >= 60 ? `${days}d ${formatDurationMs(rest * 1000)}` : `${days}d`;
+}
+
+function buildPolicyRows(rules) {
+    const groups = {};
+    (rules || []).forEach((r) => {
+        const name = r.misconfigured ? MISCONFIGURED_LABEL : (getGuardrailRuleGroupHeading(r.rule) || r.rule || "-");
+        const group = groups[name] || (groups[name] = { name, count: 0, ignored: 0 });
+        group.count += r.count;
+        group.ignored += r.ignored;
+    });
+    return Object.values(groups)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, POLICY_ROWS)
+        .map((g) => ({ name: g.name, count: g.count, ignoredPct: Math.round((g.ignored * 100) / g.count) }));
 }
 
 function buildKpis(kpis, openActivity) {
@@ -89,6 +106,7 @@ function AtlasGuardrailsOverview() {
     const [kpis, setKpis] = useState(null);
     const [triage, setTriage] = useState(null);
     const [decisions, setDecisions] = useState(null);
+    const [policies, setPolicies] = useState(null);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -107,6 +125,10 @@ function AtlasGuardrailsOverview() {
         guardrailsApi.fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setDecisions(resp); })
             .catch(() => { if (!cancelled) setDecisions(null); });
+        setPolicies(null);
+        guardrailsApi.fetchAtlasGuardrailsOverviewPolicies(startTimestamp, endTimestamp)
+            .then((resp) => { if (!cancelled) setPolicies(resp); })
+            .catch(() => { if (!cancelled) setPolicies(null); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -122,7 +144,7 @@ function AtlasGuardrailsOverview() {
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
             <DecisionsTrendCard decisions={decisions} />
-            <PolicyViolationsCard policies={data.byPolicy} onPolicyClick={openActivity} onTune={openPolicies} />
+            <PolicyViolationsCard policies={buildPolicyRows(policies?.rules)} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <SurfaceListCard surfaces={data.bySurface} onSurfaceClick={openActivity} />

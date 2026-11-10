@@ -11,7 +11,9 @@ import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -69,6 +71,23 @@ public class AtlasGuardrailsOverviewService {
         response.put("approval", TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(TimePeriodUtils.groupByTimePeriod(approval, daysBetween), daysBetween));
         response.put("alerted", TimePeriodUtils.convertTimePeriodMapToTimeSeriesData(TimePeriodUtils.groupByTimePeriod(alerted, daysBetween), daysBetween));
         response.put("granularity", TimePeriodUtils.getTimePeriodKey((int) startTs, daysBetween).substring(0, 1));
+        return response;
+    }
+
+    public BasicDBObject buildPolicies(InsightDataBundle bundle) {
+        BasicDBObject response = new BasicDBObject();
+        List<DashboardMaliciousEvent> events = bundle.windowEvents();
+        if (events == null) return response;
+        Map<String, BasicDBObject> byRule = new LinkedHashMap<>();
+        for (DashboardMaliciousEvent e : AtlasGuardrailUtils.collapseConfigFindings(events)) {
+            boolean misconfigured = AtlasGuardrailUtils.isConfigFinding(e);
+            String rule = misconfigured ? "" : (e.getSubCategory() == null ? "" : e.getSubCategory());
+            BasicDBObject row = byRule.computeIfAbsent(misconfigured + "|" + rule, k -> new BasicDBObject("rule", rule)
+                    .append("misconfigured", misconfigured).append("count", 0L).append("ignored", 0L));
+            row.put("count", row.getLong("count") + 1);
+            if (Status.IGNORED.name().equalsIgnoreCase(e.getStatus())) row.put("ignored", row.getLong("ignored") + 1);
+        }
+        response.put("rules", new ArrayList<>(byRule.values()));
         return response;
     }
 

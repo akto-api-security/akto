@@ -206,6 +206,15 @@ export default {
         return resp
     },
 
+    async fetchAtlasGuardrailsOverviewPolicies(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/fetchAtlasGuardrailsOverviewPolicies',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
     async suggestGuardrailCompliance(inputType, payload) {
         const resp = await request({
             url: '/api/ask_ai',

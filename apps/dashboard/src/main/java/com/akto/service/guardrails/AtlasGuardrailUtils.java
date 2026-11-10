@@ -28,7 +28,7 @@ public class AtlasGuardrailUtils {
         List<DashboardMaliciousEvent> out = new ArrayList<>();
         for (DashboardMaliciousEvent e : events) {
             if (e == null) continue;
-            if (e.getUrl() == null || !e.getUrl().contains(CONFIG_ENDPOINT_SEGMENT)) {
+            if (!isConfigFinding(e)) {
                 out.add(e);
                 continue;
             }
@@ -40,6 +40,10 @@ public class AtlasGuardrailUtils {
         }
         out.addAll(latestConfigFinding.values());
         return out;
+    }
+
+    static boolean isConfigFinding(DashboardMaliciousEvent e) {
+        return e.getUrl() != null && e.getUrl().contains(CONFIG_ENDPOINT_SEGMENT);
     }
 
     static long periodDays(InsightDataBundle bundle) {

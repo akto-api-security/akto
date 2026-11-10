@@ -873,6 +873,49 @@ Identify the specific rule from the \`ruleViolated\` field:
 - **If public sharing should be permitted for this case**, an administrator can disable the \`Block public sharing\` option under the guardrail policy's Access restrictions.
 - **If users repeatedly encounter this block**, advise them to share with the organisation or specific individuals instead of setting the link to public.
 `
+    },
+
+    // ─── Context Poisoning ──────────────────────────────────────────────────────
+    {
+        prefixes: ["ContextPoisoning", "context_poisoning"],
+        capability: "contextPoisoning",
+        heading: "Context Poisoning Detected",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "Content that entered the agent's context - a fetched web page, a file, or a tool result - carried hidden instructions or misleading information meant to steer the agent away from the user's actual request."
+            },
+            {
+                heading: "Why is it dangerous?",
+                body: "An agent treats what is in its context as trusted input. Poisoned context can make it leak data, call tools it should not, or act on false information, without the user ever typing anything malicious."
+            }
+        ],
+        remediation: `### Recommended actions
+- **Identify the source** of the poisoned content (the URL, file or tool named in the violation) and stop the agent from reading it.
+- **Review what the agent did next** in this session for any tool calls or data sent as a result.
+- **Restrict untrusted sources** the agent is allowed to read, for example with a blocked-hosts policy.
+`
+    },
+
+    // ─── Custom Redaction Rule ──────────────────────────────────────────────────
+    {
+        prefixes: ["UserDefinedLLMRedactionRule"],
+        heading: "Custom Redaction Rule Applied",
+        overview: [
+            {
+                heading: "What is this?",
+                body: "A user-defined redaction rule, evaluated by an LLM validator, found content matching what your organisation asked to be redacted, and removed it before the request continued."
+            },
+            {
+                heading: "Why does it matter?",
+                body: "Redaction rules cover organisation-specific sensitive content that standard filters do not recognise. A hit means that content was about to leave through an AI tool."
+            }
+        ],
+        remediation: `### Recommended actions
+- **No action is needed for this request** - the matching content was redacted.
+- **If the same rule fires often for one user or tool**, check why that content keeps being shared and whether the workflow should change.
+- **If the redaction was wrong**, an administrator can refine the rule in the guardrail policy.
+`
     }
 ];
 
@@ -911,7 +954,6 @@ export function getGuardrailRuleInfo(ruleViolated, templateId) {
 
 // Capabilities without a detail-dialog entry above. capability === guardrails/<capability>.conf filename.
 const EXTRA_CAPABILITY_PREFIXES = [
-    { prefixes: ["ContextPoisoning", "context_poisoning"], capability: "contextPoisoning" },
     { prefixes: ["BlockedHosts", "blocked_host"], capability: "blockedHosts" },
     // Credential types detected by the PII filter (and the Password scanner) are secrets, not personal data.
     {
@@ -932,6 +974,15 @@ export function getGuardrailCapabilityForRule(ruleViolated) {
         if (def.capability && matches(def.prefixes)) return def.capability;
     }
     return null;
+}
+
+// Display group for a rule_violated value: the heading of the entry owning its compliance capability (so
+// credential-type PII such as PII-password groups with secrets), else the heading of the entry it matches.
+export function getGuardrailRuleGroupHeading(ruleViolated) {
+    const capability = getGuardrailCapabilityForRule(ruleViolated);
+    const owner = capability && GUARDRAIL_RULE_DEFINITIONS.find((def) => def.capability === capability);
+    if (owner) return owner.heading;
+    return getGuardrailRuleInfo(ruleViolated)?.heading || null;
 }
 
 export default GUARDRAIL_RULE_DEFINITIONS;
