@@ -45,7 +45,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 class HttpCallParserLoopbackHostE2ETest {
 
-    private static final int ACCOUNT_ID = 1_000_777;
+    // Must be in HttpCallParser.LOOPBACK_HOST_NORMALIZATION_ACCOUNTS or normalization is a no-op.
+    private static final int ACCOUNT_ID = 1760499072;
+    // An account NOT in that allow-list: loopback hosts must be left untouched for it.
+    private static final int OTHER_ACCOUNT_ID = 1_000_777;
     private static final int VXLAN_ID = 4242;
     private static final String INBOUND = "1";
 
@@ -168,6 +171,33 @@ class HttpCallParserLoopbackHostE2ETest {
         assertEquals("api.example.com".hashCode(), collectionId,
                 "a non-loopback host must be untouched by loopback normalization");
         assertNotNull(collectionByHost("api.example.com"));
+    }
+
+    @Test
+    @DisplayName("For a non-allow-listed account, loopback is NOT normalized (falls to vxlan bucket)")
+    void loopbackHost_notNormalizedForOtherAccount() throws Exception {
+        // Switch the actual account to one NOT in LOOPBACK_HOST_NORMALIZATION_ACCOUNTS.
+        forceActualAccountId(OTHER_ACCOUNT_ID);
+        Context.accountId.set(OTHER_ACCOUNT_ID);
+        try {
+            HttpResponseParams params = HttpCallParser.parseKafkaMessage(kafkaMessage("127.0.0.1:2424"));
+            assertNotNull(params);
+
+            int collectionId = newParser().createApiCollectionId(params);
+
+            // The gate is off for this account: 127.0.0.1:2424 is NOT a valid hostname, so it does
+            // not take the host path and must land in the vxlan (non-hostname) bucket instead.
+            assertEquals(VXLAN_ID, collectionId,
+                    "loopback traffic for a non-allow-listed account must fall into the vxlan bucket");
+            assertNull(collectionByHost("localhost:2424"),
+                    "no 'localhost:2424' collection may be created for a non-allow-listed account");
+            assertNull(collectionByHost("127.0.0.1:2424"),
+                    "the raw loopback IP must not form a host collection either");
+        } finally {
+            // Restore so the class's other tests (which assume ACCOUNT_ID) are unaffected.
+            forceActualAccountId(ACCOUNT_ID);
+            Context.accountId.set(ACCOUNT_ID);
+        }
     }
 
     private static void forceActualAccountId(int accountId) throws Exception {
