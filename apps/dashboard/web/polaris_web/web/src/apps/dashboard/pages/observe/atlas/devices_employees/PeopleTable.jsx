@@ -118,14 +118,13 @@ function FilterChip({ label, active, onClick }) {
     );
 }
 
-function ListFilter({ field, options, selected, onChange }) {
-    const [open, setOpen] = useState(false);
+function ListFilter({ field, options, selected, onChange, open, setOpen }) {
     const label = FILTER_LABELS[field];
     return (
         <Popover
             active={open}
             onClose={() => setOpen(false)}
-            activator={<Button disclosure disabled={options.length === 0 && selected.length === 0} onClick={() => setOpen((current) => !current)}>{selected.length ? `${label} (${selected.length})` : label}</Button>}
+            activator={<Button disclosure disabled={options.length === 0 && selected.length === 0} onClick={() => setOpen(!open)}>{selected.length ? `${label} (${selected.length})` : label}</Button>}
         >
             <Box padding="3">
                 <ChoiceList allowMultiple title={label} titleHidden choices={options} selected={selected} onChange={(values) => onChange({ [field]: values })} />
@@ -187,7 +186,7 @@ function filtersFromModel(tab, model) {
 
 const sameValues = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
-function FilterRow({ tab, filters, onFiltersChange, dataOptions }) {
+function FilterRow({ tab, filters, onFiltersChange, dataOptions, openFilter, setOpenFilter }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
     const tags = appliedTags(filters);
     return (
@@ -198,6 +197,8 @@ function FilterRow({ tab, filters, onFiltersChange, dataOptions }) {
                     field={field}
                     options={filterOptions(field, dataOptions)}
                     selected={field === "osBrowser" ? selectedOsBrowser(filters) : filters[field]}
+                    open={openFilter === field}
+                    setOpen={(value) => setOpenFilter(value ? field : null)}
                     onChange={field === "osBrowser" ? (patch) => onFiltersChange(splitOsBrowser(patch.osBrowser)) : onFiltersChange}
                 />
             ))}
@@ -220,6 +221,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     const [loading, setLoading] = useState(true);
     const [selectedRows, setSelectedRows] = useState([]);
     const [tagNames, setTagNames] = useState(null);
+    const [openFilter, setOpenFilter] = useState(null);
     const [refreshKey, setRefreshKey] = useState(0);
     const tabs = [
         { id: "employees", content: "Employees", badge: counts.employees != null ? counts.employees.toLocaleString("en-US") : undefined },
@@ -293,7 +295,7 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 searchValue={search}
                 onSearchChange={onSearchChange}
                 searchPlaceholder={SEARCH_HINTS[tab]}
-                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} dataOptions={dataOptions} />}
+                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} dataOptions={dataOptions} openFilter={openFilter} setOpenFilter={setOpenFilter} />}
                 height={PEOPLE_TABLE_HEIGHT}
                 domLayout="normal"
                 rowHeight={ROW_HEIGHT}
