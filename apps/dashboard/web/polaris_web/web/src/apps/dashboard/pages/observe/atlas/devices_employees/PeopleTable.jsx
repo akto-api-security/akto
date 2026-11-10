@@ -125,7 +125,7 @@ function ListFilter({ field, options, selected, onChange }) {
         <Popover
             active={open}
             onClose={() => setOpen(false)}
-            activator={<Button disclosure onClick={() => setOpen((current) => !current)}>{selected.length ? `${label} (${selected.length})` : label}</Button>}
+            activator={<Button disclosure disabled={options.length === 0 && selected.length === 0} onClick={() => setOpen((current) => !current)}>{selected.length ? `${label} (${selected.length})` : label}</Button>}
         >
             <Box padding="3">
                 <ChoiceList allowMultiple title={label} titleHidden choices={options} selected={selected} onChange={(values) => onChange({ [field]: values })} />
