@@ -32,7 +32,7 @@ const employeeColumns = (dataOptions) => [
 ];
 
 const deviceColumns = (dataOptions) => [
-    { field: "name", headerName: "Device", flex: 2, minWidth: 220, cellRenderer: DeviceCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
+    { field: "name", headerName: "Device", flex: 2, minWidth: 340, cellRenderer: DeviceCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
     {
         field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer,
         ...setFilter(dataOptions.osBrowser, osBrowserLabel),
