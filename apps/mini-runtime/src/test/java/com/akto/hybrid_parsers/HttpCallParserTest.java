@@ -139,13 +139,57 @@ class HttpCallParserTest {
         // Test with leading/trailing whitespace
         assertTrue(HttpCallParser.isBlockedHost(" localhost "), "localhost with whitespace should be blocked");
         assertTrue(HttpCallParser.isBlockedHost(" svc.cluster.local "), "svc.cluster.local with whitespace should be blocked");
-        
+
         // Test with tabs and newlines
         assertTrue(HttpCallParser.isBlockedHost("\tlocalhost\t"), "localhost with tabs should be blocked");
-        
+
         // Test with special characters in valid domains
         assertFalse(HttpCallParser.isBlockedHost("example.com-"), "Domain with trailing dash should not be blocked");
         assertFalse(HttpCallParser.isBlockedHost("-example.com"), "Domain with leading dash should not be blocked");
         assertFalse(HttpCallParser.isBlockedHost("example.com_"), "Domain with trailing underscore should not be blocked");
+    }
+
+    // ---- normalizeLoopbackHost: loopback IPs are rewritten to "localhost" (port preserved) so
+    // they become valid hostnames and take the host-collection path instead of the vxlan bucket. ----
+
+    @Test
+    @DisplayName("Should rewrite 127.0.0.1 (with port) to localhost preserving the port")
+    void testNormalizeLoopbackIpv4() {
+        assertEquals("localhost", HttpCallParser.normalizeLoopbackHost("127.0.0.1"));
+        assertEquals("localhost:2424", HttpCallParser.normalizeLoopbackHost("127.0.0.1:2424"));
+        assertEquals("localhost:8080", HttpCallParser.normalizeLoopbackHost("127.0.0.1:8080"));
+        // Any address in the 127.0.0.0/8 loopback block
+        assertEquals("localhost", HttpCallParser.normalizeLoopbackHost("127.1.2.3"));
+        assertEquals("localhost:9000", HttpCallParser.normalizeLoopbackHost("127.0.0.53:9000"));
+    }
+
+    @Test
+    @DisplayName("Should rewrite IPv6 loopback ::1 to localhost preserving the port")
+    void testNormalizeLoopbackIpv6() {
+        assertEquals("localhost", HttpCallParser.normalizeLoopbackHost("::1"));
+        assertEquals("localhost", HttpCallParser.normalizeLoopbackHost("[::1]"));
+        assertEquals("localhost:8080", HttpCallParser.normalizeLoopbackHost("[::1]:8080"));
+    }
+
+    @Test
+    @DisplayName("Should trim surrounding whitespace before matching loopback")
+    void testNormalizeLoopbackWhitespace() {
+        assertEquals("localhost:2424", HttpCallParser.normalizeLoopbackHost("  127.0.0.1:2424 "));
+    }
+
+    @Test
+    @DisplayName("Should leave non-loopback hosts unchanged")
+    void testNormalizeLoopbackLeavesOthersUnchanged() {
+        assertNull(HttpCallParser.normalizeLoopbackHost(null));
+        assertEquals("", HttpCallParser.normalizeLoopbackHost(""));
+        assertEquals("localhost", HttpCallParser.normalizeLoopbackHost("localhost"));
+        assertEquals("example.com", HttpCallParser.normalizeLoopbackHost("example.com"));
+        assertEquals("api.example.com:443", HttpCallParser.normalizeLoopbackHost("api.example.com:443"));
+        // Non-loopback private/public IPs are NOT rewritten (only the 127/8 and ::1 ranges are)
+        assertEquals("192.168.1.1", HttpCallParser.normalizeLoopbackHost("192.168.1.1"));
+        assertEquals("10.0.0.1:8080", HttpCallParser.normalizeLoopbackHost("10.0.0.1:8080"));
+        assertEquals("0.0.0.0", HttpCallParser.normalizeLoopbackHost("0.0.0.0"));
+        // A host that merely contains 127.0.0.1 as a path is not a bare loopback host
+        assertEquals("127.0.0.1/api/v1", HttpCallParser.normalizeLoopbackHost("127.0.0.1/api/v1"));
     }
 }
