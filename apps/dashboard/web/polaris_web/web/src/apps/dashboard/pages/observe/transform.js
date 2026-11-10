@@ -71,7 +71,7 @@ const apiDetailsHeaders = [
         itemOrder: 3,
         value: 'hostName',
         icon: GlobeMinor,
-        iconTooltip: "Hostname of the api collection"
+        iconTooltip: "Hostname of the " + mapLabel('API', getDashboardCategory()) + " collection"
     },
     {
         text: 'Last Seen',

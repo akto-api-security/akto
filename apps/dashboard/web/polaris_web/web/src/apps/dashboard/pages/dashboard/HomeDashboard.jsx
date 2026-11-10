@@ -901,7 +901,7 @@ function HomeDashboard() {
         <InfoCard
             component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
             title={"Recent " + mapLabel("Tests", getDashboardCategory())}
-            titleToolTip={"View details of recent" + mapLabel("API security tests", getDashboardCategory()) + ", APIs tested and number of issues found of last 7 days."}
+            titleToolTip={"View details of recent " + mapLabel("API security tests", getDashboardCategory()) + ", " + mapLabel('APIs', getDashboardCategory()) + " tested and number of issues found of last 7 days."}
             linkText={"Increase " + mapLabel("test coverage", getDashboardCategory())}
             linkUrl="/dashboard/testing"
         />
@@ -1024,7 +1024,7 @@ function HomeDashboard() {
                 </div>
             }
             title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
-            titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated APIs which may pose security risks.`}
+            titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated ${mapLabel('APIs', getDashboardCategory())} which may pose security risks.`}
             linkText="Check out"
             linkUrl={EXPLORE_MODE_QUERY_PATH}
         />
@@ -1552,7 +1552,7 @@ function HomeDashboard() {
                             <HorizontalStack gap="2" blockAlign="center">
                                 <Spinner size="small" accessibilityLabel="Counting" />
                                 <Text>
-                                    Counting the APIs of your collections{postureNotice.collections > 0 ? ` (${postureNotice.counted} of ${postureNotice.collections})` : ''}.
+                                    Counting the {mapLabel('APIs', getDashboardCategory())} of your collections{postureNotice.collections > 0 ? ` (${postureNotice.counted} of ${postureNotice.collections})` : ''}.
                                     The numbers below are partial and fill in as it goes.
                                 </Text>
                             </HorizontalStack>
@@ -1567,7 +1567,7 @@ function HomeDashboard() {
             )}
             {postureNotice.endApproximate && (
                 <Banner status="warning">
-                    Too many APIs were discovered after the end of this range to take them out of the numbers, so they are today's.
+                    Too many {mapLabel('APIs', getDashboardCategory())} were discovered after the end of this range to take them out of the numbers, so they are today's.
                 </Banner>
             )}
             {components.map(({id, component}) => (

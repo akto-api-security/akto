@@ -9,11 +9,10 @@ import func from "../../../../../util/func";
 import { Badge, IndexFiltersMode, Avatar, Box, Button, ChoiceList, HorizontalStack, Modal, Text, TextField, VerticalStack } from "@shopify/polaris";
 import { ActivityGroupBadges, ActivityGroupingToggle, expandToGroupEvents, showsActivityGrouping } from "../utils/activityGroups";
 import SessionStore from "../../../../main/SessionStore";
-import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId, extractRuleViolated, extractBehaviour, isBackfillRefId, getBehaviourTone, resolveComplianceClauseMap, mergePolicyComplianceMap, parseStoredRiskScore, parseStoredReason, truncateToWords, truncateToChars } from "../utils/formatUtils";
 import threatDetectionRequests from "../api";
 import { LABELS } from "../constants";
-import { isAgenticSecurityCategory, isEndpointSecurityCategory, isApiSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isApiSecurityCategory, isEndpointSecurityCategory, mapLabel } from "../../../../main/labelHelper";
 import { fetchEndpointShieldUsernameMap, getUsernameForCollection, getBrowserExtensionActorEmail } from "../../observe/api_collections/endpointShieldHelper";
 import IpReputationScore from "./IpReputationScore";
 import guardrailApi from "../../guardrails/api";
@@ -124,9 +123,9 @@ const getHeaders = () => {
       title: "Severity",
     },
     {
-      text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+      text: mapLabel("API endpoint", PersistStore.getState().dashboardCategory),
       value: "endpointComp",
-      title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+      title: mapLabel("API endpoint", PersistStore.getState().dashboardCategory),
     },
     {
       text: "Host",
@@ -171,7 +170,7 @@ const getHeaders = () => {
   baseHeaders.push({
     text: "Filter",
     value: "filterId",
-    title: labelMap[PersistStore.getState().dashboardCategory]["Attack type"],
+    title: mapLabel("Attack type", PersistStore.getState().dashboardCategory),
   });
 
   // Only show detection type for Agentic Security (Argus) and Endpoint Security (Atlas), not for API Security
@@ -1412,7 +1411,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       },
       {
         key: 'latestAttack',
-        label: labelMap[PersistStore.getState().dashboardCategory]["Latest attack sub-category"],
+        label: mapLabel("Latest attack sub-category", PersistStore.getState().dashboardCategory),
         type: 'select',
         choices: attackTypeChoices,
         multiple: true

@@ -962,7 +962,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
                                             <Text variant="bodyMd">
                                                 Running specialized tests like Broken Object Level Authorization,
                                                 Broken User Authentication etc, require an additional attacker
-                                                authorization token. Hence before triggering Akto tests on your apis,
+                                                authorization token. Hence before triggering Akto tests on your {mapLabel('APIs', getDashboardCategory())},
                                                 you may need to specify an authorization token which can be treated as
                                                 attacker token during test run. Attacker Token can be specified
                                                 manually, as well as in automated manner. We provide multiple ways to

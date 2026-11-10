@@ -82,10 +82,10 @@ const UndoDemergedApis = () => {
             {
                 mergedApis && mergedApis?.length > 0 ?
                 <ResourceList
-                    resourceName={{ singular: 'merged api', plural: 'merged apis' }}
+                    resourceName={{ singular: 'merged ' + mapLabel('API', getDashboardCategory()), plural: 'merged ' + mapLabel('APIs', getDashboardCategory()) }}
                     items={mergedApis}
                     renderItem={resourceListRenderItems}
-                    headerContent={`Showing ${mergedApis.length} merged api${mergedApis.length > 1 ? 's': ''}`}
+                    headerContent={`Showing ${mergedApis.length} merged ${mergedApis.length > 1 ? mapLabel('APIs', getDashboardCategory()) : mapLabel('API', getDashboardCategory())}`}
                     showHeader
                     loading={loading}
                 /> : 

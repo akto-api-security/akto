@@ -1841,7 +1841,7 @@ function ApiEndpoints(props) {
             key="delete-api-modal"
         >
             <Modal.Section>
-                <Text>Are you sure you want to delete {(apis || []).length} API(s)?</Text>
+                <Text>Are you sure you want to delete {(apis || []).length} {mapLabel('API', getDashboardCategory())}(s)?</Text>
             </Modal.Section>
         </Modal>
     )
@@ -1866,7 +1866,7 @@ function ApiEndpoints(props) {
         >
             <Modal.Section>
                 <VerticalStack gap="4">
-                    <Text>Are you sure you want to de-merge {(apis || []).length} merged API(s)?</Text>
+                    <Text>Are you sure you want to de-merge {(apis || []).length} merged {mapLabel('API', getDashboardCategory())}(s)?</Text>
                     <Text variant="bodyMd" color="subdued">
                         This will split the merged endpoints back into their original forms. For example,
                         <Text as="span" fontWeight="semibold"> /api/products/INTEGER/reviews </Text>
