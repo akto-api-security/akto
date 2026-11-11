@@ -277,7 +277,7 @@ function footprintLayout(model, highlight) {
                 draggable: false,
                 position: { x, y: layout.headHeight + (rowIndex + offset) * layout.rowHeight },
                 style: lit && !lit.has(node.id) ? { opacity: layout.dimmedOpacity } : undefined,
-                data: { component: { category: node.category, iconSrc: node.iconSrc, type: node.sub || "Select to list", label: node.label, status: node.status, selected: highlight === node.id } },
+                data: { component: { category: node.category, iconSrc: node.iconSrc, type: node.sub || "Select to list", label: node.label, status: node.status, tooltip: node.tooltip, selected: highlight === node.id } },
             });
         });
     });
