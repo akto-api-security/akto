@@ -722,6 +722,138 @@
             </result>
         </action>
 
+        <action name="api/fetchEndpointShieldStats" class="com.akto.action.settings.ModuleInfoAction" method="fetchEndpointShieldStats">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^deviceStats.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAtlasPersonDetail" class="com.akto.action.settings.ModuleInfoAction" method="fetchAtlasPersonDetail">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^atlasDetail.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAtlasOverview" class="com.akto.action.settings.ModuleInfoAction" method="fetchAtlasOverview">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^atlasOverview.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAtlasTrend" class="com.akto.action.settings.ModuleInfoAction" method="fetchAtlasTrend">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^atlasTrend.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAtlasEmployees" class="com.akto.action.settings.ModuleInfoAction" method="fetchAtlasEmployees">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^atlasRows.*,^atlasTotal</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAtlasDevices" class="com.akto.action.settings.ModuleInfoAction" method="fetchAtlasDevices">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">LOGS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^atlasRows.*,^atlasTotal</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchEndpointShieldUserMetadata" class="com.akto.action.settings.ModuleInfoAction" method="fetchEndpointShieldUserMetadata">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -10378,6 +10510,60 @@
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">TEST_SCRIPTS</param>
                 <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAllScripts" class="com.akto.action.testing.ScriptAction" method="fetchAllScripts">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">TEST_SCRIPTS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/deleteScript" class="com.akto.action.testing.ScriptAction" method="deleteScript">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">TEST_SCRIPTS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User deleted a script</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">TEST_PRE_SCRIPT</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>

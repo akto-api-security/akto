@@ -691,7 +691,7 @@ const transform = {
             </List>
           )
           break;
-        case "API endpoints affected":
+        case this.getAffectedEndpointsTitle():
           if (affectedEndpoints == null || affectedEndpoints == undefined || affectedEndpoints.length == 0) {
             return;
           }
@@ -909,13 +909,18 @@ const transform = {
     return transform.enrichWithRunStatus(rows, statusSummaries);
   },
 
+  // Shared by getInfoSectionsHeaders and the fillMoreInformation switch, which keys on the title
+  getAffectedEndpointsTitle() {
+    return mapLabel('API endpoints', getDashboardCategory()) + " affected"
+  },
+
   getInfoSectionsHeaders() {
     let moreInfoSections = [
       {
         icon: RiskMajor,
         title: "Impact",
         content: "",
-        tooltipContent: 'The impact of the test on apis in general scenario.'
+        tooltipContent: 'The impact of the test on ' + mapLabel('APIs', getDashboardCategory()) + ' in general scenario.'
       },
       {
         icon: CollectionsMajor,
@@ -943,7 +948,7 @@ const transform = {
       },
       {
         icon: MarketingMajor,
-        title: mapLabel('API endpoints', getDashboardCategory()) + " affected",
+        title: this.getAffectedEndpointsTitle(),
         content: "",
         tooltipContent: "Affecting endpoints in your inventory for the same test"
       },
@@ -1348,32 +1353,32 @@ const transform = {
         value: (
           <GetPrettifyEndpoint methodBoxWidth="38px" maxWidth="180px" method={apiInfo.id.method} url={apiInfo.id.url} />
         ),
-        tooltipContent: "Name of the api on which test is run"
+        tooltipContent: "Name of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: 'Hostname',
         value: <TextComp value={observeFunc.getHostName(apiInfo.id.url)} />,
-        tooltipContent: "Hostname of the api on which test is run"
+        tooltipContent: "Hostname of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: "Auth type",
         value: <TextComp value={(auth_type || "").toLowerCase()} />,
-        tooltipContent: "Authentication type of the api on which test is run"
+        tooltipContent: "Authentication type of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: "Access type",
         value: <TextComp value={access_type} />,
-        tooltipContent: "Access type of the api on which test is run"
+        tooltipContent: "Access type of the " + mapLabel('API', getDashboardCategory()) + " on which test is run"
       },
       {
         title: "Sensitive Data",
         value: <TextComp value={sensitiveData} />,
-        tooltipContent: "Sensitive parameters detected in API data"
+        tooltipContent: "Sensitive parameters detected in " + mapLabel('API', getDashboardCategory()) + " data"
       },
       {
         title: "Detected",
         value: <TextComp value={func.prettifyEpoch(apiInfo.lastSeen)} />,
-        tooltipContent: "Discovered time of the API"
+        tooltipContent: "Discovered time of the " + mapLabel('API', getDashboardCategory())
       }
     ]
 
@@ -1593,6 +1598,9 @@ const transform = {
     return {
       configsAdvancedSettings: settings,
       testRoleId: testRun.testRoleId,
+      // null/undefined = leave the stored script unchanged; "" = no script; otherwise a script id
+      preRequestScriptId: testRun.preRequestScriptId ?? null,
+      postRequestScriptId: testRun.postRequestScriptId ?? null,
       testSubCategoryList: testSuiteIds?.length === 0 ? selectedTests : [],
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,

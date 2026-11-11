@@ -179,7 +179,7 @@ function TestRolesPage(){
         <PageWithMultipleCards
             title={<TitleWithInfo
                 titleText={mapLabel("Test", getDashboardCategory()) + " roles"}
-                tooltipContent={`Test roles define specific access permissions and authentication methods for API ${mapLabel('security testing', getDashboardCategory())} scenarios.`}
+                tooltipContent={`Test roles define specific access permissions and authentication methods for ${mapLabel('API', getDashboardCategory())} ${mapLabel('security testing', getDashboardCategory())} scenarios.`}
             />}
         primaryAction = {<AllowedAction allowed={canCall('api/addTestRoles')}><Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button></AllowedAction>}
         isFirstPage={true}

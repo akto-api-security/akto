@@ -1,6 +1,6 @@
 import { Button, Collapsible, Divider, LegacyCard, LegacyStack, Text, Box } from "@shopify/polaris"
 import { ChevronRightMinor, ChevronDownMinor } from '@shopify/polaris-icons';
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import api from "../api"
 import HardCoded from "./HardCoded";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered";
@@ -13,7 +13,6 @@ import settingRequests from "../../settings/api";
 import TestCollectionConfiguration from '../configurations/TestCollectionConfiguration'
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import LocalStore from "../../../../main/LocalStorageStore";
-import func from "@/util/func"
 import SampleData from "../../../components/shared/SampleData";
 import { isApiSecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
 import { usePermissions, permissions, loadPermissions, whenAllowed } from "@/util/permissions";
@@ -26,29 +25,14 @@ function UserConfig() {
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
     const [initialLimit, setInitialLimit] = useState(0);
     const [initialLimitAgentic, setInitialLimitAgentic] = useState(0);
-    const [preRequestScript, setPreRequestScript] = useState({ javascript: "" });
-    const [preRequestScriptInitial, setPreRequestScriptInitial] = useState({ message: "" });
-    const preRequestScriptContentRef = useRef("");
-    const [postRequestScript, setPostRequestScript] = useState({ javascript: "" });
-    const [postRequestScriptInitial, setPostRequestScriptInitial] = useState({ message: "" });
-    const postRequestScriptContentRef = useRef("");
     const [commonTestTemplate, setCommonTestTemplate] = useState({message: ""});
     const [commonTestTemplate2, setCommonTestTemplate2] = useState("");
     const [initialDeltaTime, setInitialDeltaTime] = useState(120) ;
     const { canCall } = usePermissions()
     // rate limit and ignore time are admin settings
     const canSeeAdminSettings = canCall('api/fetchAdminSettings')
-    const canEditScripts = canCall('api/addScript')
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
-
-    const handlePreRequestScriptChange = (value) => {
-        preRequestScriptContentRef.current = value
-    }
-
-    const handlePostRequestScriptChange = (value) => {
-        postRequestScriptContentRef.current = value
-    }
 
     async function fetchAuthMechanismData() {
         setIsLoading(true)
@@ -71,25 +55,6 @@ function UserConfig() {
                 LocalStore.getState().setDefaultIgnoreSummaryTime(val)
             })
         }
-        if (permissions.canCall('api/addScript')) try {
-            await api.fetchScript('PRE_REQUEST').then((resp)=> {
-                if (resp && resp.testScript) {
-                    const js = resp.testScript.javascript ?? ""
-                    setPreRequestScript(resp.testScript)
-                    setPreRequestScriptInitial({ message: js })
-                    preRequestScriptContentRef.current = js
-                }
-            });
-            await api.fetchScript('POST_REQUEST').then((resp)=> {
-                if (resp && resp.testScript) {
-                    const js = resp.testScript.javascript ?? ""
-                    setPostRequestScript(resp.testScript)
-                    setPostRequestScriptInitial({ message: js })
-                    postRequestScriptContentRef.current = js
-                }
-            });
-        } catch(e){
-        }
 
         setIsLoading(false)
     }
@@ -105,28 +70,6 @@ function UserConfig() {
         fetchAuthMechanismData()
         fetchCommonTestTemplate()
     }, [])
-
-    async function addOrUpdatePreRequestScript() {
-        const currentJavascript = preRequestScriptContentRef.current
-        if (preRequestScript.id) {
-            api.updateScript(preRequestScript.id, currentJavascript)
-            func.setToast(true, false, "Pre-request script updated")
-        } else {
-            api.addScript({ javascript: currentJavascript, scriptType: 'PRE_REQUEST' })
-            func.setToast(true, false, "Pre-request script added")
-        }
-    }
-
-    async function addOrUpdatePostRequestScript() {
-        const currentJavascript = postRequestScriptContentRef.current
-        if (postRequestScript.id) {
-            api.updateScript(postRequestScript.id, currentJavascript)
-            func.setToast(true, false, "Post-request script updated")
-        } else {
-            api.addScript({ javascript: currentJavascript, scriptType: 'POST_REQUEST' })
-            func.setToast(true, false, "Post-request script added")
-        }
-    }
 
     async function handleStopAllTests() {
         await api.stopAllTests()
@@ -286,46 +229,6 @@ function UserConfig() {
         />
     )
 
-    const preRequestScriptComponent = (
-        <LegacyCard sectioned title="Configure Pre-request script" key="preRequestScript"  primaryFooterAction={
-                {
-                    content: "Save", destructive: false, onAction: () => { addOrUpdatePreRequestScript() }
-                }
-        }>
-            <Divider />
-            <LegacyCard.Section>
-                <SampleData
-                    data={preRequestScriptInitial}
-                    editorLanguage="javascript"
-                    minHeight="500px"
-                    readOnly={false}
-                    getEditorData={handlePreRequestScriptChange}
-                    wordWrap={true}
-                />
-            </LegacyCard.Section>
-        </LegacyCard>
-    )
-
-    const postRequestScriptComponent = (
-        <LegacyCard sectioned title="Configure Post-request script" key="postRequestScript" primaryFooterAction={
-                {
-                    content: "Save", destructive: false, onAction: () => { addOrUpdatePostRequestScript() }
-                }
-        }>
-            <Divider />
-            <LegacyCard.Section>
-                <SampleData
-                    data={postRequestScriptInitial}
-                    editorLanguage="javascript"
-                    minHeight="500px"
-                    readOnly={false}
-                    getEditorData={handlePostRequestScriptChange}
-                    wordWrap={true}
-                />
-            </LegacyCard.Section>
-        </LegacyCard>
-    )
-
     async function saveCommonTemplate() {
         await api.saveCommonTestTemplate(commonTestTemplate2)
         setToastConfig({ isActive: true, isError: false, message: "Test template saved successfully!" })
@@ -350,11 +253,6 @@ function UserConfig() {
     )
 
     let components = canSeeAdminSettings ? [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime, commonTemplateComponent] : [<TestCollectionConfiguration/>, commonTemplateComponent]
-
-    if (canEditScripts && func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
-        components.push(preRequestScriptComponent)
-        components.push(postRequestScriptComponent)
-    }
 
     return (
         isLoading ? <SpinnerCentered /> 

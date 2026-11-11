@@ -102,6 +102,7 @@ import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPa
 import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
 import ConfigureIgnoredEventsPage from "../dashboard/pages/threat_detection/ConfigureIgnoredEventsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
+import ScriptsPage from "../dashboard/pages/testing/scripts/ScriptsPage";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
 import Datadog from "../dashboard/pages/settings/integrations/Datadog";
@@ -122,6 +123,7 @@ import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
 import EndpointShieldMetadata from "../dashboard/pages/observe/atlas/EndpointShieldMetadata";
+import DevicesEmployeesPage from "../dashboard/pages/observe/atlas/devices_employees/DevicesEmployeesPage";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
@@ -136,7 +138,6 @@ import AgenticMainPage from "../dashboard/pages/agentic/AgenticMainPage.jsx";
 import Endpoints from "../dashboard/pages/observe/agentic/Endpoints.jsx";
 import AgenticAssetDevicesPage from "../dashboard/pages/observe/agentic/AgenticAssetDevicesPage.jsx";
 import UsersAndDevices from "../dashboard/pages/observe/agentic/UsersAndDevices.jsx";
-import DeviceEndpoints from "../dashboard/pages/observe/agentic/DeviceEndpoints.jsx";
 import AgenticAssetsPage from "../dashboard/pages/observe/agentic/AgenticAssetsPage.jsx";
 import AgenticDiscoveryOverview from "../dashboard/pages/observe/atlas/discovery/AgenticDiscoveryOverview.jsx";
 import LLMObservability from "../dashboard/pages/observe/llm/LLMObservability.jsx";
@@ -232,6 +233,10 @@ const router = createBrowserRouter([
                             {
                               path:"test-suite",
                               element:<TestSuite/>
+                            },
+                            {
+                              path:"scripts",
+                              element:<ScriptsPage/>
                             }
                         ]
                     },
@@ -269,7 +274,7 @@ const router = createBrowserRouter([
                             },
                             {
                                 path: "endpoints",
-                                element: <DeviceEndpoints/>
+                                element: <DevicesEmployeesPage/>
                             },
                             {
                                 path: "llm-observability",

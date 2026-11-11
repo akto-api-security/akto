@@ -31,6 +31,9 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
+import com.akto.dto.testing.config.TestScript;
+import com.akto.service.scripts.TestScriptException;
+import com.akto.service.scripts.TestScriptService;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
@@ -123,6 +126,13 @@ public class StartTestAction extends UserAction {
     private String testRoleId;
     private boolean cleanUpTestingResources;
 
+    // null = default-test-{type} script, "" = no script, otherwise a TestScript id. See ScriptSelection.
+    @Getter @Setter
+    private String preRequestScriptId;
+    @Getter @Setter
+    private String postRequestScriptId;
+    private final TestScriptService testScriptService = new TestScriptService();
+
     private AutoTicketingDetails autoTicketingDetails;
 
     private Map<String, String> issuesDescriptionMap;
@@ -175,6 +185,8 @@ public class StartTestAction extends UserAction {
     private boolean sendMsTeamsAlert = false;
     private boolean doNotMarkIssuesAsFixed = false;
     private boolean runAutomatedTests = false;
+    private String automatedTestsCustomPrompt;
+    private static final int MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS = 2000;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -270,6 +282,7 @@ public class StartTestAction extends UserAction {
             }
             List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
             testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
+            applyScriptSelections(testingRunConfig);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
@@ -283,6 +296,9 @@ public class StartTestAction extends UserAction {
         testingRun.setDoNotMarkIssuesAsFixed(this.doNotMarkIssuesAsFixed);
         testingRun.setMaxAgentTokens(this.maxAgentTokens);
         testingRun.setRunAutomatedTests(this.runAutomatedTests);
+        if (this.runAutomatedTests && StringUtils.isNotBlank(this.automatedTestsCustomPrompt)) {
+            testingRun.setAutomatedTestsCustomPrompt(StringUtils.left(this.automatedTestsCustomPrompt.trim(), MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS));
+        }
         return testingRun;
     }
 
@@ -316,6 +332,22 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private boolean validateScriptSelections(String preId, String postId) {
+        try {
+            testScriptService.validateRunSelection(preId, TestScript.Type.PRE_REQUEST);
+            testScriptService.validateRunSelection(postId, TestScript.Type.POST_REQUEST);
+            return true;
+        } catch (TestScriptException e) {
+            addActionError(e.getMessage());
+            return false;
+        }
+    }
+
+    private void applyScriptSelections(TestingRunConfig testingRunConfig) {
+        testingRunConfig.setPreRequestScriptId(this.preRequestScriptId);
+        testingRunConfig.setPostRequestScriptId(this.postRequestScriptId);
+    }
+
     private static final Slack SLACK_INSTANCE = Slack.getInstance();
 
     public String startTest() {
@@ -326,6 +358,10 @@ public class StartTestAction extends UserAction {
         }
 
         if (!validateAutoTicketingDetails(this.autoTicketingDetails)) {
+            return Action.ERROR.toUpperCase();
+        }
+
+        if (!validateScriptSelections(this.preRequestScriptId, this.postRequestScriptId)) {
             return Action.ERROR.toUpperCase();
         }
 
@@ -423,6 +459,7 @@ public class StartTestAction extends UserAction {
 
                 List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
                 testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
+                applyScriptSelections(testingRunConfig);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
             }
@@ -1539,7 +1576,21 @@ public class StartTestAction extends UserAction {
                     return Action.ERROR.toUpperCase();
                 }
 
+                // validated before any write so a bad script id never leaves a half-applied edit
+                if (!validateScriptSelections(editableTestingRunConfig.getPreRequestScriptId(), editableTestingRunConfig.getPostRequestScriptId())) {
+                    return Action.ERROR.toUpperCase();
+                }
+
                 List<Bson> updates = new ArrayList<>();
+
+                // absent (null) = unchanged; "" = no script; otherwise the validated script id
+                if (editableTestingRunConfig.getPreRequestScriptId() != null && !editableTestingRunConfig.getPreRequestScriptId().equals(existingTestingRunConfig.getPreRequestScriptId())) {
+                    updates.add(Updates.set(TestingRunConfig.PRE_REQUEST_SCRIPT_ID, editableTestingRunConfig.getPreRequestScriptId()));
+                }
+
+                if (editableTestingRunConfig.getPostRequestScriptId() != null && !editableTestingRunConfig.getPostRequestScriptId().equals(existingTestingRunConfig.getPostRequestScriptId())) {
+                    updates.add(Updates.set(TestingRunConfig.POST_REQUEST_SCRIPT_ID, editableTestingRunConfig.getPostRequestScriptId()));
+                }
 
                 if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
@@ -2199,6 +2250,14 @@ public class StartTestAction extends UserAction {
 
     public boolean getRunAutomatedTests() {
         return runAutomatedTests;
+    }
+
+    public void setAutomatedTestsCustomPrompt(String automatedTestsCustomPrompt) {
+        this.automatedTestsCustomPrompt = automatedTestsCustomPrompt;
+    }
+
+    public String getAutomatedTestsCustomPrompt() {
+        return automatedTestsCustomPrompt;
     }
 
     public void setRecurringWeekly(boolean recurringWeekly) {

@@ -15,14 +15,19 @@ import com.akto.dao.GuardrailPoliciesDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.AgenticUsers;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.DeviceTag;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
+import com.akto.testing.scripts.LegacyTestScriptAdapter;
 import com.akto.util.Pair;
+import com.mongodb.ErrorCategory;
+import com.mongodb.MongoWriteException;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -34,6 +39,38 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class BackwardCompatibilityUtils {
+
+    /**
+     * Copies the pre-library scripts (one per type, in test_collection_properties) into the script
+     * library as default-test-pre / default-test-post. Reads through LegacyTestScriptAdapter, the same
+     * code the runtime fallback uses, so the copied script is the one runs were already executing.
+     * Keeps the legacy _id and timestamps, never touches the legacy docs, and skips a type whose
+     * default name already exists. Safe to re-run and to run concurrently from several instances.
+     * Returns how many scripts were copied.
+     */
+    public static int migrateTestScriptsToLibrary() {
+        LegacyTestScriptAdapter legacy = new LegacyTestScriptAdapter();
+        int copied = 0;
+        for (TestScript.Type type : new TestScript.Type[]{TestScript.Type.PRE_REQUEST, TestScript.Type.POST_REQUEST}) {
+            TestScript script = legacy.findDefault(type);
+            if (script == null || TestScriptsDao.instance.findByName(script.getName()) != null) {
+                continue;
+            }
+            if (script.getId() == null || TestScriptsDao.instance.findById(script.getId()) != null) {
+                script.setId(java.util.UUID.randomUUID().toString());
+            }
+            try {
+                TestScriptsDao.instance.insertOne(script);
+                copied++;
+            } catch (MongoWriteException e) {
+                // another instance migrated the same account first
+                if (e.getError().getCategory() != ErrorCategory.DUPLICATE_KEY) {
+                    throw e;
+                }
+            }
+        }
+        return copied;
+    }
 
     public static void moveUserDataFromModuleInfoToAgenticUsers() {
         List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(Filters.eq(

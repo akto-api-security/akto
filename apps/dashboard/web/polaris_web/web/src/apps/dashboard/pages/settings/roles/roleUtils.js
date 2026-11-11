@@ -1,3 +1,4 @@
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 // Shared by the roles list, the role editor and the SSO group mappings
 
 const rolesOptions = [
@@ -28,7 +29,7 @@ const PERMISSION_GROUPS = [
         title: 'Inventory and Data',
         features: [
             { feature: 'API_COLLECTIONS', label: ' Collections and Inventory', description: "View and manage collections and the discovered inventory, including endpoints and their details." },
-            { feature: 'SENSITIVE_DATA', label: 'Sensitive Data', description: "See which sensitive data types (such as emails or tokens) were found in your APIs, and change how they are treated." },
+            { feature: 'SENSITIVE_DATA', label: 'Sensitive Data', description: "See which sensitive data types (such as emails or tokens) were found in your " + mapLabel('APIs', getDashboardCategory()) + ", and change how they are treated." },
             { feature: 'SAMPLE_DATA', label: 'Request and Response Samples', description: "View the captured request and response samples for endpoints. These can contain real traffic data." },
         ]
     },
