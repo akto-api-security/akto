@@ -1,7 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { Text, VerticalStack } from "@shopify/polaris";
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
-import { CATEGORY_LABELS, CATEGORY_ORDER, DEVICES_PATH, DEVICE_SCOPES } from "../constants";
+import openInventory from "../shared/openInventory";
+import { CATEGORY_LABELS, CATEGORY_ORDER, DEVICES_PATH, DEVICE_SCOPES, INVENTORY_CATEGORIES } from "../constants";
 
 const EMPTY_VALUE = "—";
 const format = (count) => (count === undefined || count === null ? EMPTY_VALUE : Number(count).toLocaleString("en-US"));
@@ -37,7 +38,7 @@ export default function StatTiles({ tiles, deviceScope, fleet }) {
     const items = CATEGORY_ORDER.map((id) => {
         const tile = tiles?.categories?.find((candidate) => candidate.id === id);
         const sub = tile ? subLine(id, tile) : { text: "" };
-        return { title: CATEGORY_LABELS[id], isComp: true, data: statValue(tile?.count, sub.text && { text: sub.text, color: sub.critical ? "critical" : undefined }) };
+        return { title: CATEGORY_LABELS[id], isComp: true, data: statValue(tile?.count, sub.text && { text: sub.text, color: sub.critical ? "critical" : undefined }), onClick: () => openInventory(navigate, INVENTORY_CATEGORIES[id]) };
     });
     items.push({ title: "Devices with AI", isComp: true, data: statValue(devicesWithAi, fleetShare(devicesWithAi, fleet.managedDevices)), onClick: () => navigate(DEVICES_PATH) });
     return <SummaryCardInfo summaryItems={items} />;

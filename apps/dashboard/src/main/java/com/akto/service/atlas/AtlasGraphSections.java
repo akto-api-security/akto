@@ -23,7 +23,7 @@ final class AtlasGraphSections {
     private static final int MATRIX_TEAMS = 8;
     private static final int CHAIN_COLUMN_LIMIT = 10;
     // Categories that appear as nodes in the "AI tools" column of the supply chain.
-    private static final List<String> CHAIN_TOOL_CATEGORIES = Arrays.asList(AtlasCategory.AGENTS, AtlasCategory.BROWSER);
+    private static final List<String> CHAIN_TOOL_CATEGORIES = Arrays.asList(AtlasCategory.AGENTS, AtlasCategory.IDE, AtlasCategory.BROWSER);
 
     private final List<AtlasTool> tools;
     private final AtlasPeople people;

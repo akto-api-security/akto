@@ -1,10 +1,11 @@
 export const ATLAS_DISCOVERY_CHAT_SCOPE = "atlas_agentic_discovery";
 
 // Tiles on the overview, in the mockup's order.
-export const CATEGORY_ORDER = ["agents", "mcp", "browser", "skills"];
+export const CATEGORY_ORDER = ["agents", "ide", "mcp", "browser", "skills"];
 
 export const CATEGORY_LABELS = {
     agents: "AI agents & CLIs",
+    ide: "IDE assistants",
     mcp: "MCP servers",
     browser: "Browser AI apps",
     skills: "Skills & plugins",
@@ -15,6 +16,7 @@ export { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../devices_em
 // Short type tag shown next to a tool name in lists.
 export const CATEGORY_SHORT = {
     agents: "Agent",
+    ide: "IDE",
     mcp: "MCP",
     browser: "Browser",
     skills: "Skill",
@@ -85,6 +87,9 @@ export const VIOLATION_WINDOW_SECONDS = 7 * 24 * 3600;
 
 export const GUARDRAIL_POLICIES_PATH = "/dashboard/guardrails/policies";
 export const DEVICES_PATH = "/dashboard/observe/endpoints";
+export const INVENTORY_PATH = "/dashboard/observe/agentic-assets";
+// The inventory tab (category key) a tile opens; the Skills & plugins tile opens Skills, and Plugins is the tab next to it.
+export const INVENTORY_CATEGORIES = { agents: ["agent"], ide: ["ide"], mcp: ["mcp"], browser: ["browser_ai"], skills: ["skills"] };
 
 // Row signals, shown as small tags; the red ones are the ones to act on.
 export const SIGNAL_META = {

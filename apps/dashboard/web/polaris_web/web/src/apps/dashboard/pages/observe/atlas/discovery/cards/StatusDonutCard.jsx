@@ -13,7 +13,7 @@ const DONUT_MARGIN = 20;
 const COUNT_COLUMN_WIDTH = "40px";
 const PERCENT_COLUMN_WIDTH = "44px";
 // The categories the donut covers, named as on the tiles at the top of the page.
-const COVERED_CATEGORIES = [CATEGORY_LABELS.agents, CATEGORY_LABELS.mcp, CATEGORY_LABELS.browser].join(", ");
+const COVERED_CATEGORIES = [CATEGORY_LABELS.agents, CATEGORY_LABELS.ide, CATEGORY_LABELS.mcp, CATEGORY_LABELS.browser].join(", ");
 
 // DonutChart wants { label: { text: count, color } }; a picked status leaves only its slice.
 const donutData = (counts, selected) => Object.fromEntries(STATUS_ORDER.filter((key) => !selected || key === selected).map((key) => [

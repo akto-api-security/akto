@@ -239,10 +239,11 @@ public class TestAtlasDiscoveryService {
         List<Map<String, Object>> categories = (List<Map<String, Object>>) section(
                 service(rows, new HashMap<>(), Collections.emptySet()).buildOverview(), "tiles").get("categories");
 
-        assertEquals(Arrays.asList("agents", "mcp", "browser", "skills"),
+        assertEquals(Arrays.asList("agents", "ide", "mcp", "browser", "skills"),
                 categories.stream().map(category -> category.get("id")).collect(Collectors.toList()));
         assertEquals(1, categories.get(0).get("count"));
-        assertEquals(1, categories.get(1).get("count"));
+        assertEquals(0, categories.get(1).get("count"));
+        assertEquals(1, categories.get(2).get("count"));
     }
 
     @Test
@@ -345,8 +346,15 @@ public class TestAtlasDiscoveryService {
 
     @Test
     public void agentRowsAreAgents() {
-        for (String agent : Arrays.asList("cursor", "claude-vs-code", "authorized-agent", "geminicli")) {
+        for (String agent : Arrays.asList("claude-vs-code", "authorized-agent", "geminicli")) {
             assertEquals(agent, "agents", AtlasCategory.of(tool("agent", agent, 1, NOW, "d1")));
+        }
+    }
+
+    @Test
+    public void knownIdeAgentsAreIdeAssistants() {
+        for (String ide : Arrays.asList("cursor", "windsurf", "claude1")) {
+            assertEquals(ide, "ide", AtlasCategory.of(tool("agent", ide, 1, NOW, "d1")));
         }
     }
 
