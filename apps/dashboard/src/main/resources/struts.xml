@@ -7891,7 +7891,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ISSUES</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User generated a test report</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
