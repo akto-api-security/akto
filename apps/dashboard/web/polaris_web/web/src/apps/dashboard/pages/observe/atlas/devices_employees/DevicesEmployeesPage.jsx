@@ -19,7 +19,7 @@ import ViolationsBySeverityCard from "./ViolationsBySeverityCard";
 import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
 import {
-    DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH, RISK_BUCKET_WIDTH,
+    DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH,
 } from "./peopleConstants";
 import transform from "./transform";
 
@@ -182,10 +182,7 @@ function DevicesEmployeesPage() {
     };
     const onSelectSeverity = (severity) => toggleView("devices", { violationSeverities: [severity] });
     const onSelectMode = (mode) => toggleView("devices", { guardrailModes: [mode] });
-    const onSelectBucket = (index) => toggleView("employees", {
-        riskMin: index * RISK_BUCKET_WIDTH,
-        riskMax: (index + 1) * RISK_BUCKET_WIDTH,
-    });
+    const onSelectBucket = ({ riskMin, riskMax }) => toggleView("employees", { riskMin, riskMax });
 
     return (
         <PageWithMultipleCards
