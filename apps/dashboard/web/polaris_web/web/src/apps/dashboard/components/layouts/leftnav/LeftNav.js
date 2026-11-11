@@ -617,7 +617,7 @@ export default function LeftNav() {
                     key: "7",
                     subNavigationItems: [
                         // Argus has no "AI Agent Guardrails" block (that one is Gen AI only), so Overview lives here.
-                        ...((dashboardCategory === CATEGORY_AGENTIC_SECURITY && func.isAktoUser()) ? [{
+                        ...(dashboardCategory === CATEGORY_AGENTIC_SECURITY ? [{
                             label: "Overview",
                             requires: pageRequires("/dashboard/guardrails/overview"),
                             onClick: () => {
@@ -780,15 +780,14 @@ export default function LeftNav() {
                 icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_ai_agent_guardrails");
-                    // Overview is visible to Akto users only, so everyone else lands on Activity.
-                    navigate(func.isAktoUser() ? "/dashboard/guardrails/overview" : "/dashboard/guardrails/activity");
+                    navigate("/dashboard/guardrails/overview");
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "10",
                 subNavigationItems: [
-                    ...(func.isAktoUser() ? [{
+                    {
                         label: "Overview",
                         requires: pageRequires("/dashboard/guardrails/overview"),
                         onClick: () => {
@@ -797,7 +796,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_guardrails_overview",
-                    }] : []),
+                    },
                     {
                         label: "Guardrails Activity",
                         requires: pageRequires("/dashboard/guardrails/activity"),
