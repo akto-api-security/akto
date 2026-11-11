@@ -238,7 +238,8 @@ public class Executor {
             RawApi preparedForPentest = applyPreRequestScript(origRawApi, testingRunConfig);
             PentestExecutionResult pentestResult =
                     automatedAgenticTestExecutor.executeAgenticTest(preparedForPentest, testSubType,
-                            TestingConfigurations.getInstance().getAutomatedTestsCustomPrompt());
+                            TestingConfigurations.getInstance().getAutomatedTestsCustomPrompt(),
+                            TestingConfigurations.getInstance().getSmartAgentConfig());
             List<TestResult> automatedAgenticResults = pentestResult.getTestResults();
             aiSummaryTraces = pentestResult.getAiSummaryTraces();
             smartTestingSkipReason = pentestResult.getSkipReason();
@@ -329,7 +330,8 @@ public class Executor {
                             // sendRequest already ran the pre-request script on this request
                             RawApi vulnerableAttempt = new RawApi(testReq.getRequest(), testResponse, null);
                             PentestExecutionResult verification = automatedAgenticTestExecutor.verifyFinding(
-                                    verificationBaseline, vulnerableAttempt, verificationSubType);
+                                    verificationBaseline, vulnerableAttempt, verificationSubType,
+                                    TestingConfigurations.getInstance().getSmartAgentConfig());
                             List<TestResult> verdicts = verification.getTestResults();
                             if (verdicts != null && !verdicts.isEmpty()) {
                                 boolean confirmed = verdicts.get(verdicts.size() - 1).getVulnerable();
