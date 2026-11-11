@@ -192,7 +192,7 @@ function AtlasGuardrailsOverview() {
     return (
         <PageWithMultipleCards
             title="Guardrail overview"
-            subtitle={`Violations across ${plural(kpis?.managedDevices, "managed device", "managed devices")} and${formatCount(data.discoveredAssets)} discovered AI agents, apps and MCP servers`}
+            subtitle={`Violations across ${kpis?.managedDevices ? `${plural(kpis.managedDevices, "managed device", "managed devices")} and ` : ""}${formatCount(data.discoveredAssets)} discovered AI agents, apps and MCP servers`}
             isFirstPage
             secondaryActions={
                 <HorizontalStack gap="2" blockAlign="center">
