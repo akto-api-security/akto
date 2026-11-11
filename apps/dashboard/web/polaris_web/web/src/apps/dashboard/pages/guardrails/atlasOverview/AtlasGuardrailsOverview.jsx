@@ -21,6 +21,7 @@ import { formatDurationMs } from "../../observe/llm/constants";
 import { getGuardrailRuleGroupHeading } from "../../threat_detection/constants/guardrailRuleDefinitions";
 import { formatAssetDisplayName } from "../violations/ViolationsPage";
 import { CLIENT_TYPES } from "../../observe/agentic/mcpClientHelper";
+import observeFunc from "../../observe/transform";
 
 const POLICIES_PATH = "/dashboard/guardrails/policies";
 const EMPTY_VALUE = "—";
@@ -52,7 +53,7 @@ const AGENTIC_ASSET_STATUS_TAGS = {
 const AGENTIC_ASSET_STATUS_RANK = ["BLOCKED", "UNDER_REVIEW", "UNAPPROVED", "APPROVED"];
 
 function formatCount(n) {
-    return n === undefined || n === null ? EMPTY_VALUE : Number(n).toLocaleString();
+    return n === undefined || n === null ? EMPTY_VALUE : observeFunc.formatNumberWithCommas(n);
 }
 
 function formatTriageDuration(seconds) {

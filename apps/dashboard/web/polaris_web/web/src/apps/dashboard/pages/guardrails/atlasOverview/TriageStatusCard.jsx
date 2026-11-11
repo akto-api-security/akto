@@ -2,6 +2,7 @@ import { Box, Card, HorizontalStack, Icon, Link, Text, VerticalStack } from "@sh
 import { DiamondAlertMajor } from "@shopify/polaris-icons";
 import { OverviewCardHeader } from "./OverviewCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import observeFunc from "../../observe/transform";
 
 const BAR_COLOR = {
     OPEN: "bg-inverse-active",
@@ -27,7 +28,7 @@ export default function TriageStatusCard({ triage, periodDays, loading, onStatus
                         <VerticalStack gap="1">
                             <HorizontalStack align="space-between">
                                 <Text variant="bodyMd">{status.label}</Text>
-                                <Text variant="bodyMd" fontWeight="semibold">{status.count}</Text>
+                                <Text variant="bodyMd" fontWeight="semibold">{observeFunc.formatNumberWithCommas(status.count)}</Text>
                             </HorizontalStack>
                             <Box background="bg-inset" borderRadius="1" minHeight="6px">
                                 <Box background={BAR_COLOR[status.key]} borderRadius="1" minHeight="6px" width={`${Math.round((status.count / max) * 100)}%`} />
@@ -42,7 +43,7 @@ export default function TriageStatusCard({ triage, periodDays, loading, onStatus
                                 <Icon source={DiamondAlertMajor} color="warning" />
                             </Box>
                             <Text variant="bodyMd" as="p">
-                                <Text as="span" fontWeight="semibold">{stale}</Text>
+                                <Text as="span" fontWeight="semibold">{observeFunc.formatNumberWithCommas(stale)}</Text>
                                 {` critical ${stale === 1 ? "violation has" : "violations have"} no owner and ${stale === 1 ? "is" : "are"} older than `}
                                 <Text as="span" fontWeight="semibold">{`${hours} ${hours === 1 ? "hour" : "hours"}`}</Text>
                                 {". "}

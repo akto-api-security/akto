@@ -1,6 +1,7 @@
 import { Box, Card, HorizontalGrid, Link, Text, VerticalStack } from "@shopify/polaris";
 import { OverviewCardHeader, OverviewListRow } from "./OverviewCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import observeFunc from "../../observe/transform";
 
 const NOISY_IGNORE_PCT = 40;
 const COLUMNS = "minmax(0, 1.3fr) minmax(0, 1fr) 80px 90px";
@@ -9,6 +10,7 @@ export default function PolicyViolationsCard({ policies, loading, onPolicyClick,
     if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Violations by policy" subtitle="High ignore rates usually mean a policy needs tuning" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
 
     const max = Math.max(1, ...policies.map((p) => p.count));
+    const countWidth = `${Math.max(3, ...policies.map((p) => String(observeFunc.formatNumberWithCommas(p.count)).length))}ch`;
     return (
         <Card padding="0">
             <Box padding="4" paddingBlockEnd="2">
@@ -30,11 +32,11 @@ export default function PolicyViolationsCard({ policies, loading, onPolicyClick,
                             <Link monochrome removeUnderline onClick={() => onPolicyClick(policy)}>
                                 <Text variant="bodyMd" as="span" truncate>{policy.name}</Text>
                             </Link>
-                            <HorizontalGrid columns="1fr 36px" gap="2" alignItems="center">
+                            <HorizontalGrid columns={`1fr ${countWidth}`} gap="2" alignItems="center">
                                 <Box background="bg-inset" borderRadius="1" minHeight="6px">
                                     <Box background="bg-magic-strong" borderRadius="1" minHeight="6px" width={`${Math.round((policy.count / max) * 100)}%`} />
                                 </Box>
-                                <Text variant="bodyMd" alignment="end">{policy.count}</Text>
+                                <Text variant="bodyMd" alignment="end">{observeFunc.formatNumberWithCommas(policy.count)}</Text>
                             </HorizontalGrid>
                             <Text variant="bodyMd" color={noisy ? "warning" : "subdued"} fontWeight={noisy ? "semibold" : "regular"}>{`${policy.ignoredPct}%`}</Text>
                             {noisy ? <Link onClick={() => onTune(policy)}>Tune policy</Link> : <span />}

@@ -1,6 +1,7 @@
 import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import { OverviewCardHeader, OverviewListRow } from "./OverviewCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
+import observeFunc from "../../observe/transform";
 
 const TREND_UP_COLOR = "#8E1F0B";
 const TREND_DOWN_COLOR = "#0C5132";
@@ -26,7 +27,7 @@ export default function ViolationsSourcesCard({ rows, periodDays, loading, onRow
                             <Text variant="bodySm" color="subdued">{row.examples}</Text>
                         </VerticalStack>
                         <VerticalStack gap="0" inlineAlign="end">
-                            <Text variant="bodyMd" fontWeight="semibold">{row.count}</Text>
+                            <Text variant="bodyMd" fontWeight="semibold">{observeFunc.formatNumberWithCommas(row.count)}</Text>
                             {row.changePct !== undefined && row.changePct !== null && (
                                 <Text variant="bodySm" color={row.changePct === 0 ? "subdued" : undefined}>
                                     <span style={{ whiteSpace: "nowrap", ...(row.changePct === 0 ? {} : { color: row.changePct > 0 ? TREND_UP_COLOR : TREND_DOWN_COLOR }) }}>
