@@ -23,7 +23,7 @@ export const SUBTITLES = {
     adoption: "Employees using each tool, last 30 days",
     trend: "Per week, last 12 weeks, by current status",
     reach: `Top ${RISK_REACH_LIMIT} tools by devices. Each circle is a tool, sized by its employees. The shaded corner is high risk on many devices. Select a circle for details.`,
-    chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first; only connected nodes are shown. Line width shows devices.",
+    chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first. Line width shows devices.",
     agentMcp: "Devices where an agent has each MCP server configured; darker means more devices. Shows up to 5 agents and 8 MCP servers, the busiest first.",
     teams: "Share of each team's employees using a category, last 30 days",
 };
