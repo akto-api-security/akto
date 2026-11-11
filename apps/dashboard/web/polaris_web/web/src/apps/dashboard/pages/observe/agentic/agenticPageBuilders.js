@@ -24,21 +24,21 @@ export function normalizeSeverity(raw) {
     return func.getAktoSeverities().find((sev) => upper.startsWith(sev.slice(0, 3))) || null;
 }
 
-// Risk score → Akto severity bucket (drives the .badge-wrapper-<SEVERITY> colour on RiskPill).
+// Risk score (0-5, one decimal) → Akto severity bucket: up to 2 Low, 2.1-3 Medium, 3.1-4 High,
+// above 4 Critical.
 export function getRiskLevel(score) {
-    if (score >= 4.5) return "CRITICAL";
-    if (score >= 4.0) return "HIGH";
-    if (score >= 3.5) return "MEDIUM";
+    if (score > 4) return "CRITICAL";
+    if (score > 3) return "HIGH";
+    if (score > 2) return "MEDIUM";
     return "LOW";
 }
 
-// Polaris Badge status for a risk score — matches the old Endpoints layout.
+const RISK_LEVEL_STATUS = { CRITICAL: "critical", HIGH: "attention", MEDIUM: "warning", LOW: "info" };
+
+// Polaris Badge status for a risk score, from the same buckets so badge colour and level agree.
 export function getRiskStatus(score) {
-    if (score >= 4.5) return "critical";
-    if (score >= 4) return "attention";
-    if (score >= 2.5) return "warning";
-    if (score > 0) return "info";
-    return undefined;
+    if (!(score > 0)) return undefined;
+    return RISK_LEVEL_STATUS[getRiskLevel(score)];
 }
 
 // Human label derived from the bucket — no duplicated thresholds.

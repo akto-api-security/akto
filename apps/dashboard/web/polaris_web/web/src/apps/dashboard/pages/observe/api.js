@@ -452,6 +452,7 @@ export default {
             totalAssets: resp?.totalAssets || 0,
             totalEndpoints: resp?.totalEndpoints || 0,
             countsByType: resp?.countsByType || {},
+            countsByCategory: resp?.countsByCategory || {},
             monthLabels: resp?.monthLabels || [],
             assetSparkline: resp?.assetSparkline || [],
             assetDelta: resp?.assetDelta || 0,

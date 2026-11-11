@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactFlow, { Handle, Position, Background, Controls } from "react-flow-renderer";
 import { Box, Button, HorizontalStack, VerticalStack, Text, Card, Icon, Avatar, Tooltip } from "@shopify/polaris";
-import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor, MaximizeMajor, MinimizeMajor } from "@shopify/polaris-icons";
+import { AutomationMajor, MagicMajor, CustomersMinor, ToolsMajor, MaximizeMajor, MinimizeMajor, DesktopMajor, RiskMajor } from "@shopify/polaris-icons";
 import MCPIcon from "@/assets/MCP_Icon.svg";
 import PluginIcon from "@/assets/Plugin.svg";
 import { getAgentLinkedComponents } from "./agenticPageBuilders";
@@ -18,6 +18,7 @@ export function topoColors(category) {
         case "ai-model": return { borderColor: "#ec4899", backgroundColor: "#fdf2f8" };
         case "skill":    return { borderColor: "#7C3AED", backgroundColor: "#F3E8FF" };
         case "plugin":   return { borderColor: "#4F46E5", backgroundColor: "#EEF2FF" };
+        case "violation": return { borderColor: "#D72C0D", backgroundColor: "#FFF4F4" };
         default:         return { borderColor: "#6b7280", backgroundColor: "#f9fafb" };
     }
 }
@@ -31,6 +32,8 @@ export function topoIcon(category) {
         case "ai-model": return MagicMajor;
         case "skill":    return AutomationMajor;
         case "plugin":   return PluginIcon;
+        case "device":   return DesktopMajor;
+        case "violation": return RiskMajor;
         default:         return CustomersMinor;
     }
 }
@@ -64,7 +67,7 @@ export function TopoNode({ data }) {
                                     : <Icon source={IconComponent} />
                                 }
                                 <Box width={component.category === "ai-model" ? "140px" : "110px"}>
-                                    <Tooltip content={component.label} preferredWidth={400}>
+                                    <Tooltip content={component.tooltip || component.label} preferredWidth={400}>
                                         <Text variant="bodySm" color="base" truncate>{component.label}</Text>
                                     </Tooltip>
                                 </Box>

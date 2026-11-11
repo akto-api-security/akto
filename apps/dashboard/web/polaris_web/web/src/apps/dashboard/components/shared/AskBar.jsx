@@ -19,12 +19,16 @@ import { buildAgenticObserveChatMetadata } from "../../pages/observe/agentic/age
  *     suggestions={ASK_ATLAS_SUGGESTIONS}
  *     chatScope={ATLAS_CHAT_SCOPE}
  * />
+ *
+ * chatData adds context to every question, e.g. the asset an asset panel is showing
+ * (buildAgenticObserveChatMetadata's data). Remount with a new key to start a fresh chat.
  */
 function AskBar({
     label = "Ask Akto",
     placeholder,
     suggestions = [],
     chatScope,
+    chatData,
     conversationType = "AGENTIC_OBSERVE",
 }) {
     const [query, setQuery] = useState("");
@@ -44,7 +48,7 @@ function AskBar({
         setLoading(true);
 
         try {
-            const response = await sendQuery(question, conversationId, conversationType, buildAgenticObserveChatMetadata(chatScope));
+            const response = await sendQuery(question, conversationId, conversationType, buildAgenticObserveChatMetadata(chatScope, chatData));
             if (latestRequest.current !== requestId) return;
             if (response?.conversationId) {
                 setConversationId((prev) => prev || response.conversationId);
@@ -59,7 +63,7 @@ function AskBar({
         } finally {
             if (latestRequest.current === requestId) setLoading(false);
         }
-    }, [query, loading, conversationId, conversationType, chatScope]);
+    }, [query, loading, conversationId, conversationType, chatScope, chatData]);
 
     const clear = useCallback(() => {
         latestRequest.current += 1;

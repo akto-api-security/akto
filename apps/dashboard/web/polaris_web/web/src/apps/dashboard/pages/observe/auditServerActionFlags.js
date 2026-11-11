@@ -8,6 +8,8 @@ export function getServerActionFlags(auditItem, { registryConfigured, addHandler
     const isRejected = remarks === "Rejected"
     const isApproved = remarks === "Approved"
     const isConditional = remarks === "Conditionally Approved"
+    // Set from the AI inventory ("Mark under review"): no decision yet, so both are offered.
+    const isUnderReview = remarks === "Under review"
 
     const nowEpochSec = Math.floor(Date.now() / 1000)
     const expiresAtRaw = auditItem?.approvalConditions?.expiresAt
@@ -40,6 +42,9 @@ export function getServerActionFlags(auditItem, { registryConfigured, addHandler
                 conditional = true
             }
         } else if (isApproved) {
+            block = true
+        } else if (isUnderReview) {
+            allow = true
             block = true
         }
         return { allow, block, conditional }
