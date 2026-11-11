@@ -1,6 +1,7 @@
 import React from 'react';
 import { getBezierPath, Handle, Position } from 'react-flow-renderer';
 import GetPrettifyEndpoint from '../GetPrettifyEndpoint';
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 
 export const createCustomEdge = (markerId, strokeColor = 'grey', useColorVariation = false) => {
   return ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data }) => {
@@ -87,7 +88,7 @@ export const createCustomNode = (borderColor = '#ccc', borderWidth = '1px', hand
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
           }}>
-            Selected API
+            Selected {mapLabel('API', getDashboardCategory())}
           </div>
         )}
         <GetPrettifyEndpoint

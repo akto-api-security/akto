@@ -37,6 +37,7 @@ public class MCPScanAction extends UserAction {
     private String authKey;
     private String authValue;
     private String testRoleHexId;
+    private String miniTestingName;
     private String apiCollectionId;
     private ApiCollection createdCollection;
 
@@ -136,7 +137,7 @@ public class MCPScanAction extends UserAction {
                         Context.accountId.set(accountId);
                         loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and MCP endpoint: {}",
                             createdCollection.getId(), createdCollection.getHostName(), createdCollection.getSseCallbackUrl());
-                        new McpToolsSyncJobExecutor().runJobforCollection(createdCollection, apiConfig, authHeader);
+                        new McpToolsSyncJobExecutor(miniTestingName).runJobforCollection(createdCollection, apiConfig, authHeader);
                     }
                 }, 0, TimeUnit.SECONDS);
 
@@ -201,5 +202,13 @@ public class MCPScanAction extends UserAction {
 
     public void setTestRoleHexId(String testRoleHexId) {
         this.testRoleHexId = testRoleHexId;
+    }
+
+    public String getMiniTestingName() {
+        return miniTestingName;
+    }
+
+    public void setMiniTestingName(String miniTestingName) {
+        this.miniTestingName = miniTestingName;
     }
 }

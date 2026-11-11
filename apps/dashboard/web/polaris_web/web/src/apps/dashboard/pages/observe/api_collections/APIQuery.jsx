@@ -178,7 +178,7 @@ function APIQuery() {
             try {
                 await api.createCustomCollection(newCollectionName, dt);
                 setActive(false);
-                func.setToast(true, false, <div data-testid="collection_creation_message">{"API collection created successfully"}</div>);
+                func.setToast(true, false, <div data-testid="collection_creation_message">{mapLabel('API', getDashboardCategory()) + " collection created successfully"}</div>);
             } catch (error) {
                 func.setToast(true, true, "Failed to create collection. Please try again.");
             }
@@ -378,7 +378,7 @@ function APIQuery() {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    tooltipContent={"Query across your API ecosystem and create meaningful groups effortlessly"}
+                    tooltipContent={"Query across your " + mapLabel('API', getDashboardCategory()) + " ecosystem and create meaningful groups effortlessly"}
                     titleText={"Explore Mode"}
                 />
             }

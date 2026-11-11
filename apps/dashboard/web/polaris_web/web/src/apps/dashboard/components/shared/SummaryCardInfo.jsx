@@ -1,7 +1,50 @@
 import { Box, Card, HorizontalGrid, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
+import Pressable from '../../pages/dashboard/ask/components/Pressable'
+
+function ClickableSummaryCard({summaryItems}) {
+    return (
+        <Card padding={0} key="info">
+            <Box overflowX="hidden" overflowY="hidden" borderRadius="3">
+                <HorizontalGrid columns={summaryItems.length} gap={0}>
+                    {summaryItems.map((item, index) => {
+                        const cellProps = {
+                            borderInlineEndWidth: index < (summaryItems.length - 1) ? "1" : "",
+                            borderColor: "border-subdued",
+                            paddingBlockStart: 3,
+                            paddingBlockEnd: 3,
+                            paddingInlineStart: 4,
+                            paddingInlineEnd: 4,
+                        }
+                        const content = (
+                            <VerticalStack gap="1">
+                                <Text color="subdued" variant="headingXs">
+                                    {item.title}
+                                </Text>
+                                {item?.isComp ? item.data :<Text variant={item.variant ? item.variant : 'bodyMd'} fontWeight="semibold" color={item.color ? item.color :""}>
+                                    {item.data}
+                                </Text>
+                                }
+                            </VerticalStack>
+                        )
+                        return item.onClick ? (
+                            <Pressable key={index} onClick={item.onClick} accessibilityLabel={String(item.title)} hoverBackground="bg-subdued" {...cellProps}>
+                                {content}
+                            </Pressable>
+                        ) : (
+                            <Box key={index} {...cellProps}>
+                                {content}
+                            </Box>
+                        )
+                    })}
+                </HorizontalGrid>
+            </Box>
+        </Card>
+    )
+}
 
 function SummaryCardInfo({summaryItems}) {
+    if (summaryItems.some((item) => item.onClick)) return <ClickableSummaryCard summaryItems={summaryItems} />
     return (
         <Card padding={0} key="info">
             <Box padding={2} paddingInlineStart={4} paddingInlineEnd={4}>

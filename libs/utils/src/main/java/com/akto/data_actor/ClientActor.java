@@ -1710,6 +1710,27 @@ public class ClientActor extends DataActor {
     };
 
     @Override
+    public List<ApiSequences> fetchSequenceRules() {
+        List<ApiSequences> rules = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSequenceRules", "", "POST", new BasicDBObject().toJson(), buildHeaders(), "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb(null, "invalid response in fetchSequenceRules", LoggerMaker.LogDb.RUNTIME);
+                return rules;
+            }
+            BasicDBList objList = (BasicDBList) BasicDBObject.parse(responsePayload).get("apiSequencesList");
+            if (objList == null) return rules;
+            for (Object obj : objList) {
+                rules.add(objectMapper.readValue(((BasicDBObject) obj).toJson(), ApiSequences.class));
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in fetchSequenceRules", LoggerMaker.LogDb.RUNTIME);
+        }
+        return rules;
+    }
+
     public List<ApiSequences> fetchApiSequences() {
         List<ApiSequences> apiSequences = new ArrayList<>();
         Map<String, List<String>> headers = buildHeaders();

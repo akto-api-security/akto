@@ -18,6 +18,7 @@ import CreateNewCollectionModal from "./CreateNewCollectionModal"
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
+import { CollectionTagsHeading } from "./component/CollectionTagsList"
 import useTable from "@/apps/dashboard/components/tables/TableContext"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
@@ -74,7 +75,7 @@ const headers = [
             filterKey: "splitApiCollectionName",
             textValue: 'splitApiCollectionName',
             showFilter: true,
-            titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel('API collection name', getDashboardCategory())} />
+            titleWithTooltip: <HeadingWithTooltip content={"These " + mapLabel('API group', getDashboardCategory()) + "s are computed periodically"} title={mapLabel('API collection name', getDashboardCategory())} />
         },
         {
             title: "Endpoint ID",
@@ -103,7 +104,7 @@ const headers = [
         filterKey: "displayName",
         textValue: 'displayName',
         showFilter: true,
-        titleWithTooltip: <HeadingWithTooltip content="These API groups are computed periodically" title={mapLabel("API collection name", getDashboardCategory())} />
+        titleWithTooltip: <HeadingWithTooltip content={"These " + mapLabel('API group', getDashboardCategory()) + "s are computed periodically"} title={mapLabel("API collection name", getDashboardCategory())} />
     }]),
     {
         title: mapLabel("Total endpoints", getDashboardCategory()),
@@ -177,12 +178,12 @@ const headers = [
     },
     {
         text: 'Collection tags',
-        title: 'Collection tags',
+        title: <CollectionTagsHeading title="Collection tags" />,
         value: 'envTypeComp',
         filterKey: "envType",
         showFilter: true,
         textValue: 'envType',
-        tooltipContent: (<Text variant="bodySm">Tags for an API collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
+        tooltipContent: (<Text variant="bodySm">Tags for an {mapLabel('API', getDashboardCategory())} collection to describe collection attributes such as environment type (staging, production) and other custom attributes</Text>),
     },
     ...(allowedAccounts.includes(Number(window.ACTIVE_ACCOUNT)) ? [{
         title: "Access Type",
@@ -1108,7 +1109,7 @@ function ApiCollections(props) {
             actions.push({
                 content: `Delete collection${func.addPlurality(selectedResources.length)}`,
                 onAction: () => {
-                    const deleteConfirmationMessage = `Are you sure, you want to delete these untracked API collection${func.addPlurality(selectedResources.length)}? This will remove them from the untracked list.`
+                    const deleteConfirmationMessage = `Are you sure, you want to delete these untracked ${mapLabel('API', getDashboardCategory())} collection${func.addPlurality(selectedResources.length)}? This will remove them from the untracked list.`
                     func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleUntrackedDelete(selectedResources))
                 },
                 requires: 'api/deleteUntrackedCollections'
@@ -1171,7 +1172,7 @@ function ApiCollections(props) {
             data[key].length > 0 && data[key].forEach((c) => {
                 const list = dataMap[c?.id]?.map(func.formatCollectionType);
                 c['envType'] = list
-                c['envTypeComp'] = transform.getCollectionTypeList(list, 1, false)
+                c['envTypeComp'] = transform.getCollectionTypeList(list, 1, false, true)
             })
         })
         setData(copyObj)
@@ -1934,7 +1935,7 @@ function ApiCollections(props) {
                         <TitleWithInfo
                             tooltipContent={activeFilterTitle
                                 ? `Viewing collections filtered by ${activeFilterTitle}`
-                                : "Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
+                                : "Akto automatically groups similar " + mapLabel('APIs', getDashboardCategory()) + " into meaningful collections based on their subdomain names. "}
                             titleText={pageTitle}
                             docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                         />

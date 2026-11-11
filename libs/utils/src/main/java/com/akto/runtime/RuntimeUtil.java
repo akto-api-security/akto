@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.net.URI;
 import java.net.URL;
 import java.util.*;
+import java.util.function.Predicate;
 
 public class RuntimeUtil {
 
@@ -76,6 +77,27 @@ public class RuntimeUtil {
 
     private static String[] trimAndSplit(String url) {
         return trim(url).split("/");
+    }
+
+    // Catalog URL for a request: an exact catalog URL first, then the first catalog template that matches.
+    // Query string and trailing slash are ignored. Returns null when the catalog has neither.
+    public static String findCatalogUrl(String url, Method method, Predicate<String> isCatalogUrl, Collection<URLTemplate> templates) {
+        if (url == null || method == null) return null;
+        int query = url.indexOf('?');
+        String path = query >= 0 ? url.substring(0, query) : url;
+        String trimmed = path.length() > 1 && path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
+        for (String candidate : new String[] { path, trimmed, trimmed + "/" }) {
+            if (isCatalogUrl.test(candidate)) return candidate;
+        }
+        if (templates != null) {
+            for (URLTemplate template : templates) {
+                if (!template.match(trimmed, method)) continue;
+                // getTemplateString() drops the leading "/" when the first segment is a placeholder; the catalog keeps it
+                String templateUrl = template.getTemplateString();
+                return path.startsWith("/") && !templateUrl.startsWith("/") ? "/" + templateUrl : templateUrl;
+            }
+        }
+        return null;
     }
 
     public static URLTemplate createUrlTemplate(String url, Method method) {

@@ -11,6 +11,8 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
+import com.akto.dto.testing.config.TestScript;
+import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
@@ -43,6 +45,7 @@ import javax.servlet.http.HttpSession;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -487,4 +490,120 @@ public class TestStartTestAction extends MongoBasedTest {
         
     }
 
+    private TestScript insertScript(String id, TestScript.Type type) {
+        TestScript script = new TestScript(id, id + "-name", "x();", type, "a@x.com", "a@x.com", Context.now(), Context.now());
+        TestScriptsDao.instance.insertOne(script);
+        return script;
+    }
+
+    private StartTestAction rerunActionWithScripts(String preId, String postId) {
+        TestingRunConfigDao.instance.getMCollection().drop();
+        TestingRunDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
+
+        TestingRun testingRun = new TestingRun(Context.now(), "",
+                new CollectionWiseTestingEndpoints(1000), 0, State.COMPLETED, 0, "test", "", false);
+        TestingRunDao.instance.insertOne(testingRun);
+
+        StartTestAction startTestAction = new StartTestAction();
+        startTestAction.setSession(new HashMap<>());
+        startTestAction.setTestingRunHexId(testingRun.getHexId());
+        startTestAction.setSelectedTests(Collections.emptyList());
+        startTestAction.setTestSuiteIds(Collections.emptyList());
+        startTestAction.setPreRequestScriptId(preId);
+        startTestAction.setPostRequestScriptId(postId);
+        return startTestAction;
+    }
+
+    @Test
+    public void testStartTestStoresSelectedScripts() {
+        TestScriptsDao.instance.getMCollection().drop();
+        insertScript("pre-1", TestScript.Type.PRE_REQUEST);
+
+        StartTestAction action = rerunActionWithScripts("pre-1", TestScript.NO_SCRIPT);
+        assertEquals(Action.SUCCESS.toUpperCase(), action.startTest());
+
+        TestingRunConfig config = TestingRunConfigDao.instance.findAll(Filters.empty()).get(0);
+        assertEquals("pre-1", config.getPreRequestScriptId());
+        assertEquals(TestScript.NO_SCRIPT, config.getPostRequestScriptId());
+    }
+
+    @Test
+    public void testStartTestWithoutScriptsKeepsDefaultSemantics() {
+        StartTestAction action = rerunActionWithScripts(null, null);
+        assertEquals(Action.SUCCESS.toUpperCase(), action.startTest());
+
+        TestingRunConfig config = TestingRunConfigDao.instance.findAll(Filters.empty()).get(0);
+        assertNull(config.getPreRequestScriptId());
+        assertNull(config.getPostRequestScriptId());
+    }
+
+    @Test
+    public void testStartTestRejectsUnknownOrWrongTypeScript() {
+        TestScriptsDao.instance.getMCollection().drop();
+        insertScript("post-1", TestScript.Type.POST_REQUEST);
+
+        StartTestAction unknown = rerunActionWithScripts("missing", null);
+        assertEquals(Action.ERROR.toUpperCase(), unknown.startTest());
+        assertEquals(0, TestingRunConfigDao.instance.findAll(Filters.empty()).size());
+
+        StartTestAction wrongType = rerunActionWithScripts("post-1", null);
+        assertEquals(Action.ERROR.toUpperCase(), wrongType.startTest());
+        assertEquals(0, TestingRunConfigDao.instance.findAll(Filters.empty()).size());
+    }
+
+    private int insertConfigWithScripts(String preId, String postId) {
+        TestingRunConfigDao.instance.getMCollection().drop();
+        int id = UUID.randomUUID().hashCode() & 0xfffffff;
+        TestingRunConfig config = new TestingRunConfig();
+        config.setId(id);
+        config.setTestRoleId("role");
+        config.setPreRequestScriptId(preId);
+        config.setPostRequestScriptId(postId);
+        TestingRunConfigDao.instance.insertOne(config);
+        return id;
+    }
+
+    private String modifyScripts(int configId, String preId, String postId) {
+        EditableTestingRunConfig editable = new EditableTestingRunConfig();
+        editable.setPreRequestScriptId(preId);
+        editable.setPostRequestScriptId(postId);
+        StartTestAction action = new StartTestAction();
+        action.setTestingRunConfigId(configId);
+        action.setEditableTestingRunConfig(editable);
+        return action.modifyTestingRunConfig();
+    }
+
+    @Test
+    public void testModifyConfigScriptIds() {
+        TestScriptsDao.instance.getMCollection().drop();
+        insertScript("pre-1", TestScript.Type.PRE_REQUEST);
+        insertScript("pre-2", TestScript.Type.PRE_REQUEST);
+
+        // absent = unchanged
+        int configId = insertConfigWithScripts("pre-1", "post-x");
+        assertEquals(Action.SUCCESS.toUpperCase(), modifyScripts(configId, null, null));
+        TestingRunConfig config = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, configId));
+        assertEquals("pre-1", config.getPreRequestScriptId());
+        assertEquals("post-x", config.getPostRequestScriptId());
+
+        // "" = none, id = that script
+        assertEquals(Action.SUCCESS.toUpperCase(), modifyScripts(configId, "pre-2", TestScript.NO_SCRIPT));
+        config = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, configId));
+        assertEquals("pre-2", config.getPreRequestScriptId());
+        assertEquals(TestScript.NO_SCRIPT, config.getPostRequestScriptId());
+    }
+
+    @Test
+    public void testModifyConfigRejectsInvalidScriptWithoutPartialWrite() {
+        TestScriptsDao.instance.getMCollection().drop();
+        insertScript("pre-1", TestScript.Type.PRE_REQUEST);
+        int configId = insertConfigWithScripts("pre-1", null);
+
+        // valid pre, invalid post: nothing is written
+        assertEquals(Action.ERROR.toUpperCase(), modifyScripts(configId, TestScript.NO_SCRIPT, "missing"));
+        TestingRunConfig config = TestingRunConfigDao.instance.findOne(Filters.eq(Constants.ID, configId));
+        assertEquals("pre-1", config.getPreRequestScriptId());
+        assertNull(config.getPostRequestScriptId());
+    }
 }

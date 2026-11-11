@@ -64,7 +64,7 @@ _FIELDS = (
     # Seconds before expiry to refresh pod IAM-role credentials (EKS Pod
     # Identity / IRSA). Default 1800 (30 min); capped at half their lifetime.
     "BEDROCK_CREDENTIALS_REFRESH_MARGIN_SEC",
-    # Morgan Stanley reach-back gateway (POST /reachback/test). Azure AD token
+    # Reach-back gateway ("reachback" provider, POST /reachback/test). Azure AD token
     # (TENANT/CLIENT_ID/SCOPE/THUMBPRINT + SPN key file) and mTLS (cert/key/CA
     # files) are both required — see reachback.py.
     "REACHBACK_BASE_URL",
@@ -81,6 +81,9 @@ _FIELDS = (
     "DATABASE_ABSTRACTOR_SERVICE_URL",
     # Per-deployment cascade default modelMap (JSON). Empty → built-in default.
     "DEFAULT_MODEL_CONFIG_JSON",
+    # Model for post-verdict enrichment (/guardrails/llm/async, /scan enrichment=reason), same JSON
+    # shape. Empty → those calls use the core model exactly as before (see get_enrichment_config).
+    "ENRICHMENT_MODEL_CONFIG_JSON",
     "SCANNER_RESPONSE_FORMAT",
     # PromptInjection input-side rules: "v1" (default) or "v2" (prompts/prompt_injection.py).
     "PROMPT_INJECTION_PROMPT_VERSION",
@@ -187,6 +190,7 @@ class Settings:
     FALLBACK_SLACK_WEBHOOK_URL: str
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
+    ENRICHMENT_MODEL_CONFIG_JSON: str
     SCANNER_RESPONSE_FORMAT: str
     PROMPT_INJECTION_PROMPT_VERSION: str
     ANONYMIZER_URL: str

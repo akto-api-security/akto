@@ -15,7 +15,7 @@ import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
 import Dropdown from '../Dropdown';
 import Wrapped2025 from './Wrapped2025';
-import { shortNameToCategory } from '../../../../main/labelHelper';
+import { isEndpointSecurityCategory, shortNameToCategory } from '../../../../main/labelHelper';
 import insightsApi from '@/apps/dashboard/pages/observe/agentic/insights/insightsApi';
 import AskOverlayButton from '@/apps/dashboard/pages/dashboard/ask/AskOverlayButton';
 import { INSIGHT_GROUP, INSIGHT_GROUP_LABEL, INSIGHT_GROUP_ROUTE, INSIGHT_DEEP_LINK_PARAM } from '@/apps/dashboard/pages/observe/agentic/insights/insightsHelpers';
@@ -203,8 +203,7 @@ export default function Header() {
     );
 
 
-    // const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
-    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/Halloween-white.svg" : "/public/Halloween-purple.svg";
+    const logoSrc = dashboardCategory === "Agentic Security" ? "/public/white_logo.svg" : "/public/akto_name_with_logo.svg";
     const { agenticSecurityGranted, endpointSecurityGranted, dastGranted, mcpSecurityGranted } = func.getStiggFeatureGrants();
     const dashboardInsightsGranted = func.checkLocal() || func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
 
@@ -470,7 +469,7 @@ export default function Header() {
             {/* Same entitlement the overlay's own endpoints check (usageInterceptor DASHBOARD_INSIGHTS). */}
             <AskOverlayButton />
 
-            {dashboardInsightsGranted && (
+            {dashboardInsightsGranted && isEndpointSecurityCategory() && (
                 <Popover
                     active={insightsPopoverActive}
                     onClose={handleCloseInsightsPopover}
