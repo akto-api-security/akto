@@ -352,7 +352,8 @@ let filtersLlms = [
         title: 'Status',
         choices: [
             { label: "Allowed", value: "Approved" },
-            { label: "Blocked", value: "Rejected" }
+            { label: "Blocked", value: "Rejected" },
+            { label: "Under review", value: "Under review" }
         ],
     }
 ]
@@ -792,7 +793,7 @@ function AuditData() {
         const countPhrase = `${n} selected ${rowNoun}${n === 1 ? "" : "s"}`;
         const actions = [];
         // Only offer the action that changes something, like the Skills tab.
-        if (rows.some((r) => r?.isBlocked)) {
+        if (rows.some((r) => r?.isBlocked || r?.remarks === "Under review")) {
             actions.push({
                 content: n === 1 ? `Allow this ${rowNoun}` : `Allow ${countPhrase}`,
                 onAction: () => bulkUpdateLlms("Approved", selectedIds),

@@ -55,8 +55,26 @@ function SearchBar({ value, onChange, placeholder, topRadius = true }) {
     );
 }
 
-function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false }) {
+// variant "inline": one row, "N selected" + plain buttons + "Clear selection" (AI inventory design).
+function BulkActionBar({ count, bulkActions = [], onClear, noRadius = false, variant = "default" }) {
     if (!count) return null;
+    if (variant === "inline") {
+        return (
+            <div style={{ padding: "8px 16px", background: "#F5F0FF", borderTop: "1px solid #DDD3FA", borderBottom: "1px solid #DDD3FA" }}>
+                <HorizontalStack align="space-between" blockAlign="center" wrap={false}>
+                    <HorizontalStack gap="2" blockAlign="center">
+                        <Text variant="bodyMd" fontWeight="semibold">{count} selected</Text>
+                        {withPermissions(bulkActions).map(action => (
+                            <AllowedAction key={action.label} allowed={!action.disabled} reason={action.helpText}>
+                                <Button size="slim" onClick={action.onAction}>{action.label}</Button>
+                            </AllowedAction>
+                        ))}
+                    </HorizontalStack>
+                    <Button plain onClick={onClear}>Clear selection</Button>
+                </HorizontalStack>
+            </div>
+        );
+    }
     return (
         <Box paddingBlockEnd={noRadius ? "0" : "2"}>
             <div style={{
@@ -154,6 +172,10 @@ export default function AgGridTable({
     bulkActionCount = 0,
     bulkActions = [],
     onClearBulk,
+    // "default" | "inline" — see BulkActionBar.
+    bulkBarVariant = "default",
+    // Per-table overrides on top of agTableTheme (e.g. selected-row colour); keep the object stable.
+    themeParams,
     pagination,
     // Every table defaults to 50, regardless of whatever paginationPageSize a given page passes —
     // a page only keeps its own smaller size (e.g. a compact 10-row list) by also opting out of
@@ -192,9 +214,12 @@ export default function AgGridTable({
     };
     const [debouncedSearchValue, setDebouncedSearchValue] = useState(searchValue || "");
     const skipMinSearchLength = !!renderSearch;
-    const theme = noOuterBorder
-        ? agTableTheme.withParams({ wrapperBorder: false, wrapperBorderRadius: 0 })
-        : agTableTheme;
+    const theme = useMemo(() => {
+        const base = noOuterBorder
+            ? agTableTheme.withParams({ wrapperBorder: false, wrapperBorderRadius: 0 })
+            : agTableTheme;
+        return themeParams ? base.withParams(themeParams) : base;
+    }, [noOuterBorder, themeParams]);
 
     const debouncedSetSearch = useRef(
         debounce((val, serverMode) => {
@@ -451,7 +476,7 @@ export default function AgGridTable({
                 )
             )}
             {searchBelow ? <Box paddingInlineStart="4" paddingInlineEnd="4" paddingBlockStart="3" paddingBlockEnd="3">{searchBelow}</Box> : null}
-            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius />
+            <BulkActionBar count={bulkActionCount} bulkActions={bulkActions} onClear={onClearBulk} noRadius variant={bulkBarVariant} />
             <div style={height ? { height } : { flex: 1, minHeight: 0 }}>
                 {gridNode}
             </div>

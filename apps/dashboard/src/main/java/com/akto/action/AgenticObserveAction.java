@@ -113,6 +113,9 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
     @Setter private Map<String, Integer> trafficMap;
     @Setter private Map<String, Double> riskScoreMap;
     @Setter private Map<String, List<String>> filters; // AG Grid column filters, keyed by field name (e.g. "tags", "groupName")
+    // fetchAgenticAssetsSummary from the AI inventory (new layout): adds tool search and per-row tools,
+    // approval status, employees and category. The legacy Endpoints page leaves it off.
+    @Setter private boolean aiInventory;
 
     // ---- Server-side pagination for fetchUsersAndDevicesSummary ----
     @Setter private String groupBy; // "user" | "device"
@@ -919,8 +922,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             Map<Integer, ApiCollection> byId = new HashMap<>();
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
-            Map<String, Integer> traffic = trafficMap != null ? trafficMap : Collections.emptyMap();
-            Map<String, Double> risk = riskScoreMap != null ? riskScoreMap : Collections.emptyMap();
+            // The AI inventory no longer sends trafficMap/riskScoreMap — fall back to the same cached
+            // server-side maps fetchAgenticAssetsSummary uses, so device last-seen/risk aren't 0.
+            Map<String, Integer> traffic = getOrComputeTrafficMap();
+            Map<String, Double> risk = getOrComputeRiskScoreMap();
             Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
 
             Map<String, DeviceAcc> devices = accumulateDevices(ids, byId, traffic, risk, userAnalysis);
@@ -2323,6 +2328,168 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
         return v.getInt("critical", 0) + v.getInt("high", 0) + v.getInt("medium", 0) + v.getInt("low", 0);
     }
 
+    // Discovered tools per collection, account-wide, for the AI inventory's Tool capabilities column
+    // and tool search. Read from api_info (one small record per endpoint, ids only) rather than
+    // aggregating single_type_info, which holds a record per parameter. Cached like the skill data:
+    // one read per TTL, not per page.
+    private static final Map<String, ToolNamesCacheEntry> toolNamesCache = new ConcurrentHashMap<>();
+
+    private static final class ToolNamesCacheEntry {
+        final long builtAt = System.currentTimeMillis();
+        // Agent hosts' built-in tools (/tool/*) and MCP servers' tool endpoints, kept apart because an
+        // agent row's collections also carry its MCP servers' traffic.
+        final Map<Integer, Set<String>> builtinTools = new HashMap<>();
+        final Map<Integer, Set<String>> mcpTools = new HashMap<>();
+    }
+
+    private ToolNamesCacheEntry getOrBuildToolNames(Collection<GroupSummary> groups) {
+        String cacheKey = ArgusCollectionScope.isLimited(getSUser()) ? scopedCacheKey() : accountCacheKey();
+        ToolNamesCacheEntry existing = toolNamesCache.get(cacheKey);
+        if (existing != null && (System.currentTimeMillis() - existing.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+            return existing;
+        }
+        return toolNamesCache.compute(cacheKey, (k, cached) -> {
+            if (cached != null && (System.currentTimeMillis() - cached.builtAt) < CLASSIFICATION_CACHE_TTL_MS) {
+                return cached;
+            }
+            ToolNamesCacheEntry entry = new ToolNamesCacheEntry();
+            Set<Integer> collectionIds = new HashSet<>();
+            for (GroupSummary g : groups) {
+                if ("agent".equals(g.rowType) || "service".equals(g.rowType)) collectionIds.addAll(g.collectionIds);
+            }
+            if (collectionIds.isEmpty()) return entry;
+            for (ApiInfo info : ApiInfoDao.instance.findAll(
+                    Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds), Projections.include(Constants.ID))) {
+                if (info.getId() == null) continue;
+                String url = info.getId().getUrl();
+                int collectionId = info.getId().getApiCollectionId();
+                if (url == null) continue;
+                if (isAgentBuiltinToolUrl(url)) {
+                    entry.builtinTools.computeIfAbsent(collectionId, c -> new TreeSet<>()).add(mcpDisplayName(url));
+                } else if ("Tool".equals(bucketFromUrl(url)) && !isAgentLlmMessagesUrl(url)) {
+                    entry.mcpTools.computeIfAbsent(collectionId, c -> new TreeSet<>()).add(mcpDisplayName(url));
+                }
+            }
+            return entry;
+        });
+    }
+
+    // Agent rows: their own built-in tools; MCP server rows: their tools; others have none.
+    private static Set<String> toolNamesOf(GroupSummary g, ToolNamesCacheEntry tools) {
+        Map<Integer, Set<String>> source = "agent".equals(g.rowType) ? tools.builtinTools
+                : "service".equals(g.rowType) ? tools.mcpTools : null;
+        Set<String> names = new TreeSet<>();
+        if (source == null) return names;
+        for (Integer id : g.collectionIds) {
+            Set<String> s = source.get(id);
+            if (s != null) names.addAll(s);
+        }
+        return names;
+    }
+
+    static final String APPROVAL_APPROVED = "Approved";
+    static final String APPROVAL_UNAPPROVED = "Unapproved";
+    static final String APPROVAL_BLOCKED = "Blocked";
+    static final String APPROVAL_UNDER_REVIEW = "Under review";
+
+    // AI inventory tab of a row (keys; AgenticInventoryTable.jsx owns the labels).
+    private static String inventoryCategory(GroupSummary g) {
+        String t = g.clientType;
+        if (AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(t)) return McpClientRegistry.isIdeAssistant(g.groupKey) ? "ide" : "agent";
+        if (AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT.equals(t)) return "saas";
+        if (AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER.equals(t)) return "mcp";
+        if (AgenticObserveUtil.CLIENT_TYPE_LLM.equals(t)) return "browser_ai";
+        if (AgenticObserveUtil.CLIENT_TYPE_SKILL.equals(t)) return "skills";
+        if (AgenticObserveUtil.CLIENT_TYPE_PLUGIN.equals(t)) return "plugins";
+        return null;
+    }
+
+    // Audit type whose Allow/Block decisions apply to this row, or null when the row can't be approved.
+    private static String approvalAuditType(GroupSummary g) {
+        if ("service".equals(g.rowType)) return Constants.AKTO_MCP_SERVER_TAG;
+        if ("llm".equals(g.rowType)) return Constants.AKTO_BROWSER_LLM_TAG;
+        if ("agent".equals(g.rowType) && AgenticObserveUtil.CLIENT_TYPE_AI_AGENT.equals(g.clientType)) return Constants.AKTO_AI_AGENT_TAG;
+        return null;
+    }
+
+    private static final class ApprovalState {
+        int priority = Integer.MAX_VALUE;
+        // browser-llm rows are updated by record id (updateLlmAuditData)
+        final List<String> hexIds = new ArrayList<>();
+
+        String status() {
+            // Same collapse as AuditDataAction.collapseRemarksArr: an expired conditional shows as Rejected.
+            if (priority == 0 || priority == 3) return APPROVAL_BLOCKED;
+            if (priority == 1 || priority == 2) return APPROVAL_APPROVED;
+            return priority == 4 ? APPROVAL_UNDER_REVIEW : APPROVAL_UNAPPROVED;
+        }
+    }
+
+    /**
+     * Approval state per approvable group (keyed by approvalAuditType + "|" + groupKey), from the same
+     * mcp_audit_info records the Audit Data page shows. Groups with no record are absent (Unapproved).
+     * mcp-server records are named bare, agent- or device+agent-prefixed ("mcp.notion.com",
+     * "cursor.akto-docs", "<device>.cursor.akto-docs"), so they go to the longest groupKey they end
+     * with, the same suffix rule updateAuditData's mcpServerForAllAgents uses.
+     */
+    private static Map<String, ApprovalState> fetchApprovalStates(List<GroupSummary> groups) {
+        Map<String, Set<String>> keysByType = new HashMap<>();
+        for (GroupSummary g : groups) {
+            String type = approvalAuditType(g);
+            if (type != null) keysByType.computeIfAbsent(type, k -> new HashSet<>()).add(g.groupKey);
+        }
+        Map<String, ApprovalState> states = new HashMap<>();
+        if (keysByType.isEmpty()) return states;
+
+        List<Bson> byType = new ArrayList<>();
+        Set<String> serverKeys = keysByType.getOrDefault(Constants.AKTO_MCP_SERVER_TAG, Collections.emptySet());
+        if (!serverKeys.isEmpty()) {
+            Bson serverFilter = Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG);
+            if (Context.contextSource.get() != null) {
+                serverFilter = Filters.and(serverFilter, Filters.or(
+                        Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
+                        Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false)));
+            }
+            byType.add(serverFilter);
+        }
+        for (String type : Arrays.asList(Constants.AKTO_BROWSER_LLM_TAG, Constants.AKTO_AI_AGENT_TAG)) {
+            Set<String> keys = keysByType.get(type);
+            if (keys != null) byType.add(Filters.and(Filters.eq(McpAuditInfo.TYPE, type), Filters.in(McpAuditInfo.RESOURCE_NAME, keys)));
+        }
+        if (byType.isEmpty()) return states;
+
+        long now = System.currentTimeMillis() / 1000L;
+        List<McpAuditInfo> records = McpAuditInfoDao.instance.findAll(Filters.or(byType),
+                Projections.include(McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME, McpAuditInfo.REMARKS, McpAuditInfo.APPROVAL_CONDITIONS));
+        for (McpAuditInfo rec : records) {
+            String name = rec.getResourceName();
+            if (StringUtils.isBlank(name)) continue;
+            String groupKey = Constants.AKTO_MCP_SERVER_TAG.equals(rec.getType()) ? longestSuffixKey(name, serverKeys) : name;
+            if (groupKey == null) continue;
+            ApprovalState state = states.computeIfAbsent(rec.getType() + "|" + groupKey, k -> new ApprovalState());
+            state.priority = Math.min(state.priority, AuditDataAction.remarksPriority(rec.getRemarks(), rec.getApprovalConditions(), now));
+            if (Constants.AKTO_BROWSER_LLM_TAG.equals(rec.getType()) && rec.getId() != null) state.hexIds.add(rec.getId().toHexString());
+        }
+        return states;
+    }
+
+    // "a.b.c" tries "a.b.c", then "b.c", then "c".
+    private static String longestSuffixKey(String name, Set<String> keys) {
+        for (String candidate = name; candidate != null; ) {
+            if (keys.contains(candidate)) return candidate;
+            int dot = candidate.indexOf('.');
+            candidate = dot < 0 ? null : candidate.substring(dot + 1);
+        }
+        return null;
+    }
+
+    private static String approvalStatusOf(GroupSummary g, Map<String, ApprovalState> states) {
+        String type = approvalAuditType(g);
+        if (type == null) return null;
+        ApprovalState state = states.get(type + "|" + g.groupKey);
+        return state == null ? APPROVAL_UNAPPROVED : state.status();
+    }
+
     /**
      * Paginated, sorted, searchable grouped-asset rows for the Agentic Assets "New Layout" table.
      * Builds lightweight summaries for every group (classifyAllGroups — one pass, no per-device
@@ -2354,8 +2521,18 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
 
             if (StringUtils.isNotBlank(queryValue)) {
                 String q = queryValue.toLowerCase(Locale.ROOT);
-                all.removeIf(g -> g.name == null || !g.name.toLowerCase(Locale.ROOT).contains(q));
+                ToolNamesCacheEntry searchTools = aiInventory ? getOrBuildToolNames(cached.groups.values()) : null;
+                all.removeIf(g -> {
+                    if (g.name != null && g.name.toLowerCase(Locale.ROOT).contains(q)) return false;
+                    if (searchTools != null) {
+                        for (String t : toolNamesOf(g, searchTools)) if (t.toLowerCase(Locale.ROOT).contains(q)) return false;
+                    }
+                    return true;
+                });
             }
+
+            // Read fresh on every call (not part of the classification cache) so an Approve/Block shows immediately.
+            Map<String, ApprovalState> approvalStates = aiInventory ? fetchApprovalStates(all) : Collections.emptyMap();
 
             // AG Grid column filters. "type" is a small fixed enum (AgenticObserveUtil.CLIENT_TYPE_*),
             // matched directly. "tags" mirrors AgenticAssetsPage.jsx's shapeRow tag derivation exactly
@@ -2418,6 +2595,16 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                         return allowedSeverities.stream().noneMatch(s -> v.getInt(s, 0) > 0);
                     });
                 }
+                // "category" — the AI inventory tabs (inventoryCategory keys).
+                if (filters.containsKey("category")) {
+                    Set<String> allowedCategories = new HashSet<>(filters.get("category"));
+                    all.removeIf(g -> !allowedCategories.contains(inventoryCategory(g)));
+                }
+                // "approvalStatus" — Approved / Unapproved / Under review / Blocked; rows that can't be approved never match.
+                if (filters.containsKey("approvalStatus")) {
+                    Set<String> allowedStatuses = new HashSet<>(filters.get("approvalStatus"));
+                    all.removeIf(g -> !allowedStatuses.contains(approvalStatusOf(g, approvalStates)));
+                }
             }
 
             long total = all.size();
@@ -2442,6 +2629,8 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             for (ApiCollection c : collections) byId.put(c.getId(), c);
 
             Map<String, Integer> userAnalysis = getOrComputeUserAnalysisFlatMap();
+            Map<String, String> usernameMap = getOrComputeUsernameMap();
+            ToolNamesCacheEntry rowTools = aiInventory ? getOrBuildToolNames(cached.groups.values()) : null;
             SkillDataCacheEntry skillData = getOrBuildSkillData();
             Set<String> maliciousKeys = skillData.maliciousSkillKeys;
             List<BasicDBObject> rowsOut = new ArrayList<>();
@@ -2498,6 +2687,23 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
                     row.remove("baseRiskScore");
                     row.remove("baseRiskScoreReason");
                 }
+                if (aiInventory) {
+                    row.put("inventoryCategory", inventoryCategory(g));
+                    // Discovered tool names, for the Tool capabilities column and the asset panel's tools list.
+                    row.put("tools", new ArrayList<>(toolNamesOf(g, rowTools)));
+                    Set<String> employees = new HashSet<>();
+                    for (String id : g.endpointIds) {
+                        String u = resolveUsernameByDeviceId(id, usernameMap);
+                        if (StringUtils.isNotBlank(u) && !"-".equals(u)) employees.add(u.toLowerCase(Locale.ROOT));
+                    }
+                    row.put("employeesCount", employees.size());
+                    String approvalStatus = approvalStatusOf(g, approvalStates);
+                    if (approvalStatus != null) {
+                        row.put("approvalStatus", approvalStatus);
+                        ApprovalState state = approvalStates.get(approvalAuditType(g) + "|" + g.groupKey);
+                        if ("llm".equals(g.rowType)) row.put("auditHexIds", state == null ? Collections.emptyList() : state.hexIds);
+                    }
+                }
                 rowsOut.add(row);
             }
             loggerMaker.warnAndAddToDb("[fetchAgenticAssetsSummary-timing] TOTAL=" + (System.currentTimeMillis() - tStart)
@@ -2506,11 +2712,10 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             // Current-page-only, same as fetchAgenticAssetEndpointsPage's distinctUsernames — the
             // client accumulates these across page turns to progressively populate the Username filter's
             // choices (see Endpoints.jsx's updateFilterChoicesIfChanged).
-            Map<String, String> resolveMapForChoices = getOrComputeUsernameMap();
             Set<String> distinctUsernames = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (GroupSummary g : page) {
                 for (String id : g.endpointIds) {
-                    String u = resolveUsernameByDeviceId(id, resolveMapForChoices);
+                    String u = resolveUsernameByDeviceId(id, usernameMap);
                     if (StringUtils.isNotBlank(u) && !"-".equals(u)) distinctUsernames.add(u);
                 }
             }
@@ -2909,13 +3114,17 @@ public class AgenticObserveAction extends AbstractThreatDetectionAction {
             }
 
             Map<String, Integer> countsByType = new LinkedHashMap<>();
+            Map<String, Integer> countsByCategory = new LinkedHashMap<>();
             List<Integer> assetTs = new ArrayList<>();
             for (GroupSummary g : counted) {
                 countsByType.merge(g.clientType, 1, Integer::sum);
+                String category = inventoryCategory(g);
+                if (category != null) countsByCategory.merge(category, 1, Integer::sum);
                 assetTs.add(g.maxTrafficTimestamp);
             }
             response.put("totalAssets", counted.size());
             response.put("countsByType", countsByType);
+            response.put("countsByCategory", countsByCategory);
 
             // Legacy Endpoints.jsx's "Total endpoints" summary card — unique device count across the
             // whole account (not deduped per-group, since one device can belong to several groups).

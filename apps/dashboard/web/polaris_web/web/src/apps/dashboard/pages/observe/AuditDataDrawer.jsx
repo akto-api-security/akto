@@ -50,6 +50,7 @@ const remarksTone = (remarks) => {
     if (remarks === "Rejected") return "critical"
     if (remarks === "Approved") return "success"
     if (remarks === "Conditionally Approved") return "attention"
+    if (remarks === "Under review") return "attention"
     return undefined
 }
 
