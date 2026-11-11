@@ -26,6 +26,7 @@ import org.bson.conversions.Bson;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -88,16 +89,65 @@ public class AtlasPeopleService {
     private static final long CACHE_TTL_MS = 60_000;
     private static final Pattern VERSION = Pattern.compile("^v?(\\d+)\\.(\\d+)\\.(\\d+)");
 
-    private static final Map<String, CachedSnapshot> CACHE = new ConcurrentHashMap<>();
-    private static final Map<String, CompletableFuture<Snapshot>> IN_FLIGHT = new ConcurrentHashMap<>();
+    private static final int SNAPSHOT_CACHE_MAX_ENTRIES = 200;
+    private static final TtlCache<Snapshot> SNAPSHOT_CACHE = new TtlCache<>(CACHE_TTL_MS, SNAPSHOT_CACHE_MAX_ENTRIES);
+    // All-time per-host violation counts for the severity drill-down; an expensive full-history aggregation, so kept longer than snapshots.
+    private static final long ALL_TIME_VIOLATIONS_TTL_MS = 15 * 60_000;
+    private static final int ALL_TIME_VIOLATIONS_MAX_ENTRIES = 500;
+    private static final TtlCache<List<HostSeverityCount>> ALL_TIME_VIOLATIONS_CACHE = new TtlCache<>(ALL_TIME_VIOLATIONS_TTL_MS, ALL_TIME_VIOLATIONS_MAX_ENTRIES);
+    private static final Map<String, Integer> NO_VIOLATIONS = Collections.unmodifiableMap(emptySeverityCounts());
 
-    private static class CachedSnapshot {
-        final Snapshot snapshot;
-        final long loadedAtMs;
+    // Per-key cache with a TTL and a size cap. On a miss one caller loads (outside any map lock) and concurrent callers wait for it; a failed load is never cached.
+    private static final class TtlCache<T> {
+        private final long ttlMs;
+        private final int maxEntries;
+        private final Map<String, Entry<T>> entries = new ConcurrentHashMap<>();
+        private final Map<String, CompletableFuture<T>> inFlight = new ConcurrentHashMap<>();
 
-        CachedSnapshot(Snapshot snapshot, long loadedAtMs) {
-            this.snapshot = snapshot;
-            this.loadedAtMs = loadedAtMs;
+        private static final class Entry<T> {
+            final T value;
+            final long loadedAtMs;
+
+            Entry(T value, long loadedAtMs) {
+                this.value = value;
+                this.loadedAtMs = loadedAtMs;
+            }
+        }
+
+        TtlCache(long ttlMs, int maxEntries) {
+            this.ttlMs = ttlMs;
+            this.maxEntries = maxEntries;
+        }
+
+        T get(String key, Supplier<T> loader) {
+            long now = System.currentTimeMillis();
+            entries.values().removeIf(entry -> now - entry.loadedAtMs >= ttlMs);
+            Entry<T> cached = entries.get(key);
+            if (cached != null) return cached.value;
+            CompletableFuture<T> mine = new CompletableFuture<>();
+            CompletableFuture<T> running = inFlight.putIfAbsent(key, mine);
+            if (running != null) return running.join();
+            try {
+                cached = entries.get(key);
+                T value = cached != null ? cached.value : loader.get();
+                if (cached == null) put(key, value);
+                mine.complete(value);
+                return value;
+            } catch (RuntimeException e) {
+                mine.completeExceptionally(e);
+                throw e;
+            } finally {
+                inFlight.remove(key, mine);
+            }
+        }
+
+        private void put(String key, T value) {
+            if (entries.size() >= maxEntries) {
+                entries.entrySet().stream()
+                        .min(Comparator.comparingLong(entry -> entry.getValue().loadedAtMs))
+                        .ifPresent(oldest -> entries.remove(oldest.getKey()));
+            }
+            entries.put(key, new Entry<>(value, System.currentTimeMillis()));
         }
     }
 
@@ -277,6 +327,8 @@ public class AtlasPeopleService {
         public List<String> browserList;
         public double riskMin;
         public double riskMax = RISK_MAX;
+        // Per-device (by key) counts that replace the snapshot's 7-day counts for the Devices filter, sort and rows; null keeps the snapshot's.
+        public Map<String, Map<String, Integer>> violationsOverride;
         public String sortKey;
         public int sortOrder = -1;
         public int skip;
@@ -285,24 +337,22 @@ public class AtlasPeopleService {
 
     // Returns the cached snapshot for the key; on a miss one caller builds it (outside any map lock) and concurrent callers wait for that build.
     public Snapshot getOrBuild(String key, Supplier<Snapshot> loader) {
-        CACHE.values().removeIf(entry -> System.currentTimeMillis() - entry.loadedAtMs >= CACHE_TTL_MS);
-        CachedSnapshot cached = CACHE.get(key);
-        if (cached != null) return cached.snapshot;
-        CompletableFuture<Snapshot> mine = new CompletableFuture<>();
-        CompletableFuture<Snapshot> running = IN_FLIGHT.putIfAbsent(key, mine);
-        if (running != null) return running.join();
-        try {
-            cached = CACHE.get(key);
-            Snapshot built = cached != null ? cached.snapshot : loader.get();
-            if (cached == null) CACHE.put(key, new CachedSnapshot(built, System.currentTimeMillis()));
-            mine.complete(built);
-            return built;
-        } catch (RuntimeException e) {
-            mine.completeExceptionally(e);
-            throw e;
-        } finally {
-            IN_FLIGHT.remove(key, mine);
+        return SNAPSHOT_CACHE.get(key, loader);
+    }
+
+    // All-time per-host violation counts, cached per key; a loader that throws leaves nothing cached.
+    public List<HostSeverityCount> getOrLoadAllTimeHostCounts(String key, Supplier<List<HostSeverityCount>> loader) {
+        return ALL_TIME_VIOLATIONS_CACHE.get(key, loader);
+    }
+
+    // Per-device severity counts (by device key) from host counts, matched to devices the same way as the snapshot's own 7-day counts.
+    public Map<String, Map<String, Integer>> violationsByDeviceKey(Snapshot snapshot, List<HostSeverityCount> hostCounts) {
+        Map<String, Map<String, Integer>> byKey = new HashMap<>();
+        for (HostSeverityCount counts : hostCounts) {
+            DeviceRow device = deviceForHost(counts.getHost(), snapshot.devicesByLowerName, snapshot.devicesByHost);
+            if (device != null) addSeverityCounts(byKey.computeIfAbsent(device.key, key -> emptySeverityCounts()), counts);
         }
+        return byKey;
     }
 
     // Latest released shield version per OS from the account's endpoint shield settings; used to flag outdated agents.
@@ -643,18 +693,25 @@ public class AtlasPeopleService {
     // Adds threat-backend severity counts per host (last VIOLATION_WINDOW_SECONDS) to the matching device.
     private static void addViolations(Map<String, DeviceRow> devicesByLowerName, Map<String, DeviceRow> devicesByHost, InsightDataBundle bundle) {
         for (HostSeverityCount counts : bundle.hostSeverityCounts) {
-            if (counts.getHost() == null) continue;
-            DeviceRow device = devicesByHost.get(counts.getHost().toLowerCase(Locale.ROOT));
-            if (device == null) {
-                String hostDevice = AgenticObserveUtil.extractEndpointId(counts.getHost());
-                if (hostDevice != null) device = devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
-            }
-            if (device == null) continue;
-            device.violationsBySeverity.merge("critical", counts.getCritical(), Integer::sum);
-            device.violationsBySeverity.merge("high", counts.getHigh(), Integer::sum);
-            device.violationsBySeverity.merge("medium", counts.getMedium(), Integer::sum);
-            device.violationsBySeverity.merge("low", counts.getLow(), Integer::sum);
+            DeviceRow device = deviceForHost(counts.getHost(), devicesByLowerName, devicesByHost);
+            if (device != null) addSeverityCounts(device.violationsBySeverity, counts);
         }
+    }
+
+    // The device a threat-event host belongs to: an exact host match first, then the endpoint id embedded in the host.
+    private static DeviceRow deviceForHost(String host, Map<String, DeviceRow> devicesByLowerName, Map<String, DeviceRow> devicesByHost) {
+        if (host == null) return null;
+        DeviceRow device = devicesByHost.get(host.toLowerCase(Locale.ROOT));
+        if (device != null) return device;
+        String hostDevice = AgenticObserveUtil.extractEndpointId(host);
+        return hostDevice == null ? null : devicesByLowerName.get(hostDevice.toLowerCase(Locale.ROOT));
+    }
+
+    private static void addSeverityCounts(Map<String, Integer> target, HostSeverityCount counts) {
+        target.merge("critical", counts.getCritical(), Integer::sum);
+        target.merge("high", counts.getHigh(), Integer::sum);
+        target.merge("medium", counts.getMedium(), Integer::sum);
+        target.merge("low", counts.getLow(), Integer::sum);
     }
 
     // Groups devices by lowercase username into employees and attaches team tags from agent_users.
@@ -910,8 +967,24 @@ public class AtlasPeopleService {
         matching.sort(deviceComparator(query).thenComparing(device -> device.key));
         totalOut[0] = matching.size();
         List<Map<String, Object>> page = new ArrayList<>();
-        for (DeviceRow device : slice(matching, query)) page.add(device.toMap());
+        for (DeviceRow device : slice(matching, query)) page.add(deviceRow(device, query));
         return page;
+    }
+
+    private static Map<String, Integer> violationsOf(DeviceRow device, PeopleQuery query) {
+        if (query.violationsOverride == null) return device.violationsBySeverity;
+        return query.violationsOverride.getOrDefault(device.key, NO_VIOLATIONS);
+    }
+
+    // The device's row, showing the same violation counts it was filtered on.
+    private static Map<String, Object> deviceRow(DeviceRow device, PeopleQuery query) {
+        Map<String, Object> row = device.toMap();
+        if (query.violationsOverride != null) {
+            Map<String, Integer> counts = violationsOf(device, query);
+            row.put("violations", counts);
+            row.put("violationCount", sum(counts));
+        }
+        return row;
     }
 
     // Filters, sorts and slices the employee list; device filters match if any of the employee's devices match.
@@ -958,7 +1031,7 @@ public class AtlasPeopleService {
         }
         if (notEmpty(query.healthStates) && !query.healthStates.contains(device.health)) return false;
         if (notEmpty(query.guardrailModes) && !query.guardrailModes.contains(device.guardrailMode)) return false;
-        if (notEmpty(query.violationSeverities) && query.violationSeverities.stream().noneMatch(severity -> device.violationsBySeverity.getOrDefault(severity, 0) > 0)) return false;
+        if (notEmpty(query.violationSeverities) && query.violationSeverities.stream().noneMatch(severity -> violationsOf(device, query).getOrDefault(severity, 0) > 0)) return false;
         if (notEmpty(query.tagPairs) && device.tags.stream().noneMatch(tag -> query.tagPairs.contains(tagPair(tag)))) return false;
         if (notEmpty(query.categories)) {
             for (String category : query.categories) {
@@ -1098,7 +1171,7 @@ public class AtlasPeopleService {
             case "toolCount": comparator = Comparator.comparingInt(DeviceRow::toolCount); break;
             case "unapprovedTools": comparator = Comparator.comparingInt(d -> d.unapprovedTools); break;
             case "riskScore": comparator = Comparator.comparingDouble(d -> d.riskScore); break;
-            case "violations": comparator = Comparator.comparingInt(d -> sum(d.violationsBySeverity)); break;
+            case "violations": comparator = Comparator.comparingInt(d -> sum(violationsOf(d, query))); break;
             default: comparator = Comparator.comparingInt(d -> d.lastHeartbeat);
         }
         return query.sortOrder >= 0 ? comparator : comparator.reversed();
