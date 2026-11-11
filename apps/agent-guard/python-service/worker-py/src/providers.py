@@ -159,6 +159,52 @@ def _log_vllm_metrics(provider: str, model: str, base_url: str, body: Any, clien
     )
 
 
+# max_model_len an OpenAI-compatible (vLLM) endpoint reports on /models, per (base_url, model): (value,
+# expires_at). Re-read every 10 min so a server restarted with a longer context is picked up; a failed
+# read keeps the last known value and is retried after a minute.
+_MODEL_LEN_TTL_S = 600.0
+_MODEL_LEN_RETRY_S = 60.0
+_MODEL_LEN_TIMEOUT_S = 2.0
+_MODEL_LEN: dict[tuple[str, str], tuple[int | None, float]] = {}
+# The one in-flight /models read per (base_url, model), shared by every scan that needs it.
+_MODEL_LEN_FETCH: dict[tuple[str, str], asyncio.Task] = {}
+# Tokens the chat template wraps around the user message (BOS, turn markers), with room to spare.
+_CHAT_TEMPLATE_TOKENS = 64
+
+
+async def _fetch_max_model_len(base_url: str, model: str, api_key: str) -> None:
+    key = (base_url, model)
+    value = _MODEL_LEN.get(key, (None, 0.0))[0]  # an unreadable /models keeps the last known value
+    headers = dict(_IDENTITY, **({"Authorization": f"Bearer {api_key}"} if api_key else {}))
+    try:
+        resp = await http_client.get_client().get(f"{base_url}/models", headers=headers, timeout=_MODEL_LEN_TIMEOUT_S)
+        resp.raise_for_status()
+        value = next((m.get("max_model_len") for m in resp.json()["data"] if m.get("id") == model), None)
+        ttl = _MODEL_LEN_TTL_S
+    except Exception as exc:
+        logger.warning(f"[Providers] could not read max_model_len from {base_url}/models: {exc!r}")
+        ttl = _MODEL_LEN_RETRY_S
+    _MODEL_LEN[key] = (value, time.monotonic() + ttl)
+
+
+async def _max_model_len(base_url: str, model: str, api_key: str) -> int | None:
+    """Cached max_model_len. A scan never waits on a refresh: an expired value is returned as is while one
+    background read, shared by concurrent scans, updates it. Only the first lookup in a process waits, on that
+    same shared read (bounded by _MODEL_LEN_TIMEOUT_S)."""
+    key = (base_url, model)
+    cached = _MODEL_LEN.get(key)
+    if cached is not None and time.monotonic() < cached[1]:
+        return cached[0]
+    fetch = _MODEL_LEN_FETCH.get(key)
+    if fetch is None or fetch.done() or fetch.get_loop() is not asyncio.get_running_loop():
+        fetch = asyncio.ensure_future(_fetch_max_model_len(base_url, model, api_key))
+        _MODEL_LEN_FETCH[key] = fetch
+    if cached is not None:
+        return cached[0]
+    await asyncio.shield(fetch)
+    return _MODEL_LEN[key][0]
+
+
 class LLMProvider(ABC):
     name: str = ""
 
@@ -170,6 +216,10 @@ class LLMProvider(ABC):
 
     @abstractmethod
     async def complete(self, prompt: str) -> str: ...
+
+    async def prompt_budget_bytes(self) -> int | None:
+        """Longest prompt, in UTF-8 bytes, certain to fit the model's context window; None = no known limit."""
+        return None
 
 
 class OpenAIProvider(LLMProvider):
@@ -205,6 +255,14 @@ class OpenAIProvider(LLMProvider):
         if self.include_metrics:
             _log_vllm_metrics(self.name, self.model, self.base_url, body, client_ms)
         return body["choices"][0]["message"]["content"]
+
+    async def prompt_budget_bytes(self) -> int | None:
+        # A byte-fallback tokenizer (Gemma, Qwen, Llama) never makes more tokens than the text has UTF-8
+        # bytes, so a prompt of N bytes always fits in N tokens: no tokenizer or /tokenize round trip.
+        # ponytail: bytes over-count English ~5x, so long English splits more than it must; count with
+        # vLLM /tokenize if the extra chunk calls show up in cost.
+        limit = await _max_model_len(self.base_url, self.model, self.api_key)
+        return None if limit is None else limit - _max_tokens() - _CHAT_TEMPLATE_TOKENS
 
 
 class AnthropicProvider(LLMProvider):
@@ -1238,6 +1296,8 @@ class FallbackProvider(LLMProvider):
         # Hung primary must raise TimeoutError, not the caller's CancelledError, or the backup never runs.
         self.primary_timeout_s = primary_timeout_s
         self.backup_timeout_s = backup_timeout_s  # extra time the caller allows for the backup after the primary
+        self._budget_backup: LLMProvider | None = None  # built on first budget lookup, not per scan
+        self._budget_backup_built = False
 
     async def complete(self, prompt: str) -> str:
         if self.health_url:
@@ -1250,6 +1310,19 @@ class FallbackProvider(LLMProvider):
             if self.health_url:
                 raise  # only the probe sends a health-checked primary's traffic to the backup, not one failed request
             return await self._complete_on_backup(prompt, repr(exc), exc)
+
+    async def prompt_budget_bytes(self) -> int | None:
+        """Chunks must fit whichever model serves them: the primary, or the backup after failover. So the budget is
+        the smaller of the two limits that are known. Backups that report none (Anthropic, Bedrock) leave the
+        primary's limit."""
+        if not self._budget_backup_built:
+            self._budget_backup = build_provider_from_config(self.backup_entry)
+            self._budget_backup_built = True
+        limits = [await self.primary.prompt_budget_bytes()]
+        if self._budget_backup is not None:
+            limits.append(await self._budget_backup.prompt_budget_bytes())
+        known = [limit for limit in limits if limit is not None]
+        return min(known) if known else None
 
     async def _complete_on_backup(self, prompt: str, why: str, exc: Exception | None = None) -> str:
         backup = build_provider_from_config(self.backup_entry)
