@@ -20,6 +20,8 @@ import com.akto.service.atlas.AtlasPeopleService;
 import com.akto.service.insights.InsightContext;
 import com.akto.service.insights.InsightDataBundle;
 import com.akto.service.insights.InsightService;
+import com.akto.service.insights.InsightsThreatBackendAccess;
+import com.akto.action.threat_detection.HostSeverityCount;
 import com.akto.utils.vulnerability.InstalledAppVulnerabilityAnalysis;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -43,6 +45,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -445,6 +449,18 @@ public class ModuleInfoAction extends UserAction {
     }
 
 
+    // All-time per-host violation counts, cached apart from the 7-day insights bundle. A failed fetch throws (and is not cached), so the request errors instead of showing no rows.
+    private List<HostSeverityCount> loadAllTimeHostSeverityCounts() {
+        String key = Context.accountId.get() + "_" + Context.contextSource.get();
+        return atlasPeopleService.getOrLoadAllTimeHostCounts(key, () -> {
+            try {
+                return new InsightsThreatBackendAccess().hostSeverityCounts(ALL_TIME_TS, ALL_TIME_TS);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
     // Copies the request parameters (filters, search, sort, paging) into a PeopleQuery.
     private AtlasPeopleService.PeopleQuery buildPeopleQuery() {
         AtlasPeopleService.PeopleQuery query = new AtlasPeopleService.PeopleQuery();
@@ -486,6 +502,8 @@ public class ModuleInfoAction extends UserAction {
     }
 
     private static final String FIRST_SEEN_FIELD = "firstSeenTs";
+    // start_ts = end_ts = 0 means no detectedAt filter in the threat backend (ThreatActorService.fetchHostSeverityCounts), i.e. all time.
+    private static final int ALL_TIME_TS = 0;
 
     // Earliest positive startedTs per device group, i.e. when its first heartbeat row was inserted.
     private Map<String, Integer> loadFirstSeenByGroup() {
@@ -548,7 +566,13 @@ public class ModuleInfoAction extends UserAction {
         if (ArgusCollectionScope.isLimited(getSUser())) return SUCCESS.toUpperCase();
         try {
             long[] total = new long[1];
-            atlasRows = atlasPeopleService.pageDevices(loadAtlasSnapshot(), buildPeopleQuery(), total);
+            AtlasPeopleService.Snapshot snapshot = loadAtlasSnapshot();
+            AtlasPeopleService.PeopleQuery query = buildPeopleQuery();
+            // The severity donut counts all time, so its drill-down filters on all-time counts, not the snapshot's 7-day ones.
+            if (query.violationSeverities != null && !query.violationSeverities.isEmpty()) {
+                query.violationsOverride = atlasPeopleService.violationsByDeviceKey(snapshot, loadAllTimeHostSeverityCounts());
+            }
+            atlasRows = atlasPeopleService.pageDevices(snapshot, query, total);
             atlasTotal = total[0];
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
