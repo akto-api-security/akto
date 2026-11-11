@@ -84,6 +84,12 @@ _FIELDS = (
     # Model for post-verdict enrichment (/guardrails/llm/async, /scan enrichment=reason), same JSON
     # shape. Empty → those calls use the core model exactly as before (see get_enrichment_config).
     "ENRICHMENT_MODEL_CONFIG_JSON",
+    # Per-pod default model config for PER_POD_CONFIG_SCANNERS (see constants.pod_model_config):
+    # a JSON list, entry N = {"modelConfigs": [...]} for the pod whose POD_NAME
+    # ends in -N (StatefulSet ordinal, via the Downward API). Replaces DEFAULT_MODEL_CONFIG_JSON
+    # for those scanners on that pod; a request's own modelConfigs still wins. Empty → shared default.
+    "PER_POD_MODEL_CONFIGS_JSON",
+    "POD_NAME",
     "SCANNER_RESPONSE_FORMAT",
     # PromptInjection input-side rules: "v1" (default) or "v2" (prompts/prompt_injection.py).
     "PROMPT_INJECTION_PROMPT_VERSION",
@@ -191,6 +197,8 @@ class Settings:
     DATABASE_ABSTRACTOR_SERVICE_URL: str
     DEFAULT_MODEL_CONFIG_JSON: str
     ENRICHMENT_MODEL_CONFIG_JSON: str
+    PER_POD_MODEL_CONFIGS_JSON: str
+    POD_NAME: str
     SCANNER_RESPONSE_FORMAT: str
     PROMPT_INJECTION_PROMPT_VERSION: str
     ANONYMIZER_URL: str
