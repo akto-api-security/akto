@@ -1,4 +1,6 @@
 import threatApi from '../../threat_detection/api'
+import guardrailApi from '../api'
+import { SEVERITY } from '../utils'
 import { UNASSIGNED_OWNER } from '../../threat_detection/utils/caseManagement'
 
 // How many rows each list panel loads first, and per "Show more".
@@ -44,6 +46,13 @@ export function formatDuration(seconds) {
     return `${Math.floor(hours / 24)}d ${hours % 24}h`
 }
 
+// Policy name -> severity. The policies page shows a policy with no severity as MEDIUM, so this does too.
+function severityByPolicy(policies) {
+    const bySeverity = {}
+    ;(policies || []).forEach((p) => { bySeverity[p.name] = String(p.severity || SEVERITY.MEDIUM.value).toUpperCase() })
+    return bySeverity
+}
+
 // A page of rows from the backend and how many rows there are in all. A failed answer has none.
 const toPage = (resp, extra = {}) => ({ rows: resp?.rows || [], total: resp?.totalRows || 0, ...extra })
 
@@ -78,8 +87,9 @@ export async function fetchOverview(start, end) {
         loadPage('topPolicies', start, end, 0),
         loadPage('heatmap', start, end, 0),
         loadPage('attention', start, end, 0),
+        guardrailApi.fetchAllGuardrailPolicies(),
     ])
-    const [daily, prevDaily, sevActive, sevReview, reviewUnassigned, reviewCritUnassigned, actions, triage, topPolicies, heatmap, attention] =
+    const [daily, prevDaily, sevActive, sevReview, reviewUnassigned, reviewCritUnassigned, actions, triage, topPolicies, heatmap, attention, policies] =
         results.map((r) => (r.status === 'fulfilled' ? r.value : null))
 
     const total = daily?.totalAnalysed || 0
@@ -105,6 +115,8 @@ export async function fetchOverview(start, end) {
         trend: (actions?.days || []).map((d) => ({ ...d, ts: d.ts * 1000 })),
         topPolicies: topPolicies || toPage(null),
         heatmap: heatmap || toPage(null, { columns: [], otherPolicies: [] }),
+        // Colours the heatmap. Empty when the policies could not be read, and the cells are then left uncoloured.
+        policySeverity: severityByPolicy(policies),
         attention: attention || toPage(null),
     }
 }

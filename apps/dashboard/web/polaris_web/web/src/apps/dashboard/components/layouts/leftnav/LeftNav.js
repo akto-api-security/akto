@@ -610,7 +610,6 @@ export default function LeftNav() {
                         ...((dashboardCategory === CATEGORY_AGENTIC_SECURITY && func.isAktoUser()) ? [{
                             label: "Overview",
                             requires: pageRequires("/dashboard/guardrails/overview"),
-                            badge: <Badge status="info">Beta</Badge>,
                             onClick: () => {
                                 navigate("/dashboard/guardrails/overview");
                                 handleSelect("dashboard_guardrails_overview");
@@ -782,7 +781,6 @@ export default function LeftNav() {
                     ...(func.isAktoUser() ? [{
                         label: "Overview",
                         requires: pageRequires("/dashboard/guardrails/overview"),
-                        badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/guardrails/overview");
                             handleSelect("dashboard_guardrails_overview");

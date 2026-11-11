@@ -264,6 +264,9 @@ public class GuardrailOverviewService {
       return resp.build();
     }
     long lastDay = end > 0 ? end - (end % DAY_SECONDS) : Collections.max(byDay.keySet());
+    // "All time" ends a year ahead. Counted back from a day that far out, the window would hold no events, so it stops today.
+    long now = System.currentTimeMillis() / 1000;
+    lastDay = Math.min(lastDay, now - (now % DAY_SECONDS));
     long firstDay = start > 0 ? start - (start % DAY_SECONDS) : Collections.min(byDay.keySet());
     firstDay = Math.max(firstDay, lastDay - (MAX_DAYS - 1) * DAY_SECONDS);
 

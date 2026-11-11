@@ -124,15 +124,37 @@ public class GuardrailOverviewServiceTest {
 
   @Test
   void aYearLongCapKeepsTheNewestDaysButTotalsEveryEvent() {
-    long end = DAY_1 + 1000 * DAY;
-    returnRows(row(DAY_1, "blocked", 7), row(end - end % DAY, "blocked", 1));
+    // Both ends are in the past: the window stops today, so a future end would not show the cap.
+    long start = DAY_1 - 1000 * DAY;
+    long end = DAY_1;
+    returnRows(row(start, "blocked", 7), row(end - end % DAY, "blocked", 1));
 
     FetchGuardrailActionCountsResponse resp =
-        service.fetchActionCounts(ACCOUNT_ID, request(DAY_1, end), "AGENTIC", null);
+        service.fetchActionCounts(ACCOUNT_ID, request(start, end), "AGENTIC", null);
 
     assertEquals(366, resp.getDaysCount());
     assertEquals(end - end % DAY, resp.getDays(365).getTs());
     assertEquals(8, resp.getTotal().getBlocked());
+  }
+
+  // The "All time" option sends since = 0 and until = a year from now. The days must still end today,
+  // where the events are, not a year ahead where the chart would show nothing.
+  @Test
+  void aRangeEndingInTheFutureStillEndsTodayWithTheEvents() {
+    long now = System.currentTimeMillis() / 1000;
+    long today = now - now % DAY;
+    returnRows(row(today - 10 * DAY, "blocked", 4), row(today, "alerted", 2));
+
+    FetchGuardrailActionCountsResponse resp =
+        service.fetchActionCounts(ACCOUNT_ID, request(0, now + 365 * DAY), "AGENTIC", null);
+
+    assertEquals(11, resp.getDaysCount());
+    assertEquals(today - 10 * DAY, resp.getDays(0).getTs());
+    assertEquals(4, resp.getDays(0).getCounts().getBlocked());
+    assertEquals(today, resp.getDays(10).getTs());
+    assertEquals(2, resp.getDays(10).getCounts().getAlerted());
+    assertEquals(4, resp.getTotal().getBlocked());
+    assertEquals(2, resp.getTotal().getAlerted());
   }
 
   @Test
