@@ -1,5 +1,7 @@
 package com.akto.service.atlas;
 
+import com.akto.util.AgenticObserveUtil;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -26,11 +28,18 @@ final class AtlasGraphSections {
     private final AtlasPeople people;
     // Status of every known MCP server by lower-cased name.
     private final Map<String, AtlasAssetStatus> serverStatuses;
+    // The discovered MCP servers by lower-cased name; other names an agent links (a website, a browser AI app) are not servers.
+    private final Map<String, AtlasTool> serverTools = new HashMap<>();
 
     AtlasGraphSections(List<AtlasTool> tools, AtlasPeople people, Map<String, AtlasAssetStatus> serverStatuses) {
         this.tools = tools;
         this.people = people;
         this.serverStatuses = serverStatuses;
+        for (AtlasTool tool : tools) {
+            AtlasToolRow row = tool.getRow();
+            // A service row can also be an AI app (e.g. a chat website); the inventory lists only MCP Server ones as servers.
+            if (AtlasAssetStatusService.ROW_TYPE_SERVICE.equals(row.getRowType()) && AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER.equals(row.getClientType())) serverTools.put(AtlasDiscoveryService.lower(tool.getRow().getGroupKey()), tool);
+        }
     }
 
     /** Devices where each of the busiest agents has each of the busiest MCP servers configured. */
@@ -46,6 +55,8 @@ final class AtlasGraphSections {
             Map<String, Object> col = new LinkedHashMap<>();
             col.put("name", server);
             col.put("status", AtlasAssetStatus.nameOf(serverStatuses.get(server)));
+            // The discovered server behind the column, so a click can open it.
+            col.put("tool", serverTools.get(server).summary());
             serverCols.add(col);
         }
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -56,9 +67,8 @@ final class AtlasGraphSections {
             }
             List<Integer> cells = new ArrayList<>();
             for (String server : servers) cells.add(byServer.getOrDefault(server, 0));
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("key", agent.key());
-            row.put("name", agent.getRow().getName());
+            // The agent's list fields, so a click opens its flyout.
+            Map<String, Object> row = agent.summary();
             row.put("cells", cells);
             rows.add(row);
         }
@@ -99,47 +109,34 @@ final class AtlasGraphSections {
         return out;
     }
 
-    /** Teams -> AI tools -> MCP servers; edge weight is devices. Each column keeps its busiest nodes. */
+    /** Teams -> AI tools -> MCP servers; edge weight is devices. Each column keeps its busiest connected nodes; a node with no incoming link is left out. */
     Map<String, Object> supplyChain() {
-        List<AtlasTool> chainTools = tools.stream()
-                .filter(t -> CHAIN_TOOL_CATEGORIES.contains(t.getCategory()) && t.governable())
-                .sorted(busiestFirst())
-                .limit(CHAIN_COLUMN_LIMIT).collect(Collectors.toList());
-        Map<String, Set<String>> devicesByServer = devicesByServer(chainTools);
-        List<String> servers = busiest(devicesByServer, CHAIN_COLUMN_LIMIT);
-
-        Map<String, Map<String, Integer>> teamToolDevices = new HashMap<>();
         // Distinct devices per team: a device that runs several of these tools is counted once.
         Map<String, Set<String>> devicesByTeam = new HashMap<>();
-        for (AtlasTool tool : chainTools) {
+        Map<String, Map<String, Integer>> teamToolDevices = new HashMap<>();
+        List<AtlasTool> chainTools = new ArrayList<>();
+        List<AtlasTool> candidates = tools.stream()
+                .filter(t -> CHAIN_TOOL_CATEGORIES.contains(t.getCategory()) && t.governable())
+                .sorted(busiestFirst())
+                .collect(Collectors.toList());
+        // A tool no team reaches has no incoming link, so it is skipped before the top N is taken.
+        for (AtlasTool tool : candidates) {
+            if (chainTools.size() >= CHAIN_COLUMN_LIMIT) break;
             Map<String, Integer> byTeam = new HashMap<>();
+            Map<String, Set<String>> toolTeamDevices = new HashMap<>();
             for (String deviceId : tool.getRow().getDeviceIds()) {
                 String team = people.teamOfDevice(deviceId);
                 if (team == null) continue;
                 byTeam.merge(team, 1, Integer::sum);
-                devicesByTeam.computeIfAbsent(team, k -> new HashSet<>()).add(deviceId);
+                toolTeamDevices.computeIfAbsent(team, k -> new HashSet<>()).add(deviceId);
             }
+            if (byTeam.isEmpty()) continue;
+            toolTeamDevices.forEach((team, devices) -> devicesByTeam.computeIfAbsent(team, k -> new HashSet<>()).addAll(devices));
             teamToolDevices.put(tool.key(), byTeam);
+            chainTools.add(tool);
         }
         List<String> teams = busiest(devicesByTeam, CHAIN_COLUMN_LIMIT);
-
-        Map<String, Set<String>> members = people.membersByTeam();
-        List<Map<String, Object>> teamNodes = new ArrayList<>();
-        for (String team : teams) {
-            Map<String, Object> teamNode = node("team:" + team, team, null, devicesByTeam.get(team).size(), null);
-            if (members.containsKey(team)) teamNode.put("employees", members.get(team).size());
-            teamNodes.add(teamNode);
-        }
-        List<Map<String, Object>> toolNodes = new ArrayList<>();
-        for (AtlasTool tool : chainTools) {
-            Map<String, Object> toolNode = node("tool:" + tool.key(), tool.getRow().getName(), tool.getCategory(), tool.devices(), tool.getStatus());
-            toolNode.put("clientType", tool.getRow().getClientType());
-            toolNodes.add(toolNode);
-        }
-        List<Map<String, Object>> serverNodes = new ArrayList<>();
-        for (String server : servers) {
-            serverNodes.add(node("mcp:" + server, server, AtlasCategory.MCP, devicesByServer.get(server).size(), serverStatuses.get(server)));
-        }
+        List<String> servers = busiest(devicesByServer(chainTools), CHAIN_COLUMN_LIMIT);
 
         List<Map<String, Object>> edges = new ArrayList<>();
         for (AtlasTool tool : chainTools) {
@@ -152,6 +149,40 @@ final class AtlasGraphSections {
                 if (servers.contains(server) && !e.getValue().isEmpty()) edges.add(edge("tool:" + tool.key(), "mcp:" + server, e.getValue().size()));
             }
         }
+        // A tool whose teams all fell outside the top N has no incoming link either; its servers lose theirs with it.
+        Set<String> reachedTools = new HashSet<>();
+        for (Map<String, Object> edge : edges) {
+            if (((String) edge.get("source")).startsWith("team:")) reachedTools.add((String) edge.get("target"));
+        }
+        edges.removeIf(edge -> ((String) edge.get("source")).startsWith("tool:") && !reachedTools.contains(edge.get("source")));
+        Set<String> reachedServers = new HashSet<>();
+        Set<String> reachingTeams = new HashSet<>();
+        for (Map<String, Object> edge : edges) {
+            if (((String) edge.get("target")).startsWith("mcp:")) reachedServers.add((String) edge.get("target"));
+            else reachingTeams.add((String) edge.get("source"));
+        }
+
+        Map<String, Set<String>> members = people.membersByTeam();
+        List<Map<String, Object>> teamNodes = new ArrayList<>();
+        for (String team : teams) {
+            if (!reachingTeams.contains("team:" + team)) continue;
+            Map<String, Object> teamNode = node("team:" + team, team, null, devicesByTeam.get(team).size(), null);
+            if (members.containsKey(team)) teamNode.put("employees", members.get(team).size());
+            teamNodes.add(teamNode);
+        }
+        List<Map<String, Object>> toolNodes = new ArrayList<>();
+        for (AtlasTool tool : chainTools) {
+            if (!reachedTools.contains("tool:" + tool.key())) continue;
+            Map<String, Object> toolNode = node("tool:" + tool.key(), tool.getRow().getName(), tool.getCategory(), tool.devices(), tool.getStatus());
+            toolNode.put("clientType", tool.getRow().getClientType());
+            toolNodes.add(toolNode);
+        }
+        Map<String, Set<String>> devicesByServer = devicesByServer(chainTools);
+        List<Map<String, Object>> serverNodes = new ArrayList<>();
+        for (String server : servers) {
+            if (!reachedServers.contains("mcp:" + server)) continue;
+            serverNodes.add(node("mcp:" + server, server, AtlasCategory.MCP, devicesByServer.get(server).size(), serverStatuses.get(server)));
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("columns", Arrays.asList(teamNodes, toolNodes, serverNodes));
         out.put("edges", edges);
@@ -162,12 +193,13 @@ final class AtlasGraphSections {
         return Comparator.comparingInt(AtlasTool::devices).reversed().thenComparing(AtlasTool::key);
     }
 
-    // Devices per lower-cased MCP server across the given tools.
-    private static Map<String, Set<String>> devicesByServer(Collection<AtlasTool> sources) {
+    // Devices per lower-cased discovered MCP server across the given tools.
+    private Map<String, Set<String>> devicesByServer(Collection<AtlasTool> sources) {
         Map<String, Set<String>> devicesByServer = new HashMap<>();
         for (AtlasTool tool : sources) {
             for (Map.Entry<String, Set<String>> e : tool.getRow().getMcpDevices().entrySet()) {
-                devicesByServer.computeIfAbsent(AtlasDiscoveryService.lower(e.getKey()), k -> new HashSet<>()).addAll(e.getValue());
+                String server = AtlasDiscoveryService.lower(e.getKey());
+                if (serverTools.containsKey(server)) devicesByServer.computeIfAbsent(server, k -> new HashSet<>()).addAll(e.getValue());
             }
         }
         return devicesByServer;

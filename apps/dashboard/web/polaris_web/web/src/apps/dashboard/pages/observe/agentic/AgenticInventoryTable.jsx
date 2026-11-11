@@ -165,11 +165,20 @@ const COL_DEFS = [
     // Fixed set — matches shapeRow's own tag derivation below exactly. Values are pre-computed
     // string arrays on each row (array-valued field: a row matches if ANY selected tag is present).
     filter: "agSetColumnFilter",
-    filterParams: { values: ["Contains personal account", "Local MCP Server", "Misconfigured", "Malicious Skill"] },
+    filterParams: { values: ["Contains personal account", "Local MCP Server", "Misconfigured", "Malicious Skill", "Malicious MCP Server"] },
     sortable: false,
   },
   { field: "pluginVersion", headerName: "Plugin Version", width: 130, hide: true, filter: false, sortable: false },
   { field: "pluginMarketplace", headerName: "Marketplace", width: 170, hide: true, filter: false, sortable: false },
+  {
+    // Filter-only: "High risk" is matched server-side on each group's risk score.
+    field: "riskBand",
+    headerName: "Risk band",
+    hide: true,
+    filter: "agSetColumnFilter",
+    filterParams: { values: ["High risk"] },
+    sortable: false,
+  },
   {
     field: "severity",
     headerName: "Severity",

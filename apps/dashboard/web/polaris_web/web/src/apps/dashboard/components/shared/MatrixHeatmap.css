@@ -46,6 +46,19 @@
     font-weight: 500;
 }
 
+/* Rows that open something on click. */
+.matrix-heatmap--clickable {
+    cursor: pointer;
+}
+
+.matrix-heatmap__row.matrix-heatmap--clickable:hover {
+    text-decoration: underline;
+}
+
+.matrix-heatmap__cell.matrix-heatmap--clickable:hover {
+    outline: 2px solid var(--p-color-border-interactive);
+}
+
 .matrix-heatmap__cell--light-text {
     color: var(--cell-text-light);
 }

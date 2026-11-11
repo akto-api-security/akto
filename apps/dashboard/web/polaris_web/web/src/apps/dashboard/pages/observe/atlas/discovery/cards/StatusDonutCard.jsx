@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Box, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import DonutChart from "@/apps/dashboard/components/shared/DonutChart";
 import DiscoveryCard from "../shared/DiscoveryCard";
 import StatusToggle from "../shared/StatusToggle";
+import { openInventoryByStatus } from "../shared/openInventory";
 import { CATEGORY_LABELS, STATUS_META, STATUS_ORDER } from "../constants";
 import "../shared/discovery.css";
 
@@ -41,6 +43,7 @@ function LegendRow({ statusKey, count, total, dimmed, selected, onClick }) {
 }
 
 export default function StatusDonutCard({ counts, status }) {
+    const navigate = useNavigate();
     const total = counts?.total || 0;
     const [selected, setSelected] = useState(null);
     const data = useMemo(() => (counts ? donutData(counts, selected) : {}), [counts, selected]);
@@ -63,6 +66,7 @@ export default function StatusDonutCard({ counts, status }) {
                             subtitle={selected ? STATUS_META[selected].label.toLowerCase() : "need a decision"}
                             titleFontWeight="600"
                             sliceBorderWidth={0}
+                            onSegmentClick={(label) => openInventoryByStatus(navigate, label)}
                         />
                     </Box>
                     <Box width="100%">

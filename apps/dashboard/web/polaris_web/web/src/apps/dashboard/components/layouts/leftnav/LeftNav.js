@@ -273,7 +273,6 @@ export default function LeftNav() {
                     {
                         label: "Overview",
                         requires: pageRequires("/dashboard/observe/agentic-discovery"),
-                        badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/observe/agentic-discovery");
                             handleSelect("dashboard_observe_agentic_discovery");
@@ -311,7 +310,6 @@ export default function LeftNav() {
                     ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && window?.STIGG_FEATURE_WISE_ALLOWED?.AGENT_TRAFFIC_LOGS?.isGranted === true ? [{
                         label: "Traces",
                         requires: pageRequires("/dashboard/observe/llm-observability"),
-                        badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/observe/llm-observability");
                             handleSelect("dashboard_observe_llm_observability");

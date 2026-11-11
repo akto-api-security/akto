@@ -18,9 +18,9 @@ function shade(value, max, scale) {
 
 const barVars = (scale) => Object.fromEntries(scale.barSteps.map((step, index) => [`--bar-stop-${index}`, scale.cells[step]]));
 
-// Row x column grid shaded by value; max is the darkest value.
+// Row x column grid shaded by value; max is the darkest value. onRowClick(row) makes a row label and its cells clickable; onCellClick(row, column) makes the cells clickable, and wins over onRowClick for them; empty cells are never clickable.
 export default function MatrixHeatmap({
-    columns, rows, max, format = (value) => value, tipUnit = "", emptyText = EMPTY_CELL_TEXT, labelWidth = 120, cellHeight = 36, minCellWidth = 52, showScale, scaleLabel, dangerScaleLabel,
+    columns, rows, max, format = (value) => value, tipUnit = "", emptyText = EMPTY_CELL_TEXT, labelWidth = 120, cellHeight = 36, minCellWidth = 52, showScale, scaleLabel, dangerScaleLabel, onRowClick, onCellClick,
 }) {
     const gridVars = {
         "--label-width": `${labelWidth}px`,
@@ -40,7 +40,7 @@ export default function MatrixHeatmap({
                         </span>
                     ))}
                     {rows.map((row, rowIndex) => (
-                        <RowCells key={rowIndex} row={row} columns={columns} max={max} format={format} tipUnit={tipUnit} emptyText={emptyText} />
+                        <RowCells key={rowIndex} row={row} columns={columns} max={max} format={format} tipUnit={tipUnit} emptyText={emptyText} onRowClick={onRowClick} onCellClick={onCellClick} />
                     ))}
                 </div>
             </div>
@@ -75,19 +75,36 @@ const tipEdge = (index, count) => {
 // "5 devices", "1 device"; just the formatted value when there is no unit.
 const tipValue = (value, format, unit) => `${format(value)}${unit ? ` ${unit}${value === 1 ? "" : "s"}` : ""}`;
 
-function RowCells({ row, columns, max, format, tipUnit, emptyText }) {
+// Click props for an element that runs `action`; none when there is no action.
+const clickProps = (action) => (action ? {
+    role: "button",
+    tabIndex: 0,
+    onClick: action,
+    onKeyDown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            action();
+        }
+    },
+} : {});
+
+function RowCells({ row, columns, max, format, tipUnit, emptyText, onRowClick, onCellClick }) {
+    const labelClickable = clickProps(onRowClick && (() => onRowClick(row)));
     return (
         <>
-            <span className="matrix-heatmap__row"><Text as="span" variant="bodyMd">{row.label}</Text></span>
+            <span className={`matrix-heatmap__row${onRowClick ? " matrix-heatmap--clickable" : ""}`} aria-label={onRowClick ? `Open ${row.label}` : undefined} {...labelClickable}><Text as="span" variant="bodyMd">{row.label}</Text></span>
             {row.cells.map((value, index) => {
                 const shading = shade(value, max, columns[index].danger ? RED_SCALE : PURPLE_SCALE);
                 const tip = `${row.label} · ${columns[index].label}: ${tipValue(value || 0, format, tipUnit)}`;
+                // An empty cell has nothing behind it, so it never opens anything.
+                const cellAction = !value ? undefined : onCellClick ? () => onCellClick(row, columns[index]) : onRowClick && (() => onRowClick(row));
                 return (
                     <div
                         key={index}
-                        className={`matrix-heatmap__cell hover-tip${shading ? "" : " matrix-heatmap__cell--empty"}${shading?.lightText ? " matrix-heatmap__cell--light-text" : ""}${tipEdge(index, columns.length)}`}
+                        className={`matrix-heatmap__cell hover-tip${shading ? "" : " matrix-heatmap__cell--empty"}${shading?.lightText ? " matrix-heatmap__cell--light-text" : ""}${tipEdge(index, columns.length)}${cellAction ? " matrix-heatmap--clickable" : ""}`}
                         role="img"
                         aria-label={tip}
+                        {...clickProps(cellAction)}
                         data-tip={tip}
                         style={shading ? { "--cell-bg": shading.background } : undefined}
                     >

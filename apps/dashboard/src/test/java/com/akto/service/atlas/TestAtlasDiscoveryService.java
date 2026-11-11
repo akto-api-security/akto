@@ -29,7 +29,7 @@ public class TestAtlasDiscoveryService {
         row.setRowType(rowType);
         row.setGroupKey(key);
         row.setName(key);
-        row.setClientType("AI Agent");
+        row.setClientType("service".equals(rowType) ? "MCP Server" : "AI Agent");
         row.setRiskScore(risk);
         row.setFirstSeen(firstSeen);
         row.setLastSeen(NOW);
@@ -441,6 +441,27 @@ public class TestAtlasDiscoveryService {
 
     @Test
     @SuppressWarnings("unchecked")
+    public void supplyChainLeavesOutNodesWithNoIncomingLink() {
+        AtlasToolRow connected = tool("agent", "agent-a", 1, NOW, "d1");
+        connected.getMcpDevices().put("Server-A", new HashSet<>(Collections.singletonList("d1")));
+        // d9 belongs to no team, so no team reaches this tool, and the server only it uses is unreachable too.
+        AtlasToolRow loose = tool("agent", "agent-b", 1, NOW, "d9");
+        loose.getMcpDevices().put("Server-B", new HashSet<>(Collections.singletonList("d9")));
+        List<AtlasToolRow> rows = Arrays.asList(connected, loose, tool("service", "server-a", 1, NOW, "d1"), tool("service", "server-b", 1, NOW, "d9"));
+        Map<String, Object> chain = section(service(rows, new HashMap<>(), Collections.emptySet()).buildOverview(), "supplyChain");
+
+        List<List<Map<String, Object>>> columns = (List<List<Map<String, Object>>>) chain.get("columns");
+        assertEquals(1, columns.get(1).size());
+        assertEquals("agent-a", columns.get(1).get(0).get("label"));
+        assertEquals(1, columns.get(2).size());
+        assertEquals("server-a", columns.get(2).get(0).get("label"));
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) chain.get("edges");
+        assertEquals(2, edges.size());
+        assertTrue(edges.stream().noneMatch(edge -> String.valueOf(edge.get("source")).contains("agent-b") || String.valueOf(edge.get("target")).contains("server-b")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     public void supplyChainCountsEachDeviceOncePerTeamAndSkipsUntaggedDevices() {
         // Both tools run on the same two devices: d1 belongs to a team, d2 has none and is left out.
         AtlasToolRow first = tool("agent", "agent-a", 1, NOW, "d1", "d2");
@@ -451,6 +472,24 @@ public class TestAtlasDiscoveryService {
         assertEquals(1, teamNodes.size());
         assertEquals(1, teamNodes.get(0).get("devices"));
         assertFalse("".equals(teamNodes.get(0).get("label")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void graphsLeaveOutLinkedNamesThatAreNotDiscoveredServers() {
+        AtlasToolRow agent = tool("agent", "agent-a", 1, NOW, "d1");
+        agent.getMcpDevices().put("server-a", new HashSet<>(Collections.singletonList("d1")));
+        agent.getMcpDevices().put("some-site.example", new HashSet<>(Collections.singletonList("d1")));
+        agent.getMcpDevices().put("chat-site.example", new HashSet<>(Collections.singletonList("d1")));
+        // A service row that is a browser AI app, not an MCP server.
+        AtlasToolRow chatSite = tool("service", "chat-site.example", 1, NOW, "d1");
+        chatSite.setClientType("LLM");
+        Map<String, Object> overview = service(Arrays.asList(agent, tool("service", "server-a", 1, NOW, "d1"), chatSite), new HashMap<>(), Collections.emptySet()).buildOverview();
+
+        List<Map<String, Object>> columns = (List<Map<String, Object>>) section(overview, "agentMcpMatrix").get("servers");
+        assertEquals(1, columns.size());
+        assertEquals("server-a", columns.get(0).get("name"));
+        assertEquals(1, ((List<List<Map<String, Object>>>) section(overview, "supplyChain").get("columns")).get(2).size());
     }
 
     @Test
@@ -467,6 +506,8 @@ public class TestAtlasDiscoveryService {
         assertEquals(1, columns.size());
         assertEquals("server-new", columns.get(0).get("name"));
         assertEquals("BLOCKED", columns.get(0).get("status"));
+        // The column carries the discovered server, so a click can open it.
+        assertEquals("service|server-new", ((Map<String, Object>) columns.get(0).get("tool")).get("key"));
 
         List<Map<String, Object>> serverNodes = ((List<List<Map<String, Object>>>) section(overview, "supplyChain").get("columns")).get(2);
         assertEquals(1, serverNodes.size());
