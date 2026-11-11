@@ -79,6 +79,16 @@
             </result>
         </action>
 
+        <!-- Multipart file validation, forwarded to guardrails-service /api/validate/file.
+             Same path and form fields as guardrails-service, so callers switch by base URL.
+             No "json" interceptor: the body is multipart, bound by defaultStack's actionFileUpload. -->
+        <action name="api/validate/file" class="com.akto.action.FileValidationAction" method="validateFile">
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">data</param>
+            </result>
+        </action>
+
         <!-- Generic AI-provider guardrail webhook: provider is the {1} path variable.
              Parses that provider's format (adapter registry), always runs guardrails
              + ingests. Adding a provider = one new adapter, no struts change. -->
