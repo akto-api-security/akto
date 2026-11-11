@@ -739,13 +739,25 @@ export default function LeftNav() {
                 icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_ai_agent_guardrails");
-                    navigate("/dashboard/guardrails/activity");
+                    // Overview is visible to Akto users only, so everyone else lands on Activity.
+                    navigate(func.isAktoUser() ? "/dashboard/guardrails/overview" : "/dashboard/guardrails/activity");
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "10",
                 subNavigationItems: [
+                    ...(func.isAktoUser() ? [{
+                        label: "Overview",
+                        requires: pageRequires("/dashboard/guardrails/overview"),
+                        badge: <Badge status="info">Beta</Badge>,
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/overview");
+                            handleSelect("dashboard_guardrails_overview");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_guardrails_overview",
+                    }] : []),
                     {
                         label: "Guardrails Activity",
                         requires: pageRequires("/dashboard/guardrails/activity"),
