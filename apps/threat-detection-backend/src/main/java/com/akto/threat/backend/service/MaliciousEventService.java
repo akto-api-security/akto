@@ -518,127 +518,7 @@ public class MaliciousEventService {
       excludedFields.addAll(Arrays.asList("metadata","latestApiOrig","payload","remediation", "evidenceLine", "humanResponse", "owaspCategories"));
     }
 
-    Document query = new Document();
-    if (!filter.getActorsList().isEmpty()) {
-      query.append("actor", new Document("$in", filter.getActorsList()));
-    }
-
-    if (!filter.getUrlsList().isEmpty()) {
-      query.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
-    }
-
-    if (!filter.getApiCollectionIdList().isEmpty()) {
-      query.append("latestApiCollectionId", new Document("$in", filter.getApiCollectionIdList()));
-    }
-
-    if (!filter.getMethodList().isEmpty()) {
-      // Convert string methods to uppercase to match enum names stored in MongoDB
-      List<String> methodStrings = filter.getMethodList().stream()
-          .map(m -> m != null ? m.toUpperCase() : null)
-          .filter(m -> m != null)
-          .collect(Collectors.toList());
-      if (!methodStrings.isEmpty()) {
-        query.append("latestApiMethod", new Document("$in", methodStrings));
-      }
-    }
-
-    if (!filter.getIpsList().isEmpty()) {
-      query.append("latestApiIp", new Document("$in", filter.getIpsList()));
-    }
-
-    if (!filter.getTypesList().isEmpty()) {
-      query.append("type", new Document("$in", filter.getTypesList()));
-    }
-
-    if (!filter.getSubCategoryList().isEmpty()) {
-      query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
-    }
-
-    // Host attribution: exact match (hosts) OR loose device+service match (looseHostKeys, for
-    // 2-vs-3-segment hostname format mismatches) OR claude-config scanner events (no collection of
-    // their own, attributed by device id instead) — see the Filter.search_text/loose_host_keys/
-    // claude_device_ids/match_claude_config proto doc comments for the client-side derivation this
-    // mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
-    Document hostMatch = ThreatUtils.hostAttributionMatch(filter.getHostsList(), filter.getLooseHostKeysList(),
-        filter.getClaudeDeviceIdsList(), filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig());
-    List<Document> extraAndClauses = new ArrayList<>();
-    if (hostMatch != null) {
-      extraAndClauses.add(hostMatch);
-    }
-    if (filter.hasSearchText() && !filter.getSearchText().isEmpty()) {
-      Pattern searchPattern = Pattern.compile(Pattern.quote(filter.getSearchText()), Pattern.CASE_INSENSITIVE);
-      extraAndClauses.add(new Document("$or", Arrays.asList(
-          new Document("filterId", searchPattern),
-          new Document("host", searchPattern),
-          new Document("actor", searchPattern)
-      )));
-    }
-    if (!extraAndClauses.isEmpty()) {
-      List<Document> allClauses = new ArrayList<>();
-      allClauses.add(new Document(query));
-      allClauses.addAll(extraAndClauses);
-      query.clear();
-      query.append("$and", allClauses);
-    }
-
-    if (filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty()) {
-      query.append("latestApiOrig", new Document("$regex", filter.getLatestApiOrigRegex()));
-    }
-
-
-    if (!filter.getLatestAttackList().isEmpty()) {
-      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
-    }
-
-    if (!filter.getSeverityList().isEmpty()) {
-      query.append("severity", new Document("$in", filter.getSeverityList()));
-    }
-
-    if (filter.hasStatusFilter()) {
-      applyStatusFilter(query, filter.getStatusFilter());
-    }
-
-    if (filter.hasDetectedAtTimeRange()) {
-      TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
-      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
-      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
-
-      query.append("detectedAt", new Document("$gte", start).append("$lte", end));
-    }
-
-    if (filter.hasSuccessfulExploit()) {
-      boolean val = filter.getSuccessfulExploit();
-      if (val) {
-        query.append("successfulExploit", true);
-      } else {
-        List<Document> andConditions = new ArrayList<>();
-        andConditions.add(new Document(query));
-        andConditions.add(new Document("$or", Arrays.asList(
-            new Document("successfulExploit", false),
-            new Document("successfulExploit", new Document("$exists", false))
-        )));
-        query.clear();
-        query.append("$and", andConditions);
-      }
-    }
-
-    applyRiskScoreFilter(query, filter);
-    andDocument(query, agenticTypeCondition(filter.getAgenticTypesList()));
-    andDocument(query, behaviourCondition(filter.getBehavioursList()));
-    andDocument(query, caseOwnerCondition(filter.getCaseOwnersList()));
-    andDocument(query, caseNotesCondition(filter.hasHasCaseNotes() ? filter.getHasCaseNotes() : null));
-
-    // if (filter.hasLabel()) {
-    //   String labelString = filter.getLabel();
-    //   MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
-    //   applyLabelFilter(query, labelEnum);
-    // }
-
-    // Apply simple context filter (only for ENDPOINT and AGENTIC)
-    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
-    if (!contextFilter.isEmpty()) {
-      andDocument(query, contextFilter);
-    }
+    Document query = buildListFilterQuery(accountId, filter, contextSource);
     applyHumanResponseFilter(query, humanResponseFilter);
 
     // Skills Evaluations / Misconfigured Settings partitions (see ThreatUtils.evaluationModeConditions).
@@ -1488,6 +1368,134 @@ public class MaliciousEventService {
     clauses.add(clause);
     query.clear();
     query.append("$and", clauses);
+  }
+
+  // Mongo query for a list filter in the given context. Shared by the violations list and the
+  // guardrail overview aggregations, so both count exactly the same events for the same filter.
+  public Document buildListFilterQuery(String accountId, ListMaliciousRequestsRequest.Filter filter, String contextSource) {
+    Document query = new Document();
+    if (!filter.getActorsList().isEmpty()) {
+      query.append("actor", new Document("$in", filter.getActorsList()));
+    }
+
+    if (!filter.getUrlsList().isEmpty()) {
+      query.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
+    }
+
+    if (!filter.getApiCollectionIdList().isEmpty()) {
+      query.append("latestApiCollectionId", new Document("$in", filter.getApiCollectionIdList()));
+    }
+
+    if (!filter.getMethodList().isEmpty()) {
+      // Convert string methods to uppercase to match enum names stored in MongoDB
+      List<String> methodStrings = filter.getMethodList().stream()
+          .map(m -> m != null ? m.toUpperCase() : null)
+          .filter(m -> m != null)
+          .collect(Collectors.toList());
+      if (!methodStrings.isEmpty()) {
+        query.append("latestApiMethod", new Document("$in", methodStrings));
+      }
+    }
+
+    if (!filter.getIpsList().isEmpty()) {
+      query.append("latestApiIp", new Document("$in", filter.getIpsList()));
+    }
+
+    if (!filter.getTypesList().isEmpty()) {
+      query.append("type", new Document("$in", filter.getTypesList()));
+    }
+
+    if (!filter.getSubCategoryList().isEmpty()) {
+      query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
+    }
+
+    // Host attribution: exact match (hosts) OR loose device+service match (looseHostKeys, for
+    // 2-vs-3-segment hostname format mismatches) OR claude-config scanner events (no collection of
+    // their own, attributed by device id instead) — see the Filter.search_text/loose_host_keys/
+    // claude_device_ids/match_claude_config proto doc comments for the client-side derivation this
+    // mirrors (ViolationsTab.jsx's hostSet/looseHostSet/claudeDeviceIds).
+    Document hostMatch = ThreatUtils.hostAttributionMatch(filter.getHostsList(), filter.getLooseHostKeysList(),
+        filter.getClaudeDeviceIdsList(), filter.hasMatchClaudeConfig() && filter.getMatchClaudeConfig());
+    List<Document> extraAndClauses = new ArrayList<>();
+    if (hostMatch != null) {
+      extraAndClauses.add(hostMatch);
+    }
+    if (filter.hasSearchText() && !filter.getSearchText().isEmpty()) {
+      Pattern searchPattern = Pattern.compile(Pattern.quote(filter.getSearchText()), Pattern.CASE_INSENSITIVE);
+      extraAndClauses.add(new Document("$or", Arrays.asList(
+          new Document("filterId", searchPattern),
+          new Document("host", searchPattern),
+          new Document("actor", searchPattern)
+      )));
+    }
+    if (!extraAndClauses.isEmpty()) {
+      List<Document> allClauses = new ArrayList<>();
+      allClauses.add(new Document(query));
+      allClauses.addAll(extraAndClauses);
+      query.clear();
+      query.append("$and", allClauses);
+    }
+
+    if (filter.hasLatestApiOrigRegex() && !filter.getLatestApiOrigRegex().isEmpty()) {
+      query.append("latestApiOrig", new Document("$regex", filter.getLatestApiOrigRegex()));
+    }
+
+
+    if (!filter.getLatestAttackList().isEmpty()) {
+      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
+
+    if (!filter.getSeverityList().isEmpty()) {
+      query.append("severity", new Document("$in", filter.getSeverityList()));
+    }
+
+    if (filter.hasStatusFilter()) {
+      applyStatusFilter(query, filter.getStatusFilter());
+    }
+
+    if (filter.hasDetectedAtTimeRange()) {
+      TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
+      long start = timeRange.hasStart() ? timeRange.getStart() : 0;
+      long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
+
+      query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    if (filter.hasSuccessfulExploit()) {
+      boolean val = filter.getSuccessfulExploit();
+      if (val) {
+        query.append("successfulExploit", true);
+      } else {
+        List<Document> andConditions = new ArrayList<>();
+        andConditions.add(new Document(query));
+        andConditions.add(new Document("$or", Arrays.asList(
+            new Document("successfulExploit", false),
+            new Document("successfulExploit", new Document("$exists", false))
+        )));
+        query.clear();
+        query.append("$and", andConditions);
+      }
+    }
+
+    applyRiskScoreFilter(query, filter);
+    andDocument(query, agenticTypeCondition(filter.getAgenticTypesList()));
+    andDocument(query, behaviourCondition(filter.getBehavioursList()));
+    andDocument(query, caseOwnerCondition(filter.getCaseOwnersList()));
+    andDocument(query, caseNotesCondition(filter.hasHasCaseNotes() ? filter.getHasCaseNotes() : null));
+
+    // if (filter.hasLabel()) {
+    //   String labelString = filter.getLabel();
+    //   MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
+    //   applyLabelFilter(query, labelEnum);
+    // }
+
+    // Apply simple context filter (only for ENDPOINT and AGENTIC)
+    Document contextFilter = ThreatUtils.buildSimpleContextFilter(contextSource, accountId);
+    if (!contextFilter.isEmpty()) {
+      andDocument(query, contextFilter);
+    }
+
+    return query;
   }
 
   private Document buildQueryFromFilter(Map<String, Object> filter, String contextSource, String accountId) {
