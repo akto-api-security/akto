@@ -26,13 +26,18 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.De
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchThreatsForActorRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchHostSeverityCountsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GuardrailOverviewRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchSkillSeverityCountsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchDashboardTopDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ToggleArchivalEnabledRequest;
+import com.akto.threat.backend.dao.MaliciousEventDao;
+import com.akto.threat.backend.service.GuardrailOverviewService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.google.protobuf.Message;
+import org.bson.Document;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
@@ -51,6 +56,7 @@ public class DashboardRouter implements ARouter {
     private final MaliciousEventService dsService;
     private final ThreatActorService threatActorService;
     private final ThreatApiService threatApiService;
+    private final GuardrailOverviewService guardrailOverviewService;
 
     public DashboardRouter(
         MaliciousEventService dsService,
@@ -60,6 +66,7 @@ public class DashboardRouter implements ARouter {
         this.dsService = dsService;
         this.threatActorService = threatActorService;
         this.threatApiService = threatApiService;
+        this.guardrailOverviewService = new GuardrailOverviewService(MaliciousEventDao.instance, dsService);
     }
 
     private String getContextSourceHeader(io.vertx.ext.web.RoutingContext ctx) {
@@ -112,6 +119,39 @@ public class DashboardRouter implements ARouter {
         }
 
         return filterMap;
+    }
+
+    // One Guardrail overview panel: parses the shared request and answers with whatever the panel returns.
+    @FunctionalInterface
+    private interface OverviewPanel {
+        Message fetch(String accountId, GuardrailOverviewRequest request, String contextSource, Document hostScopeMatch);
+    }
+
+    private void overviewRoute(Router router, String path, OverviewPanel panel) {
+        router
+            .post(path)
+            .blockingHandler(ctx -> {
+                GuardrailOverviewRequest req = ProtoMessageUtils.<
+                GuardrailOverviewRequest
+                >toProtoMessage(
+                    GuardrailOverviewRequest.class,
+                    ctx.body().asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    panel.fetch(
+                        ctx.get("accountId"),
+                        req,
+                        getContextSourceHeader(ctx),
+                        req.hasHostScope() ? ThreatUtils.hostScopeMatch(req.getHostScope()) : null
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
     }
 
     @Override
@@ -777,6 +817,13 @@ public class DashboardRouter implements ARouter {
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
+
+        overviewRoute(router, "/get_guardrail_action_counts", guardrailOverviewService::fetchActionCounts);
+        overviewRoute(router, "/get_guardrail_policy_counts", guardrailOverviewService::fetchPolicyCounts);
+        overviewRoute(router, "/get_guardrail_host_policy_counts", guardrailOverviewService::fetchHostPolicyCounts);
+        overviewRoute(router, "/get_guardrail_triage_time", guardrailOverviewService::fetchTriageTime);
+        overviewRoute(router, "/get_guardrail_needs_attention",
+            (accountId, req, contextSource, hostScope) -> guardrailOverviewService.fetchNeedsAttention(accountId, req, contextSource));
 
         router
             .post("/fetch_threats_for_actor")

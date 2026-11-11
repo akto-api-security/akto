@@ -12,13 +12,15 @@ import {
 import {
     CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_CHROME_HEIGHT, PEOPLE_TABLE_HEIGHT, PEOPLE_TABLE_MIN_HEIGHT, RISK_MAX, SEARCH_HINTS,
 } from "./peopleConstants";
+import EditDeviceTagsModal from "../../agentic/EditDeviceTagsModal";
 import transform from "./transform";
 
 const DEFAULT_COL_DEF = { sortable: true, resizable: true, filter: false, cellStyle: { display: "flex", alignItems: "center" } };
 const ROW_HEIGHT = 48;
+const tagOwner = (row) => row.username || row.owner;
 
 const employeeColumns = (dataOptions) => [
-    { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer },
+    { field: "username", headerName: "Employee", flex: 2, minWidth: 200, cellRenderer: EmployeeCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
     { field: "teams", headerName: "Team", flex: 1, minWidth: 140, sortable: false, cellRenderer: TeamsCellRenderer, ...setFilter(dataOptions.teams, (value) => value), filterValueGetter: (params) => params.data?.teams || [] },
     { field: "deviceCount", headerName: "Devices", width: 100, cellRenderer: CountCellRenderer },
     { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
@@ -30,21 +32,21 @@ const employeeColumns = (dataOptions) => [
 ];
 
 const deviceColumns = (dataOptions) => [
-    { field: "name", headerName: "Device", flex: 2, minWidth: 220, cellRenderer: DeviceCellRenderer },
+    { field: "name", headerName: "Device", flex: 2, minWidth: 340, cellRenderer: DeviceCellRenderer, checkboxSelection: true, headerCheckboxSelection: true },
+    { field: "owner", headerName: "Owner", flex: 1, minWidth: 140, cellRenderer: OwnerCellRenderer },
+    { field: "riskScore", headerName: "Risk", width: 90, cellRenderer: RiskCellRenderer },
+    { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
+    { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
+    { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
     {
         field: "os", headerName: "OS/Browser", flex: 1.2, minWidth: 170, cellRenderer: OsCellRenderer,
         ...setFilter(dataOptions.osBrowser, osBrowserLabel),
         filterValueGetter: (params) => (params.data ? (params.data.extension ? `browser:${params.data.browser || "other"}` : `os:${params.data.os}`) : null),
     },
-    { field: "owner", headerName: "Owner", flex: 1, minWidth: 140, cellRenderer: OwnerCellRenderer },
     { field: "hasPersonalAccount", headerName: "Flags", flex: 1.4, minWidth: 260, sortable: false, cellRenderer: FlagsCellRenderer },
     { field: "tags", headerName: "Tags", flex: 1.2, minWidth: 220, sortable: false, cellRenderer: TagsCellRenderer, ...setFilter(dataOptions.tags, (value) => value), filterValueGetter: (params) => (params.data?.tags || []).map((tag) => `${tag.key}=${tag.value}`) },
     { field: "health", headerName: "Atlas agent", flex: 1.5, minWidth: 220, cellRenderer: AgentCellRenderer, ...setFilter(dataOptions.healthStates, (value) => HEALTH_LABELS[value] || value) },
     { field: "guardrailMode", headerName: "Guardrail mode", width: 150, cellRenderer: GuardrailModeCellRenderer, ...setFilter(dataOptions.guardrailModes, (value) => MODE_LABELS[value] || value) },
-    { field: "toolCount", headerName: "AI tools", width: 100, cellRenderer: CountCellRenderer },
-    { field: "unapprovedTools", headerName: "Unapproved", width: 130, cellRenderer: UnapprovedCellRenderer },
-    { field: "violations", headerName: "Violations (7d)", width: 150, cellRenderer: ViolationsCellRenderer },
-    { field: "riskScore", headerName: "Risk", width: 90, cellRenderer: RiskCellRenderer },
     { field: "lastHeartbeat", headerName: "Last check-in", width: 150, cellRenderer: LastSeenCellRenderer },
 ];
 
@@ -116,14 +118,13 @@ function FilterChip({ label, active, onClick }) {
     );
 }
 
-function ListFilter({ field, options, selected, onChange }) {
-    const [open, setOpen] = useState(false);
+function ListFilter({ field, options, selected, onChange, open, setOpen }) {
     const label = FILTER_LABELS[field];
     return (
         <Popover
             active={open}
             onClose={() => setOpen(false)}
-            activator={<Button disclosure onClick={() => setOpen((current) => !current)}>{selected.length ? `${label} (${selected.length})` : label}</Button>}
+            activator={<Button disclosure disabled={options.length === 0 && selected.length === 0} onClick={() => setOpen(!open)}>{selected.length ? `${label} (${selected.length})` : label}</Button>}
         >
             <Box padding="3">
                 <ChoiceList allowMultiple title={label} titleHidden choices={options} selected={selected} onChange={(values) => onChange({ [field]: values })} />
@@ -185,7 +186,7 @@ function filtersFromModel(tab, model) {
 
 const sameValues = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
 
-function FilterRow({ tab, filters, onFiltersChange, dataOptions }) {
+function FilterRow({ tab, filters, onFiltersChange, dataOptions, openFilter, setOpenFilter }) {
     const chips = tab === "employees" ? EMPLOYEE_CHIPS : DEVICE_CHIPS;
     const tags = appliedTags(filters);
     return (
@@ -196,6 +197,8 @@ function FilterRow({ tab, filters, onFiltersChange, dataOptions }) {
                     field={field}
                     options={filterOptions(field, dataOptions)}
                     selected={field === "osBrowser" ? selectedOsBrowser(filters) : filters[field]}
+                    open={openFilter === field}
+                    setOpen={(value) => setOpenFilter(value ? field : null)}
                     onChange={field === "osBrowser" ? (patch) => onFiltersChange(splitOsBrowser(patch.osBrowser)) : onFiltersChange}
                 />
             ))}
@@ -216,6 +219,10 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     const gridRef = useRef(null);
     const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [selectedRows, setSelectedRows] = useState([]);
+    const [tagNames, setTagNames] = useState(null);
+    const [openFilter, setOpenFilter] = useState(null);
+    const [refreshKey, setRefreshKey] = useState(0);
     const tabs = [
         { id: "employees", content: "Employees", badge: counts.employees != null ? counts.employees.toLocaleString("en-US") : undefined },
         { id: "devices", content: "Devices", badge: counts.devices != null ? counts.devices.toLocaleString("en-US") : undefined },
@@ -247,8 +254,11 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     const onColumnFilterChanged = useCallback((event) => {
         const patch = filtersFromModel(tab, event.api.getFilterModel());
         if (Object.keys(patch).every((key) => sameValues(patch[key], filters[key]))) return;
+        const values = columnFilterValues(filters);
+        const allSelected = Object.keys(COLUMN_FILTER_FIELDS[tab]).some((key) => values[key].length > 0 && values[key].length === (dataOptions[key] || []).length);
+        if (allSelected && Object.values(patch).every((value) => value.length === 0)) return;
         onFiltersChange(patch);
-    }, [tab, filters, onFiltersChange]);
+    }, [tab, filters, dataOptions, onFiltersChange]);
 
     const selectedId = selected?.kind === (isEmployees ? "employee" : "device") ? selected.id : null;
     const getRowStyle = useCallback(({ data }) => {
@@ -261,9 +271,19 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     const tableHeight = Math.min(PEOPLE_TABLE_HEIGHT, Math.max(PEOPLE_TABLE_MIN_HEIGHT, PEOPLE_TABLE_CHROME_HEIGHT + rows.length * ROW_HEIGHT));
 
     const gridKey = useMemo(
-        () => `${tab}-${deviceScope}-${JSON.stringify(filters)}`,
-        [tab, deviceScope, filters]
+        () => `${tab}-${deviceScope}-${JSON.stringify(filters)}-${refreshKey}`,
+        [tab, deviceScope, filters, refreshKey]
     );
+    useEffect(() => { setSelectedRows([]); }, [gridKey]);
+
+    const openTagModal = () => {
+        const owners = [...new Set(selectedRows.map(tagOwner).filter(Boolean))];
+        if (owners.length === 0) {
+            func.setToast(true, true, "The selected devices have no owner to tag");
+            return;
+        }
+        setTagNames(owners);
+    };
 
     return (
         <Box background="bg" borderRadius="3" borderWidth="1" borderColor="border-subdued">
@@ -290,8 +310,21 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 onRowClicked={(event) => event.data && onOpen(isEmployees ? "employee" : "device", isEmployees ? event.data.username : event.data.key)}
                 gridRef={gridRef}
                 getRowStyle={getRowStyle}
-                rowSelection={undefined}
+                rowSelection="multiple"
+                suppressRowClickSelection
+                onSelectionChanged={(event) => setSelectedRows(event.api.getSelectedRows())}
+                bulkActionCount={selectedRows.length}
+                bulkActions={[{ label: "Edit device tags", onAction: openTagModal, requires: "api/bulkUpdateUserDeviceTag" }]}
+                onClearBulk={() => gridRef.current?.api?.deselectAll()}
             />
+            {tagNames && (
+                <EditDeviceTagsModal
+                    usernames={tagNames}
+                    rows={selectedRows.map((row) => ({ id: tagOwner(row), groupName: tagOwner(row), tags: row.tags }))}
+                    onClose={() => setTagNames(null)}
+                    onSaved={() => { setTagNames(null); setRefreshKey((key) => key + 1); }}
+                />
+            )}
         </Box>
     );
 }

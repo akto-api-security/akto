@@ -257,6 +257,7 @@ function PeopleFlyout({ target, deviceScope, onClose, onOpen, onUpdated, queuedI
                         items={[{ label: displayName, badge: ready && !isDevice && detail.riskScore ? detail.riskScore : undefined }]}
                         onClose={onClose}
                         subtitle={subtitle}
+                        asTitle
                     >
                         {ready && isDevice && <Badge size="small" status={HEALTH_BADGE_STATUS[detail.health]}>{HEALTH_LABELS[detail.health]}</Badge>}
                     </FlyoutBreadcrumb>

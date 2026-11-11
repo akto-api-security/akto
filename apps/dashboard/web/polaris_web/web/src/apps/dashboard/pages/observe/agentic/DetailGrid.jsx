@@ -16,7 +16,7 @@ export default function DetailGrid({ heading, items = [], columns = 1, labelWidt
         const display = <TooltipText tooltip={text} text={text} />
         const content = (
             <Box maxWidth={valueMaxWidth}>
-                <Text variant="bodySm" fontWeight={valueWeight} color={d.isWarning ? "warning" : undefined}>
+                <Text as="div" variant="bodySm" fontWeight={valueWeight} color={d.isWarning ? "warning" : undefined}>
                     {d.href && d.value ? <Link url={d.href} external={d.external !== false}>{display}</Link> : display}
                 </Text>
             </Box>

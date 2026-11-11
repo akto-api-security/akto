@@ -778,4 +778,22 @@ export default {
         })
         return resp
     },
+    // Smart agents
+    async fetchSmartAgentProfiles() {
+        return await request({ url: '/api/fetchSmartAgentProfiles', method: 'post', data: {} })
+    },
+    async fetchSmartAgentProfile(hexId) {
+        return await request({ url: '/api/fetchSmartAgentProfile', method: 'post', data: { hexId } })
+    },
+    async saveSmartAgentProfile(profile) {
+        const { hexId, name, description, skills, customSkills, allowCreateIdentities, instructions, knowledgeFiles, knowledgeLinks } = profile
+        return await request({
+            url: '/api/saveSmartAgentProfile',
+            method: 'post',
+            data: { hexId, name, description, skills, customSkills, allowCreateIdentities, instructions, knowledgeFiles, knowledgeLinks }
+        })
+    },
+    async deleteSmartAgentProfile(hexId) {
+        return await request({ url: '/api/deleteSmartAgentProfile', method: 'post', data: { hexId } })
+    },
 }

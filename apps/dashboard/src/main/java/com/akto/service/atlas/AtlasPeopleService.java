@@ -268,6 +268,7 @@ public class AtlasPeopleService {
         public final List<String> deviceNames = new ArrayList<>();
         public final List<String> deviceKeys = new ArrayList<>();
         public final Set<String> teams = new LinkedHashSet<>();
+        public final List<Map<String, String>> tags = new ArrayList<>();
         public final Set<String> skillNames = new LinkedHashSet<>();
         public final Map<String, Integer> violationsBySeverity = emptySeverityCounts();
         public int toolCount;
@@ -282,6 +283,7 @@ public class AtlasPeopleService {
             row.put("deviceCount", deviceNames.size());
             row.put("devices", deviceNames);
             row.put("teams", new ArrayList<>(teams));
+            row.put("tags", tags);
             row.put("toolCount", toolCount);
             row.put("skillCount", skillNames.size());
             row.put("unapprovedTools", unapprovedTools);
@@ -396,6 +398,7 @@ public class AtlasPeopleService {
                     Map<String, String> entry = new LinkedHashMap<>();
                     entry.put("key", tag.getKey());
                     entry.put("value", tag.getValue());
+                    entry.put("source", tag.getSource());
                     device.tags.add(entry);
                 }
             }
@@ -741,6 +744,13 @@ public class AtlasPeopleService {
                 List<DeviceTag> tags = bundle.userTags.get(employee.username);
                 if (tags == null) continue;
                 for (DeviceTag tag : tags) {
+                    if (tag != null && tag.getKey() != null && tag.getValue() != null) {
+                        Map<String, String> entry = new LinkedHashMap<>();
+                        entry.put("key", tag.getKey());
+                        entry.put("value", tag.getValue());
+                        entry.put("source", tag.getSource());
+                        employee.tags.add(entry);
+                    }
                     if (tag != null && TEAM_TAG_KEY.equals(tag.getKey()) && tag.getValue() != null && !tag.getValue().trim().isEmpty()) {
                         employee.teams.add(tag.getValue().trim().toLowerCase(Locale.ROOT));
                     }

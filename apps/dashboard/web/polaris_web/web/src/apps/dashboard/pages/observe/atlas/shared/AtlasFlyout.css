@@ -1,0 +1,7 @@
+/* Dims the page behind an open flyout; sits just under .flyLayout (z-index 400). */
+.atlas-flyout-backdrop {
+    position: fixed;
+    inset: 3.5rem 0 0 0;
+    z-index: 399;
+    background: color-mix(in srgb, var(--p-color-text) 12%, transparent);
+}

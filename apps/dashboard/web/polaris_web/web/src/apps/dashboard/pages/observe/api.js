@@ -301,11 +301,11 @@ export default {
     // ~500KB+ on Atlas Scale Test) to be re-POSTed on every paginated request.
     // aiInventory: the AI inventory (new layout) — adds tool search and per-row tools, status,
     // employees and category. Left off by the legacy Endpoints page.
-    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory } = {}) {
+    async fetchAgenticAssetsSummary({ skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory, firstSeenStart, firstSeenEnd } = {}) {
         const resp = await request({
             url: '/api/fetchAgenticAssetsSummary',
             method: 'post',
-            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory },
+            data: { skip, limit, sortKey, sortOrder, queryValue, trafficMap, riskScoreMap, sensitiveMap, startTimestamp, endTimestamp, filters, violationsByCollectionId, skillViolationsByName, aiInventory, firstSeenStart, firstSeenEnd },
         })
         return { rows: resp?.rows || [], total: resp?.total || 0, distinctUsernames: resp?.distinctUsernames || [] }
     },

@@ -61,6 +61,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
         doNotMarkIssuesAsFixed: false,
         runAutomatedTests: false,
         automatedTestsCustomPrompt: "",
+        smartAgentProfileId: "",
         autoTicketingDetails: initialAutoTicketingDetails,
         miniTestingServiceNames: [],
         slackChannel: ""
@@ -619,7 +620,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, apiCollectionIds, disab
 
     async function handleRun() {
         const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, maxAgentTokens, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceNames, slackChannel, doNotMarkIssuesAsFixed, runAutomatedTests,automatedTestsCustomPrompt, preRequestScriptId, postRequestScriptId } = testRun
-        const scriptSelection = { preRequestScriptId, postRequestScriptId }
+        // with smart testing on, the chosen smart agent (if any) runs it; none: the default smart testing
+        const scriptSelection = { preRequestScriptId, postRequestScriptId, ...(runAutomatedTests && testRun.smartAgentProfileId ? { smartAgentProfileId: testRun.smartAgentProfileId } : {}) }
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)

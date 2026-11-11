@@ -1,8 +1,8 @@
-import { Text, VerticalStack } from "@shopify/polaris";
+import { Box, Text, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import SpinnerCentered from "../../../../components/progress/SpinnerCentered";
 import {
-    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
+    BROWSER_ICONS, CATEGORY_LABELS, CATEGORY_ORDER, EMPTY_PEOPLE_FILTERS, FLYOUT_GRAPH_LIMIT, FLYOUT_GRAPH_STEP, HEALTH_LABELS, HEALTH_ORDER, MODE_LABELS, GENERIC_BROWSER_ICON, OS_ICON_KEYS, STAT_CARDS, STAT_EMPTY_VALUE, osLabel,
 } from "./peopleConstants";
 import { getDomainForFavicon } from "../../agentic/mcpClientHelper";
 
@@ -18,8 +18,7 @@ const STAT_CARD_TARGETS = {
 };
 
 const FOOTPRINT_LAYOUT = { nodeWidth: 176, columnGap: 40, rowHeight: 84, headHeight: 40, viewWidth: 696, minHeight: 200, dimmedOpacity: 0.3, dimmedEdgeOpacity: 0.07 };
-const FOOTPRINT_EDGE_COLOR = "#B38CFF";
-const FOOTPRINT_RISKY_EDGE_COLOR = "#E0442A";
+const FOOTPRINT_EDGE_COLOR = "#E1E3E5";
 
 const CSV_COLUMNS = {
     employees: [
@@ -78,7 +77,7 @@ function statValue(value, subtext) {
     return (
         <VerticalStack gap="1">
             <Text as="p" variant="heading2xl">{formatCount(value)}</Text>
-            {subtext && <Text as="p" variant="bodySm" color={subtext.color || "subdued"}>{subtext.text}</Text>}
+            {subtext && <Text as="p" variant="bodySm" fontWeight="medium" color={subtext.color || "subdued"}>{subtext.text}</Text>}
         </VerticalStack>
     );
 }
@@ -264,7 +263,6 @@ function footprintLayout(model, highlight) {
     const layout = FOOTPRINT_LAYOUT;
     const lit = highlight ? connectedIds(model.edges, highlight) : null;
     const tallest = Math.max(1, ...model.columns.map((column) => column.length));
-    const statusOf = new Map(model.columns.flat().map((node) => [node.id, node.status]));
     const nodes = [];
     model.columns.forEach((column, columnIndex) => {
         const x = columnIndex * (layout.nodeWidth + layout.columnGap);
@@ -282,14 +280,13 @@ function footprintLayout(model, highlight) {
         });
     });
     const edges = model.edges.map((edge) => {
-        const risky = statusOf.get(edge.source) === "bad" || statusOf.get(edge.target) === "bad";
         const edgeLit = !lit || (lit.has(edge.source) && lit.has(edge.target));
         return {
             id: `e-${edge.source}-${edge.target}`,
             source: edge.source,
             target: edge.target,
             type: "default",
-            style: { stroke: risky ? FOOTPRINT_RISKY_EDGE_COLOR : FOOTPRINT_EDGE_COLOR, strokeWidth: risky ? 2 : 1.5, opacity: edgeLit ? 1 : layout.dimmedEdgeOpacity },
+            style: { stroke: FOOTPRINT_EDGE_COLOR, strokeWidth: 1.5, opacity: edgeLit ? 1 : layout.dimmedEdgeOpacity },
         };
     });
     const contentWidth = model.columns.length * layout.nodeWidth + (model.columns.length - 1) * layout.columnGap;
@@ -301,6 +298,11 @@ function footprintLayout(model, highlight) {
 const transform = {
     footprintLayout,
     statCardTarget: (id) => STAT_CARD_TARGETS[id],
+    tooltip: (text) => <Box width="350px">{text}</Box>,
+    activeStatCard: (tab, filters, clickedId) => Object.keys(STAT_CARD_TARGETS).find((id) => {
+        const target = STAT_CARD_TARGETS[id];
+        return (Object.keys(target.filters).length > 0 || id === clickedId) && target.tab === tab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...target.filters }) === JSON.stringify(filters);
+    }),
     filterOptions: (overview) => ({
         teams: overview?.teamOptions || [],
         tags: overview?.tagOptions || [],
@@ -309,7 +311,7 @@ const transform = {
         guardrailModes: Object.keys(MODE_LABELS).filter((mode) => (overview?.guardrailModes?.[mode] || 0) > 0),
         categories: CATEGORY_ORDER.filter((category) => (overview?.categoryTotals?.[category] || 0) > 0),
     }),
-    buildStatItems: (deviceStats, onSelect, discovery) => {
+    buildStatItems: (deviceStats, onSelect, discovery, activeId) => {
         const subtexts = deviceStats ? statSubtexts(deviceStats, discovery) : {};
         const values = { ...deviceStats, devicesWithAiTools: discovery?.devicesCount, employeesUsingAi: discovery?.usersCount };
         return STAT_CARDS.map((card) => ({
@@ -317,6 +319,7 @@ const transform = {
             isComp: true,
             data: statValue(values[card.id], subtexts[card.id]),
             onClick: () => onSelect(card.id),
+            selected: card.id === activeId,
         }));
     },
     cardBody: (status, body) => {
