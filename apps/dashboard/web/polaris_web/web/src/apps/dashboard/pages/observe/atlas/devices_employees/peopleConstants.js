@@ -122,6 +122,10 @@ export const FOOTPRINT_LEGEND = [
 ];
 
 export const PEOPLE_TABLE_HEIGHT = 500;
+// Smallest table body, so the loading and "no rows" overlays still fit.
+export const PEOPLE_TABLE_MIN_HEIGHT = 200;
+// Grid header (AgGridTable's 40px default) plus room for the horizontal scrollbar.
+export const PEOPLE_TABLE_CHROME_HEIGHT = 56;
 
 export const MIN_SEARCH_LENGTH = 3;
 export const EXPORT_PAGE_SIZE = 500;
