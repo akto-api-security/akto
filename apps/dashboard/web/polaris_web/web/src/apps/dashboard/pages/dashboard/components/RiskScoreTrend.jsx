@@ -23,7 +23,7 @@ function RiskScoreTrend({riskScoreRangeMap, riskScoreRanges}) {
         <Card key="scoreTrend">
             <VerticalStack gap={5}>
                 <TitleWithInfo
-                    titleText={"APIs by risk score"}
+                    titleText={mapLabel('APIs', getDashboardCategory()) + " by risk score"}
                     tooltipContent={"All your endpoints grouped on the basis of their risk score."}
                     textProps={{variant: "headingMd"}}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/risk-score"}

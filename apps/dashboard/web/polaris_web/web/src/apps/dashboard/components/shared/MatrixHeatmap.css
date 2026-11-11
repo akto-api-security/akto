@@ -1,0 +1,88 @@
+/* Row x column heatmap. Layout values arrive as CSS custom properties from MatrixHeatmap.jsx. */
+.matrix-heatmap {
+    /* The cell and legend-bar shades come from MatrixHeatmap.jsx. */
+    --cell-text: var(--p-color-text);
+    --cell-text-light: var(--p-color-text-on-color);
+    --empty-bg: var(--p-color-bg-subdued);
+    --empty-fg: var(--p-color-text-disabled);
+    overflow-x: auto;
+    /* Room inside the scroll box for the hover text above the first row. */
+    padding-top: 32px;
+    margin-top: -32px;
+}
+
+.matrix-heatmap__grid {
+    display: grid;
+    grid-template-columns: var(--label-width) repeat(var(--columns), minmax(var(--min-cell-width), 1fr));
+    gap: 3px;
+    min-width: var(--grid-min-width);
+}
+
+.matrix-heatmap__column {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    align-self: end;
+    padding-bottom: 4px;
+    line-height: 14px;
+    text-align: center;
+}
+
+.matrix-heatmap__row {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.matrix-heatmap__cell {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--cell-height);
+    border-radius: 4px;
+    background: var(--cell-bg);
+    color: var(--cell-text);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.matrix-heatmap__cell--light-text {
+    color: var(--cell-text-light);
+}
+
+.matrix-heatmap__cell--empty {
+    background: var(--empty-bg);
+    color: var(--empty-fg);
+}
+
+.matrix-heatmap__scale {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-top: 12px;
+}
+
+.matrix-heatmap__scale-key {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.matrix-heatmap__scale-bar {
+    width: 120px;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--bar-stop-0), var(--bar-stop-1), var(--bar-stop-2));
+}
+
+.matrix-heatmap__scale-label {
+    margin-right: 6px;
+    white-space: nowrap;
+}
+
+/* Labelled keys sit side by side, so their bars are shorter to keep both on one line. */
+.matrix-heatmap__scale-key--labelled .matrix-heatmap__scale-bar {
+    width: 72px;
+}

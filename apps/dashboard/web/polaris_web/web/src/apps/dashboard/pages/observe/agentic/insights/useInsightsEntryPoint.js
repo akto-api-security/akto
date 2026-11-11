@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import func from "@/util/func";
 import { INSIGHT_DEEP_LINK_PARAM } from "./insightsHelpers";
+import { isEndpointSecurityCategory } from "../../../../../main/labelHelper";
 
 // Shared behavior behind every "open the insights flyout" entry point (AgenticAssetsPage,
 // GuardrailPolicies, ViolationsPage): the DASHBOARD_INSIGHTS feature gate, the flyout's
@@ -10,7 +11,7 @@ import { INSIGHT_DEEP_LINK_PARAM } from "./insightsHelpers";
 // A page wires the returned pieces into wherever its button/flyout actually live — this hook
 // owns none of the JSX, only the behavior that was getting copy-pasted with it.
 export default function useInsightsEntryPoint() {
-    const granted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS");
+    const granted = func.checkForFeatureSaas("DASHBOARD_INSIGHTS") && isEndpointSecurityCategory();
     const [searchParams, setSearchParams] = useSearchParams();
     const [open, setOpen] = useState(false);
     const [initialInsightId, setInitialInsightId] = useState(null);

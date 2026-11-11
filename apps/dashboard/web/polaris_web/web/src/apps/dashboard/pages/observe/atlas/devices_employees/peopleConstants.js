@@ -1,3 +1,4 @@
+import { getDashboardCategory, mapLabel } from '@/apps/main/labelHelper'
 export const DEVICE_SCOPES = [
     { value: "all", label: "All devices" },
     { value: "desktop", label: "Desktop agents" },
@@ -78,10 +79,8 @@ export const tokenVar = (token) => `var(--p-color-${token})`;
 export const RISK_BUCKET_COUNT = 5;
 export const RISK_MAX = 5;
 export const RISK_BUCKET_WIDTH = RISK_MAX / RISK_BUCKET_COUNT;
-export const MEDIUM_RISK_THRESHOLD = 2.5;
 export const HIGH_RISK_THRESHOLD = 4;
-export const RISK_COLORS = { low: "#B38CFF", medium: "#E86A00", high: "#D72C0D" };
-export const RISK_EXPLANATION = "The highest API risk score (0 to 5, from the stored api_info risk score) across the AI tools on an employee's devices.";
+export const RISK_EXPLANATION = "The highest " + mapLabel('API', getDashboardCategory()) + " risk score (0 to 5, from the stored api_info risk score) across the AI tools on an employee's devices.";
 
 export const EMPLOYEE_CHIPS = [
     { key: "usesAi", label: "Uses AI tools" },
