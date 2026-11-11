@@ -1,3 +1,4 @@
+import { typeLabelOf } from "../../agentic/inventoryCategories";
 import { BRAND_PURPLE, PURPLE_LIGHT, REVIEW_YELLOW, RISKY_RED } from "@/apps/dashboard/components/shared/dataColors";
 export const ATLAS_DISCOVERY_CHAT_SCOPE = "atlas_agentic_discovery";
 
@@ -13,15 +14,6 @@ export const CATEGORY_LABELS = {
 };
 
 export { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../devices_employees/peopleConstants";
-
-// Short type tag shown next to a tool name in lists.
-export const CATEGORY_SHORT = {
-    agents: "Agent",
-    ide: "IDE",
-    mcp: "MCP",
-    browser: "Browser",
-    skills: "Skill",
-};
 
 // Mirrors RISK_REACH_LIMIT in AtlasDiscoveryService.
 const RISK_REACH_LIMIT = 50;
@@ -88,6 +80,9 @@ export const DEVICES_PATH = "/dashboard/observe/endpoints";
 export const INVENTORY_PATH = "/dashboard/observe/agentic-assets";
 // The inventory tab (category key) a tile opens; the Skills & plugins tile opens Skills, and Plugins is the tab next to it.
 export const INVENTORY_CATEGORIES = { agents: ["agent"], ide: ["ide"], mcp: ["mcp"], browser: ["browser_ai"], skills: ["skills"] };
+
+// Type tag shown next to a tool name in lists: the inventory's own Type text ("AI agent", "MCP server", ...).
+export const CATEGORY_SHORT = Object.fromEntries(Object.entries(INVENTORY_CATEGORIES).map(([category, [tab]]) => [category, typeLabelOf({ inventoryCategory: tab })]));
 
 // Row signals, shown as small tags; the red ones are the ones to act on.
 export const SIGNAL_META = {
