@@ -9,9 +9,9 @@ public final class AtlasCategory {
     private AtlasCategory() {}
 
     public static final String ALL = "all";
-    public static final String AGENTS = "agents";
-    public static final String MCP = "mcp";
-    public static final String BROWSER = "browser";
+    public static final String AGENTS = AtlasPeopleService.CAT_AGENTS;
+    public static final String MCP = AtlasPeopleService.CAT_MCP;
+    public static final String BROWSER = AtlasPeopleService.CAT_BROWSER;
     public static final String SKILLS = "skills";
     public static final List<String> ORDER = Arrays.asList(AGENTS, MCP, BROWSER, SKILLS);
 

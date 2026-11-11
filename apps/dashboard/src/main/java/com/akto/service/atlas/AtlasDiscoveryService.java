@@ -40,15 +40,13 @@ public class AtlasDiscoveryService {
 
     private final List<AtlasTool> tools = new ArrayList<>();
     private final AtlasPeople people;
-    private final int managedDevices;
     private final int now;
     private final Map<String, AtlasAssetStatus> serverStatuses = new HashMap<>();
     private final AtlasGraphSections graphs;
 
     public AtlasDiscoveryService(List<AtlasToolRow> rows, Map<String, AtlasAssetStatus> decisions, Set<String> allowlistNamesLower,
-                                 AtlasPeople people, int managedDevices, int now) {
+                                 AtlasPeople people, int now) {
         this.people = people;
-        this.managedDevices = managedDevices;
         this.now = now;
         AtlasAssetStatusService statuses = new AtlasAssetStatusService();
         for (AtlasToolRow row : rows) {
@@ -271,7 +269,6 @@ public class AtlasDiscoveryService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("categories", categories);
         out.put("devicesWithAi", devices.size());
-        out.put("managedDevices", managedDevices);
         return out;
     }
 

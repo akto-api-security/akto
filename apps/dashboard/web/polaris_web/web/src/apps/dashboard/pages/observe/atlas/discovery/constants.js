@@ -10,14 +10,7 @@ export const CATEGORY_LABELS = {
     skills: "Skills & plugins",
 };
 
-export const DEVICE_SCOPES = [
-    { value: "all", label: "All devices" },
-    { value: "desktop", label: "Desktop agents" },
-    { value: "browser", label: "Browser extensions" },
-];
-
-export const EXPORT_PAGE_SIZE = 500;
-export const EXPORT_ROW_LIMIT = 10000;
+export { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../devices_employees/peopleConstants";
 
 // Short type tag shown next to a tool name in lists.
 export const CATEGORY_SHORT = {
@@ -92,6 +85,7 @@ export const VIOLATION_WINDOW_LABEL = "last 7 days";
 export const VIOLATION_WINDOW_SECONDS = 7 * 24 * 3600;
 
 export const GUARDRAIL_POLICIES_PATH = "/dashboard/guardrails/policies";
+export const DEVICES_PATH = "/dashboard/observe/endpoints";
 
 // Row signals, shown as small tags; the red ones are the ones to act on.
 export const SIGNAL_META = {

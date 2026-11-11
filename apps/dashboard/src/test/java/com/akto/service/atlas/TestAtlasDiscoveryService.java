@@ -45,7 +45,7 @@ public class TestAtlasDiscoveryService {
 
     private static AtlasDiscoveryService service(List<AtlasToolRow> rows, Map<String, AtlasAssetStatus> decisions, Set<String> allowlist) {
         return new AtlasDiscoveryService(rows, decisions, allowlist, new AtlasPeople(users("d1", "user.one", "d2", "user.two"),
-                users("user.one", "Platform")), 10, NOW);
+                users("user.one", "Platform")), NOW);
     }
 
     @SuppressWarnings("unchecked")
@@ -163,18 +163,6 @@ public class TestAtlasDiscoveryService {
         // Only user.one is tagged (Platform) and used a tool recently, so the team's agents share is 1 of 1.
         List<Map<String, Object>> teams = (List<Map<String, Object>>) section(overview, "teamCategoryMatrix").get("rows");
         assertEquals(Long.valueOf(100L), ((List<Long>) teams.get(0).get("percents")).get(0));
-    }
-
-    @Test
-    @SuppressWarnings("unchecked")
-    public void managedDevicesIsTheEndpointShieldCountEvenWhenFewerThanDevicesWithAi() {
-        AtlasToolRow agent = tool("agent", "agent-a", 1, NOW, "d1", "d2");
-        AtlasDiscoveryService service = new AtlasDiscoveryService(Collections.singletonList(agent), new HashMap<>(), Collections.emptySet(),
-                new AtlasPeople(users("d1", "user.one", "d2", "user.two"), users("user.one", "Platform")), 1, NOW);
-        Map<String, Object> tiles = section(service.buildOverview(), "tiles");
-
-        assertEquals(2, tiles.get("devicesWithAi"));
-        assertEquals(1, tiles.get("managedDevices"));
     }
 
     @Test
@@ -332,9 +320,6 @@ public class TestAtlasDiscoveryService {
         assertEquals(new HashSet<>(Collections.singletonList("desk-one")), desktop.getDeviceIds());
         assertEquals(new HashSet<>(Collections.singletonList("desk-one")), desktop.getMcpDevices().get("server-a"));
         assertEquals(new HashSet<>(Collections.singletonList("browser-one")), AtlasDeviceScope.apply(rows, "browser", browsers).get(0).getDeviceIds());
-        assertEquals(1, AtlasDeviceScope.countDevices(2, 1, "browser"));
-        assertEquals(1, AtlasDeviceScope.countDevices(2, 1, "desktop"));
-        assertEquals(2, AtlasDeviceScope.countDevices(2, 1, "all"));
         assertTrue(AtlasDeviceScope.apply(Collections.singletonList(tool("agent", "agent-b", 1, NOW, "browser-one")), "desktop", browsers).isEmpty());
 
         agent.getDeviceLastSeen().put("desk-one", NOW);

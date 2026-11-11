@@ -30,12 +30,6 @@ public final class AtlasDeviceScope {
         return browsers;
     }
 
-    /** Managed devices inside the scope, from the Endpoint Shield row counts (all rows, and the browser ones). */
-    public static int countDevices(int all, int browsers, String scope) {
-        if (BROWSER.equals(scope)) return browsers;
-        return DESKTOP.equals(scope) ? all - browsers : all;
-    }
-
     /** Rows restricted to in-scope devices; a tool left on no device is dropped. */
     public static List<AtlasToolRow> apply(List<AtlasToolRow> rows, String scope, Set<String> browserDevices) {
         if (!DESKTOP.equals(scope) && !BROWSER.equals(scope)) return rows;

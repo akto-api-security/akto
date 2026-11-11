@@ -11,6 +11,7 @@ import { agentMcpMatrix, decisionsPageSize, teamMatrix } from "./transform";
 import DiscoveryHeaderActions from "./shared/DiscoveryHeaderActions";
 import useAssetStatusUpdate from "./shared/useAssetStatusUpdate";
 import useDiscoveryFilters, { useToolsExport } from "./shared/useDiscoveryFilters";
+import useFleetStats from "./shared/useFleetStats";
 import AdoptionCard from "./cards/AdoptionCard";
 import AssetFlyout from "./cards/AssetFlyout";
 import DecisionsCard from "./cards/DecisionsCard";
@@ -34,6 +35,7 @@ function teamCellHeightFor(agentMatrix, teamsMatrix) {
 function AgenticDiscoveryOverview() {
     const filters = useDiscoveryFilters();
     const { deviceScope } = filters;
+    const fleet = useFleetStats(deviceScope);
     const [data, setData] = useState(null);
     // The scope `data` was fetched for; the decisions list waits for data of the current one.
     const [dataScope, setDataScope] = useState("");
@@ -109,7 +111,7 @@ function AgenticDiscoveryOverview() {
         <div key="ask" ref={askRef}>
             <AskBar label="Ask Atlas" placeholder={ASK_ATLAS_PLACEHOLDER} suggestions={ASK_ATLAS_SUGGESTIONS} chatScope={ATLAS_DISCOVERY_CHAT_SCOPE} request={askRequest} />
         </div>,
-        <StatTiles key="tiles" tiles={data?.tiles} />,
+        <StatTiles key="tiles" tiles={data?.tiles} deviceScope={deviceScope} fleet={fleet} />,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
             <DecisionsCard
                 deviceScope={deviceScope}
@@ -170,7 +172,7 @@ function AgenticDiscoveryOverview() {
     return (
         <PageWithMultipleCards
             title="Agentic discovery"
-            subtitle={`Every AI agent, MCP server, skill and browser AI app${data?.tiles ? ` on ${data.tiles.managedDevices.toLocaleString("en-US")} managed devices` : ""}`}
+            subtitle={`Every AI agent, MCP server, skill and browser AI app${fleet.managedDevices === null ? "" : ` on ${fleet.managedDevices.toLocaleString("en-US")} managed devices`}`}
             isFirstPage
             secondaryActions={<DiscoveryHeaderActions filters={filters} onExport={exportTools} exporting={exporting} />}
             components={components}

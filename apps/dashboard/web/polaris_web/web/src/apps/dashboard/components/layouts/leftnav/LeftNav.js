@@ -17,7 +17,7 @@ import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import Store from "../../../store";
 import api from "../../../../signup/api";
-import { useCallback, useMemo, useState} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import func from "@/util/func";
 import { usePermissions, pageRequires } from "@/util/permissions";
 import Dropdown from "../Dropdown";
@@ -63,6 +63,14 @@ export default function LeftNav() {
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
+
+    // In-page links (not nav clicks) to another observe page move the highlight; sub-pages keep their parent's.
+    useEffect(() => {
+        const observeId = currPathString.replace(/-/g, "_");
+        if (observeId.startsWith("dashboard_observe_")) {
+            setLeftNavSelected((current) => (observeId.startsWith(current) ? current : observeId));
+        }
+    }, [currPathString]);
 
     const handleAccountChange = useCallback(async (selected) => {
         const accountId = selected === undefined || selected === null || selected === ""

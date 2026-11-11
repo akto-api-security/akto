@@ -1,7 +1,6 @@
 package com.akto.service.atlas;
 
 import lombok.AllArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -13,14 +12,8 @@ import java.util.Set;
 @AllArgsConstructor
 public class AtlasPeople {
 
-    public static final String UNKNOWN_USERNAME = "not-available";
-
     private final Map<String, String> usernameByDevice;
     private final Map<String, String> teamByUser;
-
-    public static boolean isKnownUser(String username) {
-        return StringUtils.isNotBlank(username) && !UNKNOWN_USERNAME.equals(username);
-    }
 
     /** The distinct known users of these devices. */
     public Set<String> usersOf(Collection<String> deviceIds) {
@@ -32,7 +25,7 @@ public class AtlasPeople {
         Map<String, Integer> devices = new HashMap<>();
         for (String deviceId : deviceIds) {
             String username = usernameByDevice.get(deviceId);
-            if (isKnownUser(username)) devices.merge(username, 1, Integer::sum);
+            if (AtlasPeopleService.isRealUsername(username)) devices.merge(username, 1, Integer::sum);
         }
         return devices;
     }
@@ -42,7 +35,7 @@ public class AtlasPeople {
         Map<String, Integer> lastSeen = new HashMap<>();
         for (Map.Entry<String, Integer> e : lastSeenByDevice.entrySet()) {
             String username = usernameByDevice.get(e.getKey());
-            if (isKnownUser(username)) lastSeen.merge(username, e.getValue(), Math::max);
+            if (AtlasPeopleService.isRealUsername(username)) lastSeen.merge(username, e.getValue(), Math::max);
         }
         return lastSeen;
     }

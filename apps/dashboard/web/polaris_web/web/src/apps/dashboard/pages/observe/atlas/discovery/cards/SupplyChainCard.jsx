@@ -3,9 +3,9 @@ import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
 import AssetTopologyGraph from "@/apps/dashboard/pages/observe/agentic/AssetTopologyGraph";
 import { buildColumnGraph, RISKY_FOCUS } from "@/apps/dashboard/pages/observe/agentic/columnGraph";
 import DiscoveryCard from "../shared/DiscoveryCard";
-import { RISKY_LEGEND_KEY, SUBTITLES } from "../constants";
+import { CHAIN_LEGEND, RISKY_LEGEND_KEY, SUBTITLES } from "../constants";
 import { chainModel, TOPO_STATUS } from "../transform";
-import ColorLegend from "./ColorLegend";
+import FilterLegend from "./FilterLegend";
 
 const TOPO_HEAD_TYPE = "topoHead";
 const FIT_PADDING = 0.1;
@@ -31,7 +31,7 @@ export default function SupplyChainCard({ chain, status }) {
         <DiscoveryCard
             title="AI supply chain"
             subtitle={SUBTITLES.chain}
-            legend={<ColorLegend selected={legendPick} onSelect={setLegendPick} />}
+            legend={<FilterLegend items={CHAIN_LEGEND} selected={legendPick} onSelect={setLegendPick} />}
             status={status}
             empty={empty}
             emptyText="No tool connections discovered yet."

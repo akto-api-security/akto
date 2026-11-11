@@ -205,14 +205,17 @@ export const openThreatActivityPage = (filters = {}) =>
 export const openGuardrailActivityPage = (filters = {}) =>
     openActivityPage("/dashboard/guardrails/activity", filters);
 
-// Drops the filters saved for Guardrail Activity (every tab), so a link into it starts from only its own filters.
-export const clearSavedGuardrailActivityFilters = () => {
+// Drops the filters saved for an activity page (every tab), so a link into it starts from only its own filters.
+export const clearSavedActivityFilters = (path) => {
     const { filtersMap, setFiltersMap } = PersistStore.getState();
-    setFiltersMap(Object.fromEntries(Object.entries(filtersMap || {}).filter(([pageKey]) => !pageKey.startsWith("/dashboard/guardrails/activity/"))));
+    setFiltersMap(Object.fromEntries(Object.entries(filtersMap || {}).filter(([pageKey]) => !pageKey.startsWith(`${path}/`))));
 };
 
-// In-app link to Guardrail Activity, for a same-tab navigate.
-export const guardrailActivityLink = (filters = {}) => activityLink("/dashboard/guardrails/activity", filters);
+// The Agentic Guardrail Activity page (charts and table); its saved filters live under this path.
+export const THREAT_ACTIVITY_PATH = "/dashboard/protection/threat-activity";
+
+// In-app link to Agentic Guardrail Activity, for a same-tab navigate.
+export const threatActivityLink = (filters = {}) => activityLink(THREAT_ACTIVITY_PATH, filters);
 
 // Active-tab row count for one Atlas tool, same query as the tab; null on failure.
 export const fetchActiveToolViolationCount = (atlasToolKey, startTimestamp, endTimestamp) =>

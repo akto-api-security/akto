@@ -19,7 +19,6 @@ import com.akto.utils.TtlCache;
 import com.mongodb.BasicDBObject;
 import lombok.Getter;
 import lombok.Setter;
-import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.HashMap;
@@ -42,18 +41,10 @@ public class AtlasDiscoveryAction extends UserAction {
     private static final long DEVICE_CACHE_TTL_MS = 60_000;
     private static final int DEVICE_CACHE_MAX_ENTRIES = 1000;
     private static final String TOOL_NOT_FOUND = "Tool not found";
-    private static final TtlCache<Integer, DeviceSnapshot> DEVICE_CACHE = new TtlCache<>(DEVICE_CACHE_TTL_MS, DEVICE_CACHE_MAX_ENTRIES);
+    private static final TtlCache<Integer, Map<String, Map<String, String>>> DEVICE_CACHE = new TtlCache<>(DEVICE_CACHE_TTL_MS, DEVICE_CACHE_MAX_ENTRIES);
 
     private final InsightService insightService = new InsightService();
     private final AtlasAssetStatusService statusService = new AtlasAssetStatusService();
-
-    /** Endpoint Shield device metadata and the page's row counts (all rows, and the browser ones). */
-    @Value
-    private static class DeviceSnapshot {
-        Map<String, Map<String, String>> devices;
-        int shieldRows;
-        int shieldBrowserRows;
-    }
 
     @Getter @Setter private String deviceScope;
     @Getter @Setter private List<String> assetKeys;
@@ -157,29 +148,24 @@ public class AtlasDiscoveryAction extends UserAction {
         if (ArgusCollectionScope.isLimited(getSUser())) return null;
         int now = Context.now();
         InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx(now));
-        DeviceSnapshot shield = loadDevices();
         List<AtlasToolRow> allRows = toolRows();
-        List<AtlasToolRow> rows = AtlasDeviceScope.apply(allRows, deviceScope, AtlasDeviceScope.browserDevices(shield.getDevices()));
+        List<AtlasToolRow> rows = AtlasDeviceScope.apply(allRows, deviceScope, AtlasDeviceScope.browserDevices(loadDevices()));
         // Decisions do not depend on the device scope; malicious skills are looked up by name.
         Map<String, AtlasAssetStatus> decisions = new HashMap<>(statusService.loadDecisions());
         decisions.putAll(statusService.loadSkillDecisions(allRows));
-        int managedDevices = shield.getShieldRows() == 0
-                ? bundle.deviceIdToUsername.size()
-                : AtlasDeviceScope.countDevices(shield.getShieldRows(), shield.getShieldBrowserRows(), deviceScope);
         return new AtlasDiscoveryService(rows, decisions, bundle.allowlistNamesLower,
-                new AtlasPeople(bundle.deviceIdToUsername, teamByUser(bundle)), managedDevices, now);
+                new AtlasPeople(bundle.deviceIdToUsername, teamByUser(bundle)), now);
     }
 
     // Every endpoint-shield module is read, so share one read per account across the requests of a page load.
-    private static DeviceSnapshot loadDevices() {
+    private static Map<String, Map<String, String>> loadDevices() {
         Integer account = Context.accountId.get();
-        DeviceSnapshot cached = DEVICE_CACHE.get(account);
+        Map<String, Map<String, String>> cached = DEVICE_CACHE.get(account);
         if (cached != null) return cached;
         // Read outside any lock; two concurrent loads at worst both read and the later put wins.
-        int[] shieldRows = ModuleInfoDao.instance.countEndpointShieldRows();
-        DeviceSnapshot snapshot = new DeviceSnapshot(ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield(), shieldRows[0], shieldRows[1]);
-        DEVICE_CACHE.put(account, snapshot);
-        return snapshot;
+        Map<String, Map<String, String>> devices = ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield();
+        DEVICE_CACHE.put(account, devices);
+        return devices;
     }
 
     // Atlas reads only the bundle's account-wide data, so a short window keeps its range-scoped reads cheap; the end is shared across loads.

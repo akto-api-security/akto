@@ -4,7 +4,7 @@ import { Avatar, Badge, Banner, HorizontalStack, Text } from "@shopify/polaris";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
 import { getRiskLabel, getRiskLevel } from "@/apps/dashboard/pages/observe/agentic/agenticPageBuilders";
 import func from "@/util/func";
-import { clearSavedGuardrailActivityFilters, fetchActiveToolViolationCount, guardrailActivityLink } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
+import { THREAT_ACTIVITY_PATH, clearSavedActivityFilters, fetchActiveToolViolationCount, threatActivityLink } from "@/apps/dashboard/pages/threat_detection/utils/threatDashboardUtils";
 import AtlasFlyout, { FlyoutRowList } from "../../shared/AtlasFlyout";
 import discoveryApi from "../discoveryApi";
 import AssetStatusBadge from "../shared/AssetStatusBadge";
@@ -160,8 +160,6 @@ export default function AssetFlyout({ row, deviceScope, refreshKey, onClose, onU
             askBar={row && (
                 <AskBar
                     key={key}
-                    showInput={false}
-                    title={`Ask Atlas about ${row.name}`}
                     label="Ask Atlas"
                     placeholder={`Ask Atlas about ${row.name}`}
                     suggestions={askSuggestions(row.name)}
@@ -176,7 +174,7 @@ export default function AssetFlyout({ row, deviceScope, refreshKey, onClose, onU
                 <Banner
                     status="critical"
                     title={`${plural(violations.count, "active guardrail violation")} in the ${VIOLATION_WINDOW_LABEL}`}
-                    action={{ content: "View in guardrail activity", onAction: () => { clearSavedGuardrailActivityFilters(); navigate(guardrailActivityLink({ atlasTool: key, atlasToolName: row.name, startTimestamp: violations.startTimestamp, endTimestamp: violations.endTimestamp })); } }}
+                    action={{ content: "View in guardrail activity", onAction: () => { clearSavedActivityFilters(THREAT_ACTIVITY_PATH); navigate(threatActivityLink({ atlasTool: key, atlasToolName: row.name, startTimestamp: violations.startTimestamp, endTimestamp: violations.endTimestamp })); } }}
                 />
             )}
             <FlyoutRowList title={`${CAPABILITY_TITLES[rowType]} (${capabilities.total})`} rows={capabilityRows(capabilities.tools)} />
