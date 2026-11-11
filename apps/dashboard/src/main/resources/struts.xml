@@ -14967,8 +14967,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User deleted extra API info from collections</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15013,8 +15012,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User deleted non-host API data from collections</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15036,8 +15034,7 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ_WRITE</param>
-                <param name="actionDescription">User cleared temporary retain flags on collections</param>
+                <param name="accessType">READ</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
