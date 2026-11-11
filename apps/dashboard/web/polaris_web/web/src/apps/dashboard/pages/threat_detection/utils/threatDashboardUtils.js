@@ -202,13 +202,36 @@ export const openThreatActivityPage = (filters = {}) =>
     openActivityPage("/dashboard/protection/threat-activity", filters);
 
 // Guardrail Activity is the same table on its own route (see LeftNav), so it takes the same filters.
+export const GUARDRAIL_ACTIVITY_PATH = "/dashboard/guardrails/activity";
+
 export const openGuardrailActivityPage = (filters = {}) =>
-    openActivityPage("/dashboard/guardrails/activity", filters);
+    openActivityPage(GUARDRAIL_ACTIVITY_PATH, filters);
+
+// In-app link to Guardrail Activity, for a same-tab navigate.
+export const guardrailActivityLink = (filters = {}) => activityLink(GUARDRAIL_ACTIVITY_PATH, filters);
 
 // Drops the filters saved for an activity page (every tab), so a link into it starts from only its own filters.
 export const clearSavedActivityFilters = (path) => {
     const { filtersMap, setFiltersMap } = PersistStore.getState();
     setFiltersMap(Object.fromEntries(Object.entries(filtersMap || {}).filter(([pageKey]) => !pageKey.startsWith(`${path}/`))));
+};
+
+// Same-tab link into Guardrail Activity with the filters applied. The table ignores the filters in the URL once the
+// page has been reloaded (the browser keeps that navigation type for every in-app move after it), so they are also
+// saved under the table's own page key, which it reads every time it opens.
+export const goToGuardrailActivity = (navigate, filters = {}) => {
+    clearSavedActivityFilters(GUARDRAIL_ACTIVITY_PATH);
+    const link = guardrailActivityLink(filters);
+    const urlFilters = new URLSearchParams(link.split("?")[1]).get("filters") || "";
+    const saved = urlFilters.split("&").filter(Boolean).map((part) => {
+        const [key, values = ""] = part.split("__");
+        return { key, value: values.split(",").filter(Boolean) };
+    });
+    if (saved.length > 0) {
+        const { filtersMap, setFiltersMap } = PersistStore.getState();
+        setFiltersMap({ ...filtersMap, [`${GUARDRAIL_ACTIVITY_PATH}/`]: { filters: saved, sort: [] } });
+    }
+    navigate(link);
 };
 
 // The Agentic Guardrail Activity page (charts and table); its saved filters live under this path.

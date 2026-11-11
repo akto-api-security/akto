@@ -1,6 +1,6 @@
 import { useEffect, useReducer, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Banner, Box, Button, HorizontalGrid, HorizontalStack, VerticalStack } from '@shopify/polaris'
+import { Badge, Banner, Box, Button, HorizontalGrid, HorizontalStack, VerticalStack } from '@shopify/polaris'
 import { produce } from 'immer'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
 import DateRangeFilter from '../../../components/layouts/DateRangeFilter'
@@ -10,7 +10,7 @@ import PersistStore from '../../../../main/PersistStore'
 import func from '@/util/func'
 import values from '@/util/values'
 import threatApi from '../../threat_detection/api'
-import { openGuardrailActivityPage } from '../../threat_detection/utils/threatDashboardUtils'
+import { goToGuardrailActivity } from '../../threat_detection/utils/threatDashboardUtils'
 import { downloadMaliciousEventsAsCsv } from '../../threat_detection/utils/exportEvents'
 import InsightsFlyout from '../../observe/agentic/insights/InsightsFlyout'
 import InsightsEntryButton from '../../observe/agentic/insights/InsightsEntryButton'
@@ -26,8 +26,11 @@ import NeedsAttentionCard from './NeedsAttentionCard'
 
 const EXPORT_LIMIT = 2000
 
-// "Last 7 days", same as the design.
-const DEFAULT_DATE_RANGE = values.ranges[2]
+// The Policies page opens the policy named in ?policy=, or just lists the policies when it no longer exists.
+const policyLink = (name) => `/dashboard/guardrails/policies${name ? `?policy=${encodeURIComponent(name)}` : ''}`
+
+// "Last 1 year". Found by alias, so reordering the picker's ranges cannot change the default.
+const DEFAULT_DATE_RANGE = values.ranges.find((range) => range.alias === 'lastYear')
 
 // A shared link only reproduces the page if the date filter comes back with it.
 function dateRangeFromSearchParams(searchParams) {
@@ -92,9 +95,10 @@ function GuardrailOverview() {
         }
     }
 
-    // The activity page opens in a new tab with the same date range and these filters applied. It lands on its
-    // Active tab, the closest match to the design's Open and All tabs; the page does not read a tab from the link yet.
-    const openActivity = (filters = {}) => openGuardrailActivityPage({ startTimestamp, endTimestamp, ...filters })
+    // The activity page opens in this window with the same date range and these filters applied, and Back returns
+    // here with the same range. It lands on its Active tab, the closest match to the design's Open and All tabs;
+    // the page does not read a tab from the link yet.
+    const openActivity = (filters = {}) => goToGuardrailActivity(navigate, { startTimestamp, endTimestamp, ...filters })
 
     const exportCsv = async () => {
         try {
@@ -130,7 +134,7 @@ function GuardrailOverview() {
     } else if (!data) {
         body = <Banner status="critical" title="Couldn't load the guardrail overview">Try again in a moment.</Banner>
     } else {
-        const { critUnassigned, kpis, trend, topPolicies, heatmap, attention } = data
+        const { critUnassigned, kpis, trend, topPolicies, heatmap, policySeverity, attention } = data
         body = (
             <VerticalStack gap="4">
                 {critUnassigned > 0 && (
@@ -159,6 +163,7 @@ function GuardrailOverview() {
                 </HorizontalGrid>
                 <ViolationHeatmap
                     heatmap={heatmap}
+                    policySeverity={policySeverity}
                     onOpen={(hosts, policies) => openActivity({ host: hosts.join(','), latestAttack: policies.join(',') })}
                     onLoadMore={() => loadMore('heatmap')}
                     loadingMore={loadingMore === 'heatmap'}
@@ -171,6 +176,7 @@ function GuardrailOverview() {
                     collectionsMap={collectionsMap}
                     onViewAll={() => openActivity()}
                     onReview={(row) => openActivity({ latestAttack: row.policy, host: row.host })}
+                    onOpenPolicy={(row) => navigate(policyLink(row.policy))}
                     onAssign={(row, agent) => setAssigning({ row, agent })}
                 />
             </VerticalStack>
@@ -203,10 +209,13 @@ function GuardrailOverview() {
     return (
         <PageWithMultipleCards
             title={
-                <TitleWithInfo
-                    titleText="Guardrail overview"
-                    tooltipContent="Violations caught by your guardrail policies across your agents, and what needs attention first."
-                />
+                <HorizontalStack gap="2" blockAlign="center">
+                    <TitleWithInfo
+                        titleText="Guardrail overview"
+                        tooltipContent="Violations caught by your guardrail policies across your agents, and what needs attention first."
+                    />
+                    <Badge status="info">Beta</Badge>
+                </HorizontalStack>
             }
             isFirstPage
             secondaryActions={
