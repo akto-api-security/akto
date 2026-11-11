@@ -1,6 +1,9 @@
 import { Box, Card, HorizontalGrid, Text, VerticalStack } from "@shopify/polaris";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 
-export default function KpiStrip({ items }) {
+export default function KpiStrip({ items, loading }) {
+    if (loading) return <Card><SpinnerCentered height="96px" /></Card>;
+
     return (
         <Card padding="0">
             <HorizontalGrid columns={{ xs: 1, sm: 2, md: items.length }}>

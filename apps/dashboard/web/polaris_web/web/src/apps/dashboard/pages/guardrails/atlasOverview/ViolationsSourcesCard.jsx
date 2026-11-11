@@ -1,5 +1,6 @@
 import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import { OverviewCardHeader, OverviewListRow } from "./OverviewCard";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 
 const TREND_UP_COLOR = "#8E1F0B";
 const TREND_DOWN_COLOR = "#0C5132";
@@ -9,7 +10,9 @@ function formatChange(pct) {
     return pct > 0 ? `+${pct}%` : `−${Math.abs(pct)}%`;
 }
 
-export default function ViolationsSourcesCard({ rows, periodDays, onRowClick }) {
+export default function ViolationsSourcesCard({ rows, periodDays, loading, onRowClick }) {
+    if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Where violations happen" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
+
     return (
         <Card padding="0">
             <Box padding="4" paddingBlockEnd="2">

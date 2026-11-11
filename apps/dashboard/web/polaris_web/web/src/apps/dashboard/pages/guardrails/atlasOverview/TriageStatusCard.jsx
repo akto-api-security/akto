@@ -1,6 +1,7 @@
 import { Box, Card, HorizontalStack, Icon, Link, Text, VerticalStack } from "@shopify/polaris";
 import { DiamondAlertMajor } from "@shopify/polaris-icons";
 import { OverviewCardHeader } from "./OverviewCard";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 
 const BAR_COLOR = {
     OPEN: "bg-inverse-active",
@@ -11,7 +12,9 @@ const BAR_COLOR = {
     RESOLVED: "bg-success-strong",
 };
 
-export default function TriageStatusCard({ triage, periodDays, onStatusClick, onAssign }) {
+export default function TriageStatusCard({ triage, periodDays, loading, onStatusClick, onAssign }) {
+    if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Triage status" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
+
     const max = Math.max(1, ...triage.statuses.map((s) => s.count));
     const stale = triage.staleCriticalUnassigned;
     const hours = triage.staleAfterHours;

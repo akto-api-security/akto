@@ -1,6 +1,7 @@
 import { Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 import StackedChart from "@/apps/dashboard/components/charts/StackedChart";
 import { OverviewCardHeader } from "./OverviewCard";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 
 const SERIES = [
     { key: "blocked", name: "Blocked", color: "#6200EA" },
@@ -17,7 +18,9 @@ const X_AXIS = {
 
 const GRANULARITY_TITLE = { D: "Daily", W: "Weekly", M: "Monthly" };
 
-export default function DecisionsTrendCard({ decisions }) {
+export default function DecisionsTrendCard({ decisions, loading }) {
+    if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Guardrail decisions" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
+
     const data = [...SERIES].reverse().map((s) => ({
         name: s.name,
         color: s.color,

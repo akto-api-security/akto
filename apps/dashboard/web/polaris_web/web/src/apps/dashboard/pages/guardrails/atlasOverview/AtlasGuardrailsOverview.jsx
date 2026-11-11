@@ -186,26 +186,26 @@ function AtlasGuardrailsOverview() {
         setTriage(null);
         guardrailsApi.fetchSummary(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setKpis(resp); })
-            .catch(() => { if (!cancelled) setKpis(null); });
+            .catch(() => { if (!cancelled) setKpis({}); });
         guardrailsApi.fetchTriageStatus(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTriage(resp); })
-            .catch(() => { if (!cancelled) setTriage(null); });
+            .catch(() => { if (!cancelled) setTriage({}); });
         setDecisions(null);
         guardrailsApi.fetchDecisionsTrend(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setDecisions(resp); })
-            .catch(() => { if (!cancelled) setDecisions(null); });
+            .catch(() => { if (!cancelled) setDecisions({}); });
         setPolicies(null);
         guardrailsApi.fetchViolationsByPolicy(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setPolicies(resp); })
-            .catch(() => { if (!cancelled) setPolicies(null); });
+            .catch(() => { if (!cancelled) setPolicies({}); });
         setViolationsSources(null);
         guardrailsApi.fetchViolationsSources(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setViolationsSources(resp); })
-            .catch(() => { if (!cancelled) setViolationsSources(null); });
+            .catch(() => { if (!cancelled) setViolationsSources({}); });
         setTopAgenticAssets(null);
         guardrailsApi.fetchTopAgenticAssets(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTopAgenticAssets(resp); })
-            .catch(() => { if (!cancelled) setTopAgenticAssets(null); });
+            .catch(() => { if (!cancelled) setTopAgenticAssets({}); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -214,19 +214,19 @@ function AtlasGuardrailsOverview() {
     const openPolicies = () => navigate(POLICIES_PATH);
 
     const components = [
-        <KpiStrip key="kpis" items={buildKpis(kpis, openActivity)} />,
+        <KpiStrip key="kpis" items={buildKpis(kpis, openActivity)} loading={kpis === null} />,
         <HorizontalGrid key="attention" columns={{ xs: 1, md: ["twoThirds", "oneThird"] }} gap="4">
             <AttentionCard rows={data.attention} onReview={openActivity} onViewAll={openActivity} />
-            <TriageStatusCard triage={{ statuses: triage?.statuses || [], staleCriticalUnassigned: triage?.staleCriticalUnassigned || 0, staleAfterHours: triage?.staleAfterHours }} periodDays={triage?.periodDays} onStatusClick={openActivity} onAssign={openActivity} />
+            <TriageStatusCard triage={{ statuses: triage?.statuses || [], staleCriticalUnassigned: triage?.staleCriticalUnassigned || 0, staleAfterHours: triage?.staleAfterHours }} periodDays={triage?.periodDays} loading={triage === null} onStatusClick={openActivity} onAssign={openActivity} />
         </HorizontalGrid>,
         <HorizontalGrid key="decisions" columns={{ xs: 1, md: 2 }} gap="4">
-            <DecisionsTrendCard decisions={decisions} />
-            <PolicyViolationsCard policies={buildPolicyRows(policies?.rules)} onPolicyClick={openActivity} onTune={openPolicies} />
+            <DecisionsTrendCard decisions={decisions} loading={decisions === null} />
+            <PolicyViolationsCard policies={buildPolicyRows(policies?.rules)} loading={policies === null} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
-            <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} onRowClick={openActivity} />
+            <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} loading={violationsSources === null} onRowClick={openActivity} />
             <TopEmployeesCard employees={data.topEmployees} />
-            <TopAssetsCard assets={buildTopAgenticAssetRows(topAgenticAssets?.collections)} />
+            <TopAssetsCard assets={buildTopAgenticAssetRows(topAgenticAssets?.collections)} loading={topAgenticAssets === null} />
         </HorizontalGrid>,
     ];
 

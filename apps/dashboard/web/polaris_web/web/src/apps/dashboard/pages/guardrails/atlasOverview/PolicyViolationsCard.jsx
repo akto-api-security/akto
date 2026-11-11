@@ -1,10 +1,13 @@
-import { Box, Card, HorizontalGrid, Link, Text } from "@shopify/polaris";
+import { Box, Card, HorizontalGrid, Link, Text, VerticalStack } from "@shopify/polaris";
 import { OverviewCardHeader, OverviewListRow } from "./OverviewCard";
+import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 
 const NOISY_IGNORE_PCT = 40;
 const COLUMNS = "minmax(0, 1.3fr) minmax(0, 1fr) 80px 90px";
 
-export default function PolicyViolationsCard({ policies, onPolicyClick, onTune }) {
+export default function PolicyViolationsCard({ policies, loading, onPolicyClick, onTune }) {
+    if (loading) return <Card><VerticalStack gap="3"><OverviewCardHeader title="Violations by policy" subtitle="High ignore rates usually mean a policy needs tuning" /><SpinnerCentered height="200px" /></VerticalStack></Card>;
+
     const max = Math.max(1, ...policies.map((p) => p.count));
     return (
         <Card padding="0">
