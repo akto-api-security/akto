@@ -1,6 +1,7 @@
 package com.akto.testing.kafka_utils;
 
 
+import com.akto.dto.testing.SmartAgentConfig;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,8 @@ public class TestingConfigurations {
     private boolean doNotMarkIssuesAsFixed;
     private boolean runAutomatedTests;
     private String automatedTestsCustomPrompt;
+    // the run's smart agent (null: none), sent with every smart test
+    private SmartAgentConfig smartAgentConfig;
     private String dashboardContext;
 
     private TestingConfigurations() {
@@ -127,6 +130,14 @@ public class TestingConfigurations {
 
     public void setRunAutomatedTests(boolean runAutomatedTests) {
         this.runAutomatedTests = runAutomatedTests;
+    }
+
+    public SmartAgentConfig getSmartAgentConfig() {
+        return smartAgentConfig;
+    }
+
+    public void setSmartAgentConfig(SmartAgentConfig smartAgentConfig) {
+        this.smartAgentConfig = smartAgentConfig;
     }
 
     public String getAutomatedTestsCustomPrompt() {

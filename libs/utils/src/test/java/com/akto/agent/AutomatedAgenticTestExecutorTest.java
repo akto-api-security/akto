@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.dto.testing.SmartAgentConfig;
+import com.akto.dto.testing.SmartAgentKnowledgeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -16,6 +18,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -113,6 +116,48 @@ class AutomatedAgenticTestExecutorTest {
         assertTrue(result.getTestResults().get(0).getVulnerable());
         assertTrue(sent().has("finding") && !sent().get("finding").has("testSubType"));
         assertFalse(sent().has("userPrompt"));
+    }
+
+    private static SmartAgentConfig smartAgent() {
+        SmartAgentConfig agent = new SmartAgentConfig();
+        agent.setProfileId("p1");
+        agent.setProfileName("Shop agent");
+        agent.setSkills(Arrays.asList("OBJECT_OWNERSHIP", "TENANT_ISOLATION"));
+        agent.setCustomSkills(Collections.singletonList(new SmartAgentKnowledgeFile("Refunds", "refund an order twice")));
+        agent.setInstructions("Order 7 is mine.");
+        String sha = "ab" + new String(new char[62]).replace('\0', 'c');
+        agent.setKnowledgeFiles(Arrays.asList(new SmartAgentKnowledgeFile("flows.md", "checkout then pay"),
+                new SmartAgentKnowledgeFile("spec.yaml", null, sha, 1200)));
+        agent.setKnowledgeLinks(Collections.singletonList("https://docs.example.test/openapi.json"));
+        return agent;
+    }
+
+    @Test
+    void theRunsSmartAgentIsSentWithEachSmartTestAndAStoredFileOnlyAsItsId() throws Exception {
+        executor().executeAgenticTest(captured(), "X", null, smartAgent());
+        JsonNode sent = sent().get("smartAgent");
+        assertEquals("Shop agent", sent.get("profileName").asText());
+        assertEquals("TENANT_ISOLATION", sent.get("skills").get(1).asText());
+        assertEquals("refund an order twice", sent.get("customSkills").get(0).get("content").asText());
+        assertFalse(sent.get("allowCreateIdentities").asBoolean());
+        assertEquals("Order 7 is mine.", sent.get("instructions").asText());
+        assertEquals("https://docs.example.test/openapi.json", sent.get("knowledgeLinks").get(0).asText());
+        assertEquals("checkout then pay", sent.get("knowledgeFiles").get(0).get("content").asText());
+        assertFalse(sent.get("knowledgeFiles").get(1).has("content"));
+        assertEquals(1200, sent.get("knowledgeFiles").get(1).get("size").asInt());
+        assertTrue(sent.get("knowledgeFiles").get(1).get("sha256").asText().startsWith("ab"));
+
+        executor().verifyFinding(captured(), captured(), "X", smartAgent());
+        assertEquals("Shop agent", sent().get("smartAgent").get("profileName").asText());
+        assertFalse(sent().get("finding").has("smartAgent"));
+    }
+
+    @Test
+    void withoutASmartAgentTheRequestIsExactlyAsBefore() throws Exception {
+        executor().executeAgenticTest(captured(), "X", "use org 7", null);
+        assertFalse(sent().has("smartAgent"));
+        executor().verifyFinding(captured(), captured(), "X");
+        assertFalse(sent().has("smartAgent"));
     }
 
     @Test
