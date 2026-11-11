@@ -224,6 +224,15 @@ export default {
         return resp
     },
 
+    async fetchTopAgenticAssets(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchTopAgenticAssets',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
     async suggestGuardrailCompliance(inputType, payload) {
         const resp = await request({
             url: '/api/ask_ai',

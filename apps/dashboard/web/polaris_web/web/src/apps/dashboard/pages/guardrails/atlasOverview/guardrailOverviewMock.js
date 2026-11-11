@@ -14,13 +14,6 @@ const guardrailOverviewMock = {
         { name: "priya.nair", department: "Platform Eng", devices: 2, count: 22, critical: 2 },
         { name: "arjun.rao", department: "Payments", devices: 1, count: 19, critical: 1 },
     ],
-    topAssets: [
-        { name: "ChatGPT", kind: "Browser AI app", tag: "Personal", count: 288 },
-        { name: "Claude Code", kind: "AI agent CLI", tag: "Approved", count: 214 },
-        { name: "DeepSeek Chat", kind: "Browser AI app", tag: "Unapproved", count: 172 },
-        { name: "postgres-mcp (community)", kind: "MCP server · 14 devices", tag: "Unapproved", count: 96 },
-        { name: "Cursor", kind: "IDE assistant", tag: "Approved", count: 88 },
-    ],
 };
 
 export default guardrailOverviewMock;

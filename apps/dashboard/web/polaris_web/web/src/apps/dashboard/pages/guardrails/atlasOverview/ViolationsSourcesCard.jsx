@@ -26,7 +26,7 @@ export default function ViolationsSourcesCard({ rows, periodDays, onRowClick }) 
                             <Text variant="bodyMd" fontWeight="semibold">{row.count}</Text>
                             {row.changePct !== undefined && row.changePct !== null && (
                                 <Text variant="bodySm" color={row.changePct === 0 ? "subdued" : undefined}>
-                                    <span style={row.changePct === 0 ? undefined : { color: row.changePct > 0 ? TREND_UP_COLOR : TREND_DOWN_COLOR }}>
+                                    <span style={{ whiteSpace: "nowrap", ...(row.changePct === 0 ? {} : { color: row.changePct > 0 ? TREND_UP_COLOR : TREND_DOWN_COLOR }) }}>
                                         {`${formatChange(row.changePct)} vs previous ${periodDays} ${periodDays === 1 ? "day" : "days"}`}
                                     </span>
                                 </Text>

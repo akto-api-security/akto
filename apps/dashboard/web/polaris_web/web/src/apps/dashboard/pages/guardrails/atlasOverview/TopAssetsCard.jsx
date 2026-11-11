@@ -6,7 +6,7 @@ export default function TopAssetsCard({ assets }) {
     return (
         <Card padding="0">
             <Box padding="4" paddingBlockEnd="2">
-                <OverviewCardHeader title="Agents, apps and servers involved" />
+                <OverviewCardHeader title="Top agents, apps and servers involved" />
             </Box>
             {assets.map((asset) => (
                 <OverviewListRow key={asset.name}>

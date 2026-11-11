@@ -84,6 +84,18 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
         }
     }
 
+    public String fetchTopAgenticAssets() {
+        try {
+            InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
+            this.response = overviewService.buildTopAgenticAssets(bundle);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Atlas guardrails overview top agentic assets: " + e.getMessage());
+            addActionError("Failed to build Atlas guardrails overview top agentic assets");
+            return ERROR.toUpperCase();
+        }
+    }
+
     private InsightContext buildCtx() {
         if (endTimestamp == 0) endTimestamp = Context.now();
         return new InsightContext(Context.accountId.get(), Context.userId.get(), Context.contextSource.get(),

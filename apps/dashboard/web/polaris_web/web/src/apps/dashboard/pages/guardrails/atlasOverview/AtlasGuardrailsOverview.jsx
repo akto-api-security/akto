@@ -35,6 +35,13 @@ const ASSET_TYPE_LABELS = {
     [CLIENT_TYPES.SAAS_AGENT]: "SaaS agents",
     Other: "Others",
 };
+const TOP_AGENTIC_ASSETS = 5;
+const AGENTIC_ASSET_KINDS = {
+    [CLIENT_TYPES.LLM]: "Browser AI app",
+    [CLIENT_TYPES.AI_AGENT]: "AI agent CLI",
+    [CLIENT_TYPES.SAAS_AGENT]: "SaaS agent",
+    [CLIENT_TYPES.MCP_SERVER]: "MCP server",
+};
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : Number(n).toLocaleString();
@@ -128,6 +135,35 @@ function buildViolationsSourcesRows(assetTypes) {
         .sort((a, b) => b.count - a.count);
 }
 
+function buildTopAgenticAssetRows(collections) {
+    const groups = new Map();
+    (collections || []).forEach((c) => {
+        const name = formatAssetDisplayName(c.host) || c.host;
+        const group = groups.get(name) || { name, type: c.type, count: 0, devices: new Set(), skills: new Set(), unapproved: false, personal: false };
+        group.count += c.count;
+        if (c.device) group.devices.add(c.device);
+        (c.skills || []).forEach((skill) => group.skills.add(skill));
+        if (!c.approved) group.unapproved = true;
+        if (c.personal) group.personal = true;
+        groups.set(name, group);
+    });
+    return [...groups.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, TOP_AGENTIC_ASSETS)
+        .map((g) => {
+            const isMcpServer = g.type === CLIENT_TYPES.MCP_SERVER;
+            const detail = isMcpServer
+                ? plural(g.devices.size, "device", "devices")
+                : (g.skills.size ? plural(g.skills.size, "skill", "skills") : "");
+            return {
+                name: g.name,
+                kind: [AGENTIC_ASSET_KINDS[g.type] || g.type, detail].filter(Boolean).join(" · "),
+                tag: isMcpServer ? (g.unapproved ? "Unapproved" : "Approved") : (g.personal ? "Personal" : undefined),
+                count: formatCount(g.count),
+            };
+        });
+}
+
 function AtlasGuardrailsOverview() {
     const navigate = useNavigate();
     const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -139,6 +175,7 @@ function AtlasGuardrailsOverview() {
     const [decisions, setDecisions] = useState(null);
     const [policies, setPolicies] = useState(null);
     const [violationsSources, setViolationsSources] = useState(null);
+    const [topAgenticAssets, setTopAgenticAssets] = useState(null);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -165,6 +202,10 @@ function AtlasGuardrailsOverview() {
         guardrailsApi.fetchViolationsSources(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setViolationsSources(resp); })
             .catch(() => { if (!cancelled) setViolationsSources(null); });
+        setTopAgenticAssets(null);
+        guardrailsApi.fetchTopAgenticAssets(startTimestamp, endTimestamp)
+            .then((resp) => { if (!cancelled) setTopAgenticAssets(resp); })
+            .catch(() => { if (!cancelled) setTopAgenticAssets(null); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -185,7 +226,7 @@ function AtlasGuardrailsOverview() {
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} onRowClick={openActivity} />
             <TopEmployeesCard employees={data.topEmployees} />
-            <TopAssetsCard assets={data.topAssets} />
+            <TopAssetsCard assets={buildTopAgenticAssetRows(topAgenticAssets?.collections)} />
         </HorizontalGrid>,
     ];
 

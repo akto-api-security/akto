@@ -239,4 +239,32 @@ public class AtlasGuardrailsOverviewService {
         response.put("assetTypes", assetTypes);
         return response;
     }
+
+    public BasicDBObject buildTopAgenticAssets(InsightDataBundle bundle) {
+        BasicDBObject response = new BasicDBObject();
+        List<BasicDBObject> collections = new ArrayList<>();
+        response.put("collections", collections);
+        List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
+        if (events == null) return response;
+
+        Map<Integer, ApiCollection> collectionsById = new HashMap<>();
+        for (ApiCollection c : bundle.collections) collectionsById.put(c.getId(), c);
+        Map<String, String> remarksByServiceName = InsightUtil.remarksByServiceName(bundle.auditRows);
+        Map<Integer, Map<String, Integer>> byCollection = bundle.hostResolver().countByCollection(
+                AtlasGuardrailUtils.collapseConfigFindings(events), AtlasGuardrailUtils::violationKey);
+        for (Map.Entry<Integer, Map<String, Integer>> entry : byCollection.entrySet()) {
+            ApiCollection c = collectionsById.get(entry.getKey());
+            if (c == null) continue;
+            String type = AgenticObserveUtil.getTypeFromCollection(c);
+            if (!AtlasGuardrailUtils.AGENTIC_ASSET_TYPES.contains(type)) continue;
+            collections.add(new BasicDBObject("host", c.getHostName())
+                    .append("type", type)
+                    .append("device", InsightUtil.deviceIdOf(c))
+                    .append("count", AtlasGuardrailUtils.totalOf(entry.getValue()))
+                    .append("skills", AtlasGuardrailUtils.skillNamesOf(entry.getValue()))
+                    .append("approved", AtlasPeopleService.isSanctioned(c, bundle.allowlistNamesLower, remarksByServiceName))
+                    .append("personal", InsightUtil.isPersonalAccount(c)));
+        }
+        return response;
+    }
 }

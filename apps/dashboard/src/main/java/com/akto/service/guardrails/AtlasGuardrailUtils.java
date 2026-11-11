@@ -27,6 +27,18 @@ public class AtlasGuardrailUtils {
     static final String BEHAVIOUR_APPROVAL = "approval";
     private static final String UNASSIGNED_OWNER = "__unassigned__";
     private static final String CONFIG_ENDPOINT_SEGMENT = "/config/";
+    static final String ASSET_TYPE_OTHER = "Other";
+    static final List<String> ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
+            AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER, AgenticObserveUtil.CLIENT_TYPE_LLM,
+            AgenticObserveUtil.CLIENT_TYPE_SKILL, AgenticObserveUtil.CLIENT_TYPE_PLUGIN, ASSET_TYPE_OTHER);
+    static final String PERIOD_CURRENT = "current";
+    static final String PERIOD_PREVIOUS = "previous";
+    private static final int ASSET_TYPE_EXAMPLES = 5;
+    private static final String EXAMPLE_COUNTS = "exampleCounts";
+    static final List<String> AGENTIC_ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
+            AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_LLM, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
+    private static final String VIOLATION_KEY = "violation";
+    private static final String SKILL_KEY_PREFIX = "skill:";
 
     static List<DashboardMaliciousEvent> collapseConfigFindings(List<DashboardMaliciousEvent> events) {
         Map<String, DashboardMaliciousEvent> latestConfigFinding = new LinkedHashMap<>();
@@ -92,15 +104,6 @@ public class AtlasGuardrailUtils {
     static boolean hasTicket(DashboardMaliciousEvent e) {
         return e.getJiraTicketUrl() != null && !e.getJiraTicketUrl().isEmpty();
     }
-
-    static final String ASSET_TYPE_OTHER = "Other";
-    static final List<String> ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
-            AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER, AgenticObserveUtil.CLIENT_TYPE_LLM,
-            AgenticObserveUtil.CLIENT_TYPE_SKILL, AgenticObserveUtil.CLIENT_TYPE_PLUGIN, ASSET_TYPE_OTHER);
-    static final String PERIOD_CURRENT = "current";
-    static final String PERIOD_PREVIOUS = "previous";
-    private static final int ASSET_TYPE_EXAMPLES = 5;
-    private static final String EXAMPLE_COUNTS = "exampleCounts";
 
     static String periodKey(DashboardMaliciousEvent e, int startTs) {
         return e.getTimestamp() >= startTs ? PERIOD_CURRENT : PERIOD_PREVIOUS;
@@ -173,5 +176,24 @@ public class AtlasGuardrailUtils {
         if (events == null) return null;
         int startTs = bundle.ctx.getStartTs();
         return events.stream().filter(e -> e != null && e.getTimestamp() >= startTs).collect(Collectors.toList());
+    }
+
+    static String violationKey(DashboardMaliciousEvent e) {
+        String skill = SkillEvaluationConcentrationProvider.extractSkillName(e.getUrl());
+        return skill == null ? VIOLATION_KEY : SKILL_KEY_PREFIX + skill;
+    }
+
+    static long totalOf(Map<String, Integer> countsByKey) {
+        long total = 0;
+        for (Integer count : countsByKey.values()) total += count;
+        return total;
+    }
+
+    static List<String> skillNamesOf(Map<String, Integer> countsByKey) {
+        List<String> skills = new ArrayList<>();
+        for (String key : countsByKey.keySet()) {
+            if (key.startsWith(SKILL_KEY_PREFIX)) skills.add(key.substring(SKILL_KEY_PREFIX.length()));
+        }
+        return skills;
     }
 }
