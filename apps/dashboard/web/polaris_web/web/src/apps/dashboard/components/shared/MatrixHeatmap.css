@@ -29,15 +29,24 @@
 
 .matrix-heatmap__row {
     display: flex;
+    position: relative;
     align-items: center;
-    white-space: nowrap;
     min-width: 0;
 }
 
-/* A long row label ends in an ellipsis; the full name is its hover title. */
+/* A long row label wraps onto a second line that still fits the cell height; past that it ends in an ellipsis, and the full name is its hover title. */
 .matrix-heatmap__row-label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+    line-height: 16px;
+}
+
+/* Polaris Text sets its own line height, which would grow the wrapped label past the cell. */
+.matrix-heatmap__row .matrix-heatmap__row-label > * {
+    line-height: inherit;
 }
 
 .matrix-heatmap__cell {
