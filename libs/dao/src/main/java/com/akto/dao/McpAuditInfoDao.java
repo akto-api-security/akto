@@ -4,6 +4,7 @@ import com.akto.dto.McpAuditInfo;
 import com.akto.dao.context.Context;
 import com.akto.dao.insights.agentic.AgentFindingGroupAggregation;
 import com.akto.dto.insights.agentic.AgentFindingGroup;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Accumulators;
@@ -57,6 +58,10 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
         
         fieldNames = new String[]{"updatedTimestamp"};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+
+        // Lets the Atlas discovery decisions be read in _id order within a type without a sort.
+        fieldNames = new String[]{McpAuditInfo.TYPE, Constants.ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{McpAuditInfo.MCP_HOST, McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME};

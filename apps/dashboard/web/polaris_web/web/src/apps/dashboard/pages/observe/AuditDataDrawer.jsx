@@ -266,7 +266,7 @@ function AuditDataDrawer({
             ? <Text variant="bodySm" color="critical">{parentOverride.remarks}</Text>
             : (child?.remarks
                 ? <Text variant="bodySm">{child.remarks}</Text>
-                : <Text variant="bodySm">Approved</Text>),
+                : <Text variant="bodySm">{child?.markedBy ? "Under review" : "Unapproved"}</Text>),
         markedBy: parentOverride ? parentOverride.markedBy : (child.markedBy || "-"),
     }))
 
@@ -363,7 +363,7 @@ function AuditDataDrawer({
     const auditCellData = auditItem ? {
         resourceName: auditItem.resourceName,
         typeBadge: [auditItem.type].filter(Boolean),
-        remarksBadge: [parentOverride ? parentOverride.remarks : (auditItem.remarks || "Approved")],
+        remarksBadge: [parentOverride ? parentOverride.remarks : (auditItem.remarks || (auditItem.markedBy ? "Under review" : "Unapproved"))],
         lastDetected: auditItem.lastDetected ? func.prettifyEpoch(auditItem.lastDetected) : "-",
         updatedTimestamp: auditItem.updatedTimestamp ? func.prettifyEpoch(auditItem.updatedTimestamp) : "-",
         markedBy: parentOverride ? parentOverride.markedBy : (auditItem.markedBy || "-"),

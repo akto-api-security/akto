@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Box, Button, Divider, Form, HorizontalStack, LegacyCard, Text, TextField, VerticalStack } from "@shopify/polaris";
 import func from "@/util/func";
 import Pressable from "../../pages/dashboard/ask/components/Pressable";
@@ -30,6 +30,7 @@ function AskBar({
     chatScope,
     chatData,
     conversationType = "AGENTIC_OBSERVE",
+    request,
 }) {
     const [query, setQuery] = useState("");
     const [messages, setMessages] = useState([]);
@@ -38,13 +39,13 @@ function AskBar({
     const [focused, setFocused] = useState(false);
     const latestRequest = useRef(0);
 
-    const submit = useCallback(async (text) => {
+    const submit = useCallback(async (text, clearInput = true) => {
         const question = (text ?? query).trim();
         if (!question || loading) return;
 
         const requestId = ++latestRequest.current;
         setMessages((prev) => [...prev, { id: `user_${requestId}`, role: "user", message: question }]);
-        setQuery("");
+        if (clearInput) setQuery("");
         setLoading(true);
 
         try {
@@ -64,6 +65,17 @@ function AskBar({
             if (latestRequest.current === requestId) setLoading(false);
         }
     }, [query, loading, conversationId, conversationType, chatScope, chatData]);
+
+    // Asks the question another part of the page sent; only a new request id triggers it.
+    useEffect(() => {
+        if (!request?.question) return;
+        if (loading) {
+            func.setToast(true, true, "Still answering the previous question. Try again in a moment.");
+            return;
+        }
+        // The user's own typed text stays put.
+        submit(request.question, false);
+    }, [request?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const clear = useCallback(() => {
         latestRequest.current += 1;

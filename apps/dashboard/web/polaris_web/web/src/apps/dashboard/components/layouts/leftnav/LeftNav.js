@@ -17,13 +17,16 @@ import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import Store from "../../../store";
 import api from "../../../../signup/api";
-import { useCallback, useMemo, useState} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import func from "@/util/func";
 import { usePermissions, pageRequires } from "@/util/permissions";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
 import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_ENDPOINT_SECURITY, CATEGORY_DAST, mapLabel, isAgenticSecurityCategory } from "../../../../main/labelHelper";
+
+// The Overview tiles link to these nav pages (and Back returns to Overview); the highlight follows them.
+const LINKED_NAV_IDS = new Set(["dashboard_observe_agentic_discovery", "dashboard_observe_agentic_assets", "dashboard_observe_endpoints"]);
 
 // a nav item's "requires" is the action its page loads first; items the role can't open are left out,
 // a section with nothing left is hidden, and a section opens its first item the role can open
@@ -63,6 +66,12 @@ export default function LeftNav() {
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
+
+    // A link (not a nav click) to one of those pages moves the highlight; exact ids only, so sub-pages keep their parent's.
+    useEffect(() => {
+        const observeId = currPathString.replace(/-/g, "_");
+        if (LINKED_NAV_IDS.has(observeId)) setLeftNavSelected(observeId);
+    }, [currPathString]);
 
     const handleAccountChange = useCallback(async (selected) => {
         const accountId = selected === undefined || selected === null || selected === ""
@@ -261,6 +270,17 @@ export default function LeftNav() {
                 subNavigationItems: [
                     ...(dashboardCategory === CATEGORY_ENDPOINT_SECURITY ? [
                     // { label: "Agentic assets (legacy)", onClick: () => { navigate("/dashboard/observe/agentic-assets"); handleSelect("dashboard_observe_agentic_assets"); setActive("active"); }, selected: leftNavSelected === "dashboard_observe_agentic_assets" },
+                    {
+                        label: "Overview",
+                        requires: pageRequires("/dashboard/observe/agentic-discovery"),
+                        badge: <Badge status="info">Beta</Badge>,
+                        onClick: () => {
+                            navigate("/dashboard/observe/agentic-discovery");
+                            handleSelect("dashboard_observe_agentic_discovery");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_agentic_discovery",
+                    },
                     {
                         label: "Agentic assets",
                         onClick: () => {
