@@ -1870,6 +1870,25 @@ public class DbAction extends ActionSupport {
         }
     }
     
+    String testScriptId;
+    public void setTestScriptId(String testScriptId) {
+        this.testScriptId = testScriptId;
+    }
+
+    public String fetchTestScriptById() {
+        if (testScriptId == null || testScriptId.isEmpty()) {
+            addActionError("testScriptId is required");
+            return Action.ERROR.toUpperCase();
+        }
+        try {
+            testScript = DbLayer.fetchTestScriptById(testScriptId);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchTestScriptById " + testScriptId);
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     public String countTestingRunResultSummaries() {
         count = DbLayer.countTestingRunResultSummaries(testingRunHexId, sinceTimestamp, TestingRun.State.valueOf(state));
         return Action.SUCCESS.toUpperCase();

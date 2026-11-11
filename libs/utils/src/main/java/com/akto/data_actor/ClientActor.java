@@ -81,6 +81,7 @@ public class ClientActor extends DataActor {
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     public static final String ULTRON_URL = "https://ultron.akto.io";
     private static final String PARAM_TEST_SCRIPT_TYPE = "testScriptType";
+    private static final String PARAM_TEST_SCRIPT_ID = "testScriptId";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static ExecutorService sequenceThreadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
         
@@ -4510,36 +4511,39 @@ public class ClientActor extends DataActor {
     }
 
     public TestScript fetchTestScript(TestScript.Type type){
-        TestScript testScript = null;
-
-        Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put(PARAM_TEST_SCRIPT_TYPE, type != null ? type.name() : null);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestScript", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("invalid response in fetchTestScript", LoggerMaker.LogDb.RUNTIME);
-                return testScript;
-            }
-            BasicDBObject payloadObj;
+        return requestTestScript("/fetchTestScript", obj);
+    }
 
-            try {
-                payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBObject testScriptObj = (BasicDBObject) payloadObj.get("testScript");
-                // No script configured for this type is a normal, common outcome (most accounts
-                // don't set one) — not an error. Avoid NPE-ing on toJson() and don't log it.
-                if (testScriptObj != null) {
-                    testScript = objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
-            }
+    public TestScript fetchTestScriptById(String id){
+        BasicDBObject obj = new BasicDBObject();
+        obj.put(PARAM_TEST_SCRIPT_ID, id);
+        return requestTestScript("/fetchTestScriptById", obj);
+    }
+
+    /**
+     * null when the database-abstractor has no such script (a normal outcome: most accounts have none);
+     * throws when the script could not be read, so callers never cache a failure as "no script".
+     */
+    private TestScript requestTestScript(String path, BasicDBObject body) {
+        OriginalHttpRequest request = new OriginalHttpRequest(url + path, "", "POST", body.toString(), buildHeaders(), "");
+        OriginalHttpResponse response;
+        try {
+            response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchTestScript" + e, LoggerMaker.LogDb.RUNTIME);
+            throw new IllegalStateException("error calling " + path, e);
         }
-        return testScript;
+        if (response == null || response.getStatusCode() != 200 || response.getBody() == null) {
+            throw new IllegalStateException("invalid response from " + path + ": " + (response == null ? "null" : response.getStatusCode()));
+        }
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(response.getBody());
+            BasicDBObject testScriptObj = (BasicDBObject) payloadObj.get("testScript");
+            return testScriptObj == null ? null : objectMapper.readValue(testScriptObj.toJson(), TestScript.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("error parsing response from " + path, e);
+        }
     }
 
     public List<DependencyNode> findDependencyNodes(int apiCollectionId, String urlVar, String method, String reqMethod) {
