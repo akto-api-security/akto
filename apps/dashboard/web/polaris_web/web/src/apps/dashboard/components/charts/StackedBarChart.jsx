@@ -8,8 +8,8 @@ const BAR_RADIUS = 2;
 // Labels only at the first, middle and last category, so a long run of periods stays readable.
 const sparseTicks = (count) => [...new Set([0, Math.floor((count - 1) / 2), count - 1])];
 
-// Stacked columns with totals on top; series: [{ name, color, data }] listed bottom to top.
-export default function StackedBarChart({ categories, series, height = 220, tooltipFormatter }) {
+// Stacked columns with totals on top; series: [{ name, color, data }] listed bottom to top. onPointClick(seriesName, index) makes the columns clickable; index is the column position.
+export default function StackedBarChart({ categories, series, height = 220, tooltipFormatter, onPointClick }) {
     const options = useMemo(() => ({
         chart: { type: "column", height, spacing: [18, 0, 0, 0] },
         title: { text: null },
@@ -28,9 +28,10 @@ export default function StackedBarChart({ categories, series, height = 220, tool
         tooltip: { shared: true, formatter: tooltipFormatter },
         plotOptions: {
             column: { stacking: "normal", borderWidth: 0, borderRadius: BAR_RADIUS, groupPadding: 0.08, pointPadding: 0 },
+            series: onPointClick ? { cursor: "pointer", point: { events: { click() { onPointClick(this.series.name, this.index); } } } } : {},
         },
         series: series.map((item) => ({ name: item.name, color: item.color, data: item.data })),
-    }), [categories, series, height, tooltipFormatter]);
+    }), [categories, series, height, tooltipFormatter, onPointClick]);
 
     return <HighchartsReact highcharts={Highcharts} options={options} />;
 }

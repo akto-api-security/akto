@@ -19,7 +19,7 @@ import ViolationsBySeverityCard from "./ViolationsBySeverityCard";
 import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
 import {
-    DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH,
+    CATEGORY_ORDER, DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH,
 } from "./peopleConstants";
 import transform from "./transform";
 
@@ -156,6 +156,20 @@ function DevicesEmployeesPage() {
         if (device) openPerson("device", device);
         else if (employee) openPerson("employee", employee);
     }, [openPerson]);
+
+    // ?team=<name>[&category=agents|mcp|browser] opens the Employees tab filtered to that team and tool type (the Atlas Overview links here).
+    // The filters only know their values once the overview has loaded, and the grid drops a selection it does not know, so this waits for it.
+    const teamLinkHandled = useRef(false);
+    useEffect(() => {
+        if (teamLinkHandled.current || overviewStatus === "loading") return;
+        teamLinkHandled.current = true;
+        const params = new URLSearchParams(window.location.search);
+        const team = params.get("team");
+        const category = params.get("category");
+        if (team && !params.get("device") && !params.get("employee") && !params.get("user")) {
+            showTable("employees", { teams: [team], categories: CATEGORY_ORDER.includes(category) ? [category] : [] });
+        }
+    }, [overviewStatus, showTable]);
 
     const exportTable = async () => {
         const requestName = tab === "employees" ? "fetchAtlasEmployees" : "fetchAtlasDevices";

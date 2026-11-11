@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import { useNavigate } from "react-router-dom";
+import { Badge, HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
 import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS } from "../devices_employees/constants";
-import { ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, LOAD_STATE, SUBTITLES } from "./constants";
+import { CATEGORY_ORDER as PEOPLE_TOOL_TYPES } from "../devices_employees/peopleConstants";
+import { ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, DEVICES_PATH, LOAD_STATE, SUBTITLES } from "./constants";
 import { agentMcpMatrix, decisionsPageSize, teamMatrix } from "./transform";
 import DiscoveryHeaderActions from "./shared/DiscoveryHeaderActions";
+import { openNewLayoutPage } from "./shared/openInventory";
 import useAssetStatusUpdate from "./shared/useAssetStatusUpdate";
 import useDiscoveryOverview from "./shared/useDiscoveryOverview";
 import useDiscoveryFilters, { useToolsExport } from "./shared/useDiscoveryFilters";
@@ -33,6 +36,7 @@ function teamCellHeightFor(agentMatrix, teamsMatrix) {
 }
 
 function AgenticDiscoveryOverview() {
+    const navigate = useNavigate();
     const filters = useDiscoveryFilters();
     const { deviceScope } = filters;
     const fleet = useFleetStats(deviceScope);
@@ -59,6 +63,12 @@ function AgenticDiscoveryOverview() {
         setAskRequest((current) => ({ id: (current?.id || 0) + 1, question }));
         askRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, []);
+
+    // A team's employees on Devices & employees, narrowed to a tool type when that page has one for the category (IDE assistants and skills do not).
+    const openTeam = (team, category) => {
+        const toolType = PEOPLE_TOOL_TYPES.includes(category) ? `&category=${category}` : "";
+        openNewLayoutPage(navigate, `${DEVICES_PATH}?team=${encodeURIComponent(team)}${toolType}`);
+    };
 
     const closeFlyout = useCallback(() => setOpenRow(null), []);
     // A tool may not exist in the new device scope, so its flyout would only show an error.
@@ -119,6 +129,8 @@ function AgenticDiscoveryOverview() {
                 matrix={agentMatrix}
                 emptyText="No agent is connected to an MCP server yet."
                 labelWidth={120}
+                onRowClick={(row) => setOpenRow(row.source)}
+                onCellClick={(row, column) => setOpenRow(column.source || row.source)}
                 cellHeight={AGENT_CELL_HEIGHT}
                 minCellWidth={76}
             />
@@ -132,6 +144,8 @@ function AgenticDiscoveryOverview() {
                 format={(value) => `${value}%`}
                 emptyCellText="0%"
                 labelWidth={110}
+                onRowClick={(row) => openTeam(row.label)}
+                onCellClick={(row, column) => openTeam(row.label, column.id)}
                 cellHeight={teamCellHeight}
                 minCellWidth={56}
             />
@@ -141,6 +155,7 @@ function AgenticDiscoveryOverview() {
     return (
         <PageWithMultipleCards
             title="Agentic discovery"
+            titleMetadata={<Badge status="info">Beta</Badge>}
             subtitle={`Every AI agent, MCP server, skill and browser AI app${fleet.managedDevices === null ? "" : ` on ${observeFunc.formatNumberWithCommas(fleet.managedDevices)} managed devices`}`}
             isFirstPage
             secondaryActions={<DiscoveryHeaderActions filters={filters} onExport={exportTools} exporting={exporting} />}
