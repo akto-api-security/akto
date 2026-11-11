@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import { themeQuartz } from "ag-grid-enterprise";
-import { Box, HorizontalStack, Pagination, Text, VerticalStack, Button, TextField, Icon } from "@shopify/polaris";
+import { ActionList, Box, HorizontalGrid, HorizontalStack, Pagination, Popover, Text, VerticalStack, Button, TextField, Icon } from "@shopify/polaris";
 import { MobileCancelMajor, SearchMinor } from "@shopify/polaris-icons";
 import PersistStore from "@/apps/main/PersistStore";
 import "./rows/row.css";
@@ -40,7 +40,15 @@ export const agTableTheme = themeQuartz.withParams({
 
 function SearchBar({ value, onChange, placeholder, topRadius = true }) {
     return (
-        <Box borderWidth="1" borderColor="border-subdued" borderRadiusStartStart={topRadius ? 2 : 0} borderRadiusStartEnd={topRadius ? 2 : 0} padding={1} borderInlineStartWidth="1" borderBlockStartWidth="1" borderInlineEndWidth="1">
+        <Box
+            borderColor="border-subdued"
+            borderRadiusStartStart={topRadius ? 2 : 0}
+            borderRadiusStartEnd={topRadius ? 2 : 0}
+            padding={1}
+            {...(topRadius
+                ? { borderWidth: "1", borderInlineStartWidth: "1", borderBlockStartWidth: "1", borderInlineEndWidth: "1" }
+                : { borderBlockStartWidth: "1", borderBlockEndWidth: "1" })}
+        >
             <div className="ag-grid-search-bar">
             <TextField
                 prefix={<Box><Icon source={SearchMinor} /></Box>}
@@ -203,7 +211,8 @@ export default function AgGridTable({
     serverSideRowModel = false,
     ...rest
 }) {
-    const paginationPageSize = hidePageSizeSelector ? (paginationPageSizeProp || 20) : 50;
+    const [paginationPageSize, setPaginationPageSize] = useState(hidePageSizeSelector ? (paginationPageSizeProp || 20) : 50);
+    const [pageSizePopoverActive, setPageSizePopoverActive] = useState(false);
     const hasSearch = !!searchPlaceholder || !!renderSearch;
     const isSearchControlled = searchValueProp !== undefined;
     const [uncontrolledSearch, setUncontrolledSearch] = useState("");
@@ -284,7 +293,7 @@ export default function AgGridTable({
                 }
             });
         }
-    }, [query.filters, query.sortKey, query.sortOrder, query.page, debouncedSearchValue, fetchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [query.filters, query.sortKey, query.sortOrder, query.page, paginationPageSize, debouncedSearchValue, fetchTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleFilterChanged = useCallback((e) => {
         if (!isServerMode) return;
@@ -371,8 +380,9 @@ export default function AgGridTable({
 
     // Custom pagination bar — only rendered in the non-SSRM server mode; SSRM uses AG Grid's own footer.
     const serverPaginationBar = isServerMode && !useSSRM && query.total > 0 ? (
-        <Box padding="2">
-            <HorizontalStack align="center">    
+        <Box padding="2" borderBlockStartWidth="1" borderColor="border-subdued">
+            <HorizontalGrid columns="1fr auto 1fr" gap="4" alignItems="center">
+                <Box />
                 <Pagination
                     hasPrevious={query.page > 0}
                     onPrevious={() => dispatchQuery({ type: "SET_PAGE", page: query.page - 1 })}
@@ -380,7 +390,36 @@ export default function AgGridTable({
                     onNext={() => dispatchQuery({ type: "SET_PAGE", page: query.page + 1 })}
                     label={query.total === 0 ? "No results" : query.page * paginationPageSize + 1 + "-" + Math.min((query.page + 1) * paginationPageSize, query.total) + " of " + query.total}
                 />
-            </HorizontalStack>
+                {hidePageSizeSelector ? <Box /> : (
+                    <HorizontalStack align="end">
+                        <Popover
+                            active={pageSizePopoverActive}
+                            onClose={() => setPageSizePopoverActive(false)}
+                            preferredAlignment="right"
+                            fullWidth
+                            activator={
+                                <Box width="120px">
+                                    <Button disclosure="select" fullWidth onClick={() => setPageSizePopoverActive((active) => !active)}>
+                                        {`Show ${paginationPageSize}`}
+                                    </Button>
+                                </Box>
+                            }
+                        >
+                            <ActionList
+                                items={paginationPageSizeSelector.map((size) => ({
+                                    content: String(size),
+                                    active: size === paginationPageSize,
+                                    onAction: () => {
+                                        dispatchQuery({ type: "SET_PAGE", page: 0 });
+                                        setPaginationPageSize(size);
+                                        setPageSizePopoverActive(false);
+                                    },
+                                }))}
+                            />
+                        </Popover>
+                    </HorizontalStack>
+                )}
+            </HorizontalGrid>
         </Box>
     ) : null;
 

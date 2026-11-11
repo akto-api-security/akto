@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, HorizontalGrid } from "@shopify/polaris";
+import { Box, Button, Card, HorizontalGrid } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
@@ -19,7 +19,7 @@ import ViolationsBySeverityCard from "./ViolationsBySeverityCard";
 import PeopleFlyout from "./PeopleFlyout";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS, ATLAS_CHAT_SCOPE } from "./constants";
 import {
-    DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH,
+    CATEGORY_ORDER, DEVICE_SCOPES, EMPTY_PEOPLE_FILTERS, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT, HIGH_RISK_THRESHOLD, MIN_SEARCH_LENGTH,
 } from "./peopleConstants";
 import transform from "./transform";
 
@@ -41,6 +41,7 @@ function DevicesEmployeesPage() {
     const [severityCounts, setSeverityCounts] = useState(null);
     const [severityStatus, setSeverityStatus] = useState("loading");
     const [queuedModuleIds, setQueuedModuleIds] = useState([]);
+    const [clickedStat, setClickedStat] = useState(null);
 
     useEffect(() => {
         let ignore = false;
@@ -128,9 +129,12 @@ function DevicesEmployeesPage() {
         setFilters({ ...EMPTY_PEOPLE_FILTERS, ...patch });
     }, []);
     const markQueued = useCallback((moduleIds) => setQueuedModuleIds((previous) => [...new Set([...previous, ...moduleIds])]), []);
+    const tableRef = useRef(null);
+    // Chart and stat clicks drive the table below them, so bring it into view when one applies a filter.
     const toggleView = (nextTab, patch = {}) => {
         const sameView = tab === nextTab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...patch }) === JSON.stringify(filters);
         showTable(nextTab, sameView ? {} : patch);
+        if (!sameView) tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
     const onDevicesTab = tab === "devices";
     const activeHealth = onDevicesTab && filters.healthStates.length === 1 ? filters.healthStates[0] : null;
@@ -156,6 +160,20 @@ function DevicesEmployeesPage() {
         else if (employee) openPerson("employee", employee);
     }, [openPerson]);
 
+    // ?team=<name>[&category=agents|mcp|browser] opens the Employees tab filtered to that team and tool type (the Atlas Overview links here).
+    // The filters only know their values once the overview has loaded, and the grid drops a selection it does not know, so this waits for it.
+    const teamLinkHandled = useRef(false);
+    useEffect(() => {
+        if (teamLinkHandled.current || overviewStatus === "loading") return;
+        teamLinkHandled.current = true;
+        const params = new URLSearchParams(window.location.search);
+        const team = params.get("team");
+        const category = params.get("category");
+        if (team && !params.get("device") && !params.get("employee") && !params.get("user")) {
+            showTable("employees", { teams: [team], categories: CATEGORY_ORDER.includes(category) ? [category] : [] });
+        }
+    }, [overviewStatus, showTable]);
+
     const exportTable = async () => {
         const requestName = tab === "employees" ? "fetchAtlasEmployees" : "fetchAtlasDevices";
         const params = transform.peopleParams(deviceScope, filters, search.length >= MIN_SEARCH_LENGTH ? search : "");
@@ -178,7 +196,9 @@ function DevicesEmployeesPage() {
 
     const onSelectStat = (id) => {
         const target = transform.statCardTarget(id);
-        if (target) toggleView(target.tab, target.filters);
+        if (!target) return;
+        toggleView(target.tab, target.filters);
+        setClickedStat(clickedStat === id ? null : id);
     };
     const onSelectSeverity = (severity) => toggleView("devices", { violationSeverities: [severity] });
     const onSelectMode = (mode) => toggleView("devices", { guardrailModes: [mode] });
@@ -203,7 +223,7 @@ function DevicesEmployeesPage() {
                     suggestions={ASK_ATLAS_SUGGESTIONS}
                     chatScope={ATLAS_CHAT_SCOPE}
                 />,
-                <SummaryCardInfo key="stats-row" summaryItems={transform.buildStatItems(stats, onSelectStat, discovery)} />,
+                <SummaryCardInfo key="stats-row" summaryItems={transform.buildStatItems(stats, onSelectStat, discovery, transform.activeStatCard(tab, filters, clickedStat))} />,
                 <HorizontalGrid key="overview-cards" columns={{ xs: 1, md: 3 }} gap="4">
                     <AgentHealthCard
                         overview={overview}
@@ -234,6 +254,9 @@ function DevicesEmployeesPage() {
                 <HorizontalGrid key="trend-cards" columns={{ xs: "1fr", md: "2fr 1fr" }} gap="4">
                     <Card padding="0">
                         <EndpointBrowserTrendChart
+                            subtitle="Managed endpoints and browser extensions by month"
+                            height={250}
+                            tooltip={transform.tooltip("Number of managed devices over time, split by operating system for desktop agents and by browser for browser extensions.")}
                             osTrend={trendStats?.osTrend || {}}
                             browserTrend={trendStats?.browserTrend || {}}
                             monthLabels={trendStats?.monthLabels || []}
@@ -241,22 +264,23 @@ function DevicesEmployeesPage() {
                     </Card>
                     <ViolationsBySeverityCard counts={severityCounts} status={severityStatus} onSelect={onSelectSeverity} />
                 </HorizontalGrid>,
-                <PeopleTable
-                    key="people-table"
-                    tab={tab}
-                    onTabChange={(nextTab) => showTable(nextTab)}
-                    filters={filters}
-                    onFiltersChange={patchFilters}
-                    deviceScope={deviceScope}
-                    counts={{ employees: overview?.employeeCount, devices: overview?.deviceCount }}
-                    search={search}
-                    onSearchChange={setSearch}
-                    violationsAvailable={overview?.violationsAvailable}
-                    riskAvailable={overview?.riskAvailable}
-                    onOpen={openPerson}
-                    selected={openTarget}
-                    filterOptions={filterOptions}
-                />,
+                <Box key="people-table" ref={tableRef}>
+                    <PeopleTable
+                        tab={tab}
+                        onTabChange={(nextTab) => showTable(nextTab)}
+                        filters={filters}
+                        onFiltersChange={patchFilters}
+                        deviceScope={deviceScope}
+                        counts={{ employees: overview?.employeeCount, devices: overview?.deviceCount }}
+                        search={search}
+                        onSearchChange={setSearch}
+                        violationsAvailable={overview?.violationsAvailable}
+                        riskAvailable={overview?.riskAvailable}
+                        onOpen={openPerson}
+                        selected={openTarget}
+                        filterOptions={filterOptions}
+                    />
+                </Box>,
                 <PeopleFlyout
                     key="people-flyout"
                     target={openTarget}

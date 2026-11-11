@@ -14,7 +14,7 @@ import { RiskPill } from "./AgenticCellRenderers";
 //   subtitle — Optional text rendered as its own row below the breadcrumb, still above the divider
 //              (e.g. an asset's description).
 
-export default function FlyoutBreadcrumb({ items = [], onClose, children, subtitle }) {
+export default function FlyoutBreadcrumb({ items = [], onClose, children, subtitle, asTitle }) {
     return (
         <>
             <Box
@@ -36,7 +36,7 @@ export default function FlyoutBreadcrumb({ items = [], onClose, children, subtit
                                                 {item.label}
                                             </Link>
                                         ) : (
-                                            <Text variant="bodySm" fontWeight={isLast ? "semibold" : "regular"}>
+                                            <Text variant={asTitle ? "headingMd" : "bodySm"} fontWeight={isLast || asTitle ? "semibold" : "regular"}>
                                                 {item.label}
                                             </Text>
                                         )}

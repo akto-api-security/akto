@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Text, VerticalStack } from "@shopify/polaris";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
@@ -139,9 +139,9 @@ export default function AssetOverview({ asset, enrichMaps, startTimestamp, endTi
     const violations = useRecentViolations(asset);
     const topEmployees = useMemo(() => (assetDevices ? topEmployeesOf(assetDevices.devices) : null), [assetDevices]);
     const recentViolations = violations ? Object.values(violations).reduce((sum, n) => sum + n, 0) : 0;
-    const footprint = useMemo(() => (assetDevices && violations
-        ? buildAssetFootprint({ asset, devices: assetDevices.devices, deviceTotal: assetDevices.total, violations })
-        : null), [asset, assetDevices, violations]);
+    const buildFootprint = useCallback(({ fullscreen, expanded }) => buildAssetFootprint({
+        asset, devices: assetDevices.devices, deviceTotal: assetDevices.total, violations, fullscreen, expanded,
+    }), [asset, assetDevices, violations]);
     const riskFactors = useMemo(() => computeAssetRiskFactors(asset), [asset]);
     const details = useMemo(() => detailsOf(asset), [asset]);
     const chatData = useMemo(() => ({
@@ -179,8 +179,8 @@ export default function AssetOverview({ asset, enrichMaps, startTimestamp, endTi
                     </CalloutStrip>
                 )}
 
-                {footprint && (
-                    <FootprintGraph key={asset.id} title="AI footprint" model={footprint} legend={ASSET_FOOTPRINT_LEGEND} />
+                {assetDevices && violations && (
+                    <FootprintGraph key={asset.id} title="AI footprint" buildModel={buildFootprint} legend={ASSET_FOOTPRINT_LEGEND} />
                 )}
 
                 {toolsSection && (

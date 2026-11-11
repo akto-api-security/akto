@@ -39,9 +39,9 @@ export const CATEGORY_LABELS = {
 };
 
 export const CATEGORY_BACKGROUNDS = {
-    agents: "bg-magic-strong",
-    mcp: "bg-magic-hover",
-    browser: "bg-magic-subdued",
+    agents: "bg-inverse-hover",
+    mcp: "bg-strong-active",
+    browser: "bg-inverse-active",
 };
 
 export const HEALTH_LABELS = {
@@ -86,7 +86,7 @@ export const EMPLOYEE_CHIPS = [
     { key: "usesAi", label: "Uses AI tools" },
     { key: "hasUnapproved", label: "Has unapproved tools" },
     { key: "usesPersonal", label: "Uses personal AI accounts" },
-    { key: "highRisk", label: "Risk 4+" },
+    { key: "highRisk", label: "Has risk 4+" },
 ];
 
 export const DEVICE_CHIPS = [
@@ -122,6 +122,10 @@ export const FOOTPRINT_LEGEND = [
 ];
 
 export const PEOPLE_TABLE_HEIGHT = 500;
+// Smallest table body, so the loading and "no rows" overlays still fit.
+export const PEOPLE_TABLE_MIN_HEIGHT = 200;
+// Grid header (AgGridTable's 40px default) plus room for the horizontal scrollbar.
+export const PEOPLE_TABLE_CHROME_HEIGHT = 56;
 
 export const MIN_SEARCH_LENGTH = 3;
 export const EXPORT_PAGE_SIZE = 500;
@@ -132,7 +136,7 @@ export const FILTER_LABELS = {
     osBrowser: "OS/Browser",
     healthStates: "Agent",
     guardrailModes: "Guardrail mode",
-    categories: "Tool type",
+    categories: "Asset type",
     tags: "Tag",
 };
 

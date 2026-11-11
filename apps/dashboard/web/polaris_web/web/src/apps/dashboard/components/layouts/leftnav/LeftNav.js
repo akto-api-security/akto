@@ -273,7 +273,6 @@ export default function LeftNav() {
                     {
                         label: "Overview",
                         requires: pageRequires("/dashboard/observe/agentic-discovery"),
-                        badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/observe/agentic-discovery");
                             handleSelect("dashboard_observe_agentic_discovery");
@@ -311,7 +310,6 @@ export default function LeftNav() {
                     ...((dashboardCategory === "Agentic Security" || dashboardCategory === "Endpoint Security") && window?.STIGG_FEATURE_WISE_ALLOWED?.AGENT_TRAFFIC_LOGS?.isGranted === true ? [{
                         label: "Traces",
                         requires: pageRequires("/dashboard/observe/llm-observability"),
-                        badge: <Badge status="info">Beta</Badge>,
                         onClick: () => {
                             navigate("/dashboard/observe/llm-observability");
                             handleSelect("dashboard_observe_llm_observability");
@@ -441,6 +439,18 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_testing_scripts",
                         requires: pageRequires("/dashboard/testing/scripts"),
+                    }] : []),
+                    // smart agents: same access as smart testing in the Run test modal
+                    ...((window?.STIGG_FEATURE_WISE_ALLOWED?.AUTOMATED_AGENTIC_TEST_RUN?.isGranted === true || window?.USER_NAME?.indexOf("@akto.io") !== -1) ? [{
+                        label: "Smart agents",
+                        badge: <Badge status="info">Beta</Badge>,
+                        onClick: () => {
+                            navigate("/dashboard/testing/smart-agents");
+                            handleSelect("dashboard_testing_smart_agents");
+                            setActive("active");
+                        },
+                        selected: typeof leftNavSelected === "string" && leftNavSelected.startsWith("dashboard_testing_smart_agents"),
+                        requires: pageRequires("/dashboard/testing/smart-agents"),
                     }] : []),
                 ],
                 key: "4",

@@ -1,4 +1,5 @@
 import { HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { CustomersMajor } from "@shopify/polaris-icons";
 import SegmentBar from "@/apps/dashboard/components/shared/SegmentBar";
 import Pressable from "@/apps/dashboard/pages/dashboard/ask/components/Pressable";
 import DiscoveryCard from "../shared/DiscoveryCard";
@@ -21,7 +22,9 @@ export default function AdoptionCard({ rows, status, onOpen }) {
             subtitle={SUBTITLES.adoption}
             status={status}
             empty={!rows || rows.length === 0}
-            emptyText="No employee usage has been mapped to tools yet."
+            emptyIcon={CustomersMajor}
+            emptyTone="subdued"
+            emptyText="No employee has used an AI tool in the last 30 days."
         >
             <VerticalStack gap="3">
                 {(rows || []).map((row) => (

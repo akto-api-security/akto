@@ -1,3 +1,4 @@
+import { typeLabelOf } from "../../agentic/inventoryCategories";
 import { BRAND_PURPLE, PURPLE_LIGHT, REVIEW_YELLOW, RISKY_RED } from "@/apps/dashboard/components/shared/dataColors";
 export const ATLAS_DISCOVERY_CHAT_SCOPE = "atlas_agentic_discovery";
 
@@ -14,15 +15,6 @@ export const CATEGORY_LABELS = {
 
 export { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../devices_employees/peopleConstants";
 
-// Short type tag shown next to a tool name in lists.
-export const CATEGORY_SHORT = {
-    agents: "Agent",
-    ide: "IDE",
-    mcp: "MCP",
-    browser: "Browser",
-    skills: "Skill",
-};
-
 // Mirrors RISK_REACH_LIMIT in AtlasDiscoveryService.
 const RISK_REACH_LIMIT = 50;
 
@@ -31,7 +23,7 @@ export const SUBTITLES = {
     adoption: "Employees using each tool, last 30 days",
     trend: "Per week, last 12 weeks, by current status",
     reach: `Top ${RISK_REACH_LIMIT} tools by devices. Each circle is a tool, sized by its employees. The shaded corner is high risk on many devices. Select a circle for details.`,
-    chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first. Line width shows devices.",
+    chain: "Teams reaching MCP servers through AI tools. Top 10 of each, busiest first; only connected nodes are shown. Line width shows devices.",
     agentMcp: "Devices where an agent has each MCP server configured; darker means more devices. Shows up to 5 agents and 8 MCP servers, the busiest first.",
     teams: "Share of each team's employees using a category, last 30 days",
 };
@@ -88,6 +80,13 @@ export const DEVICES_PATH = "/dashboard/observe/endpoints";
 export const INVENTORY_PATH = "/dashboard/observe/agentic-assets";
 // The inventory tab (category key) a tile opens; the Skills & plugins tile opens Skills, and Plugins is the tab next to it.
 export const INVENTORY_CATEGORIES = { agents: ["agent"], ide: ["ide"], mcp: ["mcp"], browser: ["browser_ai"], skills: ["skills"] };
+// Mirrors WEEK_SECONDS in AtlasDiscoveryService.
+export const WEEK_SECONDS = 7 * 24 * 60 * 60;
+// The tabs the status charts count: every tool that can be approved or blocked.
+export const GOVERNED_INVENTORY_CATEGORIES = [...INVENTORY_CATEGORIES.agents, ...INVENTORY_CATEGORIES.ide, ...INVENTORY_CATEGORIES.mcp, ...INVENTORY_CATEGORIES.browser];
+
+// Type tag shown next to a tool name in lists: the inventory's own Type text ("AI agent", "MCP server", ...).
+export const CATEGORY_SHORT = Object.fromEntries(Object.entries(INVENTORY_CATEGORIES).map(([category, [tab]]) => [category, typeLabelOf({ inventoryCategory: tab })]));
 
 // Row signals, shown as small tags; the red ones are the ones to act on.
 export const SIGNAL_META = {
@@ -119,12 +118,13 @@ export const LOAD_STATE = { LOADING: "loading", ERROR: "error", READY: "ready" }
 // Asset status values as the backend sends them.
 export const ASSET_STATUS = { APPROVED: "APPROVED", UNDER_REVIEW: "UNDER_REVIEW", UNAPPROVED: "UNAPPROVED", BLOCKED: "BLOCKED" };
 
+// `filters` (and `categories`, default the governed tabs) is what the row opens in the inventory; a row without them asks Atlas its question.
 export const RISKY_CONFIG_META = {
-    malicious: { label: "Malicious components", sub: "MCP servers or skills flagged as malicious", question: "Which MCP servers or skills are flagged as malicious?" },
-    misconfigured: { label: "Misconfigured tool configs", sub: "Agents, servers or skills flagged with a risky config", question: "Which agents, MCP servers or skills have a risky configuration?" },
-    localMcp: { label: "Local MCP servers", sub: "Running on employee devices, outside any gateway", question: "Which MCP servers run locally on employee devices?" },
-    personal: { label: "Personal AI accounts", sub: "Tools signed in with a personal account", question: "Who is using personal AI accounts?" },
-    highRiskUnreviewed: { label: "High-risk tools not reviewed", sub: "Unapproved or under review, risk 4.0 or higher", question: "Which high-risk tools have not been reviewed yet?" },
+    malicious: { label: "Malicious components", sub: "MCP servers or skills flagged as malicious", question: "Which MCP servers or skills are flagged as malicious?", categories: INVENTORY_CATEGORIES.mcp.concat(INVENTORY_CATEGORIES.skills), filters: { tags: ["Malicious MCP Server", "Malicious Skill"] } },
+    misconfigured: { label: "Misconfigured tool configs", sub: "Agents, servers or skills flagged with a risky config", question: "Which agents, MCP servers or skills have a risky configuration?", filters: { tags: ["Misconfigured"] } },
+    localMcp: { label: "Local MCP servers", sub: "Running on employee devices, outside any gateway", question: "Which MCP servers run locally on employee devices?", filters: { tags: ["Local MCP Server"] } },
+    personal: { label: "Personal AI accounts", sub: "Tools signed in with a personal account", question: "Who is using personal AI accounts?", filters: { tags: ["Contains personal account"] } },
+    highRiskUnreviewed: { label: "High-risk tools not reviewed", sub: "Unapproved or under review, risk 4.0 or higher", question: "Which high-risk tools have not been reviewed yet?", filters: { approvalStatus: ["Unapproved", "Under review"], riskBand: ["High risk"] } },
 };
 
 export const MAX_NODE_LABEL = 22;

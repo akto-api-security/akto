@@ -187,6 +187,8 @@ public class StartTestAction extends UserAction {
     private boolean runAutomatedTests = false;
     private String automatedTestsCustomPrompt;
     private static final int MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS = 2000;
+    // the smart agent chosen for smart testing (none: smart testing as before)
+    private String smartAgentProfileId;
 
     private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
@@ -299,7 +301,25 @@ public class StartTestAction extends UserAction {
         if (this.runAutomatedTests && StringUtils.isNotBlank(this.automatedTestsCustomPrompt)) {
             testingRun.setAutomatedTestsCustomPrompt(StringUtils.left(this.automatedTestsCustomPrompt.trim(), MAX_AUTOMATED_TESTS_CUSTOM_PROMPT_CHARS));
         }
+        if (!applySmartAgentProfile(testingRun)) {
+            addActionError("Smart agent not found");
+            throw new IllegalArgumentException("smart agent profile not found: " + this.smartAgentProfileId);
+        }
         return testingRun;
+    }
+
+    /** The smart agent chosen in the Run test modal: a copy goes on the run. False when it does not exist. */
+    boolean applySmartAgentProfile(TestingRun testingRun) {
+        if (StringUtils.isBlank(this.smartAgentProfileId)) {
+            return true;
+        }
+        SmartAgentProfile profile = SmartAgentProfileAction.findProfile(this.smartAgentProfileId);
+        if (profile == null) {
+            return false;
+        }
+        testingRun.setRunAutomatedTests(true);
+        testingRun.setSmartAgentConfig(profile.toRunConfig());
+        return true;
     }
 
     List<String> selectedMiniTestingServiceNames;
@@ -2250,6 +2270,10 @@ public class StartTestAction extends UserAction {
 
     public boolean getRunAutomatedTests() {
         return runAutomatedTests;
+    }
+
+    public void setSmartAgentProfileId(String smartAgentProfileId) {
+        this.smartAgentProfileId = smartAgentProfileId;
     }
 
     public void setAutomatedTestsCustomPrompt(String automatedTestsCustomPrompt) {
