@@ -106,4 +106,16 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
     public String execute() {
         return SUCCESS.toUpperCase();
     }
+
+    public String fetchTopEmployees() {
+        try {
+            InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
+            this.response = overviewService.buildTopEmployees(bundle);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Atlas guardrails overview top employees: " + e.getMessage());
+            addActionError("Failed to build Atlas guardrails overview top employees");
+            return ERROR.toUpperCase();
+        }
+    }
 }

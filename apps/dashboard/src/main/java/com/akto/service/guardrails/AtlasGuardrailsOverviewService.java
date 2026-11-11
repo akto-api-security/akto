@@ -19,6 +19,7 @@ import com.akto.util.TimePeriodUtils;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -288,6 +289,34 @@ public class AtlasGuardrailsOverviewService {
                     .append("count", bySkill.get(skill.getName()))
                     .append("status", AtlasAssetStatus.nameOf(statusService.resolve(skill, decisions, bundle.allowlistNamesLower))));
         }
+        return response;
+    }
+
+    public BasicDBObject buildTopEmployees(InsightDataBundle bundle) {
+        BasicDBObject response = new BasicDBObject();
+        List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
+        if (events == null) return response;
+
+        Map<String, BasicDBObject> byEmployee = new HashMap<>();
+        Map<String, Set<String>> devicesByEmployee = new HashMap<>();
+        for (DashboardMaliciousEvent e : AtlasGuardrailUtils.collapseConfigFindings(events)) {
+            String deviceId = AgenticObserveUtil.extractEndpointId(e.getHost());
+            if (deviceId == null) continue;
+            String username = bundle.usernameForDevice(deviceId);
+            String name = username != null ? username : deviceId;
+            BasicDBObject row = byEmployee.computeIfAbsent(name, k -> new BasicDBObject("name", name)
+                    .append("tags", AtlasGuardrailUtils.employeeTags(bundle, username))
+                    .append("count", 0L).append("critical", 0L));
+            row.put("count", row.getLong("count") + 1);
+            if (AtlasGuardrailUtils.isCritical(e)) row.put("critical", row.getLong("critical") + 1);
+            devicesByEmployee.computeIfAbsent(name, k -> new HashSet<>()).add(deviceId);
+        }
+
+        List<BasicDBObject> employees = new ArrayList<>(byEmployee.values());
+        for (BasicDBObject row : employees) row.put("devices", devicesByEmployee.get(row.getString("name")).size());
+        employees.sort(Comparator.comparingLong((BasicDBObject row) -> row.getLong("critical"))
+                .thenComparingLong(row -> row.getLong("count")).reversed());
+        response.put("employees", employees);
         return response;
     }
 }

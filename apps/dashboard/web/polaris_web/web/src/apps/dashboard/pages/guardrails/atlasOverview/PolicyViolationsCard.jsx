@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Box, Button, Card, HorizontalGrid, HorizontalStack, Link, Text, VerticalStack } from "@shopify/polaris";
-import { OverviewCardHeader, OverviewListRow } from "./OverviewCard";
+import { Box, Card, HorizontalGrid, Link, Text, VerticalStack } from "@shopify/polaris";
+import { OverviewCardHeader, OverviewListRow, OverviewShowMore } from "./OverviewCard";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import observeFunc from "../../observe/transform";
 
@@ -49,14 +49,7 @@ export default function PolicyViolationsCard({ policies, pageSize, loading, onPo
                     </OverviewListRow>
                 );
             })}
-            {policies.length > pageSize && (
-                <Box padding="4" paddingBlockStart="2">
-                    <HorizontalStack gap="4">
-                        {shown.length < policies.length && <Button plain onClick={() => setVisible(visible + pageSize)}>{`Show more (${policies.length - shown.length} more)`}</Button>}
-                        {shown.length > pageSize && <Button plain onClick={() => setVisible(pageSize)}>Show less</Button>}
-                    </HorizontalStack>
-                </Box>
-            )}
+            <OverviewShowMore total={policies.length} shown={shown.length} pageSize={pageSize} onChange={setVisible} />
         </Card>
     );
 }

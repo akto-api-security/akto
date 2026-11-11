@@ -233,6 +233,15 @@ export default {
         return resp
     },
 
+    async fetchTopEmployees(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchTopEmployees',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
     async suggestGuardrailCompliance(inputType, payload) {
         const resp = await request({
             url: '/api/ask_ai',

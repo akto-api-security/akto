@@ -1,4 +1,4 @@
-import { Box, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Button, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
 
 export function OverviewCardHeader({ title, subtitle, action }) {
     return (
@@ -19,4 +19,16 @@ export function OverviewListRow({ onClick, children }) {
         </Box>
     );
     return onClick ? <div className="insight-row" onClick={onClick}>{row}</div> : row;
+}
+
+export function OverviewShowMore({ total, shown, pageSize, onChange }) {
+    if (total <= pageSize) return null;
+    return (
+        <Box padding="4" paddingBlockStart="2">
+            <HorizontalStack gap="4">
+                {shown < total && <Button plain onClick={() => onChange(shown + pageSize)}>{`Show more (${total - shown} more)`}</Button>}
+                {shown > pageSize && <Button plain onClick={() => onChange(pageSize)}>Show less</Button>}
+            </HorizontalStack>
+        </Box>
+    );
 }

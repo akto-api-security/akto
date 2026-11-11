@@ -7,6 +7,7 @@ import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithM
 import DateRangeFilter from "@/apps/dashboard/components/layouts/DateRangeFilter";
 import { openViolationInGuardrailViolations } from "@/apps/dashboard/pages/observe/agentic/agenticObserveApi";
 import func from "@/util/func";
+import values from "@/util/values";
 import KpiStrip from "./KpiStrip";
 import AttentionCard from "./AttentionCard";
 import TriageStatusCard from "./TriageStatusCard";
@@ -51,6 +52,7 @@ const AGENTIC_ASSET_STATUS_TAGS = {
     UNAPPROVED: "Unapproved",
 };
 const AGENTIC_ASSET_STATUS_RANK = ["BLOCKED", "UNDER_REVIEW", "UNAPPROVED", "APPROVED"];
+const TOP_EMPLOYEES = 5;
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : observeFunc.formatNumberWithCommas(n);
@@ -172,11 +174,24 @@ function buildTopAgenticAssetRows(collections, skills) {
         });
 }
 
+function buildTopEmployeeRows(employees) {
+    return (employees || []).map((e) => {
+        const tags = (e.tags || []).map((t) => func.toSentenceCase(t));
+        const team = tags.length > 0 ? `${tags[0]}${tags.length > 1 ? ` +${tags.length - 1}` : ""}` : "";
+        return {
+            name: e.name,
+            detail: [team, plural(e.devices, "device", "devices")].filter(Boolean).join(" · "),
+            count: formatCount(e.count),
+            critical: e.critical > 0 ? `${formatCount(e.critical)} critical` : null,
+        };
+    });
+}
+
 function AtlasGuardrailsOverview() {
     const navigate = useNavigate();
     const [currDateRange, dispatchCurrDateRange] = useReducer(
         produce((draft, action) => func.dateRangeReducer(draft, action)),
-        func.getLast30DaysRange(),
+        values.ranges[2],
     );
     const [kpis, setKpis] = useState(null);
     const [triage, setTriage] = useState(null);
@@ -184,7 +199,9 @@ function AtlasGuardrailsOverview() {
     const [policies, setPolicies] = useState(null);
     const [violationsSources, setViolationsSources] = useState(null);
     const [topAgenticAssets, setTopAgenticAssets] = useState(null);
+    const [topEmployees, setTopEmployees] = useState(null);
     const policyRows = useMemo(() => buildPolicyRows(policies?.rules), [policies]);
+    const topEmployeeRows = useMemo(() => buildTopEmployeeRows(topEmployees?.employees), [topEmployees]);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -215,6 +232,10 @@ function AtlasGuardrailsOverview() {
         guardrailsApi.fetchTopAgenticAssets(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTopAgenticAssets(resp); })
             .catch(() => { if (!cancelled) setTopAgenticAssets({}); });
+        setTopEmployees(null);
+        guardrailsApi.fetchTopEmployees(startTimestamp, endTimestamp)
+            .then((resp) => { if (!cancelled) setTopEmployees(resp); })
+            .catch(() => { if (!cancelled) setTopEmployees({}); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -234,7 +255,7 @@ function AtlasGuardrailsOverview() {
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
             <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} loading={violationsSources === null} onRowClick={openActivity} />
-            <TopEmployeesCard employees={data.topEmployees} />
+            <TopEmployeesCard employees={topEmployeeRows} pageSize={TOP_EMPLOYEES} loading={topEmployees === null} />
             <TopAssetsCard assets={buildTopAgenticAssetRows(topAgenticAssets?.collections, topAgenticAssets?.skills)} loading={topAgenticAssets === null} />
         </HorizontalGrid>,
     ];

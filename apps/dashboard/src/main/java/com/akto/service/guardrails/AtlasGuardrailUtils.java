@@ -3,6 +3,7 @@ package com.akto.service.guardrails;
 import com.akto.action.AgenticObserveAction;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.DeviceTag;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto.Status;
 import com.akto.service.atlas.AtlasAssetStatusService;
 import com.akto.service.atlas.AtlasToolRow;
@@ -15,13 +16,16 @@ import com.akto.util.Pair;
 import com.akto.util.ThreatDetectionConstants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.mongodb.BasicDBObject;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class AtlasGuardrailUtils {
@@ -43,6 +47,7 @@ public class AtlasGuardrailUtils {
     private static final String EXAMPLE_COUNTS = "exampleCounts";
     static final List<String> AGENTIC_ASSET_TYPES = Arrays.asList(AgenticObserveUtil.CLIENT_TYPE_AI_AGENT,
             AgenticObserveUtil.CLIENT_TYPE_SAAS_AGENT, AgenticObserveUtil.CLIENT_TYPE_LLM, AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
+    private static final List<String> EMPLOYEE_TAG_KEYS = Arrays.asList("team", "group", "role");
 
     static List<DashboardMaliciousEvent> collapseConfigFindings(List<DashboardMaliciousEvent> events) {
         Map<String, DashboardMaliciousEvent> latestConfigFinding = new LinkedHashMap<>();
@@ -93,7 +98,7 @@ public class AtlasGuardrailUtils {
     }
 
     static boolean isOpenCriticalUnassigned(DashboardMaliciousEvent e) {
-        return isOpen(e) && Severity.CRITICAL.name().equalsIgnoreCase(e.getSeverity()) && isUnassigned(e.getCaseOwner());
+        return isOpen(e) && isCritical(e) && isUnassigned(e.getCaseOwner());
     }
 
     static boolean isOpen(DashboardMaliciousEvent e) {
@@ -208,5 +213,24 @@ public class AtlasGuardrailUtils {
     static AtlasToolRow skillAsset(String skillName) {
         return AtlasToolRow.builder().rowType(AtlasAssetStatusService.ROW_TYPE_SKILL)
                 .groupKey(skillName).name(skillName).build();
+    }
+
+    static boolean isCritical(DashboardMaliciousEvent e) {
+        return Severity.CRITICAL.name().equalsIgnoreCase(e.getSeverity());
+    }
+
+    static List<String> employeeTags(InsightDataBundle bundle, String username) {
+        List<DeviceTag> tags = username == null || bundle.userTags == null ? null : bundle.userTags.get(username);
+        if (tags == null) return Collections.emptyList();
+        Set<String> values = new LinkedHashSet<>();
+        for (String key : EMPLOYEE_TAG_KEYS) {
+            for (DeviceTag tag : tags) {
+                if (tag != null && key.equalsIgnoreCase(tag.getKey()) && StringUtils.isNotBlank(tag.getValue())) values.add(tag.getValue().trim());
+            }
+        }
+        for (DeviceTag tag : tags) {
+            if (tag != null && StringUtils.isNotBlank(tag.getValue())) values.add(tag.getValue().trim());
+        }
+        return new ArrayList<>(values);
     }
 }
