@@ -44,7 +44,6 @@ public class InsightService {
     private static final class CachedBundle {
         final InsightDataBundle bundle;
         final long loadedAtMs;
-        volatile boolean refreshing;
         CachedBundle(InsightDataBundle bundle, long loadedAtMs) { this.bundle = bundle; this.loadedAtMs = loadedAtMs; }
     }
 
@@ -57,20 +56,9 @@ public class InsightService {
      */
     public InsightDataBundle getOrLoadBundle(InsightContext ctx) {
         String key = ctx.bundleCacheKey();
-        // Drop long-expired entries so the map stays bounded; remove(k, v) never drops an entry reloaded meanwhile.
-        long nowMs = System.currentTimeMillis();
-        BUNDLE_CACHE.forEach((k, entry) -> {
-            if (!entry.refreshing && nowMs - entry.loadedAtMs >= 2 * BUNDLE_CACHE_TTL_MS) BUNDLE_CACHE.remove(k, entry);
-        });
         CachedBundle cached = BUNDLE_CACHE.compute(key, (k, existing) -> {
             if (existing != null && System.currentTimeMillis() - existing.loadedAtMs < BUNDLE_CACHE_TTL_MS) return existing;
-            // The sweep skips an entry while it is reloaded, so it rarely waits on this load.
-            if (existing != null) existing.refreshing = true;
-            try {
-                return new CachedBundle(loader.load(ctx), System.currentTimeMillis());
-            } finally {
-                if (existing != null) existing.refreshing = false;
-            }
+            return new CachedBundle(loader.load(ctx), System.currentTimeMillis());
         });
         return cached.bundle;
     }

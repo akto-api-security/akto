@@ -1,3 +1,4 @@
+import { BRAND_PURPLE, PURPLE_LIGHT, REVIEW_YELLOW, RISKY_RED } from "@/apps/dashboard/components/shared/dataColors";
 export const ATLAS_DISCOVERY_CHAT_SCOPE = "atlas_agentic_discovery";
 
 // Tiles on the overview, in the mockup's order.
@@ -35,17 +36,14 @@ export const SUBTITLES = {
     teams: "Share of each team's employees using a category, last 30 days",
 };
 
-const BRAND_PURPLE = "#8051FF";
-
 // Every status colour once: color is the status key, bubble the lighter circle tint, stroke the circle outline when it differs.
 const STATUS_PALETTE = {
-    APPROVED: { color: BRAND_PURPLE, bubble: "#B38CFF" },
-    UNDER_REVIEW: { color: "#E4C300", stroke: "#B98900" },
+    APPROVED: { color: BRAND_PURPLE, bubble: PURPLE_LIGHT },
+    UNDER_REVIEW: { color: REVIEW_YELLOW, stroke: "#B98900" },
     UNAPPROVED: { color: "#D72C0D" },
     BLOCKED: { color: "#8C9196", fillAlpha: 0.4 },
 };
 const DEFAULT_FILL_ALPHA = 0.55;
-const RISKY_PATH_COLOR = "#E0442A";
 
 const withAlpha = (hex, alpha) => {
     const [red, green, blue] = [1, 3, 5].map((start) => parseInt(hex.slice(start, start + 2), 16));
@@ -112,7 +110,7 @@ export const STATUS_META = {
 export const RISKY_LEGEND_KEY = "RISKY";
 export const CHAIN_LEGEND = [
     ...["APPROVED", "UNDER_REVIEW", "UNAPPROVED"].map((status) => ({ key: status, label: STATUS_META[status].label, color: STATUS_META[status].color })),
-    { key: RISKY_LEGEND_KEY, label: "Risky path", color: RISKY_PATH_COLOR },
+    { key: RISKY_LEGEND_KEY, label: "Risky path", color: RISKY_RED },
 ];
 
 // Load state of a card or flyout.

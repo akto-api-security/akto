@@ -1,5 +1,6 @@
 import { getRiskLevel } from "@/apps/dashboard/pages/observe/agentic/agenticPageBuilders";
 import { ASSET_STATUS, BUBBLE_STYLE, CAPABILITY_TAGS, CATEGORY_LABELS, DECISIONS_PAGING, MAX_NODE_LABEL, RISK_LEVEL_BADGE, SIGNAL_META, STATUS_META } from "./constants";
+import observeFunc from "@/apps/dashboard/pages/observe/transform";
 
 const BAD = "bad";
 const PERCENT_MAX = 100;
@@ -37,7 +38,7 @@ export function devicesTickLabels(max) {
     const ticks = devicesTicks(max);
     return ticks.map((tick, index) => {
         if (index === 0) return "1 device";
-        return index === ticks.length - 1 ? `${tick.toLocaleString("en-US")} devices` : String(tick);
+        return index === ticks.length - 1 ? `${observeFunc.formatNumberWithCommas(tick)} devices` : String(tick);
     });
 }
 

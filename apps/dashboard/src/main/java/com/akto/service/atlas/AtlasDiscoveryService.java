@@ -61,7 +61,8 @@ public class AtlasDiscoveryService {
     private Set<String> recentUsersOf(AtlasToolRow row) {
         int since = now - ADOPTION_WINDOW_SECONDS;
         if (row.getDeviceLastSeen().isEmpty()) {
-            boolean recent = row.getLastSeen() == 0 || row.getLastSeen() >= since;
+            // An unknown last-seen (0) is not recent.
+            boolean recent = row.getLastSeen() >= since;
             return recent ? people.usersOf(row.getDeviceIds()) : Collections.<String>emptySet();
         }
         Set<String> devices = new HashSet<>();

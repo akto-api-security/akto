@@ -3,6 +3,7 @@ import SegmentBar from "@/apps/dashboard/components/shared/SegmentBar";
 import Pressable from "@/apps/dashboard/pages/dashboard/ask/components/Pressable";
 import DiscoveryCard from "../shared/DiscoveryCard";
 import { ADOPTION_BAR, CATEGORY_SHORT, SUBTITLES } from "../constants";
+import observeFunc from "@/apps/dashboard/pages/observe/transform";
 
 const BAR_HEIGHT = "6px";
 // A filled part and an empty part, so the leader fills the track.
@@ -28,7 +29,7 @@ export default function AdoptionCard({ rows, status, onOpen }) {
                         <VerticalStack gap="1">
                             <HorizontalStack align="space-between">
                                 <Text as="span">{row.name} <Text as="span" color="subdued">· {CATEGORY_SHORT[row.category]}</Text></Text>
-                                <Text as="span" fontWeight="semibold">{row.employees.toLocaleString("en-US")}</Text>
+                                <Text as="span" fontWeight="semibold">{observeFunc.formatNumberWithCommas(row.employees)}</Text>
                             </HorizontalStack>
                             <SegmentBar segments={barOf(row.employees, topEmployees)} height={BAR_HEIGHT} />
                         </VerticalStack>

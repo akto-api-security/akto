@@ -1,11 +1,7 @@
 /* Scatter of circles on a positioned grid; per-bubble values come as CSS custom properties. */
 .bubble-plot {
-    /* Colours defined once for the zone, hover glow and hover text. */
-    --zone-rgb: 214, 69, 50;
-    --zone-text: #A64A40;
-    --glow-rgb: 98, 0, 234;
-    --tip-bg: var(--p-color-text, #202223);
-    --tip-fg: var(--p-color-text-on-color, #fff);
+    /* --zone-color and --glow-color come from BubblePlot.jsx. */
+    --zone-text: var(--p-color-text-critical);
     position: relative;
     height: var(--plot-height);
     border-left: 1px solid var(--p-color-border);
@@ -19,9 +15,9 @@
     top: 0;
     width: var(--zone-width);
     height: var(--zone-height);
-    background: rgba(var(--zone-rgb), 0.04);
-    border-left: 1px dashed rgba(var(--zone-rgb), 0.3);
-    border-bottom: 1px dashed rgba(var(--zone-rgb), 0.3);
+    background: color-mix(in srgb, var(--zone-color) 4%, transparent);
+    border-left: 1px dashed color-mix(in srgb, var(--zone-color) 30%, transparent);
+    border-bottom: 1px dashed color-mix(in srgb, var(--zone-color) 30%, transparent);
     border-bottom-left-radius: 8px;
 }
 
@@ -49,38 +45,7 @@
 }
 
 .bubble-plot__circle:hover {
-    box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.25);
-}
-
-/* Instant hover text (the native title attribute waits about a second). */
-.bubble-plot__circle:hover::after,
-.bubble-plot__circle:focus-visible::after {
-    content: attr(data-tip);
-    position: absolute;
-    bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 10;
-    padding: 4px 8px;
-    border-radius: 6px;
-    background: var(--tip-bg);
-    color: var(--tip-fg);
-    font-size: 12px;
-    white-space: nowrap;
-    pointer-events: none;
-}
-
-.bubble-plot__circle--tip-start:hover::after,
-.bubble-plot__circle--tip-start:focus-visible::after {
-    left: 0;
-    transform: none;
-}
-
-.bubble-plot__circle--tip-end:hover::after,
-.bubble-plot__circle--tip-end:focus-visible::after {
-    left: auto;
-    right: 0;
-    transform: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--glow-color) 25%, transparent);
 }
 
 .bubble-plot__label {
@@ -89,7 +54,7 @@
     left: calc(var(--x) + var(--offset));
     padding: 0 3px;
     border-radius: 3px;
-    background: rgba(255, 255, 255, 0.85);
+    background: color-mix(in srgb, var(--p-color-bg-surface) 85%, transparent);
     white-space: nowrap;
     cursor: pointer;
 }

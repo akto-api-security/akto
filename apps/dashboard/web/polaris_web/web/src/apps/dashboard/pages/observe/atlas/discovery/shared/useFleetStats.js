@@ -9,7 +9,8 @@ export default function useFleetStats(deviceScope) {
         let ignore = false;
         Promise.all([observeApi.fetchUsersAndDevicesStats(), settingRequests.fetchEndpointShieldStats({ deviceScope })])
             .then(([discovery, shield]) => { if (!ignore) setStats({ devicesWithAi: discovery.devicesCount, managedDevices: shield?.deviceStats?.managedDevices ?? null }); })
-            .catch(() => {});
+            // Null shows as unavailable.
+            .catch(() => { if (!ignore) setStats({ devicesWithAi: null, managedDevices: null }); });
         return () => { ignore = true; };
     }, [deviceScope]);
     return stats;

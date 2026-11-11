@@ -3,13 +3,12 @@ import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
 import PageWithMultipleCards from "@/apps/dashboard/components/layouts/PageWithMultipleCards";
 import AskBar from "@/apps/dashboard/components/shared/AskBar";
 import useElementSize from "@/apps/dashboard/components/shared/useElementSize";
-import func from "@/util/func";
 import { ASK_ATLAS_PLACEHOLDER, ASK_ATLAS_SUGGESTIONS } from "../devices_employees/constants";
 import { ASSET_STATUS, ATLAS_DISCOVERY_CHAT_SCOPE, LOAD_STATE, SUBTITLES } from "./constants";
-import discoveryApi from "./discoveryApi";
 import { agentMcpMatrix, decisionsPageSize, teamMatrix } from "./transform";
 import DiscoveryHeaderActions from "./shared/DiscoveryHeaderActions";
 import useAssetStatusUpdate from "./shared/useAssetStatusUpdate";
+import useDiscoveryOverview from "./shared/useDiscoveryOverview";
 import useDiscoveryFilters, { useToolsExport } from "./shared/useDiscoveryFilters";
 import useFleetStats from "./shared/useFleetStats";
 import AdoptionCard from "./cards/AdoptionCard";
@@ -22,6 +21,7 @@ import RiskyConfigsCard from "./cards/RiskyConfigsCard";
 import StatTiles from "./cards/StatTiles";
 import StatusDonutCard from "./cards/StatusDonutCard";
 import SupplyChainCard from "./cards/SupplyChainCard";
+import observeFunc from "@/apps/dashboard/pages/observe/transform";
 
 // The side-by-side heatmaps end at the same height: the one with fewer rows gets taller cells.
 const AGENT_CELL_HEIGHT = 36;
@@ -36,42 +36,11 @@ function AgenticDiscoveryOverview() {
     const filters = useDiscoveryFilters();
     const { deviceScope } = filters;
     const fleet = useFleetStats(deviceScope);
-    const [data, setData] = useState(null);
-    // The scope `data` was fetched for; the decisions list waits for data of the current one.
-    const [dataScope, setDataScope] = useState("");
-    // The scope whose overview failed to load; a new scope starts clean.
-    const [failedScope, setFailedScope] = useState("");
-    const failed = failedScope === deviceScope;
     const [refreshKey, setRefreshKey] = useState(0);
+    const { data, dataScope, failed } = useDiscoveryOverview(deviceScope, refreshKey);
     const [openRow, setOpenRow] = useState(null);
     const { exportTools, exporting } = useToolsExport(filters);
     const [sideColumnRef, { height: sideColumnHeight }] = useElementSize();
-    const loadedFor = useRef("");
-    const dataRef = useRef(null);
-    dataRef.current = data;
-
-    useEffect(() => {
-        let ignore = false;
-        // A new scope starts from spinners; a refresh after a decision keeps the cards on screen.
-        if (loadedFor.current !== deviceScope) {
-            loadedFor.current = deviceScope;
-            setData(null);
-        }
-        discoveryApi.fetchAtlasDiscoveryOverview(deviceScope)
-            .then((response) => {
-                if (ignore) return;
-                setData(response || {});
-                setDataScope(deviceScope);
-                setFailedScope("");
-            })
-            .catch(() => {
-                if (ignore) return;
-                // A failed refresh keeps the cards that are already on screen.
-                if (!dataRef.current) setFailedScope(deviceScope);
-                func.setToast(true, true, "Failed to load agentic discovery");
-            });
-        return () => { ignore = true; };
-    }, [deviceScope, refreshKey]);
 
     const refresh = useCallback(() => setRefreshKey((key) => key + 1), []);
     const { update, pending } = useAssetStatusUpdate(refresh);
@@ -172,7 +141,7 @@ function AgenticDiscoveryOverview() {
     return (
         <PageWithMultipleCards
             title="Agentic discovery"
-            subtitle={`Every AI agent, MCP server, skill and browser AI app${fleet.managedDevices === null ? "" : ` on ${fleet.managedDevices.toLocaleString("en-US")} managed devices`}`}
+            subtitle={`Every AI agent, MCP server, skill and browser AI app${fleet.managedDevices === null ? "" : ` on ${observeFunc.formatNumberWithCommas(fleet.managedDevices)} managed devices`}`}
             isFirstPage
             secondaryActions={<DiscoveryHeaderActions filters={filters} onExport={exportTools} exporting={exporting} />}
             components={components}

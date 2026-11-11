@@ -1,7 +1,9 @@
+import { PURPLE_LIGHT, REVIEW_YELLOW, RISKY_RED } from "@/apps/dashboard/components/shared/dataColors";
+
 const LAYOUT = { nodeWidth: 176, columnGap: 40, maxColumnGap: 520, rowHeight: 84, headHeight: 40, minHeight: 240, dimmedOpacity: 0.3, dimmedEdgeOpacity: 0.07 };
-const EDGE_COLOR = "#B38CFF";
-const RISKY_EDGE_COLOR = "#E0442A";
-const REVIEW_EDGE_COLOR = "#E4C300";
+const EDGE_COLOR = PURPLE_LIGHT;
+const RISKY_EDGE_COLOR = RISKY_RED;
+const REVIEW_EDGE_COLOR = REVIEW_YELLOW;
 const BASE_EDGE_WIDTH = 1;
 const MAX_EDGE_WIDTH_BOOST = 3.5;
 const EDGE_WIDTH_SCALE = 1.2;

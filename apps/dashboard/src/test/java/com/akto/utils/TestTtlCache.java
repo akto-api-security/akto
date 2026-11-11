@@ -27,6 +27,19 @@ public class TestTtlCache {
     }
 
     @Test
+    public void aFullMapDropsExpiredEntriesBeforeStartingOver() throws InterruptedException {
+        TtlCache<String, Integer> cache = new TtlCache<>(200, 2);
+        cache.put("a", 1);
+        Thread.sleep(400);
+        cache.put("b", 2);
+        cache.put("c", 3);
+        // "a" had expired, so "b" survives instead of the whole map starting over.
+        assertNull(cache.get("a"));
+        assertEquals(Integer.valueOf(2), cache.get("b"));
+        assertEquals(Integer.valueOf(3), cache.get("c"));
+    }
+
+    @Test
     public void overwritingAKeyAtCapacityKeepsTheOthers() {
         TtlCache<String, Integer> cache = new TtlCache<>(60_000, 2);
         cache.put("a", 1);

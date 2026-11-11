@@ -10,6 +10,7 @@ export default function RiskyConfigsCard({ rows, status, onAsk }) {
             <VerticalStack gap="2">
                 {(rows || []).map((row) => {
                     const meta = RISKY_CONFIG_META[row.id];
+                    if (!meta) return null;
                     return (
                         <Pressable key={row.id} onClick={() => onAsk(meta.question)} accessibilityLabel={`Ask Atlas: ${meta.question}`} hoverBackground="bg-subdued" borderRadius="2">
                             <Box padding="1">

@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { Box, HorizontalStack, Text } from "@shopify/polaris";
 import { LABEL_GAP_PX, placeLabels } from "./bubbleLabels";
 import useElementSize from "./useElementSize";
+import { PURPLE_DARK, RISKY_RED } from "./dataColors";
+import "./HoverTip.css";
 import "./BubblePlot.css";
 
 const GRID_COLOR = "var(--p-color-bg-hover)";
@@ -18,8 +20,8 @@ const gridLines = (bands) => Array.from({ length: bands - 1 }, (_, i) => {
 function tipClass(bubble, plotWidth) {
     const centerX = Math.min(Math.max((bubble.x / 100) * plotWidth, bubble.radius), plotWidth - bubble.radius);
     const half = (bubble.tip.length * TIP_CHAR_PX + TIP_PAD_PX) / 2;
-    if (centerX - half < 0) return " bubble-plot__circle--tip-start";
-    return centerX + half > plotWidth ? " bubble-plot__circle--tip-end" : "";
+    if (centerX - half < 0) return " hover-tip--start";
+    return centerX + half > plotWidth ? " hover-tip--end" : "";
 }
 
 const onActivate = (action) => (event) => {
@@ -42,7 +44,7 @@ export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabel
                 </div>
             )}
             <Box width="100%">
-                <div ref={plotRef} className="bubble-plot" style={{ "--plot-height": `${height}px`, "--plot-grid": gridLines(bands) }}>
+                <div ref={plotRef} className="bubble-plot" style={{ "--plot-height": `${height}px`, "--plot-grid": gridLines(bands), "--zone-color": RISKY_RED, "--glow-color": PURPLE_DARK }}>
                     {zone && (
                         <>
                             <div className="bubble-plot__zone" style={{ "--zone-width": `${zone.widthPct}%`, "--zone-height": `${zone.heightPct}%` }} />
@@ -52,7 +54,7 @@ export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabel
                     {bubbles.map((bubble) => (
                         <div
                             key={bubble.key}
-                            className={`bubble-plot__circle${tipClass(bubble, width)}`}
+                            className={`bubble-plot__circle hover-tip${tipClass(bubble, width)}`}
                             role="button"
                             tabIndex={0}
                             data-tip={bubble.tip}
@@ -63,8 +65,10 @@ export default function BubblePlot({ bubbles, height = 300, bands = 4, bandLabel
                         />
                     ))}
                     {bubbles.filter((bubble) => labelSides[bubble.key]).map((bubble) => (
+                        // A mouse shortcut to the same action as the circle, which is the keyboard and screen reader target.
                         <span
                             key={`label-${bubble.key}`}
+                            aria-hidden="true"
                             className={`bubble-plot__label${labelSides[bubble.key] === "left" ? " bubble-plot__label--flip" : ""}`}
                             onClick={bubble.onClick}
                             style={{ "--x": `${bubble.x}%`, "--y": `${bubble.y}%`, "--offset": `${bubble.radius + LABEL_GAP_PX}px` }}

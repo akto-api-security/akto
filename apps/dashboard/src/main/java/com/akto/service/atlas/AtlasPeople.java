@@ -12,8 +12,19 @@ import java.util.Set;
 @AllArgsConstructor
 public class AtlasPeople {
 
+    private static final String USERNAME_KEY = "username";
+
     private final Map<String, String> usernameByDevice;
     private final Map<String, String> teamByUser;
+
+    /** From ModuleInfoDao's device metadata map (device -> username, os, browserName). */
+    public static AtlasPeople of(Map<String, Map<String, String>> deviceMetadata, Map<String, String> teamByUser) {
+        Map<String, String> usernameByDevice = new HashMap<>();
+        for (Map.Entry<String, Map<String, String>> e : deviceMetadata.entrySet()) {
+            usernameByDevice.put(e.getKey(), e.getValue().get(USERNAME_KEY));
+        }
+        return new AtlasPeople(usernameByDevice, teamByUser);
+    }
 
     /** The distinct known users of these devices. */
     public Set<String> usersOf(Collection<String> deviceIds) {

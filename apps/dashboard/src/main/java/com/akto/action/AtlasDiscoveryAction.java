@@ -10,10 +10,8 @@ import com.akto.service.atlas.AtlasAssetStatusService;
 import com.akto.service.atlas.AtlasDeviceScope;
 import com.akto.service.atlas.AtlasDiscoveryService;
 import com.akto.service.atlas.AtlasPeople;
+import com.akto.service.atlas.AtlasPeopleSource;
 import com.akto.service.atlas.AtlasToolRow;
-import com.akto.service.insights.InsightContext;
-import com.akto.service.insights.InsightDataBundle;
-import com.akto.service.insights.InsightService;
 import com.akto.utils.ArgusCollectionScope;
 import com.akto.utils.TtlCache;
 import com.mongodb.BasicDBObject;
@@ -33,8 +31,6 @@ public class AtlasDiscoveryAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AtlasDiscoveryAction.class, LogDb.DASHBOARD);
 
-    // The insights bundle is keyed by its time range, so the range end is rounded up to share one cached bundle across loads.
-    private static final int BUNDLE_BUCKET_SECONDS = 300;
     private static final int MAX_STATUS_UPDATE_KEYS = 100;
     private static final int MAX_PAGE_SIZE = 500;
     private static final int DEFAULT_PAGE_SIZE = 50;
@@ -43,7 +39,7 @@ public class AtlasDiscoveryAction extends UserAction {
     private static final String TOOL_NOT_FOUND = "Tool not found";
     private static final TtlCache<Integer, Map<String, Map<String, String>>> DEVICE_CACHE = new TtlCache<>(DEVICE_CACHE_TTL_MS, DEVICE_CACHE_MAX_ENTRIES);
 
-    private final InsightService insightService = new InsightService();
+    private final AtlasPeopleSource peopleSource = new AtlasPeopleSource();
     private final AtlasAssetStatusService statusService = new AtlasAssetStatusService();
 
     @Getter @Setter private String deviceScope;
@@ -144,17 +140,19 @@ public class AtlasDiscoveryAction extends UserAction {
     }
 
     // Null for users restricted to some collections: employee-level data is account-wide, so they get an empty page.
+    // Like the Devices & employees endpoints, this only applies in Argus contexts (ArgusCollectionScope); in Endpoint security nobody is restricted.
     private AtlasDiscoveryService buildService() {
         if (ArgusCollectionScope.isLimited(getSUser())) return null;
         int now = Context.now();
-        InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx(now));
+        AtlasPeopleSource.Snapshot account = peopleSource.load();
+        Map<String, Map<String, String>> devices = loadDevices();
         List<AtlasToolRow> allRows = toolRows();
-        List<AtlasToolRow> rows = AtlasDeviceScope.apply(allRows, deviceScope, AtlasDeviceScope.browserDevices(loadDevices()));
+        List<AtlasToolRow> rows = AtlasDeviceScope.apply(allRows, deviceScope, AtlasDeviceScope.browserDevices(devices));
         // Decisions do not depend on the device scope; malicious skills are looked up by name.
         Map<String, AtlasAssetStatus> decisions = new HashMap<>(statusService.loadDecisions());
         decisions.putAll(statusService.loadSkillDecisions(allRows));
-        return new AtlasDiscoveryService(rows, decisions, bundle.allowlistNamesLower,
-                new AtlasPeople(bundle.deviceIdToUsername, teamByUser(bundle)), now);
+        return new AtlasDiscoveryService(rows, decisions, account.getAllowlistNamesLower(),
+                AtlasPeople.of(devices, account.getTeamByUser()), now);
     }
 
     // Every endpoint-shield module is read, so share one read per account across the requests of a page load.
@@ -166,22 +164,6 @@ public class AtlasDiscoveryAction extends UserAction {
         Map<String, Map<String, String>> devices = ModuleInfoDao.instance.fetchDeviceMetadataMapForEndpointShield();
         DEVICE_CACHE.put(account, devices);
         return devices;
-    }
-
-    // Atlas reads only the bundle's account-wide data, so a short window keeps its range-scoped reads cheap; the end is shared across loads.
-    private InsightContext buildCtx(int now) {
-        Integer userId = Context.userId.get();
-        int end = (now + BUNDLE_BUCKET_SECONDS - 1) / BUNDLE_BUCKET_SECONDS * BUNDLE_BUCKET_SECONDS;
-        return new InsightContext(Context.accountId.get(), userId == null ? 0 : userId, Context.contextSource.get(), end - BUNDLE_BUCKET_SECONDS, end);
-    }
-
-    private static Map<String, String> teamByUser(InsightDataBundle bundle) {
-        Map<String, String> teams = new HashMap<>();
-        for (String username : bundle.userTags.keySet()) {
-            String team = bundle.teamForUser(username);
-            if (StringUtils.isNotBlank(team)) teams.put(username, team.trim());
-        }
-        return teams;
     }
 
     private static AtlasAssetStatus parseStatus(String value) {

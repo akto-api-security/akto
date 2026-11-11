@@ -34,9 +34,11 @@ public final class TtlCache<K, V> {
 
     public void put(K key, V value) {
         long nowMs = System.currentTimeMillis();
-        // Drop long-expired entries so the map stays bounded; a full map starts over.
-        entries.values().removeIf(entry -> nowMs - entry.loadedAtMs >= 2 * ttlMs);
-        if (!entries.containsKey(key) && entries.size() >= maxEntries) entries.clear();
+        // Only a full map is swept: expired entries go first, and if it is still full it starts over.
+        if (!entries.containsKey(key) && entries.size() >= maxEntries) {
+            entries.values().removeIf(entry -> nowMs - entry.loadedAtMs >= ttlMs);
+            if (entries.size() >= maxEntries) entries.clear();
+        }
         entries.put(key, new Entry<>(value, nowMs));
     }
 

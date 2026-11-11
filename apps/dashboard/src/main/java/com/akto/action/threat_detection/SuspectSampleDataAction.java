@@ -191,7 +191,15 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("label", this.label);
     }
 
-    List<String> scopedHosts = hostsScopedToAtlasTool();
+    List<String> scopedHosts;
+    try {
+      scopedHosts = hostsScopedToAtlasTool();
+    } catch (Exception e) {
+      // A failed lookup is an error, not "no events".
+      loggerMaker.errorAndAddToDb("Atlas tool host lookup failed: " + e.getMessage());
+      addActionError("Failed to scope the guardrail activity to the tool");
+      return ERROR.toUpperCase();
+    }
     if (scopedHosts != null && !scopedHosts.isEmpty()) {
       filter.put("hosts", scopedHosts);
     }
@@ -409,22 +417,18 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   private List<String> atlasToolEventHosts() {
     int split = this.atlasToolKey.indexOf('|');
     if (split <= 0 || this.atlasToolKey.length() > ATLAS_TOOL_KEY_MAX_LENGTH) return Collections.emptyList();
-    try {
-      Set<String> toolHosts = new AgenticObserveAction()
-          .fetchAtlasToolHosts(this.atlasToolKey.substring(0, split), this.atlasToolKey.substring(split + 1))
-          .stream().map(host -> host.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
-      // An unknown tool never costs a threat-backend call.
-      if (toolHosts.isEmpty()) return Collections.emptyList();
-      return eventHostsInWindow().stream()
-          .filter(host -> toolHosts.contains(host.toLowerCase(Locale.ROOT))).collect(Collectors.toList());
-    } catch (Exception e) {
-      loggerMaker.errorAndAddToDb("Atlas tool host lookup failed: " + e.getMessage());
-      return Collections.emptyList();
-    }
+    Set<String> toolHosts = new AgenticObserveAction()
+        .fetchAtlasToolHosts(this.atlasToolKey.substring(0, split), this.atlasToolKey.substring(split + 1))
+        .stream().map(host -> host.toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+    // An unknown tool never costs a threat-backend call.
+    if (toolHosts.isEmpty()) return Collections.emptyList();
+    return eventHostsInWindow().stream()
+        .filter(host -> toolHosts.contains(host.toLowerCase(Locale.ROOT))).collect(Collectors.toList());
   }
 
   private List<String> eventHostsInWindow() {
-    String cacheKey = Context.accountId.get() + "|" + Context.contextSource.get() + "|" + this.startTimestamp + "|" + this.endTimestamp;
+    // Minute buckets, so a window re-sent with slightly different times shares one entry.
+    String cacheKey = Context.accountId.get() + "|" + Context.contextSource.get() + "|" + this.startTimestamp / 60 + "|" + this.endTimestamp / 60;
     List<String> cached = EVENT_HOSTS.get(cacheKey);
     if (cached != null) return cached;
     List<HostSeverityCount> counts = fetchHostSeverityCounts(this.startTimestamp, this.endTimestamp);

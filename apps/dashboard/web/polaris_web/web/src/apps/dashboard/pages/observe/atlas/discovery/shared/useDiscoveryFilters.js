@@ -3,6 +3,7 @@ import func from "@/util/func";
 import discoveryApi from "../discoveryApi";
 import { DEVICE_SCOPES, EXPORT_PAGE_SIZE, EXPORT_ROW_LIMIT } from "../constants";
 import { toCsvLines } from "../transform";
+import observeFunc from "@/apps/dashboard/pages/observe/transform";
 
 // Device scope for the overview and its CSV export.
 export default function useDiscoveryFilters() {
@@ -29,7 +30,7 @@ export function useToolsExport({ deviceScope }) {
             // The byte-order mark keeps Excel from garbling non-ASCII tool names.
             lines[0] = `\uFEFF${lines[0]}`;
             func.saveCsv(lines, "atlas-ai-tools");
-            if (total > rows.length) func.setToast(true, false, `Exported the first ${rows.length.toLocaleString("en-US")} of ${total.toLocaleString("en-US")} tools`);
+            if (total > rows.length) func.setToast(true, false, `Exported the first ${observeFunc.formatNumberWithCommas(rows.length)} of ${observeFunc.formatNumberWithCommas(total)} tools`);
         } catch (error) {
             func.setToast(true, true, "Failed to export the tools");
         } finally {

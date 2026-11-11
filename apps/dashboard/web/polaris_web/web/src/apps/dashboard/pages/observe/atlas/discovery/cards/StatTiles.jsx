@@ -3,9 +3,10 @@ import { Text, VerticalStack } from "@shopify/polaris";
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
 import openInventory from "../shared/openInventory";
 import { CATEGORY_LABELS, CATEGORY_ORDER, DEVICES_PATH, DEVICE_SCOPES, INVENTORY_CATEGORIES } from "../constants";
+import observeFunc from "@/apps/dashboard/pages/observe/transform";
 
 const EMPTY_VALUE = "—";
-const format = (count) => (count === undefined || count === null ? EMPTY_VALUE : Number(count).toLocaleString("en-US"));
+const format = (count) => (count === undefined || count === null ? EMPTY_VALUE : observeFunc.formatNumberWithCommas(Number(count)));
 
 // A count with an optional line under it, sized like the Devices & employees tiles.
 function statValue(value, subtext) {

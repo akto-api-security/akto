@@ -1,8 +1,11 @@
+import { Text } from "@shopify/polaris";
+import { PURPLE_SCALE_CELLS, RED_SCALE_CELLS } from "./dataColors";
+import "./HoverTip.css";
 import "./MatrixHeatmap.css";
 
 // Cell colours light to dark, and which steps the legend bar blends between.
-const PURPLE_SCALE = { cells: ["#F4EEFF", "#E5D7FF", "#B38CFF", "#8051FF", "#6200EA"], barSteps: [0, 2, 4] };
-const RED_SCALE = { cells: ["#FFF4F4", "#FED3D1", "#FD8A7B", "#E0442A", "#B01E00"], barSteps: [1, 2, 4] };
+const PURPLE_SCALE = { cells: PURPLE_SCALE_CELLS, barSteps: [0, 2, 4] };
+const RED_SCALE = { cells: RED_SCALE_CELLS, barSteps: [1, 2, 4] };
 const LIGHT_TEXT_FROM_STEP = 3;
 const EMPTY_CELL_TEXT = "–";
 
@@ -32,7 +35,9 @@ export default function MatrixHeatmap({
                 <div className="matrix-heatmap__grid" style={gridVars}>
                     <span />
                     {columns.map((column, columnIndex) => (
-                        <span key={columnIndex} title={column.label} className={`matrix-heatmap__column${column.danger ? " matrix-heatmap__column--danger" : ""}`}>{column.label}</span>
+                        <span key={columnIndex} title={column.label} className="matrix-heatmap__column">
+                            <Text as="span" variant="bodySm" color={column.danger ? "critical" : "subdued"} fontWeight={column.danger ? "semibold" : undefined}>{column.label}</Text>
+                        </span>
                     ))}
                     {rows.map((row, rowIndex) => (
                         <RowCells key={rowIndex} row={row} columns={columns} max={max} format={format} tipUnit={tipUnit} emptyText={emptyText} />
@@ -53,18 +58,18 @@ export default function MatrixHeatmap({
 function ScaleKey({ label, format, max, scale }) {
     return (
         <span className={`matrix-heatmap__scale-key${label ? " matrix-heatmap__scale-key--labelled" : ""}`}>
-            {label && <span className="matrix-heatmap__scale-label">{label}</span>}
-            <span>{format(0)}</span>
+            {label && <span className="matrix-heatmap__scale-label"><Text as="span" variant="bodySm" color="subdued">{label}</Text></span>}
+            <Text as="span" variant="bodySm" color="subdued">{format(0)}</Text>
             <span className="matrix-heatmap__scale-bar" style={barVars(scale)} />
-            <span>{format(max)}</span>
+            <Text as="span" variant="bodySm" color="subdued">{format(max)}</Text>
         </span>
     );
 }
 
 // The first and last columns hang their hover text inward so it stays inside the grid.
 const tipEdge = (index, count) => {
-    if (index === 0) return " matrix-heatmap__cell--tip-start";
-    return index === count - 1 ? " matrix-heatmap__cell--tip-end" : "";
+    if (index === 0) return " hover-tip--start";
+    return index === count - 1 ? " hover-tip--end" : "";
 };
 
 // "5 devices", "1 device"; just the formatted value when there is no unit.
@@ -73,14 +78,14 @@ const tipValue = (value, format, unit) => `${format(value)}${unit ? ` ${unit}${v
 function RowCells({ row, columns, max, format, tipUnit, emptyText }) {
     return (
         <>
-            <span className="matrix-heatmap__row">{row.label}</span>
+            <span className="matrix-heatmap__row"><Text as="span" variant="bodyMd">{row.label}</Text></span>
             {row.cells.map((value, index) => {
                 const shading = shade(value, max, columns[index].danger ? RED_SCALE : PURPLE_SCALE);
                 const tip = `${row.label} · ${columns[index].label}: ${tipValue(value || 0, format, tipUnit)}`;
                 return (
                     <div
                         key={index}
-                        className={`matrix-heatmap__cell${shading ? "" : " matrix-heatmap__cell--empty"}${shading?.lightText ? " matrix-heatmap__cell--light-text" : ""}${tipEdge(index, columns.length)}`}
+                        className={`matrix-heatmap__cell hover-tip${shading ? "" : " matrix-heatmap__cell--empty"}${shading?.lightText ? " matrix-heatmap__cell--light-text" : ""}${tipEdge(index, columns.length)}`}
                         role="img"
                         aria-label={tip}
                         data-tip={tip}

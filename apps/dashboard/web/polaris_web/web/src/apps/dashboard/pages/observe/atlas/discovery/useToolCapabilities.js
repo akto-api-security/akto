@@ -4,6 +4,7 @@ import { buildAgentBuiltinToolsFromStis, buildMcpComponentsFromStis } from "@/ap
 import { CAPABILITY_LIST_LIMIT, CAPABILITY_TITLES } from "./constants";
 
 const EMPTY = { tools: [], total: 0 };
+const FAILED = { ...EMPTY, failed: true };
 
 // Most worrying first: malicious, privileged, then by risk and name.
 const byConcern = (a, b) => (b.isMalicious - a.isMalicious) || (b.hasPrivilegedAccess - a.hasPrivilegedAccess) || (b.riskScore - a.riskScore) || a.name.localeCompare(b.name);
@@ -32,7 +33,7 @@ export default function useToolCapabilities(rowType, collectionIds) {
                 const tools = [...byName.values()].sort(byConcern);
                 setCapabilities({ tools: tools.slice(0, CAPABILITY_LIST_LIMIT), total: tools.length });
             })
-            .catch(() => { if (!ignore) setCapabilities(EMPTY); });
+            .catch(() => { if (!ignore) setCapabilities(FAILED); });
         return () => { ignore = true; };
     }, [rowType, idsKey]);
 

@@ -176,6 +176,29 @@ public class TestAtlasDiscoveryService {
 
     @Test
     @SuppressWarnings("unchecked")
+    public void aToolWithNoKnownLastUseIsNotCountedAsAdopted() {
+        AtlasToolRow unknown = tool("agent", "agent-unknown", 1, NOW - 90 * DAY, "d1");
+        unknown.setLastSeen(0);
+        Map<String, Object> overview = service(Collections.singletonList(unknown), new HashMap<>(), Collections.emptySet()).buildOverview();
+        assertTrue(((List<Map<String, Object>>) overview.get("adoption")).isEmpty());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void aFailingSectionBlanksOnlyItsOwnCard() {
+        AtlasToolRow agent = tool("agent", "agent-a", 1, NOW, "d1");
+        // No team data at all breaks the sections that read teams, not the rest of the page.
+        AtlasDiscoveryService broken = new AtlasDiscoveryService(Collections.singletonList(agent), new HashMap<>(), Collections.emptySet(),
+                new AtlasPeople(users("d1", "user.one"), null), NOW);
+        Map<String, Object> overview = broken.buildOverview();
+        List<String> unavailable = (List<String>) overview.get("unavailableSources");
+        assertTrue(unavailable.contains("teamCategoryMatrix"));
+        assertFalse(unavailable.contains("tiles"));
+        assertTrue(overview.containsKey("tiles") && overview.containsKey("decisions"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     public void onlyMaliciousSkillsNeedADecision() {
         AtlasToolRow clean = tool("skill", "clean-skill", 1, NOW, "d1");
         AtlasToolRow flagged = tool("skill", "flagged-skill", 1, NOW, "d1");
