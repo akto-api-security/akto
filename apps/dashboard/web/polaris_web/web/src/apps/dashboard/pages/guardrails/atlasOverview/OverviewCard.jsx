@@ -18,5 +18,5 @@ export function OverviewListRow({ onClick, children }) {
             {children}
         </Box>
     );
-    return onClick ? <div onClick={onClick} style={{ cursor: "pointer" }}>{row}</div> : row;
+    return onClick ? <div className="insight-row" onClick={onClick}>{row}</div> : row;
 }

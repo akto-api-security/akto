@@ -7,14 +7,6 @@ const guardrailOverviewMock = {
         { severity: "HIGH", title: "Hidden prompt injection on a public docs site", meta: "docs.example-sdk.dev read by 5 agents · Prompt injection · Blocked", count: 5, secondaryAction: "Block domain" },
         { severity: "MEDIUM", title: "Unsanctioned AI app spreading in Marketing", meta: "DeepSeek Chat · 22 employees continued past the warning", count: 22, secondaryAction: "Block app" },
     ],
-    bySurface: [
-        { name: "Browser AI apps", examples: "ChatGPT, Gemini, Claude.ai, DeepSeek, Copilot", count: 734, changePct: 22 },
-        { name: "AI agents & CLIs", examples: "Claude Code, Codex CLI, Gemini CLI, Aider", count: 612, changePct: 9 },
-        { name: "IDE assistants", examples: "Cursor, Copilot, Windsurf, JetBrains AI", count: 402, changePct: -4 },
-        { name: "MCP servers", examples: "38 servers on 214 devices · 9 unapproved", count: 288, changePct: 31 },
-        { name: "Skills & plugins", examples: "Claude skills, Cursor rules, IDE extensions", count: 96, changePct: 12 },
-        { name: "Local models", examples: "Ollama, LM Studio, llama.cpp", count: 41, changePct: -8 },
-    ],
     topEmployees: [
         { name: "meera.kapoor", department: "Support", devices: 1, count: 46, critical: 0 },
         { name: "tom.becker", department: "Marketing", devices: 2, count: 39, critical: 0 },

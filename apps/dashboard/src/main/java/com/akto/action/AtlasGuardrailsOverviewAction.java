@@ -24,7 +24,7 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
 
     @Getter private BasicDBObject response = new BasicDBObject();
 
-    public String fetchAtlasGuardrailsOverviewKpis() {
+    public String fetchSummary() {
         try {
             InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
             this.response = overviewService.buildKpis(bundle);
@@ -36,7 +36,7 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
         }
     }
 
-    public String fetchAtlasGuardrailsOverviewTriage() {
+    public String fetchTriageStatus() {
         try {
             InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
             this.response = overviewService.buildTriage(bundle);
@@ -48,7 +48,7 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
         }
     }
 
-    public String fetchAtlasGuardrailsOverviewDecisions() {
+    public String fetchDecisionsTrend() {
         try {
             InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
             this.response = overviewService.buildDecisions(bundle);
@@ -60,7 +60,7 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
         }
     }
 
-    public String fetchAtlasGuardrailsOverviewPolicies() {
+    public String fetchViolationsByPolicy() {
         try {
             InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
             this.response = overviewService.buildPolicies(bundle);
@@ -68,6 +68,18 @@ public class AtlasGuardrailsOverviewAction extends UserAction {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error building Atlas guardrails overview policies: " + e.getMessage());
             addActionError("Failed to build Atlas guardrails overview policies");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchViolationsSources() {
+        try {
+            InsightDataBundle bundle = insightService.getOrLoadBundle(buildCtx());
+            this.response = overviewService.buildViolationsSources(bundle);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error building Atlas guardrails overview violations sources: " + e.getMessage());
+            addActionError("Failed to build Atlas guardrails overview violations sources");
             return ERROR.toUpperCase();
         }
     }

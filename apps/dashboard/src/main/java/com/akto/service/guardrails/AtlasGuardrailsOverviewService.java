@@ -3,13 +3,20 @@ package com.akto.service.guardrails;
 import com.akto.action.threat_detection.DashboardMaliciousEvent;
 import com.akto.dao.context.Context;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto.Status;
+import com.akto.dto.ApiCollection;
+import com.akto.service.atlas.AtlasPeopleService;
+import com.akto.service.insights.HostCollectionResolver;
 import com.akto.service.insights.InsightDataBundle;
+import com.akto.service.insights.InsightUtil;
+import com.akto.service.insights.providers.SkillEvaluationConcentrationProvider;
 import com.akto.util.AgenticObserveUtil;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.akto.util.TimePeriodUtils;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,7 +30,7 @@ public class AtlasGuardrailsOverviewService {
         BasicDBObject triage = new BasicDBObject();
         triage.put("periodDays", AtlasGuardrailUtils.periodDays(bundle));
         triage.put("staleAfterHours", AtlasGuardrailUtils.TRIAGE_TARGET_HOURS);
-        List<DashboardMaliciousEvent> events = bundle.windowEvents();
+        List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
         if (events == null) return triage;
         List<DashboardMaliciousEvent> current = AtlasGuardrailUtils.collapseConfigFindings(events);
 
@@ -45,8 +52,8 @@ public class AtlasGuardrailsOverviewService {
 
     public BasicDBObject buildDecisions(InsightDataBundle bundle) {
         BasicDBObject response = new BasicDBObject();
-        response.put("periodDays", bundle.ctx.getStartTs() > 0 ? AtlasGuardrailUtils.periodDays(bundle) : null);
-        List<DashboardMaliciousEvent> events = bundle.windowEvents();
+        response.put("periodDays", AtlasGuardrailUtils.periodDays(bundle));
+        List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
         if (events == null) return response;
         List<DashboardMaliciousEvent> current = AtlasGuardrailUtils.collapseConfigFindings(events);
 
@@ -76,7 +83,7 @@ public class AtlasGuardrailsOverviewService {
 
     public BasicDBObject buildPolicies(InsightDataBundle bundle) {
         BasicDBObject response = new BasicDBObject();
-        List<DashboardMaliciousEvent> events = bundle.windowEvents();
+        List<DashboardMaliciousEvent> events = AtlasGuardrailUtils.currentPeriodEvents(bundle);
         if (events == null) return response;
         Map<String, BasicDBObject> byRule = new LinkedHashMap<>();
         for (DashboardMaliciousEvent e : AtlasGuardrailUtils.collapseConfigFindings(events)) {
@@ -92,24 +99,9 @@ public class AtlasGuardrailsOverviewService {
     }
 
     public BasicDBObject buildKpis(InsightDataBundle bundle) {
-        int startTs = bundle.ctx.getStartTs();
-        int endTs = bundle.ctx.getEndTs();
-        int length = endTs - startTs;
-        boolean hasPreviousPeriod = startTs > 0 && length > 0 && startTs - length > 0;
-
-        List<DashboardMaliciousEvent> fetched = hasPreviousPeriod
-                ? bundle.eventsBetween(startTs - length, endTs)
-                : bundle.windowEvents();
-        List<DashboardMaliciousEvent> current = null;
-        List<DashboardMaliciousEvent> previous = null;
-        if (fetched != null) {
-            current = AtlasGuardrailUtils.collapseConfigFindings(fetched.stream()
-                    .filter(e -> e != null && e.getTimestamp() >= startTs).collect(Collectors.toList()));
-            if (hasPreviousPeriod) {
-                previous = AtlasGuardrailUtils.collapseConfigFindings(fetched.stream()
-                        .filter(e -> e != null && e.getTimestamp() < startTs).collect(Collectors.toList()));
-            }
-        }
+        Pair<List<DashboardMaliciousEvent>, List<DashboardMaliciousEvent>> split = AtlasGuardrailUtils.splitByPeriod(bundle);
+        List<DashboardMaliciousEvent> current = split == null ? null : split.getFirst();
+        List<DashboardMaliciousEvent> previous = split == null ? null : split.getSecond();
 
         BasicDBObject kpis = new BasicDBObject();
         kpis.put("periodDays", AtlasGuardrailUtils.periodDays(bundle));
@@ -185,5 +177,66 @@ public class AtlasGuardrailsOverviewService {
         Long median = AtlasGuardrailUtils.medianOf(waits);
         if (median != null) kpi.put("seconds", median);
         return kpi;
+    }
+
+    public BasicDBObject buildViolationsSources(InsightDataBundle bundle) {
+        BasicDBObject response = new BasicDBObject();
+        response.put("periodDays", AtlasGuardrailUtils.periodDays(bundle));
+        Pair<List<DashboardMaliciousEvent>, List<DashboardMaliciousEvent>> split = AtlasGuardrailUtils.splitByPeriod(bundle);
+        if (split == null) return response;
+        int startTs = bundle.ctx.getStartTs();
+        boolean hasPreviousPeriod = split.getSecond() != null;
+        List<DashboardMaliciousEvent> events = new ArrayList<>(split.getFirst());
+        if (hasPreviousPeriod) events.addAll(split.getSecond());
+
+        Map<String, BasicDBObject> byType = new LinkedHashMap<>();
+        for (String type : AtlasGuardrailUtils.ASSET_TYPES) byType.put(type, AtlasGuardrailUtils.assetTypeRow(type));
+
+        Map<Integer, ApiCollection> collectionsById = new HashMap<>();
+        for (ApiCollection c : bundle.collections) collectionsById.put(c.getId(), c);
+        Map<String, String> remarksByServiceName = InsightUtil.remarksByServiceName(bundle.auditRows);
+        Set<Integer> mcpServers = new HashSet<>();
+        Set<String> mcpDevices = new HashSet<>();
+        Set<Integer> unapprovedMcpServers = new HashSet<>();
+
+        HostCollectionResolver resolver = bundle.hostResolver();
+        Map<Integer, Map<String, Integer>> byCollection = resolver.countByCollection(events,
+                e -> AtlasGuardrailUtils.isSkillFinding(e) ? null : AtlasGuardrailUtils.periodKey(e, startTs));
+        for (Map.Entry<Integer, Map<String, Integer>> entry : byCollection.entrySet()) {
+            ApiCollection c = collectionsById.get(entry.getKey());
+            String type = c == null ? AtlasGuardrailUtils.ASSET_TYPE_OTHER : AgenticObserveUtil.getTypeFromCollection(c);
+            String label = c == null ? null : AgenticObserveUtil.getPluginName(c);
+            String host = c == null ? null : c.getHostName();
+            int current = entry.getValue().getOrDefault(AtlasGuardrailUtils.PERIOD_CURRENT, 0);
+            AtlasGuardrailUtils.addToAssetType(byType, type, label, host, current, entry.getValue().getOrDefault(AtlasGuardrailUtils.PERIOD_PREVIOUS, 0));
+            if (AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER.equals(type) && current > 0) {
+                mcpServers.add(c.getId());
+                String deviceId = InsightUtil.deviceIdOf(c);
+                if (deviceId != null) mcpDevices.add(deviceId);
+                if (!AtlasPeopleService.isSanctioned(c, bundle.allowlistNamesLower, remarksByServiceName)) unapprovedMcpServers.add(c.getId());
+            }
+        }
+        for (DashboardMaliciousEvent e : events) {
+            String period = AtlasGuardrailUtils.periodKey(e, startTs);
+            boolean current = AtlasGuardrailUtils.PERIOD_CURRENT.equals(period);
+            if (AtlasGuardrailUtils.isSkillFinding(e)) {
+                AtlasGuardrailUtils.addToAssetType(byType, AgenticObserveUtil.CLIENT_TYPE_SKILL,
+                        SkillEvaluationConcentrationProvider.extractSkillName(e.getUrl()), null, current ? 1 : 0, current ? 0 : 1);
+            } else if (resolver.resolveEvent(e.getHost(), e.getActor()).isEmpty()) {
+                AtlasGuardrailUtils.addToAssetType(byType, AtlasGuardrailUtils.ASSET_TYPE_OTHER, null, e.getHost(), current ? 1 : 0, current ? 0 : 1);
+            }
+        }
+
+        BasicDBObject mcp = byType.get(AgenticObserveUtil.CLIENT_TYPE_MCP_SERVER);
+        mcp.put("servers", mcpServers.size());
+        mcp.put("devices", mcpDevices.size());
+        mcp.put("unapproved", unapprovedMcpServers.size());
+        List<BasicDBObject> assetTypes = new ArrayList<>();
+        for (BasicDBObject row : byType.values()) {
+            if (AtlasGuardrailUtils.ASSET_TYPE_OTHER.equals(row.getString("type")) && row.getLong("count") == 0) continue;
+            assetTypes.add(AtlasGuardrailUtils.finishAssetTypeRow(row, hasPreviousPeriod));
+        }
+        response.put("assetTypes", assetTypes);
+        return response;
     }
 }

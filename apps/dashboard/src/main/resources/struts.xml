@@ -14295,7 +14295,7 @@
             </result>
         </action>
 
-        <action name="api/fetchAtlasGuardrailsOverviewKpis" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchAtlasGuardrailsOverviewKpis">
+        <action name="api/atlas/guardrails/overview/fetchSummary" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchSummary">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -14317,7 +14317,7 @@
             </result>
         </action>
 
-        <action name="api/fetchAtlasGuardrailsOverviewPolicies" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchAtlasGuardrailsOverviewPolicies">
+        <action name="api/atlas/guardrails/overview/fetchViolationsByPolicy" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchViolationsByPolicy">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -14339,7 +14339,7 @@
             </result>
         </action>
 
-        <action name="api/fetchAtlasGuardrailsOverviewTriage" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchAtlasGuardrailsOverviewTriage">
+        <action name="api/atlas/guardrails/overview/fetchTriageStatus" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchTriageStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -14361,7 +14361,29 @@
             </result>
         </action>
 
-        <action name="api/fetchAtlasGuardrailsOverviewDecisions" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchAtlasGuardrailsOverviewDecisions">
+        <action name="api/atlas/guardrails/overview/fetchDecisionsTrend" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchDecisionsTrend">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="SUCCESS" type="json">
+                <param name="root">response</param>
+            </result>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/atlas/guardrails/overview/fetchViolationsSources" class="com.akto.action.AtlasGuardrailsOverviewAction" method="fetchViolationsSources">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

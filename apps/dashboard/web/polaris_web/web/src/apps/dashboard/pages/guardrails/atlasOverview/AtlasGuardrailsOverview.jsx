@@ -12,18 +12,29 @@ import AttentionCard from "./AttentionCard";
 import TriageStatusCard from "./TriageStatusCard";
 import DecisionsTrendCard from "./DecisionsTrendCard";
 import PolicyViolationsCard from "./PolicyViolationsCard";
-import SurfaceListCard from "./SurfaceListCard";
+import ViolationsSourcesCard from "./ViolationsSourcesCard";
 import TopEmployeesCard from "./TopEmployeesCard";
 import TopAssetsCard from "./TopAssetsCard";
 import guardrailOverviewMock from "./guardrailOverviewMock";
 import guardrailsApi from "../api";
 import { formatDurationMs } from "../../observe/llm/constants";
 import { getGuardrailRuleGroupHeading } from "../../threat_detection/constants/guardrailRuleDefinitions";
+import { formatAssetDisplayName } from "../violations/ViolationsPage";
+import { CLIENT_TYPES } from "../../observe/agentic/mcpClientHelper";
 
 const POLICIES_PATH = "/dashboard/guardrails/policies";
 const EMPTY_VALUE = "—";
 const POLICY_ROWS = 8;
 const MISCONFIGURED_LABEL = "Misconfigured settings";
+const ASSET_TYPE_LABELS = {
+    [CLIENT_TYPES.LLM]: "Browser AI apps",
+    [CLIENT_TYPES.AI_AGENT]: "AI agents & CLIs",
+    [CLIENT_TYPES.MCP_SERVER]: "MCP servers",
+    [CLIENT_TYPES.SKILL]: "Skills",
+    [CLIENT_TYPES.PLUGIN]: "Plugins",
+    [CLIENT_TYPES.SAAS_AGENT]: "SaaS agents",
+    Other: "Others",
+};
 
 function formatCount(n) {
     return n === undefined || n === null ? EMPTY_VALUE : Number(n).toLocaleString();
@@ -97,6 +108,26 @@ function buildKpis(kpis, openActivity) {
     ];
 }
 
+function plural(count, one, many) {
+    return `${formatCount(count)} ${count === 1 ? one : many}`;
+}
+
+function buildViolationsSourcesRows(assetTypes) {
+    return (assetTypes || [])
+        .map((s) => {
+            const examples = s.type === CLIENT_TYPES.MCP_SERVER
+                ? (s.servers ? `${plural(s.servers, "server", "servers")} on ${plural(s.devices, "device", "devices")} · ${formatCount(s.unapproved)} unapproved` : "")
+                : [...new Set((s.examples || []).map((x) => x.name || formatAssetDisplayName(x.host)).filter(Boolean))].join(", ");
+            return {
+                name: ASSET_TYPE_LABELS[s.type] || s.type,
+                examples,
+                count: s.count,
+                changePct: s.changePct,
+            };
+        })
+        .sort((a, b) => b.count - a.count);
+}
+
 function AtlasGuardrailsOverview() {
     const navigate = useNavigate();
     const [currDateRange, dispatchCurrDateRange] = useReducer(
@@ -107,6 +138,7 @@ function AtlasGuardrailsOverview() {
     const [triage, setTriage] = useState(null);
     const [decisions, setDecisions] = useState(null);
     const [policies, setPolicies] = useState(null);
+    const [violationsSources, setViolationsSources] = useState(null);
     const getTimeEpoch = (key) => Math.floor(Date.parse(currDateRange.period[key]) / 1000);
     const startTimestamp = getTimeEpoch("since");
     const endTimestamp = getTimeEpoch("until");
@@ -115,20 +147,24 @@ function AtlasGuardrailsOverview() {
         let cancelled = false;
         setKpis(null);
         setTriage(null);
-        guardrailsApi.fetchAtlasGuardrailsOverviewKpis(startTimestamp, endTimestamp)
+        guardrailsApi.fetchSummary(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setKpis(resp); })
             .catch(() => { if (!cancelled) setKpis(null); });
-        guardrailsApi.fetchAtlasGuardrailsOverviewTriage(startTimestamp, endTimestamp)
+        guardrailsApi.fetchTriageStatus(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setTriage(resp); })
             .catch(() => { if (!cancelled) setTriage(null); });
         setDecisions(null);
-        guardrailsApi.fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp)
+        guardrailsApi.fetchDecisionsTrend(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setDecisions(resp); })
             .catch(() => { if (!cancelled) setDecisions(null); });
         setPolicies(null);
-        guardrailsApi.fetchAtlasGuardrailsOverviewPolicies(startTimestamp, endTimestamp)
+        guardrailsApi.fetchViolationsByPolicy(startTimestamp, endTimestamp)
             .then((resp) => { if (!cancelled) setPolicies(resp); })
             .catch(() => { if (!cancelled) setPolicies(null); });
+        setViolationsSources(null);
+        guardrailsApi.fetchViolationsSources(startTimestamp, endTimestamp)
+            .then((resp) => { if (!cancelled) setViolationsSources(resp); })
+            .catch(() => { if (!cancelled) setViolationsSources(null); });
         return () => { cancelled = true; };
     }, [startTimestamp, endTimestamp]);
 
@@ -147,7 +183,7 @@ function AtlasGuardrailsOverview() {
             <PolicyViolationsCard policies={buildPolicyRows(policies?.rules)} onPolicyClick={openActivity} onTune={openPolicies} />
         </HorizontalGrid>,
         <HorizontalGrid key="lists" columns={{ xs: 1, md: 3 }} gap="4">
-            <SurfaceListCard surfaces={data.bySurface} onSurfaceClick={openActivity} />
+            <ViolationsSourcesCard rows={buildViolationsSourcesRows(violationsSources?.assetTypes)} periodDays={violationsSources?.periodDays} onRowClick={openActivity} />
             <TopEmployeesCard employees={data.topEmployees} />
             <TopAssetsCard assets={data.topAssets} />
         </HorizontalGrid>,
@@ -156,7 +192,7 @@ function AtlasGuardrailsOverview() {
     return (
         <PageWithMultipleCards
             title="Guardrail overview"
-            subtitle={`Violations across ${formatCount(kpis?.managedDevices)} managed devices and ${formatCount(data.discoveredAssets)} discovered AI agents, apps and MCP servers`}
+            subtitle={`Violations across ${plural(kpis?.managedDevices, "managed device", "managed devices")} and${formatCount(data.discoveredAssets)} discovered AI agents, apps and MCP servers`}
             isFirstPage
             secondaryActions={
                 <HorizontalStack gap="2" blockAlign="center">

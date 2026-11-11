@@ -179,36 +179,45 @@ export default {
         return resp
     },
 
-    async fetchAtlasGuardrailsOverviewKpis(startTimestamp, endTimestamp) {
+    async fetchSummary(startTimestamp, endTimestamp) {
         const resp = await request({
-            url: '/api/fetchAtlasGuardrailsOverviewKpis',
+            url: '/api/atlas/guardrails/overview/fetchSummary',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
         return resp
     },
 
-    async fetchAtlasGuardrailsOverviewTriage(startTimestamp, endTimestamp) {
+    async fetchTriageStatus(startTimestamp, endTimestamp) {
         const resp = await request({
-            url: '/api/fetchAtlasGuardrailsOverviewTriage',
+            url: '/api/atlas/guardrails/overview/fetchTriageStatus',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
         return resp
     },
 
-    async fetchAtlasGuardrailsOverviewDecisions(startTimestamp, endTimestamp) {
+    async fetchDecisionsTrend(startTimestamp, endTimestamp) {
         const resp = await request({
-            url: '/api/fetchAtlasGuardrailsOverviewDecisions',
+            url: '/api/atlas/guardrails/overview/fetchDecisionsTrend',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })
         return resp
     },
 
-    async fetchAtlasGuardrailsOverviewPolicies(startTimestamp, endTimestamp) {
+    async fetchViolationsByPolicy(startTimestamp, endTimestamp) {
         const resp = await request({
-            url: '/api/fetchAtlasGuardrailsOverviewPolicies',
+            url: '/api/atlas/guardrails/overview/fetchViolationsByPolicy',
+            method: 'post',
+            data: { startTimestamp, endTimestamp }
+        })
+        return resp
+    },
+
+    async fetchViolationsSources(startTimestamp, endTimestamp) {
+        const resp = await request({
+            url: '/api/atlas/guardrails/overview/fetchViolationsSources',
             method: 'post',
             data: { startTimestamp, endTimestamp }
         })

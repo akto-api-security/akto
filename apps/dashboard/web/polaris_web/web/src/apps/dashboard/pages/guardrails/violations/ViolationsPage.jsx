@@ -113,7 +113,7 @@ function getAssetServiceName(raw) {
     return raw;
 }
 
-function formatAssetDisplayName(raw) {
+export function formatAssetDisplayName(raw) {
     if (!raw) return null;
     return formatDisplayName(getAssetServiceName(raw));
 }
