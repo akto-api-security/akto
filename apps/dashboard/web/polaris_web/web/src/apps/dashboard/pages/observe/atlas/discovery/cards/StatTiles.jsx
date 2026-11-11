@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Text, VerticalStack } from "@shopify/polaris";
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo";
-import openInventory from "../shared/openInventory";
+import openInventory, { openNewLayoutPage } from "../shared/openInventory";
 import { CATEGORY_LABELS, CATEGORY_ORDER, DEVICES_PATH, DEVICE_SCOPES, INVENTORY_CATEGORIES } from "../constants";
 import observeFunc from "@/apps/dashboard/pages/observe/transform";
 
@@ -41,6 +41,6 @@ export default function StatTiles({ tiles, deviceScope, fleet }) {
         const sub = tile ? subLine(id, tile) : { text: "" };
         return { title: CATEGORY_LABELS[id], isComp: true, data: statValue(tile?.count, sub.text && { text: sub.text, color: sub.critical ? "critical" : undefined }), onClick: () => openInventory(navigate, INVENTORY_CATEGORIES[id]) };
     });
-    items.push({ title: "Devices with AI", isComp: true, data: statValue(devicesWithAi, fleetShare(devicesWithAi, fleet.managedDevices)), onClick: () => navigate(DEVICES_PATH) });
+    items.push({ title: "Devices with AI", isComp: true, data: statValue(devicesWithAi, fleetShare(devicesWithAi, fleet.managedDevices)), onClick: () => openNewLayoutPage(navigate, DEVICES_PATH) });
     return <SummaryCardInfo summaryItems={items} />;
 }
