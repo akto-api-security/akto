@@ -1,10 +1,10 @@
-import { Box, Card, HorizontalStack, Text, VerticalStack } from "@shopify/polaris";
+import { Box, Card, HorizontalStack, Icon, Text, VerticalStack } from "@shopify/polaris";
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered";
 import { LOAD_STATE } from "../constants";
 import "./discovery.css";
 
-// Card frame with loading/error/empty states; flush drops body padding, fill pins a footer to the bottom, center middles the body.
-export default function DiscoveryCard({ title, subtitle, legend, status, empty, emptyText, flush, fill, center, children }) {
+// Card frame with loading/error/empty states; flush drops body padding, fill pins a footer to the bottom, center middles the body; emptyIcon tops an empty message.
+export default function DiscoveryCard({ title, subtitle, legend, status, empty, emptyText, emptyIcon, flush, fill, center, children }) {
     let body = children;
     let isMessage = false;
     if (status === LOAD_STATE.LOADING) {
@@ -14,7 +14,12 @@ export default function DiscoveryCard({ title, subtitle, legend, status, empty, 
         body = <Text as="p" color="subdued">This section is unavailable right now.</Text>;
         isMessage = true;
     } else if (empty) {
-        body = <Text as="p" color="subdued">{emptyText || "Nothing to show yet."}</Text>;
+        body = (
+            <VerticalStack gap="2" inlineAlign={flush ? "center" : "start"}>
+                {emptyIcon && <Icon source={emptyIcon} tone="success" />}
+                <Text as="p" color="subdued" alignment={flush ? "center" : "start"}>{emptyText || "Nothing to show yet."}</Text>
+            </VerticalStack>
+        );
         isMessage = true;
     }
 
@@ -31,7 +36,7 @@ export default function DiscoveryCard({ title, subtitle, legend, status, empty, 
         const card = (
             <Card padding="0">
                 <Box padding="4" paddingBlockEnd="2">{header}</Box>
-                {isMessage ? <Box padding="4">{body}</Box> : body}
+                {isMessage ? <div className="discovery-card-message"><Box padding="4">{body}</Box></div> : body}
             </Card>
         );
         return fill ? <div className="discovery-card-fill">{card}</div> : card;

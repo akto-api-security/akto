@@ -17,6 +17,14 @@
     display: flex;
     flex-direction: column;
 }
+/* A message under a flush card's header, centered in the space left. */
+.discovery-card-message {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
 .discovery-card__footer {
     margin-top: auto;
 }

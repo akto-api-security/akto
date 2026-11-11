@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CircleTickMajor } from "@shopify/polaris-icons";
 import { Badge, Box, HorizontalStack, Pagination, Text, VerticalStack } from "@shopify/polaris";
 import Pressable from "@/apps/dashboard/pages/dashboard/ask/components/Pressable";
 import observeFunc from "@/apps/dashboard/pages/observe/transform";
@@ -93,7 +94,8 @@ export default function DecisionsCard({ deviceScope, refreshKey, pageSize: measu
             subtitle={SUBTITLES.decisions}
             status={status}
             empty={rows.length === 0}
-            emptyText="No risky or new tools need a decision."
+            emptyIcon={CircleTickMajor}
+            emptyText="All caught up. No risky or new tools need a decision."
         >
             {rows.map((row) => (
                 <Box key={row.key} paddingBlockStart="2" paddingBlockEnd="2" paddingInlineStart="4" paddingInlineEnd="4" borderBlockStartWidth="1" borderColor="border-subdued">
