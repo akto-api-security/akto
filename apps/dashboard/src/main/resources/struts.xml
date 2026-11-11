@@ -9507,8 +9507,9 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="featureLabel">API_TOKENS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User generated a runtime token for the helm command</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -9949,8 +9950,9 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">INTEGRATIONS</param>
-                <param name="accessType">READ</param>
+                <param name="featureLabel">API_TOKENS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User fetched or generated Burp credentials</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
@@ -15057,7 +15059,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">ADMIN_ACTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User ran advanced traffic filters that clean stored sample data</param>
             </interceptor-ref>
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
