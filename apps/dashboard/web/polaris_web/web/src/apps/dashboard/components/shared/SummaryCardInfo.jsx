@@ -5,7 +5,7 @@ import Pressable from '../../pages/dashboard/ask/components/Pressable'
 function ClickableSummaryCard({summaryItems}) {
     return (
         <Card padding={0} key="info">
-            <Box overflowX="hidden" overflowY="hidden" borderRadius="3">
+            <Box overflowX="hidden" overflowY="hidden">
                 <HorizontalGrid columns={summaryItems.length} gap={0}>
                     {summaryItems.map((item, index) => {
                         const cellProps = {
@@ -27,8 +27,16 @@ function ClickableSummaryCard({summaryItems}) {
                                 }
                             </VerticalStack>
                         )
+                        const isFilter = item.selected !== undefined
                         return item.onClick ? (
-                            <Pressable key={index} onClick={item.onClick} accessibilityLabel={String(item.title)} hoverBackground="bg-subdued" {...cellProps}>
+                            <Pressable
+                                key={index}
+                                onClick={item.onClick}
+                                accessibilityLabel={String(item.title)}
+                                background={item.selected ? "bg-magic-hover" : undefined}
+                                hoverBackground={isFilter ? (item.selected ? "bg-magic-hover" : "bg-magic-subdued") : "bg-subdued"}
+                                {...cellProps}
+                            >
                                 {content}
                             </Pressable>
                         ) : (

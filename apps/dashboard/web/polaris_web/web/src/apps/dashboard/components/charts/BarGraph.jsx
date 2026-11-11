@@ -4,7 +4,7 @@ import Highcharts from "highcharts"
 import { useRef } from "react";
 import observeFunc from "../../pages/observe/transform"
 
-function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xAxisTitle,barWidth, yAxisTitle, barGap, showGridLines, showYAxis, onBarClick, showDataLabels}) {
+function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xAxisTitle,barWidth, yAxisTitle, barGap, showGridLines, showYAxis, onBarClick, showDataLabels, extraChartOptions}) {
 
     const chartComponentRef = useRef(null)
     let xCategories = []
@@ -18,7 +18,7 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
             custom: { ...(x.id !== undefined ? { id: x.id } : {}), ...(x.filterKey !== undefined ? { filterKey: x.filterKey } : {}), ...(x.url !== undefined ? { url: x.url } : {}), ...(x.method !== undefined ? { method: x.method } : {}) }
         })
     })
-    const chartOptions = {
+    const baseOptions = {
         chart: {
             type: 'column',
             backgroundColor: backgroundColor || "white",
@@ -90,6 +90,7 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
         }],
         ...defaultChartOptions,
     };
+    const chartOptions = extraChartOptions ? Highcharts.merge(baseOptions, extraChartOptions) : baseOptions;
 
     useEffect(() => {
         const mediaQueryList = window.matchMedia('print')

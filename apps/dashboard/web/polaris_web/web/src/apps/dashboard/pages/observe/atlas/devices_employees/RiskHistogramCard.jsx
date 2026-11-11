@@ -11,6 +11,12 @@ const CHART_OPTIONS = {
     legend: { enabled: false },
     yAxis: [{ title: { text: "" }, visible: false, gridLineWidth: 0, min: 0, maxPadding: 0.2 }],
 };
+const TEXT_COLOR = "#202223";
+const DIVIDER_COLOR = "#E1E3E5";
+const EXTRA_OPTIONS = {
+    xAxis: { lineColor: DIVIDER_COLOR, tickColor: DIVIDER_COLOR, labels: { style: { color: TEXT_COLOR } } },
+    plotOptions: { series: { dataLabels: { style: { color: TEXT_COLOR, textOutline: "none" } } } },
+};
 
 // Each numeric bucket joins the level of its midpoint, so the thresholds stay in getRiskLevel only.
 // A score exactly on a boundary (2.0, 3.0, 4.0) sits in the higher bucket, so it can show one level above its badge.
@@ -37,17 +43,17 @@ function RiskHistogramCard({ overview, status, onSelectBucket, onSelectHighRisk 
 
     const body = (
         <VerticalStack gap="2">
-            <Text as="p" color="subdued">Highest {mapLabel('API', getDashboardCategory())} risk score (0 to 5) across each employee's AI tools</Text>
             {riskUnavailable ? (
                 <Text as="p" variant="bodySm" color="critical">Risk scores are unavailable right now.</Text>
             ) : (
                 <BarGraph
                     data={data}
-                    height="280px"
+                    height="250px"
                     barWidth={BAR_WIDTH}
                     showYAxis={false}
                     showDataLabels
                     defaultChartOptions={CHART_OPTIONS}
+                    extraChartOptions={EXTRA_OPTIONS}
                     onBarClick={(name, custom) => onSelectBucket(levels[custom.id])}
                 />
             )}
@@ -57,7 +63,7 @@ function RiskHistogramCard({ overview, status, onSelectBucket, onSelectHighRisk 
         </VerticalStack>
     );
 
-    return <InfoCard title="Employee risk scores" titleToolTip={RISK_EXPLANATION} component={transform.cardBody(status, body)} />;
+    return <InfoCard title="Employee risk scores" subtitle={`Highest ${mapLabel('API', getDashboardCategory())} risk score (0 to 5) across each employee's AI tools`} titleToolTip={transform.tooltip(RISK_EXPLANATION)} component={transform.cardBody(status, body)} />;
 }
 
 export default RiskHistogramCard;
