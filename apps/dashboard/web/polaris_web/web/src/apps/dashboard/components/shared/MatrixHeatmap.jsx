@@ -92,7 +92,7 @@ function RowCells({ row, columns, max, format, tipUnit, emptyText, onRowClick, o
     const labelClickable = clickProps(onRowClick && (() => onRowClick(row)));
     return (
         <>
-            <span className={`matrix-heatmap__row${onRowClick ? " matrix-heatmap--clickable" : ""}`} aria-label={onRowClick ? `Open ${row.label}` : undefined} {...labelClickable}><Text as="span" variant="bodyMd">{row.label}</Text></span>
+            <span className={`matrix-heatmap__row${onRowClick ? " matrix-heatmap--clickable" : ""}`} aria-label={onRowClick ? `Open ${row.label}` : undefined} {...labelClickable}><span className="matrix-heatmap__row-label" title={row.label}><Text as="span" variant="bodyMd">{row.label}</Text></span></span>
             {row.cells.map((value, index) => {
                 const shading = shade(value, max, columns[index].danger ? RED_SCALE : PURPLE_SCALE);
                 const tip = `${row.label} · ${columns[index].label}: ${tipValue(value || 0, format, tipUnit)}`;

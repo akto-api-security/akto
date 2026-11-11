@@ -31,6 +31,13 @@
     display: flex;
     align-items: center;
     white-space: nowrap;
+    min-width: 0;
+}
+
+/* A long row label ends in an ellipsis; the full name is its hover title. */
+.matrix-heatmap__row-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .matrix-heatmap__cell {
