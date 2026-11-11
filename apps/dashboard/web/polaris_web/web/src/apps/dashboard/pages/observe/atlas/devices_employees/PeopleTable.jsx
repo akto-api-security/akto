@@ -10,7 +10,7 @@ import {
     LastSeenCellRenderer, OsCellRenderer, OwnerCellRenderer, RiskCellRenderer, FlagsCellRenderer, TagsCellRenderer, TeamsCellRenderer, UnapprovedCellRenderer, ViolationsCellRenderer,
 } from "./PeopleCellRenderers";
 import {
-    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_HEIGHT, RISK_MAX, SEARCH_HINTS,
+    CATEGORY_LABELS, DEVICE_CHIPS, EMPLOYEE_CHIPS, EMPTY_PEOPLE_FILTERS, FILTER_LABELS, FILTER_OPTION_LABELS, LIST_FILTERS, HEALTH_LABELS, HIGH_RISK_THRESHOLD, MODE_LABELS, osLabel, PEOPLE_TABLE_CHROME_HEIGHT, PEOPLE_TABLE_HEIGHT, PEOPLE_TABLE_MIN_HEIGHT, RISK_MAX, SEARCH_HINTS,
 } from "./peopleConstants";
 import EditDeviceTagsModal from "../../agentic/EditDeviceTagsModal";
 import transform from "./transform";
@@ -267,6 +267,9 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
     }, [isEmployees, selectedId]);
     useEffect(() => { gridRef.current?.api?.redrawRows(); }, [selectedId]);
 
+    // Shrinks to the loaded rows (a filter leaving one row gives a short table) and scrolls inside past PEOPLE_TABLE_HEIGHT.
+    const tableHeight = Math.min(PEOPLE_TABLE_HEIGHT, Math.max(PEOPLE_TABLE_MIN_HEIGHT, PEOPLE_TABLE_CHROME_HEIGHT + rows.length * ROW_HEIGHT));
+
     const gridKey = useMemo(
         () => `${tab}-${deviceScope}-${JSON.stringify(filters)}-${refreshKey}`,
         [tab, deviceScope, filters, refreshKey]
@@ -298,8 +301,8 @@ function PeopleTable({ tab, onTabChange, filters, onFiltersChange, deviceScope, 
                 searchValue={search}
                 onSearchChange={onSearchChange}
                 searchPlaceholder={SEARCH_HINTS[tab]}
-                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} dataOptions={dataOptions} openFilter={openFilter} setOpenFilter={setOpenFilter} />}
-                height={PEOPLE_TABLE_HEIGHT}
+                searchBelow={<FilterRow tab={tab} filters={filters} onFiltersChange={onFiltersChange} dataOptions={dataOptions} />}
+                height={tableHeight}
                 domLayout="normal"
                 rowHeight={ROW_HEIGHT}
                 noOuterBorder

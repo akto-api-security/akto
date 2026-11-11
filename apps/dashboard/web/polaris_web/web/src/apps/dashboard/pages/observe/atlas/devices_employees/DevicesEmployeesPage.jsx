@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, HorizontalGrid } from "@shopify/polaris";
+import { Box, Button, Card, HorizontalGrid } from "@shopify/polaris";
 import { ExportMinor } from "@shopify/polaris-icons";
 import func from "@/util/func";
 import settingRequests from "../../../settings/api";
@@ -129,9 +129,12 @@ function DevicesEmployeesPage() {
         setFilters({ ...EMPTY_PEOPLE_FILTERS, ...patch });
     }, []);
     const markQueued = useCallback((moduleIds) => setQueuedModuleIds((previous) => [...new Set([...previous, ...moduleIds])]), []);
+    const tableRef = useRef(null);
+    // Chart and stat clicks drive the table below them, so bring it into view when one applies a filter.
     const toggleView = (nextTab, patch = {}) => {
         const sameView = tab === nextTab && JSON.stringify({ ...EMPTY_PEOPLE_FILTERS, ...patch }) === JSON.stringify(filters);
         showTable(nextTab, sameView ? {} : patch);
+        if (!sameView) tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
     const onDevicesTab = tab === "devices";
     const activeHealth = onDevicesTab && filters.healthStates.length === 1 ? filters.healthStates[0] : null;
@@ -261,22 +264,23 @@ function DevicesEmployeesPage() {
                     </Card>
                     <ViolationsBySeverityCard counts={severityCounts} status={severityStatus} onSelect={onSelectSeverity} />
                 </HorizontalGrid>,
-                <PeopleTable
-                    key="people-table"
-                    tab={tab}
-                    onTabChange={(nextTab) => showTable(nextTab)}
-                    filters={filters}
-                    onFiltersChange={patchFilters}
-                    deviceScope={deviceScope}
-                    counts={{ employees: overview?.employeeCount, devices: overview?.deviceCount }}
-                    search={search}
-                    onSearchChange={setSearch}
-                    violationsAvailable={overview?.violationsAvailable}
-                    riskAvailable={overview?.riskAvailable}
-                    onOpen={openPerson}
-                    selected={openTarget}
-                    filterOptions={filterOptions}
-                />,
+                <Box key="people-table" ref={tableRef}>
+                    <PeopleTable
+                        tab={tab}
+                        onTabChange={(nextTab) => showTable(nextTab)}
+                        filters={filters}
+                        onFiltersChange={patchFilters}
+                        deviceScope={deviceScope}
+                        counts={{ employees: overview?.employeeCount, devices: overview?.deviceCount }}
+                        search={search}
+                        onSearchChange={setSearch}
+                        violationsAvailable={overview?.violationsAvailable}
+                        riskAvailable={overview?.riskAvailable}
+                        onOpen={openPerson}
+                        selected={openTarget}
+                        filterOptions={filterOptions}
+                    />
+                </Box>,
                 <PeopleFlyout
                     key="people-flyout"
                     target={openTarget}
