@@ -234,7 +234,7 @@ public class AtlasDiscoveryService {
         return connection;
     }
 
-    private static String lower(String value) {
+    static String lower(String value) {
         return StringUtils.lowerCase(value, Locale.ROOT);
     }
 

@@ -58,8 +58,6 @@ public class AtlasAssetStatusService {
     private static final int CASCADE_BATCH_SIZE = 1000;
     private static final int MAX_SKILL_DECISION_NAMES = 1000;
     private static final LoggerMaker logger = new LoggerMaker(AtlasAssetStatusService.class, LogDb.DASHBOARD);
-    private static final List<AtlasAssetStatus> PRECEDENCE = Arrays.asList(
-            AtlasAssetStatus.BLOCKED, AtlasAssetStatus.APPROVED, AtlasAssetStatus.UNDER_REVIEW, AtlasAssetStatus.UNAPPROVED);
 
     private static final TtlCache<String, Map<String, AtlasAssetStatus>> CACHE = new TtlCache<>(CACHE_TTL_MS, CACHE_MAX_ENTRIES);
     private static final AtomicLong GENERATION = new AtomicLong();
@@ -103,7 +101,9 @@ public class AtlasAssetStatusService {
         // A write that lands while reading bumps the generation, so a snapshot read before it is not cached.
         long generation = GENERATION.get();
         Map<String, AtlasAssetStatus> decisions = readDecisions();
-        if (GENERATION.get() == generation) CACHE.put(cacheKey, decisions);
+        CACHE.put(cacheKey, decisions);
+        // Checked after the put, so a write finishing in between cannot leave this snapshot cached.
+        if (GENERATION.get() != generation) CACHE.removeKeysIf(cacheKey::equals);
         return decisions;
     }
 
@@ -119,24 +119,39 @@ public class AtlasAssetStatusService {
         int updated = 0;
         List<Bson> decision = decisionUpdates(status, markedBy, now);
         Set<Integer> serverCollectionIds = new HashSet<>();
+        Set<String> blocked = status == AtlasAssetStatus.UNDER_REVIEW ? blockedKeys(tools) : Collections.emptySet();
         try {
             List<AtlasToolRow> servers = new ArrayList<>();
             for (AtlasToolRow tool : tools) {
-                if (!canDecide(tool)) continue;
+                // Marking under review never unblocks, same as the Audit page.
+                if (!canDecide(tool) || blocked.contains(toolKey(tool.getRowType(), tool.getGroupKey()))) continue;
                 String type = auditTypeOf(tool.getRowType());
                 if (Constants.AKTO_MCP_SERVER_TAG.equals(type)) servers.add(tool);
                 else updateRows(tool, type, status, decision);
-                if (ROW_TYPE_SKILL.equals(tool.getRowType())) setSkillBlocked(tool, status == AtlasAssetStatus.BLOCKED);
+                // Under review leaves a skill's block flag alone, as it leaves a block.
+                if (ROW_TYPE_SKILL.equals(tool.getRowType()) && status != AtlasAssetStatus.UNDER_REVIEW) setSkillBlocked(tool, status == AtlasAssetStatus.BLOCKED);
                 updated++;
             }
             if (!servers.isEmpty()) serverCollectionIds.addAll(updateServerRows(servers, status, decision));
-            // One pass over the tool rows for all servers, not one per server.
-            cascadeToTools(new ArrayList<>(serverCollectionIds), decision);
+            // One pass over the tool rows for all servers, not one per server. Under review leaves tools their own decisions, as on the Audit page.
+            if (status != AtlasAssetStatus.UNDER_REVIEW) cascadeToTools(new ArrayList<>(serverCollectionIds), decision);
         } finally {
             // Also after a partial write, so the next read does not serve the old decisions.
             invalidate();
         }
         return updated;
+    }
+
+    // Read fresh, not from the cache, so a block made in the last minute is never marked under review.
+    private Set<String> blockedKeys(Collection<AtlasToolRow> tools) {
+        Map<String, AtlasAssetStatus> decisions = readDecisions();
+        decisions.putAll(loadSkillDecisions(tools));
+        Set<String> blocked = new HashSet<>();
+        for (AtlasToolRow tool : tools) {
+            String type = auditTypeOf(tool.getRowType());
+            if (type != null && decisions.get(decisionKey(type, tool.getGroupKey())) == AtlasAssetStatus.BLOCKED) blocked.add(toolKey(tool.getRowType(), tool.getGroupKey()));
+        }
+        return blocked;
     }
 
     // A failed read throws, so it is never cached as "every tool is unapproved".
@@ -165,23 +180,25 @@ public class AtlasAssetStatusService {
         return decisions;
     }
 
-    // Pages the matching rows by _id and keeps the strongest decision per tool.
+    // Pages the matching rows by _id and keeps the strongest decision per tool, ranked like the Audit page.
     private void readInto(Map<String, AtlasAssetStatus> decisions, Bson filter) {
-        Bson projection = Projections.include(McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME, McpAuditInfo.REMARKS, McpAuditInfo.MARKED_BY);
+        Map<String, Integer> best = new HashMap<>();
+        Bson projection = Projections.include(McpAuditInfo.TYPE, McpAuditInfo.RESOURCE_NAME, McpAuditInfo.REMARKS, McpAuditInfo.APPROVAL_CONDITIONS);
         ObjectId lastId = null;
         while (true) {
             Bson page = lastId == null ? filter : Filters.and(filter, Filters.gt(Constants.ID, lastId));
             List<McpAuditInfo> rows = McpAuditInfoDao.instance.findAll(page, 0, PAGE_SIZE, Sorts.ascending(Constants.ID), projection);
             for (McpAuditInfo row : rows) {
                 if (row.getResourceName() == null) continue;
-                AtlasAssetStatus rowStatus = statusOf(row);
-                decisions.merge(decisionKey(row.getType(), serverOrResourceName(row)), rowStatus, AtlasAssetStatusService::stronger);
+                int priority = priorityOf(row);
+                best.merge(decisionKey(row.getType(), serverOrResourceName(row)), priority, Math::min);
                 // A row Atlas created for a server has the bare name, which can itself have dots (e.g. "mcp.example.com").
-                decisions.merge(decisionKey(row.getType(), row.getResourceName()), rowStatus, AtlasAssetStatusService::stronger);
+                best.merge(decisionKey(row.getType(), row.getResourceName()), priority, Math::min);
             }
-            if (rows.size() < PAGE_SIZE) return;
+            if (rows.size() < PAGE_SIZE) break;
             lastId = rows.get(rows.size() - 1).getId();
         }
+        best.forEach((key, priority) -> decisions.put(key, statusOfPriority(priority)));
     }
 
     // Same api_info flag the Agentic assets page sets when it blocks a skill, so the decision reaches the skill's collections.
@@ -202,17 +219,29 @@ public class AtlasAssetStatusService {
         return type + KEY_SEPARATOR + StringUtils.defaultString(name).toLowerCase(Locale.ROOT);
     }
 
-    static AtlasAssetStatus statusOf(McpAuditInfo row) {
+    // Same order as AuditDataAction.remarksPriority: rejected, active conditional, approved, expired conditional, under review, pending.
+    static int priorityOf(McpAuditInfo row) {
         String remarks = row.getRemarks();
-        if (McpAuditInfo.REMARKS_REJECTED.equals(remarks)) return AtlasAssetStatus.BLOCKED;
-        // ponytail: a conditional approval counts as approved even once expired.
-        if (McpAuditInfo.REMARKS_APPROVED.equals(remarks) || CONDITIONALLY_APPROVED.equals(remarks)) return AtlasAssetStatus.APPROVED;
-        // A blank decision someone set by hand is "under review"; one created by discovery is just unreviewed.
-        return StringUtils.isNotBlank(row.getMarkedBy()) ? AtlasAssetStatus.UNDER_REVIEW : AtlasAssetStatus.UNAPPROVED;
+        if (McpAuditInfo.REMARKS_REJECTED.equals(remarks)) return 0;
+        if (CONDITIONALLY_APPROVED.equals(remarks)) return isExpired(row.getApprovalConditions()) ? 3 : 1;
+        if (McpAuditInfo.REMARKS_APPROVED.equals(remarks)) return 2;
+        return McpAuditInfo.REMARKS_UNDER_REVIEW.equals(remarks) ? 4 : 5;
     }
 
-    static AtlasAssetStatus stronger(AtlasAssetStatus a, AtlasAssetStatus b) {
-        return PRECEDENCE.indexOf(a) <= PRECEDENCE.indexOf(b) ? a : b;
+    // Like the Audit page and the AI inventory, an expired conditional approval shows as blocked.
+    static AtlasAssetStatus statusOfPriority(int priority) {
+        if (priority == 0 || priority == 3) return AtlasAssetStatus.BLOCKED;
+        if (priority == 1 || priority == 2) return AtlasAssetStatus.APPROVED;
+        return priority == 4 ? AtlasAssetStatus.UNDER_REVIEW : AtlasAssetStatus.UNAPPROVED;
+    }
+
+    static AtlasAssetStatus statusOf(McpAuditInfo row) {
+        return statusOfPriority(priorityOf(row));
+    }
+
+    private static boolean isExpired(Map<String, Object> conditions) {
+        Object expiresAt = conditions == null ? null : conditions.get("expiresAt");
+        return expiresAt instanceof Number && ((Number) expiresAt).longValue() > 0 && Context.now() > ((Number) expiresAt).longValue();
     }
 
     private static boolean isAllowlisted(AtlasToolRow tool, Set<String> allowlistNamesLower) {
@@ -223,7 +252,8 @@ public class AtlasAssetStatusService {
     }
 
     private static Bson contextSourceFilter(CONTEXT_SOURCE contextSource) {
-        if (contextSource == null) return Filters.eq(McpAuditInfo.CONTEXT_SOURCE, null);
+        // Same as the AI inventory: without a context source every row counts.
+        if (contextSource == null) return new Document();
         return Filters.or(
                 Filters.eq(McpAuditInfo.CONTEXT_SOURCE, contextSource.name()),
                 Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
@@ -232,8 +262,7 @@ public class AtlasAssetStatusService {
     private static List<Bson> decisionUpdates(AtlasAssetStatus status, String markedBy, int now) {
         List<Bson> updates = new ArrayList<>();
         updates.add(Updates.set(McpAuditInfo.REMARKS, remarksOf(status)));
-        // Resetting to unapproved clears the marker, which is what tells it apart from "under review".
-        updates.add(Updates.set(McpAuditInfo.MARKED_BY, status == AtlasAssetStatus.UNAPPROVED ? "" : markedBy));
+        updates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
         updates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, now));
         if (status == AtlasAssetStatus.APPROVED) updates.add(Updates.set(McpAuditInfo.APPROVED_AT, now));
         return updates;
@@ -252,7 +281,7 @@ public class AtlasAssetStatusService {
     private static String remarksOf(AtlasAssetStatus status) {
         if (status == AtlasAssetStatus.APPROVED) return McpAuditInfo.REMARKS_APPROVED;
         if (status == AtlasAssetStatus.BLOCKED) return McpAuditInfo.REMARKS_REJECTED;
-        return "";
+        return status == AtlasAssetStatus.UNDER_REVIEW ? McpAuditInfo.REMARKS_UNDER_REVIEW : "";
     }
 
     // Same decision on the server's tool rows, so a tool still approved cannot undo a server block.
@@ -290,7 +319,7 @@ public class AtlasAssetStatusService {
     // One scan finds the global rows of every selected server; the update then goes by _id, so many servers cost one scan.
     private List<Integer> updateServerRows(List<AtlasToolRow> servers, AtlasAssetStatus status, List<Bson> decision) {
         List<Bson> updates = new ArrayList<>(decision);
-        updates.add(Updates.set(McpAuditInfo.BLOCK_ALL, status == AtlasAssetStatus.BLOCKED));
+        if (status != AtlasAssetStatus.UNDER_REVIEW) updates.add(Updates.set(McpAuditInfo.BLOCK_ALL, status == AtlasAssetStatus.BLOCKED));
         String names = servers.stream().map(tool -> Pattern.quote(tool.getGroupKey())).collect(Collectors.joining("|"));
         Bson rowFilter = Filters.and(Filters.eq(McpAuditInfo.TYPE, Constants.AKTO_MCP_SERVER_TAG),
                 Filters.regex(McpAuditInfo.RESOURCE_NAME, "^(?:[^.]+\\.[^.]+\\.)?(?:" + names + ")$", "i"), globalScope());
@@ -313,7 +342,10 @@ public class AtlasAssetStatusService {
             lastId = rows.get(rows.size() - 1).getId();
         }
         for (AtlasToolRow tool : servers) {
-            if (!matchedNames.contains(tool.getGroupKey().toLowerCase(Locale.ROOT))) insertRow(tool, Constants.AKTO_MCP_SERVER_TAG, status, updates);
+            if (matchedNames.contains(tool.getGroupKey().toLowerCase(Locale.ROOT))) continue;
+            insertRow(tool, Constants.AKTO_MCP_SERVER_TAG, status, updates);
+            // A server with no row yet still has tool rows, which follow its decision.
+            collectionIds.addAll(tool.getCollectionIds());
         }
         return new ArrayList<>(collectionIds);
     }
@@ -330,7 +362,8 @@ public class AtlasAssetStatusService {
         if (status == AtlasAssetStatus.UNAPPROVED) return;
         List<Bson> insert = new ArrayList<>(updates);
         insert.add(Updates.max(McpAuditInfo.LAST_DETECTED, tool.getLastSeen()));
-        insert.add(Updates.setOnInsert(McpAuditInfo.CONTEXT_SOURCE, CONTEXT_SOURCE.ENDPOINT.name()));
+        CONTEXT_SOURCE contextSource = Context.contextSource.get();
+        insert.add(Updates.setOnInsert(McpAuditInfo.CONTEXT_SOURCE, (contextSource == null ? CONTEXT_SOURCE.ENDPOINT : contextSource).name()));
         McpAuditInfoDao.instance.getMCollection().updateOne(
                 Filters.and(Filters.eq(McpAuditInfo.TYPE, type), Filters.eq(McpAuditInfo.RESOURCE_NAME, tool.getGroupKey()), globalScope()),
                 Updates.combine(insert), new UpdateOptions().upsert(true));

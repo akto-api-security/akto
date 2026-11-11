@@ -66,6 +66,17 @@ function AskBar({
         }
     }, [query, loading, conversationId, conversationType, chatScope, chatData]);
 
+    // Asks the question another part of the page sent; only a new request id triggers it.
+    useEffect(() => {
+        if (!request?.question) return;
+        if (loading) {
+            func.setToast(true, true, "Still answering the previous question. Try again in a moment.");
+            return;
+        }
+        // The user's own typed text stays put.
+        submit(request.question, false);
+    }, [request?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const clear = useCallback(() => {
         latestRequest.current += 1;
         setMessages([]);

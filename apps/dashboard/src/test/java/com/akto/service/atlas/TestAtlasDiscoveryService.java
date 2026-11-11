@@ -483,16 +483,34 @@ public class TestAtlasDiscoveryService {
         assertEquals(AtlasAssetStatus.BLOCKED, AtlasAssetStatusService.statusOf(auditRow("Rejected", "user.one")));
         assertEquals(AtlasAssetStatus.APPROVED, AtlasAssetStatusService.statusOf(auditRow("Approved", "user.one")));
         assertEquals(AtlasAssetStatus.APPROVED, AtlasAssetStatusService.statusOf(auditRow("Conditionally Approved", "user.one")));
-        assertEquals(AtlasAssetStatus.UNDER_REVIEW, AtlasAssetStatusService.statusOf(auditRow("", "user.one")));
+        assertEquals(AtlasAssetStatus.UNDER_REVIEW, AtlasAssetStatusService.statusOf(auditRow("Under review", "user.one")));
+        // A blank decision is unreviewed, whoever touched it.
+        assertEquals(AtlasAssetStatus.UNAPPROVED, AtlasAssetStatusService.statusOf(auditRow("", "user.one")));
         assertEquals(AtlasAssetStatus.UNAPPROVED, AtlasAssetStatusService.statusOf(auditRow("", "")));
         assertEquals(AtlasAssetStatus.UNAPPROVED, AtlasAssetStatusService.statusOf(auditRow(null, null)));
     }
 
     @Test
-    public void strongestDecisionWinsWhenRowsDisagree() {
-        assertEquals(AtlasAssetStatus.BLOCKED, AtlasAssetStatusService.stronger(AtlasAssetStatus.APPROVED, AtlasAssetStatus.BLOCKED));
-        assertEquals(AtlasAssetStatus.APPROVED, AtlasAssetStatusService.stronger(AtlasAssetStatus.UNDER_REVIEW, AtlasAssetStatus.APPROVED));
-        assertEquals(AtlasAssetStatus.UNDER_REVIEW, AtlasAssetStatusService.stronger(AtlasAssetStatus.UNAPPROVED, AtlasAssetStatus.UNDER_REVIEW));
+    public void expiredConditionalApprovalShowsAsBlocked() {
+        McpAuditInfo expired = auditRow("Conditionally Approved", "user.one");
+        expired.setApprovalConditions(Collections.singletonMap("expiresAt", 1));
+        McpAuditInfo active = auditRow("Conditionally Approved", "user.one");
+        active.setApprovalConditions(Collections.singletonMap("expiresAt", Integer.MAX_VALUE));
+        assertEquals(AtlasAssetStatus.BLOCKED, AtlasAssetStatusService.statusOf(expired));
+        assertEquals(AtlasAssetStatus.APPROVED, AtlasAssetStatusService.statusOf(active));
+    }
+
+    @Test
+    public void decisionPrioritiesFollowTheAuditPage() {
+        McpAuditInfo expired = auditRow("Conditionally Approved", "user.one");
+        expired.setApprovalConditions(Collections.singletonMap("expiresAt", 1));
+        int blocked = AtlasAssetStatusService.priorityOf(auditRow("Rejected", "user.one"));
+        int approved = AtlasAssetStatusService.priorityOf(auditRow("Approved", "user.one"));
+        int expiredConditional = AtlasAssetStatusService.priorityOf(expired);
+        int underReview = AtlasAssetStatusService.priorityOf(auditRow("Under review", "user.one"));
+        int pending = AtlasAssetStatusService.priorityOf(auditRow("", ""));
+        // A lower number wins when rows disagree: an approved row beats an expired one, which beats under review.
+        assertTrue(blocked < approved && approved < expiredConditional && expiredConditional < underReview && underReview < pending);
     }
 
     @Test

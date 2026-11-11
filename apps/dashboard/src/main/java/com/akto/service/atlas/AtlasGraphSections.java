@@ -1,7 +1,5 @@
 package com.akto.service.atlas;
 
-import org.apache.commons.lang3.StringUtils;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -10,7 +8,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -55,7 +52,7 @@ final class AtlasGraphSections {
         for (AtlasTool agent : agents.subList(0, Math.min(MATRIX_AGENTS, agents.size()))) {
             Map<String, Integer> byServer = new HashMap<>();
             for (Map.Entry<String, Set<String>> e : agent.getRow().getMcpDevices().entrySet()) {
-                byServer.merge(lower(e.getKey()), e.getValue().size(), Integer::sum);
+                byServer.merge(AtlasDiscoveryService.lower(e.getKey()), e.getValue().size(), Integer::sum);
             }
             List<Integer> cells = new ArrayList<>();
             for (String server : servers) cells.add(byServer.getOrDefault(server, 0));
@@ -151,7 +148,7 @@ final class AtlasGraphSections {
                 if (devices != null) edges.add(edge("team:" + team, "tool:" + tool.key(), devices));
             }
             for (Map.Entry<String, Set<String>> e : tool.getRow().getMcpDevices().entrySet()) {
-                String server = lower(e.getKey());
+                String server = AtlasDiscoveryService.lower(e.getKey());
                 if (servers.contains(server) && !e.getValue().isEmpty()) edges.add(edge("tool:" + tool.key(), "mcp:" + server, e.getValue().size()));
             }
         }
@@ -170,7 +167,7 @@ final class AtlasGraphSections {
         Map<String, Set<String>> devicesByServer = new HashMap<>();
         for (AtlasTool tool : sources) {
             for (Map.Entry<String, Set<String>> e : tool.getRow().getMcpDevices().entrySet()) {
-                devicesByServer.computeIfAbsent(lower(e.getKey()), k -> new HashSet<>()).addAll(e.getValue());
+                devicesByServer.computeIfAbsent(AtlasDiscoveryService.lower(e.getKey()), k -> new HashSet<>()).addAll(e.getValue());
             }
         }
         return devicesByServer;
@@ -181,10 +178,6 @@ final class AtlasGraphSections {
         return membersByKey.keySet().stream()
                 .sorted(Comparator.comparingInt((String key) -> membersByKey.get(key).size()).reversed().thenComparing(key -> key))
                 .limit(limit).collect(Collectors.toList());
-    }
-
-    private static String lower(String value) {
-        return StringUtils.lowerCase(value, Locale.ROOT);
     }
 
     private static Map<String, Object> node(String id, String label, String category, int devices, AtlasAssetStatus status) {

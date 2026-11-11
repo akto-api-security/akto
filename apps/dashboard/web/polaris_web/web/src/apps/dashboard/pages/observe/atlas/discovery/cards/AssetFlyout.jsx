@@ -139,7 +139,7 @@ export default function AssetFlyout({ row, deviceScope, refreshKey, onClose, onU
             ? { label: "Create guardrail policy", primary: true, onClick: () => navigate(GUARDRAIL_POLICIES_PATH, { state: { openCreateGuardrail: true } }) }
             : { label: "Approve", primary: true, disabled: pending, onClick: () => change(ASSET_STATUS.APPROVED) },
         status !== ASSET_STATUS.BLOCKED && { label: "Block", disabled: pending, onClick: () => change(ASSET_STATUS.BLOCKED) },
-        status !== ASSET_STATUS.UNDER_REVIEW && { label: "Mark under review", disabled: pending, onClick: () => change(ASSET_STATUS.UNDER_REVIEW) },
+        status !== ASSET_STATUS.UNDER_REVIEW && status !== ASSET_STATUS.BLOCKED && { label: "Mark under review", disabled: pending, onClick: () => change(ASSET_STATUS.UNDER_REVIEW) },
     ].filter(Boolean);
 
     let loadState = LOAD_STATE.READY;
