@@ -10239,7 +10239,8 @@
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">USER_ACTIONS</param>
-                <param name="accessType">READ</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User skipped onboarding</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
