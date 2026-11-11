@@ -10,6 +10,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,6 +28,7 @@ public class UtilityServer {
 
     private static HttpServer server;
     private static ExecutorService executorService;
+    private static ExecutorService httpExecutor;
     private static ApiExecutionJobStore jobStore;
     private static DataActor dataActor;
     private static volatile boolean started = false;
@@ -50,7 +52,14 @@ public class UtilityServer {
                 t.setDaemon(true);
                 return t;
             });
-            server = HttpServer.create(new InetSocketAddress(port), 0);
+            httpExecutor = Executors.newCachedThreadPool(r -> {
+                Thread t = new Thread(r, "akto-utility-http");
+                t.setDaemon(true);
+                return t;
+            });
+            // Bind IPv4 explicitly. On macOS a wildcard bind is IPv6-only, so
+            // Docker's host.docker.internal (IPv4) gets connection refused.
+            server = HttpServer.create(new InetSocketAddress(InetAddress.getByName("0.0.0.0"), port), 0);
             server.createContext("/utility/execute", new ExecuteApiHandler(jobStore, executorService));
             server.createContext("/utility/result", new GetResultHandler(jobStore));
             server.createContext("/utility/agentQueryRecords", new FetchAgentQueryRecordsHandler(dataActor));
@@ -59,7 +68,9 @@ public class UtilityServer {
             server.createContext("/utility/sendLogs", new SendLogsHandler(dataActor));
             server.createContext("/utility/fetchAgentModels", new FetchAgentModelsHandler(dataActor));
             server.createContext("/utility/ingestTraffic", new TrafficIngestHandler());
-            server.setExecutor(null);
+            // A null executor runs every handler on the accept thread. One slow
+            // insertAgenticTestingLog then stops the server from accepting connections.
+            server.setExecutor(httpExecutor);
             server.start();
             started = true;
             logger.info("akto-utility-server started on port " + port);
@@ -80,21 +91,28 @@ public class UtilityServer {
                 server.stop(1);
                 logger.info("akto-utility-server stopped");
             }
-            if (executorService != null) {
-                executorService.shutdown();
-                if (!executorService.awaitTermination(10, TimeUnit.SECONDS)) {
-                    executorService.shutdownNow();
-                }
-            }
+            shutdownExecutor(httpExecutor);
+            shutdownExecutor(executorService);
         } catch (Exception e) {
             logger.error("Error stopping akto-utility-server: " + e.getMessage(), e);
         } finally {
             ApiExecutionJobStoreRegistry.set(null);
             server = null;
             executorService = null;
+            httpExecutor = null;
             jobStore = null;
             dataActor = null;
             started = false;
+        }
+    }
+
+    private static void shutdownExecutor(ExecutorService executor) throws InterruptedException {
+        if (executor == null) {
+            return;
+        }
+        executor.shutdown();
+        if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+            executor.shutdownNow();
         }
     }
 
